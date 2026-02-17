@@ -44,22 +44,19 @@ export interface Client {
   email: string; // Used for login
   identification: string; // Used for login (unique)
   accessCode: string; // 6-digit login code
-  bookingHistory: BookingHistoryItem[];
+  bookingHistory: BookingHistoryItem[]; 
   lastVisit?: Date;
-  joinDate: Date;
-  points: number;
+  joinDate: Date; 
+  points: number; 
   notes?: string;
-  avatar?: string;
-  sticker?: string; // Aesthetic emoji/sticker
-  preferences?: CutPreferences;
-  isBlocked?: boolean;
-  role?: Role; // Contextual role for the session
+  avatar?: string; 
+  preferences?: CutPreferences; 
 }
 
 export interface Service {
   id: string;
   name: string;
-  durationMinutes: number;
+  durationMinutes: number; 
   price: number;
 }
 
@@ -71,15 +68,14 @@ export interface Barber {
   accessCode: string; // 6-digit login code
   email: string; // Contact email
   tier: 'JUNIOR' | 'SENIOR' | 'MASTER';
-  speedFactor: number;
+  speedFactor: number; 
   avatar: string;
-  sticker?: string; // Aesthetic emoji/sticker
 }
 
 export interface Appointment {
   id: string;
-  clientId: string;
-  clientName: string;
+  clientId: string; 
+  clientName: string; 
   barberId: string;
   serviceId: string;
   startTime: Date;
@@ -88,11 +84,11 @@ export interface Appointment {
   actualEndTime?: Date;
   status: AppointmentStatus;
   notes?: string;
-  isShadow?: boolean;
-
-  price: number;
+  isShadow?: boolean; 
+  
+  price: number; 
   durationMinutes: number;
-
+  
   // Cancellation Metadata
   cancellationReason?: string;
   cancellationDate?: Date;
@@ -105,7 +101,7 @@ export interface TimeSlice {
 }
 
 export interface Metrics {
-  dailyOccupancy: number;
+  dailyOccupancy: number; 
   deadTimeMinutes: number;
   revenue: number;
   appointmentsCompleted: number;

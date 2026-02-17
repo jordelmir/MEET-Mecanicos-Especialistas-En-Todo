@@ -1,41 +1,33 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Client, CutPreferences, GlobalStyleOptions, Role, Appointment } from '../types';
-import {
-    X, Star, Calendar, Scissors, Award, History, Edit3, Save, MessageSquare,
-    Info, Plus, Check, Hash, Smile, Zap, AlertCircle, Layout, Sparkles,
-    ChevronRight, User, Trash2, Clock, AlertTriangle, PhoneCall, Fingerprint,
-    Tag, ShieldCheck, Lock, RefreshCcw, Key, CheckCircle, Gamepad2
-} from 'lucide-react';
-import { SnakeGame } from './SnakeGame';
+import { X, Star, Calendar, Scissors, Award, History, Edit3, Save, MessageSquare, Info, Plus, Check, Hash, Smile, Zap, AlertCircle, Layout, Sparkles, ChevronRight, User, Trash2, Clock, AlertTriangle, PhoneCall, Fingerprint, Tag } from 'lucide-react';
 import { AvatarSelector } from './AvatarSelector';
 import { formatTime, canClientCancel } from '../services/timeEngine';
 
 interface UserProfileProps {
-    client: Client;
-    shopRules?: string;
-    globalOptions: GlobalStyleOptions;
-    userRole: Role;
-    userAppointments: Appointment[];
-    onClose: () => void;
-    onUpdatePreferences: (clientId: string, prefs: CutPreferences) => void;
-    onUpdateProfile: (updatedData: Partial<Client>) => void;
-    onUpdateGlobalOptions?: (newOptions: GlobalStyleOptions) => void;
-    onCancelAppointment: (id: string, reason?: string) => void;
+  client: Client;
+  shopRules?: string;
+  globalOptions: GlobalStyleOptions; 
+  userRole: Role;
+  userAppointments: Appointment[];
+  onClose: () => void;
+  onUpdatePreferences: (clientId: string, prefs: CutPreferences) => void;
+  onUpdateProfile: (updatedData: Partial<Client>) => void; 
+  onCancelAppointment: (id: string, reason?: string) => void;
 }
 
 // --- SUB-COMPONENT: STYLE SELECTOR ---
 interface StyleSelectorProps {
-    title: string;
-    icon: React.ElementType;
-    value: string;
-    options: string[];
-    onSelect: (val: string) => void;
-    onAddCustom: (val: string) => void;
-    onRemoveOption?: (val: string) => void;
+  title: string;
+  icon: React.ElementType;
+  value: string;
+  options: string[];
+  onSelect: (val: string) => void;
+  onAddCustom: (val: string) => void;
 }
 
-const StyleSelector: React.FC<StyleSelectorProps> = ({ title, icon: Icon, value, options, onSelect, onAddCustom, onRemoveOption }) => {
+const StyleSelector: React.FC<StyleSelectorProps> = ({ title, icon: Icon, value, options, onSelect, onAddCustom }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [customVal, setCustomVal] = useState('');
 
@@ -63,38 +55,27 @@ const StyleSelector: React.FC<StyleSelectorProps> = ({ title, icon: Icon, value,
                     {title}
                 </label>
             </div>
-
+            
             <div className="flex-1 flex flex-wrap content-start gap-2">
                 {options.map(opt => (
-                    <div key={opt} className="relative group/opt">
-                        <button
-                            onClick={() => onSelect(opt)}
-                            className={`px-3 py-2 md:py-1.5 rounded-md text-xs md:text-[11px] font-bold border transition-all touch-target ${value === opt
-                                ? 'bg-brand-500 text-black border-brand-500 shadow-sm scale-105'
-                                : 'bg-dark-900 text-gray-400 border-dark-700 hover:border-gray-500 hover:text-white'
-                                }`}
-                        >
-                            {opt}
-                        </button>
-                        {onRemoveOption && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemoveOption(opt);
-                                }}
-                                className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/opt:opacity-100 transition-opacity shadow-lg hover:bg-red-500"
-                            >
-                                <X size={10} />
-                            </button>
-                        )}
-                    </div>
+                    <button
+                        key={opt}
+                        onClick={() => onSelect(opt)}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-bold border transition-all ${
+                            value === opt 
+                            ? 'bg-brand-500 text-black border-brand-500 shadow-sm scale-105' 
+                            : 'bg-dark-900 text-gray-400 border-dark-700 hover:border-gray-500 hover:text-white'
+                        }`}
+                    >
+                        {opt}
+                    </button>
                 ))}
-
+                
                 {isAdding ? (
                     <div className="flex items-center gap-1 bg-dark-900 border border-brand-500/50 rounded-md px-2 py-1 animate-in zoom-in duration-200">
-                        <input
+                        <input 
                             autoFocus
-                            type="text"
+                            type="text" 
                             className="bg-transparent text-white text-[11px] outline-none w-20 font-bold placeholder-gray-600"
                             placeholder="..."
                             value={customVal}
@@ -105,7 +86,7 @@ const StyleSelector: React.FC<StyleSelectorProps> = ({ title, icon: Icon, value,
                         <button onClick={handleAdd} className="text-brand-500 hover:text-white"><Check size={12} /></button>
                     </div>
                 ) : (
-                    <button
+                    <button 
                         onClick={() => setIsAdding(true)}
                         className="px-2 py-1.5 rounded-md text-[10px] font-bold border border-dashed border-dark-600 text-gray-500 hover:text-brand-400 hover:border-brand-500/50 hover:bg-brand-500/5 transition-all flex items-center gap-1"
                     >
@@ -135,7 +116,7 @@ const PressHoldButton: React.FC<PressHoldButtonProps> = ({ onConfirm, label }) =
         if (!startTimeRef.current) startTimeRef.current = time;
         const elapsed = time - startTimeRef.current;
         const newProgress = Math.min((elapsed / DURATION) * 100, 100);
-
+        
         setProgress(newProgress);
 
         if (newProgress < 100) {
@@ -171,11 +152,11 @@ const PressHoldButton: React.FC<PressHoldButtonProps> = ({ onConfirm, label }) =
             style={{ WebkitUserSelect: 'none' }} // Prevent text selection on mobile
         >
             {/* Background Fill Animation */}
-            <div
+            <div 
                 className="absolute inset-0 bg-red-600 transition-all ease-linear"
                 style={{ width: `${progress}%` }}
             ></div>
-
+            
             {/* Content Layer */}
             <div className="absolute inset-0 flex items-center justify-center gap-2 z-10 pointer-events-none">
                 <Fingerprint size={24} className={`transition-colors ${progress > 50 ? 'text-white' : 'text-red-500'}`} />
@@ -188,812 +169,537 @@ const PressHoldButton: React.FC<PressHoldButtonProps> = ({ onConfirm, label }) =
 };
 
 
-export const UserProfile: React.FC<UserProfileProps> = ({ client, shopRules, globalOptions, userRole, userAppointments, onClose, onUpdatePreferences, onUpdateProfile, onUpdateGlobalOptions, onCancelAppointment }) => {
-    const [activeTab, setActiveTab] = useState<'history' | 'preferences' | 'security' | 'games'>('history');
-    const [tempPin, setTempPin] = useState(client.accessCode || '');
-    const [isSavingPin, setIsSavingPin] = useState(false);
-    const [pinSuccess, setPinSuccess] = useState(false);
+export const UserProfile: React.FC<UserProfileProps> = ({ client, shopRules, globalOptions, userRole, userAppointments, onClose, onUpdatePreferences, onUpdateProfile, onCancelAppointment }) => {
+  const [activeTab, setActiveTab] = useState<'history' | 'preferences'>('history');
+  
+  // Avatar Editing State
+  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+  const [tempAvatar, setTempAvatar] = useState(client.avatar || '');
+  const [imgError, setImgError] = useState(false);
 
-    // Password Editing State
-    const [newPassword, setNewPassword] = useState('');
-    const [isSavingPass, setIsSavingPass] = useState(false);
-    const [passSuccess, setPassSuccess] = useState(false);
-    const [passError, setPassError] = useState<string | null>(null);
+  // Cancellation Wizard State
+  const [cancelStep, setCancelStep] = useState<'IDLE' | 'REASON' | 'CALL_CHECK' | 'CONFIRM' | 'SUCCESS'>('IDLE');
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [otherReason, setOtherReason] = useState('');
 
-    // Avatar Editing State
-    const [isEditingAvatar, setIsEditingAvatar] = useState(false);
-    const [tempAvatar, setTempAvatar] = useState(client.avatar || '');
-    const [imgError, setImgError] = useState(false);
+  const cancellationReasons = [
+      "Emergencia Personal",
+      "Enfermedad",
+      "Cambio de Horario Laboral",
+      "Tráfico / Transporte",
+      "Insatisfacción Servicio Anterior",
+      "Otro Motivo"
+  ];
 
-    // Name Editing State (Admin Only)
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [tempName, setTempName] = useState(client.name);
+  // Preferences Form State
+  // Initialize with client preferences or empty remarks
+  const [prefs, setPrefs] = useState<CutPreferences>(client.preferences || { remarks: '' });
 
-    const handleSaveName = () => {
-        if (tempName.trim()) {
-            onUpdateProfile({ name: tempName.trim() });
-            setIsEditingName(false);
-        }
-    };
+  // Handle local dynamic options (custom additions that aren't in global yet but user wants to save)
+  // We reconstruct the full option list by merging Global Options + User Selected Option (if it's not in global)
+  const optionLists = useMemo(() => {
+      const lists: Record<string, string[]> = {};
+      
+      globalOptions.forEach(cat => {
+          const userVal = prefs[cat.id];
+          const globalItems = cat.items;
+          // Ensure user's value is in the list even if custom
+          const merged = userVal && !globalItems.includes(userVal) 
+              ? [...globalItems, userVal] 
+              : globalItems;
+          lists[cat.id] = Array.from(new Set(merged));
+      });
+      
+      return lists;
+  }, [globalOptions, prefs]);
 
-    // Cancellation Wizard State
-    const [cancelStep, setCancelStep] = useState<'IDLE' | 'REASON' | 'CALL_CHECK' | 'CONFIRM' | 'SUCCESS'>('IDLE');
-    const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
-    const [cancelReason, setCancelReason] = useState<string>('');
-    const [otherReason, setOtherReason] = useState('');
+  // Helper for dynamic local additions (visual only until saved)
+  const handleAddOption = (categoryId: string, value: string) => {
+      setPrefs(prev => ({
+          ...prev,
+          [categoryId]: value
+      }));
+  };
 
-    const cancellationReasons = [
-        "Emergencia Personal",
-        "Enfermedad",
-        "Cambio de Horario Laboral",
-        "Tráfico / Transporte",
-        "Insatisfacción Servicio Anterior",
-        "Otro Motivo"
-    ];
+  const handleSavePrefs = () => {
+    onUpdatePreferences(client.id, prefs);
+    onClose();
+  };
+  
+  const handleSaveAvatar = () => {
+      onUpdateProfile({ avatar: tempAvatar });
+      setIsEditingAvatar(false);
+  };
 
-    // Preferences Form State
-    // Initialize with client preferences or empty remarks
-    const [prefs, setPrefs] = useState<CutPreferences>(client.preferences || { remarks: '' });
+  // Helper to map icon ID
+  const getCategoryIcon = (id: string) => {
+      switch(id) {
+          case 'sides': return Hash;
+          case 'top': return Scissors;
+          case 'beard': return Smile;
+          case 'finish': return Zap;
+          default: return Tag;
+      }
+  };
 
-    // Handle local dynamic options (custom additions that aren't in global yet but user wants to save)
-    // We reconstruct the full option list by merging Global Options + User Selected Option (if it's not in global)
-    const optionLists = useMemo(() => {
-        const lists: Record<string, string[]> = {};
+  // --- CANCELLATION LOGIC ---
+  const startCancellation = (id: string) => {
+      setSelectedAppointmentId(id);
+      setCancelStep('REASON');
+      setCancelReason('');
+      setOtherReason('');
+  };
 
-        globalOptions.forEach(cat => {
-            const userVal = prefs[cat.id];
-            const globalItems = cat.items;
-            // Ensure user's value is in the list even if custom
-            const merged = userVal && !globalItems.includes(userVal)
-                ? [...globalItems, userVal]
-                : globalItems;
-            lists[cat.id] = Array.from(new Set(merged));
-        });
+  const handleReasonSelection = (reason: string) => {
+      setCancelReason(reason);
+      setCancelStep('CALL_CHECK'); // Proceed to call check
+  };
 
-        return lists;
-    }, [globalOptions, prefs]);
+  const finalizeCancellation = () => {
+      if (selectedAppointmentId) {
+          const finalReason = cancelReason === 'Otro Motivo' ? otherReason : cancelReason;
+          // Trigger Success Animation State
+          setCancelStep('SUCCESS');
+          
+          // Actual Execution
+          setTimeout(() => {
+              onCancelAppointment(selectedAppointmentId, finalReason);
+              // Wait a bit then close/reset
+              setTimeout(() => {
+                  setCancelStep('IDLE');
+                  setSelectedAppointmentId(null);
+              }, 2000);
+          }, 1500); // Wait for animation
+      }
+  };
 
-    // Helper for dynamic local additions (visual only until saved)
-    const handleAddOption = (categoryId: string, value: string) => {
-        setPrefs(prev => ({
-            ...prev,
-            [categoryId]: value
-        }));
-    };
+  const upcomingAppointments = userAppointments.sort((a,b) => a.startTime.getTime() - b.startTime.getTime());
 
-    const handleSavePrefs = () => {
-        onUpdatePreferences(client.id, prefs);
-        onClose();
-    };
+  return (
+    <div className="fixed inset-0 z-[60] bg-dark-900/90 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 md:p-6 overflow-hidden">
+      
+      {/* MAIN CONTAINER: Responsive Grid with strict overflow control */}
+      <div className="bg-[#0a0a0a] w-full h-full md:h-[90vh] md:rounded-3xl shadow-2xl border border-white/5 flex flex-col md:flex-row max-w-7xl overflow-hidden relative">
+        
+        {/* === LEFT PANEL: IDENTITY (Sidebar) === */}
+        <div className="w-full md:w-[320px] lg:w-[380px] bg-dark-900 border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0 relative max-h-[30vh] md:max-h-full">
+            
+            {/* Background Texture */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(240,180,41,0.05),transparent_40%)] pointer-events-none"></div>
 
-    const handleRemoveOption = (categoryId: string, value: string) => {
-        console.log('Removing option:', categoryId, value, onUpdateGlobalOptions);
-        // 1. If this option is currently selected by the user, clear it locally
-        if (prefs[categoryId] === value) {
-            setPrefs(prev => ({ ...prev, [categoryId]: '' }));
-        }
+            {/* Mobile Close Button (Top Right of Identity) */}
+            <button 
+                onClick={onClose} 
+                className="absolute top-4 right-4 z-50 p-2 text-gray-500 hover:text-white md:hidden"
+            >
+                <X size={24} />
+            </button>
 
-        // 2. If user is ADMIN and we have onUpdateGlobalOptions, update the global catalog
-        if (userRole === Role.ADMIN && onUpdateGlobalOptions) {
-            const newGlobalOptions = globalOptions.map(cat => {
-                if (cat.id === categoryId) {
-                    return { ...cat, items: cat.items.filter(i => i !== value) };
-                }
-                return cat;
-            });
-            onUpdateGlobalOptions(newGlobalOptions);
-        }
-    };
+            {/* Identity Content */}
+            <div className="p-6 md:p-8 flex flex-col items-center text-center h-full overflow-y-auto custom-scrollbar">
+                
+                {/* Avatar */}
+                <div className="relative group mb-5 shrink-0">
+                    <div className="w-20 h-20 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-full border-[3px] border-dark-700 overflow-hidden relative shadow-2xl bg-dark-800 flex items-center justify-center transition-all group-hover:border-brand-500/50">
+                        {isEditingAvatar && imgError ? (
+                             <AlertCircle className="text-red-500 animate-pulse" size={32} />
+                        ) : (
+                             <img 
+                                key={isEditingAvatar ? tempAvatar : client.avatar}
+                                src={isEditingAvatar ? tempAvatar : (client.avatar || `https://ui-avatars.com/api/?name=${client.name}&background=random`)} 
+                                alt={client.name} 
+                                className="w-full h-full object-cover"
+                                onError={() => setImgError(true)}
+                                onLoad={() => setImgError(false)}
+                            />
+                        )}
+                        {!isEditingAvatar && (
+                            <button 
+                                className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-[2px]"
+                                onClick={() => { setIsEditingAvatar(true); setTempAvatar(client.avatar || ''); setImgError(false); }}
+                            >
+                                <Edit3 size={24} className="text-white mb-1" />
+                                <span className="text-[9px] font-bold text-white uppercase tracking-widest">Editar</span>
+                            </button>
+                        )}
+                    </div>
+                    {!isEditingAvatar && (
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-dark-800 border border-dark-600 text-brand-500 text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg whitespace-nowrap z-10">
+                            <Star size={10} fill="currentColor" />
+                            <span>{client.points} XP</span>
+                        </div>
+                    )}
+                </div>
 
-    const handleSaveAvatar = () => {
-        onUpdateProfile({ avatar: tempAvatar });
-        setIsEditingAvatar(false);
-    };
-
-    // Helper to map icon ID
-    const getCategoryIcon = (id: string) => {
-        switch (id) {
-            case 'sides': return Hash;
-            case 'top': return Scissors;
-            case 'beard': return Smile;
-            case 'finish': return Zap;
-            default: return Tag;
-        }
-    };
-
-    // --- CANCELLATION LOGIC ---
-    const startCancellation = (id: string) => {
-        setSelectedAppointmentId(id);
-        setCancelStep('REASON');
-        setCancelReason('');
-        setOtherReason('');
-    };
-
-    const handleReasonSelection = (reason: string) => {
-        setCancelReason(reason);
-        setCancelStep('CALL_CHECK'); // Proceed to call check
-    };
-
-    const finalizeCancellation = () => {
-        if (selectedAppointmentId) {
-            const finalReason = cancelReason === 'Otro Motivo' ? otherReason : cancelReason;
-            // Trigger Success Animation State
-            setCancelStep('SUCCESS');
-
-            // Actual Execution
-            setTimeout(() => {
-                onCancelAppointment(selectedAppointmentId, finalReason);
-                // Wait a bit then close/reset
-                setTimeout(() => {
-                    setCancelStep('IDLE');
-                    setSelectedAppointmentId(null);
-                }, 2000);
-            }, 1500); // Wait for animation
-        }
-    };
-
-    const upcomingAppointments = userAppointments.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
-
-    return (
-        <div className="fixed inset-0 z-[60] bg-dark-900/90 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 md:p-6 overflow-hidden">
-
-            {/* MAIN CONTAINER: Responsive Grid with strict overflow control */}
-            <div className="bg-[#0a0a0a] w-full h-full md:h-[90vh] md:rounded-3xl shadow-2xl border border-white/5 flex flex-col md:flex-row max-w-7xl overflow-hidden relative">
-
-                {/* === LEFT PANEL: IDENTITY (Sidebar / Top Card) === */}
-                <div className="w-full md:w-[320px] lg:w-[380px] bg-dark-900 border-b md:border-b-0 md:border-r border-white/5 flex flex-col shrink-0 relative transition-all duration-300">
-
-                    {/* Background Texture */}
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(240,180,41,0.05),transparent_40%)] pointer-events-none"></div>
-
-                    {/* Mobile Close Button (Top Right of Identity) */}
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 z-50 p-2 text-gray-500 hover:text-white md:hidden"
-                    >
-                        <X size={24} />
-                    </button>
-
-                    {/* Identity Content */}
-                    <div className="p-6 md:p-8 flex flex-col items-center text-center h-full overflow-y-auto custom-scrollbar">
-
-                        {/* Avatar */}
-                        <div className="relative group mb-5 shrink-0">
-                            <div className="w-20 h-20 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-full border-[3px] border-dark-700 overflow-hidden relative shadow-2xl bg-dark-800 flex items-center justify-center transition-all group-hover:border-brand-500/50">
-                                {isEditingAvatar && imgError ? (
-                                    <AlertCircle className="text-red-500 animate-pulse" size={32} />
-                                ) : (
-                                    <img
-                                        key={isEditingAvatar ? tempAvatar : client.avatar}
-                                        src={isEditingAvatar ? tempAvatar : (client.avatar || `https://ui-avatars.com/api/?name=${client.name}&background=random`)}
-                                        alt={client.name}
-                                        className="w-full h-full object-cover"
-                                        onError={() => setImgError(true)}
-                                        onLoad={() => setImgError(false)}
-                                    />
-                                )}
-                                {!isEditingAvatar && (
-                                    <button
-                                        className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-[2px]"
-                                        onClick={() => { setIsEditingAvatar(true); setTempAvatar(client.avatar || ''); setImgError(false); }}
-                                    >
-                                        <Edit3 size={24} className="text-white mb-1" />
-                                        <span className="text-[9px] font-bold text-white uppercase tracking-widest">Editar</span>
-                                    </button>
-                                )}
-                            </div>
-                            {!isEditingAvatar && (
-                                <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-dark-800 border border-dark-600 text-brand-500 text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg whitespace-nowrap z-10 transition-all">
-                                    {client.sticker && <span className="text-sm">{client.sticker}</span>}
-                                    <Star size={10} fill="currentColor" />
-                                    <span>{client.points} XP</span>
-                                </div>
-                            )}
+                {isEditingAvatar ? (
+                    <div className="w-full animate-in slide-in-from-top-4 duration-300">
+                        <AvatarSelector 
+                            currentAvatar={tempAvatar}
+                            name={client.name}
+                            onAvatarChange={(url) => { setTempAvatar(url); setImgError(false); }}
+                        />
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                             <button onClick={() => { setIsEditingAvatar(false); setTempAvatar(client.avatar || ''); }} className="py-2.5 bg-dark-800 text-gray-400 text-xs font-bold rounded-lg hover:text-white">Cancelar</button>
+                             <button onClick={handleSaveAvatar} className="py-2.5 bg-brand-500 text-black text-xs font-bold rounded-lg hover:bg-brand-400 shadow-lg">Guardar</button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight mb-1">{client.name}</h2>
+                        <div className="flex items-center gap-2 mb-6">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 border border-white/5">
+                                Miembro desde {client.joinDate.getFullYear()}
+                            </span>
                         </div>
 
-                        {isEditingAvatar ? (
-                            <div className="w-full animate-in slide-in-from-top-4 duration-300">
-                                <AvatarSelector
-                                    currentAvatar={tempAvatar}
-                                    name={client.name}
-                                    onAvatarChange={(url) => { setTempAvatar(url); setImgError(false); }}
-                                />
-                                <div className="grid grid-cols-2 gap-2 mt-3">
-                                    <button onClick={() => { setIsEditingAvatar(false); setTempAvatar(client.avatar || ''); }} className="py-2.5 bg-dark-800 text-gray-400 text-xs font-bold rounded-lg hover:text-white">Cancelar</button>
-                                    <button onClick={handleSaveAvatar} className="py-2.5 bg-brand-500 text-black text-xs font-bold rounded-lg hover:bg-brand-400 shadow-lg">Guardar</button>
-                                </div>
+                        {/* Quick Stats Grid */}
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                            <div className="bg-dark-800/50 p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center hover:bg-dark-800 transition-colors">
+                                <Scissors size={18} className="text-brand-500 mb-1 opacity-80"/>
+                                <span className="text-lg font-bold text-white leading-none">{client.bookingHistory.length}</span>
+                                <span className="text-[9px] text-gray-500 uppercase font-bold mt-1">Cortes</span>
                             </div>
-                        ) : (
-                            <>
-                                {isEditingName ? (
-                                    <div className="flex items-center gap-2 mb-2 w-full animate-in zoom-in duration-200">
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            className="bg-dark-900 border border-brand-500 rounded-lg px-3 py-1 text-xl md:text-2xl font-black text-white outline-none w-full shadow-[0_0_15px_rgba(240,180,41,0.2)]"
-                                            value={tempName}
-                                            onChange={(e) => setTempName(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleSaveName();
-                                                if (e.key === 'Escape') setIsEditingName(false);
-                                            }}
-                                        />
-                                        <button onClick={handleSaveName} className="p-2 bg-brand-500 text-black rounded-lg hover:bg-brand-400 shadow-lg shrink-0">
-                                            <Check size={20} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="group/name flex items-center justify-center gap-2 mb-1 relative">
-                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight">{client.name}</h2>
-                                        <button
-                                            onClick={() => { setIsEditingName(true); setTempName(client.name); }}
-                                            className="opacity-0 group-hover/name:opacity-100 p-1.5 text-gray-500 hover:text-brand-500 hover:bg-brand-500/10 rounded-lg transition-all"
-                                            title="Editar Nombre"
-                                        >
-                                            <Edit3 size={16} />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-2 mb-6">
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 border border-white/5">
-                                        Miembro desde {client.joinDate.getFullYear()}
-                                    </span>
-                                </div>
-
-                                {/* Quick Stats Grid */}
-                                <div className="grid grid-cols-2 gap-3 w-full">
-                                    <div className="bg-dark-800/50 p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center hover:bg-dark-800 transition-colors">
-                                        <Scissors size={18} className="text-brand-500 mb-1 opacity-80" />
-                                        <span className="text-lg font-bold text-white leading-none">{client.bookingHistory.length}</span>
-                                        <span className="text-[9px] text-gray-500 uppercase font-bold mt-1">Cortes</span>
-                                    </div>
-                                    <div className="bg-dark-800/50 p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center hover:bg-dark-800 transition-colors">
-                                        <Calendar size={18} className="text-blue-500 mb-1 opacity-80" />
-                                        <span className="text-lg font-bold text-white leading-none">
-                                            {client.lastVisit ? client.lastVisit.toLocaleDateString('es-CR', { day: 'numeric', month: 'short' }) : '-'}
-                                        </span>
-                                        <span className="text-[9px] text-gray-500 uppercase font-bold mt-1">Última Visita</span>
-                                    </div>
-                                </div>
-
-                                {/* Sticker / Reconocimiento Selector */}
-                                <div className="mt-6 w-full pt-6 border-t border-white/5">
-                                    <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] mb-3 block">Sticker de Reconocimiento</label>
-                                    <div className="grid grid-cols-6 gap-2">
-                                        {['⚡', '✂️', '🔥', '🏆', '✨', '🎯', '🚀', '💎', '👑', '😎', '💆‍♂️', '💈'].map(emoji => (
-                                            <button
-                                                key={emoji}
-                                                onClick={() => onUpdateProfile({ sticker: emoji })}
-                                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all border ${client.sticker === emoji ? 'bg-brand-500/20 border-brand-500 shadow-[0_0_15px_rgba(240,180,41,0.2)] scale-110' : 'bg-dark-800 border-white/5 hover:border-white/20'}`}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                        <button
-                                            onClick={() => onUpdateProfile({ sticker: '' })}
-                                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs transition-all border ${!client.sticker ? 'bg-white/10 border-white/30' : 'bg-dark-800 border-white/5 hover:border-white/20'}`}
-                                        >
-                                            <X size={14} className="text-gray-500" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Decoration */}
-                                <div className="mt-auto pt-8 hidden md:block opacity-30">
-                                    <Sparkles className="text-brand-500 animate-pulse" size={24} />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {/* === RIGHT PANEL: WORKSPACE === */}
-                <div className="flex-1 flex flex-col min-w-0 bg-[#0f0f0f] relative h-full">
-
-                    {/* Desktop Close Button */}
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 z-50 p-2 bg-dark-800 text-gray-400 hover:text-white rounded-full hover:bg-red-500/20 hover:text-red-500 transition-all hidden md:flex items-center justify-center border border-white/5"
-                    >
-                        <X size={18} />
-                    </button>
-
-                    {/* Navigation Tabs - Scrollable on mobile */}
-                    <div className="flex items-center border-b border-white/5 bg-dark-900/30 px-2 md:px-6 pt-2 sticky top-0 z-40 backdrop-blur-md shrink-0 overflow-x-auto no-scrollbar mask-linear-fade">
-                        {[
-                            { id: 'history', label: 'Mis Citas & Historial', icon: History },
-                            { id: 'preferences', label: 'Mi Estilo', icon: Award },
-                            { id: 'security', label: 'Seguridad', icon: Fingerprint },
-                            { id: 'games', label: 'Entretenimiento', icon: Gamepad2 }
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 text-[10px] md:text-xs font-bold uppercase tracking-widest relative transition-colors whitespace-nowrap ${activeTab === tab.id ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}
-                            >
-                                <tab.icon size={14} className={activeTab === tab.id ? 'text-brand-500' : 'opacity-50'} />
-                                {tab.label}
-                                {activeTab === tab.id && (
-                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-500 shadow-[0_0_10px_rgba(240,180,41,0.5)]"></div>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Scrollable Content - flex-1 and min-h-0 is CRITICAL for scrolling to work inside flex */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 min-h-0 mobile-p-safe pb-24 md:pb-8">
-
-                        {activeTab === 'history' && (
-                            <div className="max-w-3xl mx-auto space-y-6 animate-in slide-in-from-right-4 duration-300 pb-20">
-                                {shopRules && (
-                                    <div className="bg-blue-500/5 border-l-2 border-blue-500 p-4 rounded-r-lg flex gap-3">
-                                        <Info size={16} className="text-blue-400 shrink-0 mt-0.5" />
-                                        <div>
-                                            <h4 className="text-blue-400 font-bold text-xs uppercase mb-1">Información del Local</h4>
-                                            <p className="text-xs text-gray-400 whitespace-pre-line leading-relaxed">{shopRules}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* UPCOMING APPOINTMENTS SECTION */}
-                                {upcomingAppointments.length > 0 && (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 text-emerald-500 pb-2 border-b border-emerald-900/30">
-                                            <Calendar size={12} />
-                                            <span className="text-[10px] font-bold uppercase tracking-widest">Próxima Cita</span>
-                                        </div>
-
-                                        {upcomingAppointments.map(apt => {
-                                            const canCancel = canClientCancel(apt.startTime);
-                                            const isBeingCancelled = selectedAppointmentId === apt.id && cancelStep !== 'IDLE';
-
-                                            // Dynamic Height Class: Expands when cancelling to fit the wizard comfortably on mobile
-                                            const containerHeightClass = isBeingCancelled
-                                                ? 'min-h-[450px] md:min-h-[400px] border-red-500/30'
-                                                : '';
-
-                                            return (
-                                                <div key={apt.id} className={`bg-dark-800/80 border border-emerald-500/30 rounded-xl p-5 relative overflow-hidden group transition-all duration-300 ${containerHeightClass}`}>
-
-                                                    {/* CANCELLATION OVERLAY - WIZARD */}
-                                                    {isBeingCancelled && (
-                                                        <div className="absolute inset-0 z-20 bg-dark-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 md:p-6 text-center animate-in fade-in duration-300 overflow-y-auto custom-scrollbar">
-
-                                                            {/* STEP 1: REASON */}
-                                                            {cancelStep === 'REASON' && (
-                                                                <div className="w-full max-w-sm animate-in slide-in-from-bottom-4 my-auto">
-                                                                    <div className="flex justify-between items-center mb-4 sticky top-0 bg-dark-900/0 backdrop-blur-sm py-2 z-10">
-                                                                        <h4 className="text-white font-bold text-sm">¿Por qué deseas cancelar?</h4>
-                                                                        <button onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }} className="p-1"><X size={20} className="text-gray-500 hover:text-white" /></button>
-                                                                    </div>
-                                                                    <div className="space-y-2.5 pb-4">
-                                                                        {cancellationReasons.map(r => (
-                                                                            <button
-                                                                                key={r}
-                                                                                onClick={() => handleReasonSelection(r)}
-                                                                                className="w-full text-left p-3.5 rounded-lg border border-dark-600 hover:border-brand-500 hover:bg-dark-800 text-xs text-gray-300 hover:text-white transition-all flex justify-between group/btn active:scale-[0.98]"
-                                                                            >
-                                                                                {r} <ChevronRight size={14} className="opacity-0 group-hover/btn:opacity-100 transition-opacity" />
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                    {cancelReason === 'Otro Motivo' && (
-                                                                        <textarea
-                                                                            className="w-full mt-2 bg-dark-800 border border-dark-600 rounded-lg p-3 text-xs text-white outline-none focus:border-brand-500 min-h-[80px]"
-                                                                            placeholder="Describe el motivo..."
-                                                                            value={otherReason}
-                                                                            onChange={e => setOtherReason(e.target.value)}
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* STEP 2: CALL CHECK */}
-                                                            {cancelStep === 'CALL_CHECK' && (
-                                                                <div className="w-full max-w-sm animate-in slide-in-from-right-4 my-auto">
-                                                                    <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-orange-500">
-                                                                        <PhoneCall size={24} />
-                                                                    </div>
-                                                                    <h4 className="text-white font-bold text-lg mb-2">Protocolo de Cancelación</h4>
-                                                                    <p className="text-xs text-gray-400 mb-6 leading-relaxed px-2">
-                                                                        Para evitar penalizaciones en tu perfil, es obligatorio notificar verbalmente al barbero sobre esta cancelación de último momento.
-                                                                    </p>
-                                                                    <div className="space-y-3">
-                                                                        <button
-                                                                            onClick={() => setCancelStep('CONFIRM')}
-                                                                            className="w-full bg-orange-600 hover:bg-orange-500 text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all shadow-lg active:scale-95"
-                                                                        >
-                                                                            Ya llamé al Barbero
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }}
-                                                                            className="w-full text-gray-500 hover:text-white py-3 text-xs"
-                                                                        >
-                                                                            Cancelar proceso
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* STEP 3: PRESS TO HOLD CONFIRM */}
-                                                            {cancelStep === 'CONFIRM' && (
-                                                                <div className="w-full max-w-xs animate-in zoom-in-95 my-auto">
-                                                                    <div className="mb-6 flex flex-col items-center">
-                                                                        <AlertCircle size={32} className="text-red-500 mb-2" />
-                                                                        <h4 className="text-red-500 font-bold text-sm uppercase tracking-wider text-center">Confirmación Final</h4>
-                                                                    </div>
-
-                                                                    <PressHoldButton
-                                                                        onConfirm={finalizeCancellation}
-                                                                        label="MANTÉN PARA CANCELAR"
-                                                                        isMobile={true}
-                                                                    />
-
-                                                                    <p className="text-[10px] text-gray-500 mt-6 text-center">
-                                                                        Esta acción no se puede deshacer.
-                                                                    </p>
-                                                                    <button
-                                                                        onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }}
-                                                                        className="mt-4 text-gray-500 hover:text-white text-xs underline w-full py-2"
-                                                                    >
-                                                                        Volver atrás
-                                                                    </button>
-                                                                </div>
-                                                            )}
-
-                                                            {/* STEP 4: SUCCESS ANIMATION */}
-                                                            {cancelStep === 'SUCCESS' && (
-                                                                <div className="flex flex-col items-center justify-center animate-in zoom-in duration-300 my-auto">
-                                                                    <div className="w-20 h-20 rounded-full border-4 border-emerald-500 flex items-center justify-center mb-4 relative">
-                                                                        <Check size={40} className="text-emerald-500" strokeWidth={4} />
-                                                                        <div className="absolute inset-0 rounded-full border-4 border-emerald-500 animate-ping opacity-75"></div>
-                                                                    </div>
-                                                                    <h3 className="text-xl font-bold text-white">Cancelación Exitosa</h3>
-                                                                    <p className="text-xs text-gray-500 mt-2">Tu agenda ha sido actualizada.</p>
-                                                                </div>
-                                                            )}
-
-                                                        </div>
-                                                    )}
-
-                                                    <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                                                        <Clock size={80} className="text-emerald-500" />
-                                                    </div>
-
-                                                    {/* Normal Card Content */}
-                                                    <div className="flex justify-between items-start relative z-10">
-                                                        <div>
-                                                            <div className="text-xs text-emerald-400 font-bold uppercase mb-1 flex items-center gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Confirmada
-                                                            </div>
-                                                            <h3 className="text-xl font-bold text-white capitalize">
-                                                                {apt.startTime.toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                                            </h3>
-                                                            <div className="text-3xl font-mono font-black text-white mt-1">
-                                                                {formatTime(apt.startTime)}
-                                                            </div>
-                                                        </div>
-                                                        {canCancel ? (
-                                                            <button
-                                                                onClick={() => startCancellation(apt.id)}
-                                                                className="bg-dark-900 hover:bg-red-900/30 border border-dark-600 hover:border-red-500/50 text-gray-400 hover:text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2"
-                                                            >
-                                                                <Trash2 size={14} /> Cancelar
-                                                            </button>
-                                                        ) : (
-                                                            <div className="flex flex-col items-end gap-1">
-                                                                <div className="inline-flex items-center gap-2 text-[10px] text-orange-400 bg-orange-900/20 px-2 py-1 rounded border border-orange-900/40 relative z-10 font-bold">
-                                                                    <AlertTriangle size={10} />
-                                                                    Restricción de Tiempo
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {!canCancel && (
-                                                        <p className="text-[10px] text-gray-500 mt-3 relative z-10 border-t border-white/5 pt-2">
-                                                            No se puede cancelar, solo <span className="text-white font-bold">45 minutos</span> antes de la cita y se requiere llamar al barbero.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-
-                                <div className="space-y-4 pt-6">
-                                    <div className="flex items-center gap-2 text-gray-500 pb-2 border-b border-white/5">
-                                        <Layout size={12} />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">Historial de Servicios</span>
-                                    </div>
-
-                                    {client.bookingHistory.length === 0 ? (
-                                        <div className="text-center py-12 border border-dashed border-dark-700 rounded-2xl bg-dark-800/20">
-                                            <p className="text-gray-500 text-sm">No hay servicios anteriores registrados.</p>
-                                        </div>
-                                    ) : (
-                                        client.bookingHistory.map((item) => (
-                                            <div key={item.id} className="flex gap-4 group">
-                                                {/* Timeline connector */}
-                                                <div className="flex flex-col items-center">
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-dark-600 border border-dark-500 group-hover:bg-brand-500 group-hover:border-brand-400 transition-colors z-10"></div>
-                                                    <div className="w-px h-full bg-dark-700 -mt-1 group-last:hidden"></div>
-                                                </div>
-
-                                                {/* Card */}
-                                                <div className="flex-1 bg-dark-800/40 border border-white/5 rounded-xl p-4 hover:bg-dark-800 transition-all hover:border-brand-500/20 mb-2">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h4 className="font-bold text-white text-sm">{item.serviceName}</h4>
-                                                            <p className="text-[10px] text-gray-500 flex items-center gap-1.5 mt-1">
-                                                                <Calendar size={10} />
-                                                                {item.date.toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="block font-mono font-bold text-brand-500 text-sm">₡{item.price.toLocaleString('es-CR')}</span>
-                                                            <span className="text-[9px] text-emerald-500/80 uppercase font-bold">Completado</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
-                                                        <div className="w-5 h-5 rounded-full bg-dark-700 flex items-center justify-center text-[10px] text-gray-400">
-                                                            <User size={10} />
-                                                        </div>
-                                                        <span className="text-xs text-gray-400">{item.barberName}</span>
-                                                    </div>
-                                                    {item.notes && (
-                                                        <div className="mt-2 bg-black/20 p-2 rounded text-[11px] text-gray-400 italic flex gap-2">
-                                                            <MessageSquare size={12} className="shrink-0 mt-0.5" />
-                                                            "{item.notes}"
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
+                            <div className="bg-dark-800/50 p-3 rounded-xl border border-white/5 flex flex-col items-center justify-center hover:bg-dark-800 transition-colors">
+                                <Calendar size={18} className="text-blue-500 mb-1 opacity-80"/>
+                                <span className="text-lg font-bold text-white leading-none">
+                                    {client.lastVisit ? client.lastVisit.toLocaleDateString('es-CR', {day:'numeric', month:'short'}) : '-'}
+                                </span>
+                                <span className="text-[9px] text-gray-500 uppercase font-bold mt-1">Última Visita</span>
                             </div>
-                        )}
+                        </div>
 
-                        {activeTab === 'preferences' && (
-                            <div className="max-w-5xl mx-auto pb-10 animate-in slide-in-from-right-4 duration-300">
-                                <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between border-b border-white/5 pb-6">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white mb-1">Ficha Técnica de Estilo</h2>
-                                        <p className="text-xs text-gray-400 max-w-lg">
-                                            Configura tus preferencias visuales. Tu barbero consultará esta guía antes de cada corte.
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={handleSavePrefs}
-                                        className="bg-brand-500 text-black px-6 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide hover:bg-brand-400 shadow-[0_0_20px_rgba(240,180,41,0.2)] transition-all flex items-center gap-2"
-                                    >
-                                        <Save size={16} /> Guardar Ficha
-                                    </button>
-                                </div>
-
-                                {/* BENTO GRID LAYOUT - DYNAMIC MAPPING */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-
-                                    {/* REMARKS (Always fixed first) */}
-                                    <div className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2">
-                                        <div className="h-full bg-dark-800/40 border border-white/5 rounded-xl p-5 hover:border-brand-500/30 transition-colors group flex flex-col">
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <div className="p-1.5 rounded-lg bg-dark-700 text-brand-500"><MessageSquare size={16} /></div>
-                                                <label className="text-sm text-gray-200 font-bold uppercase tracking-wide">Observaciones Clave</label>
-                                            </div>
-                                            <textarea
-                                                className="flex-1 w-full bg-dark-900 border border-dark-700 rounded-lg p-4 text-sm text-white focus:border-brand-500 focus:outline-none resize-none placeholder-gray-600 leading-relaxed"
-                                                placeholder="Ej: Tengo un remolino en la coronilla, cuidado con la cicatriz en la ceja izquierda, prefiero las patillas en punta..."
-                                                value={prefs.remarks}
-                                                onChange={(e) => setPrefs({ ...prefs, remarks: e.target.value })}
-                                            />
-                                            <p className="text-[10px] text-gray-500 mt-2 text-right">Visible para ti y para el barbero en la cita.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* DYNAMIC CATEGORIES */}
-                                    {globalOptions.map((category) => (
-                                        <div key={category.id} className="lg:col-span-2">
-                                            <StyleSelector
-                                                title={category.label}
-                                                icon={getCategoryIcon(category.id)}
-                                                value={prefs[category.id] || ''}
-                                                options={optionLists[category.id] || []}
-                                                onSelect={(val) => setPrefs({ ...prefs, [category.id]: val })}
-                                                onAddCustom={(val) => handleAddOption(category.id, val)}
-                                                onRemoveOption={userRole === Role.ADMIN ? (val) => handleRemoveOption(category.id, val) : undefined}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'security' && (
-                            <div className="space-y-10 animate-in fade-in zoom-in-95 slide-in-from-bottom-6 duration-1000 ease-out fill-mode-both pb-20">
-                                <div className="flex flex-col gap-2">
-                                    <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Centro de Seguridad</h2>
-                                    <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">Protege tu acceso y credenciales personales</p>
-                                </div>
-
-                                <div className="max-w-xl mx-auto pt-8">
-                                    <div className="relative group mb-12">
-                                        <div className="absolute -inset-1 bg-gradient-to-r from-brand-500 to-orange-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-                                        <div className="relative w-24 h-24 bg-dark-800 rounded-full flex items-center justify-center mx-auto border border-white/10 shadow-2xl">
-                                            {pinSuccess ? (
-                                                <ShieldCheck className="text-emerald-500 animate-bounce" size={48} />
-                                            ) : (
-                                                <Lock className="text-brand-500" size={48} />
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 space-y-10 shadow-3xl">
-                                        <div className="text-center space-y-2">
-                                            <h3 className="text-xl font-bold text-white tracking-tight">Código Maestro (6 Dígitos)</h3>
-                                            <p className="text-gray-500 text-sm">Configura tu PIN de seguridad de 6 dígitos</p>
-                                        </div>
-
-                                        <div className="flex justify-between gap-3 max-w-sm mx-auto">
-                                            {[0, 1, 2, 3, 4, 5].map((i) => (
-                                                <input
-                                                    key={`pin-entry-${i}`}
-                                                    id={`pin-entry-${i}`}
-                                                    type="password"
-                                                    maxLength={1}
-                                                    inputMode="numeric"
-                                                    autoComplete="one-time-code"
-                                                    className={`w-full aspect-[3/4] bg-dark-900/50 border ${tempPin[i] ? 'border-brand-500/50 bg-brand-500/5 shadow-[0_0_15px_rgba(202,168,111,0.1)]' : 'border-white/10'} rounded-2xl text-center text-3xl font-black text-white focus:border-brand-500 focus:bg-brand-500/5 outline-none transition-all duration-300 transform focus:scale-105`}
-                                                    placeholder="-"
-                                                    value={tempPin[i] || ''}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '').slice(-1);
-                                                        if (val) {
-                                                            const newPin = tempPin.split('');
-                                                            newPin[i] = val;
-                                                            const joined = newPin.join('').slice(0, 6);
-                                                            setTempPin(joined);
-                                                            if (i < 5) document.getElementById(`pin-entry-${i + 1}`)?.focus();
-                                                        }
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Backspace') {
-                                                            const newPin = tempPin.split('');
-                                                            if (!newPin[i] && i > 0) {
-                                                                newPin[i - 1] = '';
-                                                                setTempPin(newPin.join(''));
-                                                                document.getElementById(`pin-entry-${i - 1}`)?.focus();
-                                                            } else {
-                                                                newPin[i] = '';
-                                                                setTempPin(newPin.join(''));
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-gray-600 text-center font-bold uppercase tracking-widest mt-2">PIN Maestro (Acceso Rápido)</p>
-
-                                        <div className="flex items-center gap-4 bg-orange-500/5 border border-orange-500/10 p-5 rounded-2xl">
-                                            <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center shrink-0">
-                                                <AlertTriangle className="text-orange-500" size={20} />
-                                            </div>
-                                            <p className="text-[11px] text-gray-400 leading-relaxed font-medium">
-                                                Para tu seguridad, elige una combinación que no sea obvia (evita 123456 o 000000).
-                                            </p>
-                                        </div>
-
-                                        <button
-                                            disabled={tempPin.length !== 6 || isSavingPin || pinSuccess}
-                                            onClick={async () => {
-                                                setIsSavingPin(true);
-                                                await new Promise(r => setTimeout(r, 1000)); // Simulate professional verification
-                                                onUpdateProfile({ accessCode: tempPin });
-                                                setIsSavingPin(false);
-                                                setPinSuccess(true);
-                                                setTimeout(() => setPinSuccess(false), 3000);
-                                            }}
-                                            className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all duration-500 relative overflow-hidden group/btn ${tempPin.length === 6
-                                                ? 'bg-gradient-to-r from-brand-600 to-brand-400 text-black shadow-xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95'
-                                                : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5'
-                                                }`}
-                                        >
-                                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                                {isSavingPin ? (
-                                                    <>
-                                                        <RefreshCcw className="animate-spin" size={16} />
-                                                        Verificando...
-                                                    </>
-                                                ) : pinSuccess ? (
-                                                    <>
-                                                        <CheckCircle size={16} />
-                                                        Código Actualizado
-                                                    </>
-                                                ) : (
-                                                    'Actualizar Código Maestro'
-                                                )}
-                                            </span>
-                                            {tempPin.length === 6 && (
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:animate-shimmer" />
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    <div className="mt-12 pt-10 border-t border-white/5 space-y-8">
-                                        <div className="text-center space-y-2">
-                                            <h3 className="text-xl font-bold text-white tracking-tight">Cambiar Contraseña</h3>
-                                            <p className="text-gray-500 text-sm">Usa una contraseña fuerte de 8 o más caracteres</p>
-                                        </div>
-
-                                        <div className="relative group max-w-sm mx-auto">
-                                            <div className="absolute inset-y-0 left-4 flex items-center text-gray-500 pointer-events-none group-focus-within:text-brand-500 transition-colors">
-                                                <Key size={18} />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                placeholder="Nueva Contraseña"
-                                                className="w-full bg-dark-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold outline-none focus:border-brand-500 focus:bg-brand-500/5 transition-all text-sm"
-                                                value={newPassword}
-                                                onChange={(e) => setNewPassword(e.target.value)}
-                                            />
-                                        </div>
-
-                                        {passError && (
-                                            <div className="flex items-center gap-2 text-red-500 text-[10px] font-bold uppercase justify-center animate-in shake">
-                                                <AlertCircle size={14} />
-                                                {passError}
-                                            </div>
-                                        )}
-
-                                        <button
-                                            disabled={newPassword.length < 6 || isSavingPass || passSuccess}
-                                            onClick={async () => {
-                                                setIsSavingPass(true);
-                                                setPassError(null);
-
-                                                const { error } = await (window as any).supabase.auth.updateUser({
-                                                    password: newPassword
-                                                });
-
-                                                if (error) {
-                                                    setPassError(error.message);
-                                                    setIsSavingPass(false);
-                                                } else {
-                                                    setIsSavingPass(false);
-                                                    setPassSuccess(true);
-                                                    setNewPassword('');
-                                                    setTimeout(() => setPassSuccess(false), 3000);
-                                                }
-                                            }}
-                                            className={`w-full max-w-sm mx-auto flex py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all duration-300 relative overflow-hidden ${newPassword.length >= 6
-                                                ? 'bg-white text-black hover:bg-brand-500 shadow-xl'
-                                                : 'bg-white/5 text-gray-600 border border-white/5'
-                                                }`}
-                                        >
-                                            <span className="w-full flex items-center justify-center gap-2">
-                                                {isSavingPass ? <RefreshCcw className="animate-spin" size={16} /> : passSuccess ? <CheckCircle size={16} /> : 'Actualizar Contraseña'}
-                                            </span>
-                                        </button>
-                                    </div>
-
-                                    <div className="mt-8 flex justify-center gap-6">
-                                        <div className="flex items-center gap-2 text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                            Encriptación End-to-End
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'games' && (
-                            <div className="max-w-md mx-auto py-4 animate-in fade-in zoom-in-95 duration-500">
-                                <SnakeGame />
-                            </div>
-                        )}
-                    </div>
-                </div>
+                        {/* Decoration */}
+                        <div className="mt-auto pt-8 hidden md:block opacity-30">
+                            <Sparkles className="text-brand-500 animate-pulse" size={24} />
+                        </div>
+                    </>
+                )}
             </div>
         </div>
-    );
+
+        {/* === RIGHT PANEL: WORKSPACE === */}
+        <div className="flex-1 flex flex-col min-w-0 bg-[#0f0f0f] relative h-full">
+            
+            {/* Desktop Close Button */}
+            <button 
+                onClick={onClose} 
+                className="absolute top-4 right-4 z-50 p-2 bg-dark-800 text-gray-400 hover:text-white rounded-full hover:bg-red-500/20 hover:text-red-500 transition-all hidden md:flex items-center justify-center border border-white/5"
+            >
+                <X size={18} />
+            </button>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center border-b border-white/5 bg-dark-900/30 px-6 pt-2 sticky top-0 z-40 backdrop-blur-md shrink-0">
+                {[
+                    { id: 'history', label: 'Mis Citas & Historial', icon: History },
+                    { id: 'preferences', label: 'Mi Estilo', icon: Award }
+                ].map((tab) => (
+                    <button 
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-widest relative transition-colors ${activeTab === tab.id ? 'text-white' : 'text-gray-600 hover:text-gray-400'}`}
+                    >
+                        <tab.icon size={14} className={activeTab === tab.id ? 'text-brand-500' : 'opacity-50'} />
+                        {tab.label}
+                        {activeTab === tab.id && (
+                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-500 shadow-[0_0_10px_rgba(240,180,41,0.5)]"></div>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Scrollable Content - flex-1 and min-h-0 is CRITICAL for scrolling to work inside flex */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 min-h-0">
+                
+                {activeTab === 'history' && (
+                    <div className="max-w-3xl mx-auto space-y-6 animate-in slide-in-from-right-4 duration-300 pb-20">
+                        {shopRules && (
+                            <div className="bg-blue-500/5 border-l-2 border-blue-500 p-4 rounded-r-lg flex gap-3">
+                                <Info size={16} className="text-blue-400 shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="text-blue-400 font-bold text-xs uppercase mb-1">Información del Local</h4>
+                                    <p className="text-xs text-gray-400 whitespace-pre-line leading-relaxed">{shopRules}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* UPCOMING APPOINTMENTS SECTION */}
+                        {upcomingAppointments.length > 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-emerald-500 pb-2 border-b border-emerald-900/30">
+                                    <Calendar size={12} />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Próxima Cita</span>
+                                </div>
+                                
+                                {upcomingAppointments.map(apt => {
+                                    const canCancel = canClientCancel(apt.startTime);
+                                    const isBeingCancelled = selectedAppointmentId === apt.id && cancelStep !== 'IDLE';
+
+                                    // Dynamic Height Class: Expands when cancelling to fit the wizard comfortably on mobile
+                                    const containerHeightClass = isBeingCancelled 
+                                        ? 'min-h-[450px] md:min-h-[400px] border-red-500/30' 
+                                        : '';
+
+                                    return (
+                                        <div key={apt.id} className={`bg-dark-800/80 border border-emerald-500/30 rounded-xl p-5 relative overflow-hidden group transition-all duration-300 ${containerHeightClass}`}>
+                                            
+                                            {/* CANCELLATION OVERLAY - WIZARD */}
+                                            {isBeingCancelled && (
+                                                <div className="absolute inset-0 z-20 bg-dark-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 md:p-6 text-center animate-in fade-in duration-300 overflow-y-auto custom-scrollbar">
+                                                    
+                                                    {/* STEP 1: REASON */}
+                                                    {cancelStep === 'REASON' && (
+                                                        <div className="w-full max-w-sm animate-in slide-in-from-bottom-4 my-auto">
+                                                            <div className="flex justify-between items-center mb-4 sticky top-0 bg-dark-900/0 backdrop-blur-sm py-2 z-10">
+                                                                <h4 className="text-white font-bold text-sm">¿Por qué deseas cancelar?</h4>
+                                                                <button onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }} className="p-1"><X size={20} className="text-gray-500 hover:text-white"/></button>
+                                                            </div>
+                                                            <div className="space-y-2.5 pb-4">
+                                                                {cancellationReasons.map(r => (
+                                                                    <button 
+                                                                        key={r}
+                                                                        onClick={() => handleReasonSelection(r)}
+                                                                        className="w-full text-left p-3.5 rounded-lg border border-dark-600 hover:border-brand-500 hover:bg-dark-800 text-xs text-gray-300 hover:text-white transition-all flex justify-between group/btn active:scale-[0.98]"
+                                                                    >
+                                                                        {r} <ChevronRight size={14} className="opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            {cancelReason === 'Otro Motivo' && (
+                                                                <textarea 
+                                                                    className="w-full mt-2 bg-dark-800 border border-dark-600 rounded-lg p-3 text-xs text-white outline-none focus:border-brand-500 min-h-[80px]"
+                                                                    placeholder="Describe el motivo..."
+                                                                    value={otherReason}
+                                                                    onChange={e => setOtherReason(e.target.value)}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* STEP 2: CALL CHECK */}
+                                                    {cancelStep === 'CALL_CHECK' && (
+                                                        <div className="w-full max-w-sm animate-in slide-in-from-right-4 my-auto">
+                                                            <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-orange-500">
+                                                                <PhoneCall size={24} />
+                                                            </div>
+                                                            <h4 className="text-white font-bold text-lg mb-2">Protocolo de Cancelación</h4>
+                                                            <p className="text-xs text-gray-400 mb-6 leading-relaxed px-2">
+                                                                Para evitar penalizaciones en tu perfil, es obligatorio notificar verbalmente al barbero sobre esta cancelación de último momento.
+                                                            </p>
+                                                            <div className="space-y-3">
+                                                                <button 
+                                                                    onClick={() => setCancelStep('CONFIRM')}
+                                                                    className="w-full bg-orange-600 hover:bg-orange-500 text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all shadow-lg active:scale-95"
+                                                                >
+                                                                    Ya llamé al Barbero
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }}
+                                                                    className="w-full text-gray-500 hover:text-white py-3 text-xs"
+                                                                >
+                                                                    Cancelar proceso
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* STEP 3: PRESS TO HOLD CONFIRM */}
+                                                    {cancelStep === 'CONFIRM' && (
+                                                        <div className="w-full max-w-xs animate-in zoom-in-95 my-auto">
+                                                            <div className="mb-6 flex flex-col items-center">
+                                                                <AlertCircle size={32} className="text-red-500 mb-2" />
+                                                                <h4 className="text-red-500 font-bold text-sm uppercase tracking-wider text-center">Confirmación Final</h4>
+                                                            </div>
+                                                            
+                                                            <PressHoldButton 
+                                                                onConfirm={finalizeCancellation} 
+                                                                label="MANTÉN PARA CANCELAR"
+                                                                isMobile={true}
+                                                            />
+                                                            
+                                                            <p className="text-[10px] text-gray-500 mt-6 text-center">
+                                                                Esta acción no se puede deshacer.
+                                                            </p>
+                                                            <button 
+                                                                onClick={() => { setCancelStep('IDLE'); setSelectedAppointmentId(null); }}
+                                                                className="mt-4 text-gray-500 hover:text-white text-xs underline w-full py-2"
+                                                            >
+                                                                Volver atrás
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* STEP 4: SUCCESS ANIMATION */}
+                                                    {cancelStep === 'SUCCESS' && (
+                                                        <div className="flex flex-col items-center justify-center animate-in zoom-in duration-300 my-auto">
+                                                            <div className="w-20 h-20 rounded-full border-4 border-emerald-500 flex items-center justify-center mb-4 relative">
+                                                                <Check size={40} className="text-emerald-500" strokeWidth={4} />
+                                                                <div className="absolute inset-0 rounded-full border-4 border-emerald-500 animate-ping opacity-75"></div>
+                                                            </div>
+                                                            <h3 className="text-xl font-bold text-white">Cancelación Exitosa</h3>
+                                                            <p className="text-xs text-gray-500 mt-2">Tu agenda ha sido actualizada.</p>
+                                                        </div>
+                                                    )}
+
+                                                </div>
+                                            )}
+
+                                            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                                <Clock size={80} className="text-emerald-500" />
+                                            </div>
+                                            
+                                            {/* Normal Card Content */}
+                                            <div className="flex justify-between items-start relative z-10">
+                                                <div>
+                                                    <div className="text-xs text-emerald-400 font-bold uppercase mb-1 flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Confirmada
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-white capitalize">
+                                                        {apt.startTime.toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                                    </h3>
+                                                    <div className="text-3xl font-mono font-black text-white mt-1">
+                                                        {formatTime(apt.startTime)}
+                                                    </div>
+                                                </div>
+                                                {canCancel ? (
+                                                    <button 
+                                                        onClick={() => startCancellation(apt.id)}
+                                                        className="bg-dark-900 hover:bg-red-900/30 border border-dark-600 hover:border-red-500/50 text-gray-400 hover:text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2"
+                                                    >
+                                                        <Trash2 size={14} /> Cancelar
+                                                    </button>
+                                                ) : (
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <div className="inline-flex items-center gap-2 text-[10px] text-orange-400 bg-orange-900/20 px-2 py-1 rounded border border-orange-900/40 relative z-10 font-bold">
+                                                            <AlertTriangle size={10} /> 
+                                                            Restricción de Tiempo
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {!canCancel && (
+                                                <p className="text-[10px] text-gray-500 mt-3 relative z-10 border-t border-white/5 pt-2">
+                                                    No se puede cancelar, solo <span className="text-white font-bold">45 minutos</span> antes de la cita y se requiere llamar al barbero.
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+
+                        <div className="space-y-4 pt-6">
+                            <div className="flex items-center gap-2 text-gray-500 pb-2 border-b border-white/5">
+                                <Layout size={12} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Historial de Servicios</span>
+                            </div>
+
+                            {client.bookingHistory.length === 0 ? (
+                                <div className="text-center py-12 border border-dashed border-dark-700 rounded-2xl bg-dark-800/20">
+                                    <p className="text-gray-500 text-sm">No hay servicios anteriores registrados.</p>
+                                </div>
+                            ) : (
+                                client.bookingHistory.map((item) => (
+                                    <div key={item.id} className="flex gap-4 group">
+                                        {/* Timeline connector */}
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-dark-600 border border-dark-500 group-hover:bg-brand-500 group-hover:border-brand-400 transition-colors z-10"></div>
+                                            <div className="w-px h-full bg-dark-700 -mt-1 group-last:hidden"></div>
+                                        </div>
+                                        
+                                        {/* Card */}
+                                        <div className="flex-1 bg-dark-800/40 border border-white/5 rounded-xl p-4 hover:bg-dark-800 transition-all hover:border-brand-500/20 mb-2">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h4 className="font-bold text-white text-sm">{item.serviceName}</h4>
+                                                    <p className="text-[10px] text-gray-500 flex items-center gap-1.5 mt-1">
+                                                        <Calendar size={10} />
+                                                        {item.date.toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-mono font-bold text-brand-500 text-sm">₡{item.price.toLocaleString('es-CR')}</span>
+                                                    <span className="text-[9px] text-emerald-500/80 uppercase font-bold">Completado</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                                                <div className="w-5 h-5 rounded-full bg-dark-700 flex items-center justify-center text-[10px] text-gray-400">
+                                                    <User size={10} />
+                                                </div>
+                                                <span className="text-xs text-gray-400">{item.barberName}</span>
+                                            </div>
+                                            {item.notes && (
+                                                <div className="mt-2 bg-black/20 p-2 rounded text-[11px] text-gray-400 italic flex gap-2">
+                                                    <MessageSquare size={12} className="shrink-0 mt-0.5" />
+                                                    "{item.notes}"
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'preferences' && (
+                    <div className="max-w-5xl mx-auto pb-10 animate-in slide-in-from-right-4 duration-300">
+                        <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between border-b border-white/5 pb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-1">Ficha Técnica de Estilo</h2>
+                                <p className="text-xs text-gray-400 max-w-lg">
+                                    Configura tus preferencias visuales. Tu barbero consultará esta guía antes de cada corte.
+                                </p>
+                            </div>
+                            <button 
+                                onClick={handleSavePrefs}
+                                className="bg-brand-500 text-black px-6 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide hover:bg-brand-400 shadow-[0_0_20px_rgba(240,180,41,0.2)] transition-all flex items-center gap-2"
+                            >
+                                <Save size={16} /> Guardar Ficha
+                            </button>
+                        </div>
+
+                        {/* BENTO GRID LAYOUT - DYNAMIC MAPPING */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            
+                            {/* REMARKS (Always fixed first) */}
+                            <div className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2">
+                                <div className="h-full bg-dark-800/40 border border-white/5 rounded-xl p-5 hover:border-brand-500/30 transition-colors group flex flex-col">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-1.5 rounded-lg bg-dark-700 text-brand-500"><MessageSquare size={16}/></div>
+                                        <label className="text-sm text-gray-200 font-bold uppercase tracking-wide">Observaciones Clave</label>
+                                    </div>
+                                    <textarea 
+                                        className="flex-1 w-full bg-dark-900 border border-dark-700 rounded-lg p-4 text-sm text-white focus:border-brand-500 focus:outline-none resize-none placeholder-gray-600 leading-relaxed"
+                                        placeholder="Ej: Tengo un remolino en la coronilla, cuidado con la cicatriz en la ceja izquierda, prefiero las patillas en punta..."
+                                        value={prefs.remarks}
+                                        onChange={(e) => setPrefs({...prefs, remarks: e.target.value})}
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-2 text-right">Visible para el barbero en la cita.</p>
+                                </div>
+                            </div>
+                            
+                            {/* DYNAMIC CATEGORIES */}
+                            {globalOptions.map((category) => (
+                                <div key={category.id} className="lg:col-span-2">
+                                    <StyleSelector 
+                                        title={category.label}
+                                        icon={getCategoryIcon(category.id)}
+                                        value={prefs[category.id] || ''}
+                                        options={optionLists[category.id] || []}
+                                        onSelect={(val) => setPrefs({...prefs, [category.id]: val})}
+                                        onAddCustom={(val) => handleAddOption(category.id, val)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+      </div>
+    </div>
+  );
 };
