@@ -94,6 +94,11 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
                           <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                           {s.label}
                         </div>
+                        {wo.price > 45000 && (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 bg-green-500/10 text-green-400 ml-2 border border-green-500/20">
+                            🏷️ LAVADO Y ASPIRADO GRATIS
+                          </div>
+                        )}
                         <h3 className="text-lg font-bold text-white">{service?.name || 'Servicio General'}</h3>
                         <p className="text-steel-300 text-sm font-mono mt-1">Placa: {wo.vehicleInfo.plate} - {wo.vehicleInfo.brand} {wo.vehicleInfo.model}</p>
                       </div>
@@ -140,12 +145,13 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {currentUser.vehicles.map((v, i) => (
               <div key={i} className="glass-inner p-4 rounded-xl flex items-center gap-4 hover:border-forge-500/30 transition-all cursor-pointer">
-                <div className="w-12 h-12 rounded-lg bg-steel-800 flex items-center justify-center border border-white/10 text-xl shadow-inner">
+                <div className="w-12 h-12 rounded-lg bg-steel-800 flex items-center justify-center border border-white/10 text-xl shadow-inner flex-shrink-0">
                   🚗
                 </div>
-                <div>
-                  <div className="font-bold text-white">{v.brand} {v.model}</div>
-                  <div className="text-xs text-steel-400 font-mono mt-0.5">Placa: {v.plate} · {v.year}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white truncate">{v.brand} {v.model}</div>
+                  <div className="text-xs text-steel-400 font-mono mt-0.5 truncate">Placa: {v.plate} · {v.year}</div>
+                  <div className="text-[10px] text-forge-500 font-mono mt-0.5">Kilometraje: {v.mileage.toLocaleString()} km</div>
                 </div>
               </div>
             ))}

@@ -22,7 +22,8 @@ import { calculateEndTime } from './services/timeEngine';
 import { saveState, loadState } from './services/storage';
 import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
-import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText } from 'lucide-react';
+import { TVDashboard } from './components/TVDashboard';
+import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor } from 'lucide-react';
 
 export default function App() {
   // ── AUTH STATE ──
@@ -70,6 +71,7 @@ export default function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTVModeOpen, setIsTVModeOpen] = useState(false);
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -394,6 +396,15 @@ export default function App() {
             {role === Role.ADMIN && (
               <div className="flex items-center gap-2 glass-inner p-1 rounded-full border border-white/5">
                 <button
+                  onClick={() => setIsTVModeOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 mr-2"
+                  title="Abrir Pantalla de Taller (TV)"
+                >
+                  <Monitor size={14} />
+                  <span className="hidden md:inline">TV</span>
+                </button>
+                <div className="w-px h-4 bg-steel-700 mr-2"></div>
+                <button
                   onClick={() => setAdminViewMode('DASHBOARD')}
                   className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
                     adminViewMode === 'DASHBOARD' ? 'bg-steel-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
@@ -699,6 +710,16 @@ export default function App() {
           onUpdateCatalog={setCatalog}
           role={role}
           onClose={() => setIsCatalogOpen(false)}
+        />
+      )}
+
+      {/* TV Dashboard Mode */}
+      {isTVModeOpen && (
+        <TVDashboard
+          workOrders={workOrders}
+          mechanics={mechanics}
+          services={services}
+          onClose={() => setIsTVModeOpen(false)}
         />
       )}
 

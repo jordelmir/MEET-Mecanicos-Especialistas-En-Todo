@@ -160,7 +160,14 @@ export function WorkOrderReceipt({ workOrder, service, mechanic, client, onClose
             )}
 
             {/* Pricing */}
-            <div style={{ borderTop: '1px dashed #ddd', marginTop: '20px', paddingTop: '20px' }}>
+            <div style={{ borderTop: '1px dashed #ddd', marginTop: '20px', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div>
+                {workOrder.price > 45000 && (
+                  <div style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, border: '1px solid #bbf7d0', display: 'inline-block' }}>
+                    🏷️ INCLUYE LAVADO Y ASPIRADO GRATIS
+                  </div>
+                )}
+              </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase', letterSpacing: '2px' }}>Total</div>
                 <div style={{ fontSize: '32px', fontWeight: 900, color: '#00f0ff', marginTop: '4px' }}>

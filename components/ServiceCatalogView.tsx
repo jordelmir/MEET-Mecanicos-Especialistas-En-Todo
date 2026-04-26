@@ -19,6 +19,7 @@ export function ServiceCatalogView({ catalog, role, onUpdateCatalog, onClose }: 
   // Edit State
   const [editingItem, setEditingItem] = useState<{ sectionId: string, itemIndex: number } | null>(null);
   const [editMinutes, setEditMinutes] = useState<number>(0);
+  const [editPrice, setEditPrice] = useState<number>(0);
 
   const filters = [
     { key: 'all', label: 'Todos' },
@@ -51,12 +52,13 @@ export function ServiceCatalogView({ catalog, role, onUpdateCatalog, onClose }: 
     });
   };
 
-  const handleSaveMinutes = (sectionId: string, itemIndex: number) => {
+  const handleSaveItem = (sectionId: string, itemIndex: number) => {
     if (editMinutes > 0) {
       const newCatalog = [...catalog];
       const sectionIndex = newCatalog.findIndex(s => s.id === sectionId);
       if (sectionIndex !== -1) {
         newCatalog[sectionIndex].items[itemIndex].estimatedMinutes = editMinutes;
+        newCatalog[sectionIndex].items[itemIndex].basePrice = editPrice;
         onUpdateCatalog(newCatalog);
       }
     }
@@ -164,42 +166,66 @@ export function ServiceCatalogView({ catalog, role, onUpdateCatalog, onClose }: 
                           {badge.label}
                         </span>
                         {item.estimatedMinutes && (
-                          <div className="flex items-center gap-2 w-28 justify-end">
+                          <div className="flex items-center gap-4 w-48 justify-end">
                             {editingItem?.sectionId === section.id && editingItem?.itemIndex === i ? (
                               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                <input
-                                  type="number"
-                                  value={editMinutes}
-                                  onChange={e => setEditMinutes(+e.target.value)}
-                                  className="w-12 bg-steel-900 border border-forge-500 rounded px-1 py-0.5 text-xs text-forge-500 font-mono outline-none text-right"
-                                  autoFocus
-                                  onKeyDown={e => e.key === 'Enter' && handleSaveMinutes(section.id, i)}
-                                />
-                                <button onClick={() => handleSaveMinutes(section.id, i)} className="text-green-400 hover:text-green-300">
-                                  <Check size={14} />
-                                </button>
-                                <button onClick={() => setEditingItem(null)} className="text-red-400 hover:text-red-300">
-                                  <X size={14} />
-                                </button>
+                                <div className="flex flex-col gap-1 items-end mr-2">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-steel-400 font-mono">MIN:</span>
+                                    <input
+                                      type="number"
+                                      value={editMinutes}
+                                      onChange={e => setEditMinutes(+e.target.value)}
+                                      className="w-12 bg-steel-900 border border-forge-500 rounded px-1 py-0.5 text-xs text-forge-500 font-mono outline-none text-right"
+                                      onKeyDown={e => e.key === 'Enter' && handleSaveItem(section.id, i)}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-steel-400 font-mono">₡:</span>
+                                    <input
+                                      type="number"
+                                      value={editPrice}
+                                      onChange={e => setEditPrice(+e.target.value)}
+                                      className="w-16 bg-steel-900 border border-forge-500 rounded px-1 py-0.5 text-xs text-forge-500 font-mono outline-none text-right"
+                                      onKeyDown={e => e.key === 'Enter' && handleSaveItem(section.id, i)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <button onClick={() => handleSaveItem(section.id, i)} className="text-green-400 hover:text-green-300 p-1">
+                                    <Check size={14} />
+                                  </button>
+                                  <button onClick={() => setEditingItem(null)} className="text-red-400 hover:text-red-300 p-1">
+                                    <X size={14} />
+                                  </button>
+                                </div>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-2 group">
-                                <span className="font-mono text-[10px] text-steel-300">
-                                  {item.estimatedMinutes >= 60
-                                    ? `${Math.floor(item.estimatedMinutes / 60)}h${item.estimatedMinutes % 60 > 0 ? ` ${item.estimatedMinutes % 60}m` : ''}`
-                                    : `${item.estimatedMinutes}m`
-                                  }
-                                </span>
+                              <div className="flex items-center gap-4 group">
+                                <div className="flex flex-col items-end">
+                                  {item.basePrice !== undefined && item.basePrice > 0 && (
+                                    <span className="font-mono text-xs font-bold text-forge-500">
+                                      ₡{item.basePrice.toLocaleString()}
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-[10px] text-steel-300">
+                                    {item.estimatedMinutes >= 60
+                                      ? `${Math.floor(item.estimatedMinutes / 60)}h${item.estimatedMinutes % 60 > 0 ? ` ${item.estimatedMinutes % 60}m` : ''}`
+                                      : `${item.estimatedMinutes}m`
+                                    }
+                                  </span>
+                                </div>
                                 {(role === Role.ADMIN || role === Role.MECHANIC) && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setEditingItem({ sectionId: section.id, itemIndex: i });
-                                      setEditMinutes(item.estimatedMinutes);
+                                      setEditMinutes(item.estimatedMinutes || 0);
+                                      setEditPrice(item.basePrice || 0);
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-steel-400 hover:text-forge-500"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-steel-400 hover:text-forge-500 p-1"
                                   >
-                                    <Edit2 size={12} />
+                                    <Edit2 size={14} />
                                   </button>
                                 )}
                               </div>

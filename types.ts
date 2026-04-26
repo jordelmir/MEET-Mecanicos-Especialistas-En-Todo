@@ -66,6 +66,7 @@ export interface CatalogItem {
   name: string;
   category: ServiceCategory;
   estimatedMinutes?: number;
+  basePrice?: number;
 }
 
 export interface CatalogSection {
