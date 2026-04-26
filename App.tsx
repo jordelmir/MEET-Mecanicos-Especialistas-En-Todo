@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { INITIAL_WORK_ORDERS, MECHANICS as INITIAL_MECHANICS, SERVICES as DEFAULT_SERVICES, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR, INITIAL_CLIENTS, MOCK_ADMIN_USER } from './constants';
+import { INITIAL_WORK_ORDERS, MECHANICS as INITIAL_MECHANICS, SERVICES as DEFAULT_SERVICES, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR, INITIAL_CLIENTS, MOCK_ADMIN_USER, SERVICE_CATALOG } from './constants';
 import { WorkOrder, Role, WorkOrderStatus, Metrics, Client, ServiceHistoryItem, Service, Mechanic, VehicleInfo } from './types';
 import { Timeline } from './components/Timeline';
 import { MetricsPanel } from './components/MetricsPanel';
@@ -38,6 +38,7 @@ export default function App() {
   const [clients, setClients] = useState<Client[]>(() => loadState('clients', INITIAL_CLIENTS));
   const [services, setServices] = useState<Service[]>(() => loadState('services', DEFAULT_SERVICES));
   const [mechanics, setMechanics] = useState<Mechanic[]>(() => loadState('mechanics', INITIAL_MECHANICS));
+  const [catalog, setCatalog] = useState<any[]>(() => loadState('catalog', SERVICE_CATALOG));
 
   // ── SHOP SETTINGS ──
   const [shopRules, setShopRules] = useState<string>(() => loadState('shopRules', "1. Verificar el vehículo al recibir con el cliente presente.\n2. Notificar al cliente antes de realizar trabajos adicionales.\n3. Garantía de 30 días en mano de obra."));
@@ -50,6 +51,7 @@ export default function App() {
   useEffect(() => { saveState('clients', clients); }, [clients]);
   useEffect(() => { saveState('services', services); }, [services]);
   useEffect(() => { saveState('mechanics', mechanics); }, [mechanics]);
+  useEffect(() => { saveState('catalog', catalog); }, [catalog]);
   useEffect(() => { saveState('shopRules', shopRules); }, [shopRules]);
   useEffect(() => { saveState('openHour', openHour); }, [openHour]);
   useEffect(() => { saveState('closeHour', closeHour); }, [closeHour]);
@@ -690,9 +692,14 @@ export default function App() {
         />
       )}
 
-      {/* Service Catalog */}
+      {/* Service Catalog Modal */}
       {isCatalogOpen && (
-        <ServiceCatalogView onClose={() => setIsCatalogOpen(false)} />
+        <ServiceCatalogView
+          catalog={catalog}
+          onUpdateCatalog={setCatalog}
+          role={role}
+          onClose={() => setIsCatalogOpen(false)}
+        />
       )}
 
       {/* Work Order Editor */}

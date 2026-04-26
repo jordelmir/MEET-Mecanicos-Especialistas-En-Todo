@@ -1,18 +1,24 @@
 
 import React, { useState, useMemo } from 'react';
-import { CatalogSection, ServiceCategory } from '../types';
-import { SERVICE_CATALOG } from '../constants';
+import { CatalogSection, ServiceCategory, Role } from '../types';
 import { getCategoryBadge } from '../services/timeEngine';
-import { X, Search, ChevronDown, ChevronUp, Download, Printer } from 'lucide-react';
+import { X, Search, ChevronDown, ChevronUp, Download, Printer, Edit2, Check } from 'lucide-react';
 
 interface ServiceCatalogViewProps {
+  catalog: CatalogSection[];
+  role: Role;
+  onUpdateCatalog: (catalog: CatalogSection[]) => void;
   onClose: () => void;
 }
 
-export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
+export function ServiceCatalogView({ catalog, role, onUpdateCatalog, onClose }: ServiceCatalogViewProps) {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(SERVICE_CATALOG.map(c => c.id)));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(catalog.map(c => c.id)));
+  
+  // Edit State
+  const [editingItem, setEditingItem] = useState<{ sectionId: string, itemIndex: number } | null>(null);
+  const [editMinutes, setEditMinutes] = useState<number>(0);
 
   const filters = [
     { key: 'all', label: 'Todos' },
@@ -23,7 +29,7 @@ export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
   ];
 
   const filteredCatalog = useMemo(() => {
-    return SERVICE_CATALOG.map(section => {
+    return catalog.map(section => {
       const items = section.items.filter(item => {
         const matchFilter = activeFilter === 'all' || item.category === activeFilter;
         const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
@@ -31,7 +37,7 @@ export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
       });
       return { ...section, items };
     }).filter(section => section.items.length > 0);
-  }, [search, activeFilter]);
+  }, [catalog, search, activeFilter]);
 
   const totalItems = useMemo(() => 
     filteredCatalog.reduce((sum, s) => sum + s.items.length, 0)
@@ -45,9 +51,21 @@ export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
     });
   };
 
+  const handleSaveMinutes = (sectionId: string, itemIndex: number) => {
+    if (editMinutes > 0) {
+      const newCatalog = [...catalog];
+      const sectionIndex = newCatalog.findIndex(s => s.id === sectionId);
+      if (sectionIndex !== -1) {
+        newCatalog[sectionIndex].items[itemIndex].estimatedMinutes = editMinutes;
+        onUpdateCatalog(newCatalog);
+      }
+    }
+    setEditingItem(null);
+  };
+
   const exportCSV = () => {
     let csv = 'Categoría,Servicio,Tipo,Tiempo Estimado (min)\n';
-    SERVICE_CATALOG.forEach(cat => {
+    catalog.forEach(cat => {
       cat.items.forEach(item => {
         const { label } = getCategoryBadge(item.category);
         csv += `"${cat.title}","${item.name}","${label}","${item.estimatedMinutes || ''}"\n`;
@@ -146,12 +164,47 @@ export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
                           {badge.label}
                         </span>
                         {item.estimatedMinutes && (
-                          <span className="font-mono text-[10px] text-steel-300 w-16 text-right">
-                            {item.estimatedMinutes >= 60
-                              ? `${Math.floor(item.estimatedMinutes / 60)}h${item.estimatedMinutes % 60 > 0 ? ` ${item.estimatedMinutes % 60}m` : ''}`
-                              : `${item.estimatedMinutes}m`
-                            }
-                          </span>
+                          <div className="flex items-center gap-2 w-28 justify-end">
+                            {editingItem?.sectionId === section.id && editingItem?.itemIndex === i ? (
+                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <input
+                                  type="number"
+                                  value={editMinutes}
+                                  onChange={e => setEditMinutes(+e.target.value)}
+                                  className="w-12 bg-steel-900 border border-forge-500 rounded px-1 py-0.5 text-xs text-forge-500 font-mono outline-none text-right"
+                                  autoFocus
+                                  onKeyDown={e => e.key === 'Enter' && handleSaveMinutes(section.id, i)}
+                                />
+                                <button onClick={() => handleSaveMinutes(section.id, i)} className="text-green-400 hover:text-green-300">
+                                  <Check size={14} />
+                                </button>
+                                <button onClick={() => setEditingItem(null)} className="text-red-400 hover:text-red-300">
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group">
+                                <span className="font-mono text-[10px] text-steel-300">
+                                  {item.estimatedMinutes >= 60
+                                    ? `${Math.floor(item.estimatedMinutes / 60)}h${item.estimatedMinutes % 60 > 0 ? ` ${item.estimatedMinutes % 60}m` : ''}`
+                                    : `${item.estimatedMinutes}m`
+                                  }
+                                </span>
+                                {(role === Role.ADMIN || role === Role.MECHANIC) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingItem({ sectionId: section.id, itemIndex: i });
+                                      setEditMinutes(item.estimatedMinutes);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-steel-400 hover:text-forge-500"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
