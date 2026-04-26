@@ -23,7 +23,8 @@ import { saveState, loadState } from './services/storage';
 import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TVDashboard } from './components/TVDashboard';
-import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor } from 'lucide-react';
+import { OBD2Scanner } from './components/OBD2Scanner';
+import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle } from 'lucide-react';
 
 export default function App() {
   // ── AUTH STATE ──
@@ -46,6 +47,7 @@ export default function App() {
   const [openHour, setOpenHour] = useState<number>(() => loadState('openHour', DEFAULT_OPEN_HOUR));
   const [closeHour, setCloseHour] = useState<number>(() => loadState('closeHour', DEFAULT_CLOSE_HOUR));
   const [timeSliceMinutes, setTimeSliceMinutes] = useState<number>(() => loadState('timeSlice', 30));
+  const [freeWashThreshold, setFreeWashThreshold] = useState<number>(() => loadState('freeWashThreshold', 45000));
 
   // ── PERSIST STATE ──
   useEffect(() => { saveState('workOrders', workOrders); }, [workOrders]);
@@ -57,6 +59,7 @@ export default function App() {
   useEffect(() => { saveState('openHour', openHour); }, [openHour]);
   useEffect(() => { saveState('closeHour', closeHour); }, [closeHour]);
   useEffect(() => { saveState('timeSlice', timeSliceMinutes); }, [timeSliceMinutes]);
+  useEffect(() => { saveState('freeWashThreshold', freeWashThreshold); }, [freeWashThreshold]);
 
   // ── UI STATE ──
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -72,6 +75,7 @@ export default function App() {
   const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTVModeOpen, setIsTVModeOpen] = useState(false);
+  const [isOBD2Open, setIsOBD2Open] = useState(false);
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -353,11 +357,12 @@ export default function App() {
     }
   };
 
-  const handleUpdateSettings = (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number }) => {
+  const handleUpdateSettings = (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number; freeWashThreshold: number }) => {
     setShopRules(settings.rules);
     setOpenHour(settings.openHour);
     setCloseHour(settings.closeHour);
     setTimeSliceMinutes(settings.timeSlice);
+    setFreeWashThreshold(settings.freeWashThreshold);
     toast('success', 'Configuración Guardada', 'Las preferencias del taller se han actualizado');
   };
 
@@ -447,6 +452,15 @@ export default function App() {
             )}
 
             <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-8">
+              {/* OBD2 Button */}
+              <button
+                onClick={() => setIsOBD2Open(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-inner text-forge-500 hover:text-forge-400 hover:border-forge-500/50 transition-all text-[10px] font-mono font-bold"
+              >
+                <AlertTriangle size={12} />
+                OBD2 Scanner
+              </button>
+              
               {/* ⌘K Search */}
               <button
                 onClick={() => setIsPaletteOpen(true)}
@@ -640,6 +654,7 @@ export default function App() {
               workOrders={workOrders}
               services={services}
               mechanics={mechanics}
+              freeWashThreshold={freeWashThreshold}
               onBookNew={() => setIsBookingModalOpen(true)}
               onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
               onUpdateUser={handleUpdateClient}
@@ -668,6 +683,7 @@ export default function App() {
               openHour={openHour}
               closeHour={closeHour}
               timeSliceMinutes={timeSliceMinutes}
+              freeWashThreshold={freeWashThreshold}
               currentUser={loggedInUser}
               currentRole={role}
               onBook={handleBook}
@@ -720,6 +736,7 @@ export default function App() {
           currentOpenHour={openHour}
           currentCloseHour={closeHour}
           currentTimeSlice={timeSliceMinutes}
+          currentFreeWashThreshold={freeWashThreshold}
           onSave={handleUpdateSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
@@ -733,6 +750,11 @@ export default function App() {
           role={role}
           onClose={() => setIsCatalogOpen(false)}
         />
+      )}
+
+      {/* OBD2 Scanner Modal */}
+      {isOBD2Open && (
+        <OBD2Scanner onClose={() => setIsOBD2Open(false)} />
       )}
 
       {/* TV Dashboard Mode */}
@@ -779,6 +801,7 @@ export default function App() {
           service={services.find(s => s.id === receiptWorkOrder.serviceId)}
           mechanic={mechanics.find(m => m.id === receiptWorkOrder.mechanicId)}
           client={clients.find(c => c.id === receiptWorkOrder.clientId)}
+          freeWashThreshold={freeWashThreshold}
           onClose={() => setReceiptWorkOrder(null)}
         />
       )}

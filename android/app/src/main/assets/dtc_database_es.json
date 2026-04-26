@@ -1,0 +1,1982 @@
+[
+  {
+    "code": "P0100",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (100)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (100)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0101",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (101)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (101)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0102",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (102)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (102)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0103",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (103)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (103)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0104",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (104)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (104)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0105",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (105)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (105)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0106",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (106)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (106)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0107",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (107)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (107)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0108",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (108)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (108)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0109",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (109)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (109)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0110",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (110)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (110)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0111",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (111)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (111)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0112",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (112)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (112)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0113",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (113)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (113)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0114",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (114)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (114)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0115",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (115)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (115)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0116",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (116)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (116)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0117",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (117)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (117)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0118",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (118)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (118)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0119",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (119)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (119)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0120",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (120)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (120)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0121",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (121)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (121)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0122",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (122)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (122)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0123",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (123)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (123)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0124",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (124)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (124)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0125",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (125)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (125)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0126",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (126)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (126)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0127",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (127)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (127)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0128",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (128)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (128)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0129",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (129)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (129)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0130",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (130)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (130)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0131",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (131)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (131)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0132",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (132)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (132)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0133",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (133)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (133)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0134",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (134)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (134)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0135",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (135)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (135)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0136",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (136)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (136)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0137",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (137)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (137)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0138",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (138)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (138)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0139",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (139)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (139)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0140",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (140)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (140)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0141",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (141)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (141)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0142",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (142)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (142)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0143",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (143)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (143)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0144",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (144)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (144)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0145",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (145)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (145)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0146",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (146)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (146)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0147",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (147)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (147)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0148",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (148)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (148)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0149",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (149)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (149)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0150",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (150)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (150)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0151",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (151)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (151)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0152",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (152)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (152)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0153",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (153)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (153)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0154",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (154)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (154)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0155",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (155)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (155)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0156",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (156)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (156)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0157",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (157)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (157)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0158",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (158)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (158)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0159",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (159)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (159)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0160",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (160)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (160)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0161",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (161)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (161)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0162",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (162)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (162)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0163",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (163)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (163)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0164",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (164)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (164)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0165",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (165)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (165)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0166",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (166)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (166)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0167",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (167)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (167)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0168",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (168)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (168)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0169",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (169)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (169)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0170",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (170)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (170)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0171",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (171)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (171)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0172",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (172)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (172)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0173",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (173)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (173)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0174",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (174)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (174)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0175",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (175)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (175)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0176",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (176)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (176)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0177",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (177)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (177)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0178",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (178)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (178)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0179",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (179)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (179)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0180",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (180)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (180)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0181",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (181)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (181)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0182",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (182)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (182)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0183",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (183)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (183)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0184",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (184)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (184)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0185",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (185)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (185)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0186",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (186)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (186)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0187",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (187)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (187)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0188",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (188)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (188)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0189",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (189)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (189)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0190",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (190)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (190)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0191",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (191)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (191)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0192",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (192)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (192)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0193",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (193)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (193)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0194",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (194)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (194)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0195",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (195)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (195)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0196",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (196)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (196)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0197",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (197)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (197)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0198",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (198)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (198)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0199",
+    "descriptionEs": "Problema de rango/rendimiento de circuito en sistema de aire/combustible (199)",
+    "descriptionEn": "Mass or Volume Air Flow Sensor A Circuit (199)",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Sensor defectuoso, cableado",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0200",
+    "descriptionEs": "Falla en inyector o circuito de combustible (200)",
+    "descriptionEn": "Injector Circuit (200)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0201",
+    "descriptionEs": "Falla en inyector o circuito de combustible (201)",
+    "descriptionEn": "Injector Circuit (201)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0202",
+    "descriptionEs": "Falla en inyector o circuito de combustible (202)",
+    "descriptionEn": "Injector Circuit (202)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0203",
+    "descriptionEs": "Falla en inyector o circuito de combustible (203)",
+    "descriptionEn": "Injector Circuit (203)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0204",
+    "descriptionEs": "Falla en inyector o circuito de combustible (204)",
+    "descriptionEn": "Injector Circuit (204)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0205",
+    "descriptionEs": "Falla en inyector o circuito de combustible (205)",
+    "descriptionEn": "Injector Circuit (205)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0206",
+    "descriptionEs": "Falla en inyector o circuito de combustible (206)",
+    "descriptionEn": "Injector Circuit (206)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0207",
+    "descriptionEs": "Falla en inyector o circuito de combustible (207)",
+    "descriptionEn": "Injector Circuit (207)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0208",
+    "descriptionEs": "Falla en inyector o circuito de combustible (208)",
+    "descriptionEn": "Injector Circuit (208)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0209",
+    "descriptionEs": "Falla en inyector o circuito de combustible (209)",
+    "descriptionEn": "Injector Circuit (209)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0210",
+    "descriptionEs": "Falla en inyector o circuito de combustible (210)",
+    "descriptionEn": "Injector Circuit (210)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0211",
+    "descriptionEs": "Falla en inyector o circuito de combustible (211)",
+    "descriptionEn": "Injector Circuit (211)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0212",
+    "descriptionEs": "Falla en inyector o circuito de combustible (212)",
+    "descriptionEn": "Injector Circuit (212)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0213",
+    "descriptionEs": "Falla en inyector o circuito de combustible (213)",
+    "descriptionEn": "Injector Circuit (213)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0214",
+    "descriptionEs": "Falla en inyector o circuito de combustible (214)",
+    "descriptionEn": "Injector Circuit (214)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0215",
+    "descriptionEs": "Falla en inyector o circuito de combustible (215)",
+    "descriptionEn": "Injector Circuit (215)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0216",
+    "descriptionEs": "Falla en inyector o circuito de combustible (216)",
+    "descriptionEn": "Injector Circuit (216)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0217",
+    "descriptionEs": "Falla en inyector o circuito de combustible (217)",
+    "descriptionEn": "Injector Circuit (217)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0218",
+    "descriptionEs": "Falla en inyector o circuito de combustible (218)",
+    "descriptionEn": "Injector Circuit (218)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0219",
+    "descriptionEs": "Falla en inyector o circuito de combustible (219)",
+    "descriptionEn": "Injector Circuit (219)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0220",
+    "descriptionEs": "Falla en inyector o circuito de combustible (220)",
+    "descriptionEn": "Injector Circuit (220)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0221",
+    "descriptionEs": "Falla en inyector o circuito de combustible (221)",
+    "descriptionEn": "Injector Circuit (221)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0222",
+    "descriptionEs": "Falla en inyector o circuito de combustible (222)",
+    "descriptionEn": "Injector Circuit (222)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0223",
+    "descriptionEs": "Falla en inyector o circuito de combustible (223)",
+    "descriptionEn": "Injector Circuit (223)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0224",
+    "descriptionEs": "Falla en inyector o circuito de combustible (224)",
+    "descriptionEn": "Injector Circuit (224)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0225",
+    "descriptionEs": "Falla en inyector o circuito de combustible (225)",
+    "descriptionEn": "Injector Circuit (225)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0226",
+    "descriptionEs": "Falla en inyector o circuito de combustible (226)",
+    "descriptionEn": "Injector Circuit (226)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0227",
+    "descriptionEs": "Falla en inyector o circuito de combustible (227)",
+    "descriptionEn": "Injector Circuit (227)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0228",
+    "descriptionEs": "Falla en inyector o circuito de combustible (228)",
+    "descriptionEn": "Injector Circuit (228)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0229",
+    "descriptionEs": "Falla en inyector o circuito de combustible (229)",
+    "descriptionEn": "Injector Circuit (229)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0230",
+    "descriptionEs": "Falla en inyector o circuito de combustible (230)",
+    "descriptionEn": "Injector Circuit (230)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0231",
+    "descriptionEs": "Falla en inyector o circuito de combustible (231)",
+    "descriptionEn": "Injector Circuit (231)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0232",
+    "descriptionEs": "Falla en inyector o circuito de combustible (232)",
+    "descriptionEn": "Injector Circuit (232)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0233",
+    "descriptionEs": "Falla en inyector o circuito de combustible (233)",
+    "descriptionEn": "Injector Circuit (233)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0234",
+    "descriptionEs": "Falla en inyector o circuito de combustible (234)",
+    "descriptionEn": "Injector Circuit (234)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0235",
+    "descriptionEs": "Falla en inyector o circuito de combustible (235)",
+    "descriptionEn": "Injector Circuit (235)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0236",
+    "descriptionEs": "Falla en inyector o circuito de combustible (236)",
+    "descriptionEn": "Injector Circuit (236)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0237",
+    "descriptionEs": "Falla en inyector o circuito de combustible (237)",
+    "descriptionEn": "Injector Circuit (237)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0238",
+    "descriptionEs": "Falla en inyector o circuito de combustible (238)",
+    "descriptionEn": "Injector Circuit (238)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0239",
+    "descriptionEs": "Falla en inyector o circuito de combustible (239)",
+    "descriptionEn": "Injector Circuit (239)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0240",
+    "descriptionEs": "Falla en inyector o circuito de combustible (240)",
+    "descriptionEn": "Injector Circuit (240)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0241",
+    "descriptionEs": "Falla en inyector o circuito de combustible (241)",
+    "descriptionEn": "Injector Circuit (241)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0242",
+    "descriptionEs": "Falla en inyector o circuito de combustible (242)",
+    "descriptionEn": "Injector Circuit (242)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0243",
+    "descriptionEs": "Falla en inyector o circuito de combustible (243)",
+    "descriptionEn": "Injector Circuit (243)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0244",
+    "descriptionEs": "Falla en inyector o circuito de combustible (244)",
+    "descriptionEn": "Injector Circuit (244)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0245",
+    "descriptionEs": "Falla en inyector o circuito de combustible (245)",
+    "descriptionEn": "Injector Circuit (245)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0246",
+    "descriptionEs": "Falla en inyector o circuito de combustible (246)",
+    "descriptionEn": "Injector Circuit (246)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0247",
+    "descriptionEs": "Falla en inyector o circuito de combustible (247)",
+    "descriptionEn": "Injector Circuit (247)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0248",
+    "descriptionEs": "Falla en inyector o circuito de combustible (248)",
+    "descriptionEn": "Injector Circuit (248)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0249",
+    "descriptionEs": "Falla en inyector o circuito de combustible (249)",
+    "descriptionEn": "Injector Circuit (249)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0250",
+    "descriptionEs": "Falla en inyector o circuito de combustible (250)",
+    "descriptionEn": "Injector Circuit (250)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0251",
+    "descriptionEs": "Falla en inyector o circuito de combustible (251)",
+    "descriptionEn": "Injector Circuit (251)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0252",
+    "descriptionEs": "Falla en inyector o circuito de combustible (252)",
+    "descriptionEn": "Injector Circuit (252)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0253",
+    "descriptionEs": "Falla en inyector o circuito de combustible (253)",
+    "descriptionEn": "Injector Circuit (253)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0254",
+    "descriptionEs": "Falla en inyector o circuito de combustible (254)",
+    "descriptionEn": "Injector Circuit (254)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0255",
+    "descriptionEs": "Falla en inyector o circuito de combustible (255)",
+    "descriptionEn": "Injector Circuit (255)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0256",
+    "descriptionEs": "Falla en inyector o circuito de combustible (256)",
+    "descriptionEn": "Injector Circuit (256)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0257",
+    "descriptionEs": "Falla en inyector o circuito de combustible (257)",
+    "descriptionEn": "Injector Circuit (257)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0258",
+    "descriptionEs": "Falla en inyector o circuito de combustible (258)",
+    "descriptionEn": "Injector Circuit (258)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0259",
+    "descriptionEs": "Falla en inyector o circuito de combustible (259)",
+    "descriptionEn": "Injector Circuit (259)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0260",
+    "descriptionEs": "Falla en inyector o circuito de combustible (260)",
+    "descriptionEn": "Injector Circuit (260)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0261",
+    "descriptionEs": "Falla en inyector o circuito de combustible (261)",
+    "descriptionEn": "Injector Circuit (261)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0262",
+    "descriptionEs": "Falla en inyector o circuito de combustible (262)",
+    "descriptionEn": "Injector Circuit (262)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0263",
+    "descriptionEs": "Falla en inyector o circuito de combustible (263)",
+    "descriptionEn": "Injector Circuit (263)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0264",
+    "descriptionEs": "Falla en inyector o circuito de combustible (264)",
+    "descriptionEn": "Injector Circuit (264)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0265",
+    "descriptionEs": "Falla en inyector o circuito de combustible (265)",
+    "descriptionEn": "Injector Circuit (265)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0266",
+    "descriptionEs": "Falla en inyector o circuito de combustible (266)",
+    "descriptionEn": "Injector Circuit (266)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0267",
+    "descriptionEs": "Falla en inyector o circuito de combustible (267)",
+    "descriptionEn": "Injector Circuit (267)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0268",
+    "descriptionEs": "Falla en inyector o circuito de combustible (268)",
+    "descriptionEn": "Injector Circuit (268)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0269",
+    "descriptionEs": "Falla en inyector o circuito de combustible (269)",
+    "descriptionEn": "Injector Circuit (269)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0270",
+    "descriptionEs": "Falla en inyector o circuito de combustible (270)",
+    "descriptionEn": "Injector Circuit (270)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0271",
+    "descriptionEs": "Falla en inyector o circuito de combustible (271)",
+    "descriptionEn": "Injector Circuit (271)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0272",
+    "descriptionEs": "Falla en inyector o circuito de combustible (272)",
+    "descriptionEn": "Injector Circuit (272)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0273",
+    "descriptionEs": "Falla en inyector o circuito de combustible (273)",
+    "descriptionEn": "Injector Circuit (273)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0274",
+    "descriptionEs": "Falla en inyector o circuito de combustible (274)",
+    "descriptionEn": "Injector Circuit (274)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0275",
+    "descriptionEs": "Falla en inyector o circuito de combustible (275)",
+    "descriptionEn": "Injector Circuit (275)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0276",
+    "descriptionEs": "Falla en inyector o circuito de combustible (276)",
+    "descriptionEn": "Injector Circuit (276)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0277",
+    "descriptionEs": "Falla en inyector o circuito de combustible (277)",
+    "descriptionEn": "Injector Circuit (277)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0278",
+    "descriptionEs": "Falla en inyector o circuito de combustible (278)",
+    "descriptionEn": "Injector Circuit (278)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0279",
+    "descriptionEs": "Falla en inyector o circuito de combustible (279)",
+    "descriptionEn": "Injector Circuit (279)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0280",
+    "descriptionEs": "Falla en inyector o circuito de combustible (280)",
+    "descriptionEn": "Injector Circuit (280)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0281",
+    "descriptionEs": "Falla en inyector o circuito de combustible (281)",
+    "descriptionEn": "Injector Circuit (281)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0282",
+    "descriptionEs": "Falla en inyector o circuito de combustible (282)",
+    "descriptionEn": "Injector Circuit (282)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0283",
+    "descriptionEs": "Falla en inyector o circuito de combustible (283)",
+    "descriptionEn": "Injector Circuit (283)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0284",
+    "descriptionEs": "Falla en inyector o circuito de combustible (284)",
+    "descriptionEn": "Injector Circuit (284)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0285",
+    "descriptionEs": "Falla en inyector o circuito de combustible (285)",
+    "descriptionEn": "Injector Circuit (285)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0286",
+    "descriptionEs": "Falla en inyector o circuito de combustible (286)",
+    "descriptionEn": "Injector Circuit (286)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0287",
+    "descriptionEs": "Falla en inyector o circuito de combustible (287)",
+    "descriptionEn": "Injector Circuit (287)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0288",
+    "descriptionEs": "Falla en inyector o circuito de combustible (288)",
+    "descriptionEn": "Injector Circuit (288)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0289",
+    "descriptionEs": "Falla en inyector o circuito de combustible (289)",
+    "descriptionEn": "Injector Circuit (289)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0290",
+    "descriptionEs": "Falla en inyector o circuito de combustible (290)",
+    "descriptionEn": "Injector Circuit (290)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0291",
+    "descriptionEs": "Falla en inyector o circuito de combustible (291)",
+    "descriptionEn": "Injector Circuit (291)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0292",
+    "descriptionEs": "Falla en inyector o circuito de combustible (292)",
+    "descriptionEn": "Injector Circuit (292)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0293",
+    "descriptionEs": "Falla en inyector o circuito de combustible (293)",
+    "descriptionEn": "Injector Circuit (293)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0294",
+    "descriptionEs": "Falla en inyector o circuito de combustible (294)",
+    "descriptionEn": "Injector Circuit (294)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0295",
+    "descriptionEs": "Falla en inyector o circuito de combustible (295)",
+    "descriptionEn": "Injector Circuit (295)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0296",
+    "descriptionEs": "Falla en inyector o circuito de combustible (296)",
+    "descriptionEn": "Injector Circuit (296)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0297",
+    "descriptionEs": "Falla en inyector o circuito de combustible (297)",
+    "descriptionEn": "Injector Circuit (297)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0298",
+    "descriptionEs": "Falla en inyector o circuito de combustible (298)",
+    "descriptionEn": "Injector Circuit (298)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0299",
+    "descriptionEs": "Falla en inyector o circuito de combustible (299)",
+    "descriptionEn": "Injector Circuit (299)",
+    "system": "ENGINE",
+    "severity": "CRITICAL",
+    "possibleCauses": "Inyector tapado, falta de pulso",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0001",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (1)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (1)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0002",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (2)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (2)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0003",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (3)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (3)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0004",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (4)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (4)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0005",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (5)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (5)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0006",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (6)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (6)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0007",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (7)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (7)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0008",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (8)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (8)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0009",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (9)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (9)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0010",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (10)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (10)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0011",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (11)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (11)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0012",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (12)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (12)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0013",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (13)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (13)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0014",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (14)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (14)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0015",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (15)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (15)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0016",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (16)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (16)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0017",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (17)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (17)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0018",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (18)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (18)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0019",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (19)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (19)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0020",
+    "descriptionEs": "Problema en sistema SRS/Airbag frontal (20)",
+    "descriptionEn": "Driver Frontal Stage 1 Deployment Control (20)",
+    "system": "BODY",
+    "severity": "CRITICAL",
+    "possibleCauses": "Conector amarillo suelto, m\u00f3dulo da\u00f1ado",
+    "urgency": "STOP_DRIVING"
+  }
+]

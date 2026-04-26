@@ -7,18 +7,20 @@ interface ShopSettingsProps {
   currentOpenHour: number;
   currentCloseHour: number;
   currentTimeSlice: number;
-  onSave: (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number }) => void;
+  currentFreeWashThreshold: number;
+  onSave: (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number; freeWashThreshold: number }) => void;
   onClose: () => void;
 }
 
-export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, currentTimeSlice, onSave, onClose }: ShopSettingsProps) {
+export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, currentTimeSlice, currentFreeWashThreshold, onSave, onClose }: ShopSettingsProps) {
   const [rules, setRules] = useState(currentRules);
   const [openHour, setOpenHour] = useState(currentOpenHour);
   const [closeHour, setCloseHour] = useState(currentCloseHour);
   const [timeSlice, setTimeSlice] = useState(currentTimeSlice);
+  const [freeWashThreshold, setFreeWashThreshold] = useState(currentFreeWashThreshold);
 
   const handleSave = () => {
-    onSave({ rules, openHour, closeHour, timeSlice });
+    onSave({ rules, openHour, closeHour, timeSlice, freeWashThreshold });
     onClose();
   };
 
@@ -58,6 +60,16 @@ export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, 
                 {[15, 30, 45, 60].map(v => <option key={v} value={v}>{v} min</option>)}
               </select>
             </div>
+          </div>
+          
+          <div>
+            <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-1.5">Monto Lavado Gratis (₡)</label>
+            <input 
+              type="number" 
+              value={freeWashThreshold} 
+              onChange={e => setFreeWashThreshold(+e.target.value)}
+              className="w-full bg-steel-800 border border-steel-500 rounded-lg px-3 py-2 font-mono text-xs text-white focus:border-forge-500 outline-none"
+            />
           </div>
 
           <div>

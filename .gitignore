@@ -23,3 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Android build outputs
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+*.hprof
+
+# Keep releases
+!releases/*.apk
+android/gradle-8.5/
+android/gradle-8.5-bin.zip
+temp_gradle/

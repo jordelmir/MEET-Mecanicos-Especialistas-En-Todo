@@ -14,6 +14,7 @@ interface WorkOrderWizardProps {
   openHour: number;
   closeHour: number;
   timeSliceMinutes: number;
+  freeWashThreshold: number;
   currentUser: Client;
   currentRole: Role;
   onBook: (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo) => void;
@@ -34,6 +35,7 @@ export function WorkOrderWizard({
   openHour,
   closeHour,
   timeSliceMinutes,
+  freeWashThreshold,
   currentUser,
   currentRole,
   onBook,
@@ -355,7 +357,7 @@ export function WorkOrderWizard({
                   <span className="text-sm font-medium text-white">{item.value}</span>
                 </div>
               ))}
-              {selectedService && selectedService.basePrice > 45000 && (
+              {selectedService && selectedService.basePrice > freeWashThreshold && (
                 <div className="mt-2 flex items-center justify-center p-2 rounded-lg bg-green-500/10 border border-green-500/20">
                   <span className="font-bold text-xs text-green-400 uppercase tracking-wider">🏷️ Incluye Lavado y Aspirado Gratis</span>
                 </div>

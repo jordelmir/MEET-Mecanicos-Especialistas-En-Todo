@@ -9,10 +9,11 @@ interface WorkOrderReceiptProps {
   service: Service | undefined;
   mechanic: Mechanic | undefined;
   client: Client | undefined;
+  freeWashThreshold: number;
   onClose: () => void;
 }
 
-export function WorkOrderReceipt({ workOrder, service, mechanic, client, onClose }: WorkOrderReceiptProps) {
+export function WorkOrderReceipt({ workOrder, service, mechanic, client, freeWashThreshold, onClose }: WorkOrderReceiptProps) {
   const handlePrint = () => {
     const printContent = document.getElementById('receipt-content');
     if (!printContent) return;
@@ -162,7 +163,7 @@ export function WorkOrderReceipt({ workOrder, service, mechanic, client, onClose
             {/* Pricing */}
             <div style={{ borderTop: '1px dashed #ddd', marginTop: '20px', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
-                {workOrder.price > 45000 && (
+                {workOrder.price > freeWashThreshold && (
                   <div style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: 700, border: '1px solid #bbf7d0', display: 'inline-block' }}>
                     🏷️ INCLUYE LAVADO Y ASPIRADO GRATIS
                   </div>

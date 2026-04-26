@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus, VehicleInfo } from '../types';
-import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save } from 'lucide-react';
+import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save, Gauge } from 'lucide-react';
 import { formatDuration } from '../services/timeEngine';
 
 interface ClientDashboardProps {
@@ -8,12 +8,13 @@ interface ClientDashboardProps {
   workOrders: WorkOrder[];
   services: Service[];
   mechanics: Mechanic[];
+  freeWashThreshold: number;
   onBookNew: () => void;
   onCancelOrder: (id: string) => void;
   onUpdateUser?: (client: Client) => void;
 }
 
-export function ClientDashboard({ currentUser, workOrders, services, mechanics, onBookNew, onCancelOrder, onUpdateUser }: ClientDashboardProps) {
+export function ClientDashboard({ currentUser, workOrders, services, mechanics, freeWashThreshold, onBookNew, onCancelOrder, onUpdateUser }: ClientDashboardProps) {
   const [editingMileage, setEditingMileage] = useState<number | null>(null);
   const [tempMileage, setTempMileage] = useState<number>(0);
   const [isAddingVehicle, setIsAddingVehicle] = useState(false);
@@ -48,6 +49,47 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
   };
 
   const userOrders = workOrders.filter(wo => wo.clientId === currentUser.id);
+  const [viewingHistoryOrder, setViewingHistoryOrder] = useState<WorkOrder | null>(null);
+
+  const getPreventiveRecommendations = () => {
+    const recs: any[] = [];
+    currentUser.vehicles.forEach(v => {
+      const km = v.mileage;
+      if (km === 0) return;
+      
+      const addRec = (interval: number, component: string, action: string, threshold: number, isCritical: boolean = false) => {
+        const next = Math.ceil(km / interval) * interval;
+        const diff = next - km;
+        if (diff <= threshold) {
+          recs.push({
+            vehicle: `${v.brand} ${v.model}`,
+            plate: v.plate,
+            component,
+            action: `${action} a los ${next.toLocaleString()} km`,
+            urgency: diff <= 0 ? 'high' : (isCritical ? 'high' : (diff <= threshold / 2 ? 'medium' : 'low')),
+            dueAt: next,
+            diff
+          });
+        }
+      };
+
+      addRec(5000, 'Aceite de Motor', 'Cambio sugerido', 1000);
+      addRec(40000, 'Aceite de Transmisión', 'Cambio programado', 3000, true);
+      addRec(30000, 'Bujías', 'Reemplazo recomendado', 2000);
+      addRec(80000, 'Faja/Cadena Distribución', 'Inspección/Cambio crítico', 5000, true);
+      addRec(20000, 'Frenos', 'Inspección de pastillas y discos', 2000, true);
+      addRec(15000, 'Filtros (Aire/Cabina)', 'Reemplazo preventivo', 1500);
+      addRec(40000, 'Refrigerante', 'Drenado y llenado', 3000);
+    });
+    
+    return recs.sort((a, b) => {
+      const w = { high: 0, medium: 1, low: 2 };
+      if (w[a.urgency as keyof typeof w] !== w[b.urgency as keyof typeof w]) return w[a.urgency as keyof typeof w] - w[b.urgency as keyof typeof w];
+      return a.diff - b.diff;
+    }).slice(0, 5); // top 5 recommendations
+  };
+
+  const recommendations = getPreventiveRecommendations();
   
   const upcomingOrders = userOrders.filter(wo => 
     wo.status !== WorkOrderStatus.COMPLETED && 
@@ -128,7 +170,7 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
                           <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                           {s.label}
                         </div>
-                        {wo.price > 45000 && (
+                        {wo.price > freeWashThreshold && (
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 bg-green-500/10 text-green-400 ml-2 border border-green-500/20">
                             🏷️ LAVADO Y ASPIRADO GRATIS
                           </div>
@@ -251,6 +293,39 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
               </div>
             )}
           </div>
+
+          {/* Recomendaciones Preventivas */}
+          <div className="mt-8">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+              <AlertCircle className="text-forge-500" size={24} />
+              Recomendaciones Preventivas
+            </h2>
+            <div className="space-y-3">
+              {recommendations.length === 0 ? (
+                <div className="glass-inner p-4 rounded-xl text-center text-steel-400 text-sm">
+                  Todos tus vehículos están al día. ¡Excelente!
+                </div>
+              ) : (
+                recommendations.map((rec, i) => (
+                  <div key={i} className="glass-inner p-4 rounded-xl border-l-2" style={{ borderLeftColor: rec.urgency === 'high' ? '#ef4444' : rec.urgency === 'medium' ? '#f59e0b' : '#3b82f6' }}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-white font-bold text-sm">{rec.component}</div>
+                        <div className="text-steel-400 text-xs mt-1">{rec.action}</div>
+                        <div className="text-[10px] text-forge-500 font-mono mt-2">{rec.vehicle} · {rec.plate}</div>
+                      </div>
+                      <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider ${
+                        rec.urgency === 'high' ? 'bg-red-500/20 text-red-400' : 
+                        rec.urgency === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {rec.urgency === 'high' ? 'Urgente' : rec.urgency === 'medium' ? 'Pronto' : 'Preventivo'}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right Column: History */}
@@ -282,7 +357,7 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
                   const s = getStatusLabel(wo.status);
                   const serviceName = services.find(srv => srv.id === wo.serviceId)?.name || 'Servicio';
                   return (
-                    <div key={wo.id} className="p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+                    <div key={wo.id} onClick={() => setViewingHistoryOrder(wo)} className="p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-bold text-gray-200 text-sm group-hover:text-forge-400 transition-colors">{serviceName}</div>
                         <div className={`text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase ${s.color}`}>{s.label}</div>
@@ -303,6 +378,57 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
         </div>
 
       </div>
+
+      {/* History Detail Modal */}
+      {viewingHistoryOrder && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="glass rounded-2xl p-6 w-full max-w-lg border border-forge-500/30 animate-slide-up">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white font-display tracking-wider">Detalle del Servicio</h3>
+                <p className="text-steel-400 text-sm font-mono mt-1">{viewingHistoryOrder.startTime.toLocaleDateString()} · {viewingHistoryOrder.vehicleInfo.plate}</p>
+              </div>
+              <button onClick={() => setViewingHistoryOrder(null)} className="text-steel-400 hover:text-white bg-white/5 p-2 rounded-lg">
+                <XCircle size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-steel-900/50 p-4 rounded-xl border border-white/5">
+                <div className="text-[10px] text-steel-500 uppercase tracking-wider font-bold mb-1">Servicio Realizado</div>
+                <div className="text-white font-bold">{services.find(s => s.id === viewingHistoryOrder.serviceId)?.name || 'Servicio'}</div>
+                {viewingHistoryOrder.price > freeWashThreshold && (
+                  <div className="mt-2 text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-1 rounded-full inline-block font-bold">
+                    🏷️ INCLUYÓ LAVADO Y ASPIRADO GRATIS
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-steel-900/50 p-4 rounded-xl border border-white/5">
+                <div className="text-[10px] text-steel-500 uppercase tracking-wider font-bold mb-1">Diagnóstico / Notas de reparación</div>
+                <div className="text-steel-200 text-sm">{viewingHistoryOrder.diagnosticNotes || viewingHistoryOrder.notes || 'Revisión y mantenimiento general según protocolo.'}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-steel-900/50 p-4 rounded-xl border border-white/5">
+                  <div className="text-[10px] text-steel-500 uppercase tracking-wider font-bold mb-1">Mecánico a cargo</div>
+                  <div className="text-white text-sm">{mechanics.find(m => m.id === viewingHistoryOrder.mechanicId)?.name || 'General'}</div>
+                </div>
+                <div className="bg-steel-900/50 p-4 rounded-xl border border-white/5">
+                  <div className="text-[10px] text-steel-500 uppercase tracking-wider font-bold mb-1">Costo Total</div>
+                  <div className="text-forge-400 font-bold text-lg font-mono">₡{viewingHistoryOrder.price.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setViewingHistoryOrder(null)} className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
