@@ -108,9 +108,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
-                    coroutineScope.launch { 
-                        snackbarHostState.showSnackbar("Dashboard Builder (Pro) - Próximamente", duration = SnackbarDuration.Short) 
-                    } 
+                    navController.navigate("custom_pid")
                 },
                 containerColor = Color.Black, 
                 shape = RoundedCornerShape(12.dp), 
