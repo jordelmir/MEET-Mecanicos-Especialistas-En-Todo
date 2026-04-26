@@ -1,350 +1,123 @@
 
-import { Appointment, Barber, Service, AppointmentStatus } from '../types';
-import { TIME_SLICE_MINUTES } from '../constants';
+import { WorkOrder, WorkOrderStatus } from '../types';
 
-// --- Core Calculations ---
-
-export const calculateEndTime = (startTime: Date, serviceDuration: number, barberSpeed: number): Date => {
-  const realDuration = Math.ceil(serviceDuration * barberSpeed);
-  return new Date(startTime.getTime() + realDuration * 60000);
-};
-
-export const isSlotAvailable = (
-  start: Date, 
-  end: Date, 
-  barberId: string, 
-  appointments: Appointment[],
-  excludeAppointmentId?: string
-): boolean => {
-  const barberAppointments = appointments.filter(a => 
-    a.barberId === barberId && 
-    a.status !== AppointmentStatus.CANCELLED &&
-    a.status !== AppointmentStatus.DELAYED &&
-    a.id !== excludeAppointmentId
-  );
-
-  for (const apt of barberAppointments) {
-    // Check intersection
-    if (start < apt.expectedEndTime && end > apt.startTime) {
-      return false;
-    }
-  }
-  return true;
-};
-
-// --- Smart Scheduling Engine ---
-
-export interface ScoredSlot {
-  time: Date;
-  status: 'AVAILABLE' | 'OCCUPIED' | 'LOCKED'; // LOCKED = Past time or closed
-  score: 'STANDARD' | 'OPTIMAL' | 'AI_PERFECT_MATCH'; // AI Scoring
-  blockReason?: string;
+/**
+ * Calculate the estimated end time for a work order based on service duration and mechanic efficiency.
+ */
+export function calculateEndTime(startTime: Date, baseMinutes: number, efficiencyFactor: number): Date {
+  const realDuration = Math.ceil(baseMinutes / efficiencyFactor);
+  const endTime = new Date(startTime.getTime() + realDuration * 60000);
+  return endTime;
 }
 
-// 45 Minute Rule Logic
-export const canClientCancel = (appointmentDate: Date): boolean => {
-    const now = new Date();
-    const diffMs = appointmentDate.getTime() - now.getTime();
-    const diffMins = diffMs / 60000;
-    return diffMins >= 45;
-};
+/**
+ * Check if a client can cancel a work order.
+ * Rules: Can only cancel RECEIVED or DIAGNOSED status orders (not yet started).
+ */
+export function canClientCancel(order: WorkOrder): boolean {
+  return [
+    WorkOrderStatus.RECEIVED,
+    WorkOrderStatus.DIAGNOSED,
+    WorkOrderStatus.WAITING_PARTS,
+  ].includes(order.status);
+}
 
-export const generateSmartGrid = (
-  date: Date, 
-  barberId: string, 
-  serviceDuration: number, 
-  barberSpeed: number,
-  appointments: Appointment[],
-  openHour: number,
-  closeHour: number,
-  timeSliceMinutes: number = 30 // Default fallback
-): ScoredSlot[] => {
-  const slots: ScoredSlot[] = [];
-  const startOfDay = new Date(date);
-  startOfDay.setHours(openHour, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(closeHour, 0, 0, 0);
+/**
+ * Generate time slots for the timeline grid.
+ */
+export function generateTimeSlots(openHour: number, closeHour: number, sliceMinutes: number): Date[] {
+  const slots: Date[] = [];
+  const today = new Date();
+  today.setSeconds(0, 0);
 
-  const durationMs = Math.ceil(serviceDuration * barberSpeed) * 60000;
-  
-  // Filter appointments for this barber and day
-  const relevantAppointments = appointments.filter(a => 
-    a.barberId === barberId && 
-    a.status !== AppointmentStatus.CANCELLED &&
-    a.startTime.getDate() === date.getDate()
-  ).sort((a,b) => a.startTime.getTime() - b.startTime.getTime());
-
-  let current = startOfDay;
-  const now = new Date();
-
-  // Create grid based on dynamic timeSliceMinutes passed from App state
-  while (current < endOfDay) {
-    const slotTime = new Date(current);
-    const proposedEnd = new Date(slotTime.getTime() + durationMs);
-    
-    // 1. Check if passed time (LOCKED)
-    if (date.getDate() === now.getDate() && slotTime < now) {
-        slots.push({ time: slotTime, status: 'LOCKED', score: 'STANDARD', blockReason: 'Pasado' });
-        current = new Date(current.getTime() + timeSliceMinutes * 60000);
-        continue;
+  for (let h = openHour; h < closeHour; h++) {
+    for (let m = 0; m < 60; m += sliceMinutes) {
+      const slot = new Date(today);
+      slot.setHours(h, m, 0, 0);
+      slots.push(slot);
     }
-
-    // 2. Check Overlaps (OCCUPIED)
-    if (!isSlotAvailable(slotTime, proposedEnd, barberId, appointments)) {
-        slots.push({ time: slotTime, status: 'OCCUPIED', score: 'STANDARD', blockReason: 'Ocupado' });
-        current = new Date(current.getTime() + timeSliceMinutes * 60000);
-        continue;
-    }
-
-    // 3. Check Closing Time (LOCKED)
-    if (proposedEnd > endOfDay) {
-         // Doesn't fit before close
-         // We don't push it or push as locked
-         current = new Date(current.getTime() + timeSliceMinutes * 60000);
-         continue;
-    }
-
-    // 4. AI SCORING (GAP FILLING)
-    let aiScore: 'STANDARD' | 'OPTIMAL' | 'AI_PERFECT_MATCH' = 'STANDARD';
-    
-    // Check adjacency to existing appointments
-    let touchesPrevious = false;
-    let touchesNext = false;
-
-    // Check Start of Day
-    if (slotTime.getTime() === startOfDay.getTime()) touchesPrevious = true;
-
-    for (const apt of relevantAppointments) {
-        // Starts exactly when another ends
-        if (Math.abs(slotTime.getTime() - apt.expectedEndTime.getTime()) < 60000) touchesPrevious = true;
-        // Ends exactly when another starts
-        if (Math.abs(proposedEnd.getTime() - apt.startTime.getTime()) < 60000) touchesNext = true;
-    }
-
-    if (touchesPrevious && touchesNext) {
-        // Fills a perfect hole
-        aiScore = 'AI_PERFECT_MATCH'; 
-    } else if (touchesPrevious || touchesNext) {
-        // Adherent to cluster
-        aiScore = 'OPTIMAL';
-    }
-
-    slots.push({
-      time: slotTime,
-      status: 'AVAILABLE',
-      score: aiScore
-    });
-
-    current = new Date(current.getTime() + timeSliceMinutes * 60000);
   }
   return slots;
-};
-
-// Keep old function signature for compatibility if needed, or redirect
-export const generateSmartSlots = generateSmartGrid; 
-
-// --- Analytics Transformers ---
-
-export const getHourlyLoad = (appointments: Appointment[], date: Date, openHour: number, closeHour: number) => {
-  const distribution = new Array(closeHour - openHour).fill(0);
-  
-  appointments.forEach(apt => {
-    // Only count appointments for the selected date
-    if (apt.startTime.getDate() !== date.getDate() || apt.status === AppointmentStatus.CANCELLED) return;
-
-    const startHour = apt.startTime.getHours();
-    const endHour = apt.expectedEndTime.getHours();
-
-    for (let h = startHour; h <= endHour; h++) {
-        if (h >= openHour && h < closeHour) {
-            const index = h - openHour;
-            // Simple weight: 1 unit per hour touched
-            distribution[index] += 1;
-        }
-    }
-  });
-
-  // Convert to chart format
-  return distribution.map((val, idx) => ({
-    time: `${idx + openHour}:00`,
-    occupancy: val * 20 // Arbitrary scaling for visual demo
-  }));
-};
-
-export const getServiceBreakdown = (appointments: Appointment[], services: any[]) => {
-  const counts: Record<string, number> = {};
-  
-  appointments.forEach(apt => {
-    if (apt.status === AppointmentStatus.CANCELLED) return;
-    const s = services.find(srv => srv.id === apt.serviceId);
-    // CRITICAL UPDATE: Use full name, do not split
-    const name = s ? s.name : 'Unknown'; 
-    counts[name] = (counts[name] || 0) + 1;
-  });
-
-  // Convert to array and sort by value DESCENDING (Most popular first)
-  return Object.entries(counts)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-};
-
-// --- Revenue Logic ---
-
-export interface RevenueStats {
-    daily: number;
-    weekly: number;
-    monthly: number;
-    yearly: number;
 }
 
-export type TimeFrame = 'daily' | 'weekly' | 'monthly' | 'yearly';
+/**
+ * Check for scheduling conflicts.
+ */
+export function hasConflict(
+  mechanicId: string,
+  startTime: Date,
+  endTime: Date,
+  existingOrders: WorkOrder[],
+  excludeOrderId?: string
+): boolean {
+  return existingOrders.some(order => {
+    if (order.id === excludeOrderId) return false;
+    if (order.mechanicId !== mechanicId) return false;
+    if (order.status === WorkOrderStatus.CANCELLED || order.status === WorkOrderStatus.DELIVERED) return false;
 
-export const calculateRevenueStats = (appointments: Appointment[], currentDate: Date): RevenueStats => {
-    const startOfDay = new Date(currentDate);
-    startOfDay.setHours(0,0,0,0);
-    const endOfDay = new Date(currentDate);
-    endOfDay.setHours(23,59,59,999);
+    const orderStart = order.startTime.getTime();
+    const orderEnd = order.estimatedEndTime.getTime();
+    const newStart = startTime.getTime();
+    const newEnd = endTime.getTime();
 
-    const startOfWeek = new Date(startOfDay);
-    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
-    startOfWeek.setHours(0,0,0,0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23,59,59,999);
+    return newStart < orderEnd && newEnd > orderStart;
+  });
+}
 
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+/**
+ * Format duration as human-readable text.
+ */
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  if (remaining === 0) return `${hours}h`;
+  return `${hours}h ${remaining}m`;
+}
 
-    const startOfYear = new Date(currentDate.getFullYear(), 0, 1);
-    const endOfYear = new Date(currentDate.getFullYear(), 11, 31, 23, 59, 59);
+/**
+ * Get a status-based color theme.
+ */
+export function getStatusColor(status: WorkOrderStatus): { bg: string; text: string; border: string } {
+  const map: Record<WorkOrderStatus, { bg: string; text: string; border: string }> = {
+    [WorkOrderStatus.RECEIVED]:      { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: '#2563eb' },
+    [WorkOrderStatus.DIAGNOSED]:     { bg: 'rgba(139,92,246,0.15)', text: '#a78bfa', border: '#7c3aed' },
+    [WorkOrderStatus.WAITING_PARTS]: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: '#d97706' },
+    [WorkOrderStatus.IN_PROGRESS]:   { bg: 'rgba(0, 240, 255,0.15)', text: '#00f0ff', border: '#00c2cf' },
+    [WorkOrderStatus.QUALITY_CHECK]: { bg: 'rgba(16,185,129,0.15)', text: '#34d399', border: '#059669' },
+    [WorkOrderStatus.COMPLETED]:     { bg: 'rgba(34,197,94,0.15)', text: '#4ade80', border: '#16a34a' },
+    [WorkOrderStatus.DELIVERED]:     { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af', border: '#6b7280' },
+    [WorkOrderStatus.CANCELLED]:     { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: '#dc2626' },
+  };
+  return map[status] || map[WorkOrderStatus.RECEIVED];
+}
 
-    return appointments.reduce((acc, apt) => {
-        if (apt.status === AppointmentStatus.CANCELLED) return acc;
-        
-        const aptTime = apt.startTime.getTime();
-        const price = apt.price;
+/**
+ * Get status label in Spanish.
+ */
+export function getStatusLabel(status: WorkOrderStatus): string {
+  const map: Record<WorkOrderStatus, string> = {
+    [WorkOrderStatus.RECEIVED]:      'Recibido',
+    [WorkOrderStatus.DIAGNOSED]:     'Diagnosticado',
+    [WorkOrderStatus.WAITING_PARTS]: 'Esperando Repuestos',
+    [WorkOrderStatus.IN_PROGRESS]:   'En Reparación',
+    [WorkOrderStatus.QUALITY_CHECK]: 'Control de Calidad',
+    [WorkOrderStatus.COMPLETED]:     'Completado',
+    [WorkOrderStatus.DELIVERED]:     'Entregado',
+    [WorkOrderStatus.CANCELLED]:     'Cancelado',
+  };
+  return map[status] || status;
+}
 
-        if (aptTime >= startOfDay.getTime() && aptTime <= endOfDay.getTime()) acc.daily += price;
-        if (aptTime >= startOfWeek.getTime() && aptTime <= endOfWeek.getTime()) acc.weekly += price;
-        if (aptTime >= startOfMonth.getTime() && aptTime <= endOfMonth.getTime()) acc.monthly += price;
-        if (aptTime >= startOfYear.getTime() && aptTime <= endOfYear.getTime()) acc.yearly += price;
-
-        return acc;
-    }, { daily: 0, weekly: 0, monthly: 0, yearly: 0 });
-};
-
-export const getRevenueTrend = (
-    appointments: Appointment[], 
-    view: TimeFrame, 
-    currentDate: Date,
-    openHour: number,
-    closeHour: number
-) => {
-    const data: Record<string, number> = {};
-    let labels: string[] = [];
-
-    if (view === 'daily') {
-        // Initialize hours based on dynamic config
-        for (let i = openHour; i < closeHour; i++) {
-            data[`${i}:00`] = 0;
-            labels.push(`${i}:00`);
-        }
-
-        const startOfDay = new Date(currentDate);
-        startOfDay.setHours(0,0,0,0);
-        const endOfDay = new Date(currentDate);
-        endOfDay.setHours(23,59,59,999);
-
-        appointments.forEach(apt => {
-            if (apt.status === AppointmentStatus.CANCELLED) return;
-            if (apt.startTime >= startOfDay && apt.startTime <= endOfDay) {
-                const hour = apt.startTime.getHours();
-                if (hour >= openHour && hour < closeHour) {
-                    data[`${hour}:00`] += apt.price;
-                }
-            }
-        });
-
-    } else if (view === 'weekly') {
-        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-        labels = days;
-        days.forEach(d => data[d] = 0);
-
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-        startOfWeek.setHours(0,0,0,0);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23,59,59,999);
-
-        appointments.forEach(apt => {
-            if (apt.status === AppointmentStatus.CANCELLED) return;
-            if (apt.startTime >= startOfWeek && apt.startTime <= endOfWeek) {
-                const dayName = days[apt.startTime.getDay()];
-                data[dayName] += apt.price;
-            }
-        });
-
-    } else if (view === 'monthly') {
-        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-        for(let i=1; i<=daysInMonth; i++) {
-            data[i.toString()] = 0;
-            labels.push(i.toString());
-        }
-
-        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
-
-        appointments.forEach(apt => {
-            if (apt.status === AppointmentStatus.CANCELLED) return;
-            if (apt.startTime >= startOfMonth && apt.startTime <= endOfMonth) {
-                data[apt.startTime.getDate().toString()] += apt.price;
-            }
-        });
-
-    } else if (view === 'yearly') {
-        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        labels = months;
-        months.forEach(m => data[m] = 0);
-
-        const startOfYear = new Date(currentDate.getFullYear(), 0, 1);
-        const endOfYear = new Date(currentDate.getFullYear(), 11, 31, 23, 59, 59);
-
-        appointments.forEach(apt => {
-            if (apt.status === AppointmentStatus.CANCELLED) return;
-            if (apt.startTime >= startOfYear && apt.startTime <= endOfYear) {
-                const monthName = months[apt.startTime.getMonth()];
-                data[monthName] += apt.price;
-            }
-        });
-    }
-
-    return labels.map(label => ({
-        name: label,
-        value: data[label] || 0
-    }));
-};
-
-
-// --- Utilities ---
-
-export const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit', hour12: true });
-};
-
-export const formatDate = (date: Date): string => {
-  return date.toLocaleDateString('es-CR', { weekday: 'long', month: 'long', day: 'numeric' });
-};
-
-export const getStatusColor = (status: AppointmentStatus): string => {
-  switch (status) {
-    case AppointmentStatus.SCHEDULED: return 'bg-blue-600/20 border-blue-500 text-blue-100';
-    case AppointmentStatus.CONFIRMED: return 'bg-indigo-600/20 border-indigo-500 text-indigo-100';
-    case AppointmentStatus.CHECKED_IN: return 'bg-purple-600/20 border-purple-500 text-purple-100';
-    case AppointmentStatus.IN_PROGRESS: return 'bg-brand-500/20 border-brand-500 text-brand-100 animate-pulse-slow';
-    case AppointmentStatus.COMPLETED: return 'bg-emerald-600/20 border-emerald-500 text-emerald-100';
-    case AppointmentStatus.DELAYED: return 'bg-red-600/20 border-red-500 text-red-100';
-    case AppointmentStatus.CANCELLED: return 'bg-gray-600/20 border-gray-500 text-gray-400 opacity-50';
-    default: return 'bg-gray-700 border-gray-600';
-  }
-};
+/**
+ * Get category badge info.
+ */
+export function getCategoryBadge(category: string): { className: string; label: string } {
+  const map: Record<string, { className: string; label: string }> = {
+    rep:  { className: 'badge-rep',  label: 'Reparación' },
+    cam:  { className: 'badge-cam',  label: 'Cambio' },
+    mant: { className: 'badge-mant', label: 'Mantenimiento' },
+    diag: { className: 'badge-diag', label: 'Diagnóstico' },
+  };
+  return map[category] || { className: 'badge-rep', label: '?' };
+}

@@ -1,109 +1,148 @@
 
-export enum AppointmentStatus {
-  SCHEDULED = 'SCHEDULED',
-  CONFIRMED = 'CONFIRMED',
-  CHECKED_IN = 'CHECKED_IN',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-  DELAYED = 'DELAYED',
+// ─── DOMAIN: TALLER MECÁNICO ─────────────────────────────────────────────────
+
+export enum WorkOrderStatus {
+  RECEIVED = 'RECEIVED',           // Vehículo recibido
+  DIAGNOSED = 'DIAGNOSED',        // Diagnóstico completado
+  WAITING_PARTS = 'WAITING_PARTS', // Esperando repuestos
+  IN_PROGRESS = 'IN_PROGRESS',    // En reparación
+  QUALITY_CHECK = 'QUALITY_CHECK', // Control de calidad
+  COMPLETED = 'COMPLETED',        // Completado
+  DELIVERED = 'DELIVERED',        // Entregado al cliente
+  CANCELLED = 'CANCELLED',        // Cancelado
 }
 
 export enum Role {
   CLIENT = 'CLIENT',
-  BARBER = 'BARBER',
+  MECHANIC = 'MECHANIC',
   ADMIN = 'ADMIN',
 }
 
-export interface BookingHistoryItem {
+export enum ServiceCategory {
+  REP = 'rep',   // Reparación
+  CAM = 'cam',   // Cambio/Repuesto
+  MANT = 'mant', // Mantenimiento
+  DIAG = 'diag', // Diagnóstico
+}
+
+export interface ServiceHistoryItem {
   id: string;
   date: Date;
   serviceName: string;
-  barberName: string;
+  mechanicName: string;
   price: number;
-  notes?: string; // Historical comments/feedback
+  vehicleInfo: string;
+  notes?: string;
 }
 
-export interface CutPreferences {
-  remarks: string;  // Free text always exists
-  [categoryId: string]: string; // Dynamic keys for any category (sides, top, color, eyebrows...)
+export interface VehicleInfo {
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  mileage: number;
+  vin?: string;
+  fuelType: 'Gasolina' | 'Diésel' | 'Híbrido' | 'Eléctrico' | 'GLP';
 }
-
-export interface StyleCategory {
-  id: string;
-  label: string;
-  items: string[];
-}
-
-export type GlobalStyleOptions = StyleCategory[];
 
 export interface Client {
   id: string;
   name: string;
   phone: string;
-  email: string; // Used for login
-  identification: string; // Used for login (unique)
-  accessCode: string; // 6-digit login code
-  bookingHistory: BookingHistoryItem[]; 
+  email: string;
+  identification: string;
+  accessCode: string;
+  vehicles: VehicleInfo[];
+  serviceHistory: ServiceHistoryItem[];
   lastVisit?: Date;
-  joinDate: Date; 
-  points: number; 
+  joinDate: Date;
+  loyaltyPoints: number;
   notes?: string;
-  avatar?: string; 
-  preferences?: CutPreferences; 
+  avatar?: string;
+}
+
+export interface CatalogItem {
+  name: string;
+  category: ServiceCategory;
+  estimatedMinutes?: number;
+}
+
+export interface CatalogSection {
+  id: string;
+  icon: string;
+  title: string;
+  items: CatalogItem[];
 }
 
 export interface Service {
   id: string;
   name: string;
-  durationMinutes: number; 
-  price: number;
+  category: ServiceCategory;
+  estimatedMinutes: number;
+  basePrice: number;
+  description?: string;
 }
 
-export interface Barber {
+export interface Mechanic {
   id: string;
   name: string;
-  phone: string; // Added phone number
-  identification: string; // Used for login
-  accessCode: string; // 6-digit login code
-  email: string; // Contact email
-  tier: 'JUNIOR' | 'SENIOR' | 'MASTER';
-  speedFactor: number; 
+  phone: string;
+  identification: string;
+  accessCode: string;
+  email: string;
+  specialty: 'GENERAL' | 'MOTOR' | 'ELECTRICO' | 'TRANSMISION' | 'SUSPENSION' | 'DIESEL';
+  efficiencyFactor: number; // 1.0 = standard, >1 = faster
   avatar: string;
+  certifications?: string[];
 }
 
-export interface Appointment {
+export interface WorkOrder {
   id: string;
-  clientId: string; 
-  clientName: string; 
-  barberId: string;
+  clientId: string;
+  clientName: string;
+  mechanicId: string;
   serviceId: string;
+  vehicleInfo: VehicleInfo;
   startTime: Date;
-  expectedEndTime: Date;
+  estimatedEndTime: Date;
   actualStartTime?: Date;
   actualEndTime?: Date;
-  status: AppointmentStatus;
+  status: WorkOrderStatus;
   notes?: string;
-  isShadow?: boolean; 
+  diagnosticNotes?: string;
   
-  price: number; 
-  durationMinutes: number;
+  price: number;
+  estimatedMinutes: number;
   
   // Cancellation Metadata
   cancellationReason?: string;
   cancellationDate?: Date;
+  
+  // Parts tracking
+  partsNeeded?: string[];
+  partsReady?: boolean;
 }
 
 export interface TimeSlice {
   time: Date;
   isOccupied: boolean;
-  appointmentId?: string;
+  workOrderId?: string;
 }
 
 export interface Metrics {
-  dailyOccupancy: number; 
-  deadTimeMinutes: number;
+  dailyOccupancy: number;
+  idleTimeMinutes: number;
   revenue: number;
-  appointmentsCompleted: number;
-  appointmentsTotal: number;
+  ordersCompleted: number;
+  ordersTotal: number;
+  averageRepairTime?: number;
+}
+
+// Shop Configuration
+export interface ShopConfig {
+  rules: string;
+  openHour: number;
+  closeHour: number;
+  timeSliceMinutes: number;
 }

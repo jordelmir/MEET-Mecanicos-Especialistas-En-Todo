@@ -1,738 +1,706 @@
 
-import React, { useState, useMemo } from 'react';
-import { INITIAL_APPOINTMENTS, BARBERS as INITIAL_BARBERS, SERVICES as DEFAULT_SERVICES, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR, INITIAL_CLIENTS, MOCK_ADMIN_USER, DEFAULT_STYLE_OPTIONS } from './constants';
-import { Appointment, Role, AppointmentStatus, Metrics, Client, BookingHistoryItem, Service, CutPreferences, Barber, GlobalStyleOptions } from './types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { INITIAL_WORK_ORDERS, MECHANICS as INITIAL_MECHANICS, SERVICES as DEFAULT_SERVICES, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR, INITIAL_CLIENTS, MOCK_ADMIN_USER } from './constants';
+import { WorkOrder, Role, WorkOrderStatus, Metrics, Client, ServiceHistoryItem, Service, Mechanic, VehicleInfo } from './types';
 import { Timeline } from './components/Timeline';
 import { MetricsPanel } from './components/MetricsPanel';
-import { BarberDashboard } from './components/BarberDashboard'; 
-import { BookingWizard } from './components/BookingWizard';
+import { MechanicDashboard } from './components/MechanicDashboard';
+import { WorkOrderWizard } from './components/WorkOrderWizard';
 import { ServiceManager } from './components/ServiceManager';
-import { BarberManager } from './components/BarberManager';
+import { MechanicManager } from './components/MechanicManager';
 import { ClientManager } from './components/ClientManager';
-import { AppointmentEditor } from './components/AppointmentEditor';
-import { UserProfile } from './components/UserProfile';
-import { ShopRulesEditor } from './components/ShopRulesEditor';
-import { StyleOptionsEditor } from './components/StyleOptionsEditor';
-import { LoginPage } from './components/LoginPage'; 
-import { MatrixBackground } from './components/MatrixBackground'; // Visual Upgrade
-import { calculateEndTime, canClientCancel } from './services/timeEngine';
-import { CancellationAnalysis } from './components/CancellationAnalysis'; // New Component
-import { Scissors, User, LayoutDashboard, Menu, Plus, Settings, FileText, Users, ChevronDown, Bell, LogOut, Briefcase, Lock, Tag, Gauge, BarChart3, AlertCircle } from 'lucide-react';
+import { WorkOrderEditor } from './components/WorkOrderEditor';
+import { ShopSettings } from './components/ShopSettings';
+import { ServiceCatalogView } from './components/ServiceCatalogView';
+import { LoginPage } from './components/LoginPage';
+import { IndustrialBackground } from './components/IndustrialBackground';
+import { AnalyticsPanel } from './components/AnalyticsPanel';
+import { CommandPalette } from './components/CommandPalette';
+import { WorkOrderReceipt } from './components/WorkOrderReceipt';
+import { useToast } from './components/ToastSystem';
+import { calculateEndTime } from './services/timeEngine';
+import { saveState, loadState } from './services/storage';
+import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText } from 'lucide-react';
 
 export default function App() {
-  // Auth State
+  // ── AUTH STATE ──
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [role, setRole] = useState<Role>(Role.ADMIN);
   const [loggedInUser, setLoggedInUser] = useState<Client>(MOCK_ADMIN_USER);
 
-  // Data State
-  const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
-  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
-  const [barbers, setBarbers] = useState<Barber[]>(INITIAL_BARBERS);
-  const [styleOptions, setStyleOptions] = useState<GlobalStyleOptions>(DEFAULT_STYLE_OPTIONS);
-  
-  // Shop Settings State (Dynamic)
-  const [shopRules, setShopRules] = useState<string>("1. Venir con el cabello lavado y sin gel.\n2. Llegar 5 minutos antes de la cita.\n3. Avisar cancelaciones con antelación.");
-  const [openHour, setOpenHour] = useState<number>(DEFAULT_OPEN_HOUR);
-  const [closeHour, setCloseHour] = useState<number>(DEFAULT_CLOSE_HOUR);
-  // NEW: Dynamic Time Slice State
-  const [timeSliceMinutes, setTimeSliceMinutes] = useState<number>(30); // Default to 30 mins as requested
+  const { toast } = useToast();
 
-  // UI State
+  // ── DATA STATE (with localStorage persistence) ──
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() => loadState('workOrders', INITIAL_WORK_ORDERS));
+  const [clients, setClients] = useState<Client[]>(() => loadState('clients', INITIAL_CLIENTS));
+  const [services, setServices] = useState<Service[]>(() => loadState('services', DEFAULT_SERVICES));
+  const [mechanics, setMechanics] = useState<Mechanic[]>(() => loadState('mechanics', INITIAL_MECHANICS));
+
+  // ── SHOP SETTINGS ──
+  const [shopRules, setShopRules] = useState<string>(() => loadState('shopRules', "1. Verificar el vehículo al recibir con el cliente presente.\n2. Notificar al cliente antes de realizar trabajos adicionales.\n3. Garantía de 30 días en mano de obra."));
+  const [openHour, setOpenHour] = useState<number>(() => loadState('openHour', DEFAULT_OPEN_HOUR));
+  const [closeHour, setCloseHour] = useState<number>(() => loadState('closeHour', DEFAULT_CLOSE_HOUR));
+  const [timeSliceMinutes, setTimeSliceMinutes] = useState<number>(() => loadState('timeSlice', 30));
+
+  // ── PERSIST STATE ──
+  useEffect(() => { saveState('workOrders', workOrders); }, [workOrders]);
+  useEffect(() => { saveState('clients', clients); }, [clients]);
+  useEffect(() => { saveState('services', services); }, [services]);
+  useEffect(() => { saveState('mechanics', mechanics); }, [mechanics]);
+  useEffect(() => { saveState('shopRules', shopRules); }, [shopRules]);
+  useEffect(() => { saveState('openHour', openHour); }, [openHour]);
+  useEffect(() => { saveState('closeHour', closeHour); }, [closeHour]);
+  useEffect(() => { saveState('timeSlice', timeSliceMinutes); }, [timeSliceMinutes]);
+
+  // ── UI STATE ──
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isServiceManagerOpen, setIsServiceManagerOpen] = useState(false);
-  const [isBarberManagerOpen, setIsBarberManagerOpen] = useState(false);
+  const [isMechanicManagerOpen, setIsMechanicManagerOpen] = useState(false);
   const [isClientManagerOpen, setIsClientManagerOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isShopRulesOpen, setIsShopRulesOpen] = useState(false);
-  const [isStyleEditorOpen, setIsStyleEditorOpen] = useState(false);
-  const [isCancellationReportOpen, setIsCancellationReportOpen] = useState(false); // New state for report
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
-  
-  // ADMIN SPECIFIC STATE: View Mode (Dashboard vs Workstation)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [adminViewMode, setAdminViewMode] = useState<'DASHBOARD' | 'WORKSTATION'>('DASHBOARD');
-
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
 
-  // --- Derived State for Access Control ---
-  
-  // If role is BARBER, they only see themselves.
-  // If role is ADMIN, they see ALL, UNLESS they are in "Workstation Mode" where they might want to focus on their own queue (or a specific barber).
-  const visibleBarbers = useMemo(() => {
-    if (role === Role.BARBER) {
-      return barbers.filter(b => b.id === loggedInUser.id);
+  // ── DERIVED STATE ──
+  const visibleMechanics = useMemo(() => {
+    if (role === Role.MECHANIC) {
+      return mechanics.filter(m => m.id === loggedInUser.id);
     }
-    return barbers;
-  }, [barbers, role, loggedInUser.id]);
+    return mechanics;
+  }, [mechanics, role, loggedInUser.id]);
 
-  // If role is BARBER, they only see their appointments.
-  // Admin sees all.
-  const visibleAppointments = useMemo(() => {
-      if (role === Role.BARBER) {
-          return appointments.filter(a => a.barberId === loggedInUser.id);
-      }
-      return appointments;
-  }, [appointments, role, loggedInUser.id]);
+  const visibleWorkOrders = useMemo(() => {
+    if (role === Role.MECHANIC) {
+      return workOrders.filter(wo => wo.mechanicId === loggedInUser.id);
+    }
+    return workOrders;
+  }, [workOrders, role, loggedInUser.id]);
 
-
-  // --- Login Handler (Secure) ---
+  // ── LOGIN ──
   const handleLogin = async (identity: string, code: string) => {
-      setAuthError(null);
+    setAuthError(null);
 
-      // 1. Check Admin
-      if (
-          (identity === MOCK_ADMIN_USER.identification || identity === MOCK_ADMIN_USER.email) && 
-          code === MOCK_ADMIN_USER.accessCode
-      ) {
-          setRole(Role.ADMIN);
-          setLoggedInUser(MOCK_ADMIN_USER);
-          setIsAuthenticated(true);
-          return;
-      }
+    // 1. Admin
+    if (
+      (identity === MOCK_ADMIN_USER.identification || identity === MOCK_ADMIN_USER.email) &&
+      code === MOCK_ADMIN_USER.accessCode
+    ) {
+      setRole(Role.ADMIN);
+      setLoggedInUser(MOCK_ADMIN_USER);
+      setIsAuthenticated(true);
+      return;
+    }
 
-      // 2. Check Barbers
-      const barberFound = barbers.find(b => 
-          (b.identification === identity || b.email === identity) && b.accessCode === code
-      );
+    // 2. Mechanics
+    const mechFound = mechanics.find(m =>
+      (m.identification === identity || m.email === identity) && m.accessCode === code
+    );
+    if (mechFound) {
+      setRole(Role.MECHANIC);
+      const mechAsUser: Client = {
+        id: mechFound.id, name: mechFound.name, phone: mechFound.phone,
+        email: mechFound.email, identification: mechFound.identification,
+        accessCode: mechFound.accessCode, vehicles: [], serviceHistory: [],
+        joinDate: new Date(), loyaltyPoints: 0, avatar: mechFound.avatar,
+        notes: `Staff: ${mechFound.specialty}`,
+      };
+      setLoggedInUser(mechAsUser);
+      setIsAuthenticated(true);
+      return;
+    }
 
-      if (barberFound) {
-          setRole(Role.BARBER); // CORRECT: Set specific Barber Role
-          
-          // Create a "Client-like" object for the barber to satisfy the User interface
-          const barberAsUser: Client = {
-              id: barberFound.id,
-              name: barberFound.name,
-              phone: '',
-              email: barberFound.email,
-              identification: barberFound.identification,
-              accessCode: barberFound.accessCode,
-              bookingHistory: [],
-              joinDate: new Date(),
-              points: 0,
-              avatar: barberFound.avatar,
-              notes: `Staff: ${barberFound.tier}`
-          };
-          setLoggedInUser(barberAsUser);
-          setIsAuthenticated(true);
-          return;
-      }
+    // 3. Clients
+    const clientFound = clients.find(c =>
+      (c.identification === identity || c.email === identity) && c.accessCode === code
+    );
+    if (clientFound) {
+      setRole(Role.CLIENT);
+      setLoggedInUser(clientFound);
+      setIsAuthenticated(true);
+      toast('success', 'Sesión Iniciada', `Bienvenido, ${clientFound.name}`);
+      return;
+    }
 
-      // 3. Check Clients
-      const clientFound = clients.find(c => 
-          (c.identification === identity || c.email === identity) && c.accessCode === code
-      );
-
-      if (clientFound) {
-          setRole(Role.CLIENT);
-          setLoggedInUser(clientFound);
-          setIsAuthenticated(true);
-          return;
-      }
-
-      setAuthError("Credenciales inválidas. Verifica tu Cédula/Email y Código.");
+    setAuthError("Credenciales inválidas. Verifica tu Cédula/Email y Código.");
+    toast('error', 'Error de Autenticación', 'Credenciales inválidas');
   };
 
   const handleLogout = () => {
-      setIsAuthenticated(false);
-      setRole(Role.ADMIN); // Reset to default for safety
-      setAuthError(null);
-      setAdminViewMode('DASHBOARD'); // Reset admin view
+    setIsAuthenticated(false);
+    setRole(Role.ADMIN);
+    setAuthError(null);
+    setAdminViewMode('DASHBOARD');
+    toast('info', 'Sesión Cerrada', 'Has salido del sistema');
   };
 
-  // Calculate Metrics Real-time (Scoped by visibleAppointments)
+  // ── METRICS ──
   const metrics: Metrics = useMemo(() => {
-    // Only calculate for the currently selected day
-    const todaysAppointments = visibleAppointments.filter(a => 
-        a.startTime.getDate() === currentDate.getDate() &&
-        a.status !== AppointmentStatus.CANCELLED
+    const todaysOrders = visibleWorkOrders.filter(wo =>
+      wo.startTime.getDate() === currentDate.getDate() &&
+      wo.status !== WorkOrderStatus.CANCELLED
     );
 
-    // Use visibleBarbers length for capacity
-    const totalMinutesAvailable = (closeHour - openHour) * 60 * visibleBarbers.length;
-    
+    const totalMinutes = (closeHour - openHour) * 60 * visibleMechanics.length;
     let bookedMinutes = 0;
     let completedCount = 0;
     let revenue = 0;
 
-    todaysAppointments.forEach(apt => {
-        const duration = (apt.expectedEndTime.getTime() - apt.startTime.getTime()) / 60000;
-        bookedMinutes += duration;
-        revenue += apt.price;
-        if (apt.status === AppointmentStatus.COMPLETED) completedCount++;
+    todaysOrders.forEach(wo => {
+      const duration = (wo.estimatedEndTime.getTime() - wo.startTime.getTime()) / 60000;
+      bookedMinutes += duration;
+      revenue += wo.price;
+      if (wo.status === WorkOrderStatus.COMPLETED || wo.status === WorkOrderStatus.DELIVERED) completedCount++;
     });
 
-    const deadTime = Math.max(0, totalMinutesAvailable - bookedMinutes);
+    const idleTime = Math.max(0, totalMinutes - bookedMinutes);
 
     return {
-      dailyOccupancy: totalMinutesAvailable > 0 ? Math.round((bookedMinutes / totalMinutesAvailable) * 100) : 0,
-      deadTimeMinutes: Math.round(deadTime),
+      dailyOccupancy: totalMinutes > 0 ? Math.round((bookedMinutes / totalMinutes) * 100) : 0,
+      idleTimeMinutes: Math.round(idleTime),
       revenue,
-      appointmentsCompleted: completedCount,
-      appointmentsTotal: todaysAppointments.length
+      ordersCompleted: completedCount,
+      ordersTotal: todaysOrders.length,
     };
-  }, [visibleAppointments, currentDate, visibleBarbers.length, openHour, closeHour]);
+  }, [visibleWorkOrders, currentDate, visibleMechanics.length, openHour, closeHour]);
 
-  const handleStatusChange = (id: string, newStatus: AppointmentStatus) => {
-    setAppointments(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      
+  // ── STATUS CHANGE ──
+  const handleStatusChange = (id: string, newStatus: WorkOrderStatus) => {
+    setWorkOrders(prev => prev.map(wo => {
+      if (wo.id !== id) return wo;
+
       const updates: any = { status: newStatus };
 
-      // TIME TRACKING LOGIC
-      if (newStatus === AppointmentStatus.IN_PROGRESS) {
-          updates.actualStartTime = new Date(); // Start the stopwatch
-      } else if (newStatus === AppointmentStatus.COMPLETED) {
-          updates.actualEndTime = new Date(); // Stop the stopwatch
-          
-          // Calculate actual duration in minutes
-          if (a.actualStartTime) {
-              const diffMs = updates.actualEndTime.getTime() - a.actualStartTime.getTime();
-              updates.durationMinutes = Math.round(diffMs / 60000); // Update record with REAL duration
-          }
+      if (newStatus === WorkOrderStatus.IN_PROGRESS) {
+        updates.actualStartTime = new Date();
+      } else if (newStatus === WorkOrderStatus.COMPLETED) {
+        updates.actualEndTime = new Date();
+        if (wo.actualStartTime) {
+          updates.estimatedMinutes = Math.round((updates.actualEndTime.getTime() - wo.actualStartTime.getTime()) / 60000);
+        }
       }
 
-      return { ...a, ...updates };
+      return { ...wo, ...updates };
     }));
 
-    // Update Client Stats if appointment is completed
-    if (newStatus === AppointmentStatus.COMPLETED) {
-        const apt = appointments.find(a => a.id === id);
-        
-        if (apt && apt.status !== AppointmentStatus.COMPLETED) {
-            const service = services.find(s => s.id === apt.serviceId);
-            const barber = barbers.find(b => b.id === apt.barberId);
+    // Update client service history on completion
+    if (newStatus === WorkOrderStatus.COMPLETED) {
+      const wo = workOrders.find(w => w.id === id);
+      if (wo && wo.status !== WorkOrderStatus.COMPLETED) {
+        const service = services.find(s => s.id === wo.serviceId);
+        const mech = mechanics.find(m => m.id === wo.mechanicId);
+        if (service && mech) {
+          const historyItem: ServiceHistoryItem = {
+            id: `hist-${Math.random().toString(36).substr(2, 9)}`,
+            date: wo.startTime,
+            serviceName: service.name,
+            mechanicName: mech.name,
+            price: wo.price,
+            vehicleInfo: `${wo.vehicleInfo.brand} ${wo.vehicleInfo.model} ${wo.vehicleInfo.year}`,
+            notes: wo.notes,
+          };
 
-            if (service && barber) {
-                const historyItem: BookingHistoryItem = {
-                    id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-                    date: apt.startTime,
-                    serviceName: service.name,
-                    barberName: barber.name,
-                    price: apt.price,
-                    notes: apt.notes ? `Nota de cita: ${apt.notes}` : undefined
-                };
-
-                setClients(prevClients => prevClients.map(c => 
-                    c.id === apt.clientId 
-                    ? { 
-                        ...c, 
-                        bookingHistory: [historyItem, ...c.bookingHistory], 
-                        lastVisit: new Date(),
-                        points: c.points + 1
-                      }
-                    : c
-                ));
-            }
+          setClients(prevClients => prevClients.map(c =>
+            c.id === wo.clientId
+              ? { ...c, serviceHistory: [historyItem, ...c.serviceHistory], lastVisit: new Date(), loyaltyPoints: c.loyaltyPoints + 1 }
+              : c
+          ));
         }
+      }
+      toast('success', 'Orden Completada', `El trabajo de ${wo?.vehicleInfo.plate} ha finalizado`);
+    } else {
+      toast('info', 'Estado Actualizado', `Nuevo estado: ${getStatusLabel(newStatus)}`);
     }
   };
 
-  const handleUpdateAppointment = (id: string, updates: { price: number; durationMinutes: number; startTime?: Date }) => {
-    setAppointments(prev => prev.map(apt => {
-      if (apt.id !== id) return apt;
-      
-      const startToUse = updates.startTime || apt.startTime;
-      const newEndTime = new Date(startToUse.getTime() + updates.durationMinutes * 60000);
-      
-      return {
-        ...apt,
-        price: updates.price,
-        durationMinutes: updates.durationMinutes,
-        startTime: startToUse,
-        expectedEndTime: newEndTime
-      };
+  // ── UPDATE WORK ORDER ──
+  const handleUpdateWorkOrder = (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date }) => {
+    setWorkOrders(prev => prev.map(wo => {
+      if (wo.id !== id) return wo;
+      const startToUse = updates.startTime || wo.startTime;
+      const newEnd = new Date(startToUse.getTime() + updates.estimatedMinutes * 60000);
+      return { ...wo, price: updates.price, estimatedMinutes: updates.estimatedMinutes, startTime: startToUse, estimatedEndTime: newEnd };
     }));
-    setEditingAppointment(null);
+    setEditingWorkOrder(null);
+    toast('success', 'Orden Actualizada', 'Los detalles se guardaron correctamente');
   };
 
-  // --- CANCELLATION HANDLER ---
-  const handleCancelAppointment = (appointmentId: string, reason?: string) => {
-      const apt = appointments.find(a => a.id === appointmentId);
-      if (!apt) return;
-
-      // Ensure reason is captured
-      const updates: any = { 
-          status: AppointmentStatus.CANCELLED,
-          cancellationReason: reason || 'Cancelada por usuario',
-          cancellationDate: new Date()
-      };
-
-      setAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, ...updates } : a));
+  // ── CANCEL ──
+  const handleCancelWorkOrder = (orderId: string, reason?: string) => {
+    setWorkOrders(prev => prev.map(wo =>
+      wo.id === orderId
+        ? { ...wo, status: WorkOrderStatus.CANCELLED, cancellationReason: reason || 'Cancelada', cancellationDate: new Date() }
+        : wo
+    ));
+    toast('warning', 'Orden Cancelada', 'La orden ha sido anulada');
   };
 
-  // --- CRUD Handlers (Simplified) ---
-  const handleCreateClient = (clientData: Omit<Client, 'id' | 'bookingHistory' | 'points' | 'joinDate'>): Client => {
-      const newClient: Client = {
-          id: `c${clients.length + 1}`,
-          ...clientData,
-          bookingHistory: [],
-          points: 0,
-          joinDate: new Date()
-      };
-      setClients(prev => [...prev, newClient]);
-      return newClient;
+  // ── CRUD HANDLERS ──
+  const handleCreateClient = (clientData: any): Client => {
+    const newClient: Client = {
+      id: `c${Date.now()}`, ...clientData,
+      vehicles: clientData.vehicles || [],
+      serviceHistory: [], loyaltyPoints: 0, joinDate: new Date(),
+    };
+    setClients(prev => [...prev, newClient]);
+    toast('success', 'Cliente Creado', `${newClient.name} ha sido registrado`);
+    return newClient;
   };
-  
+
   const handleUpdateClient = (updatedClient: Client) => {
-      setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-      // Sync Session if needed
-      if (loggedInUser.id === updatedClient.id) {
-          setLoggedInUser(updatedClient);
-      }
+    setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+    if (loggedInUser.id === updatedClient.id) setLoggedInUser(updatedClient);
+    toast('success', 'Cliente Actualizado', 'Información guardada con éxito');
   };
 
   const handleDeleteClient = (clientId: string) => {
     setClients(prev => prev.filter(c => c.id !== clientId));
-    setAppointments(prev => prev.filter(a => a.clientId !== clientId));
-  };
-  
-  // Profile Updater (Polymorphic: Handles Barber or Client)
-  const handleUpdateProfile = (updatedData: Partial<Client>) => {
-      if (role === Role.CLIENT) {
-          const updatedClient = { ...loggedInUser, ...updatedData };
-          handleUpdateClient(updatedClient);
-      } else if (role === Role.BARBER) {
-          // If it's a barber, we must update the Barber list AND the current user session wrapper
-          const updatedBarber: Barber = {
-             ...barbers.find(b => b.id === loggedInUser.id)!,
-             avatar: updatedData.avatar || '',
-             // Can add more fields here if we allow editing name/email self-service
-          };
-          
-          handleUpdateBarber(updatedBarber);
-          
-          // Update Session
-          setLoggedInUser(prev => ({ ...prev, avatar: updatedBarber.avatar }));
-      } else if (role === Role.ADMIN) {
-           setLoggedInUser(prev => ({ ...prev, ...updatedData }));
-      }
+    setWorkOrders(prev => prev.filter(wo => wo.clientId !== clientId));
+    toast('info', 'Cliente Eliminado');
   };
 
-
-  const handleUpdatePreferences = (clientId: string, prefs: CutPreferences) => setClients(prev => prev.map(c => c.id === clientId ? { ...c, preferences: prefs } : c));
-  const handleAddService = (serviceData: Omit<Service, 'id'>) => setServices(prev => [...prev, { id: `s-${Math.random()}`, ...serviceData }]);
-  const handleUpdateService = (updatedService: Service) => setServices(prev => prev.map(s => s.id === updatedService.id ? updatedService : s));
-  const handleDeleteService = (serviceId: string) => setServices(prev => prev.filter(s => s.id !== serviceId));
-  const handleAddBarber = (barberData: Omit<Barber, 'id'>) => setBarbers(prev => [...prev, { id: `b-${Math.random()}`, ...barberData }]);
-  
-  const handleUpdateBarber = (updatedBarber: Barber) => {
-      setBarbers(prev => prev.map(b => b.id === updatedBarber.id ? updatedBarber : b));
-      // Sync Session if needed
-      if (loggedInUser.id === updatedBarber.id) {
-          setLoggedInUser(prev => ({ ...prev, avatar: updatedBarber.avatar, name: updatedBarber.name }));
-      }
+  const handleAddService = (serviceData: Omit<Service, 'id'>) => {
+    setServices(prev => [...prev, { id: `s-${Date.now()}`, ...serviceData }]);
+    toast('success', 'Servicio Agregado');
+  };
+  const handleUpdateService = (svc: Service) => {
+    setServices(prev => prev.map(s => s.id === svc.id ? svc : s));
+    toast('success', 'Servicio Actualizado');
+  };
+  const handleDeleteService = (id: string) => {
+    setServices(prev => prev.filter(s => s.id !== id));
+    toast('info', 'Servicio Eliminado');
   };
 
-  const handleDeleteBarber = (barberId: string) => setBarbers(prev => prev.filter(b => b.id !== barberId));
-  
-  // Updated Settings Handler to include Time Slice
+  const handleAddMechanic = (data: Omit<Mechanic, 'id'>) => {
+    setMechanics(prev => [...prev, { id: `m-${Date.now()}`, ...data }]);
+    toast('success', 'Mecánico Registrado');
+  };
+  const handleUpdateMechanic = (mech: Mechanic) => {
+    setMechanics(prev => prev.map(m => m.id === mech.id ? mech : m));
+    if (loggedInUser.id === mech.id) setLoggedInUser(prev => ({ ...prev, avatar: mech.avatar, name: mech.name }));
+    toast('success', 'Mecánico Actualizado');
+  };
+  const handleDeleteMechanic = (id: string) => {
+    setMechanics(prev => prev.filter(m => m.id !== id));
+    toast('info', 'Mecánico Eliminado');
+  };
+
   const handleUpdateSettings = (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number }) => {
-      setShopRules(settings.rules);
-      setOpenHour(settings.openHour);
-      setCloseHour(settings.closeHour);
-      setTimeSliceMinutes(settings.timeSlice);
-  };
-  const handleUpdateStyles = (newStyles: GlobalStyleOptions) => {
-      setStyleOptions(newStyles);
+    setShopRules(settings.rules);
+    setOpenHour(settings.openHour);
+    setCloseHour(settings.closeHour);
+    setTimeSliceMinutes(settings.timeSlice);
+    toast('success', 'Configuración Guardada', 'Las preferencias del taller se han actualizado');
   };
 
-  // --- Booking ---
-  const handleBook = (clientId: string, clientName: string, barberId: string, serviceId: string, time: Date) => {
-    const barber = barbers.find(b => b.id === barberId)!;
+  // ── BOOKING ──
+  const handleBook = (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo) => {
+    const mech = mechanics.find(m => m.id === mechanicId)!;
     const service = services.find(s => s.id === serviceId)!;
-    
-    const realDuration = Math.ceil(service.durationMinutes * barber.speedFactor);
-    const endTime = calculateEndTime(time, service.durationMinutes, barber.speedFactor);
 
-    const newAppointment: Appointment = {
-      id: Math.random().toString(36).substr(2, 9),
-      clientId,
-      clientName, 
-      barberId,
-      serviceId,
-      startTime: time,
-      expectedEndTime: endTime,
-      status: AppointmentStatus.SCHEDULED,
-      price: service.price,
-      durationMinutes: realDuration
+    const realDuration = Math.ceil(service.estimatedMinutes * mech.efficiencyFactor);
+    const endTime = calculateEndTime(time, service.estimatedMinutes, mech.efficiencyFactor);
+
+    const newOrder: WorkOrder = {
+      id: `wo-${Date.now()}`,
+      clientId, clientName, mechanicId, serviceId,
+      vehicleInfo: vehicle,
+      startTime: time, estimatedEndTime: endTime,
+      status: WorkOrderStatus.RECEIVED,
+      price: service.basePrice,
+      estimatedMinutes: realDuration,
     };
 
-    setAppointments(prev => [...prev, newAppointment]);
+    setWorkOrders(prev => [...prev, newOrder]);
     setIsBookingModalOpen(false);
     setCurrentDate(time);
+    toast('success', 'Orden Creada', `Para ${vehicle.plate} a las ${time.toLocaleTimeString([],{hour: '2-digit', minute:'2-digit'})}`);
   };
 
-  // --- RENDER ---
-
+  // ── RENDER ──
   if (!isAuthenticated) {
-      return <LoginPage onLogin={handleLogin} error={authError} />;
+    return <LoginPage onLogin={handleLogin} error={authError} />;
   }
 
-  // Define Layout Logic
-  const showAdminDashboard = role === Role.ADMIN || role === Role.BARBER;
-  
-  const currentBarber = role === Role.BARBER 
-      ? barbers.find(b => b.id === loggedInUser.id) 
-      : (role === Role.ADMIN && adminViewMode === 'WORKSTATION') 
-          ? barbers[0] // Assume Admin acts as the first barber (Master)
-          : null;
+  const showDashboard = role === Role.ADMIN || role === Role.MECHANIC;
+  const currentMechanic = role === Role.MECHANIC
+    ? mechanics.find(m => m.id === loggedInUser.id)
+    : (role === Role.ADMIN && adminViewMode === 'WORKSTATION')
+      ? mechanics[0]
+      : null;
 
   return (
-    <div className="min-h-screen text-gray-100 font-sans selection:bg-brand-500/30 relative">
-      
-      {/* HIGH TECH BACKGROUND LAYER */}
-      <MatrixBackground />
-      
-      {/* CONTENT LAYER - Z-Index 10 ensures it floats above the canvas */}
+    <div className="min-h-screen text-gray-100 font-sans relative">
+      <IndustrialBackground />
+
       <div className="relative z-10 min-h-screen flex flex-col">
-        
-        {/* Navigation Bar - NOW WITH GLASS MORPHISM */}
-        <nav className="glass-morphism h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 md:px-6 shadow-lg border-b-0">
-            <div className="flex items-center gap-3">
-            <div className="bg-brand-500 p-1.5 rounded-lg text-black shadow-[0_0_15px_rgba(240,180,41,0.4)]">
-                <Scissors size={20} strokeWidth={2.5} />
+        {/* ── NAV BAR ── */}
+        <nav className="glass h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="bg-forge-500 p-1.5 rounded-lg text-black shadow-[0_0_15px_rgba(0, 240, 255,0.4)]">
+              <Wrench size={20} strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white hidden sm:inline">CHRONOS<span className="text-brand-500">.BARBER</span></span>
-            </div>
+            <span className="font-bold text-xl tracking-tight text-white hidden sm:inline">
+              ME<span className="text-forge-500">ET</span>
+            </span>
+          </div>
 
-            <div className="flex items-center gap-4">
-            
+          <div className="flex items-center gap-4">
             {role === Role.ADMIN && (
-                <div className="flex items-center gap-2 glass-morphism-inner p-1 rounded-full border border-white/5">
-                    <button 
-                        onClick={() => setAdminViewMode('DASHBOARD')}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${adminViewMode === 'DASHBOARD' ? 'bg-dark-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        <BarChart3 size={14} />
-                        <span className="hidden md:inline">Gerencia</span>
-                    </button>
-                    <button 
-                        onClick={() => setAdminViewMode('WORKSTATION')}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${adminViewMode === 'WORKSTATION' ? 'bg-brand-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        <Gauge size={14} />
-                        <span className="hidden md:inline">Mi Estación</span>
-                    </button>
-                </div>
+              <div className="flex items-center gap-2 glass-inner p-1 rounded-full border border-white/5">
+                <button
+                  onClick={() => setAdminViewMode('DASHBOARD')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                    adminViewMode === 'DASHBOARD' ? 'bg-steel-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <BarChart3 size={14} />
+                  <span className="hidden md:inline">Gerencia</span>
+                </button>
+                <button
+                  onClick={() => setAdminViewMode('WORKSTATION')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                    adminViewMode === 'WORKSTATION' ? 'bg-forge-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Gauge size={14} />
+                  <span className="hidden md:inline">Estación</span>
+                </button>
+              </div>
             )}
-            
+
             <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-8">
-                <div className="text-right hidden sm:block leading-tight">
-                    <div className="text-xs font-bold text-white">{loggedInUser.name}</div>
-                    <div className="text-[10px] text-brand-500 font-mono tracking-wide uppercase">
-                        {role === Role.ADMIN ? 'Administrador' : role === Role.BARBER ? 'Barbero' : 'Cliente'}
-                    </div>
+              {/* ⌘K Search */}
+              <button
+                onClick={() => setIsPaletteOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-inner text-steel-300 hover:text-white hover:border-forge-500/30 transition-all text-[10px] font-mono"
+              >
+                <Search size={12} />
+                Buscar
+                <kbd className="ml-1 px-1.5 py-0.5 rounded bg-steel-700 text-steel-400 text-[9px] border border-steel-500">⌘K</kbd>
+              </button>
+              <div className="text-right hidden sm:block leading-tight">
+                <div className="text-xs font-bold text-white">{loggedInUser.name}</div>
+                <div className="text-[10px] text-forge-500 font-mono tracking-wide uppercase">
+                  {role === Role.ADMIN ? 'Administrador' : role === Role.MECHANIC ? 'Mecánico' : 'Cliente'}
                 </div>
+              </div>
 
-                {/* Show Config Button for Barbers as well */}
-                {(role === Role.BARBER || role === Role.ADMIN) && (
-                    <button
-                        onClick={() => setIsShopRulesOpen(true)}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors mr-1"
-                        title="Configuración de Agenda"
-                    >
-                        <Settings size={18} />
-                    </button>
-                )}
-
-                <button 
-                    onClick={() => setIsProfileOpen(true)}
-                    className="group relative flex items-center gap-2 rounded-full hover:bg-white/10 transition-all p-0.5 pr-1 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-                    title="Abrir Perfil"
+              {(role === Role.MECHANIC || role === Role.ADMIN) && (
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                  title="Configuración"
                 >
-                    <div className="relative w-10 h-10 rounded-full bg-dark-600 border-2 border-dark-500 group-hover:border-brand-500 transition-colors shadow-lg overflow-hidden">
-                        {loggedInUser.avatar ? (
-                            <img src={loggedInUser.avatar} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-brand-600 to-brand-400">
-                                <User size={18} className="text-black" />
-                            </div>
-                        )}
+                  <Settings size={18} />
+                </button>
+              )}
+
+              <button
+                className="group relative flex items-center gap-2 rounded-full hover:bg-white/10 transition-all p-0.5 pr-1"
+                title="Perfil"
+              >
+                <div className="relative w-9 h-9 rounded-full bg-steel-600 border-2 border-steel-500 group-hover:border-forge-500 transition-colors shadow-lg overflow-hidden">
+                  {loggedInUser.avatar ? (
+                    <img src={loggedInUser.avatar} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-forge-600 to-forge-400">
+                      <User size={16} className="text-black" />
                     </div>
-                    <ChevronDown size={14} className="text-gray-500 group-hover:text-white transition-colors mr-1" />
-                </button>
+                  )}
+                </div>
+                <ChevronDown size={14} className="text-gray-500 group-hover:text-white transition-colors mr-1" />
+              </button>
 
-                <button 
-                    onClick={handleLogout}
-                    className="ml-2 text-gray-500 hover:text-red-500 transition-colors"
-                    title="Cerrar Sesión"
-                >
-                    <LogOut size={18} />
-                </button>
+              <button
+                onClick={handleLogout}
+                className="ml-1 text-gray-500 hover:text-red-500 transition-colors"
+                title="Cerrar Sesión"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
-            </div>
+          </div>
         </nav>
 
-        {/* Main Content Area - with padding for navbar */}
+        {/* ── MAIN CONTENT ── */}
         <main className="pt-24 px-4 md:px-6 flex-1 flex flex-col pb-4">
-            
-            {showAdminDashboard ? (
+          {showDashboard ? (
             <>
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              {/* Header Area */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-slide-up">
                 <div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2 drop-shadow-lg">
-                        {role === Role.BARBER && <Lock size={20} className="text-gray-500"/>}
-                        {role === Role.BARBER ? `Estación de Trabajo` : `Centro de Operaciones`}
-                    </h1>
-                    <p className="text-gray-400 text-sm mt-1 font-medium">
-                        {role === Role.BARBER 
-                            ? `Barbero: ${loggedInUser.name}` 
-                            : adminViewMode === 'WORKSTATION' 
-                                    ? 'Modo Operativo Activo (Vista de Barbero)' 
-                                    : 'Gestión de rendimiento y agenda global'
-                        }
-                    </p>
+                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                    {role === Role.MECHANIC ? 'Estación de Trabajo' : 'Centro de Operaciones'}
+                  </h1>
+                  <p className="text-gray-400 text-sm mt-1 font-medium">
+                    {role === Role.MECHANIC
+                      ? `Mecánico: ${loggedInUser.name}`
+                      : adminViewMode === 'WORKSTATION'
+                        ? 'Modo Operativo Activo (Vista de Mecánico)'
+                        : 'Gestión integral de taller'
+                    }
+                  </p>
                 </div>
-                
-                {/* Management Toolbar - Only for ADMIN */}
+
+                {/* Admin Toolbar */}
                 {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
-                    <div className="flex flex-wrap gap-3">
-                         <button 
-                            onClick={() => setIsCancellationReportOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-red-400 px-4 py-2 rounded-lg font-bold hover:bg-red-900/20 hover:text-red-300 border border-red-900/30 backdrop-blur transition-all"
-                        >
-                            <AlertCircle size={18} />
-                            Reporte Cancelaciones
-                        </button>
-                        {/* Settings moved to nav bar for barbers, but kept here for explicit Admin Access */}
-                        <button 
-                            onClick={() => setIsShopRulesOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-gray-300 px-4 py-2 rounded-lg font-bold hover:bg-white/10 hover:text-white border border-white/5 backdrop-blur transition-all"
-                        >
-                            <Settings size={18} />
-                            Configuración
-                        </button>
-                        <button 
-                            onClick={() => setIsStyleEditorOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-gray-300 px-4 py-2 rounded-lg font-bold hover:bg-white/10 hover:text-white border border-white/5 backdrop-blur transition-all"
-                        >
-                            <Tag size={18} />
-                            Estilos
-                        </button>
-                        <button 
-                            onClick={() => setIsBarberManagerOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-gray-300 px-4 py-2 rounded-lg font-bold hover:bg-white/10 hover:text-white border border-white/5 backdrop-blur transition-all"
-                        >
-                            <Briefcase size={18} />
-                            Staff
-                        </button>
-                        <button 
-                            onClick={() => setIsClientManagerOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-gray-300 px-4 py-2 rounded-lg font-bold hover:bg-white/10 hover:text-white border border-white/5 backdrop-blur transition-all"
-                        >
-                            <Users size={18} />
-                            Clientes
-                        </button>
-                        <button 
-                            onClick={() => setIsServiceManagerOpen(true)}
-                            className="flex items-center gap-2 glass-morphism-inner text-gray-300 px-4 py-2 rounded-lg font-bold hover:bg-white/10 hover:text-white border border-white/5 backdrop-blur transition-all"
-                        >
-                            <Scissors size={18} />
-                            Servicios
-                        </button>
-                        <button 
-                            onClick={() => setIsBookingModalOpen(true)}
-                            className="flex items-center gap-2 bg-brand-500 text-black px-4 py-2 rounded-lg font-bold hover:bg-brand-400 shadow-[0_4px_20px_-5px_rgba(240,180,41,0.4)] transition-all transform hover:scale-105"
-                        >
-                            <Plus size={18} strokeWidth={3} />
-                            Nueva Cita
-                        </button>
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setIsCatalogOpen(true)}
+                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                    >
+                      <BookOpen size={16} />
+                      Catálogo
+                    </button>
+                    <button
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                    >
+                      <Settings size={16} />
+                      Config
+                    </button>
+                    <button
+                      onClick={() => setIsMechanicManagerOpen(true)}
+                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                    >
+                      <Users size={16} />
+                      Mecánicos
+                    </button>
+                    <button
+                      onClick={() => setIsClientManagerOpen(true)}
+                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                    >
+                      <Car size={16} />
+                      Clientes
+                    </button>
+                    <button
+                      onClick={() => setIsServiceManagerOpen(true)}
+                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                    >
+                      <ClipboardList size={16} />
+                      Servicios
+                    </button>
+                    <button
+                      onClick={() => setIsBookingModalOpen(true)}
+                      className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
+                    >
+                      <Plus size={16} strokeWidth={3} />
+                      Nueva Orden
+                    </button>
+                  </div>
                 )}
-                </div>
+              </div>
 
-                {/* CONDITIONAL DASHBOARD: BARBER vs ADMIN (Dashboard vs Workstation) */}
-                {(role === Role.BARBER || (role === Role.ADMIN && adminViewMode === 'WORKSTATION')) ? (
-                    <BarberDashboard 
-                        barberId={role === Role.BARBER ? loggedInUser.id : 'b1'} 
-                        currentBarber={currentBarber || undefined}
-                        barbers={barbers} 
-                        appointments={visibleAppointments}
-                        services={services}
-                        onStatusChange={handleStatusChange}
-                        onUpdateBarber={handleUpdateBarber}
-                        openHour={openHour}
-                        closeHour={closeHour}
-                    />
-                ) : (
-                    <MetricsPanel 
-                        metrics={metrics} 
-                        appointments={visibleAppointments} 
-                        currentDate={currentDate} 
-                        services={services} 
-                        openHour={openHour}
-                        closeHour={closeHour}
-                    />
-                )}
-                
-                <div className="glass-morphism rounded-xl shadow-2xl flex flex-col relative overflow-visible mt-6">
-                    <Timeline 
-                        barbers={visibleBarbers} 
-                        appointments={visibleAppointments} 
-                        services={services}
-                        currentDate={currentDate}
-                        openHour={openHour}
-                        closeHour={closeHour}
-                        timeSliceMinutes={timeSliceMinutes} // Passed down for dynamic grid
-                        onStatusChange={handleStatusChange}
-                        onDateChange={setCurrentDate}
-                        onEditAppointment={setEditingAppointment}
-                    />
-                </div>
+              {/* Dashboard Content */}
+              {(role === Role.MECHANIC || (role === Role.ADMIN && adminViewMode === 'WORKSTATION')) ? (
+                <MechanicDashboard
+                  mechanicId={role === Role.MECHANIC ? loggedInUser.id : 'm1'}
+                  currentMechanic={currentMechanic || undefined}
+                  mechanics={mechanics}
+                  workOrders={visibleWorkOrders}
+                  services={services}
+                  onStatusChange={handleStatusChange}
+                  onUpdateMechanic={handleUpdateMechanic}
+                  openHour={openHour}
+                  closeHour={closeHour}
+                />
+              ) : (
+                <>
+                  <MetricsPanel
+                    metrics={metrics}
+                    workOrders={visibleWorkOrders}
+                    currentDate={currentDate}
+                    services={services}
+                    openHour={openHour}
+                    closeHour={closeHour}
+                  />
+                  {/* Analytics Charts */}
+                  <AnalyticsPanel
+                    workOrders={workOrders}
+                    mechanics={mechanics}
+                    services={services}
+                  />
+                </>
+              )}
+
+              {/* Timeline */}
+              <div className="glass rounded-xl shadow-2xl flex flex-col relative overflow-visible mt-6">
+                <Timeline
+                  mechanics={visibleMechanics}
+                  workOrders={visibleWorkOrders}
+                  services={services}
+                  currentDate={currentDate}
+                  openHour={openHour}
+                  closeHour={closeHour}
+                  timeSliceMinutes={timeSliceMinutes}
+                  onStatusChange={handleStatusChange}
+                  onDateChange={setCurrentDate}
+                  onEditWorkOrder={setEditingWorkOrder}
+                />
+              </div>
             </>
-            ) : (
-                // CLIENT VIEW
-            <div className="flex-1 flex items-center justify-center p-4 animate-in zoom-in-95 duration-500">
-                <div className="w-full max-w-md space-y-4 relative z-10">
-                    <div className="glass-morphism-inner p-4 rounded-lg flex items-start gap-3 backdrop-blur-md border border-brand-500/20">
-                        <User className="text-brand-500 mt-1" size={20} />
-                        <div>
-                            <p className="text-sm text-brand-200 font-bold">Modo Cliente Activo</p>
-                            <p className="text-xs text-gray-400 mt-1">
-                                Bienvenido, {loggedInUser.name.split(' ')[0]}.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="glass-morphism rounded-xl shadow-2xl">
-                        <BookingWizard 
-                            barbers={barbers} 
-                            services={services} 
-                            clients={clients}
-                            existingAppointments={appointments}
-                            shopRules={shopRules}
-                            openHour={openHour}
-                            closeHour={closeHour}
-                            timeSliceMinutes={timeSliceMinutes} // Passed down
-                            currentUser={loggedInUser}
-                            currentRole={role}
-                            onBook={handleBook}
-                            onCancel={() => {}} // Client can't cancel out of their own view
-                            onCreateClient={handleCreateClient}
-                            onUpdateClient={handleUpdateClient}
-                            onDeleteClient={handleDeleteClient}
-                        />
-                    </div>
+          ) : (
+            // CLIENT VIEW
+            <div className="flex-1 flex items-center justify-center p-4 animate-slide-up">
+              <div className="w-full max-w-md space-y-4 relative z-10">
+                <div className="glass-inner p-4 rounded-lg flex items-start gap-3 border border-forge-500/20">
+                  <Car className="text-forge-500 mt-1" size={20} />
+                  <div>
+                    <p className="text-sm text-forge-300 font-bold">Modo Cliente Activo</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Bienvenido, {loggedInUser.name.split(' ')[0]}. Solicite una orden de trabajo.
+                    </p>
+                  </div>
                 </div>
-            </div>
-            )}
-        </main>
-      </div>
-
-      {/* Admin Booking Modal (Only for Admin to create appointments for others) */}
-      {isBookingModalOpen && role === Role.ADMIN && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-lg transform transition-all scale-100 glass-morphism rounded-xl">
-                <BookingWizard 
-                    barbers={barbers} 
-                    services={services} 
+                <div className="glass rounded-xl shadow-2xl">
+                  <WorkOrderWizard
+                    mechanics={mechanics}
+                    services={services}
                     clients={clients}
-                    existingAppointments={appointments}
+                    existingOrders={workOrders}
                     shopRules={shopRules}
                     openHour={openHour}
                     closeHour={closeHour}
-                    timeSliceMinutes={timeSliceMinutes} // Passed down
+                    timeSliceMinutes={timeSliceMinutes}
                     currentUser={loggedInUser}
-                    currentRole={Role.ADMIN}
+                    currentRole={role}
                     onBook={handleBook}
-                    onCancel={() => setIsBookingModalOpen(false)}
+                    onCancel={() => {}}
                     onCreateClient={handleCreateClient}
                     onUpdateClient={handleUpdateClient}
                     onDeleteClient={handleDeleteClient}
-                 />
+                  />
+                </div>
+              </div>
             </div>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="text-center py-4 font-mono text-[10px] text-steel-400 tracking-wider border-t border-white/5">
+          MEET — MECÁNICOS ESPECIALISTAS EN TODO © {new Date().getFullYear()}
+        </footer>
+      </div>
+
+      {/* ── MODALS ── */}
+
+      {/* Admin Booking Modal */}
+      {isBookingModalOpen && role === Role.ADMIN && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-slide-up">
+          <div className="w-full max-w-lg glass rounded-xl">
+            <WorkOrderWizard
+              mechanics={mechanics}
+              services={services}
+              clients={clients}
+              existingOrders={workOrders}
+              shopRules={shopRules}
+              openHour={openHour}
+              closeHour={closeHour}
+              timeSliceMinutes={timeSliceMinutes}
+              currentUser={loggedInUser}
+              currentRole={Role.ADMIN}
+              onBook={handleBook}
+              onCancel={() => setIsBookingModalOpen(false)}
+              onCreateClient={handleCreateClient}
+              onUpdateClient={handleUpdateClient}
+              onDeleteClient={handleDeleteClient}
+            />
+          </div>
         </div>
       )}
 
-      {/* Modals - Only render if user has permission (ADMIN or BARBER for specific ones) */}
-      
-      {/* Services Manager - Admin Only */}
+      {/* Service Manager */}
       {role === Role.ADMIN && isServiceManagerOpen && (
-        <ServiceManager 
-            services={services}
-            onAdd={handleAddService}
-            onUpdate={handleUpdateService}
-            onDelete={handleDeleteService}
-            onClose={() => setIsServiceManagerOpen(false)}
-        />
-      )}
-      
-      {/* Barber Manager - Admin Only */}
-      {role === Role.ADMIN && isBarberManagerOpen && (
-        <BarberManager 
-            barbers={barbers}
-            onAdd={handleAddBarber}
-            onUpdate={handleUpdateBarber}
-            onDelete={handleDeleteBarber}
-            onClose={() => setIsBarberManagerOpen(false)}
+        <ServiceManager
+          services={services}
+          onAdd={handleAddService}
+          onUpdate={handleUpdateService}
+          onDelete={handleDeleteService}
+          onClose={() => setIsServiceManagerOpen(false)}
         />
       )}
 
-      {/* Client Manager - Admin Only */}
+      {/* Mechanic Manager */}
+      {role === Role.ADMIN && isMechanicManagerOpen && (
+        <MechanicManager
+          mechanics={mechanics}
+          onAdd={handleAddMechanic}
+          onUpdate={handleUpdateMechanic}
+          onDelete={handleDeleteMechanic}
+          onClose={() => setIsMechanicManagerOpen(false)}
+        />
+      )}
+
+      {/* Client Manager */}
       {role === Role.ADMIN && isClientManagerOpen && (
-        <ClientManager 
-            clients={clients}
-            onAdd={handleCreateClient}
-            onUpdate={handleUpdateClient}
-            onDelete={handleDeleteClient}
-            onClose={() => setIsClientManagerOpen(false)}
-        />
-      )}
-      
-      {/* Shop Rules / Time Slice Settings - Available to Admin AND Barber (as requested) */}
-      {(role === Role.ADMIN || role === Role.BARBER) && isShopRulesOpen && (
-        <ShopRulesEditor
-            currentRules={shopRules}
-            currentOpenHour={openHour}
-            currentCloseHour={closeHour}
-            currentTimeSlice={timeSliceMinutes}
-            onSave={handleUpdateSettings}
-            onClose={() => setIsShopRulesOpen(false)}
+        <ClientManager
+          clients={clients}
+          onAdd={handleCreateClient}
+          onUpdate={handleUpdateClient}
+          onDelete={handleDeleteClient}
+          onClose={() => setIsClientManagerOpen(false)}
         />
       )}
 
-      {/* Style Editor - Admin Only */}
-      {role === Role.ADMIN && isStyleEditorOpen && (
-        <StyleOptionsEditor
-            currentOptions={styleOptions}
-            onSave={handleUpdateStyles}
-            onClose={() => setIsStyleEditorOpen(false)}
-        />
-      )}
-      
-      {/* Cancellation Report - Admin Only */}
-      {role === Role.ADMIN && isCancellationReportOpen && (
-        <CancellationAnalysis 
-            appointments={appointments}
-            onClose={() => setIsCancellationReportOpen(false)}
+      {/* Shop Settings */}
+      {(role === Role.ADMIN || role === Role.MECHANIC) && isSettingsOpen && (
+        <ShopSettings
+          currentRules={shopRules}
+          currentOpenHour={openHour}
+          currentCloseHour={closeHour}
+          currentTimeSlice={timeSliceMinutes}
+          onSave={handleUpdateSettings}
+          onClose={() => setIsSettingsOpen(false)}
         />
       )}
 
-      {/* Appointment Editor (Available to Admin and Barber) */}
-      {editingAppointment && (
-          <AppointmentEditor
-            appointment={editingAppointment}
-            allAppointments={appointments}
-            serviceName={services.find(s => s.id === editingAppointment.serviceId)?.name || 'Servicio'}
-            onClose={() => setEditingAppointment(null)}
-            onSave={handleUpdateAppointment}
-          />
+      {/* Service Catalog */}
+      {isCatalogOpen && (
+        <ServiceCatalogView onClose={() => setIsCatalogOpen(false)} />
       )}
 
-      {/* User Profile / Dashboard Drawer */}
-      {isProfileOpen && loggedInUser && (
-          <UserProfile 
-            client={loggedInUser} 
-            shopRules={shopRules}
-            globalOptions={styleOptions}
-            userRole={role}
-            userAppointments={appointments.filter(a => a.clientId === loggedInUser.id && a.status !== AppointmentStatus.CANCELLED)}
-            onClose={() => setIsProfileOpen(false)}
-            onUpdatePreferences={handleUpdatePreferences}
-            onUpdateProfile={handleUpdateProfile} // Added profile update handler
-            onCancelAppointment={handleCancelAppointment}
-          />
+      {/* Work Order Editor */}
+      {editingWorkOrder && (
+        <WorkOrderEditor
+          workOrder={editingWorkOrder}
+          allWorkOrders={workOrders}
+          serviceName={services.find(s => s.id === editingWorkOrder.serviceId)?.name || 'Servicio'}
+          onClose={() => setEditingWorkOrder(null)}
+          onSave={handleUpdateWorkOrder}
+        />
+      )}
+
+      {/* Command Palette (⌘K) */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        workOrders={workOrders}
+        clients={clients}
+        mechanics={mechanics}
+        services={services}
+        onSelectWorkOrder={(wo) => setEditingWorkOrder(wo)}
+        onNavigate={(action) => {
+          if (action === '__open_palette') setIsPaletteOpen(true);
+          else if (action === 'new_order') setIsBookingModalOpen(true);
+          else if (action === 'catalog') setIsCatalogOpen(true);
+        }}
+      />
+
+      {/* Work Order Receipt */}
+      {receiptWorkOrder && (
+        <WorkOrderReceipt
+          workOrder={receiptWorkOrder}
+          service={services.find(s => s.id === receiptWorkOrder.serviceId)}
+          mechanic={mechanics.find(m => m.id === receiptWorkOrder.mechanicId)}
+          client={clients.find(c => c.id === receiptWorkOrder.clientId)}
+          onClose={() => setReceiptWorkOrder(null)}
+        />
       )}
     </div>
   );

@@ -1,41 +1,62 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chronos Barber System</title>
+    <meta name="description" content="Sistema de gestión integral para taller mecánico automotriz — Órdenes de trabajo, diagnósticos y control de flota" />
+    <title>MEET — Mecánicos Especialistas En Todo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              brand: {
-                50: '#fffbea',
-                100: '#fff3c4',
-                200: '#fce588',
-                300: '#fadb5f',
-                400: '#f7c948',
-                500: '#f0b429',
-                600: '#de911d',
-                700: '#cb6e17',
-                800: '#b44d12',
-                900: '#8d2b0b',
+              forge: {
+                50: '#e0feff',
+                100: '#b5fcff',
+                200: '#82faff',
+                300: '#4cf6ff',
+                400: '#21f2ff',
+                500: '#00f0ff',
+                600: '#00c2cf',
+                700: '#009ca8',
+                800: '#007b85',
+                900: '#02666d',
               },
-              dark: {
-                900: '#121212',
-                800: '#1E1E1E',
-                700: '#2D2D2D',
-                600: '#3D3D3D',
+              steel: {
+                950: '#030508',
+                900: '#070a0f',
+                800: '#0d131a',
+                700: '#141d26',
+                600: '#1a2633',
+                500: '#213040',
+                400: '#32485e',
+                300: '#4c6885',
+                200: '#7594b3',
+                100: '#a9c5e0',
               }
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
-              mono: ['Fira Code', 'monospace'],
+              mono: ['IBM Plex Mono', 'monospace'],
+              display: ['Bebas Neue', 'sans-serif'],
             },
             animation: {
-                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glow': 'glow 2s ease-in-out infinite alternate',
+              'slide-up': 'slideUp 0.4s ease-out',
+            },
+            keyframes: {
+              glow: {
+                '0%': { boxShadow: '0 0 5px rgba(0,240,255,0.3)' },
+                '100%': { boxShadow: '0 0 25px rgba(0,240,255,0.6)' },
+              },
+              slideUp: {
+                '0%': { opacity: 0, transform: 'translateY(10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
             }
           },
         },
@@ -43,52 +64,61 @@
     </script>
     <style>
       body {
-        background-color: #050505; /* Fondo más oscuro para resaltar el Glassmorphism */
+        background-color: #030508;
         color: #e5e7eb;
       }
-      
-      /* ARCHITECTURAL GLASSMORPHISM */
-      .glass-morphism {
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
-        background: rgba(15, 15, 15, 0.65); /* Ajustado para contraste sobre Matrix */
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+      /* ── GLASSMORPHISM SYSTEM ── */
+      .glass {
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        background: rgba(14, 14, 14, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
       }
 
-      /* Variant for inner cards (lighter) */
-      .glass-morphism-inner {
+      .glass-inner {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      /* Custom scrollbar for timeline */
-      .timeline-scroll::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+      .glass-hover:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(0, 240, 255, 0.4);
       }
-      .timeline-scroll::-webkit-scrollbar-track {
-        background: rgba(30, 30, 30, 0.5);
+
+      /* ── SCROLLBARS ── */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: rgba(20, 20, 20, 0.5); }
+      ::-webkit-scrollbar-thumb { background: #1a2633; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #00f0ff; }
+
+      /* ── CATEGORY BADGES ── */
+      .badge-rep { background: rgba(220,38,38,0.12); color: #f87171; border: 1px solid rgba(220,38,38,0.3); }
+      .badge-cam { background: rgba(37,99,235,0.12); color: #60a5fa; border: 1px solid rgba(37,99,235,0.3); }
+      .badge-mant { background: rgba(22,163,74,0.12); color: #4ade80; border: 1px solid rgba(22,163,74,0.3); }
+      .badge-diag { background: rgba(124,58,237,0.12); color: #c084fc; border: 1px solid rgba(124,58,237,0.3); }
+
+      /* ── INDUSTRIAL TEXTURE ── */
+      .industrial-grid {
+        background-image:
+          linear-gradient(rgba(0,240,255,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0,240,255,0.05) 1px, transparent 1px);
+        background-size: 50px 50px;
       }
-      .timeline-scroll::-webkit-scrollbar-thumb {
-        background: #3D3D3D;
-        border-radius: 3px;
+
+      /* ── ACCENT GLOW ── */
+      .forge-glow {
+        box-shadow: 0 0 35px -5px rgba(0,240,255,0.5);
+      }
+
+      .forge-border {
+        border-image: linear-gradient(90deg, transparent, rgba(0,240,255,0.6), transparent) 1;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "recharts": "https://esm.sh/recharts@2.10.3?external=react,react-dom",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react,react-dom",
-    "react": "https://esm.sh/react@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/"
-  }
-}
-</script>
-</head>
-  <body>
+  </head>
+  <body class="industrial-grid">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
