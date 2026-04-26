@@ -20,6 +20,8 @@ import { WorkOrderReceipt } from './components/WorkOrderReceipt';
 import { useToast } from './components/ToastSystem';
 import { calculateEndTime } from './services/timeEngine';
 import { saveState, loadState } from './services/storage';
+import { ClientDashboard } from './components/ClientDashboard';
+import { UserProfileModal } from './components/UserProfileModal';
 import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText } from 'lucide-react';
 
 export default function App() {
@@ -65,6 +67,7 @@ export default function App() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -290,6 +293,17 @@ export default function App() {
     toast('info', 'Mecánico Eliminado');
   };
 
+  const handleUpdateCurrentUser = (updatedUser: any) => {
+    if (role === Role.CLIENT) {
+      handleUpdateClient(updatedUser);
+    } else if (role === Role.MECHANIC) {
+      handleUpdateMechanic(updatedUser);
+    } else if (role === Role.ADMIN) {
+      setLoggedInUser(updatedUser);
+      toast('success', 'Perfil Actualizado');
+    }
+  };
+
   const handleUpdateSettings = (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number }) => {
     setShopRules(settings.rules);
     setOpenHour(settings.openHour);
@@ -402,6 +416,7 @@ export default function App() {
               )}
 
               <button
+                onClick={() => setIsProfileModalOpen(true)}
                 className="group relative flex items-center gap-2 rounded-full hover:bg-white/10 transition-all p-0.5 pr-1"
                 title="Perfil"
               >
@@ -448,44 +463,48 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Admin Toolbar */}
-                {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setIsCatalogOpen(true)}
-                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                    >
-                      <BookOpen size={16} />
-                      Catálogo
-                    </button>
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                    >
-                      <Settings size={16} />
-                      Config
-                    </button>
-                    <button
-                      onClick={() => setIsMechanicManagerOpen(true)}
-                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                    >
-                      <Users size={16} />
-                      Mecánicos
-                    </button>
-                    <button
-                      onClick={() => setIsClientManagerOpen(true)}
-                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                    >
-                      <Car size={16} />
-                      Clientes
-                    </button>
-                    <button
-                      onClick={() => setIsServiceManagerOpen(true)}
-                      className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                    >
-                      <ClipboardList size={16} />
-                      Servicios
-                    </button>
+                {/* Toolbar */}
+                <div className="flex flex-wrap gap-2">
+                  {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
+                    <>
+                      <button
+                        onClick={() => setIsCatalogOpen(true)}
+                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                      >
+                        <BookOpen size={16} />
+                        Catálogo
+                      </button>
+                      <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                      >
+                        <Settings size={16} />
+                        Config
+                      </button>
+                      <button
+                        onClick={() => setIsMechanicManagerOpen(true)}
+                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                      >
+                        <Users size={16} />
+                        Mecánicos
+                      </button>
+                      <button
+                        onClick={() => setIsClientManagerOpen(true)}
+                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                      >
+                        <Car size={16} />
+                        Clientes
+                      </button>
+                      <button
+                        onClick={() => setIsServiceManagerOpen(true)}
+                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                      >
+                        <ClipboardList size={16} />
+                        Servicios
+                      </button>
+                    </>
+                  )}
+                  {(role === Role.ADMIN || role === Role.MECHANIC) && (
                     <button
                       onClick={() => setIsBookingModalOpen(true)}
                       className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
@@ -493,8 +512,8 @@ export default function App() {
                       <Plus size={16} strokeWidth={3} />
                       Nueva Orden
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Dashboard Content */}
@@ -547,38 +566,14 @@ export default function App() {
             </>
           ) : (
             // CLIENT VIEW
-            <div className="flex-1 flex items-center justify-center p-4 animate-slide-up">
-              <div className="w-full max-w-md space-y-4 relative z-10">
-                <div className="glass-inner p-4 rounded-lg flex items-start gap-3 border border-forge-500/20">
-                  <Car className="text-forge-500 mt-1" size={20} />
-                  <div>
-                    <p className="text-sm text-forge-300 font-bold">Modo Cliente Activo</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Bienvenido, {loggedInUser.name.split(' ')[0]}. Solicite una orden de trabajo.
-                    </p>
-                  </div>
-                </div>
-                <div className="glass rounded-xl shadow-2xl">
-                  <WorkOrderWizard
-                    mechanics={mechanics}
-                    services={services}
-                    clients={clients}
-                    existingOrders={workOrders}
-                    shopRules={shopRules}
-                    openHour={openHour}
-                    closeHour={closeHour}
-                    timeSliceMinutes={timeSliceMinutes}
-                    currentUser={loggedInUser}
-                    currentRole={role}
-                    onBook={handleBook}
-                    onCancel={() => {}}
-                    onCreateClient={handleCreateClient}
-                    onUpdateClient={handleUpdateClient}
-                    onDeleteClient={handleDeleteClient}
-                  />
-                </div>
-              </div>
-            </div>
+            <ClientDashboard
+              currentUser={loggedInUser}
+              workOrders={workOrders}
+              services={services}
+              mechanics={mechanics}
+              onBookNew={() => setIsBookingModalOpen(true)}
+              onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
+            />
           )}
         </main>
 
@@ -590,9 +585,9 @@ export default function App() {
 
       {/* ── MODALS ── */}
 
-      {/* Admin Booking Modal */}
-      {isBookingModalOpen && role === Role.ADMIN && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-slide-up">
+      {/* Booking Modal (For Admin, Mechanic, and Client) */}
+      {isBookingModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-slide-up">
           <div className="w-full max-w-lg glass rounded-xl">
             <WorkOrderWizard
               mechanics={mechanics}
@@ -604,7 +599,7 @@ export default function App() {
               closeHour={closeHour}
               timeSliceMinutes={timeSliceMinutes}
               currentUser={loggedInUser}
-              currentRole={Role.ADMIN}
+              currentRole={role}
               onBook={handleBook}
               onCancel={() => setIsBookingModalOpen(false)}
               onCreateClient={handleCreateClient}
@@ -700,6 +695,15 @@ export default function App() {
           mechanic={mechanics.find(m => m.id === receiptWorkOrder.mechanicId)}
           client={clients.find(c => c.id === receiptWorkOrder.clientId)}
           onClose={() => setReceiptWorkOrder(null)}
+        />
+      )}
+      {/* Profile Modal */}
+      {isProfileModalOpen && (
+        <UserProfileModal
+          user={loggedInUser}
+          role={role}
+          onClose={() => setIsProfileModalOpen(false)}
+          onUpdateUser={handleUpdateCurrentUser}
         />
       )}
     </div>
