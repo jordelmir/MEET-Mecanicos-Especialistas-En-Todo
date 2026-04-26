@@ -133,6 +133,30 @@ export default function App() {
     toast('error', 'Error de Autenticación', 'Credenciales inválidas');
   };
 
+  const handleRegister = async (data: { name: string; email: string; phone: string; identification: string; accessCode: string }) => {
+    setAuthError(null);
+    if (clients.some(c => c.identification === data.identification || c.email === data.email)) {
+      setAuthError("Ya existe un usuario con ese correo o cédula.");
+      toast('error', 'Error de Registro', 'El usuario ya existe');
+      return;
+    }
+    
+    const newClient: Client = {
+      id: `c${Date.now()}`, 
+      ...data,
+      vehicles: [],
+      serviceHistory: [], 
+      loyaltyPoints: 0, 
+      joinDate: new Date(),
+    };
+    
+    setClients(prev => [...prev, newClient]);
+    setRole(Role.CLIENT);
+    setLoggedInUser(newClient);
+    setIsAuthenticated(true);
+    toast('success', 'Cuenta Creada', `Bienvenido a MEET, ${newClient.name.split(' ')[0]}`);
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
     setRole(Role.ADMIN);
@@ -338,7 +362,7 @@ export default function App() {
 
   // ── RENDER ──
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} error={authError} />;
+    return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={authError} />;
   }
 
   const showDashboard = role === Role.ADMIN || role === Role.MECHANIC;
@@ -505,13 +529,24 @@ export default function App() {
                     </>
                   )}
                   {(role === Role.ADMIN || role === Role.MECHANIC) && (
-                    <button
-                      onClick={() => setIsBookingModalOpen(true)}
-                      className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
-                    >
-                      <Plus size={16} strokeWidth={3} />
-                      Nueva Orden
-                    </button>
+                    <>
+                      {role === Role.MECHANIC && (
+                        <button
+                          onClick={() => setIsClientManagerOpen(true)}
+                          className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                        >
+                          <Car size={16} />
+                          Gestión de Clientes
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsBookingModalOpen(true)}
+                        className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
+                      >
+                        <Plus size={16} strokeWidth={3} />
+                        Nueva Orden
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -632,8 +667,8 @@ export default function App() {
         />
       )}
 
-      {/* Client Manager */}
-      {role === Role.ADMIN && isClientManagerOpen && (
+      {/* Client Manager (Admin & Mechanic) */}
+      {(role === Role.ADMIN || role === Role.MECHANIC) && isClientManagerOpen && (
         <ClientManager
           clients={clients}
           onAdd={handleCreateClient}
