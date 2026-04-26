@@ -70,9 +70,14 @@ export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, 
             />
           </div>
 
-          <button onClick={handleSave} className="w-full bg-forge-500 text-black font-bold py-2.5 rounded-lg font-mono text-xs tracking-wider uppercase">
-            Guardar Configuración
-          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-steel-600 text-steel-300 font-bold hover:bg-steel-800 hover:text-white transition-all font-mono text-xs tracking-wider uppercase">
+              Cancelar
+            </button>
+            <button onClick={handleSave} className="flex-[2] bg-forge-500 text-black font-bold py-2.5 rounded-lg font-mono text-xs tracking-wider uppercase">
+              Guardar Configuración
+            </button>
+          </div>
         </div>
       </div>
     </div>

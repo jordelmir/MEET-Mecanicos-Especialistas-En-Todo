@@ -119,13 +119,21 @@ export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: Wor
             </div>
           )}
 
-          <button
-            onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 bg-forge-500 text-black font-bold py-2.5 rounded-lg font-mono text-xs tracking-wider uppercase forge-glow hover:bg-forge-400 transition-all"
-          >
-            <Save size={14} />
-            Guardar Cambios
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-lg border border-steel-600 text-steel-300 font-bold hover:bg-steel-800 hover:text-white transition-all font-mono text-xs tracking-wider uppercase"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex-[2] flex items-center justify-center gap-2 bg-forge-500 text-black font-bold py-2.5 rounded-lg font-mono text-xs tracking-wider uppercase forge-glow hover:bg-forge-400 transition-all"
+            >
+              <Save size={14} />
+              Guardar
+            </button>
+          </div>
         </div>
       </div>
     </div>

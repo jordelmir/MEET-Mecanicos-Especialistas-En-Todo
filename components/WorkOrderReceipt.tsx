@@ -68,7 +68,8 @@ export function WorkOrderReceipt({ workOrder, service, mechanic, client, onClose
             <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-forge-500 text-black font-bold rounded-lg text-xs font-mono hover:bg-forge-400 transition-all">
               <Printer size={14} /> Imprimir
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all">
+            <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1">
+              <span className="text-xs font-mono hidden sm:inline-block pr-1">Volver</span>
               <X size={18} />
             </button>
           </div>

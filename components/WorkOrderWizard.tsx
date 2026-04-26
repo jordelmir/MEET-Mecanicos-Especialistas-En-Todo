@@ -111,11 +111,10 @@ export function WorkOrderWizard({
           </h2>
           <p className="font-mono text-[10px] text-steel-300 mt-1">Complete los pasos para crear la orden</p>
         </div>
-        {currentRole === Role.ADMIN && (
-          <button onClick={onCancel} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all">
-            <X size={18} />
-          </button>
-        )}
+        <button onClick={onCancel} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1 border border-transparent hover:border-white/10">
+          <span className="text-xs font-mono hidden sm:inline-block pr-1">Cerrar</span>
+          <X size={18} />
+        </button>
       </div>
 
       {/* Step Indicator */}
@@ -365,13 +364,21 @@ export function WorkOrderWizard({
               </div>
             )}
 
-            <button
-              onClick={handleConfirm}
-              disabled={!selectedClient || !selectedVehicle || !selectedService || !selectedMechanic || !selectedTime}
-              className="w-full bg-forge-500 hover:bg-forge-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-all font-mono text-sm tracking-wider uppercase forge-glow"
-            >
-              ✓ Confirmar Orden de Trabajo
-            </button>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={onCancel}
+                className="flex-1 border border-steel-600 hover:bg-steel-800 text-steel-300 font-bold py-3 rounded-lg transition-all font-mono text-sm tracking-wider uppercase"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!selectedClient || !selectedVehicle || !selectedService || !selectedMechanic || !selectedTime}
+                className="flex-[2] bg-forge-500 hover:bg-forge-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-all font-mono text-sm tracking-wider uppercase forge-glow"
+              >
+                ✓ Confirmar Orden
+              </button>
+            </div>
           </div>
         )}
       </div>

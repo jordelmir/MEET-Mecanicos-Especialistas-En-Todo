@@ -54,8 +54,9 @@ export function ServiceManager({ services, onAdd, onUpdate, onDelete, onClose }:
             </h2>
             <p className="text-steel-400 text-sm mt-1">Configuración maestra de catálogo y tarifas de taller.</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full bg-white/5 text-steel-300 hover:text-white hover:bg-white/10 transition-all border border-white/5 relative z-10">
-            <X size={20} />
+          <button onClick={onClose} className="px-4 py-2 rounded-full bg-white/5 text-steel-300 hover:text-white hover:bg-white/10 transition-all border border-white/5 relative z-10 flex items-center gap-2">
+            <span className="text-sm font-mono font-bold">Cerrar</span>
+            <X size={18} />
           </button>
         </div>
 

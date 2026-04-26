@@ -73,7 +73,8 @@ export function ServiceCatalogView({ onClose }: ServiceCatalogViewProps) {
             <button onClick={exportCSV} className="p-2 rounded-lg glass-inner glass-hover text-steel-200 hover:text-forge-500 transition-all" title="Exportar CSV">
               <Download size={16} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all">
+            <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1">
+              <span className="text-xs font-mono hidden sm:inline-block pr-1">Cerrar</span>
               <X size={18} />
             </button>
           </div>

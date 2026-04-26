@@ -55,7 +55,8 @@ export function MechanicManager({ mechanics, onAdd, onUpdate, onDelete, onClose 
             <Users size={20} className="text-forge-500" />
             Gestión de Mecánicos
           </h2>
-          <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all">
+          <button onClick={onClose} className="p-2 rounded-lg text-steel-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-1 border border-transparent hover:border-white/10">
+            <span className="text-xs font-mono hidden sm:inline-block pr-1">Cerrar</span>
             <X size={18} />
           </button>
         </div>

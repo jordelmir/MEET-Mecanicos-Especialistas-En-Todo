@@ -40,8 +40,9 @@ export function UserProfileModal({ user, role, onClose, onUpdateUser }: UserProf
         {/* Cover / Header */}
         <div className="h-32 bg-gradient-to-br from-steel-800 to-steel-900 relative border-b border-white/5">
           <div className="absolute inset-0 opacity-20 industrial-grid"></div>
-          <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/40 backdrop-blur hover:bg-white/10 rounded-full text-white transition-all">
-            <X size={16} />
+          <button onClick={onClose} className="absolute top-4 right-4 px-3 py-1.5 bg-black/40 backdrop-blur hover:bg-white/10 rounded-full text-white transition-all flex items-center gap-1.5">
+            <span className="text-xs font-mono font-bold">Cerrar</span>
+            <X size={14} />
           </button>
         </div>
 
