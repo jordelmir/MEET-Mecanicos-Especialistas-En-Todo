@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Star
 
 val CyberpunkColorScheme = darkColorScheme(
     primary = androidx.compose.ui.graphics.Color(0xFF00FFCC),
@@ -166,6 +167,21 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("pro_hub") {
+                ProHubScreen(navController = navController)
+            }
+            composable("topology") {
+                TopologyScreen(navController = navController)
+            }
+            composable("active_tests") {
+                ActiveTestsScreen(navController = navController)
+            }
+            composable("service_resets") {
+                ServiceResetsScreen(navController = navController)
+            }
+            composable("reports") {
+                ReportScreen(navController = navController, viewModel = obdViewModel)
+            }
             composable("settings") {
                 SettingsScreen(
                     navController = navController,
@@ -272,16 +288,16 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Check, "IA") },
-            label = { Text("IA") },
-            selected = currentRoute?.startsWith("ai") == true,
-            onClick = { navController.navigate("ai") { launchSingleTop = true } },
+            icon = { Icon(Icons.Default.Star, "PRO") },
+            label = { Text("PRO") },
+            selected = currentRoute == "pro_hub",
+            onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFFCC00FF),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFFCC00FF),
+                selectedIconColor = androidx.compose.ui.graphics.Color(0xFFFFD700),
+                selectedTextColor = androidx.compose.ui.graphics.Color(0xFFFFD700),
                 unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
                 unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFFCC00FF).copy(alpha = 0.1f)
+                indicatorColor = androidx.compose.ui.graphics.Color(0xFFFFD700).copy(alpha = 0.1f)
             )
         )
     }

@@ -1,0 +1,85 @@
+package com.elysium369.meet.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+
+data class ProFeature(val id: String, val title: String, val icon: String, val color: Color, val route: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProHubScreen(navController: NavController) {
+    val proFeatures = listOf(
+        ProFeature("topology", "Mapeo\nTopológico", "🕸️", Color(0xFF00FFCC), "topology"),
+        ProFeature("active_tests", "Pruebas\nActivas", "⚙️", Color(0xFFFF003C), "active_tests"),
+        ProFeature("resets", "Service\nResets", "🛠️", Color(0xFFFFD700), "service_resets"),
+        ProFeature("reports", "Reportes\nPDF", "📄", Color(0xFFCC00FF), "reports"),
+        ProFeature("ai", "IA\nDiagnóstico", "🧠", Color(0xFFCC00FF), "ai"),
+        ProFeature("dashboard", "Dashboards\nElite", "📈", Color(0xFF00FFCC), "custom_pid")
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("MEET PRO ELITE", color = Color.White, fontWeight = FontWeight.Black) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+            )
+        },
+        containerColor = Color.Black
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
+            Text("Funciones Nivel Agencia", color = Color(0xFF00FFCC), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Herramientas de diagnóstico avanzado, controles bidireccionales y reportes de nivel mundial.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(proFeatures) { feature ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .border(1.dp, feature.color.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .clickable { navController.navigate(feature.route) }
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(feature.icon, style = MaterialTheme.typography.displayMedium)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                feature.title,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
