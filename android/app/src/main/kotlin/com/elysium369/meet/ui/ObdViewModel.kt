@@ -250,6 +250,8 @@ class ObdViewModel @Inject constructor(
 
     private val _dataLog = MutableStateFlow<List<DataLogEntry>>(emptyList())
     val dataLog: StateFlow<List<DataLogEntry>> = _dataLog.asStateFlow()
+    
+    val isAdapterPro: StateFlow<Boolean> = obdSession.isAdapterPro
 
     private var loggingJob: kotlinx.coroutines.Job? = null
 

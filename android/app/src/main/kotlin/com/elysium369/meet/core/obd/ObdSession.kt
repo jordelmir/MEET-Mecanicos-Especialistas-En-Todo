@@ -29,6 +29,9 @@ class ObdSession(
     
     private var isRunning = false
     private var currentJob: Job? = null
+    
+    private val _isAdapterPro = MutableStateFlow(false)
+    val isAdapterPro: StateFlow<Boolean> = _isAdapterPro.asStateFlow()
 
     fun setTargetAddress(address: String) {
         // Simple heuristic: if it contains a dot or port colon, it's WiFi
@@ -82,6 +85,13 @@ class ObdSession(
         sendCommandDirectly("ATS0") // Spaces off
         sendCommandDirectly("ATH0") // Headers off
         sendCommandDirectly("ATSP0") // Auto protocol
+        
+        // Detect adapter type
+        val atI = sendCommandDirectly("ATI").uppercase()
+        val isClone = atI.contains("V1.5") || atI.contains("V2.1") || atI.contains("ELM327") || atI.contains("CH340") || atI.contains("PIC18")
+        val isPro = atI.contains("VLINKER") || atI.contains("OBDLINK") || atI.contains("STN") || atI.contains("ELM327 V2.2")
+        // Prefer PRO features if explicit PRO string found, otherwise default to clone limitations to be safe
+        _isAdapterPro.value = isPro || !isClone
         
         // Check if it's connected to ECU
         val response = sendCommandDirectly("0100")

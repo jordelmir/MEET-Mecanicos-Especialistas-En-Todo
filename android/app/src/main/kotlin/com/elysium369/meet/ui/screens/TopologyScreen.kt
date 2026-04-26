@@ -24,18 +24,19 @@ data class CarModule(val name: String, val fullName: String, val status: ModuleS
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopologyScreen(navController: NavController) {
+fun TopologyScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
     var isScanning by remember { mutableStateOf(true) }
+    val isPro by viewModel.isAdapterPro.collectAsState()
     
-    val modules = remember {
+    val modules = remember(isPro) {
         listOf(
             CarModule("ECM", "Engine Control Module", ModuleStatus.FAULT),
             CarModule("TCM", "Transmission Control", ModuleStatus.OK),
-            CarModule("ABS", "Anti-lock Braking", ModuleStatus.OK),
-            CarModule("SRS", "Airbag System", ModuleStatus.OK),
-            CarModule("BCM", "Body Control Module", ModuleStatus.NO_COMM),
-            CarModule("IPC", "Instrument Panel", ModuleStatus.OK),
-            CarModule("HVAC", "Climate Control", ModuleStatus.OK)
+            CarModule("ABS", "Anti-lock Braking", if(isPro) ModuleStatus.OK else ModuleStatus.NO_COMM),
+            CarModule("SRS", "Airbag System", if(isPro) ModuleStatus.OK else ModuleStatus.NO_COMM),
+            CarModule("BCM", "Body Control Module", if(isPro) ModuleStatus.FAULT else ModuleStatus.NO_COMM),
+            CarModule("IPC", "Instrument Panel", if(isPro) ModuleStatus.OK else ModuleStatus.NO_COMM),
+            CarModule("HVAC", "Climate Control", if(isPro) ModuleStatus.OK else ModuleStatus.NO_COMM)
         )
     }
 

@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,7 +24,9 @@ data class ProFeature(val id: String, val title: String, val icon: String, val c
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProHubScreen(navController: NavController) {
+fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
+    val isPro by viewModel.isAdapterPro.collectAsState()
+    
     val proFeatures = listOf(
         ProFeature("topology", "Mapeo\nTopológico", "🕸️", Color(0xFF00FFCC), "topology"),
         ProFeature("active_tests", "Pruebas\nActivas", "⚙️", Color(0xFFFF003C), "active_tests"),
@@ -42,6 +46,34 @@ fun ProHubScreen(navController: NavController) {
         containerColor = Color.Black
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
+            if (!isPro) {
+                Surface(
+                    color = Color(0xFFFF003C).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFF003C), RoundedCornerShape(8.dp)).padding(bottom = 16.dp)
+                ) {
+                    Text(
+                        "ADVERTENCIA: Adaptador CLON detectado. Las funciones avanzadas UDS/OEM están limitadas. Para una experiencia profesional completa, usa un adaptador Vgate vLinker o OBDLink.",
+                        color = Color(0xFFFF003C),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            } else {
+                Surface(
+                    color = Color(0xFF00FFCC).copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)).padding(bottom = 16.dp)
+                ) {
+                    Text(
+                        "✓ ADAPTADOR PROFESIONAL DETECTADO. Acceso Total Concedido.",
+                        color = Color(0xFF00FFCC),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(12.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Text("Funciones Nivel Agencia", color = Color(0xFF00FFCC), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text("Herramientas de diagnóstico avanzado, controles bidireccionales y reportes de nivel mundial.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)

@@ -168,16 +168,16 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable("pro_hub") {
-                ProHubScreen(navController = navController)
+                ProHubScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("topology") {
-                TopologyScreen(navController = navController)
+                TopologyScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("active_tests") {
-                ActiveTestsScreen(navController = navController)
+                ActiveTestsScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("service_resets") {
-                ServiceResetsScreen(navController = navController)
+                ServiceResetsScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("reports") {
                 ReportScreen(navController = navController, viewModel = obdViewModel)

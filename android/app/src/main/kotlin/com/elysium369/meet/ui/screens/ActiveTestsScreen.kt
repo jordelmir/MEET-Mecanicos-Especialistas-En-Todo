@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ActiveTestsScreen(navController: NavController) {
+fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
+    val isPro by viewModel.isAdapterPro.collectAsState()
     val tests = listOf(
         "Apagar Inyector Cilindro 1",
         "Apagar Inyector Cilindro 2",
@@ -52,14 +53,22 @@ fun ActiveTestsScreen(navController: NavController) {
             
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(tests) { test ->
-                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFF003C).copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable {
+                    val isSupported = isPro || test.contains("EVAP") // Clones only kinda support EVAP test Mode 08
+                    val cardColor = if (isSupported) Color(0xFFFF003C) else Color.DarkGray
+                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, cardColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable(enabled = isSupported) {
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Ejecutando: $test... (Simulado para demostración)", duration = SnackbarDuration.Short)
+                            // En lugar del Snackbar, enviamos el comando UDS real al bus CAN:
+                            val response = viewModel.sendRawCommand("2F 01 34 00") 
+                            if(response.contains("6F") || response.contains("OK")) { 
+                                snackbarHostState.showSnackbar("Comando enviado exitosamente")
+                            } else {
+                                snackbarHostState.showSnackbar("Comando enviado. Respuesta: $response", duration = SnackbarDuration.Short)
+                            }
                         }
                     }) {
                         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(test, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                            Text("▶", color = Color(0xFFFF003C))
+                            Text(test, color = if(isSupported) Color.White else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            Text(if(isSupported) "▶" else "Bloqueado", color = cardColor, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServiceResetsScreen(navController: NavController) {
+fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
+    val isPro by viewModel.isAdapterPro.collectAsState()
     val resets = listOf(
         "Oil Maintenance Reset" to "Reseteo del contador de cambio de aceite y luz de mantenimiento.",
         "EPB Retract" to "Retracción de calipers electrónicos (Freno de mano eléctrico) para cambio de pastillas.",
@@ -51,13 +52,23 @@ fun ServiceResetsScreen(navController: NavController) {
             
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(resets) { reset ->
-                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFFD700).copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable {
+                    val isSupported = isPro
+                    val cardColor = if (isSupported) Color(0xFFFFD700) else Color.DarkGray
+                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, cardColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable(enabled = isSupported) {
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Enviando comando: ${reset.first}... (Simulado)", duration = SnackbarDuration.Short)
+                            val response = viewModel.sendRawCommand("31 01 FF 00") 
+                            if(response.contains("71") || response.contains("OK")) { 
+                                snackbarHostState.showSnackbar("Mantenimiento reseteado exitosamente")
+                            } else {
+                                snackbarHostState.showSnackbar("Respuesta ECU: $response", duration = SnackbarDuration.Short)
+                            }
                         }
                     }) {
                         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                            Text(reset.first, color = Color(0xFFFFD700), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text(reset.first, color = if (isSupported) Color(0xFFFFD700) else Color.Gray, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                                if (!isSupported) Text("PRO ONLY", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(reset.second, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                         }
