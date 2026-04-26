@@ -9,12 +9,13 @@ interface WorkOrderEditorProps {
   allWorkOrders: WorkOrder[];
   serviceName: string;
   onClose: () => void;
-  onSave: (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date }) => void;
+  onSave: (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date; vehicleMileage?: number }) => void;
 }
 
 export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: WorkOrderEditorProps) {
   const [price, setPrice] = useState(workOrder.price);
   const [duration, setDuration] = useState(workOrder.estimatedMinutes);
+  const [mileage, setMileage] = useState(workOrder.vehicleInfo.mileage);
   const [time, setTime] = useState(
     `${String(workOrder.startTime.getHours()).padStart(2, '0')}:${String(workOrder.startTime.getMinutes()).padStart(2, '0')}`
   );
@@ -24,7 +25,7 @@ export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: Wor
     const newStartTime = new Date(date + 'T00:00:00');
     const [h, m] = time.split(':').map(Number);
     newStartTime.setHours(h, m, 0, 0);
-    onSave(workOrder.id, { price, estimatedMinutes: duration, startTime: newStartTime });
+    onSave(workOrder.id, { price, estimatedMinutes: duration, startTime: newStartTime, vehicleMileage: mileage });
   };
 
   const colors = getStatusColor(workOrder.status);
@@ -87,6 +88,18 @@ export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: Wor
                 className="w-full bg-steel-800 border border-steel-500 rounded-lg px-3 py-2 font-mono text-sm text-white focus:border-forge-500 outline-none"
               />
             </div>
+          </div>
+          
+          <div>
+            <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Car size={10} />Kilometraje
+            </label>
+            <input
+              type="number"
+              value={mileage}
+              onChange={e => setMileage(+e.target.value)}
+              className="w-full bg-steel-800 border border-steel-500 rounded-lg px-3 py-2 font-mono text-sm text-forge-500 focus:border-forge-500 outline-none"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

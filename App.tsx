@@ -249,12 +249,33 @@ export default function App() {
   };
 
   // ── UPDATE WORK ORDER ──
-  const handleUpdateWorkOrder = (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date }) => {
+  const handleUpdateWorkOrder = (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date; vehicleMileage?: number }) => {
     setWorkOrders(prev => prev.map(wo => {
       if (wo.id !== id) return wo;
       const startToUse = updates.startTime || wo.startTime;
       const newEnd = new Date(startToUse.getTime() + updates.estimatedMinutes * 60000);
-      return { ...wo, price: updates.price, estimatedMinutes: updates.estimatedMinutes, startTime: startToUse, estimatedEndTime: newEnd };
+      
+      const newVehicleInfo = { ...wo.vehicleInfo };
+      if (updates.vehicleMileage !== undefined && updates.vehicleMileage !== wo.vehicleInfo.mileage) {
+        newVehicleInfo.mileage = updates.vehicleMileage;
+        
+        // Also update the client's vehicle mileage
+        setClients(clientsPrev => clientsPrev.map(client => {
+          if (client.id === wo.clientId) {
+            const updatedClient = {
+              ...client,
+              vehicles: client.vehicles.map(v => 
+                v.plate === wo.vehicleInfo.plate ? { ...v, mileage: updates.vehicleMileage! } : v
+              )
+            };
+            if (loggedInUser.id === client.id) setLoggedInUser(updatedClient);
+            return updatedClient;
+          }
+          return client;
+        }));
+      }
+
+      return { ...wo, price: updates.price, estimatedMinutes: updates.estimatedMinutes, startTime: startToUse, estimatedEndTime: newEnd, vehicleInfo: newVehicleInfo };
     }));
     setEditingWorkOrder(null);
     toast('success', 'Orden Actualizada', 'Los detalles se guardaron correctamente');
@@ -621,6 +642,7 @@ export default function App() {
               mechanics={mechanics}
               onBookNew={() => setIsBookingModalOpen(true)}
               onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
+              onUpdateUser={handleUpdateClient}
             />
           )}
         </main>

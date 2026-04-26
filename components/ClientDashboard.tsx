@@ -1,6 +1,6 @@
-import React from 'react';
-import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus } from '../types';
-import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus, VehicleInfo } from '../types';
+import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save } from 'lucide-react';
 import { formatDuration } from '../services/timeEngine';
 
 interface ClientDashboardProps {
@@ -10,9 +10,43 @@ interface ClientDashboardProps {
   mechanics: Mechanic[];
   onBookNew: () => void;
   onCancelOrder: (id: string) => void;
+  onUpdateUser?: (client: Client) => void;
 }
 
-export function ClientDashboard({ currentUser, workOrders, services, mechanics, onBookNew, onCancelOrder }: ClientDashboardProps) {
+export function ClientDashboard({ currentUser, workOrders, services, mechanics, onBookNew, onCancelOrder, onUpdateUser }: ClientDashboardProps) {
+  const [editingMileage, setEditingMileage] = useState<number | null>(null);
+  const [tempMileage, setTempMileage] = useState<number>(0);
+  const [isAddingVehicle, setIsAddingVehicle] = useState(false);
+  const [newVehicle, setNewVehicle] = useState<Partial<VehicleInfo>>({});
+
+  const handleSaveMileage = (index: number) => {
+    if (onUpdateUser && tempMileage >= 0) {
+      const updatedUser = { ...currentUser };
+      updatedUser.vehicles[index].mileage = tempMileage;
+      onUpdateUser(updatedUser);
+    }
+    setEditingMileage(null);
+  };
+
+  const handleAddVehicle = () => {
+    if (onUpdateUser && newVehicle.plate && newVehicle.brand && newVehicle.model) {
+      const vehicle: VehicleInfo = {
+        plate: newVehicle.plate,
+        brand: newVehicle.brand,
+        model: newVehicle.model,
+        year: newVehicle.year || new Date().getFullYear(),
+        color: newVehicle.color || 'Desconocido',
+        mileage: newVehicle.mileage || 0,
+        fuelType: newVehicle.fuelType as any || 'Gasolina',
+      };
+      const updatedUser = { ...currentUser };
+      updatedUser.vehicles.push(vehicle);
+      onUpdateUser(updatedUser);
+      setIsAddingVehicle(false);
+      setNewVehicle({});
+    }
+  };
+
   const userOrders = workOrders.filter(wo => wo.clientId === currentUser.id);
   
   const upcomingOrders = userOrders.filter(wo => 
@@ -138,26 +172,82 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
           )}
 
           {/* Quick Vehicles List */}
-          <h2 className="text-xl font-bold text-white flex items-center gap-2 pt-6">
-            <Wrench className="text-forge-500" size={24} />
-            Mis Vehículos
-          </h2>
+          <div className="flex items-center justify-between pt-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Wrench className="text-forge-500" size={24} />
+              Mis Vehículos
+            </h2>
+            <button 
+              onClick={() => setIsAddingVehicle(!isAddingVehicle)} 
+              className="text-xs font-bold text-forge-400 hover:text-forge-300 flex items-center gap-1"
+            >
+              {isAddingVehicle ? 'Cancelar' : <><Plus size={14} /> Agregar Vehículo</>}
+            </button>
+          </div>
+
+          {isAddingVehicle && (
+            <div className="glass-inner p-4 rounded-xl border border-forge-500/30 mb-4 animate-slide-up grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <input type="text" placeholder="Placa (ej. ABC-123)" className="bg-steel-900 border border-steel-600 rounded p-2 text-sm text-white" value={newVehicle.plate || ''} onChange={e => setNewVehicle({...newVehicle, plate: e.target.value})} />
+              <input type="text" placeholder="Marca (ej. Toyota)" className="bg-steel-900 border border-steel-600 rounded p-2 text-sm text-white" value={newVehicle.brand || ''} onChange={e => setNewVehicle({...newVehicle, brand: e.target.value})} />
+              <input type="text" placeholder="Modelo (ej. Yaris)" className="bg-steel-900 border border-steel-600 rounded p-2 text-sm text-white" value={newVehicle.model || ''} onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} />
+              <input type="number" placeholder="Año" className="bg-steel-900 border border-steel-600 rounded p-2 text-sm text-white" value={newVehicle.year || ''} onChange={e => setNewVehicle({...newVehicle, year: +e.target.value})} />
+              <input type="number" placeholder="Kilometraje Inicial" className="bg-steel-900 border border-steel-600 rounded p-2 text-sm text-white" value={newVehicle.mileage || ''} onChange={e => setNewVehicle({...newVehicle, mileage: +e.target.value})} />
+              <button onClick={handleAddVehicle} className="bg-forge-500 text-black font-bold rounded p-2 hover:bg-forge-400 transition-colors flex items-center justify-center gap-2">
+                <Save size={16} /> Guardar
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {currentUser.vehicles.map((v, i) => (
-              <div key={i} className="glass-inner p-4 rounded-xl flex items-center gap-4 hover:border-forge-500/30 transition-all cursor-pointer">
-                <div className="w-12 h-12 rounded-lg bg-steel-800 flex items-center justify-center border border-white/10 text-xl shadow-inner flex-shrink-0">
-                  🚗
+              <div key={i} className="glass-inner p-4 rounded-xl flex flex-col gap-2 hover:border-forge-500/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-steel-800 flex items-center justify-center border border-white/10 text-xl shadow-inner flex-shrink-0">
+                    🚗
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white truncate">{v.brand} {v.model}</div>
+                    <div className="text-xs text-steel-400 font-mono mt-0.5 truncate">Placa: {v.plate} · {v.year}</div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-white truncate">{v.brand} {v.model}</div>
-                  <div className="text-xs text-steel-400 font-mono mt-0.5 truncate">Placa: {v.plate} · {v.year}</div>
-                  <div className="text-[10px] text-forge-500 font-mono mt-0.5">Kilometraje: {v.mileage.toLocaleString()} km</div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                  {editingMileage === i ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[10px] text-steel-400 font-mono">KM:</span>
+                      <input 
+                        type="number" 
+                        value={tempMileage} 
+                        onChange={e => setTempMileage(+e.target.value)}
+                        className="bg-steel-900 border border-forge-500 rounded px-2 py-1 text-xs text-forge-500 font-mono outline-none flex-1"
+                        autoFocus
+                        onKeyDown={e => e.key === 'Enter' && handleSaveMileage(i)}
+                      />
+                      <button onClick={() => handleSaveMileage(i)} className="text-green-400 p-1 hover:bg-green-400/10 rounded">
+                        <CheckCircle size={14} />
+                      </button>
+                      <button onClick={() => setEditingMileage(null)} className="text-red-400 p-1 hover:bg-red-400/10 rounded">
+                        <XCircle size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-xs text-forge-500 font-mono flex items-center gap-1">
+                        <Gauge size={12} /> {v.mileage.toLocaleString()} km
+                      </div>
+                      <button 
+                        onClick={() => { setEditingMileage(i); setTempMileage(v.mileage); }}
+                        className="text-[10px] text-steel-400 hover:text-forge-400 flex items-center gap-1 transition-colors bg-white/5 px-2 py-1 rounded-md"
+                      >
+                        <Edit2 size={10} /> Actualizar KM
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
             {currentUser.vehicles.length === 0 && (
               <div className="col-span-full text-center p-4 text-steel-400 text-sm">
-                No tienes vehículos registrados. Se agregarán al crear tu primera cita.
+                No tienes vehículos registrados. Agrega uno nuevo o se crearán al hacer una cita.
               </div>
             )}
           </div>
