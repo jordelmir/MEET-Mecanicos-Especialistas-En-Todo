@@ -439,7 +439,11 @@ class ObdSession(
                             val response = readResponse(timeoutMs = 2500L + (attempts * 1500L))
                             
                             val upper = response.uppercase()
-                            if (upper.contains("NO DATA") || upper.contains("?")) {
+                            if (upper.isEmpty()) {
+                                lastException = Exception("CAN BUS TIMEOUT: No response")
+                                attempts++
+                                delay(150)
+                            } else if (upper.contains("NO DATA") || upper.contains("?")) {
                                 lastException = Exception("CAN BUS NO DATA / ERROR: $response")
                                 attempts++
                                 delay(150) // Cooling time para el bus CAN
@@ -460,6 +464,10 @@ class ObdSession(
 
                     if (!success) {
                         command.onError(lastException ?: Exception("Max retries exceeded on CAN BUS"))
+                        if (lastException is java.io.IOException) {
+                            notifyChannelDead()
+                            break // Fatal transport error, detiene la cola
+                        }
                     }
                 } else {
                     delay(50) // Prevent tight loop if queue is empty
