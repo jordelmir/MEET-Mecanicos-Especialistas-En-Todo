@@ -1,15 +1,7 @@
 package com.elysium369.meet.data.supabase
 
-import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.gotrue.Auth
-import io.github.jan.supabase.gotrue.auth
-import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,20 +36,13 @@ data class DiagnosticSession(
 
 object SupabaseManager {
 
-    private const val SUPABASE_URL = "YOUR_SUPABASE_URL_HERE"
-    private const val SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"
-
-    val client = createSupabaseClient(
-        supabaseUrl = SUPABASE_URL,
-        supabaseKey = SUPABASE_ANON_KEY
-    ) {
-        install(Auth)
-        install(Postgrest)
-    }
+    // Usar el cliente real de SupabaseModule (que tiene las credenciales correctas)
+    // para evitar duplicación y credenciales placeholder rotas
+    val client get() = com.elysium369.meet.data.remote.SupabaseModule.client
 
     suspend fun isUserPremium(): Boolean {
-        // Implement subscription check here
-        return false // Default for now to avoid complex queries that might fail compilation
+        // TODO: Wire to RevenueCat/Stripe subscription check
+        return false
     }
 }
 

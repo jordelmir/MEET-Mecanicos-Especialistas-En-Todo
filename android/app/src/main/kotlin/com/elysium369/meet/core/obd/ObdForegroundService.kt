@@ -27,11 +27,15 @@ class ObdForegroundService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val NOTIF_ID = 1
+    private val CHANNEL_ID = "obd_channel"
     
     val liveData: StateFlow<Map<String, Float>> get() = obdSession.liveData
     val connectionState: StateFlow<ObdState> get() = obdSession.state
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Crear canal ANTES de startForeground — requerido en Android 8+
+        createNotificationChannel()
+        
         try {
             startForeground(NOTIF_ID, buildNotification("Iniciando conexión..."))
         } catch (e: Exception) {
@@ -42,49 +46,67 @@ class ObdForegroundService : Service() {
             keepAliveManager.start()
             alertManager.startMonitoring(liveData, serviceScope)
             
-            // Assume dummy vehicle ID for now, this would normally be passed via Intent extra
             tripManager.startMonitoring("default_vehicle")
             
             liveData.collect { data ->
-                val temp = data["0105"]?.toInt()?.toString() ?: "--"
-                val voltage = data["VOLTAGE"]?.toString() ?: "--"
-                val rpm = data["010C"]?.toInt()?.toString() ?: "--"
-                // Assuming ObdSession has a property for this, mocking for compilation
-                val dtcCount = 0 
-                val text = "Motor: ${temp}°C | ${voltage}V | ${rpm} RPM" +
-                    if (dtcCount > 0) " | ⚠️ $dtcCount DTC" else " | ✓ Sin fallas"
+                if (data.isEmpty()) return@collect // No actualizar notificación si no hay datos
                 
-                val notificationManager = getSystemService(NotificationManager::class.java)
-                notificationManager.notify(NOTIF_ID, buildNotification(text))
+                val temp = data["0105"]?.toInt()?.toString() ?: "--"
+                val rpm = data["010C"]?.toInt()?.toString() ?: "--"
+                val speed = data["010D"]?.toInt()?.toString() ?: "--"
+                val text = "Motor: ${temp}°C | ${rpm} RPM | ${speed} km/h"
+                
+                try {
+                    val notificationManager = getSystemService(NotificationManager::class.java)
+                    notificationManager?.notify(NOTIF_ID, buildNotification(text))
+                } catch (_: Exception) {
+                    // Proteger contra excepciones de notificación en background
+                }
             }
         }
         
         return START_STICKY
     }
     
-    private fun buildNotification(text: String): Notification {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel("obd_channel", "Diagnóstico OBD", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                CHANNEL_ID, 
+                "Diagnóstico OBD", 
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Estado de la conexión OBD2"
+                setShowBadge(false)
+            }
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
-        
+    }
+    
+    private fun buildNotification(text: String): Notification {
         val pendingIntent = PendingIntent.getActivity(this, 0,
             Intent(this, MainActivity::class.java).apply {
                 action = "OPEN_SCANNER"
-            }, PendingIntent.FLAG_IMMUTABLE)
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             
-        return NotificationCompat.Builder(this, "obd_channel")
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("MEET OBD2")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setSilent(true)
             .build()
     }
     
     override fun onDestroy() {
-        serviceScope.launch {
-            tripManager.endTrip()
+        // Ejecutar cleanup ANTES de cancelar el scope
+        // (la versión anterior lanzaba una coroutine y luego cancelaba el scope
+        // inmediatamente, lo cual hacía que el cleanup nunca se ejecutara)
+        runBlocking(Dispatchers.IO) {
+            try {
+                tripManager.endTrip()
+            } catch (_: Exception) {}
             keepAliveManager.stop()
         }
         serviceScope.cancel()
