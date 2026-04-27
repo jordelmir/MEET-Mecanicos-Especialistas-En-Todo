@@ -97,21 +97,20 @@ dependencies {
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
     
-    // Google Fonts
-    implementation("androidx.compose.ui:ui-text-google-fonts:1.6.1")
-    
-    // MPAndroidChart
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
-    // Supabase (PostgREST, Auth, GoTrue)
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.3")
-    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.3")
-    implementation("io.ktor:ktor-client-android:2.3.7") // Ktor client for Supabase
+    // Supabase
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.3")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")
+    implementation("io.github.jan-tennert.supabase:storage-kt:2.2.3")
+    implementation("io.ktor:ktor-client-android:2.3.8")
+    implementation("io.ktor:ktor-client-core:2.3.8")
     
     // Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     
-    // Charts
+    // Google Fonts
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.6.1")
+    
+    // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
     testImplementation("junit:junit:4.13.2")

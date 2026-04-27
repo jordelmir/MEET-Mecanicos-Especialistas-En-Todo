@@ -173,18 +173,33 @@ class ObdSession(
             while (isRunning && isActive) {
                 val command = commandQueue.dequeue()
                 if (command != null) {
-                    try {
-                        transport.write("${command.query}\r".toByteArray())
-                        val response = readResponse()
-                        
-                        if (response.contains("NO DATA") || response.contains("?")) {
-                            // Ignorar, no desconectar por esto
-                            command.onError(Exception("Invalid response: $response"))
-                        } else {
-                            command.onSuccess(response)
+                    var success = false
+                    var attempts = 0
+                    val maxRetries = 3
+                    var lastException: Exception? = null
+
+                    while (!success && attempts < maxRetries && isRunning) {
+                        try {
+                            transport.write("${command.query}\r".toByteArray())
+                            val response = readResponse(timeoutMs = 2500L + (attempts * 1000L)) // Escalamiento de timeout por ruido CAN
+                            
+                            if (response.contains("NO DATA") || response.contains("?")) {
+                                lastException = Exception("CAN BUS NO DATA / ERROR: $response")
+                                attempts++
+                                delay(100) // Cooling time para el bus CAN
+                            } else {
+                                success = true
+                                command.onSuccess(response)
+                            }
+                        } catch (e: Exception) {
+                            lastException = e
+                            attempts++
+                            delay(200)
                         }
-                    } catch (e: Exception) {
-                        command.onError(e)
+                    }
+
+                    if (!success) {
+                        command.onError(lastException ?: Exception("Max retries exceeded on CAN BUS"))
                     }
                 } else {
                     delay(50) // Prevent tight loop if queue is empty
