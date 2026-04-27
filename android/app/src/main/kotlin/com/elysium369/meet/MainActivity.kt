@@ -1,4 +1,5 @@
 package com.elysium369.meet
+import com.elysium369.meet.core.obd.DtcDatabaseHelper
 
 import android.os.Bundle
 import android.content.Context
@@ -43,12 +44,14 @@ val CyberpunkColorScheme = darkColorScheme(
     error = androidx.compose.ui.graphics.Color(0xFFFF003C)
 )
 
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: ObdViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DtcDatabaseHelper.init(this)
         setContent {
             MaterialTheme(colorScheme = CyberpunkColorScheme) {
                 MeetApp(viewModel)

@@ -59,6 +59,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) { Text("Pending (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                     Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFFCC00FF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                     Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) { Text("Monitores", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }) { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                 }
             }
         },
@@ -99,6 +100,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                 3 -> { // Readiness Monitors
                     item { ReadinessMonitorsCard(readiness, coroutineScope, viewModel) }
                 }
+                4 -> { // Manual Search
+                    item { ManualSearchTab(navController) }
+                }
             }
         }
     }
@@ -106,7 +110,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 
 @Composable
 private fun DtcCard(dtc: String, severity: String, color: Color, navController: NavController) {
-    val desc = com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+    val dtcInfo = com.elysium369.meet.core.obd.DtcDatabaseHelper.getDtcInfo(dtc)
+    val desc = dtcInfo?.descriptionEs ?: com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+    val causes = dtcInfo?.possibleCauses
+    
     Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -117,7 +124,11 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
                 Text(dtc, color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(desc, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Text(desc, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            if (causes != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(causes, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
             Spacer(modifier = Modifier.height(12.dp))
             Button(onClick = { navController.navigate("ai/$dtc") }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
                 Text("🤖 CONSULTAR IA", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
@@ -175,6 +186,96 @@ private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.ui.ReadinessRes
                 Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(monitor.name, color = Color.White, style = MaterialTheme.typography.bodyMedium)
                     Text(if (monitor.complete) "✅ Listo" else "⏳ Incompleto", color = if (monitor.complete) Color(0xFF00FFCC) else Color(0xFFFFD700), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualSearchTab(navController: NavController) {
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResult by remember { mutableStateOf<List<com.elysium369.meet.core.obd.DtcInfo>?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it.uppercase().trim() },
+            label = { Text("Ingresar Código (Ej. P0300)", color = Color.Gray) },
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = Color(0xFF00FFCC),
+                unfocusedBorderColor = Color.Gray,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                cursorColor = Color(0xFF00FFCC)
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Button(
+            onClick = {
+                if (searchQuery.isNotEmpty()) {
+                    searchResult = com.elysium369.meet.core.obd.DtcDatabaseHelper.searchDtc(searchQuery)
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("BUSCAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (searchResult != null) {
+            if (searchResult!!.isEmpty()) {
+                EmptyDtcState("No se encontró el código en la base de datos.", Color.Gray)
+            } else {
+                Text("Resultados (${searchResult!!.size})", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                searchResult!!.forEach { dtc ->
+                    val color = when (dtc.severity.uppercase()) {
+                        "HIGH" -> Color(0xFFFF003C)
+                        "MODERATE" -> Color(0xFFFFD700)
+                        else -> Color(0xFF00FFCC)
+                    }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, color, RoundedCornerShape(4.dp))) {
+                                    Text(dtc.severity.uppercase(), color = color, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(dtc.code, color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(dtc.descriptionEs, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            if (dtc.descriptionEn.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(dtc.descriptionEn, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Posibles causas / Recomendación:", color = Color(0xFF00FFCC).copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text(dtc.possibleCauses, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { navController.navigate("ai/${dtc.code}") },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("🤖 CONSULTAR IA", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
         }
