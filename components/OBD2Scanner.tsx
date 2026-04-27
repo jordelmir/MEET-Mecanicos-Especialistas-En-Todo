@@ -6,8 +6,10 @@ import { OBD2_DATABASE_P2 as DB_P2 } from '../lib/obd2-database-p2';
 import { OBD2_DATABASE_P3 as DB_P3 } from '../lib/obd2-database-p3';
 import { OBD2_DATABASE_P4 as DB_P4 } from '../lib/obd2-database-p4';
 import { OBD2_DATABASE_P5 as DB_P5 } from '../lib/obd2-database-p5';
+import { OBD2_DATABASE_P6 as DB_P6 } from '../lib/obd2-database-p6';
+import { OBD2_DATABASE_P7 as DB_P7 } from '../lib/obd2-database-p7';
 
-const OBD2_DATABASE = { ...DB_P1, ...DB_P2, ...DB_P3, ...DB_P4, ...DB_P5 };
+const OBD2_DATABASE = { ...DB_P1, ...DB_P2, ...DB_P3, ...DB_P4, ...DB_P5, ...DB_P6, ...DB_P7 };
 
 interface OBD2ScannerProps {
   onClose: () => void;

@@ -676,11 +676,11 @@
   },
   {
     "code": "P0456",
-    "descriptionEs": "Fuga Muy Pequeña en Sistema EVAP",
-    "descriptionEn": "Se detectó una micro-fuga en el sistema EVAP.",
+    "descriptionEs": "Fuga Muy Pequeña Sistema EVAP (0.020\") (FCA)",
+    "descriptionEn": "Micro fuga detectada en sistema de control de emisiones.",
     "system": "ENGINE",
     "severity": "LOW",
-    "possibleCauses": "Revisar tapa de combustible, realizar prueba de humo en sistema EVAP.",
+    "possibleCauses": "Cambiar tapa de tanque, revisar sello de bomba NVLD/ESIM.",
     "urgency": "MONITOR"
   },
   {
@@ -894,7 +894,7 @@
     "code": "P0700",
     "descriptionEs": "Mal Funcionamiento del Control de Transmisión",
     "descriptionEn": "Se detectó falla general en el sistema de control de la transmisión automática.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Leer códigos específicos del módulo TCM con escáner avanzado. Revisar nivel de ATF.",
     "urgency": "STOP_DRIVING"
@@ -903,7 +903,7 @@
     "code": "P0705",
     "descriptionEs": "Circuito del Sensor de Rango de Transmisión",
     "descriptionEn": "Señal errónea del sensor de posición del selector (PRNDL).",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "MODERATE",
     "possibleCauses": "Ajustar o reemplazar sensor de rango, revisar cableado y conector.",
     "urgency": "CAUTION"
@@ -912,7 +912,7 @@
     "code": "P0710",
     "descriptionEs": "Circuito del Sensor de Temperatura de Transmisión",
     "descriptionEn": "Mal funcionamiento del sensor de temperatura del fluido de transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "MODERATE",
     "possibleCauses": "Revisar sensor TFT, cableado y nivel/condición del fluido ATF.",
     "urgency": "CAUTION"
@@ -921,7 +921,7 @@
     "code": "P0715",
     "descriptionEs": "Sensor de Velocidad de Entrada de Transmisión",
     "descriptionEn": "No se recibe señal del sensor de velocidad de entrada (turbina).",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar sensor de velocidad de turbina, cableado y conector.",
     "urgency": "STOP_DRIVING"
@@ -930,7 +930,7 @@
     "code": "P0720",
     "descriptionEs": "Sensor de Velocidad de Salida de Transmisión",
     "descriptionEn": "Mal funcionamiento del sensor de velocidad de salida de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar sensor de velocidad de salida, cableado y conector.",
     "urgency": "STOP_DRIVING"
@@ -939,7 +939,7 @@
     "code": "P0730",
     "descriptionEs": "Relación de Marcha Incorrecta",
     "descriptionEn": "La relación de cambio real no coincide con la esperada.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Verificar nivel de ATF, solenoide de cambio, bandas y embragues.",
     "urgency": "STOP_DRIVING"
@@ -948,7 +948,7 @@
     "code": "P0740",
     "descriptionEs": "Circuito del Solenoide TCC (Convertidor de Torque)",
     "descriptionEn": "Mal funcionamiento del circuito del embrague del convertidor de torque.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "MODERATE",
     "possibleCauses": "Revisar solenoide TCC, cableado, nivel de ATF y filtro.",
     "urgency": "CAUTION"
@@ -957,7 +957,7 @@
     "code": "P0741",
     "descriptionEs": "Rendimiento del Solenoide TCC",
     "descriptionEn": "El embrague del convertidor de torque no bloquea correctamente.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "MODERATE",
     "possibleCauses": "Reemplazar solenoide TCC, cambiar fluido ATF y filtro.",
     "urgency": "CAUTION"
@@ -966,7 +966,7 @@
     "code": "P0750",
     "descriptionEs": "Solenoide de Cambio A",
     "descriptionEn": "Mal funcionamiento del solenoide de cambio A de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar solenoide A, cableado y nivel de ATF.",
     "urgency": "STOP_DRIVING"
@@ -975,7 +975,7 @@
     "code": "P0755",
     "descriptionEs": "Solenoide de Cambio B",
     "descriptionEn": "Mal funcionamiento del solenoide de cambio B de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar solenoide B, cableado y nivel de ATF.",
     "urgency": "STOP_DRIVING"
@@ -984,7 +984,7 @@
     "code": "P0760",
     "descriptionEs": "Solenoide de Cambio C",
     "descriptionEn": "Mal funcionamiento del solenoide de cambio C de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar solenoide C, cableado y conector.",
     "urgency": "STOP_DRIVING"
@@ -993,7 +993,7 @@
     "code": "P0765",
     "descriptionEs": "Solenoide de Cambio D",
     "descriptionEn": "Mal funcionamiento del solenoide de cambio D de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar solenoide D, cableado y conector.",
     "urgency": "STOP_DRIVING"
@@ -1002,7 +1002,7 @@
     "code": "P0770",
     "descriptionEs": "Solenoide de Cambio E",
     "descriptionEn": "Mal funcionamiento del solenoide de cambio E de la transmisión.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Revisar solenoide E, cableado y conector.",
     "urgency": "STOP_DRIVING"
@@ -1011,7 +1011,7 @@
     "code": "P0780",
     "descriptionEs": "Error de Selección de Cambio",
     "descriptionEn": "La transmisión no puede seleccionar la marcha correcta.",
-    "system": "ENGINE",
+    "system": "TRANSMISSION",
     "severity": "HIGH",
     "possibleCauses": "Verificar nivel y condición del fluido ATF, solenoide y cuerpo de válvulas.",
     "urgency": "STOP_DRIVING"
@@ -1108,20 +1108,20 @@
   },
   {
     "code": "P1693",
-    "descriptionEs": "Código DTC Presente en Otro Módulo (Chrysler)",
-    "descriptionEn": "Otro módulo de control tiene un código de falla almacenado.",
+    "descriptionEs": "Código Compañero TCM a ECM (FCA)",
+    "descriptionEn": "El TCM solicita a la ECU encender el MIL por falla de caja.",
     "system": "ENGINE",
-    "severity": "LOW",
-    "possibleCauses": "Escanear todos los módulos del vehículo para encontrar el DTC asociado.",
-    "urgency": "MONITOR"
+    "severity": "MODERATE",
+    "possibleCauses": "Escanear el módulo de transmisión para obtener el código raíz.",
+    "urgency": "CAUTION"
   },
   {
     "code": "P2096",
-    "descriptionEs": "Ajuste de Combustible Post-Catalizador Pobre (B1)",
-    "descriptionEn": "Condición pobre detectada después del catalizador banco 1.",
+    "descriptionEs": "Límite Pobre de Regulación de Mezcla (B1) (BMW)",
+    "descriptionEn": "Mezcla demasiado pobre en banco 1 después del catalizador.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar catalizador, sensores O2, fugas de escape e inyectores.",
+    "possibleCauses": "Buscar fugas de admisión, fallas de inyectores y verificar bomba de combustible.",
     "urgency": "CAUTION"
   },
   {
@@ -1162,11 +1162,11 @@
   },
   {
     "code": "P2138",
-    "descriptionEs": "Correlación de Voltaje del Pedal D/E",
-    "descriptionEn": "Discrepancia entre las señales del sensor del pedal del acelerador.",
+    "descriptionEs": "Correlación de Voltaje Sensor A/B del Pedal",
+    "descriptionEn": "Discrepancia entre pistas de redundancia del pedal de acelerador.",
     "system": "ENGINE",
     "severity": "HIGH",
-    "possibleCauses": "Reemplazar sensor/pedal del acelerador. Verificar cableado y conectores.",
+    "possibleCauses": "Reemplazar conjunto del pedal del acelerador, verificar conector.",
     "urgency": "STOP_DRIVING"
   },
   {
@@ -2482,5 +2482,752 @@
     "severity": "MODERATE",
     "possibleCauses": "Verificar cableado CAN al TCM, reprogramar si es necesario.",
     "urgency": "CAUTION"
+  },
+  {
+    "code": "P0800",
+    "descriptionEs": "Circuito de Solicitud de Control de Caja de Transferencia",
+    "descriptionEn": "Falla en la comunicación con la caja de transferencia (4x4).",
+    "system": "TRANSMISSION",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar módulo de caja de transferencia, cableado y motor de transferencia.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0805",
+    "descriptionEs": "Circuito del Sensor de Posición del Embrague",
+    "descriptionEn": "Falla en el sensor que detecta si el pedal de embrague está presionado.",
+    "system": "TRANSMISSION",
+    "severity": "LOW",
+    "possibleCauses": "Revisar switch del embrague, cableado y conector.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0810",
+    "descriptionEs": "Error de Control de Posición del Embrague",
+    "descriptionEn": "El sistema de embrague automático no logra la posición correcta.",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar actuador del embrague, sensor de posición y fluido hidráulico.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0826",
+    "descriptionEs": "Circuito del Switch de Cambio Arriba/Abajo",
+    "descriptionEn": "Falla en el circuito de los botones de cambio manual (tiptronic).",
+    "system": "TRANSMISSION",
+    "severity": "LOW",
+    "possibleCauses": "Revisar switches de cambio en el volante o palanca, cableado.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0840",
+    "descriptionEs": "Circuito del Sensor de Presión de Fluido de Transmisión A",
+    "descriptionEn": "Falla en el sensor de presión del fluido de la transmisión.",
+    "system": "TRANSMISSION",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de presión, cableado y nivel de fluido ATF.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0868",
+    "descriptionEs": "Presión de Fluido de Transmisión Baja",
+    "descriptionEn": "La presión del fluido ATF es menor a la requerida.",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar nivel de ATF, bomba de aceite de la transmisión y filtro.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0870",
+    "descriptionEs": "Presión de Fluido de Transmisión Alta",
+    "descriptionEn": "La presión del fluido ATF es mayor a la esperada.",
+    "system": "TRANSMISSION",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar regulador de presión de línea y cuerpo de válvulas.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0880",
+    "descriptionEs": "Circuito de Alimentación del Módulo TCM",
+    "descriptionEn": "Falla en la alimentación eléctrica del módulo de transmisión.",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar fusible, relé y cableado de alimentación del TCM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0900",
+    "descriptionEs": "Circuito del Actuador del Embrague",
+    "descriptionEn": "Falla en el circuito del actuador del embrague automático.",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar actuador del embrague, cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0910",
+    "descriptionEs": "Circuito del Actuador de Selección de Marcha",
+    "descriptionEn": "Falla en el motor de selección de marcha (transmisión automatizada).",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar actuador de selección, cableado y módulo TCM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0920",
+    "descriptionEs": "Circuito del Actuador de Avance de Marcha",
+    "descriptionEn": "Falla en el actuador de engranaje de marcha.",
+    "system": "TRANSMISSION",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar actuador de avance, cableado y módulo TCM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0251",
+    "descriptionEs": "Bomba de Inyección A - Falla Mecánica (Diésel)",
+    "descriptionEn": "Falla mecánica en la bomba de inyección de combustible diésel.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar bomba de inyección, sincronización y presión de combustible.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0252",
+    "descriptionEs": "Bomba de Inyección A - Rango/Rendimiento (Diésel)",
+    "descriptionEn": "La bomba de inyección no entrega el volumen correcto de combustible.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bomba de inyección, regulador de presión y filtros.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0253",
+    "descriptionEs": "Circuito del Inyector 1 (Diésel)",
+    "descriptionEn": "Falla en el circuito del inyector diésel del cilindro 1.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar inyector, cableado y señal de excitación del ECM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0254",
+    "descriptionEs": "Inyector 1 - Circuito Alto (Diésel)",
+    "descriptionEn": "Señal alta en el circuito del inyector diésel cilindro 1.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado del inyector 1, posible cortocircuito.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0263",
+    "descriptionEs": "Contribución/Balance del Cilindro 1 (Diésel)",
+    "descriptionEn": "El cilindro 1 no contribuye correctamente a la potencia del motor.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar inyector, compresión y bujía de precalentamiento del cilindro 1.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0266",
+    "descriptionEs": "Contribución/Balance del Cilindro 2 (Diésel)",
+    "descriptionEn": "El cilindro 2 no contribuye correctamente a la potencia.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar inyector, compresión y bujía de precalentamiento del cilindro 2.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0269",
+    "descriptionEs": "Contribución/Balance del Cilindro 3 (Diésel)",
+    "descriptionEn": "El cilindro 3 no contribuye correctamente a la potencia.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar inyector, compresión y bujía de precalentamiento del cilindro 3.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0272",
+    "descriptionEs": "Contribución/Balance del Cilindro 4 (Diésel)",
+    "descriptionEn": "El cilindro 4 no contribuye correctamente a la potencia.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar inyector, compresión y bujía de precalentamiento del cilindro 4.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0380",
+    "descriptionEs": "Circuito de Bujías de Precalentamiento (Glow Plugs)",
+    "descriptionEn": "Falla general en el circuito del sistema de precalentamiento diésel.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar relé de bujías de precalentamiento, fusible y cableado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0381",
+    "descriptionEs": "Indicador de Bujías de Precalentamiento",
+    "descriptionEn": "Falla en el circuito del indicador de precalentamiento en tablero.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar bombillo indicador, cableado y módulo de precalentamiento.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0382",
+    "descriptionEs": "Circuito de Bujías de Precalentamiento B",
+    "descriptionEn": "Falla en el circuito secundario de precalentamiento.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar bujías de precalentamiento, relé y cableado individual.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0670",
+    "descriptionEs": "Módulo de Control de Bujías de Precalentamiento",
+    "descriptionEn": "Falla en el módulo de control del sistema de precalentamiento.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar módulo de control de glow plugs, verificar alimentación.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0671",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 1",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía, reemplazar si está abierta o en corto.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0672",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 2",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía 2, reemplazar si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0673",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 3",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 3.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía 3, reemplazar si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0674",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 4",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 4.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía 4, reemplazar si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0675",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 5",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 5.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía 5, reemplazar si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0676",
+    "descriptionEs": "Circuito de Bujía de Precalentamiento - Cilindro 6",
+    "descriptionEn": "Falla en la bujía de precalentamiento del cilindro 6.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Medir resistencia de la bujía 6, reemplazar si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2003",
+    "descriptionEs": "Eficiencia del Filtro de Partículas (DPF) Baja (B2)",
+    "descriptionEn": "El DPF del banco 2 no filtra partículas correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Regeneración forzada del DPF. Si falla, limpieza o reemplazo.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2031",
+    "descriptionEs": "Sensor de Temperatura del Gas de Escape (Banco 1)",
+    "descriptionEn": "Señal fuera de rango del sensor EGT banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de temperatura de escape, cableado y conector.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2032",
+    "descriptionEs": "Sensor de Temperatura de Escape - Bajo (B1)",
+    "descriptionEn": "Señal baja del sensor EGT banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado del sensor EGT, posible corto a tierra.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2033",
+    "descriptionEs": "Sensor de Temperatura de Escape - Alto (B1)",
+    "descriptionEn": "Señal alta del sensor EGT banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado y sensor EGT, posible circuito abierto.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2047",
+    "descriptionEs": "Circuito del Inyector de Reductor (SCR) B1",
+    "descriptionEn": "Falla en el inyector de AdBlue/DEF banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar inyector de urea, bomba AdBlue, cableado y nivel de DEF.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2048",
+    "descriptionEs": "Inyector de Reductor (SCR) - Bajo B1",
+    "descriptionEn": "Señal baja en el circuito del inyector de AdBlue.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado del inyector SCR, posible corto a tierra.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P204F",
+    "descriptionEs": "Eficiencia del Sistema SCR de NOx",
+    "descriptionEn": "El sistema de reducción catalítica selectiva no reduce NOx correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar calidad del AdBlue/DEF, inyector SCR y catalizador SCR.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2458",
+    "descriptionEs": "Tiempo de Regeneración del DPF",
+    "descriptionEn": "La regeneración del filtro de partículas toma más tiempo del normal.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Realizar regeneración estática. Verificar sensor de presión diferencial del DPF.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2459",
+    "descriptionEs": "Frecuencia de Regeneración del DPF",
+    "descriptionEn": "Las regeneraciones del DPF ocurren con demasiada frecuencia.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar inyectores (posible exceso de hollín), sensor de presión del DPF.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2463",
+    "descriptionEs": "Acumulación Excesiva de Hollín en DPF",
+    "descriptionEn": "El filtro de partículas tiene una acumulación de hollín por encima del límite.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Realizar regeneración forzada. Si no funciona, limpieza profesional del DPF.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0010",
+    "descriptionEs": "Circuito del Airbag Lateral Izquierdo",
+    "descriptionEn": "Falla en el circuito del airbag lateral del conductor.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado del airbag lateral, conector y módulo SRS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0011",
+    "descriptionEs": "Circuito del Airbag Lateral Derecho",
+    "descriptionEn": "Falla en el circuito del airbag lateral del pasajero.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado del airbag lateral derecho y módulo SRS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0020",
+    "descriptionEs": "Circuito del Airbag de Cortina Izquierdo",
+    "descriptionEn": "Falla en el circuito del airbag de cortina del lado del conductor.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado de la cortina de aire, conectores y módulo SRS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0021",
+    "descriptionEs": "Circuito del Airbag de Cortina Derecho",
+    "descriptionEn": "Falla en el circuito del airbag de cortina del lado del pasajero.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado de la cortina de aire derecha y módulo SRS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0050",
+    "descriptionEs": "Sensor de Impacto Frontal Izquierdo",
+    "descriptionEn": "Falla en el sensor de impacto frontal del lado del conductor.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor de impacto, cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0051",
+    "descriptionEs": "Sensor de Impacto Frontal Derecho",
+    "descriptionEn": "Falla en el sensor de impacto frontal del lado del pasajero.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor de impacto derecho, cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0060",
+    "descriptionEs": "Sensor de Impacto Lateral Izquierdo",
+    "descriptionEn": "Falla en el sensor de impacto lateral del conductor.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor de impacto lateral, cableado y módulo SRS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B0100",
+    "descriptionEs": "Voltaje de Alimentación del Módulo SRS",
+    "descriptionEn": "Voltaje fuera de rango en el módulo de airbags.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar batería, cableado de alimentación del módulo SRS y tierras.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0060",
+    "descriptionEs": "Circuito del Motor de la Bomba ABS",
+    "descriptionEn": "Falla en el motor de la bomba del sistema de frenos ABS.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar relé de la bomba ABS, motor de bomba, fusible y cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0065",
+    "descriptionEs": "Relé de la Bomba ABS",
+    "descriptionEn": "Falla en el relé que controla la bomba del ABS.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar relé de la bomba ABS, verificar cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0070",
+    "descriptionEs": "Válvula Solenoide de Freno ABS",
+    "descriptionEn": "Falla en una de las válvulas solenoides del módulo ABS.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Posible reemplazo del módulo hidráulico ABS completo.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0110",
+    "descriptionEs": "Circuito del Motor de la Bomba de Control de Estabilidad",
+    "descriptionEn": "Falla en el motor de la bomba del sistema ESP/ESC.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar motor de bomba ESP, relé, fusible y cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0300",
+    "descriptionEs": "Sensor del Ángulo de Dirección",
+    "descriptionEn": "Mal funcionamiento del sensor de ángulo del volante.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Calibrar sensor de ángulo de dirección con escáner. Reemplazar si falla.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C0455",
+    "descriptionEs": "Sensor de Velocidad de Giro (Yaw Rate)",
+    "descriptionEn": "Falla en el sensor de velocidad de giro del sistema ESP.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de giro, cableado y calibración del módulo ESP.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C0460",
+    "descriptionEs": "Sensor de Aceleración Lateral",
+    "descriptionEn": "Falla en el sensor de aceleración lateral del sistema de estabilidad.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de aceleración lateral, cableado y módulo ESP.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C0561",
+    "descriptionEs": "Sistema de Control de Estabilidad Deshabilitado",
+    "descriptionEn": "El sistema ESP/ESC se ha deshabilitado por una falla detectada.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Diagnosticar código primario que causó la desactivación del ESP.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C0710",
+    "descriptionEs": "Circuito del Sensor de Dirección Asistida Eléctrica",
+    "descriptionEn": "Falla en el sistema de dirección asistida eléctrica (EPS).",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar motor EPS, sensor de torque, cableado y módulo de control.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0800",
+    "descriptionEs": "Voltaje del Sistema de Frenos de Potencia",
+    "descriptionEn": "Voltaje fuera de rango en el sistema de frenos eléctricos.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar batería, alternador y cableado del módulo de frenos.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A00",
+    "descriptionEs": "Circuito del Sensor de Temperatura del Refrigerante del Motor Eléctrico",
+    "descriptionEn": "Falla en el circuito del sensor de temperatura del inversor/motor eléctrico.",
+    "system": "HYBRID",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de temperatura del inversor, bomba de agua eléctrica y nivel de refrigerante HEV.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0A08",
+    "descriptionEs": "Fallo del Circuito del Convertidor DC/DC",
+    "descriptionEn": "Problema en el convertidor de alta tensión a 12V.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar alimentación de alta tensión, fusibles principales y convertidor DC/DC.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A09",
+    "descriptionEs": "Circuito del Convertidor DC/DC Bajo",
+    "descriptionEn": "Señal baja en el circuito de estado del convertidor DC/DC.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar conexiones del convertidor DC/DC, estado de la batería de 12V.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A78",
+    "descriptionEs": "Rendimiento del Inversor del Motor de Tracción",
+    "descriptionEn": "Mal funcionamiento interno en el inversor del motor eléctrico.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado de alta tensión (NARANJA - PELIGRO), módulo inversor. Requiere técnico especializado en HV.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A79",
+    "descriptionEs": "Rendimiento del Inversor del Generador",
+    "descriptionEn": "Falla en el inversor del motor-generador (MG1).",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar módulo inversor/conversor. Aislar sistema HV antes de intervenir.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A80",
+    "descriptionEs": "Reemplazar Paquete de Baterías Híbridas",
+    "descriptionEn": "Degradación crítica detectada en los módulos de la batería de alto voltaje.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Balancear o reemplazar módulos dañados de la batería HV, o reemplazar paquete completo.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A81",
+    "descriptionEs": "Circuito del Ventilador de la Batería Híbrida",
+    "descriptionEn": "Falla en el sistema de enfriamiento de la batería de alto voltaje.",
+    "system": "HYBRID",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar conductos y ventilador de la batería, revisar motor del ventilador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0A93",
+    "descriptionEs": "Rendimiento del Sistema de Enfriamiento del Inversor",
+    "descriptionEn": "Sobrecalentamiento del sistema inversor/conversor.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar bomba de agua del inversor, nivel de refrigerante específico para HEV.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A94",
+    "descriptionEs": "Rendimiento del Convertidor DC/DC",
+    "descriptionEn": "Falla general en la conversión de voltaje HV a 12V.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar conjunto inversor/convertidor. Revisar cableado HV.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0AA6",
+    "descriptionEs": "Aislamiento de Alto Voltaje Defectuoso",
+    "descriptionEn": "Fuga de corriente de alto voltaje hacia el chasis detectada.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "¡PELIGRO! Riesgo de electrocución. Buscar daño en cables naranjas, motor MG1/MG2 o inversor.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0AC4",
+    "descriptionEs": "Módulo de Control Híbrido Solicitó Encender MIL",
+    "descriptionEn": "El módulo HEV/EV pide a la ECU del motor encender la luz de falla.",
+    "system": "HYBRID",
+    "severity": "MODERATE",
+    "possibleCauses": "Escanear módulo HEV para obtener códigos específicos de la falla híbrida.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0032",
+    "descriptionEs": "Calentador Sensor O2 - Alto (B1S1) (Nissan)",
+    "descriptionEn": "Cortocircuito a voltaje en el calentador del sensor O2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar mazo de cables del sensor O2, posible cruce con cables de alimentación.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1111",
+    "descriptionEs": "Circuito del Solenoide VVT de Admisión (Nissan)",
+    "descriptionEn": "Falla en el sistema de control de válvulas IVT de Nissan.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar solenoide IVT, revisar nivel y presión de aceite.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1148",
+    "descriptionEs": "Control de Lazo Cerrado del Sensor O2 (Nissan)",
+    "descriptionEn": "Falla en el control de mezcla cerrada del banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar sensor de relación aire-combustible (A/F) y cableado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1564",
+    "descriptionEs": "Switch de Control de Crucero en Volante (Nissan)",
+    "descriptionEn": "Falla en el circuito del switch (ASCD) en el volante.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar conector espiral (clockspring) y switches del volante.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P1705",
+    "descriptionEs": "Sensor de Posición del Acelerador para TCM (Nissan)",
+    "descriptionEn": "La transmisión no recibe señal correcta del TPS.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar sensor TPS, cableado entre ECM y TCM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1050",
+    "descriptionEs": "Control VVT - Exceso de Corriente (BMW Valvetronic)",
+    "descriptionEn": "El motor Valvetronic consume demasiada corriente.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar motor Valvetronic, eje excéntrico y sensor de posición.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P105D",
+    "descriptionEs": "Ajuste Valvetronic - Límite Alcanzado (BMW)",
+    "descriptionEn": "El sistema Valvetronic no puede alcanzar la posición comandada.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Realizar calibración Valvetronic. Revisar desgaste en eje excéntrico.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P112F",
+    "descriptionEs": "Presión del Múltiple (MAP) a Ángulo del Acelerador - Rango (BMW)",
+    "descriptionEn": "Inconsistencia entre vacío del múltiple y apertura del acelerador.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío, sensor MAP y válvula de ventilación del cárter (PCV).",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P14A3",
+    "descriptionEs": "Válvula de Contrapresión de Escape (BMW)",
+    "descriptionEn": "Falla en el actuador de la solapa de escape.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar actuador de la válvula en el escape, mangueras de vacío o motor.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0522",
+    "descriptionEs": "Sensor de Presión de Aceite - Bajo (FCA)",
+    "descriptionEn": "Señal de voltaje bajo en sensor de presión de aceite.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar sensor de presión de aceite, común en motores Pentastar.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1521",
+    "descriptionEs": "Viscosidad de Aceite Incorrecta (FCA MDS)",
+    "descriptionEn": "El sistema MDS detectó aceite no compatible.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Cambiar aceite, usar estrictamente la viscosidad recomendada (ej: 5W-20).",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2509",
+    "descriptionEs": "Pérdida Intermitente de Alimentación ECM (Cummins/FCA)",
+    "descriptionEn": "Pérdida de energía momentánea al módulo del motor.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar bornes de batería (corrosión), cables de masa y conectores del ECM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1260",
+    "descriptionEs": "Robo Detectado - Motor Inmovilizado",
+    "descriptionEn": "El sistema antirrobo inmovilizador bloqueó el arranque del motor.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar llave transponder, antena del inmovilizador y batería del mando.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1539",
+    "descriptionEs": "Clutch del A/C - Exceso de Corriente / Falla (VAG)",
+    "descriptionEn": "Falla en el circuito del embrague magnético del compresor A/C.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar bobina del compresor, fusible y relé del A/C.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U1000",
+    "descriptionEs": "Falla de Red Clase 2 (GM) / CAN Comunicación (Nissan)",
+    "descriptionEn": "Falla genérica de comunicación en la red principal.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar empalmes de tierra, humedad en módulos y terminales del conector OBD2.",
+    "urgency": "STOP_DRIVING"
   }
 ]
