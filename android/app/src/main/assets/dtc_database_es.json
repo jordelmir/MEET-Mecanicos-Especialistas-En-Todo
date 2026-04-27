@@ -586,11 +586,11 @@
   },
   {
     "code": "P0420",
-    "descriptionEs": "Eficiencia Catalítica Baja (Hyundai/Kia)",
-    "descriptionEn": "El catalizador no filtra adecuadamente. Común en motores 1.6L GDI.",
+    "descriptionEs": "Eficiencia del Sistema de Catalizador por Debajo del Umbral (Banco 1)",
+    "descriptionEn": "El convertidor catalítico lado cilindro 1 no está purificando gases correctamente.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar actualizaciones de software del PCM, verificar bobinas antes de cambiar catalizador.",
+    "possibleCauses": "Verificar que no haya fallas de encendido. Si el motor está perfecto, reemplazar catalizador.",
     "urgency": "CAUTION"
   },
   {
@@ -604,11 +604,11 @@
   },
   {
     "code": "P0430",
-    "descriptionEs": "Eficiencia del Catalizador por Debajo del Umbral (Banco 2)",
-    "descriptionEn": "El convertidor catalítico del banco 2 no funciona correctamente.",
+    "descriptionEs": "Eficiencia del Sistema de Catalizador por Debajo del Umbral (Banco 2)",
+    "descriptionEn": "El convertidor catalítico del segundo banco no está purificando gases.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Verificar sensores O2 del banco 2, fugas de escape. Reemplazar catalizador si es necesario.",
+    "possibleCauses": "Confirmar gráfica del sensor O2 post-catalizador. Reemplazar catalizador B2.",
     "urgency": "CAUTION"
   },
   {
@@ -1171,20 +1171,20 @@
   },
   {
     "code": "P2195",
-    "descriptionEs": "Sensor O2 Señal Fija Pobre (B1S1)",
-    "descriptionEn": "El sensor O2 indica permanentemente mezcla pobre.",
+    "descriptionEs": "Señal de Sensor O2 Atrapada en Pobre (B1S1)",
+    "descriptionEn": "El sensor A/F mide mezcla pobre constantemente a pesar de corrección del ECM.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar fugas de vacío, inyectores obstruidos y presión de combustible.",
+    "possibleCauses": "Buscar fuga de vacío masiva, presión baja de combustible o reemplazar sensor A/F B1S1.",
     "urgency": "CAUTION"
   },
   {
     "code": "P2196",
-    "descriptionEs": "Sensor O2 Señal Fija Rica (B1S1)",
-    "descriptionEn": "El sensor O2 indica permanentemente mezcla rica.",
+    "descriptionEs": "Señal de Sensor O2 Atrapada en Rica (B1S1)",
+    "descriptionEn": "El sensor A/F mide mezcla rica constantemente.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar inyectores con fuga, regulador de presión y sensor O2.",
+    "possibleCauses": "Verificar inyector goteando, regulador de presión roto o MAF sucio.",
     "urgency": "CAUTION"
   },
   {
@@ -1486,20 +1486,20 @@
   },
   {
     "code": "P0087",
-    "descriptionEs": "Presión del Riel de Combustible Baja",
-    "descriptionEn": "La presión en el riel común es menor a la esperada.",
+    "descriptionEs": "Presión del Riel/Sistema de Combustible - Demasiado Baja",
+    "descriptionEn": "Presión insuficiente en la rampa de inyección común (Common Rail / GDI).",
     "system": "ENGINE",
     "severity": "HIGH",
-    "possibleCauses": "Revisar bomba de alta presión, regulador, filtro y posibles fugas.",
+    "possibleCauses": "Verificar filtro de diésel tapado, bomba elevadora en tanque, y fuga en inyectores.",
     "urgency": "STOP_DRIVING"
   },
   {
     "code": "P0088",
-    "descriptionEs": "Presión del Riel de Combustible Alta",
-    "descriptionEn": "La presión en el riel común es mayor a la especificada.",
+    "descriptionEs": "Presión del Riel/Sistema de Combustible - Demasiado Alta",
+    "descriptionEn": "Regulador de presión atascado cerrado.",
     "system": "ENGINE",
     "severity": "HIGH",
-    "possibleCauses": "Revisar regulador de presión, válvula de alivio y sensor de presión.",
+    "possibleCauses": "Revisar sensor de presión de riel, reemplazar válvula reguladora de presión de combustible.",
     "urgency": "STOP_DRIVING"
   },
   {
@@ -1657,11 +1657,11 @@
   },
   {
     "code": "P2006",
-    "descriptionEs": "Actuador de Control del Múltiple de Admisión Atascado Cerrado (B1)",
-    "descriptionEn": "La aleta del colector de admisión variable no abre.",
+    "descriptionEs": "Válvula de Control de Múltiple de Admisión (IMRC) Atrapada Cerrada (MB/VW)",
+    "descriptionEn": "Las aletas del múltiple de admisión (tumble flaps) se quedaron pegadas en posición cerrada.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Limpiar colector de admisión, revisar actuador y motor eléctrico.",
+    "possibleCauses": "Revisar varillaje de admisión por rotura, actuador de vacío o motor electrónico. Limpiar carbonilla.",
     "urgency": "CAUTION"
   },
   {
@@ -1900,20 +1900,20 @@
   },
   {
     "code": "P2197",
-    "descriptionEs": "Sensor O2 Señal Fija Pobre (B2S1)",
-    "descriptionEn": "El sensor O2 banco 2 indica permanentemente mezcla pobre.",
+    "descriptionEs": "Señal de Sensor O2 Atrapada en Pobre (B2S1)",
+    "descriptionEn": "El sensor A/F del banco 2 mide mezcla pobre constantemente.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar fugas de vacío banco 2, inyectores y presión de combustible.",
+    "possibleCauses": "Buscar fuga de vacío que afecte solo al banco 2 (múltiple fisurado), reemplazar sensor.",
     "urgency": "CAUTION"
   },
   {
     "code": "P2198",
-    "descriptionEs": "Sensor O2 Señal Fija Rica (B2S1)",
-    "descriptionEn": "El sensor O2 banco 2 indica permanentemente mezcla rica.",
+    "descriptionEs": "Señal de Sensor O2 Atrapada en Rica (B2S1)",
+    "descriptionEn": "El sensor A/F del banco 2 mide mezcla rica constantemente.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar inyectores con fuga banco 2, regulador de presión.",
+    "possibleCauses": "Verificar inyectores B2 o cambiar sensor A/F B2S1.",
     "urgency": "CAUTION"
   },
   {
@@ -1945,11 +1945,11 @@
   },
   {
     "code": "P2279",
-    "descriptionEs": "Fuga de Aire en el Sistema de Admisión",
-    "descriptionEn": "Se detecta entrada de aire no medido al motor.",
+    "descriptionEs": "Fuga de Aire en el Sistema de Admisión (MB/VW)",
+    "descriptionEn": "Fuga de vacío (aire no medido por el MAF) post cuerpo de aceleración.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Revisar juntas del múltiple de admisión, mangueras de vacío y sellos.",
+    "possibleCauses": "Revisar válvula PCV (separador de aceite), mangueras de vacío y junta de múltiple de admisión.",
     "urgency": "CAUTION"
   },
   {
@@ -3562,5 +3562,77 @@
     "severity": "HIGH",
     "possibleCauses": "Revisar nivel de refrigerante, bomba de agua y válvula termostática.",
     "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2007",
+    "descriptionEs": "Válvula de Control de Múltiple de Admisión (IMRC) Atrapada Abierta",
+    "descriptionEn": "Las aletas del múltiple de admisión se quedaron pegadas en posición abierta.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar mecanismo del IMRC, mangueras de vacío o solenoide de control.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1372",
+    "descriptionEs": "Desviación de Carrera de Elevación de Válvula (Porsche Variocam)",
+    "descriptionEn": "Falla en el sistema de levantamiento variable de válvulas.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar actuador VarioCam, presión de aceite y estado del árbol de levas.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P053F",
+    "descriptionEs": "Presión de Combustible de Arranque en Frío (Land Rover)",
+    "descriptionEn": "La bomba de alta presión (HPFP) no genera presión suficiente durante el arranque inicial.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar bomba de alta presión, sensor de presión de riel y desgaste del seguidor (cam follower).",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1B00",
+    "descriptionEs": "Sistema de Gestión de Energía Híbrida / BMS (Europeos)",
+    "descriptionEn": "El sistema de gestión de baterías detectó una anomalía en carga/descarga.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cables HV, temperatura de batería y actualizar software BMS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C1A00",
+    "descriptionEs": "Módulo de Control de Suspensión Neumática (Land Rover/Porsche)",
+    "descriptionEn": "Falla en el compresor o módulo de la suspensión de aire.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar relé del compresor, fugas en balonas de aire y bloque de válvulas.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A8F",
+    "descriptionEs": "Rendimiento del Sistema de Batería de 14V (Start-Stop)",
+    "descriptionEn": "La batería auxiliar o principal no puede mantener el voltaje para Auto Start-Stop.",
+    "system": "HYBRID",
+    "severity": "MODERATE",
+    "possibleCauses": "Probar batería AGM, reemplazar si el SOH (State of Health) es bajo. Resetear BMS.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0512",
+    "descriptionEs": "Circuito de Petición de Motor de Arranque",
+    "descriptionEn": "Falla en el circuito de activación del relé de arranque desde el sistema Start-Stop o botón de encendido.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar relé de arranque, módulo inmovilizador y botón push-to-start.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1193",
+    "descriptionEs": "Circuito del Sensor de Temperatura de Admisión Alto (Chrysler/FCA)",
+    "descriptionEn": "Sensor IAT en corto.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Verificar cableado del sensor IAT, cambiar sensor si está internamente cortocircuitado.",
+    "urgency": "MONITOR"
   }
 ]
