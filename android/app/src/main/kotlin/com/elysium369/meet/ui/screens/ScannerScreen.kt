@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
@@ -37,6 +38,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     val state by viewModel.connectionState.collectAsState()
     val isLogging by viewModel.isLogging.collectAsState()
     val dataLog by viewModel.dataLog.collectAsState()
+    val cloudSyncState by viewModel.cloudSyncState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -97,6 +99,27 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         }
                     }
                 )
+                
+                // CLOUD SYNC INDICATOR
+                if (cloudSyncState.isNotBlank() && cloudSyncState != "Desconectado") {
+                    val bgColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C).copy(alpha = 0.2f) else Color(0xFF00FFCC).copy(alpha = 0.1f)
+                    val textColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C) else Color(0xFF00FFCC)
+                    Surface(
+                        color = bgColor,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).border(1.dp, textColor, RoundedCornerShape(4.dp)),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = cloudSyncState,
+                            color = textColor,
+                            modifier = Modifier.padding(8.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                
                 TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0A0A), contentColor = Color(0xFF00FFCC), indicator = { tabPositions -> TabRowDefaults.Indicator(Modifier.tabIndicatorOffset(tabPositions[selectedTab]), color = Color(0xFF00FFCC), height = 3.dp) }) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold) })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("SENSORES", color = if (selectedTab == 1) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold) })

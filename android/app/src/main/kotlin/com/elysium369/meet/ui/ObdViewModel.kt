@@ -41,11 +41,24 @@ class ObdViewModel @Inject constructor(
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
+    
+    private val _cloudSyncState = MutableStateFlow<String>("Desconectado")
+    val cloudSyncState: StateFlow<String> = _cloudSyncState.asStateFlow()
+    
+    private val _oemPids = MutableStateFlow<List<com.elysium369.meet.data.remote.CloudSyncRepository.OemPid>>(emptyList())
+    val oemPids: StateFlow<List<com.elysium369.meet.data.remote.CloudSyncRepository.OemPid>> = _oemPids.asStateFlow()
 
     fun startDiagnosticSession(vehicle: Vehicle) {
         _selectedVehicle.value = vehicle
+        _cloudSyncState.value = "Sincronizando con Servidor OEM..."
+        
         viewModelScope.launch {
             try {
+                // Fetch OEM PIDs from Cloud
+                val pids = com.elysium369.meet.data.remote.CloudSyncRepository.getOemPidsForMake(vehicle.make)
+                _oemPids.value = pids
+                _cloudSyncState.value = "✅ ${pids.size} PIDs OEM descargados para ${vehicle.make}"
+                
                 obdSession.connect()
                 // Start Foreground Service
                 val serviceIntent = Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java)
@@ -53,7 +66,7 @@ class ObdViewModel @Inject constructor(
                     context.startService(serviceIntent)
                 } catch (e: Exception) {}
             } catch (e: Exception) {
-                // handle error
+                _cloudSyncState.value = "❌ Error de sync: ${e.message}"
             }
         }
     }

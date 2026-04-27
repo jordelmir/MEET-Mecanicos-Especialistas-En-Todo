@@ -19,6 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import com.elysium369.meet.R
 
 data class ProFeature(val id: String, val title: String, val icon: String, val color: Color, val route: String)
 
@@ -45,7 +51,21 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
         },
         containerColor = Color.Black
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            
+            // ELITE LOGO
+            Image(
+                painter = painterResource(id = R.drawable.meet_elite_logo),
+                contentDescription = "Meet Elite Logo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(2.dp, Color(0xFF00FFCC), RoundedCornerShape(16.dp))
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+
             if (!isPro) {
                 Surface(
                     color = Color(0xFFFF003C).copy(alpha = 0.2f),
