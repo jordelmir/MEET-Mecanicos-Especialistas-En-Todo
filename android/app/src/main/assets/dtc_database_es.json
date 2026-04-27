@@ -388,11 +388,11 @@
   },
   {
     "code": "P0300",
-    "descriptionEs": "Fallo de Encendido Aleatorio Detectado",
-    "descriptionEn": "Se detectan fallos de encendido en múltiples cilindros de forma aleatoria.",
+    "descriptionEs": "Fallo de Encendido Aleatorio/Múltiple (Misfire)",
+    "descriptionEn": "Fallas de combustión irregulares no fijas a un solo cilindro.",
     "system": "ENGINE",
     "severity": "HIGH",
-    "possibleCauses": "Revisar bujías, cables de bujía, bobinas de encendido, presión de combustible, compresión y fugas de vacío.",
+    "possibleCauses": "Revisar fugas de vacío (intake), presión baja de combustible, válvula EGR, o gasolina contaminada.",
     "urgency": "STOP_DRIVING"
   },
   {
@@ -586,11 +586,11 @@
   },
   {
     "code": "P0420",
-    "descriptionEs": "Eficiencia del Catalizador por Debajo del Umbral (Banco 1)",
-    "descriptionEn": "El convertidor catalítico del banco 1 no filtra emisiones correctamente.",
+    "descriptionEs": "Eficiencia Catalítica Baja (Hyundai/Kia)",
+    "descriptionEn": "El catalizador no filtra adecuadamente. Común en motores 1.6L GDI.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Verificar sensores O2 antes y después del catalizador. Si los sensores están bien, reemplazar el catalizador.",
+    "possibleCauses": "Revisar actualizaciones de software del PCM, verificar bobinas antes de cambiar catalizador.",
     "urgency": "CAUTION"
   },
   {
@@ -1342,12 +1342,12 @@
   },
   {
     "code": "P0011",
-    "descriptionEs": "Sincronización del Árbol de Levas A Sobre-Avanzada (Banco 1)",
-    "descriptionEn": "El árbol de levas está más avanzado de lo que la ECU comanda.",
+    "descriptionEs": "Posición Árbol de Levas A - Sobre Avanzado (Hyundai/Kia)",
+    "descriptionEn": "Falla típica en motores Theta II/Nu por solenoides CVVT obstruidos.",
     "system": "ENGINE",
-    "severity": "MODERATE",
-    "possibleCauses": "Cambiar aceite, revisar solenoide VVT, cadena de distribución y tensor.",
-    "urgency": "CAUTION"
+    "severity": "HIGH",
+    "possibleCauses": "Revisar y limpiar solenoide (OCV) del CVVT. Cambiar aceite de motor.",
+    "urgency": "STOP_DRIVING"
   },
   {
     "code": "P0012",
@@ -3228,6 +3228,339 @@
     "system": "NETWORK",
     "severity": "HIGH",
     "possibleCauses": "Verificar empalmes de tierra, humedad en módulos y terminales del conector OBD2.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1296",
+    "descriptionEs": "Mal Funcionamiento en Sistema de Enfriamiento (VAG)",
+    "descriptionEn": "Falla en el sensor de temperatura del refrigerante o termostato (falla muy común en motores 1.8T).",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar sensor de temperatura del refrigerante (sensor verde) y revisar termostato.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2181",
+    "descriptionEs": "Rendimiento del Sistema de Enfriamiento (VAG)",
+    "descriptionEn": "El motor no alcanza la temperatura de operación correcta.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar termostato y sensor G62. Verificar nivel de anticongelante G12/G13.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P3081",
+    "descriptionEs": "Temperatura del Motor Muy Baja (VAG)",
+    "descriptionEn": "El sensor de temperatura indica que el motor no calienta.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de temperatura G62 y termostato abierto.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1545",
+    "descriptionEs": "Mal Funcionamiento Cuerpo de Aceleración (VAG)",
+    "descriptionEn": "Error de control de la mariposa electrónica.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Limpiar cuerpo de aceleración y realizar alineación básica (Throttle Body Alignment) con escáner.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1602",
+    "descriptionEs": "Corte de Tensión Borne 30 (VAG)",
+    "descriptionEn": "Interrupción de suministro de energía por voltaje bajo (batería desconectada).",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Borrar código. Si regresa, revisar estado de la batería, bornes y alternador.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P1326",
+    "descriptionEs": "Sensor de Detonación (Sistema KSDS - Hyundai/Kia)",
+    "descriptionEn": "El Sistema de Detección del Sensor Knock (KSDS) detectó vibraciones anormales (falla grave de motor).",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "¡DETENER MOTOR INMEDIATAMENTE! Posible desgaste severo de cojinetes de biela. Revisión bajo garantía.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P011A",
+    "descriptionEs": "Sensor de Temperatura ECT 1 / ECT 2 Correlación (Mazda)",
+    "descriptionEn": "Discrepancia entre los dos sensores de refrigerante (común en Skyactiv).",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar válvula de control de flujo de refrigerante (termovalve).",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0191",
+    "descriptionEs": "Sensor de Presión de Riel de Combustible (Mazda)",
+    "descriptionEn": "Presión irregular en bomba de alta (HPFP) en motores Skyactiv GDI.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bomba de alta presión de combustible, tapón en filtro.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P061B",
+    "descriptionEs": "Cálculo de Torque del Módulo de Control Interno (Mazda)",
+    "descriptionEn": "Error interno en el cálculo de torque.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar sensor MAF, cuerpo de aceleración y revisar fugas de vacío.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P3000",
+    "descriptionEs": "Sistema de Control de Batería HV",
+    "descriptionEn": "Falla genérica detectada por el módulo de la batería híbrida.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Escanear módulo HV para leer submódulo y códigos detallados de voltaje.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P3009",
+    "descriptionEs": "Fuga de Alto Voltaje (Toyota Híbrido)",
+    "descriptionEn": "Pérdida de aislamiento en el sistema de alta tensión.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "¡PELIGRO! Revisar integridad de cables naranjas y bobinados de MG1/MG2.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0A0F",
+    "descriptionEs": "El Motor No Arranca (Híbrido)",
+    "descriptionEn": "El motor de combustión no logró arrancar después del giro de MG1.",
+    "system": "HYBRID",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar falta de combustible, sistema de encendido o cuerpo de aceleración sucio.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1009",
+    "descriptionEs": "Avance de Sincronización VTC Avanzado (Honda)",
+    "descriptionEn": "Sistema VTC atascado mecánicamente o actuador fallando.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar nivel de aceite, limpiar malla/filtro del actuador VTC.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1135",
+    "descriptionEs": "Circuito del Calentador A/F (B1S1) (Toyota)",
+    "descriptionEn": "Falla en el circuito del calentador del sensor Air/Fuel.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar relé A/F, fusibles y reemplazar sensor A/F superior.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1258",
+    "descriptionEs": "Protección de Sobrecalentamiento Activa (GM)",
+    "descriptionEn": "El PCM alternará el disparo de inyectores para enfriar el motor.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "El motor está críticamente caliente. Apagar y revisar bomba de agua, radiador.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1443",
+    "descriptionEs": "Falla en la Válvula de Control de Purga EVAP (Ford)",
+    "descriptionEn": "La válvula termistor del EVAP no muestra voltaje correcto.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Reemplazar válvula de control de purga y sensor de flujo EVAP.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P1633",
+    "descriptionEs": "Voltaje KAM Muy Bajo (Ford)",
+    "descriptionEn": "El voltaje de memoria Keep Alive (KAM) al PCM es muy bajo.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusibles de KAM, batería y cableado hacia la computadora.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U1001",
+    "descriptionEs": "Línea de Comunicación CAN (Nissan)",
+    "descriptionEn": "Error temporal o permanente de comunicación en la red CAN.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar conectores, daños físicos en cableado de red CAN y empalmes.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0122",
+    "descriptionEs": "Pérdida de Comunicación con el Módulo de Control de Dinámica (VDC/ESP)",
+    "descriptionEn": "Sin datos del módulo de control de tracción.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar módulo VDC, fusibles, red CAN.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U1262",
+    "descriptionEs": "Fallo de Red de Comunicación SCP (Ford)",
+    "descriptionEn": "Error de la red estándar de Ford (SCP).",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar módulo de instrumentos y empalmes SCP.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U1102",
+    "descriptionEs": "Tiempo de Espera de Datos ESP (Mitsubishi)",
+    "descriptionEn": "El módulo no recibe mensajes del control electrónico de estabilidad.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar conexión y alimentación del módulo ESP/ABS.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U0300",
+    "descriptionEs": "Incompatibilidad de Software del Módulo de Control Interno",
+    "descriptionEn": "Versión de software de módulo no coincide con el resto de la red.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Actualizar firmware de los módulos a la versión compatible. Requiere escáner OEM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B2099",
+    "descriptionEs": "Alimentación Abierta Llave de Encendido",
+    "descriptionEn": "Circuito de retención del cilindro de llave con corto o abierto.",
+    "system": "BODY",
+    "severity": "LOW",
+    "possibleCauses": "Revisar switch de ignición y módulo de la columna de dirección.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "B2290",
+    "descriptionEs": "Módulo de Sistema de Ocupantes (OCS)",
+    "descriptionEn": "Sistema de clasificación de ocupante (asiento del pasajero) con falla.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Calibrar sensor de peso del asiento del pasajero. No poner objetos bajo el asiento.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B1318",
+    "descriptionEs": "Voltaje de Batería Bajo (Ford)",
+    "descriptionEn": "El módulo (ABS, SRS o BCM) registra un voltaje por debajo de 9.6V.",
+    "system": "BODY",
+    "severity": "MODERATE",
+    "possibleCauses": "Probar batería, conexiones y regulador de voltaje.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "B1147",
+    "descriptionEs": "Falla en el Sistema Antirrobo",
+    "descriptionEn": "El inmovilizador detectó un intento de robo o llave no reconocida.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar transponder, anillo receptor del inmovilizador.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "B1422",
+    "descriptionEs": "Sensor de Velocidad del Vehículo (HVAC Toyota)",
+    "descriptionEn": "El panel del aire acondicionado no recibe velocidad para ajuste automático.",
+    "system": "BODY",
+    "severity": "LOW",
+    "possibleCauses": "Verificar bus CAN desde el tablero de instrumentos al módulo A/C.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "B2799",
+    "descriptionEs": "Inmovilizador del Motor (Toyota)",
+    "descriptionEn": "Problema de comunicación entre el inmovilizador y la ECU del motor.",
+    "system": "BODY",
+    "severity": "HIGH",
+    "possibleCauses": "Hacer puente entre pines 4 y 13 del OBD2 por 30 mins para resincronizar llaves (procedimiento manual Toyota).",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C1145",
+    "descriptionEs": "Falla del Sensor de Velocidad Rueda Delantera Derecha (Ford)",
+    "descriptionEn": "Pérdida de señal del sensor ABS delantero derecho.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor, anillo reluctor o balero de rueda magnetizado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C1201",
+    "descriptionEs": "Sistema de Control del Motor (Toyota ABS)",
+    "descriptionEn": "El sistema ABS/VSC se desactiva porque hay una falla en el motor (Check Engine encendido).",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Este es un código reflejo. Escanear el motor y reparar el código P principal.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C1231",
+    "descriptionEs": "Falla en el Sensor de Ángulo de Dirección",
+    "descriptionEn": "Pérdida del valor central del volante.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Calibrar posición cero del sensor de ángulo de dirección (SAS).",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C2205",
+    "descriptionEs": "Error Interno del Sensor de Ángulo de Dirección",
+    "descriptionEn": "El sensor SAS ha fallado de forma interna.",
+    "system": "CHASSIS",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar reloj espiral / sensor de ángulo de dirección.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "C1500",
+    "descriptionEs": "Torque Sensor EPS (Dirección Electrónica)",
+    "descriptionEn": "Falla en el sensor de torque de la dirección electroasistida.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar columna de dirección o módulo EPS. No manipular sin desconectar batería.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "C0273",
+    "descriptionEs": "Falla en el Relé del Motor ABS (GM)",
+    "descriptionEn": "El relé principal del motor ABS no opera.",
+    "system": "CHASSIS",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar fusibles de alta corriente del ABS y módulo EBCM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0313",
+    "descriptionEs": "Fallo de Encendido Detectado por Falta de Combustible",
+    "descriptionEn": "Misfire registrado debido a que el tanque está vacío o la presión es extremadamente baja.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Llenar tanque, purgar sistema de combustible. Revisar presión de bomba.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0314",
+    "descriptionEs": "Fallo de Encendido de un Solo Cilindro (Cilindro No Especificado)",
+    "descriptionEn": "La ECU detecta misfire pero no puede aislar qué cilindro es.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Realizar prueba de balance de cilindros con escáner avanzado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P00B7",
+    "descriptionEs": "Flujo Bajo de Refrigerante de Motor",
+    "descriptionEn": "Temperatura excesiva o circulación pobre detectada.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar nivel de refrigerante, bomba de agua y válvula termostática.",
     "urgency": "STOP_DRIVING"
   }
 ]
