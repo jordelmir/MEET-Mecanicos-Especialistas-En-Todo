@@ -29,6 +29,7 @@ class ObdViewModel @Inject constructor(
 ) : ViewModel() {
 
     val connectionState: StateFlow<ObdState> = obdSession.state
+    val statusMessage: StateFlow<String> = obdSession.statusMessage
 
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()

@@ -27,43 +27,89 @@ class BtClassicTransport(
         withContext(Dispatchers.IO) {
             val device: BluetoothDevice = bluetoothAdapter.getRemoteDevice(macAddress)
             
-            repeat(3) { attempt ->
-                try {
-                    // Cerrar socket anterior limpiamente si existe
-                    runCatching { socket?.close() }
-                    socket = null
-                    
-                    // En Android 12+ usar método reflectivo como fallback si el normal falla
-                    socket = try {
-                        device.createRfcommSocketToServiceRecord(SPP_UUID)
-                    } catch (e: Exception) {
-                        // Fallback usando canal 1 directo (más compatible con clones chinos)
-                        val m = device.javaClass.getMethod(
-                            "createRfcommSocket", Int::class.javaPrimitiveType
-                        )
-                        m.invoke(device, 1) as BluetoothSocket
-                    }
-                    
-                    // Cancelar discovery ANTES de conectar — crítico para estabilidad
+            // Cancelar discovery ANTES de cualquier intento — crítico para estabilidad
+            try {
+                bluetoothAdapter.cancelDiscovery()
+            } catch (e: SecurityException) {
+                // Ignorar si no hay permiso
+            }
+            
+            // Dar tiempo al sistema para liberar el radio BT del modo discovery
+            kotlinx.coroutines.delay(300)
+
+            // ═══════════════════════════════════════════════
+            // ESTRATEGIA DE CONEXIÓN MULTI-MÉTODO
+            // Los clones chinos fallan con uno u otro método
+            // dependiendo del firmware. Intentamos todos.
+            // ═══════════════════════════════════════════════
+            val connectionMethods = listOf(
+                // Método 1: SPP estándar (funciona con adaptadores genuinos y algunos clones)
+                {
+                    device.createRfcommSocketToServiceRecord(SPP_UUID)
+                },
+                // Método 2: Canal 1 directo via reflexión (el más compatible con clones chinos)
+                {
+                    val m = device.javaClass.getMethod(
+                        "createRfcommSocket", Int::class.javaPrimitiveType
+                    )
+                    m.invoke(device, 1) as BluetoothSocket
+                },
+                // Método 3: Canal inseguro SPP (bypasses pairing issues on some devices)
+                {
+                    val m = device.javaClass.getMethod(
+                        "createInsecureRfcommSocket", Int::class.javaPrimitiveType
+                    )
+                    m.invoke(device, 1) as BluetoothSocket
+                },
+                // Método 4: createInsecureRfcommSocketToServiceRecord
+                {
+                    device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                }
+            )
+
+            var lastException: Exception? = null
+
+            for ((methodIndex, createSocket) in connectionMethods.withIndex()) {
+                repeat(2) { attempt ->
                     try {
-                        bluetoothAdapter.cancelDiscovery()
-                    } catch (e: SecurityException) {
-                        // Ignorar si no hay permiso
+                        // Cerrar socket anterior limpiamente
+                        runCatching { socket?.close() }
+                        socket = null
+                        inputStream = null
+                        outputStream = null
+                        
+                        socket = createSocket()
+                        
+                        // Dar tiempo entre intentos para que el stack BT se estabilice
+                        if (attempt > 0 || methodIndex > 0) {
+                            kotlinx.coroutines.delay(500)
+                        }
+                        
+                        socket?.connect()
+                        
+                        inputStream = socket?.inputStream
+                        outputStream = socket?.outputStream
+                        
+                        // Esperar a que los streams estén listos
+                        kotlinx.coroutines.delay(150)
+                        
+                        return@withContext // ¡ÉXITO!
+                        
+                    } catch (e: java.io.IOException) {
+                        lastException = e
+                        runCatching { socket?.close() }
+                        socket = null
+                        kotlinx.coroutines.delay(300L * (attempt + 1))
+                    } catch (e: Exception) {
+                        lastException = e as? Exception ?: Exception(e)
+                        runCatching { socket?.close() }
+                        socket = null
+                        kotlinx.coroutines.delay(300)
                     }
-                    kotlinx.coroutines.delay(200) // dar tiempo al sistema para cancelar
-                    
-                    socket?.connect()
-                    
-                    inputStream = socket?.inputStream
-                    outputStream = socket?.outputStream
-                    
-                    return@withContext
-                    
-                } catch (e: java.io.IOException) {
-                    kotlinx.coroutines.delay(1000L * (attempt + 1)) // backoff por intento
-                    if (attempt == 2) throw e // If 3rd attempt fails, propagate error
                 }
             }
+            
+            throw lastException ?: java.io.IOException("No se pudo conectar al adaptador OBD2 con ningún método")
         }
     }
 
@@ -73,31 +119,58 @@ class BtClassicTransport(
             try { outputStream?.close() } catch (e: Exception) {}
             try { socket?.close() } catch (e: Exception) {}
             socket = null
+            inputStream = null
+            outputStream = null
         }
     }
 
     override suspend fun write(data: ByteArray) {
         withContext(Dispatchers.IO) {
-            outputStream?.write(data)
-            outputStream?.flush()
+            val out = outputStream ?: throw java.io.IOException("OutputStream null — adaptador desconectado")
+            out.write(data)
+            out.flush()
         }
     }
 
     override suspend fun read(maxBytes: Int): ByteArray? {
         return withContext(Dispatchers.IO) {
             val stream = inputStream ?: return@withContext null
-            if (stream.available() > 0) {
+            try {
+                // ═══════════════════════════════════════════════
+                // LECTURA BLOQUEANTE CON TIMEOUT
+                // stream.available() en clones ELM327 a menudo
+                // retorna 0 incluso cuando hay datos en camino.
+                // Usamos lectura bloqueante con un timeout corto
+                // para no perder bytes.
+                // ═══════════════════════════════════════════════
                 val buffer = ByteArray(maxBytes)
-                val bytesRead = stream.read(buffer)
-                if (bytesRead > 0) {
-                    buffer.copyOf(bytesRead)
-                } else null
-            } else {
+                
+                // Primero checar si hay datos listos sin bloquear
+                if (stream.available() > 0) {
+                    val bytesRead = stream.read(buffer)
+                    if (bytesRead > 0) {
+                        return@withContext buffer.copyOf(bytesRead)
+                    }
+                }
+                
+                // Si no hay datos inmediatos, hacer una pausa corta y reintentar
+                // Esto le da tiempo al clon lento de preparar bytes en el buffer
+                kotlinx.coroutines.delay(25)
+                
+                if (stream.available() > 0) {
+                    val bytesRead = stream.read(buffer)
+                    if (bytesRead > 0) {
+                        return@withContext buffer.copyOf(bytesRead)
+                    }
+                }
+                
+                null
+            } catch (e: java.io.IOException) {
                 null
             }
         }
     }
 
     override val isConnected: Boolean
-        get() = socket?.isConnected == true
+        get() = socket?.isConnected == true && inputStream != null && outputStream != null
 }
