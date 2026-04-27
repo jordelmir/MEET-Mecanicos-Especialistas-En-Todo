@@ -478,11 +478,11 @@
   },
   {
     "code": "P0327",
-    "descriptionEs": "Sensor de Detonación - Entrada Baja (Banco 1)",
-    "descriptionEn": "Señal baja del sensor de detonación banco 1.",
+    "descriptionEs": "Sensor de Detonación - Entrada Baja (B1)",
+    "descriptionEn": "Señal baja del sensor knock banco 1.",
     "system": "ENGINE",
     "severity": "MODERATE",
-    "possibleCauses": "Verificar torque del sensor de detonación, cableado y reemplazar sensor.",
+    "possibleCauses": "Verificar torque del sensor, cableado y reemplazar si es necesario.",
     "urgency": "CAUTION"
   },
   {
@@ -632,7 +632,7 @@
   {
     "code": "P0442",
     "descriptionEs": "Fuga Pequeña en Sistema EVAP",
-    "descriptionEn": "Se detectó una fuga pequeña en el sistema de emisiones evaporativas.",
+    "descriptionEn": "Fuga pequeña detectada en el sistema de emisiones evaporativas.",
     "system": "ENGINE",
     "severity": "LOW",
     "possibleCauses": "Verificar tapa de combustible, mangueras y conexiones del sistema EVAP.",
@@ -659,7 +659,7 @@
   {
     "code": "P0449",
     "descriptionEs": "Circuito de Válvula de Ventilación EVAP",
-    "descriptionEn": "Falla en el circuito de la válvula solenoide de ventilación EVAP.",
+    "descriptionEn": "Falla en el solenoide de ventilación del canister.",
     "system": "ENGINE",
     "severity": "LOW",
     "possibleCauses": "Revisar solenoide de ventilación, cableado y conector.",
@@ -1424,10 +1424,10 @@
   {
     "code": "P0031",
     "descriptionEs": "Calentador Sensor O2 - Bajo (B1S1)",
-    "descriptionEn": "Circuito bajo en el calentador del sensor O2 banco 1 sensor 1.",
+    "descriptionEn": "Circuito bajo del calentador del sensor O2 upstream banco 1.",
     "system": "ENGINE",
     "severity": "LOW",
-    "possibleCauses": "Verificar cableado y reemplazar sensor O2 si la resistencia es incorrecta.",
+    "possibleCauses": "Verificar cableado del calentador, fusible y reemplazar sensor O2.",
     "urgency": "MONITOR"
   },
   {
@@ -1626,6 +1626,861 @@
     "system": "ENGINE",
     "severity": "MODERATE",
     "possibleCauses": "Verificar sensor VSS, cable del velocímetro y engranajes.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2000",
+    "descriptionEs": "Eficiencia de la Trampa de NOx por Debajo del Umbral (B1)",
+    "descriptionEn": "El sistema de reducción de NOx no funciona correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar catalizador SCR/NOx, sensor de NOx y sistema de inyección de urea.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2002",
+    "descriptionEs": "Eficiencia del Filtro de Partículas Diésel (DPF)",
+    "descriptionEn": "El filtro de partículas no está filtrando correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Realizar regeneración forzada del DPF. Si falla, limpiar o reemplazar filtro.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2004",
+    "descriptionEs": "Actuador de Control del Múltiple de Admisión Atascado Abierto (B1)",
+    "descriptionEn": "La aleta del colector de admisión variable no cierra.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar actuador del colector variable, motor eléctrico y articulación.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2006",
+    "descriptionEs": "Actuador de Control del Múltiple de Admisión Atascado Cerrado (B1)",
+    "descriptionEn": "La aleta del colector de admisión variable no abre.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar colector de admisión, revisar actuador y motor eléctrico.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2008",
+    "descriptionEs": "Circuito del Control del Múltiple de Admisión (B1)",
+    "descriptionEn": "Falla eléctrica en el control del colector de admisión variable.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar cableado del actuador, conector y módulo de control.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2015",
+    "descriptionEs": "Rango/Rendimiento del Sensor de Posición del Múltiple",
+    "descriptionEn": "El sensor de posición de las aletas del colector reporta valores fuera de rango.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar colector de admisión, revisar sensor y actuador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2017",
+    "descriptionEs": "Circuito Alto del Sensor de Posición del Múltiple",
+    "descriptionEn": "Señal alta del sensor de posición del colector variable.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado y sensor de posición del colector.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2076",
+    "descriptionEs": "Actuador del Múltiple de Admisión Atascado Abierto (B2)",
+    "descriptionEn": "Aleta del colector de admisión banco 2 atascada abierta.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar actuador del colector banco 2, limpiar y lubricar.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2100",
+    "descriptionEs": "Circuito del Motor del Cuerpo de Aceleración",
+    "descriptionEn": "Falla en el circuito del motor que controla el acelerador electrónico.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cuerpo de aceleración electrónico, cableado y ECM.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2102",
+    "descriptionEs": "Motor del Cuerpo de Aceleración - Circuito Bajo",
+    "descriptionEn": "Señal baja en el motor del acelerador electrónico.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado del cuerpo de aceleración, posible corto a tierra.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2103",
+    "descriptionEs": "Motor del Cuerpo de Aceleración - Circuito Alto",
+    "descriptionEn": "Señal alta en el motor del acelerador electrónico.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado y conector del cuerpo de aceleración.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2104",
+    "descriptionEs": "Sistema de Control del Acelerador - Modo Forzado Ralentí",
+    "descriptionEn": "La ECU forzó el acelerador a posición de ralentí por seguridad.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Diagnosticar el código primario. Revisar pedal y cuerpo de aceleración.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2105",
+    "descriptionEs": "Sistema de Control del Acelerador - Modo Forzado Apagado",
+    "descriptionEn": "La ECU forzó el apagado del motor por falla crítica del acelerador.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar todo el sistema de acelerador electrónico: pedal, cuerpo, cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2108",
+    "descriptionEs": "Módulo de Control del Acelerador - Rendimiento",
+    "descriptionEn": "El módulo TAC no responde correctamente a los comandos.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar módulo TAC o cuerpo de aceleración completo.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2110",
+    "descriptionEs": "Sistema de Control del Acelerador - RPM Limitadas",
+    "descriptionEn": "El sistema de acelerador limitó las RPM máximas por seguridad.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Resolver DTC primario del acelerador electrónico.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2111",
+    "descriptionEs": "Cuerpo de Aceleración Atascado Abierto",
+    "descriptionEn": "El cuerpo de aceleración electrónico no puede cerrarse.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Limpiar cuerpo de aceleración. Si persiste, reemplazar unidad completa.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2112",
+    "descriptionEs": "Cuerpo de Aceleración Atascado Cerrado",
+    "descriptionEn": "El cuerpo de aceleración electrónico no puede abrirse.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Limpiar cuerpo de aceleración. Si persiste, reemplazar unidad completa.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2118",
+    "descriptionEs": "Corriente del Motor del Cuerpo de Aceleración Fuera de Rango",
+    "descriptionEn": "El consumo eléctrico del motor del acelerador es anormal.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar cuerpo de aceleración. Verificar alimentación eléctrica.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2119",
+    "descriptionEs": "Rango/Rendimiento del Cuerpo de Aceleración",
+    "descriptionEn": "El acelerador no responde dentro de los parámetros esperados.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Limpiar o reemplazar cuerpo de aceleración, verificar sensores TPS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2122",
+    "descriptionEs": "Sensor de Posición del Pedal D - Entrada Baja",
+    "descriptionEn": "Señal baja del sensor de posición del pedal del acelerador D.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado del pedal, conector y sensor APP.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2123",
+    "descriptionEs": "Sensor de Posición del Pedal D - Entrada Alta",
+    "descriptionEn": "Señal alta del sensor de posición del pedal del acelerador D.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado del pedal, posible cortocircuito.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2127",
+    "descriptionEs": "Sensor de Posición del Pedal E - Entrada Baja",
+    "descriptionEn": "Señal baja del sensor de posición del pedal del acelerador E.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado y conector del sensor APP E.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2128",
+    "descriptionEs": "Sensor de Posición del Pedal E - Entrada Alta",
+    "descriptionEn": "Señal alta del sensor de posición del pedal del acelerador E.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado del pedal, posible cortocircuito.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2176",
+    "descriptionEs": "Posición de Reposo del Cuerpo de Aceleración No Aprendida",
+    "descriptionEn": "La ECU no ha completado el aprendizaje de la posición mínima del acelerador.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Realizar procedimiento de reaprendizaje del cuerpo de aceleración con escáner.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2177",
+    "descriptionEs": "Ajuste de Combustible Rico/Pobre a RPM Bajas (B1)",
+    "descriptionEn": "Ajuste de combustible fuera de rango en ralentí banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío, sensor MAF, inyectores y presión de combustible.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2178",
+    "descriptionEs": "Ajuste de Combustible Rico/Pobre a RPM Altas (B1)",
+    "descriptionEn": "Ajuste de combustible fuera de rango en aceleración banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar bomba de combustible, filtro, sensor MAF e inyectores.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2179",
+    "descriptionEs": "Ajuste de Combustible Rico/Pobre a RPM Bajas (B2)",
+    "descriptionEn": "Ajuste de combustible fuera de rango en ralentí banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío banco 2, sensor MAF e inyectores.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2187",
+    "descriptionEs": "Sistema Demasiado Pobre en Ralentí (B1)",
+    "descriptionEn": "Mezcla pobre detectada específicamente en ralentí.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío en múltiple de admisión, sellos de inyectores y PCV.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2188",
+    "descriptionEs": "Sistema Demasiado Rico en Ralentí (B1)",
+    "descriptionEn": "Mezcla rica detectada específicamente en ralentí.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar inyectores (posible fuga), regulador de presión y sensor O2.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2189",
+    "descriptionEs": "Sistema Demasiado Pobre en Ralentí (B2)",
+    "descriptionEn": "Mezcla pobre en ralentí banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío banco 2, sellos de inyectores y válvula PCV.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2197",
+    "descriptionEs": "Sensor O2 Señal Fija Pobre (B2S1)",
+    "descriptionEn": "El sensor O2 banco 2 indica permanentemente mezcla pobre.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío banco 2, inyectores y presión de combustible.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2198",
+    "descriptionEs": "Sensor O2 Señal Fija Rica (B2S1)",
+    "descriptionEn": "El sensor O2 banco 2 indica permanentemente mezcla rica.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar inyectores con fuga banco 2, regulador de presión.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2227",
+    "descriptionEs": "Circuito del Sensor de Presión Barométrica",
+    "descriptionEn": "Mal funcionamiento del sensor de presión barométrica (BARO).",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar sensor BARO, cableado y conector. Verificar con altímetro.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2228",
+    "descriptionEs": "Sensor de Presión Barométrica - Entrada Baja",
+    "descriptionEn": "Señal baja del sensor de presión barométrica.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Verificar cableado del sensor BARO, posible corto a tierra.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2263",
+    "descriptionEs": "Rendimiento del Turbo/Supercargador",
+    "descriptionEn": "El sistema de sobrealimentación no genera la presión esperada.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar turbo, actuador wastegate, mangueras de presión y sensor MAP.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2279",
+    "descriptionEs": "Fuga de Aire en el Sistema de Admisión",
+    "descriptionEn": "Se detecta entrada de aire no medido al motor.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar juntas del múltiple de admisión, mangueras de vacío y sellos.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2291",
+    "descriptionEs": "Presión de Inyector Baja - Motor No Arranca",
+    "descriptionEn": "La presión de combustible es insuficiente para arrancar el motor.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bomba de alta presión, riel de combustible y regulador.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P2400",
+    "descriptionEs": "Circuito del Sistema de Detección de Fugas EVAP",
+    "descriptionEn": "Falla en la bomba de detección de fugas del sistema EVAP.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar bomba de detección de fugas, cableado y conector.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2401",
+    "descriptionEs": "Rendimiento de la Bomba de Detección de Fugas EVAP",
+    "descriptionEn": "La bomba de detección de fugas no genera el vacío esperado.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Reemplazar bomba de detección de fugas. Verificar mangueras.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2402",
+    "descriptionEs": "Circuito Abierto de la Bomba de Fugas EVAP",
+    "descriptionEn": "Circuito abierto en la bomba del sistema de detección de fugas.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar cableado y conector de la bomba de detección de fugas.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2404",
+    "descriptionEs": "Sistema EVAP Fuga Detectada",
+    "descriptionEn": "El sistema de detección de fugas EVAP encontró una fuga.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Realizar prueba de humo en sistema EVAP, revisar tapa y mangueras.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2440",
+    "descriptionEs": "Válvula de Conmutación de Aire Secundario Atascada (B1)",
+    "descriptionEn": "La válvula de aire secundario no cambia de posición.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar válvula de conmutación, actuador de vacío y mangueras.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2442",
+    "descriptionEs": "Válvula de Conmutación de Aire Secundario Atascada (B2)",
+    "descriptionEn": "La válvula de aire secundario banco 2 no opera.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar válvula de conmutación banco 2, actuador y mangueras.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2444",
+    "descriptionEs": "Bomba de Aire Secundario Atascada Encendida (B1)",
+    "descriptionEn": "La bomba de aire secundario permanece activada.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar relé de la bomba de aire secundario y cableado.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P2500",
+    "descriptionEs": "Circuito del Generador/Alternador",
+    "descriptionEn": "Falla en el circuito de control del alternador/generador.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar alternador, regulador de voltaje, cableado y batería.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2502",
+    "descriptionEs": "Voltaje de Carga del Sistema",
+    "descriptionEn": "El sistema de carga no mantiene el voltaje correcto.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar alternador, correa, batería y conexiones.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2503",
+    "descriptionEs": "Voltaje de Carga Bajo",
+    "descriptionEn": "El alternador no genera suficiente voltaje.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar alternador o regulador de voltaje. Revisar correa.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2504",
+    "descriptionEs": "Voltaje de Carga Alto",
+    "descriptionEn": "El alternador genera voltaje excesivo.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar regulador de voltaje o alternador completo.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P2544",
+    "descriptionEs": "Solicitud de Torque de Entrada A Fuera de Rango",
+    "descriptionEn": "La señal de demanda de torque está fuera del rango esperado.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensores del pedal del acelerador y módulo ECM.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0138",
+    "descriptionEs": "Sensor O2 Alto Voltaje (B1S2)",
+    "descriptionEn": "Voltaje alto en el sensor de oxígeno downstream banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar catalizador, sensor O2 downstream y fugas de escape.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0139",
+    "descriptionEs": "Respuesta Lenta del Sensor O2 (B1S2)",
+    "descriptionEn": "El sensor O2 downstream tarda demasiado en responder.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Reemplazar sensor O2 downstream. Verificar catalizador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0156",
+    "descriptionEs": "Circuito del Sensor O2 (B2S2)",
+    "descriptionEn": "Mal funcionamiento del sensor O2 downstream banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor O2 B2S2, cableado y conector.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0157",
+    "descriptionEs": "Sensor O2 Bajo Voltaje (B2S2)",
+    "descriptionEn": "Voltaje bajo en el sensor O2 downstream banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar sensor O2, catalizador banco 2 y fugas de escape.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0158",
+    "descriptionEs": "Sensor O2 Alto Voltaje (B2S2)",
+    "descriptionEn": "Voltaje alto en el sensor O2 downstream banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar catalizador banco 2, sensor O2 y sistema de escape.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0161",
+    "descriptionEs": "Circuito del Calentador del Sensor O2 (B2S2)",
+    "descriptionEn": "Falla en el calentador del sensor O2 downstream banco 2.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusible, cableado y sensor O2 B2S2.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0332",
+    "descriptionEs": "Sensor de Detonación - Entrada Baja (B2)",
+    "descriptionEn": "Señal baja del sensor knock banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar torque del sensor knock banco 2, cableado y arnés.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0452",
+    "descriptionEs": "Sensor de Presión del Tanque EVAP - Bajo",
+    "descriptionEn": "Señal baja del sensor de presión del tanque de combustible.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar sensor FTP, cableado y conector.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0453",
+    "descriptionEs": "Sensor de Presión del Tanque EVAP - Alto",
+    "descriptionEn": "Señal alta del sensor de presión del tanque de combustible.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar sensor FTP, posible corto o circuito abierto.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0316",
+    "descriptionEs": "Fallo de Encendido en Arranque (Ford)",
+    "descriptionEn": "Se detectaron fallos de encendido durante los primeros 1000 RPM.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bujías, bobinas, inyectores y compresión.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1151",
+    "descriptionEs": "Sensor O2 Sin Cambio - Mezcla Pobre (B2, Ford)",
+    "descriptionEn": "El sensor O2 banco 2 indica condición pobre constante.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas de vacío banco 2, inyectores y presión de combustible.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1152",
+    "descriptionEs": "Sensor O2 Sin Cambio - Mezcla Rica (B2, Ford)",
+    "descriptionEn": "El sensor O2 banco 2 indica condición rica constante.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar inyectores con fuga banco 2, regulador de presión.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1233",
+    "descriptionEs": "Monitor de Bomba de Combustible Deshabilitado (Ford)",
+    "descriptionEn": "El driver de la bomba de combustible fue deshabilitado por la ECU.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar módulo FPDM, interruptor inercial de combustible y cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1235",
+    "descriptionEs": "Control de Bomba de Combustible Fuera de Rango (Ford)",
+    "descriptionEn": "La señal de control de la bomba de combustible está fuera de rango.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bomba de combustible, módulo FPDM y cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0234",
+    "descriptionEs": "Sobrealimentación del Turbo Excesiva",
+    "descriptionEn": "El turbo genera más presión de la permitida.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar wastegate, solenoide N75, mangueras de vacío y sensor MAP.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0235",
+    "descriptionEs": "Circuito del Sensor de Presión del Turbo A",
+    "descriptionEn": "Mal funcionamiento del sensor de presión de sobrealimentación.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor de presión del turbo, cableado y mangueras.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0236",
+    "descriptionEs": "Rango/Rendimiento del Sensor de Presión del Turbo",
+    "descriptionEn": "El sensor de presión del turbo reporta valores inconsistentes.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar sensor de boost, líneas de vacío y actuador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0237",
+    "descriptionEs": "Sensor de Presión del Turbo - Entrada Baja",
+    "descriptionEn": "Señal baja del sensor de presión de sobrealimentación.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado del sensor de boost, posible corto a tierra.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0238",
+    "descriptionEs": "Sensor de Presión del Turbo - Entrada Alta",
+    "descriptionEn": "Señal alta del sensor de presión de sobrealimentación.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado, posible cortocircuito o sensor dañado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0243",
+    "descriptionEs": "Circuito del Solenoide Wastegate A",
+    "descriptionEn": "Mal funcionamiento del circuito de control de la wastegate.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar solenoide de wastegate (N75 en VW), cableado y actuador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0244",
+    "descriptionEs": "Rango/Rendimiento del Solenoide Wastegate",
+    "descriptionEn": "El actuador de la wastegate no responde correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar solenoide wastegate, actuador y mangueras de vacío.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0245",
+    "descriptionEs": "Solenoide Wastegate A - Bajo",
+    "descriptionEn": "Señal baja en el circuito del solenoide de la wastegate.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado del solenoide, posible corto a tierra.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0299",
+    "descriptionEs": "Subpresión del Turbo/Supercargador",
+    "descriptionEn": "El turbo no genera la presión de sobrealimentación esperada.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar fugas en mangueras de intercooler, wastegate y turbo.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1077",
+    "descriptionEs": "Sensor de Posición de la Válvula de Admisión (Honda)",
+    "descriptionEn": "Mal funcionamiento del circuito del actuador de la válvula de admisión.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar actuador de admisión, cableado y conector.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1078",
+    "descriptionEs": "Válvula de Admisión Atascada (Honda)",
+    "descriptionEn": "La válvula de control de admisión no opera correctamente.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar válvula de admisión, revisar actuador.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1157",
+    "descriptionEs": "Sensor de Relación Aire/Combustible - Bajo (Honda)",
+    "descriptionEn": "Señal baja del sensor A/F banco 1.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar sensor A/F, cableado y fugas de escape.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P1361",
+    "descriptionEs": "Señal Intermitente del Sensor TDC (Honda)",
+    "descriptionEn": "El sensor de punto muerto superior genera señal irregular.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor TDC, cableado y conector. Limpiar sensor.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1381",
+    "descriptionEs": "Señal Intermitente del Sensor CYP (Honda)",
+    "descriptionEn": "El sensor de posición del cilindro genera señal intermitente.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor CYP, cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P1457",
+    "descriptionEs": "Fuga en Sistema EVAP (Honda)",
+    "descriptionEn": "El sistema de emisiones evaporativas detectó una fuga.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar tapa de combustible, canister y mangueras EVAP.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U0001",
+    "descriptionEs": "Bus CAN de Alta Velocidad - Sin Comunicación",
+    "descriptionEn": "El bus CAN-H no tiene comunicación activa.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cableado CAN-H, resistencias de terminación y todos los módulos.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0002",
+    "descriptionEs": "Bus CAN de Alta Velocidad - Rendimiento",
+    "descriptionEn": "Errores de comunicación en el bus CAN de alta velocidad.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Buscar interferencias EMI, verificar cableado trenzado y conectores.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0003",
+    "descriptionEs": "Bus CAN de Alta Velocidad - Abierto",
+    "descriptionEn": "Circuito abierto detectado en el bus CAN-H.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar continuidad del cableado CAN, buscar corte en arnés.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0004",
+    "descriptionEs": "Bus CAN de Alta Velocidad - Bajo",
+    "descriptionEn": "La línea CAN-H tiene voltaje bajo permanente.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Buscar corto a tierra en CAN-H, desconectar módulos para aislar falla.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0005",
+    "descriptionEs": "Bus CAN de Alta Velocidad - Alto",
+    "descriptionEn": "La línea CAN-H tiene voltaje alto permanente.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Buscar corto a positivo en CAN-H, aislar módulo defectuoso.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0010",
+    "descriptionEs": "Bus CAN de Media Velocidad - Sin Comunicación",
+    "descriptionEn": "El bus CAN de media velocidad no tiene comunicación.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado del bus CAN de media velocidad y módulos conectados.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U0028",
+    "descriptionEs": "Bus LIN del Vehículo - Sin Comunicación",
+    "descriptionEn": "El bus de comunicación LIN no está operativo.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado LIN, módulos esclavos y módulo maestro.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U0107",
+    "descriptionEs": "Pérdida de Comunicación con TAC",
+    "descriptionEn": "Sin comunicación con el módulo del acelerador electrónico.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado CAN al módulo TAC, alimentación y tierras.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0109",
+    "descriptionEs": "Pérdida de Comunicación con Calefacción/AC",
+    "descriptionEn": "Sin comunicación con el módulo HVAC.",
+    "system": "NETWORK",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusibles del HVAC, cableado CAN y módulo de clima.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U0126",
+    "descriptionEs": "Pérdida de Comunicación con Control de Dirección",
+    "descriptionEn": "Sin comunicación con el módulo de dirección eléctrica.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar fusibles, cableado CAN y módulo EPS.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0131",
+    "descriptionEs": "Pérdida de Comunicación con Sistema de Frenos",
+    "descriptionEn": "Sin comunicación con el módulo de frenos de potencia.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar fusibles, cableado CAN y módulo de frenos.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0151",
+    "descriptionEs": "Pérdida de Comunicación con Sistema de Retención",
+    "descriptionEn": "Sin comunicación con el módulo SRS/Airbag.",
+    "system": "NETWORK",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado CAN al módulo SRS, fusibles y conectores.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "U0164",
+    "descriptionEs": "Pérdida de Comunicación con HVAC Trasero",
+    "descriptionEn": "Sin comunicación con el módulo de clima trasero.",
+    "system": "NETWORK",
+    "severity": "LOW",
+    "possibleCauses": "Revisar cableado del módulo HVAC trasero y fusibles.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U0199",
+    "descriptionEs": "Pérdida de Comunicación con Módulo de Puerta",
+    "descriptionEn": "Sin comunicación con el módulo de puerta del conductor.",
+    "system": "NETWORK",
+    "severity": "LOW",
+    "possibleCauses": "Revisar cableado de la puerta, conector y módulo de puerta.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "U0293",
+    "descriptionEs": "Datos de Información del Vehículo No Recibidos",
+    "descriptionEn": "El módulo no recibe datos de configuración del vehículo.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Reprogramar módulos con información de VIN correcta.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U0401",
+    "descriptionEs": "Datos Inválidos Recibidos del ECM/PCM",
+    "descriptionEn": "Un módulo recibe datos corruptos del ECM.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado CAN, reprogramar ECM si es necesario.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "U0402",
+    "descriptionEs": "Datos Inválidos Recibidos del TCM",
+    "descriptionEn": "Un módulo recibe datos corruptos de la transmisión.",
+    "system": "NETWORK",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar cableado CAN al TCM, reprogramar si es necesario.",
     "urgency": "CAUTION"
   }
 ]
