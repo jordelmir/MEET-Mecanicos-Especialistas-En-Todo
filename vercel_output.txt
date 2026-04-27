@@ -1,0 +1,8 @@
+Retrieving project…
+Deploying jordelmirs-projects/meet-mecanicos
+Uploading [--------------------] (0.0B/126.4MB)
+Uploading [=====---------------] (31.6MB/126.4MB)
+Uploading [==========----------] (63.2MB/126.4MB)
+Uploading [===============-----] (94.8MB/126.4MB)
+Uploading [====================] (126.4MB/126.4MB)
+Error: File size limit exceeded (100 MB)

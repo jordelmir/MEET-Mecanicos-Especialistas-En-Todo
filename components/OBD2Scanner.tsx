@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Search, AlertTriangle, Info, ShieldAlert, X, Wrench } from 'lucide-react';
 
-const OBD2_DATABASE: Record<string, { title: string; desc: string; fix: string; severity: 'high' | 'medium' | 'low' }> = {
-  'P0300': { title: 'Fallo de Encendido Aleatorio', desc: 'Múltiples cilindros están presentando fallas de encendido.', fix: 'Revisar bujías, bobinas de encendido, presión de combustible y posibles fugas de vacío.', severity: 'high' },
-  'P0171': { title: 'Sistema Demasiado Pobre (Banco 1)', desc: 'El motor está recibiendo mucho aire o poco combustible.', fix: 'Revisar sensor MAF, bomba de combustible o buscar fugas de vacío en el múltiple de admisión.', severity: 'medium' },
-  'P0420': { title: 'Eficiencia del Catalizador por Debajo del Umbral', desc: 'El convertidor catalítico no está filtrando las emisiones correctamente.', fix: 'Revisar sensores de oxígeno (O2) y reemplazar el convertidor catalítico si es necesario.', severity: 'medium' },
-  'P0135': { title: 'Mal Funcionamiento del Circuito del Calentador (Sensor O2)', desc: 'Falla en el circuito del calentador del sensor de oxígeno.', fix: 'Revisar cableado del sensor de oxígeno y reemplazar el sensor si está dañado.', severity: 'low' },
-  'P0455': { title: 'Fuga Grande en el Sistema EVAP', desc: 'El sistema de control de emisiones evaporativas detectó una fuga importante.', fix: 'Revisar la tapa de combustible (asegurarla bien), válvulas de purga y mangueras del sistema EVAP.', severity: 'low' },
-  'P0101': { title: 'Problema en Rango/Desempeño del Sensor MAF', desc: 'El sensor de flujo de masa de aire (MAF) está enviando señales fuera de rango.', fix: 'Limpiar o reemplazar el sensor MAF, revisar filtro de aire y conexiones.', severity: 'medium' },
-  'P0335': { title: 'Mal Funcionamiento en el Sensor de Posición del Cigüeñal', desc: 'La computadora no recibe señal del sensor del cigüeñal (CKP).', fix: 'Revisar cableado del sensor CKP y reemplazar el sensor si está fallando.', severity: 'high' },
-  'P0430': { title: 'Eficiencia del Catalizador por Debajo del Umbral (Banco 2)', desc: 'El convertidor catalítico del banco 2 no funciona correctamente.', fix: 'Revisar sensores de oxígeno (O2) del banco 2 y reemplazar el convertidor catalítico si es necesario.', severity: 'medium' },
-  'P0500': { title: 'Mal Funcionamiento del Sensor de Velocidad del Vehículo', desc: 'Falta o error en la señal del sensor de velocidad (VSS).', fix: 'Revisar el sensor de velocidad, su cableado y engranajes.', severity: 'medium' },
-  'P0700': { title: 'Mal Funcionamiento del Sistema de Control de la Transmisión', desc: 'Se ha detectado una falla general en la transmisión automática.', fix: 'Conectar un escáner avanzado para leer códigos específicos de la transmisión (TCM).', severity: 'high' },
-};
+import dtcDatabase from '../dtc_database.json';
+
+const OBD2_DATABASE: Record<string, { title: string; desc: string; fix: string; severity: 'high' | 'medium' | 'low' }> = {};
+
+dtcDatabase.forEach((item: any) => {
+  OBD2_DATABASE[item.code] = {
+    title: item.descriptionEs || 'Descripción no disponible',
+    desc: item.descriptionEn || '',
+    fix: item.possibleCauses || 'Revisar manual del fabricante o realizar escaneo profundo.',
+    severity: item.severity === 'HIGH' ? 'high' : item.severity === 'MODERATE' ? 'medium' : 'low'
+  };
+});
 
 interface OBD2ScannerProps {
   onClose: () => void;
