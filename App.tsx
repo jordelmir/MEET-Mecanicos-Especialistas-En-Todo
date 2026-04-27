@@ -390,6 +390,15 @@ export default function App() {
     toast('success', 'Orden Creada', `Para ${vehicle.plate} a las ${time.toLocaleTimeString([],{hour: '2-digit', minute:'2-digit'})}`);
   };
 
+  const handleSimulateAPKScan = (scanResult: any) => {
+    const updatedClient = {
+      ...loggedInUser,
+      scans: [scanResult, ...(loggedInUser.scans || [])]
+    };
+    handleUpdateClient(updatedClient);
+    toast('success', 'Escaneo Recibido', 'Datos de OBD2 sincronizados desde la App MEET');
+  };
+
   // ── RENDER ──
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={authError} />;
@@ -658,6 +667,7 @@ export default function App() {
               onBookNew={() => setIsBookingModalOpen(true)}
               onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
               onUpdateUser={handleUpdateClient}
+              onSimulateAPKScan={handleSimulateAPKScan}
             />
           )}
         </main>

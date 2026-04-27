@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
 import { Client, VehicleInfo } from '../types';
-import { X, Plus, Pencil, Trash2, Users, Search, Car, ChevronDown, ChevronUp, Phone, Mail } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, Users, Search, Car, ChevronDown, ChevronUp, Phone, Mail, Activity, Smartphone, ShieldAlert, Info } from 'lucide-react';
 
 interface ClientManagerProps {
   clients: Client[];
@@ -117,6 +116,49 @@ export function ClientManager({ clients, onAdd, onUpdate, onDelete, onClose }: C
                         <div key={h.id} className="flex items-center justify-between text-[10px] text-steel-300">
                           <span>{h.serviceName}</span>
                           <span className="font-mono text-forge-500">₡{h.price.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* OBD2 Scans */}
+                  {client.scans && client.scans.length > 0 && (
+                    <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                      <p className="font-mono text-[10px] text-forge-500 uppercase tracking-wider flex items-center gap-1">
+                        <Smartphone size={10} /> Escaneos OBD2 MEET App
+                      </p>
+                      {client.scans.slice(0, 3).map(scan => (
+                        <div key={scan.id} className={`p-2 rounded-lg border-l-2 ${
+                          scan.severity === 'high' ? 'border-red-500 bg-red-500/5' :
+                          scan.severity === 'medium' ? 'border-yellow-500 bg-yellow-500/5' :
+                          'border-blue-500 bg-blue-500/5'
+                        }`}>
+                          <div className="flex justify-between items-start mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {scan.severity === 'high' ? <ShieldAlert size={12} className="text-red-500" /> : <Info size={12} className="text-forge-500" />}
+                              <span className="text-[10px] font-bold text-white uppercase tracking-wider">{scan.vehiclePlate}</span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                              scan.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                              scan.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {scan.severity === 'high' ? 'Crítico' : scan.severity === 'medium' ? 'Moderado' : 'Leve'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-1 mb-1.5">
+                            {scan.dtcCodes.map(code => (
+                              <span key={code} className="bg-steel-900 border border-white/10 px-1 py-0.5 rounded text-[9px] text-white font-mono font-bold">
+                                {code}
+                              </span>
+                            ))}
+                          </div>
+                          
+                          <div className="flex justify-between items-center text-[9px] text-steel-400 mt-1">
+                            <span className="truncate flex-1 italic">"{scan.notes}"</span>
+                            <span className="font-mono whitespace-nowrap ml-2">{new Date(scan.date).toLocaleDateString()}</span>
+                          </div>
                         </div>
                       ))}
                     </div>

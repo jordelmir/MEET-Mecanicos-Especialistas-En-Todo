@@ -1,5 +1,5 @@
 
-import { Mechanic, Service, WorkOrder, WorkOrderStatus, Client, ServiceHistoryItem, CatalogSection, ServiceCategory, VehicleInfo } from './types';
+import { Mechanic, Service, WorkOrder, WorkOrderStatus, Client, ServiceHistoryItem, CatalogSection, ServiceCategory, VehicleInfo, OBD2ScanResult } from './types';
 
 // Default Fallbacks
 export const DEFAULT_OPEN_HOUR = 7;
@@ -257,6 +257,16 @@ export const INITIAL_CLIENTS: Client[] = [
       { plate: 'ABC-123', brand: 'Toyota', model: 'Corolla', year: 2019, color: 'Gris', mileage: 65000, fuelType: 'Gasolina' },
       { plate: 'XYZ-789', brand: 'Hyundai', model: 'Tucson', year: 2021, color: 'Blanco', mileage: 32000, fuelType: 'Gasolina' },
     ],
+    scans: [
+      {
+        id: 'scan_001',
+        date: pastDate(2),
+        vehiclePlate: 'ABC-123',
+        dtcCodes: ['P0300', 'P0171'],
+        severity: 'high',
+        notes: 'Cliente reporta temblor en el motor al encender el auto.'
+      }
+    ],
     serviceHistory: generateServiceHistory(8),
     lastVisit: pastDate(14),
     joinDate: pastDate(730),
@@ -273,6 +283,16 @@ export const INITIAL_CLIENTS: Client[] = [
     accessCode: '654321',
     vehicles: [
       { plate: 'DEF-456', brand: 'Honda', model: 'CR-V', year: 2020, color: 'Rojo', mileage: 48000, fuelType: 'Gasolina' },
+    ],
+    scans: [
+      {
+        id: 'scan_002',
+        date: pastDate(5),
+        vehiclePlate: 'DEF-456',
+        dtcCodes: ['P0420'],
+        severity: 'medium',
+        notes: 'Luz de check engine encendida desde el fin de semana.'
+      }
     ],
     serviceHistory: generateServiceHistory(4),
     lastVisit: pastDate(45),

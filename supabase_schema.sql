@@ -42,9 +42,11 @@ CREATE TABLE IF NOT EXISTS scan_sessions (
   vehicle_make TEXT,
   vehicle_model TEXT,
   vehicle_year INT,
+  vehicle_plate TEXT,
   adapter_type TEXT DEFAULT 'clone',
   scan_type TEXT DEFAULT 'quick',
   dtcs_found JSONB DEFAULT '[]',
+  severity TEXT DEFAULT 'low',
   live_data_snapshot JSONB DEFAULT '{}',
   freeze_frame JSONB DEFAULT '{}',
   notes TEXT,
@@ -98,9 +100,10 @@ ALTER TABLE cloud_vehicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_resets ENABLE ROW LEVEL SECURITY;
 
+-- RLS Policies (Note: For production, replace "true" with auth.uid() checks and role-based mechanics/admin checks)
 CREATE POLICY "Public read oem_pids" ON oem_pids FOR SELECT USING (true);
 CREATE POLICY "Public read dtc_definitions" ON dtc_definitions FOR SELECT USING (true);
 CREATE POLICY "Public read service_resets" ON service_resets FOR SELECT USING (true);
-CREATE POLICY "Users manage own scans" ON scan_sessions FOR ALL USING (true);
-CREATE POLICY "Users manage own vehicles" ON cloud_vehicles FOR ALL USING (true);
+CREATE POLICY "Users manage own scans and Mechanics view all" ON scan_sessions FOR ALL USING (true);
+CREATE POLICY "Users manage own vehicles and Mechanics view all" ON cloud_vehicles FOR ALL USING (true);
 CREATE POLICY "Users manage own subs" ON subscriptions FOR ALL USING (true);

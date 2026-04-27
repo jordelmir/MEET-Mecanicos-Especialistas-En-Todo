@@ -55,11 +55,21 @@ export interface Client {
   accessCode: string;
   vehicles: VehicleInfo[];
   serviceHistory: ServiceHistoryItem[];
+  scans?: OBD2ScanResult[]; // Vía APK
   lastVisit?: Date;
   joinDate: Date;
   loyaltyPoints: number;
   notes?: string;
   avatar?: string;
+}
+
+export interface OBD2ScanResult {
+  id: string;
+  date: Date;
+  vehiclePlate: string;
+  dtcCodes: string[];
+  severity: 'high' | 'medium' | 'low' | 'none';
+  notes?: string;
 }
 
 export interface CatalogItem {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus, VehicleInfo } from '../types';
-import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save, Gauge } from 'lucide-react';
+import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save, Gauge, Smartphone, Activity, ShieldAlert, Info } from 'lucide-react';
 import { formatDuration } from '../services/timeEngine';
 
 interface ClientDashboardProps {
@@ -12,9 +12,10 @@ interface ClientDashboardProps {
   onBookNew: () => void;
   onCancelOrder: (id: string) => void;
   onUpdateUser?: (client: Client) => void;
+  onSimulateAPKScan?: () => void;
 }
 
-export function ClientDashboard({ currentUser, workOrders, services, mechanics, freeWashThreshold, onBookNew, onCancelOrder, onUpdateUser }: ClientDashboardProps) {
+export function ClientDashboard({ currentUser, workOrders, services, mechanics, freeWashThreshold, onBookNew, onCancelOrder, onUpdateUser, onSimulateAPKScan }: ClientDashboardProps) {
   const [editingMileage, setEditingMileage] = useState<number | null>(null);
   const [tempMileage, setTempMileage] = useState<number>(0);
   const [isAddingVehicle, setIsAddingVehicle] = useState(false);
@@ -292,6 +293,71 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
                 No tienes vehículos registrados. Agrega uno nuevo o se crearán al hacer una cita.
               </div>
             )}
+          </div>
+
+          {/* Escaneos OBD2 desde APK */}
+          <div className="mt-8 pt-6 border-t border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Smartphone className="text-forge-500" size={24} />
+                Diagnósticos desde App MEET
+              </h2>
+              {onSimulateAPKScan && (
+                <button 
+                  onClick={onSimulateAPKScan}
+                  className="text-xs font-bold bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 px-3 py-1.5 rounded flex items-center gap-2 transition-colors border border-forge-500/30"
+                >
+                  <Activity size={14} /> Simular Escaneo
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              {(!currentUser.scans || currentUser.scans.length === 0) ? (
+                <div className="glass-inner p-6 rounded-2xl text-center border-dashed border-2 border-steel-600">
+                  <Activity size={32} className="text-steel-500 mx-auto mb-3 opacity-50" />
+                  <h3 className="text-white font-bold mb-1">Sin escaneos recientes</h3>
+                  <p className="text-steel-400 text-sm">Conecta tu escáner OBD2 desde la App móvil de MEET para ver el estado de tu vehículo en tiempo real.</p>
+                </div>
+              ) : (
+                currentUser.scans.sort((a, b) => b.date.getTime() - a.date.getTime()).map(scan => (
+                  <div key={scan.id} className={`glass-inner p-5 rounded-xl border-l-4 ${
+                    scan.severity === 'high' ? 'border-red-500 bg-red-500/5' :
+                    scan.severity === 'medium' ? 'border-yellow-500 bg-yellow-500/5' :
+                    'border-blue-500 bg-blue-500/5'
+                  }`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          {scan.severity === 'high' ? <ShieldAlert size={16} className="text-red-500" /> : <Info size={16} className="text-forge-500" />}
+                          <span className="font-bold text-white tracking-wider text-sm">REPORTE OBD2</span>
+                        </div>
+                        <div className="text-xs text-steel-400 font-mono">{scan.date.toLocaleString()} · Placa: {scan.vehiclePlate}</div>
+                      </div>
+                      <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        scan.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                        scan.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {scan.severity === 'high' ? 'Crítico' : scan.severity === 'medium' ? 'Moderado' : 'Leve'}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {scan.dtcCodes.map(code => (
+                        <span key={code} className="bg-steel-900 border border-white/10 px-2 py-1 rounded text-xs text-white font-mono font-bold shadow-sm">
+                          {code}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    {scan.notes && (
+                      <p className="text-sm text-steel-300 italic">"{scan.notes}"</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Recomendaciones Preventivas */}
