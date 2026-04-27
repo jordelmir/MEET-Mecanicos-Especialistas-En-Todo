@@ -524,10 +524,10 @@
   {
     "code": "P0341",
     "descriptionEs": "Rango/Rendimiento del Sensor CMP",
-    "descriptionEn": "El sensor del árbol de levas envía señal fuera de rango.",
+    "descriptionEn": "Señal fuera de rango del sensor del árbol de levas.",
     "system": "ENGINE",
     "severity": "HIGH",
-    "possibleCauses": "Verificar sincronización de distribución, sensor CMP y cableado.",
+    "possibleCauses": "Verificar distribución, sensor CMP y cableado.",
     "urgency": "STOP_DRIVING"
   },
   {
@@ -1330,5 +1330,302 @@
     "severity": "HIGH",
     "possibleCauses": "Revisar cableado CAN entre módulos, alimentación y tierras.",
     "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0010",
+    "descriptionEs": "Circuito del Actuador de Posición del Árbol de Levas A (Banco 1)",
+    "descriptionEn": "Mal funcionamiento del solenoide de sincronización variable de válvulas (VVT).",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar solenoide VVT, nivel/presión de aceite y cableado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0011",
+    "descriptionEs": "Sincronización del Árbol de Levas A Sobre-Avanzada (Banco 1)",
+    "descriptionEn": "El árbol de levas está más avanzado de lo que la ECU comanda.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Cambiar aceite, revisar solenoide VVT, cadena de distribución y tensor.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0012",
+    "descriptionEs": "Sincronización del Árbol de Levas A Sobre-Retrasada (Banco 1)",
+    "descriptionEn": "El árbol de levas está más retrasado de lo que la ECU comanda.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Cambiar aceite, revisar solenoide VVT, cadena de distribución.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0013",
+    "descriptionEs": "Circuito del Actuador de Posición del Árbol de Levas B (Banco 1)",
+    "descriptionEn": "Mal funcionamiento del solenoide VVT del escape.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar solenoide VVT de escape, nivel de aceite y cableado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0014",
+    "descriptionEs": "Sincronización del Árbol de Levas B Sobre-Avanzada (Banco 1)",
+    "descriptionEn": "Árbol de levas de escape sobre-avanzado.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Cambiar aceite, revisar solenoide VVT de escape y cadena de distribución.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0016",
+    "descriptionEs": "Correlación de Posición Cigüeñal/Árbol de Levas (Banco 1)",
+    "descriptionEn": "Las posiciones del cigüeñal y árbol de levas no están sincronizadas.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cadena/correa de distribución, tensores y sensores CKP/CMP.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0017",
+    "descriptionEs": "Correlación de Posición Cigüeñal/Árbol de Levas B (Banco 1)",
+    "descriptionEn": "Desincronización entre cigüeñal y árbol de levas de escape.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Verificar cadena de distribución, guías, tensores y sensores.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0020",
+    "descriptionEs": "Circuito del Actuador VVT A (Banco 2)",
+    "descriptionEn": "Falla en el solenoide de sincronización variable banco 2.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Revisar solenoide VVT banco 2, aceite y cableado.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0021",
+    "descriptionEs": "Sincronización del Árbol de Levas A Sobre-Avanzada (Banco 2)",
+    "descriptionEn": "Árbol de levas banco 2 sobre-avanzado.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Cambiar aceite, revisar solenoide VVT banco 2 y distribución.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0030",
+    "descriptionEs": "Circuito del Calentador del Sensor O2 (B1S1)",
+    "descriptionEn": "Falla en el circuito de control del calentador del sensor de oxígeno.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusible, relé, cableado y sensor O2 B1S1.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0031",
+    "descriptionEs": "Calentador Sensor O2 - Bajo (B1S1)",
+    "descriptionEn": "Circuito bajo en el calentador del sensor O2 banco 1 sensor 1.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Verificar cableado y reemplazar sensor O2 si la resistencia es incorrecta.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0036",
+    "descriptionEs": "Circuito del Calentador del Sensor O2 (B1S2)",
+    "descriptionEn": "Falla en el calentador del sensor O2 downstream banco 1.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusible, cableado y sensor O2 B1S2.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0037",
+    "descriptionEs": "Calentador Sensor O2 - Bajo (B1S2)",
+    "descriptionEn": "Circuito bajo del calentador del sensor O2 downstream banco 1.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Verificar cableado y reemplazar sensor O2 downstream.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0050",
+    "descriptionEs": "Circuito del Calentador del Sensor O2 (B2S1)",
+    "descriptionEn": "Falla en el calentador del sensor O2 banco 2 sensor 1.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusible, cableado y sensor O2 B2S1.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0056",
+    "descriptionEs": "Circuito del Calentador del Sensor O2 (B2S2)",
+    "descriptionEn": "Falla en el calentador del sensor O2 downstream banco 2.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar fusible, cableado y sensor O2 B2S2.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0068",
+    "descriptionEs": "Correlación MAP/MAF - Cuerpo de Aceleración",
+    "descriptionEn": "Las lecturas del MAP y MAF no coinciden con la posición del acelerador.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Limpiar cuerpo de aceleración, revisar sensores MAP/MAF y fugas de vacío.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0069",
+    "descriptionEs": "Correlación MAP/Presión Barométrica",
+    "descriptionEn": "Discrepancia entre presión del múltiple y presión barométrica.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar sensor MAP, manguera de vacío y sensor barométrico.",
+    "urgency": "CAUTION"
+  },
+  {
+    "code": "P0087",
+    "descriptionEs": "Presión del Riel de Combustible Baja",
+    "descriptionEn": "La presión en el riel común es menor a la esperada.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar bomba de alta presión, regulador, filtro y posibles fugas.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0088",
+    "descriptionEs": "Presión del Riel de Combustible Alta",
+    "descriptionEn": "La presión en el riel común es mayor a la especificada.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar regulador de presión, válvula de alivio y sensor de presión.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0089",
+    "descriptionEs": "Rendimiento del Regulador de Presión de Combustible",
+    "descriptionEn": "El regulador no mantiene la presión correcta.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar regulador de presión de combustible, verificar líneas.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0205",
+    "descriptionEs": "Circuito del Inyector - Cilindro 5",
+    "descriptionEn": "Falla en el circuito del inyector del cilindro 5.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado, conector y resistencia del inyector 5.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0206",
+    "descriptionEs": "Circuito del Inyector - Cilindro 6",
+    "descriptionEn": "Falla en el circuito del inyector del cilindro 6.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado, conector y resistencia del inyector 6.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0207",
+    "descriptionEs": "Circuito del Inyector - Cilindro 7",
+    "descriptionEn": "Falla en el circuito del inyector del cilindro 7.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado, conector y resistencia del inyector 7.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0208",
+    "descriptionEs": "Circuito del Inyector - Cilindro 8",
+    "descriptionEn": "Falla en el circuito del inyector del cilindro 8.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar cableado, conector y resistencia del inyector 8.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0345",
+    "descriptionEs": "Circuito del Sensor CMP A (Banco 2)",
+    "descriptionEn": "No se recibe señal del sensor del árbol de levas banco 2.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Revisar sensor CMP banco 2, cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0351",
+    "descriptionEs": "Bobina de Encendido A - Circuito Primario",
+    "descriptionEn": "Falla en el circuito de la bobina de encendido del cilindro 1.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar bobina del cilindro 1, verificar cableado y conector.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0352",
+    "descriptionEs": "Bobina de Encendido B - Circuito Primario",
+    "descriptionEn": "Falla en el circuito de la bobina del cilindro 2.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar bobina del cilindro 2, verificar cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0353",
+    "descriptionEs": "Bobina de Encendido C - Circuito Primario",
+    "descriptionEn": "Falla en el circuito de la bobina del cilindro 3.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar bobina del cilindro 3, verificar cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0354",
+    "descriptionEs": "Bobina de Encendido D - Circuito Primario",
+    "descriptionEn": "Falla en el circuito de la bobina del cilindro 4.",
+    "system": "ENGINE",
+    "severity": "HIGH",
+    "possibleCauses": "Reemplazar bobina del cilindro 4, verificar cableado.",
+    "urgency": "STOP_DRIVING"
+  },
+  {
+    "code": "P0463",
+    "descriptionEs": "Sensor de Nivel de Combustible - Entrada Alta",
+    "descriptionEn": "Señal alta del sensor de nivel de combustible.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar cableado del sensor de nivel, posible circuito abierto.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0496",
+    "descriptionEs": "Flujo de Purga EVAP Alto",
+    "descriptionEn": "Flujo excesivo de purga del sistema EVAP detectado.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Reemplazar válvula de purga EVAP (posiblemente atascada abierta).",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0497",
+    "descriptionEs": "Flujo de Purga EVAP Bajo",
+    "descriptionEn": "Flujo insuficiente de purga del sistema EVAP.",
+    "system": "ENGINE",
+    "severity": "LOW",
+    "possibleCauses": "Revisar válvula de purga EVAP, mangueras y canister.",
+    "urgency": "MONITOR"
+  },
+  {
+    "code": "P0501",
+    "descriptionEs": "Rango/Rendimiento del Sensor de Velocidad",
+    "descriptionEn": "El sensor de velocidad reporta valores inconsistentes.",
+    "system": "ENGINE",
+    "severity": "MODERATE",
+    "possibleCauses": "Verificar sensor VSS, cable del velocímetro y engranajes.",
+    "urgency": "CAUTION"
   }
 ]

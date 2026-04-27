@@ -3,8 +3,9 @@ import { Search, AlertTriangle, Info, ShieldAlert, X, Wrench } from 'lucide-reac
 
 import { OBD2_DATABASE as DB_P1 } from '../lib/obd2-database';
 import { OBD2_DATABASE_P2 as DB_P2 } from '../lib/obd2-database-p2';
+import { OBD2_DATABASE_P3 as DB_P3 } from '../lib/obd2-database-p3';
 
-const OBD2_DATABASE = { ...DB_P1, ...DB_P2 };
+const OBD2_DATABASE = { ...DB_P1, ...DB_P2, ...DB_P3 };
 
 interface OBD2ScannerProps {
   onClose: () => void;
