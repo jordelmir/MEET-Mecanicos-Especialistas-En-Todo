@@ -1,18 +1,10 @@
 import React, { useState } from 'react';
 import { Search, AlertTriangle, Info, ShieldAlert, X, Wrench } from 'lucide-react';
 
-import dtcDatabase from '../dtc_database.json';
+import { OBD2_DATABASE as DB_P1 } from '../lib/obd2-database';
+import { OBD2_DATABASE_P2 as DB_P2 } from '../lib/obd2-database-p2';
 
-const OBD2_DATABASE: Record<string, { title: string; desc: string; fix: string; severity: 'high' | 'medium' | 'low' }> = {};
-
-dtcDatabase.forEach((item: any) => {
-  OBD2_DATABASE[item.code] = {
-    title: item.descriptionEs || 'Descripción no disponible',
-    desc: item.descriptionEn || '',
-    fix: item.possibleCauses || 'Revisar manual del fabricante o realizar escaneo profundo.',
-    severity: item.severity === 'HIGH' ? 'high' : item.severity === 'MODERATE' ? 'medium' : 'low'
-  };
-});
+const OBD2_DATABASE = { ...DB_P1, ...DB_P2 };
 
 interface OBD2ScannerProps {
   onClose: () => void;
