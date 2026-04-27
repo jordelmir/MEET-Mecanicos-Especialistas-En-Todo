@@ -1,7 +1,6 @@
 package com.elysium369.meet.core.obd
 
 import com.elysium369.meet.core.transport.TransportInterface
-import com.elysium369.meet.core.keepalive.KeepAliveManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
