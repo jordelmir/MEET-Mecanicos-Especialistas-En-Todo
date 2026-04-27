@@ -1,18 +1,7 @@
 import React, { useState } from 'react';
 import { Search, AlertTriangle, Info, ShieldAlert, X, Wrench } from 'lucide-react';
 
-import { OBD2_DATABASE as DB_P1 } from '../lib/obd2-database';
-import { OBD2_DATABASE_P2 as DB_P2 } from '../lib/obd2-database-p2';
-import { OBD2_DATABASE_P3 as DB_P3 } from '../lib/obd2-database-p3';
-import { OBD2_DATABASE_P4 as DB_P4 } from '../lib/obd2-database-p4';
-import { OBD2_DATABASE_P5 as DB_P5 } from '../lib/obd2-database-p5';
-import { OBD2_DATABASE_P6 as DB_P6 } from '../lib/obd2-database-p6';
-import { OBD2_DATABASE_P7 as DB_P7 } from '../lib/obd2-database-p7';
-import { OBD2_DATABASE_P8 as DB_P8 } from '../lib/obd2-database-p8';
-import { OBD2_DATABASE_P9 as DB_P9 } from '../lib/obd2-database-p9';
-import { OBD2_DATABASE_P10 as DB_P10 } from '../lib/obd2-database-p10';
-
-const OBD2_DATABASE = { ...DB_P1, ...DB_P2, ...DB_P3, ...DB_P4, ...DB_P5, ...DB_P6, ...DB_P7, ...DB_P8, ...DB_P9, ...DB_P10 };
+import { supabase } from '../lib/supabase';
 
 interface OBD2ScannerProps {
   onClose: () => void;
@@ -22,17 +11,40 @@ export function OBD2Scanner({ onClose }: OBD2ScannerProps) {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<any>(null);
   const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) return;
     
     setSearched(true);
-    if (OBD2_DATABASE[cleanCode]) {
-      setResult({ code: cleanCode, ...OBD2_DATABASE[cleanCode] });
-    } else {
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('dtc_codes')
+        .select('*')
+        .eq('code', cleanCode)
+        .single();
+
+      if (error || !data) {
+        setResult(null);
+      } else {
+        setResult({
+          code: data.code,
+          title: data.description_es,
+          desc: data.description_en, // we stored desc in en
+          fix: data.possible_causes,
+          severity: data.severity === 'HIGH' ? 'high' : data.severity === 'MODERATE' ? 'medium' : 'low'
+        });
+      }
+    } catch (err) {
+      console.error(err);
       setResult(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,13 +82,19 @@ export function OBD2Scanner({ onClose }: OBD2ScannerProps) {
                 className="w-full bg-steel-900 border-2 border-steel-700 rounded-xl pl-12 pr-4 py-4 text-xl font-bold text-white uppercase focus:border-forge-500 outline-none transition-all placeholder:text-steel-600 font-mono"
                 autoFocus
               />
-              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold hover:bg-forge-400 transition-colors">
-                Analizar
+              <button type="submit" disabled={loading} className="absolute right-2 top-1/2 -translate-y-1/2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold hover:bg-forge-400 transition-colors disabled:opacity-50">
+                {loading ? '...' : 'Analizar'}
               </button>
             </div>
           </form>
 
-          {searched && (
+          {loading && (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-forge-500"></div>
+            </div>
+          )}
+
+          {!loading && searched && (
             <div className="animate-fade-in">
               {result ? (
                 <div className={`rounded-xl p-5 border-l-4 ${
