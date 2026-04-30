@@ -60,3 +60,31 @@ Both platforms strictly adhere to the "Neon Cyan" futuristic design language.
 - **Color Palette**: Dark charcoal backgrounds (`#0a0a0a`), deep blues (`#111827`), and striking cyan accents (`#00f0ff` / `rgb(6, 182, 212)`).
 - **Glassmorphism**: Translucent panels with background blur to convey a sophisticated, high-tech interface.
 - **Feedback**: Immediate visual reactivity. Buttons feature glow-on-hover, and connection statuses pulse (Connecting: Yellow, Connected: Green/Cyan, Error: Red).
+
+---
+ 
+## 5. PDF Report Generation & AI Diagnostics (v2.2.0)
+ 
+MEET v2.2.0 introduces the **Elite Diagnostic Report**, a professional-grade PDF document generated directly on the device using the Android `PdfDocument` API.
+ 
+### 5.1. Waveform Analysis Engine
+- **Real-time Plotting**: The engine converts telemetry history into high-fidelity SVG-like paths on the PDF canvas.
+- **AI-Driven Anomaly Highlighting**: If MEET AI detects a non-linear behavior or sensor drift, the specific graph is automatically rendered in **Neon Red** with an "AI DETECTED" tag and a predictive insight summary.
+- **Multi-Page Management**: A dynamic pagination system ensures that long telemetry streams and multiple detected DTCs are gracefully distributed across pages with consistent headers and footers.
+ 
+### 5.2. MEET AI Elite Predictor
+- **Predictive Health Score**: A weighted algorithm calculates a score from 0-100 based on active DTCs, pending codes, and live sensor anomalies.
+- **Anomalous PID Detection**: Using Gemini-integrated analysis, the system identifies "silent" failures (e.g., fuel trims trending lean before a P0171 is set) and provides actionable repair recommendations.
+ 
+---
+ 
+## 6. Production Workflow & Deployment
+ 
+### 6.1. Build & Versioning
+- **Android Build**: Compiled via `./gradlew assembleDebug` for high-performance testing.
+- **Binary Storage**: Latest stable APKs are archived in the `/releases` directory of the repository for internal distribution.
+- **Version Sync**: The project uses unified versioning across Android and Web components (v2.2.0-stable).
+ 
+### 6.2. CI/CD Integration
+- **Git Flow**: All feature patches are synchronized to the `main` branch.
+- **Verification**: Every production-grade build undergoes a local compilation check to ensure logic integrity before being pushed to the global repository.

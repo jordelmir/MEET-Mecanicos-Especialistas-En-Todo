@@ -62,6 +62,9 @@ class ObdViewModel @Inject constructor(
     private val _permanentDtcs = MutableStateFlow<List<String>>(emptyList())
     val permanentDtcs: StateFlow<List<String>> = _permanentDtcs.asStateFlow()
 
+    private val _readinessMonitors = MutableStateFlow<ReadinessResult?>(null)
+    val readinessMonitors: StateFlow<ReadinessResult?> = _readinessMonitors.asStateFlow()
+
     private val _vin = MutableStateFlow<String?>(null)
     val vin: StateFlow<String?> = _vin.asStateFlow()
 
