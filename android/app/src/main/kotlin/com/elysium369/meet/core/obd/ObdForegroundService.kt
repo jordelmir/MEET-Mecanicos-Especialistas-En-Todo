@@ -21,7 +21,6 @@ import javax.inject.Inject
 class ObdForegroundService : Service() {
 
     @Inject lateinit var obdSession: ObdSession
-    @Inject lateinit var keepAliveManager: KeepAliveManager
     @Inject lateinit var alertManager: AlertManager
     @Inject lateinit var tripManager: TripManager
 
@@ -33,6 +32,8 @@ class ObdForegroundService : Service() {
     val connectionState: StateFlow<ObdState> get() = obdSession.state
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val vehicleId = intent?.getStringExtra("vehicle_id") ?: "unknown_vehicle"
+        
         // Crear canal ANTES de startForeground — requerido en Android 8+
         createNotificationChannel()
         
@@ -43,24 +44,32 @@ class ObdForegroundService : Service() {
         }
         
         serviceScope.launch {
-            keepAliveManager.start()
             alertManager.startMonitoring(liveData, serviceScope)
             
-            tripManager.startMonitoring("default_vehicle")
+            val sessionId = java.util.UUID.randomUUID().toString()
+            tripManager.startMonitoring(vehicleId, sessionId)
             
+            var lastUpdate = 0L
             liveData.collect { data ->
-                if (data.isEmpty()) return@collect // No actualizar notificación si no hay datos
+                if (data.isEmpty()) return@collect
                 
-                val temp = data["0105"]?.toInt()?.toString() ?: "--"
-                val rpm = data["010C"]?.toInt()?.toString() ?: "--"
-                val speed = data["010D"]?.toInt()?.toString() ?: "--"
-                val text = "Motor: ${temp}°C | ${rpm} RPM | ${speed} km/h"
+                val now = System.currentTimeMillis()
+                // Throttling: solo actualizar notificación cada 3 segundos para ahorrar batería
+                // A MENOS que haya una alerta crítica de AlertManager
+                val isCritical = data["0105"]?.let { it > 115f } ?: false // Sobrecalentamiento > 115C
                 
-                try {
-                    val notificationManager = getSystemService(NotificationManager::class.java)
-                    notificationManager?.notify(NOTIF_ID, buildNotification(text))
-                } catch (_: Exception) {
-                    // Proteger contra excepciones de notificación en background
+                if (now - lastUpdate > 3000 || isCritical) {
+                    val temp = data["0105"]?.toInt()?.toString() ?: "--"
+                    val rpm = data["010C"]?.toInt()?.toString() ?: "--"
+                    val speed = data["010D"]?.toInt()?.toString() ?: "--"
+                    val alertText = if (isCritical) "⚠️ ¡SOBRECALENTAMIENTO! " else ""
+                    val text = "${alertText}Motor: ${temp}°C | ${rpm} RPM | ${speed} km/h"
+                    
+                    try {
+                        val notificationManager = getSystemService(NotificationManager::class.java)
+                        notificationManager?.notify(NOTIF_ID, buildNotification(text))
+                        lastUpdate = now
+                    } catch (_: Exception) {}
                 }
             }
         }
@@ -107,7 +116,7 @@ class ObdForegroundService : Service() {
             try {
                 tripManager.endTrip()
             } catch (_: Exception) {}
-            keepAliveManager.stop()
+            // KeepAlive se detiene con obdSession.disconnect()
         }
         serviceScope.cancel()
         super.onDestroy()

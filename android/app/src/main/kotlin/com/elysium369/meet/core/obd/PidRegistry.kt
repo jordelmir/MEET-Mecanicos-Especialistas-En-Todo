@@ -72,10 +72,87 @@ object PidRegistry {
         PidDefinition("01","44","Ratio Aire/Comb","",0f,2f,1.2f,1.5f,{a,b,_,_ -> 2f*((a*256f)+b)/65536f}, PidCategory.EMISSIONS, isPremium=true),
         
         // TRANSMISSION (Premium)
-        PidDefinition("01","A4","Temp Trans","°C",-40f,215f,110f,130f,{a,_,_,_ -> a-40f}, PidCategory.TRANSMISSION, isPremium=true)
+        // TRANSMISSION (Premium)
+        PidDefinition("01","A4","Temp Trans","°C",-40f,215f,110f,130f,{a,_,_,_ -> a-40f}, PidCategory.TRANSMISSION, isPremium=true),
+        PidDefinition("01","3C","Temp Cat B1S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
+        PidDefinition("01","3D","Temp Cat B2S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
+        PidDefinition("01","5A","Pedal Relat.","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
+        PidDefinition("01","5E","Consumo Comb.","L/h",0f,3212.75f,0f,0f,{a,b,_,_ -> ((a*256f)+b)/20f}, PidCategory.FUEL, isPremium=true)
+    )
+
+    /**
+     * Manufacturer-specific PIDs (usually Mode 22).
+     * These require specific ECU headers and often security access.
+     */
+    val MANUFACTURER_PIDS = mapOf(
+        "FORD" to listOf(
+            PidDefinition("22", "03E0", "Carga Alt.", "%", 0f, 100f, 90f, 98f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0200", "Presión Aceite", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true)
+        ),
+        "TOYOTA" to listOf(
+            PidDefinition("21", "01", "Temp Bat HV", "°C", -40f, 100f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "01", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { _, b, _, _ -> b / 2.55f }, PidCategory.ELECTRICAL, true)
+        ),
+        "GM" to listOf(
+            PidDefinition("22", "1940", "Temp Trans Fluid", "°C", -40f, 150f, 110f, 125f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1153", "Vida Aceite", "%", 0f, 100f, 10f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true)
+        ),
+        "VOLKSWAGEN" to listOf(
+            PidDefinition("22", "11BD", "Presión Turbo Deseada", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "11BE", "Presión Turbo Real", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true)
+        ),
+        "HYUNDAI" to listOf(
+            PidDefinition("22", "0101", "Temp Bat EV", "°C", -40f, 80f, 45f, 55f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0105", "SOH Batería", "%", 0f, 100f, 80f, 70f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true)
+        )
+    )
+
+    val ACTIVE_TESTS = listOf(
+        ActiveTest(
+            id = "FUEL_PUMP",
+            name = "Prueba Bomba Combustible",
+            description = "Activa la bomba de combustible por 5 segundos para verificar presión.",
+            startCommand = "300101", // Example UDS command
+            stopCommand = "300100",
+            durationMs = 5000,
+            monitoredPids = listOf("010A"), // Monitor Fuel Pressure
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+        ActiveTest(
+            id = "EVAP_VENT",
+            name = "Solenoide EVAP Vent",
+            description = "Cicla la válvula de ventilación del sistema EVAP.",
+            startCommand = "2F011003", // Example Mode 2F (IO Control)
+            stopCommand = "2F011000",
+            durationMs = 10000,
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF)
+        ),
+        ActiveTest(
+            id = "ABS_PUMP",
+            name = "Purga Bomba ABS",
+            description = "Activa el motor de la bomba ABS para purgado de aire.",
+            manufacturer = "GM",
+            startCommand = "22123401", // Mocked GM specific
+            stopCommand = "22123400",
+            durationMs = 3000,
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.BATTERY_ABOVE_12V)
+        )
     )
 
     fun getPid(mode: String, pid: String): PidDefinition? {
-        return STANDARD_PIDS.find { it.mode == mode && it.pid == pid }
+        val std = STANDARD_PIDS.find { it.mode == mode && it.pid == pid }
+        if (std != null) return std
+        
+        // Search in manufacturer PIDs
+        MANUFACTURER_PIDS.values.forEach { list ->
+            val found = list.find { it.mode == mode && it.pid == pid }
+            if (found != null) return found
+        }
+        
+        return null
+    }
+
+    fun getOemPids(manufacturer: String): List<PidDefinition> {
+        return MANUFACTURER_PIDS[manufacturer.uppercase()] ?: emptyList()
     }
 }

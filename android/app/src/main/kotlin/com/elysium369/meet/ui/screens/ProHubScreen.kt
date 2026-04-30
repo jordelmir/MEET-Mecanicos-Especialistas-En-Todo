@@ -98,6 +98,40 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
             Spacer(modifier = Modifier.height(8.dp))
             Text("Herramientas de diagnóstico avanzado, controles bidireccionales y reportes de nivel mundial.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(24.dp))
+
+            // QoS MONITOR
+            val qos by viewModel.qosMetrics.collectAsState()
+            Surface(
+                color = Color.White.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceAround) {
+                    QosStat("Muestreo", "${"%.1f".format(qos.cmdsPerSecond)} Hz", if (qos.cmdsPerSecond > 10) Color(0xFF00FFCC) else Color.Yellow)
+                    QosStat("Latencia", "${qos.latencyMs}ms", if (qos.latencyMs < 100) Color(0xFF00FFCC) else Color.Red)
+                    QosStat("Estado", if (qos.isStable) "ESTABLE" else "INESTABLE", if (qos.isStable) Color(0xFF00FFCC) else Color.Red)
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // SMART SCAN BUTTON
+            Button(
+                onClick = { viewModel.viewModelScope.launch { viewModel.runSmartScan() } },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC)),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("EJECUTAR ESCANEO INTELIGENTE", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+            
+            val syncState by viewModel.cloudSyncState.collectAsState()
+            if (syncState.isNotEmpty()) {
+                Text(syncState, color = Color(0xFF00FFCC), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
             
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -133,5 +167,13 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 }
             }
         }
+    }
+}
+
+@Composable
+fun QosStat(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+        Text(value, color = color, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
     }
 }

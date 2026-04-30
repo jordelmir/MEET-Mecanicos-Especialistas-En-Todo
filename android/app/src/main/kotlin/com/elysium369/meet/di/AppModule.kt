@@ -65,4 +65,10 @@ object AppModule {
     fun provideGeminiDiagnostic(): GeminiDiagnostic {
         return GeminiDiagnostic()
     }
+
+    @Provides
+    @Singleton
+    fun provideReportGenerator(@ApplicationContext context: Context): com.elysium369.meet.core.export.ReportGenerator {
+        return com.elysium369.meet.core.export.ReportGenerator(context)
+    }
 }

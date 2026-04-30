@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.elysium369.meet.core.trips.Trip
+import com.elysium369.meet.data.local.entities.TripEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -20,18 +20,18 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripScreen(
-    trips: List<Trip>,
+    trips: List<TripEntity>,
     isPremium: Boolean,
-    onExportPdf: (Trip) -> Unit
+    onExportPdf: (TripEntity) -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial de Viajes", color = Color.White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
+                title = { Text("Historial de Viajes", color = Color.White, fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
             )
         },
-        containerColor = Color(0xFF121212)
+        containerColor = Color.Black
     ) { padding ->
         if (trips.isEmpty()) {
             Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -46,7 +46,8 @@ fun TripScreen(
                 if (!isPremium) {
                     item {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                         ) {
                             Row(
@@ -56,7 +57,7 @@ fun TripScreen(
                                 Text("⭐", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column {
-                                    Text("Funciones Pro Bloqueadas", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("Funciones Pro Bloqueadas", color = Color(0xFF00BFFF), fontWeight = FontWeight.Bold)
                                     Text("Exportación PDF, consumo de L/100km, y puntuación Eco-Score requieren suscripción.", 
                                         color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                 }
@@ -65,7 +66,7 @@ fun TripScreen(
                     }
                 }
 
-                items(trips.sortedByDescending { it.startTime }) { trip ->
+                items(trips.sortedByDescending { it.startedAt }) { trip ->
                     TripCard(trip, isPremium, onExportPdf)
                 }
             }
@@ -74,36 +75,36 @@ fun TripScreen(
 }
 
 @Composable
-fun TripCard(trip: Trip, isPremium: Boolean, onExportPdf: (Trip) -> Unit) {
+fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> Unit) {
     val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-    val durationMin = trip.durationMs / 60000
+    val durationMin = trip.durationSeconds / 60
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(sdf.format(Date(trip.startTime)), color = Color(0xFFFF6B35), fontWeight = FontWeight.Bold)
+                Text(sdf.format(Date(trip.startedAt)), color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                 if (isPremium) {
-                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) Color.Green else Color.Yellow, fontWeight = FontWeight.Bold)
+                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) Color(0xFF00FFCC) else Color.Yellow, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TripStatBox("Duración", "$durationMin min")
-                TripStatBox("Max Vel", "${String.format("%.1f", trip.maxSpeed)} km/h")
-                TripStatBox("Max Temp", "${String.format("%.1f", trip.maxTemp)} °C")
+                TripStatBox("Max Vel", "${String.format("%.1f", trip.maxSpeedKmh)} km/h")
+                TripStatBox("Max Temp", "${String.format("%.1f", trip.maxTempC)} °C")
             }
             if (isPremium) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { onExportPdf(trip) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC).copy(alpha = 0.2f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("📄 Exportar Reporte PDF", color = Color.White)
+                    Text("📄 Exportar Reporte PDF", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                 }
             }
         }

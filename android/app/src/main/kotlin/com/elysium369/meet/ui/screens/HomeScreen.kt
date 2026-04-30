@@ -127,10 +127,10 @@ fun HomeScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)),
+                            .border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("SELECCIONAR VEHÍCULO", fontWeight = FontWeight.Bold, color = Color(0xFFCC00FF))
+                        Text("SELECCIONAR VEHÍCULO", fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
                     }
                 }
             }
@@ -190,8 +190,8 @@ fun HomeScreen(
             QuickActionCard("⚠️", "DTCs", Color(0xFFFF003C), Modifier.weight(1f)) { navController.navigate("dtc") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("🚗", "Garage", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("garage") }
-            QuickActionCard("🤖", "IA", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("ai") }
+            QuickActionCard("🚗", "Garage", Color(0xFF00BFFF), Modifier.weight(1f)) { navController.navigate("garage") }
+            QuickActionCard("🤖", "IA", Color(0xFF00FFCC), Modifier.weight(1f)) { navController.navigate("ai") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             QuickActionCard("🔧", "Terminal", Color(0xFF00FFCC), Modifier.weight(1f)) { navController.navigate("terminal") }

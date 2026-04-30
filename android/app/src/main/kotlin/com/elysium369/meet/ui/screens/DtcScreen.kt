@@ -46,7 +46,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                     title = { Text("Diagnóstico DTC", color = Color.White, fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A)),
                     actions = {
-                        TextButton(onClick = { coroutineScope.launch { viewModel.readPendingDtcs(); viewModel.readPermanentDtcs(); viewModel.readReadinessMonitors() } }) {
+                        TextButton(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }) {
                             Text("ESCANEAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                         }
                         TextButton(onClick = { showClearDialog = true }) {
@@ -57,7 +57,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                 TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0A0A), contentColor = Color(0xFF00FFCC)) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) { Text("Activos (${activeDtcs.size})", color = if (selectedTab == 0) Color(0xFFFF003C) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) { Text("Pending (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFFCC00FF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFF00BFFF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                     Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) { Text("Monitores", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                     Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }) { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
                 }
@@ -92,9 +92,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                 }
                 2 -> { // Permanent DTCs (Mode 0A)
                     if (permanentDtcs.isEmpty()) {
-                        item { EmptyDtcState("No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente.", Color(0xFFCC00FF)) }
+                        item { EmptyDtcState("No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente.", Color(0xFF00BFFF)) }
                     } else {
-                        items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFFCC00FF), navController) }
+                        items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFF00BFFF), navController) }
                     }
                 }
                 3 -> { // Readiness Monitors
@@ -109,7 +109,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 }
 
 @Composable
-private fun DtcCard(dtc: String, severity: String, color: Color, navController: NavController) {
+private fun DtcCard(dtc: String, severity: String, color: Color, navController: NavController, viewModel: ObdViewModel) {
     val dtcInfo = com.elysium369.meet.core.obd.DtcDatabaseHelper.getDtcInfo(dtc)
     val desc = dtcInfo?.descriptionEs ?: com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
     val causes = dtcInfo?.possibleCauses
@@ -130,8 +130,43 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
                 Text(causes, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = { navController.navigate("ai/$dtc") }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
-                Text("🤖 CONSULTAR IA", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
+            
+            val freezeFrame by viewModel.freezeFrameData.collectAsState()
+            
+            if (freezeFrame.isNotEmpty() && freezeFrame["02"]?.contains(dtc) == true) {
+                Text("❄️ DATOS DE CUADRO CONGELADO:", color = Color(0xFF00BFFF), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                freezeFrame.filter { it.key != "02" }.forEach { (pid, valStr) ->
+                    val pidName = when(pid) {
+                        "05" -> "Temp. Refrigerante"
+                        "0C" -> "RPM Motor"
+                        "0D" -> "Velocidad"
+                        "04" -> "Carga Motor"
+                        else -> "PID $pid"
+                    }
+                    Text("$pidName: $valStr", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { navController.navigate("ai/$dtc") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("🤖 IA", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                }
+                
+                val coroutineScope = rememberCoroutineScope()
+                Button(
+                    onClick = { coroutineScope.launch { viewModel.refreshFreezeFrame(dtc) } },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00BFFF), RoundedCornerShape(8.dp)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("❄️ FF DATA", color = Color(0xFF00BFFF), fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -149,7 +184,7 @@ private fun EmptyDtcState(message: String, color: Color) {
 }
 
 @Composable
-private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.ui.ReadinessResult?, coroutineScope: kotlinx.coroutines.CoroutineScope, viewModel: ObdViewModel) {
+private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.core.obd.ReadinessResult?, coroutineScope: kotlinx.coroutines.CoroutineScope, viewModel: ObdViewModel) {
     if (readiness == null) {
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -157,7 +192,7 @@ private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.ui.ReadinessRes
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Monitores de emisiones no leídos aún.", color = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { coroutineScope.launch { viewModel.readReadinessMonitors() } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
+                Button(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
                     Text("LEER MONITORES", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                 }
             }
@@ -269,10 +304,10 @@ private fun ManualSearchTab(navController: NavController) {
                             Button(
                                 onClick = { navController.navigate("ai/${dtc.code}") },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)),
+                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("🤖 CONSULTAR IA", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
+                                Text("🤖 CONSULTAR IA", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                             }
                         }
                     }

@@ -1,7 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,58 +19,147 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
-    val isPro by viewModel.isAdapterPro.collectAsState()
-    val resets = listOf(
-        "Oil Maintenance Reset" to "Reseteo del contador de cambio de aceite y luz de mantenimiento.",
-        "EPB Retract" to "Retracción de calipers electrónicos (Freno de mano eléctrico) para cambio de pastillas.",
-        "DPF Regeneration" to "Regeneración forzada del filtro de partículas Diésel.",
-        "SAS Calibration" to "Calibración del sensor del ángulo de giro (Steering Angle Sensor).",
-        "Throttle Adaptation" to "Aprendizaje del cuerpo de aceleración (Idle relearn).",
-        "BMS Reset" to "Reseteo del sistema de gestión de batería al reemplazarla.",
-        "TPMS Reset" to "Reaprendizaje de sensores de presión de llantas."
+    val scope = rememberCoroutineScope()
+    var isRunning by remember { mutableStateOf(false) }
+    var resultMessage by remember { mutableStateOf("") }
+    var showConfirmDialog by remember { mutableStateOf<ResetOption?>(null) }
+
+    val resetOptions = listOf(
+        ResetOption("oil", "Reinicio de Aceite", "Restablece el contador de vida útil del aceite.", "🛢️"),
+        ResetOption("brake", "Reinicio de Frenos", "Restablece el sensor de desgaste de pastillas.", "🛑"),
+        ResetOption("battery", "Registro de Batería", "Informa a la ECU sobre una batería nueva.", "🔋"),
+        ResetOption("sas", "Calibración de Dirección", "Restablece el sensor de ángulo de dirección (SAS).", "🎡"),
+        ResetOption("throttle", "Adaptación Mariposa", "Ajusta la posición del cuerpo de aceleración.", "⚙️"),
+        ResetOption("dpf", "Regeneración DPF", "Inicia limpieza forzada del filtro de partículas.", "💨"),
+        ResetOption("tpms", "Reinicio de TPMS", "Sincroniza los sensores de presión de neumáticos.", "🚗")
     )
-    
-    val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+
+    if (showConfirmDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = null },
+            containerColor = Color(0xFF111111),
+            title = { Text("CONFIRMACIÓN ELITE", color = Color.White, fontWeight = FontWeight.Black) },
+            text = {
+                Text(
+                    "¿Estás seguro de iniciar: ${showConfirmDialog?.title}?\n\n" +
+                    "Asegúrate de que el vehículo cumpla con las condiciones de seguridad (Motor apagado/encendido según corresponda, batería > 12V).",
+                    color = Color.Gray
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val option = showConfirmDialog!!
+                        showConfirmDialog = null
+                        scope.launch {
+                            isRunning = true
+                            resultMessage = ""
+                            
+                            val success = when (option.id) {
+                                "oil" -> viewModel.resetOilService()
+                                "battery" -> viewModel.registerBattery(80)
+                                "brake" -> viewModel.resetEPB(true)
+                                "sas" -> viewModel.calibrateSAS()
+                                "throttle" -> viewModel.relearnThrottle()
+                                "dpf" -> viewModel.regenerateDPF()
+                                else -> {
+                                    kotlinx.coroutines.delay(1000)
+                                    false
+                                }
+                            }
+                            
+                            isRunning = false
+                            resultMessage = if (success) {
+                                "ÉXITO: ${option.title} completado en ${viewModel.manufacturer.value}."
+                            } else {
+                                "ERROR: Fallo al ejecutar ${option.title}. Verifica las condiciones de seguridad y compatibilidad."
+                            }
+                        }
+                    }
+                ) {
+                    Text("INICIAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = null }) {
+                    Text("CANCELAR", color = Color.White.copy(alpha = 0.6f))
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Service Resets", color = Color.White) },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Text("←", color = Color.White) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                title = { Text("SERVICE RESETS ELITE", color = Color.White, fontWeight = FontWeight.Black) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Text("←", color = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Black
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
-            Text("FUNCIONES ESPECIALES", color = Color(0xFFFFD700).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Procedimientos de taller mecánico para calibración y reseteo de módulos tras mantenimiento.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.height(16.dp))
             
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(resets) { reset ->
-                    val isSupported = isPro
-                    val cardColor = if (isSupported) Color(0xFFFFD700) else Color.DarkGray
-                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, cardColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable(enabled = isSupported) {
-                        coroutineScope.launch {
-                            val response = viewModel.sendRawCommand("31 01 FF 00") 
-                            if(response.contains("71") || response.contains("OK")) { 
-                                snackbarHostState.showSnackbar("Mantenimiento reseteado exitosamente")
-                            } else {
-                                snackbarHostState.showSnackbar("Respuesta ECU: $response", duration = SnackbarDuration.Short)
+            if (isRunning) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(2.dp), 
+                    color = Color(0xFF00FFCC),
+                    trackColor = Color(0xFF00FFCC).copy(alpha = 0.1f)
+                )
+                Text("EJECUTANDO RUTINA PROFESIONAL...", color = Color(0xFF00FFCC), modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold)
+            }
+
+            if (resultMessage.isNotEmpty()) {
+                Surface(
+                    color = if (resultMessage.contains("ÉXITO")) Color(0xFF00FFCC).copy(alpha = 0.15f) else Color(0xFFFF003C).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, if (resultMessage.contains("ÉXITO")) Color(0xFF00FFCC) else Color(0xFFFF003C)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
+                ) {
+                    Text(resultMessage, modifier = Modifier.padding(16.dp), color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(resetOptions) { option ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF151515)),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                    ) {
+                        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = Color.Black,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.size(56.dp).border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(option.icon, style = MaterialTheme.typography.headlineSmall)
+                                }
                             }
-                        }
-                    }) {
-                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text(reset.first, color = if (isSupported) Color(0xFFFFD700) else Color.Gray, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-                                if (!isSupported) Text("PRO ONLY", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(option.title, color = Color.White, fontWeight = FontWeight.ExtraBold)
+                                Text(option.description, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(reset.second, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                            Button(
+                                onClick = { showConfirmDialog = option },
+                                enabled = !isRunning && viewModel.connectionState.value == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF00FFCC),
+                                    contentColor = Color.Black,
+                                    disabledContainerColor = Color.DarkGray
+                                )
+                            ) {
+                                Text("RESETEAR", fontWeight = FontWeight.Black)
+                            }
                         }
                     }
                 }
@@ -78,3 +167,5 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
         }
     }
 }
+
+data class ResetOption(val id: String, val title: String, val description: String, val icon: String)

@@ -97,11 +97,11 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 onClick = {
                     val cmd = commandInput.trim()
                     if (cmd.isNotEmpty()) {
-                        terminalOutput = terminalOutput + "> $cmd"
+                        terminalOutput = terminalOutput + listOf("> $cmd")
                         commandInput = ""
                         
                         if (state != ObdState.CONNECTED) {
-                            terminalOutput = terminalOutput + "ERROR: OBD is not connected"
+                            terminalOutput = terminalOutput + listOf("ERROR: OBD is not connected")
                             return@Button
                         }
                         
@@ -109,9 +109,9 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         coroutineScope.launch {
                             try {
                                 val response = viewModel.sendRawCommand(cmd)
-                                terminalOutput = terminalOutput + response
+                                terminalOutput = terminalOutput + listOf(response)
                             } catch (e: Exception) {
-                                terminalOutput = terminalOutput + "ERROR: ${e.message}"
+                                terminalOutput = terminalOutput + listOf("ERROR: ${e.message}")
                             } finally {
                                 isSending = false
                             }

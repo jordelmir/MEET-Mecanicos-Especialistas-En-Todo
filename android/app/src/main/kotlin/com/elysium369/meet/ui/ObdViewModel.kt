@@ -2,271 +2,624 @@ package com.elysium369.meet.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.elysium369.meet.core.obd.ObdSession
-import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.obd.*
 import com.elysium369.meet.data.supabase.SubscriptionRepository
+import io.github.jan.supabase.gotrue.auth
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.data.supabase.VehicleRepository
+import com.elysium369.meet.data.supabase.SessionLogRepository
+import com.elysium369.meet.data.supabase.DiagnosticSession
+import com.elysium369.meet.data.local.dao.TripDao
+import com.elysium369.meet.data.local.dao.MaintenanceAlertDao
+import com.elysium369.meet.data.local.dao.CustomPidDao
+import com.elysium369.meet.data.local.entities.TripEntity
+import com.elysium369.meet.data.local.entities.MaintenanceAlertEntity
+import com.elysium369.meet.data.local.entities.CustomPidEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
 import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.util.UUID
 
 @HiltViewModel
 class ObdViewModel @Inject constructor(
     private val obdSession: ObdSession,
     private val vehicleRepository: VehicleRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val sessionLogRepository: SessionLogRepository,
     private val geminiDiagnostic: com.elysium369.meet.core.ai.GeminiDiagnostic,
-    @ApplicationContext private val context: Context
+    private val tripManager: com.elysium369.meet.core.trips.TripManager,
+    private val tripDao: TripDao,
+    private val maintenanceAlertDao: MaintenanceAlertDao,
+    private val customPidDao: CustomPidDao,
+    @ApplicationContext private val context: Context,
+    private val reportGenerator: com.elysium369.meet.core.export.ReportGenerator,
+    private val diagnosticManager: com.elysium369.meet.core.obd.AdvancedDiagnosticManager
 ) : ViewModel() {
 
+    // --- State Flows ---
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
-
+    val isAdapterPro: StateFlow<Boolean> = obdSession.isAdapterPro
+    
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
+
+    private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
     private val _activeDtcs = MutableStateFlow<List<String>>(emptyList())
     val activeDtcs: StateFlow<List<String>> = _activeDtcs.asStateFlow()
 
-    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, emptyList())
+    private val _pendingDtcs = MutableStateFlow<List<String>>(emptyList())
+    val pendingDtcs: StateFlow<List<String>> = _pendingDtcs.asStateFlow()
 
-    private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
-    
-    private val _cloudSyncState = MutableStateFlow<String>("Desconectado")
+    private val _permanentDtcs = MutableStateFlow<List<String>>(emptyList())
+    val permanentDtcs: StateFlow<List<String>> = _permanentDtcs.asStateFlow()
+
+    private val _vin = MutableStateFlow<String?>(null)
+    val vin: StateFlow<String?> = _vin.asStateFlow()
+
+    private val _freezeFrameData = MutableStateFlow<Map<String, String>>(emptyMap())
+    val freezeFrameData: StateFlow<Map<String, String>> = _freezeFrameData.asStateFlow()
+
+    private val _manufacturer = MutableStateFlow<String>("GENERIC")
+    val manufacturer: StateFlow<String> = _manufacturer.asStateFlow()
+
+    private val _isPremium = MutableStateFlow(false)
+    val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
+
+    private val _currentOdometer = MutableStateFlow(0f)
+    val currentOdometer: StateFlow<Float> = _currentOdometer.asStateFlow()
+
+    private val _cloudSyncState = MutableStateFlow("")
     val cloudSyncState: StateFlow<String> = _cloudSyncState.asStateFlow()
+
+    private val _qosMetrics = MutableStateFlow(QosMetrics())
+    val qosMetrics: StateFlow<QosMetrics> = _qosMetrics.asStateFlow()
     
-    private val _oemPids = MutableStateFlow<List<com.elysium369.meet.data.remote.CloudSyncRepository.OemPid>>(emptyList())
-    val oemPids: StateFlow<List<com.elysium369.meet.data.remote.CloudSyncRepository.OemPid>> = _oemPids.asStateFlow()
+    // Telemetry History for Graphs
+    private val _telemetryHistory = MutableStateFlow<Map<String, List<Float>>>(emptyMap())
+    val telemetryHistory: StateFlow<Map<String, List<Float>>> = _telemetryHistory.asStateFlow()
+
+    val highSpeedMode: StateFlow<Boolean> = obdSession.highSpeedMode
+    val pinnedPids: StateFlow<Set<String>> = obdSession.pinnedPids
+
+    val activeTestStatus: StateFlow<ActiveTestStatus> = obdSession.activeTestStatus
+    val availableActiveTests: List<ActiveTest> = PidRegistry.ACTIVE_TESTS
+
+    // --- Reactive Data from Room ---
+    val trips: StateFlow<List<TripEntity>> = _selectedVehicle
+        .flatMapLatest { vehicle ->
+            vehicle?.let { tripDao.getTripsForVehicle(it.id) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val maintenanceAlerts: StateFlow<List<MaintenanceAlertEntity>> = _selectedVehicle
+        .flatMapLatest { vehicle ->
+            vehicle?.let { maintenanceAlertDao.getAlertsForVehicle(it.id) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    init {
+        // IMPORTANT: Use Dispatchers.Main (not .immediate) to force async dispatch.
+        // This guarantees all MutableStateFlow fields are fully initialized
+        // before any collector lambda runs, preventing NullPointerException.
+
+        // Collect live data from session
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            obdSession.liveData.collect { data -> 
+                _liveData.value = data
+                updateTelemetryHistory(data)
+            }
+        }
+
+        // Collect VIN and detect manufacturer
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            obdSession.vin.collect { v -> 
+                _vin.value = v
+                v?.let { detectManufacturer(it) }
+                updateHealthScore()
+            }
+        }
+        
+        // Auto-refresh diagnostics on connection
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            obdSession.state.collect { state ->
+                if (state == ObdState.CONNECTED) {
+                    refreshDiagnostics()
+                    obdSession.fetchVin()
+                    _currentOdometer.value = obdSession.readOdometer()
+                }
+            }
+        }
+
+        // Sync custom PIDs to session
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            customPids.collect { pids ->
+                obdSession.setCustomPids(pids)
+            }
+        }
+
+        // Check subscription
+        viewModelScope.launch {
+            _isPremium.value = try { subscriptionRepository.isPremium() } catch (_: Exception) { false }
+        }
+
+        // Collect QoS from session
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            obdSession.qosMetrics.collect { metrics -> _qosMetrics.value = metrics }
+        }
+
+        // Auto-start AI monitoring if enabled
+        viewModelScope.launch {
+            isAiMonitoring.collect { enabled ->
+                if (enabled) startAiMonitoring() else aiMonitorJob?.cancel()
+            }
+        }
+
+        // --- Reactive Health Score ---
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            combine(
+                _activeDtcs,
+                _pendingDtcs,
+                _anomalousPids,
+                _liveData
+            ) { active, pending, anomalies, live ->
+                calculateHealthScore(active, pending, anomalies, live)
+            }.collect { score ->
+                _healthScore.value = score
+            }
+        }
+    }
+
+    // --- Actions ---
+
+    /** Connect to an OBD2 adapter by MAC address or IP */
+    fun connect(address: String) {
+        obdSession.setTargetAddress(address)
+        viewModelScope.launch {
+            obdSession.connect()
+        }
+    }
 
     fun startDiagnosticSession(vehicle: Vehicle) {
         _selectedVehicle.value = vehicle
-        _cloudSyncState.value = "Sincronizando con Servidor OEM..."
-        
         viewModelScope.launch {
-            try {
-                // Fetch OEM PIDs from Cloud
-                val pids = com.elysium369.meet.data.remote.CloudSyncRepository.getOemPidsForMake(vehicle.make)
-                _oemPids.value = pids
-                _cloudSyncState.value = "✅ ${pids.size} PIDs OEM descargados para ${vehicle.make}"
-                
-                obdSession.connect()
-                // Start Foreground Service
-                val serviceIntent = Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java)
-                try {
-                    context.startService(serviceIntent)
-                } catch (e: Exception) {}
-            } catch (e: Exception) {
-                _cloudSyncState.value = "❌ Error de sync: ${e.message}"
+            obdSession.connect()
+            if (obdSession.state.value == ObdState.CONNECTED) {
+                startForegroundService(vehicle.id)
             }
         }
     }
 
     fun stopSession() {
-        obdSession.disconnect()
-        // Stop Foreground Service
-        context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
-        _selectedVehicle.value = null
+        viewModelScope.launch {
+            saveSessionResults()
+            obdSession.disconnect()
+            context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
+            _selectedVehicle.value = null
+            clearState()
+        }
+    }
+
+    private suspend fun saveSessionResults() {
+        val vehicle = _selectedVehicle.value ?: return
+        val currentDtcs = _activeDtcs.value
+        val snapshot = _liveData.value
+        
+        val session = DiagnosticSession(
+            id = UUID.randomUUID().toString(),
+            user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+            vehicle_vin = vehicle.vin,
+            vehicle_make = vehicle.make,
+            vehicle_model = vehicle.model,
+            vehicle_year = vehicle.year,
+            dtcs_found = Json.encodeToString(currentDtcs),
+            severity = if (currentDtcs.isNotEmpty()) "high" else "low",
+            live_data_snapshot = Json.encodeToString(snapshot.mapValues { it.value.toString() })
+        )
+        
+        sessionLogRepository.saveSession(session)
+    }
+
+    private fun clearState() {
         _activeDtcs.value = emptyList()
+        _pendingDtcs.value = emptyList()
+        _permanentDtcs.value = emptyList()
+        _readinessMonitors.value = null
         _liveData.value = emptyMap()
+    }
+
+    suspend fun refreshDiagnostics() {
+        _activeDtcs.value = obdSession.readActiveDtcs()
+        _pendingDtcs.value = obdSession.readPendingDtcs()
+        _permanentDtcs.value = obdSession.readPermanentDtcs()
+        _readinessMonitors.value = obdSession.readReadinessMonitors()
+        updateHealthScore()
+    }
+
+    suspend fun clearDtcs(): Boolean {
+        val success = obdSession.clearDtcs()
+        if (success) {
+            _activeDtcs.value = emptyList()
+            _pendingDtcs.value = emptyList()
+            _freezeFrameData.value = emptyMap()
+        }
+        return success
+    }
+
+    /**
+     * Executes a "Smart Scan" — A comprehensive health check of the vehicle.
+     */
+    suspend fun runSmartScan() {
+        if (connectionState.value != ObdState.CONNECTED) return
+        
+        _cloudSyncState.value = "Iniciando Escaneo Inteligente Elite..."
+        
+        // 1. Scan DTCs
+        _cloudSyncState.value = "Buscando códigos de falla (DTCs)..."
+        refreshDiagnostics()
+        
+        // 2. If DTCs found, fetch Freeze Frame for the first one
+        if (_activeDtcs.value.isNotEmpty()) {
+            _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
+            val ff = obdSession.readFreezeFrame(_activeDtcs.value.first())
+            _freezeFrameData.value = ff
+        }
+        
+        // 3. Check Battery Voltage & Alternator health
+        _cloudSyncState.value = "Analizando sistema eléctrico..."
+        val voltage = obdSession.readBatteryVoltage()
+        val batteryHealth = if (voltage > 12.4f) "Excelente" else if (voltage > 11.8f) "Normal" else "Baja (Cargar)"
+        
+        // 4. Update status with detailed report
+        _cloudSyncState.value = "Escaneo completado. Batería: $batteryHealth (${voltage}V)"
+        
+        // 5. Auto-save session to cloud
+        saveSessionResults()
+    }
+
+    private fun detectManufacturer(vin: String) {
+        val wmi = if (vin.length >= 3) vin.substring(0, 3) else ""
+        
+        // Professional VIN Decoding (Simplified for demo, but extensible)
+        val mfr = when {
+            vin.startsWith("1FM") || vin.startsWith("1FT") -> "FORD"
+            vin.startsWith("JTD") || vin.startsWith("JT1") -> "TOYOTA"
+            vin.startsWith("1GC") || vin.startsWith("1G1") || vin.startsWith("1G6") -> "GM"
+            vin.startsWith("WBA") || vin.startsWith("WBS") -> "BMW"
+            vin.startsWith("WVW") || vin.startsWith("WVW") -> "VOLKSWAGEN"
+            vin.startsWith("VF3") || vin.startsWith("VF7") -> "PEUGEOT"
+            vin.startsWith("ZFA") -> "FIAT"
+            vin.startsWith("SAL") -> "LAND_ROVER"
+            else -> "GENERIC"
+        }
+        
+        _manufacturer.value = mfr
+        // Automatically inject OEM PIDs if they exist in the registry
+        obdSession.enableOemPids(mfr)
+    }
+
+    suspend fun refreshFreezeFrame(dtc: String) {
+        _cloudSyncState.value = "Refrescando Cuadro Congelado..."
+        val ff = obdSession.readFreezeFrame(dtc)
+        _freezeFrameData.value = ff
+        _cloudSyncState.value = "Cuadro Congelado actualizado."
+    }
+
+    suspend fun readVin(): String? {
+        return obdSession.fetchVin()
+    }
+
+    suspend fun setProtocol(protocol: String): Boolean {
+        return obdSession.setProtocol(protocol)
+    }
+
+    suspend fun scanModules() = obdSession.scanModules()
+
+    suspend fun sendRawCommand(cmd: String): String {
+        return obdSession.sendRawCommand(cmd)
+    }
+
+    /**
+     * Executes a professional-grade diagnostic routine or active test.
+     * Performs safety checks (voltage, adapter quality) before sending commands.
+     */
+    suspend fun runDiagnosticCommand(command: com.elysium369.meet.core.obd.ObdCommandDef): String {
+        // 1. Safety Guard
+        if (!obdSession.verifySafetyForProAction()) {
+            return "SAFETY_ERROR"
+        }
+        
+        // 2. Execution
+        val response = obdSession.sendRawCommand(command.command)
+        
+        // 3. Validation
+        val isSuccess = response.contains(command.expectedResponse) || 
+                        response.contains("OK") || 
+                        response.contains("61") || // ISO 14230-4 response prefix
+                        (command.command.startsWith("31") && response.startsWith("71")) // Routine control response
+        
+        return if (isSuccess) "SUCCESS" else response
+    }
+
+    suspend fun consultAi(apiKey: String?, endpointUrl: String?, dtcList: List<String>): String {
+        geminiDiagnostic.updateConfig(apiKey, endpointUrl)
+        val info = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
+        val result = geminiDiagnostic.analyzeDtc(
+            dtcList, 
+            info, 
+            _liveData.value.mapValues { "%.2f".format(it.value) },
+            _telemetryHistory.value
+        )
+        
+        // Update the UI with detected anomalies (as generic HealthAnomaly for now)
+        _anomalousPids.value = result.anomalousPids.map { 
+            com.elysium369.meet.core.ai.HealthAnomaly(it, "Anomalía detectada en diagnóstico profundo")
+        }
+        
+        return result.analysisText
+    }
+
+    fun generateFullReport(aiAnalysis: String?) {
+        val currentTrip = tripManager.currentTrip ?: return
+        val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
+        val dtcs = _activeDtcs.value
+        val history = _telemetryHistory.value
+        
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val tripData = com.elysium369.meet.data.supabase.Trip(
+                id = currentTrip.id,
+                started_at = currentTrip.startTime,
+                max_speed_kmh = 120, // Mocked or fetched from stats
+                max_rpm = 4500,
+                max_temp_c = 92
+            )
+            
+            val healthScore = _healthScore.value
+            val alerts = maintenanceAlerts.value
+            
+            val file = reportGenerator.generatePdfReport(
+                trip = tripData,
+                dtcs = dtcs,
+                aiAnalysis = aiAnalysis,
+                vehicleDetails = vehicleInfo,
+                telemetryHistory = history,
+                anomalies = _anomalousPids.value,
+                healthScore = healthScore,
+                maintenanceAlerts = alerts
+            )
+            
+            reportGenerator.shareReport(file)
+        }
+    }
+
+    fun markMaintenanceDone(alert: MaintenanceAlertEntity) {
+        viewModelScope.launch {
+            // Fetch real odometer from ECU if available
+            val currentOdo = obdSession.readOdometer()
+            val nextDue = if (currentOdo > 0) currentOdo + alert.intervalKm else alert.nextDueKm + alert.intervalKm
+            
+            val updatedAlert = alert.copy(
+                lastDoneKm = if (currentOdo > 0) currentOdo.toInt() else alert.nextDueKm,
+                nextDueKm = nextDue.toInt()
+            )
+            maintenanceAlertDao.insertAlert(updatedAlert)
+        }
+    }
+
+    fun addCustomPid(pid: CustomPidEntity) {
+        viewModelScope.launch {
+            customPidDao.insertCustomPid(pid)
+        }
+    }
+
+    fun deleteCustomPid(pid: CustomPidEntity) {
+        viewModelScope.launch {
+            customPidDao.deleteCustomPid(pid)
+        }
+    }
+
+    fun setHighSpeedMode(enabled: Boolean) {
+        obdSession.setHighSpeedMode(enabled)
+    }
+
+    fun pinPid(pid: String) {
+        obdSession.pinPid(pid)
+    }
+
+    fun unpinPid(pid: String) {
+        obdSession.unpinPid(pid)
+        // Optionally clear history for unpinned PID
+        val current = _telemetryHistory.value.toMutableMap()
+        current.remove(pid)
+        _telemetryHistory.value = current
+    }
+
+    private fun updateTelemetryHistory(newData: Map<String, Float>) {
+        val pinned = pinnedPids.value
+        if (pinned.isEmpty()) return
+
+        val currentHistory = _telemetryHistory.value
+        val newHistory = currentHistory.toMutableMap()
+        val maxPoints = 200 
+
+        pinned.forEach { pid ->
+            val value = newData[pid] ?: return@forEach
+            val list = currentHistory[pid]?.toMutableList() ?: mutableListOf()
+            list.add(value)
+            if (list.size > maxPoints) {
+                list.removeAt(0)
+            }
+            newHistory[pid] = list
+        }
+        _telemetryHistory.value = newHistory
+    }
+
+    // --- Active Testing (Bidirectional) ---
+    fun runActiveTest(test: ActiveTest) {
+        obdSession.runActiveTest(test)
+    }
+
+    fun stopActiveTest() {
+        obdSession.stopActiveTest()
+    }
+
+    suspend fun resetOilService(): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.resetOilService(mfr)
+    }
+
+    suspend fun registerBattery(capacityAh: Int): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.registerBattery(mfr, capacityAh)
+    }
+
+    suspend fun resetEPB(open: Boolean): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.resetEPB(mfr, open)
+    }
+
+    suspend fun calibrateSAS(): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.calibrateSAS(mfr)
+    }
+
+    suspend fun relearnThrottle(): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.relearnThrottle(mfr)
+    }
+
+    suspend fun regenerateDPF(): Boolean {
+        val mfr = _manufacturer.value
+        return diagnosticManager.regenerateDPF(mfr)
+    }
+
+
+    fun exportTripToPdf(trip: TripEntity) {
+        viewModelScope.launch {
+            val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Desconocido"
+            
+            // Convert Entity to Domain model for ReportGenerator
+            val domainTrip = com.elysium369.meet.data.supabase.Trip(
+                id = trip.id,
+                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                vehicle_id = trip.vehicleId,
+                session_id = trip.sessionId,
+                started_at = trip.startedAt,
+                ended_at = trip.endedAt,
+                distance_km = trip.distanceKm,
+                duration_seconds = trip.durationSeconds,
+                avg_speed_kmh = trip.avgSpeedKmh,
+                max_speed_kmh = trip.maxSpeedKmh,
+                max_rpm = trip.maxRpm,
+                avg_rpm = trip.avgRpm,
+                max_temp_c = trip.maxTempC,
+                fuel_efficiency = trip.fuelEfficiency,
+                eco_score = trip.ecoScore,
+                gps_track_json = trip.gpsTrackJson
+            )
+
+            // In a real scenario, we might want to fetch DTCs for this trip
+            // For now, use active DTCs if it's the current session, or empty
+            val dtcs = if (trip.endedAt == null) _activeDtcs.value else emptyList()
+            
+            val file = reportGenerator.generatePdfReport(
+                trip = domainTrip,
+                dtcs = dtcs,
+                aiAnalysis = null, // Could be fetched from a saved analysis
+                vehicleDetails = vehicleInfo
+            )
+            reportGenerator.shareReport(file)
+        }
+    }
+
+    suspend fun runAdapterCloneTest(): List<com.elysium369.meet.ui.screens.TestResult> {
+        val rawResults = obdSession.runAdapterTests()
+        return rawResults.map { (name, value) ->
+            val color = when {
+                value.contains("ERROR", true) || value.contains("?") -> android.graphics.Color.RED
+                value.contains("ms") && (value.replace(" ms", "").toIntOrNull() ?: 0) > 300 -> android.graphics.Color.YELLOW
+                else -> android.graphics.Color.GREEN
+            }
+            com.elysium369.meet.ui.screens.TestResult(name, value, color.toComposeColor())
+        }
+    }
+
+    private fun Int.toComposeColor() = androidx.compose.ui.graphics.Color(this)
+
+    // --- Helpers ---
+    private fun startForegroundService(vehicleId: String) {
+        val intent = Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java).apply {
+            putExtra("vehicle_id", vehicleId)
+        }
+        try { context.startService(intent) } catch (_: Exception) {}
     }
 
     fun saveVehicle(make: String, model: String, year: String, vin: String?) {
         viewModelScope.launch {
             val vehicle = Vehicle(
-                id = java.util.UUID.randomUUID().toString(),
-                user_id = "user_placeholder",
-                year = year.toIntOrNull() ?: 2000,
+                id = UUID.randomUUID().toString(),
+                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,
-                engine = "Unknown",
-                vin = if (vin.isNullOrBlank()) "Sin VIN" else vin,
-                plate = "Unknown"
+                engine = "N/A",
+                vin = vin ?: "N/A",
+                plate = "N/A"
             )
-            // Save to real repository (Room DB)
             vehicleRepository.insertVehicle(vehicle)
             _selectedVehicle.value = vehicle
         }
     }
 
-    fun connect(macAddress: String) {
-        viewModelScope.launch {
-            try {
-                obdSession.setTargetAddress(macAddress)
-                obdSession.connect() 
-                val serviceIntent = Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java)
-                try {
-                    context.startService(serviceIntent)
-                } catch (e: Exception) {}
-            } catch (e: Exception) {}
-        }
-    }
-
-    fun updateLiveData(pidName: String, value: Float) {
-        val current = _liveData.value.toMutableMap()
-        current[pidName] = value
-        _liveData.value = current
-    }
-    
-    suspend fun sendRawCommand(command: String): String {
-        return obdSession.sendRawCommand(command)
-    }
-
-    suspend fun readVin(): String? {
-        val raw = obdSession.sendRawCommand("09 02")
-        return parseVinFromResponse(raw)
-    }
-
-    private fun parseVinFromResponse(raw: String): String? {
-        val hex = raw.replace("49 02", "").replace(" ", "").trim()
-        return hex.chunked(2)
-            .mapNotNull { it.toIntOrNull(16)?.toChar() }
-            .filter { it.isLetterOrDigit() }
-            .joinToString("")
-            .takeIf { it.length == 17 }
-    }
-
-    suspend fun readFreezeFrame(dtcCode: String): Map<String, Float> {
-        // Modo 02 - Freeze Frame data
-        val supportedPids = obdSession.sendRawCommand("0200") // qué PIDs tienen freeze frame
-        val result = mutableMapOf<String, Float>()
-        // Iterar PIDs disponibles (Simplificado para el demo)
-        val pidsToCheck = listOf("0C", "0D", "05", "11") 
-        pidsToCheck.forEach { pid ->
-            val response = obdSession.sendRawCommand("02 $pid FF")
-            if (response.isNotEmpty() && !response.contains("NO DATA")) {
-                // Here we would use the pidRegistry formula
-                result[pid] = 0f // Placeholder
-            }
-        }
-        return result
-    }
-
-    suspend fun consultAi(apiKey: String?, endpointUrl: String?, dtcList: List<String>): String {
-        geminiDiagnostic.updateConfig(apiKey, endpointUrl)
-        val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
-        val liveDataStrings = _liveData.value.mapValues { "%.2f".format(it.value) }
-        return geminiDiagnostic.analyzeDtc(dtcList, vehicleInfo, liveDataStrings)
-    }
-
-    // ═══════════════════════════════════════════════
-    // PROFESSIONAL SCANNER FEATURES
-    // ═══════════════════════════════════════════════
-
-    // --- Clear DTCs (Mode 04) ---
-    private val _clearDtcResult = MutableStateFlow<String?>(null)
-    val clearDtcResult: StateFlow<String?> = _clearDtcResult.asStateFlow()
-
-    suspend fun clearDtcs(): Boolean {
-        return try {
-            val response = obdSession.sendRawCommand("04")
-            val success = !response.contains("ERROR") && !response.contains("UNABLE")
-            if (success) {
-                _activeDtcs.value = emptyList()
-                _pendingDtcs.value = emptyList()
-                _clearDtcResult.value = "✅ Códigos borrados exitosamente. MIL apagada."
-            } else {
-                _clearDtcResult.value = "❌ Error al borrar: $response"
-            }
-            success
-        } catch (e: Exception) {
-            _clearDtcResult.value = "❌ Error: ${e.message}"
-            false
-        }
-    }
-
-    // --- Pending DTCs (Mode 07) ---
-    private val _pendingDtcs = MutableStateFlow<List<String>>(emptyList())
-    val pendingDtcs: StateFlow<List<String>> = _pendingDtcs.asStateFlow()
-
-    suspend fun readPendingDtcs(): List<String> {
-        return try {
-            val response = obdSession.sendRawCommand("07")
-            val decoded = com.elysium369.meet.core.obd.DtcDecoder.decodePendingResponse(response)
-            _pendingDtcs.value = decoded
-            decoded
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    // --- Permanent DTCs (Mode 0A) ---
-    private val _permanentDtcs = MutableStateFlow<List<String>>(emptyList())
-    val permanentDtcs: StateFlow<List<String>> = _permanentDtcs.asStateFlow()
-
-    suspend fun readPermanentDtcs(): List<String> {
-        return try {
-            val response = obdSession.sendRawCommand("0A")
-            val decoded = com.elysium369.meet.core.obd.DtcDecoder.decodePermanentResponse(response)
-            _permanentDtcs.value = decoded
-            decoded
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    // --- Readiness Monitors (Mode 01 PID 01) ---
-    private val _readinessMonitors = MutableStateFlow<ReadinessResult?>(null)
-    val readinessMonitors: StateFlow<ReadinessResult?> = _readinessMonitors.asStateFlow()
-
-    suspend fun readReadinessMonitors(): ReadinessResult? {
-        return try {
-            val response = obdSession.sendRawCommand("0101")
-            val result = parseReadinessResponse(response)
-            _readinessMonitors.value = result
-            result
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun parseReadinessResponse(raw: String): ReadinessResult {
-        val clean = raw.replace("\\s+".toRegex(), "").replace("4101", "")
-        val milOn = if (clean.length >= 2) {
-            val a = clean.substring(0, 2).toIntOrNull(16) ?: 0
-            (a and 0x80) != 0
-        } else false
-        val dtcCount = if (clean.length >= 2) {
-            val a = clean.substring(0, 2).toIntOrNull(16) ?: 0
-            a and 0x7F
-        } else 0
-        val b = if (clean.length >= 4) clean.substring(2, 4).toIntOrNull(16) ?: 0 else 0
-        val c = if (clean.length >= 6) clean.substring(4, 6).toIntOrNull(16) ?: 0 else 0
-        val d = if (clean.length >= 8) clean.substring(6, 8).toIntOrNull(16) ?: 0 else 0
-        val monitors = mutableListOf<MonitorStatus>()
-        monitors.add(MonitorStatus("Misfire", (b and 0x01) != 0, (b and 0x10) == 0))
-        monitors.add(MonitorStatus("Fuel System", (b and 0x02) != 0, (b and 0x20) == 0))
-        monitors.add(MonitorStatus("Components", (b and 0x04) != 0, (b and 0x40) == 0))
-        monitors.add(MonitorStatus("Catalyst", (c and 0x01) != 0, (d and 0x01) == 0))
-        monitors.add(MonitorStatus("Heated Catalyst", (c and 0x02) != 0, (d and 0x02) == 0))
-        monitors.add(MonitorStatus("EVAP System", (c and 0x04) != 0, (d and 0x04) == 0))
-        monitors.add(MonitorStatus("Secondary Air", (c and 0x08) != 0, (d and 0x08) == 0))
-        monitors.add(MonitorStatus("A/C Refrig.", (c and 0x10) != 0, (d and 0x10) == 0))
-        monitors.add(MonitorStatus("O2 Sensor", (c and 0x20) != 0, (d and 0x20) == 0))
-        monitors.add(MonitorStatus("O2 Heater", (c and 0x40) != 0, (d and 0x40) == 0))
-        monitors.add(MonitorStatus("EGR System", (c and 0x80) != 0, (d and 0x80) == 0))
-        return ReadinessResult(milOn, dtcCount, monitors.filter { it.available })
-    }
-
     // --- Data Logging ---
-    private val _isLogging = MutableStateFlow(false)
-    val isLogging: StateFlow<Boolean> = _isLogging.asStateFlow()
+    private val _anomalousPids = MutableStateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>>(emptyList())
+    val anomalousPids: StateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>> = _anomalousPids.asStateFlow()
 
+    private val _isAiMonitoring = MutableStateFlow(false)
+    val isAiMonitoring: StateFlow<Boolean> = _isAiMonitoring.asStateFlow()
+    private var aiMonitorJob: kotlinx.coroutines.Job? = null
+
+    fun toggleAiMonitoring(enabled: Boolean) {
+        _isAiMonitoring.value = enabled
+        if (enabled) {
+            startAiMonitoring()
+        } else {
+            aiMonitorJob?.cancel()
+        }
+    }
+
+    private fun startAiMonitoring() {
+        aiMonitorJob?.cancel()
+        aiMonitorJob = viewModelScope.launch {
+            while (_isAiMonitoring.value) {
+                if (connectionState.value == ObdState.CONNECTED && telemetryHistory.value.isNotEmpty()) {
+                    val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model}" } ?: "Generic Vehicle"
+                    val anomalies = geminiDiagnostic.checkHealth(vehicleInfo, telemetryHistory.value)
+                    _anomalousPids.value = anomalies
+                    updateHealthScore()
+                }
+                kotlinx.coroutines.delay(30000) // Check every 30 seconds
+            }
+        }
+    }
+
+    private val _isLogging = MutableStateFlow(false)
+
+    val isLogging: StateFlow<Boolean> = _isLogging.asStateFlow()
     private val _dataLog = MutableStateFlow<List<DataLogEntry>>(emptyList())
     val dataLog: StateFlow<List<DataLogEntry>> = _dataLog.asStateFlow()
-    
-    val isAdapterPro: StateFlow<Boolean> = obdSession.isAdapterPro
-
     private var loggingJob: kotlinx.coroutines.Job? = null
 
     fun startDataLogging() {
@@ -275,15 +628,11 @@ class ObdViewModel @Inject constructor(
         loggingJob?.cancel()
         loggingJob = viewModelScope.launch {
             while (_isLogging.value) {
-                val currentData = _liveData.value
-                if (currentData.isNotEmpty()) {
-                    val entry = DataLogEntry(
-                        timestamp = System.currentTimeMillis(),
-                        sensorData = currentData.toMap()
-                    )
-                    _dataLog.value = _dataLog.value + entry
+                val current = _liveData.value
+                if (current.isNotEmpty()) {
+                    _dataLog.value = _dataLog.value + DataLogEntry(System.currentTimeMillis(), current)
                 }
-                kotlinx.coroutines.delay(500L) // Capture every 500ms
+                kotlinx.coroutines.delay(500)
             }
         }
     }
@@ -291,57 +640,108 @@ class ObdViewModel @Inject constructor(
     fun stopDataLogging() {
         _isLogging.value = false
         loggingJob?.cancel()
-        loggingJob = null
     }
 
-    // --- CSV Export ---
-    fun exportDataLogCsv(): String {
-        val log = _dataLog.value
-        if (log.isEmpty()) return ""
-        val allKeys = log.flatMap { it.sensorData.keys }.distinct().sorted()
-        val sb = StringBuilder()
-        sb.appendLine("Timestamp," + allKeys.joinToString(","))
-        log.forEach { entry ->
-            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date(entry.timestamp))
-            val values = allKeys.map { key -> entry.sensorData[key]?.let { "%.2f".format(it) } ?: "" }
-            sb.appendLine("$timestamp," + values.joinToString(","))
+    fun saveCsvToFile() {
+        val data = _dataLog.value
+        if (data.isEmpty()) return
+
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val fileName = "MEET_Log_${System.currentTimeMillis()}.csv"
+                val file = java.io.File(context.getExternalFilesDir(null), fileName)
+                java.io.FileWriter(file).use { writer ->
+                    // Header
+                    val pids = data.first().values.keys.toList()
+                    writer.write("Timestamp," + pids.joinToString(",") + "\n")
+                    
+                    // Data
+                    data.forEach { entry ->
+                        val row = mutableListOf<String>()
+                        row.add(entry.timestamp.toString())
+                        pids.forEach { pid ->
+                            row.add(entry.values[pid]?.toString() ?: "")
+                        }
+                        writer.write(row.joinToString(",") + "\n")
+                    }
+                }
+                
+                // Share file
+                shareFile(file)
+            } catch (e: Exception) {
+                // Log error
+            }
         }
-        return sb.toString()
     }
 
-    fun saveCsvToFile(): String? {
-        val csv = exportDataLogCsv()
-        if (csv.isEmpty()) return null
-        return try {
-            val vehicleName = _selectedVehicle.value?.let { "${it.make}_${it.model}" } ?: "session"
-            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
-            val fileName = "MEET_${vehicleName}_$timestamp.csv"
-            val dir = java.io.File(context.getExternalFilesDir(null), "exports")
-            dir.mkdirs()
-            val file = java.io.File(dir, fileName)
-            file.writeText(csv)
-            file.absolutePath
-        } catch (e: Exception) {
-            null
+    private fun shareFile(file: java.io.File) {
+        val uri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+        val chooser = Intent.createChooser(intent, "Compartir Log de MEET").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    }
+
+    private val _healthScore = MutableStateFlow(100)
+    val healthScore: StateFlow<Int> = _healthScore.asStateFlow()
+
+    private fun updateHealthScore() {
+        _healthScore.value = calculateHealthScore()
+    }
+
+    private fun calculateHealthScore(
+        active: List<String> = _activeDtcs.value,
+        pending: List<String> = _pendingDtcs.value,
+        anomalies: List<com.elysium369.meet.core.ai.HealthAnomaly> = _anomalousPids.value,
+        live: Map<String, Float> = _liveData.value
+    ): Int {
+        var score = 100
+        
+        // Subtract for DTCs (High priority)
+        score -= (active.size * 25)
+        score -= (pending.size * 10)
+        
+        // Subtract for AI Anomalies (Medium priority)
+        score -= (anomalies.size * 15)
+        
+        // Critical Sensor Thresholds
+        // 1. Engine Coolant Temperature (PID 0105)
+        val temp = live["0105"]
+        if (temp != null) {
+            if (temp > 115f) score -= 30 // Overheating
+            else if (temp > 105f) score -= 10 // Warning
+        }
+
+        // 2. Control Module Voltage (PID 0142) or Battery Voltage
+        val voltage = live["0142"] ?: live["AT RV"]
+        if (voltage != null) {
+            if (voltage < 11.5f) score -= 20 // Low battery/alternator
+            else if (voltage < 12.2f && (live["010C"] ?: 0f) < 100f) score -= 5 // Weak battery at rest
+        }
+        
+        // 3. Fuel Trims (PID 0106, 0107) - Long term trim
+        val ltft = live["0107"] ?: live["0109"]
+        if (ltft != null && (ltft > 15f || ltft < -15f)) {
+            score -= 10 // Fuel system richness/leanness
+        }
+
+        // 4. Misfires (Count detected or erratic RPM)
+        // (Placeholder for more complex logic if misfire PIDs are available)
+        
+        return score.coerceIn(5, 100)
     }
 }
 
-// Data classes for professional features
-data class ReadinessResult(
-    val milOn: Boolean,
-    val dtcCount: Int,
-    val monitors: List<MonitorStatus>
-)
-
-data class MonitorStatus(
-    val name: String,
-    val available: Boolean,
-    val complete: Boolean
-)
-
 data class DataLogEntry(
     val timestamp: Long,
-    val sensorData: Map<String, Float>
+    val values: Map<String, Float>
 )
-

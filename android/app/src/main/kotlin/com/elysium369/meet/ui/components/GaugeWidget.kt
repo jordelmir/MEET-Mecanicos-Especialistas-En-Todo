@@ -1,8 +1,6 @@
 package com.elysium369.meet.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -27,6 +25,7 @@ fun GaugeWidget(
     unit: String,
     warningThreshold: Float? = null,
     criticalThreshold: Float? = null,
+    isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Spring animation for smooth needle movement
@@ -44,12 +43,27 @@ fun GaugeWidget(
     val startAngle = 135f
     val currentSweep = progress * sweepAngle
 
+    // Animation for AI Alert
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     // Color logic
     val activeColor = when {
+        isAnomaly -> Color(0xFFFF003C) // Neon Red for AI Anomaly
         criticalThreshold != null && animatedValue >= criticalThreshold -> Color(0xFFFF003C) // Neon Red
         warningThreshold != null && animatedValue >= warningThreshold -> Color(0xFFFFD700) // Neon Yellow
         else -> Color(0xFF00FFCC) // Neon Cyan
     }
+
+    val glowAlpha = if (isAnomaly) pulseAlpha else 0.3f
 
     Box(
         contentAlignment = Alignment.Center,
@@ -75,7 +89,7 @@ fun GaugeWidget(
 
             // Value Arc GLOW
             drawArc(
-                color = activeColor.copy(alpha = 0.3f),
+                color = activeColor.copy(alpha = glowAlpha),
                 startAngle = startAngle,
                 sweepAngle = currentSweep,
                 useCenter = false,

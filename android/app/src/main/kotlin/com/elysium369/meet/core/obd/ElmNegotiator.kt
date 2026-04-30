@@ -5,8 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-class ObdConnectionException(message: String) : Exception(message)
-
 class ElmNegotiator(private val transport: TransportInterface) {
 
     data class AdapterProfile(
@@ -51,10 +49,21 @@ class ElmNegotiator(private val transport: TransportInterface) {
             throw ObdConnectionException("Adaptador no responde en ningún baudrate")
         }
 
-        val isClone = detectClone(rawId)
-        val supportsSTN = rawId.contains("STN", ignoreCase = true)
+        // Test for STN specific commands
+        val stnTest = sendWithTimeout("ST I\r", timeoutMs = 1000)
+        val isSTN = stnTest.contains("STN", true)
 
-        val initSequence = buildInitSequence(isClone, supportsSTN)
+        // Test for genuine ELM327 v2.x commands (Clones usually fail these)
+        val csTest = sendWithTimeout("AT CS\r", timeoutMs = 1000) // Get CAN stats (v2.1+)
+        val isGenuineV2 = !csTest.contains("?") && !csTest.contains("ERROR")
+
+        // Test for buffer size (v1.5 clones have small buffers)
+        sendWithTimeout("AT L1\r", timeoutMs = 500) // Linefeeds ON
+        sendWithTimeout("AT D\r", timeoutMs = 500) // Reset to defaults
+        
+        val isClone = !isSTN && !isGenuineV2
+
+        val initSequence = buildInitSequence(isClone, isSTN)
         for ((cmd, _) in initSequence) {
             val resp = sendWithTimeout(cmd, timeoutMs = if (isClone) 800 else 400)
             if (!resp.contains("OK") && !isClone) {
@@ -71,14 +80,14 @@ class ElmNegotiator(private val transport: TransportInterface) {
         val detectedProtocol = parseProtocol(protocolResponse)
 
         return AdapterProfile(
-            chipVersion = parseChipVersion(rawId),
+            chipVersion = if (isSTN) stnTest else if (isGenuineV2) "ELM327 v2.1 (Original)" else "ELM327 v1.5 (Clone)",
             isClone = isClone,
             supportedProtocols = listOf(detectedProtocol),
-            optimalBaudRate = activeBaud,
-            commandDelayMs = if (isClone) 80L else 30L,
-            supportsSTN = supportsSTN,
-            supportsHeaders = !isClone || rawId.contains("v2"),
-            maxLineLength = if (isClone) 48 else 256
+            optimalBaudRate = if (isSTN) 115200 else activeBaud,
+            commandDelayMs = if (isClone) 70L else 20L,
+            supportsSTN = isSTN,
+            supportsHeaders = true,
+            maxLineLength = if (isClone) 64 else 512
         )
     }
 

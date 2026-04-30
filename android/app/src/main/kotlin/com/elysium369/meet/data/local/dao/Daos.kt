@@ -21,6 +21,12 @@ interface DiagnosticSessionDao {
     @Query("SELECT * FROM diagnostic_sessions WHERE vehicleId = :vehicleId ORDER BY startedAt DESC")
     fun getSessionsForVehicle(vehicleId: String): Flow<List<DiagnosticSessionEntity>>
 
+    @Query("SELECT * FROM diagnostic_sessions WHERE synced = 0")
+    suspend fun getPendingSync(): List<DiagnosticSessionEntity>
+
+    @Query("UPDATE diagnostic_sessions SET synced = 1 WHERE id IN (:ids)")
+    suspend fun markAsSynced(ids: List<String>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: DiagnosticSessionEntity)
 }
@@ -38,6 +44,12 @@ interface DtcDao {
 interface TripDao {
     @Query("SELECT * FROM trips WHERE vehicleId = :vehicleId ORDER BY startedAt DESC")
     fun getTripsForVehicle(vehicleId: String): Flow<List<TripEntity>>
+
+    @Query("SELECT * FROM trips WHERE synced = 0")
+    suspend fun getPendingSync(): List<TripEntity>
+
+    @Query("UPDATE trips SET synced = 1 WHERE id IN (:ids)")
+    suspend fun markAsSynced(ids: List<String>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrip(trip: TripEntity)

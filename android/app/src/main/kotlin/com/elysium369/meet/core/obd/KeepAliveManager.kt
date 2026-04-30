@@ -1,11 +1,13 @@
 package com.elysium369.meet.core.obd
 
 import kotlinx.coroutines.*
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class KeepAliveManager @Inject constructor(
+/**
+ * Mantiene la conexión ELM327 activa enviando pulsos AT cuando
+ * no hay tráfico. Sin esto, los adaptadores BT clon cierran el socket
+ * después de ~3s de inactividad.
+ */
+class KeepAliveManager(
     private val obdSession: ObdSession
 ) {
     private var keepAliveJob: Job? = null
@@ -19,15 +21,12 @@ class KeepAliveManager @Inject constructor(
         if (keepAliveJob?.isActive == true) return
         keepAliveJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                delay(1800L) // 1.8s check interval
+                delay(1800L)
                 if (System.currentTimeMillis() - lastReceivedTime >= 1800L) {
                     if (obdSession.state.value == ObdState.CONNECTED) {
-                        // Enviar comando para mantener viva la conexión
                         try {
                             obdSession.sendKeepAliveDirectly("0100\r")
-                        } catch (e: Exception) {
-                            // Ignorar errores del keepalive
-                        }
+                        } catch (_: Exception) {}
                     }
                 }
             }

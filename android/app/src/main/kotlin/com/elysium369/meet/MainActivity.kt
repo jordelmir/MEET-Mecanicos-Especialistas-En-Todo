@@ -2,6 +2,7 @@ package com.elysium369.meet
 import com.elysium369.meet.core.obd.DtcDatabaseHelper
 
 import android.os.Bundle
+import android.os.Build
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -49,14 +50,42 @@ val CyberpunkColorScheme = darkColorScheme(
 class MainActivity : ComponentActivity() {
     private val viewModel: ObdViewModel by viewModels()
 
+    private val permissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        if (!allGranted) {
+            // Handle denied permissions (e.g., show a dialog)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DtcDatabaseHelper.init(this)
+        
+        checkPermissions()
+
         setContent {
             MaterialTheme(colorScheme = CyberpunkColorScheme) {
                 MeetApp(viewModel)
             }
         }
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(android.Manifest.permission.BLUETOOTH_SCAN)
+            permissions.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            permissions.add(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        permissionLauncher.launch(permissions.toTypedArray())
     }
 }
 
@@ -71,6 +100,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
     
     val startDestination = if (onboardingDone) "home" else "onboarding"
     
+    val trips by obdViewModel.trips.collectAsState()
+    val alerts by obdViewModel.maintenanceAlerts.collectAsState()
+    val customPids by obdViewModel.customPids.collectAsState()
+    val isPremium by obdViewModel.isPremium.collectAsState()
+    val selectedVehicle by obdViewModel.selectedVehicle.collectAsState()
+
     Scaffold(
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
@@ -150,9 +185,9 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("trips") {
                 TripScreen(
-                    trips = emptyList(),
-                    isPremium = true,
-                    onExportPdf = {}
+                    trips = trips,
+                    isPremium = isPremium,
+                    onExportPdf = { obdViewModel.exportTripToPdf(it) }
                 )
             }
             composable("ai/{dtcCode}") { backStack ->
@@ -207,21 +242,22 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("clone_test") {
                 CloneTestScreen(
-                    onRunTest = { emptyList() }
+                    onRunTest = { obdViewModel.runAdapterCloneTest() }
                 )
             }
             composable("maintenance") {
+                val currentOdo by obdViewModel.currentOdometer.collectAsState()
                 MaintenanceScreen(
-                    alerts = emptyList(),
-                    currentOdometer = 0,
-                    onMarkAsDone = {},
+                    alerts = alerts,
+                    currentOdometer = currentOdo.toLong(),
+                    onMarkAsDone = { obdViewModel.markMaintenanceDone(it) },
                     onBack = { navController.popBackStack() }
                 )
             }
             composable("custom_pid") {
                 CustomPidEditorScreen(
-                    customPids = emptyList(),
-                    onAddCustomPid = { _ -> },
+                    customPids = customPids,
+                    onAddCustomPid = { obdViewModel.addCustomPid(it) },
                     onBack = { navController.popBackStack() }
                 )
             }
