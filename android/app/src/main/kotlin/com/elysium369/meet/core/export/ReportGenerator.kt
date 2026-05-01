@@ -213,7 +213,7 @@ class ReportGenerator(private val context: Context) {
                     y = 60f
                 }
                 
-                val pidName = com.elysium369.meet.core.obd.PidRegistry.getPid("01", anomaly.pid)?.description ?: anomaly.pid
+                val pidName = com.elysium369.meet.core.obd.PidRegistry.getPid("01", anomaly.pid)?.name ?: anomaly.pid
                 canvas.drawText(pidName.uppercase(), x + 10f, y, tableTextPaint)
                 
                 val insightLines = wrapText(anomaly.insight, tableTextPaint, 360f)
@@ -335,7 +335,7 @@ class ReportGenerator(private val context: Context) {
         val labelPaint = Paint().apply {
             color = if (isAnomalous) Color.parseColor("#FF3366") else Color.BLACK; textSize = 10f; isFakeBoldText = true
         }
-        val sensorName = com.elysium369.meet.core.obd.PidRegistry.getPid("01", label)?.description ?: label
+        val sensorName = com.elysium369.meet.core.obd.PidRegistry.getPid("01", label)?.name ?: label
         canvas.drawText(sensorName.uppercase(), x + 10f, y + 18f, labelPaint)
         
         if (isAnomalous) {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.UUID
+import io.github.jan.supabase.gotrue.auth
 
 /**
  * TripManager — Professional trip tracking and telemetry analysis engine.
@@ -35,6 +36,9 @@ class TripManager @Inject constructor(
     private var rpmCount = 0
     private var totalDistance = 0f // Km
     private var totalFuelConsumed = 0f // Liters (Estimated)
+    private var maxSpeed = 0f
+    private var maxRpm = 0f
+    private var maxTemp = 0f
     
     private var fuelCalibrationFactor = 1.0f // Multiplier for fine-tuning
     
@@ -112,13 +116,13 @@ class TripManager @Inject constructor(
         lastTimestamp = now
 
         // 3. Update Maximums and Accumulators
-        trip.maxSpeedKmh = maxOf(trip.maxSpeedKmh, currentSpeed)
+        maxSpeed = maxOf(maxSpeed, currentSpeed)
         
         val currentRpm = data["010C"] ?: 0f
-        trip.maxRpm = maxOf(trip.maxRpm, currentRpm)
+        maxRpm = maxOf(maxRpm, currentRpm)
         
         val currentTemp = data["0105"] ?: 0f
-        trip.maxTempC = maxOf(trip.maxTempC, currentTemp)
+        maxTemp = maxOf(maxTemp, currentTemp)
 
         speedSum += currentSpeed
         rpmSum += currentRpm
@@ -133,8 +137,11 @@ class TripManager @Inject constructor(
         _currentTrip = trip.copy(
             distanceKm = totalDistance,
             durationSeconds = (now - trip.startedAt) / 1000,
-            avgSpeedKmh = speedSum / speedCount,
-            avgRpm = rpmSum / rpmCount,
+            avgSpeedKmh = if (speedCount > 0) speedSum / speedCount else 0f,
+            avgRpm = if (rpmCount > 0) rpmSum / rpmCount else 0f,
+            maxSpeedKmh = maxSpeed,
+            maxRpm = maxRpm,
+            maxTempC = maxTemp,
             ecoScore = calculateEcoScore()
         )
     }
@@ -171,6 +178,9 @@ class TripManager @Inject constructor(
         rpmCount = 0
         totalDistance = 0f
         totalFuelConsumed = 0f
+        maxSpeed = 0f
+        maxRpm = 0f
+        maxTemp = 0f
         speedHistory.clear()
         rpmHistory.clear()
         throttleHistory.clear()

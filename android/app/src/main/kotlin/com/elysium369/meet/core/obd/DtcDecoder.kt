@@ -58,32 +58,40 @@ object DtcDecoder {
      * Convierte 2 bytes hex en un código DTC estándar (Pxxxx, Cxxxx, Bxxxx, Uxxxx).
      * Según SAE J2012 / ISO 15031-6.
      */
-    private fun hexToDtc(hex: String): String {
+    fun hexToDtc(hex: String): String {
         return try {
             val b1 = hex.substring(0, 2).toInt(16)
             val b2 = hex.substring(2, 4)
-
-            // Los dos bits más significativos del primer byte definen la categoría
-            val prefixBits = (b1 shr 6) and 0x03
-            val prefix = when (prefixBits) {
-                0 -> "P" // Powertrain
-                1 -> "C" // Chassis
-                2 -> "B" // Body
-                3 -> "U" // Network
-                else -> "P"
-            }
-
-            // Los bits 4 y 5 del primer byte definen el primer dígito (0, 1, 2, 3)
-            val digit1 = (b1 shr 4) and 0x03
-            
-            // Los bits 0-3 del primer byte definen el segundo dígito
-            val digit2 = b1 and 0x0F
-
-            "$prefix$digit1${digit2.toString(16).uppercase()}$b2"
+            formatDtc(b1, b2)
         } catch (_: Exception) {
             "P0000"
         }
     }
+
+    fun hexToDtc(b1: Int, b2: Int): String {
+        return formatDtc(b1, String.format("%02X", b2))
+    }
+
+    private fun formatDtc(b1: Int, b2Hex: String): String {
+        // Los dos bits más significativos del primer byte definen la categoría
+        val prefixBits = (b1 shr 6) and 0x03
+        val prefix = when (prefixBits) {
+            0 -> "P" // Powertrain
+            1 -> "C" // Chassis
+            2 -> "B" // Body
+            3 -> "U" // Network
+            else -> "P"
+        }
+
+        // Los bits 4 y 5 del primer byte definen el primer dígito (0, 1, 2, 3)
+        val digit1 = (b1 shr 4) and 0x03
+        
+        // Los bits 0-3 del primer byte definen el segundo dígito
+        val digit2 = b1 and 0x0F
+
+        return "$prefix$digit1${digit2.toString(16).uppercase()}$b2Hex"
+    }
+
 
     fun decodeDtcResponse(response: String) = decode(response, "03")
     fun decodePendingResponse(response: String) = decode(response, "07")

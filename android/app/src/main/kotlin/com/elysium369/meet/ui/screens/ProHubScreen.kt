@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +34,7 @@ data class ProFeature(val id: String, val title: String, val icon: String, val c
 @Composable
 fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
     val isPro by viewModel.isAdapterPro.collectAsState()
+    val scope = rememberCoroutineScope()
     
     val proFeatures = listOf(
         ProFeature("topology", "Mapeo\nTopológico", "🕸️", Color(0xFF00FFCC), "topology"),
@@ -118,7 +121,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
             
             // SMART SCAN BUTTON
             Button(
-                onClick = { viewModel.viewModelScope.launch { viewModel.runSmartScan() } },
+                onClick = { scope.launch { viewModel.runSmartScan() } },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC)),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)

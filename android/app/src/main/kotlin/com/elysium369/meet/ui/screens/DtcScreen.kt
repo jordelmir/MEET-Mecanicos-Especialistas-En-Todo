@@ -55,11 +55,11 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                     }
                 )
                 TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0A0A), contentColor = Color(0xFF00FFCC)) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) { Text("Activos (${activeDtcs.size})", color = if (selectedTab == 0) Color(0xFFFF003C) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) { Text("Pending (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFF00BFFF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }) { Text("Monitores", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
-                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }) { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Activos (${activeDtcs.size})", color = if (selectedTab == 0) Color(0xFFFF003C) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Pending (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFF00BFFF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Monitores", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
                 }
             }
         },
@@ -80,21 +80,21 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                     if (activeDtcs.isEmpty()) {
                         item { EmptyDtcState("No hay códigos de falla activos", Color(0xFF00FFCC)) }
                     } else {
-                        items(activeDtcs) { dtc -> DtcCard(dtc, "ACTIVO", Color(0xFFFF003C), navController) }
+                        items(activeDtcs) { dtc -> DtcCard(dtc, "ACTIVO", Color(0xFFFF003C), navController, viewModel) }
                     }
                 }
                 1 -> { // Pending DTCs (Mode 07)
                     if (pendingDtcs.isEmpty()) {
                         item { EmptyDtcState("No hay códigos pendientes.\nEstos son códigos que aún no encendieron la luz MIL.", Color(0xFFFFD700)) }
                     } else {
-                        items(pendingDtcs) { dtc -> DtcCard(dtc, "PENDIENTE", Color(0xFFFFD700), navController) }
+                        items(pendingDtcs) { dtc -> DtcCard(dtc, "PENDIENTE", Color(0xFFFFD700), navController, viewModel) }
                     }
                 }
                 2 -> { // Permanent DTCs (Mode 0A)
                     if (permanentDtcs.isEmpty()) {
                         item { EmptyDtcState("No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente.", Color(0xFF00BFFF)) }
                     } else {
-                        items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFF00BFFF), navController) }
+                        items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFF00BFFF), navController, viewModel) }
                     }
                 }
                 3 -> { // Readiness Monitors

@@ -19,7 +19,7 @@ import com.elysium369.meet.data.local.entities.*
         CustomPidEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class MeetDatabase : RoomDatabase() {

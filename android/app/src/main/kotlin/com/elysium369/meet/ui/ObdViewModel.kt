@@ -71,6 +71,9 @@ class ObdViewModel @Inject constructor(
     private val _freezeFrameData = MutableStateFlow<Map<String, String>>(emptyMap())
     val freezeFrameData: StateFlow<Map<String, String>> = _freezeFrameData.asStateFlow()
 
+    private val _clearDtcResult = MutableStateFlow<String?>(null)
+    val clearDtcResult: StateFlow<String?> = _clearDtcResult.asStateFlow()
+
     private val _manufacturer = MutableStateFlow<String>("GENERIC")
     val manufacturer: StateFlow<String> = _manufacturer.asStateFlow()
 
@@ -252,11 +255,16 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun clearDtcs(): Boolean {
+        _clearDtcResult.value = "Enviando comando de borrado..."
         val success = obdSession.clearDtcs()
         if (success) {
+            _clearDtcResult.value = "✅ Códigos borrados exitosamente"
             _activeDtcs.value = emptyList()
             _pendingDtcs.value = emptyList()
             _freezeFrameData.value = emptyMap()
+            updateHealthScore()
+        } else {
+            _clearDtcResult.value = "❌ Error al borrar códigos. Asegúrese que el motor esté apagado y en contacto (IGNITION ON)."
         }
         return success
     }
@@ -383,10 +391,21 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val tripData = com.elysium369.meet.data.supabase.Trip(
                 id = currentTrip.id,
-                started_at = currentTrip.startTime,
-                max_speed_kmh = 120, // Mocked or fetched from stats
-                max_rpm = 4500,
-                max_temp_c = 92
+                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                vehicle_id = currentTrip.vehicleId,
+                session_id = currentTrip.sessionId,
+                started_at = currentTrip.startedAt,
+                ended_at = currentTrip.endedAt,
+                distance_km = currentTrip.distanceKm,
+                duration_seconds = currentTrip.durationSeconds,
+                avg_speed_kmh = currentTrip.avgSpeedKmh,
+                max_speed_kmh = currentTrip.maxSpeedKmh,
+                max_rpm = currentTrip.maxRpm,
+                avg_rpm = currentTrip.avgRpm,
+                max_temp_c = currentTrip.maxTempC,
+                fuel_efficiency = currentTrip.fuelEfficiency,
+                eco_score = currentTrip.ecoScore,
+                gps_track_json = currentTrip.gpsTrackJson
             )
             
             val healthScore = _healthScore.value
@@ -411,11 +430,12 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch {
             // Fetch real odometer from ECU if available
             val currentOdo = obdSession.readOdometer()
-            val nextDue = if (currentOdo > 0) currentOdo + alert.intervalKm else alert.nextDueKm + alert.intervalKm
+            val currentOdoLong = currentOdo.toLong()
+            val nextDue = if (currentOdoLong > 0) currentOdoLong + alert.intervalKm else alert.nextDueKm + alert.intervalKm
             
             val updatedAlert = alert.copy(
-                lastDoneKm = if (currentOdo > 0) currentOdo.toInt() else alert.nextDueKm,
-                nextDueKm = nextDue.toInt()
+                lastDoneKm = if (currentOdoLong > 0) currentOdoLong else alert.nextDueKm,
+                nextDueKm = nextDue
             )
             maintenanceAlertDao.insertAlert(updatedAlert)
         }
@@ -545,6 +565,10 @@ class ObdViewModel @Inject constructor(
             )
             reportGenerator.shareReport(file)
         }
+    }
+    
+    fun getCurrentTrip(): TripEntity? {
+        return tripManager.currentTrip
     }
 
     suspend fun runAdapterCloneTest(): List<com.elysium369.meet.ui.screens.TestResult> {

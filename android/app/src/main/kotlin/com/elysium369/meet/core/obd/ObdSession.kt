@@ -214,7 +214,7 @@ class ObdSession(
                     }
                 }
                 
-                updateQos(cycleStartTime)
+                updateQos(System.currentTimeMillis() - cycleStartTime)
                 cycleCount++
                 
                 // Adaptive delay: High speed mode on pro adapter has 0 delay
@@ -229,20 +229,34 @@ class ObdSession(
         }
     }
 
-    private fun updateQos(cycleStartTime: Long) {
+    private fun updateQos(latencyMs: Long, success: Boolean = true) {
         val now = System.currentTimeMillis()
-        val duration = now - cycleStartTime
         cmdCount++
         
+        val current = _qosMetrics.value
+        val total = current.totalRequests + 1
+        val successful = if (success) current.successfulRequests + 1 else current.successfulRequests
+        val reliability = (successful.toFloat() / total.toFloat()) * 100f
+        
         if (now - lastCmdTime >= 1000) {
-            val metrics = QosMetrics(
+            _qosMetrics.value = current.copy(
                 cmdsPerSecond = cmdCount.toFloat(),
-                latencyMs = duration.toInt(),
-                isStable = duration < 500
+                latencyMs = latencyMs.toInt(),
+                isStable = latencyMs < 500,
+                avgLatencyMs = if (current.avgLatencyMs == 0f) latencyMs.toFloat() else (current.avgLatencyMs * 0.9f + latencyMs * 0.1f),
+                totalRequests = total,
+                successfulRequests = successful,
+                reliability = reliability
             )
-            _qosMetrics.value = metrics
             cmdCount = 0
             lastCmdTime = now
+        } else {
+            _qosMetrics.value = current.copy(
+                totalRequests = total,
+                successfulRequests = successful,
+                reliability = reliability,
+                avgLatencyMs = if (current.avgLatencyMs == 0f) latencyMs.toFloat() else (current.avgLatencyMs * 0.9f + latencyMs * 0.1f)
+            )
         }
     }
 
@@ -323,16 +337,6 @@ class ObdSession(
         _liveData.value = current
     }
 
-    /**
-     * Reads battery voltage from the adapter.
-     * Essential for professional diagnostics to ensure stable power.
-     */
-    suspend fun readBatteryVoltage(): Float {
-        return try {
-            val resp = sendRawCommand("ATRV")
-            resp.filter { it.isDigit() || it == '.' }.toFloatOrNull() ?: 0f
-        } catch (_: Exception) { 0f }
-    }
 
     private suspend fun detectSupportedPids(): Set<Int> {
         val supported = mutableSetOf<Int>()
@@ -461,11 +465,6 @@ class ObdSession(
 
     // Consolidated safety guard moved to line 824 area
 
-    fun enableOemPids(manufacturer: String) {
-        oemPidsToPoll.clear()
-        val pids = PidRegistry.getOemPids(manufacturer)
-        oemPidsToPoll.addAll(pids)
-    }
 
     suspend fun readPermanentDtcs(): List<String> {
         if (_state.value != ObdState.CONNECTED) return emptyList()
@@ -842,9 +841,10 @@ class ObdSession(
     }
 
     fun enableOemPids(manufacturer: String) {
-        val oemPids = PidRegistry.getOemPids(manufacturer)
-        if (oemPids.isNotEmpty()) {
-            _activePids.update { current -> (current + oemPids).distinctBy { it.pid } }
+        oemPidsToPoll.clear()
+        val pids = PidRegistry.getOemPids(manufacturer)
+        if (pids.isNotEmpty()) {
+            oemPidsToPoll.addAll(pids)
         }
     }
 
@@ -947,7 +947,11 @@ class ObdSession(
                                     }
                                 }
                                 if (bytes.isNotEmpty()) {
-                                    monitoredData[def.name] = FormulaEvaluator.evaluate(def.formula, bytes)
+                                    val a = bytes.getOrNull(0) ?: 0
+                                    val b = bytes.getOrNull(1) ?: 0
+                                    val c = bytes.getOrNull(2) ?: 0
+                                    val d = bytes.getOrNull(3) ?: 0
+                                    monitoredData[def.name] = def.formula(a, b, c, d)
                                 }
                             }
                         }
@@ -980,19 +984,6 @@ class ObdSession(
         }
     }
 
-    private fun updateQos(latency: Long, success: Boolean) {
-        val current = _qosMetrics.value
-        val total = current.totalRequests + 1
-        val successful = if (success) current.successfulRequests + 1 else current.successfulRequests
-        val reliability = (successful.toFloat() / total.toFloat()) * 100f
-        
-        _qosMetrics.value = current.copy(
-            avgLatencyMs = if (current.avgLatencyMs == 0f) latency.toFloat() else (current.avgLatencyMs * 0.9f + latency * 0.1f),
-            totalRequests = total,
-            successfulRequests = successful,
-            reliability = reliability
-        )
-    }
 
     /**
      * Performs a series of hardware tests to validate adapter quality and capabilities.
@@ -1103,6 +1094,14 @@ class ObdSession(
         return deferred.await()
     }
 
+    /**
+     * Sends a command directly to the transport bypassing the queue.
+     * ONLY use this for keep-alive or low-level negotiation.
+     */
+    suspend fun sendKeepAliveDirectly(command: String): String {
+        return sendCommandDirectly(command, timeoutMs = 1000L)
+    }
+
     fun disconnect() {
         isRunning = false
         currentJob?.cancel()
@@ -1122,9 +1121,3 @@ class ObdCommandQueue {
     @Synchronized fun dequeue(): ObdCommand? = if (queue.isEmpty()) null else queue.removeAt(0)
 }
 
-data class QosMetrics(
-    val avgLatencyMs: Float = 0f,
-    val totalRequests: Int = 0,
-    val successfulRequests: Int = 0,
-    val reliability: Float = 100f
-)

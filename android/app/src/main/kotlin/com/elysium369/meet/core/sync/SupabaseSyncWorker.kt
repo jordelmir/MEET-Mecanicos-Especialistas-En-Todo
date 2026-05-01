@@ -35,13 +35,10 @@ class SupabaseSyncWorker(
                 DiagnosticSession(
                     id = it.id,
                     user_id = SupabaseManager.client.auth.currentUserOrNull()?.id ?: "unauthenticated",
-                    vehicle_id = it.vehicleId,
-                    adapter_fingerprint = it.adapterFingerprint,
-                    protocol_used = it.protocolUsed,
-                    started_at = it.startedAt.toString(),
-                    ended_at = it.endedAt?.toString(),
-                    dtc_snapshot = it.dtcSnapshot,
-                    live_data_summary = it.liveDataSummary
+                    vehicle_vin = it.vehicleId,
+                    adapter_type = it.adapterFingerprint,
+                    dtcs_found = it.dtcSnapshot,
+                    live_data_snapshot = it.liveDataSummary
                 )
             }
 

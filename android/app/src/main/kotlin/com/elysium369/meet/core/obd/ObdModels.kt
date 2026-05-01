@@ -25,10 +25,11 @@ data class QosMetrics(
     val cmdsPerSecond: Float = 0f,
     val latencyMs: Int = 0,
     val isStable: Boolean = true,
-    // Compatibility with old UI if needed
+    // Compatibility and advanced metrics
     val avgLatencyMs: Float = 0f,
     val reliability: Float = 100f,
-    val totalRequests: Int = 0
+    val totalRequests: Int = 0,
+    val successfulRequests: Int = 0
 )
 
 data class ObdCommandDef(
