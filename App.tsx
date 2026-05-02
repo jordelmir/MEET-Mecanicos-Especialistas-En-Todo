@@ -419,54 +419,54 @@ export default function App() {
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* ── NAV BAR ── */}
-        <nav className="glass h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 md:px-6 shadow-lg">
-          <div className="flex items-center gap-3">
+        <nav className="glass h-16 sm:h-20 md:h-16 fixed top-0 w-full z-50 flex flex-nowrap items-center justify-start md:justify-between px-3 md:px-6 shadow-lg overflow-x-auto hide-scrollbar gap-4 md:gap-0">
+          <div className="flex items-center gap-3 shrink-0 mr-auto md:mr-0">
             <div className="bg-forge-500 p-1.5 rounded-lg text-black shadow-[0_0_15px_rgba(0, 240, 255,0.4)]">
               <Wrench size={20} strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white hidden sm:inline">
+            <span className="font-bold text-xl tracking-tight text-white inline whitespace-nowrap">
               ME<span className="text-forge-500">ET</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
             {role === Role.ADMIN && (
-              <div className="flex items-center gap-2 glass-inner p-1 rounded-full border border-white/5">
+              <div className="flex items-center gap-1 md:gap-2 glass-inner p-1 rounded-full border border-white/5">
                 <button
                   onClick={() => setIsTVModeOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 mr-2"
+                  className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 md:mr-2 whitespace-nowrap"
                   title="Abrir Pantalla de Taller (TV)"
                 >
                   <Monitor size={14} />
-                  <span className="hidden md:inline">TV</span>
+                  <span>TV</span>
                 </button>
-                <div className="w-px h-4 bg-steel-700 mr-2"></div>
+                <div className="w-px h-4 bg-steel-700 md:mr-2"></div>
                 <button
                   onClick={() => setAdminViewMode('DASHBOARD')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                  className={`flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap ${
                     adminViewMode === 'DASHBOARD' ? 'bg-steel-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
                   }`}
                 >
                   <BarChart3 size={14} />
-                  <span className="hidden md:inline">Gerencia</span>
+                  <span>Gerencia</span>
                 </button>
                 <button
                   onClick={() => setAdminViewMode('WORKSTATION')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                  className={`flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap ${
                     adminViewMode === 'WORKSTATION' ? 'bg-forge-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
                   }`}
                 >
                   <Gauge size={14} />
-                  <span className="hidden md:inline">Estación</span>
+                  <span>Estación</span>
                 </button>
               </div>
             )}
 
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10 h-8">
+            <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-white/10 h-8">
               {/* OBD2 Button */}
               <button
                 onClick={() => setIsOBD2Open(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-inner text-forge-500 hover:text-forge-400 hover:border-forge-500/50 transition-all text-[10px] font-mono font-bold"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-forge-500 hover:text-forge-400 hover:border-forge-500/50 transition-all text-[10px] font-mono font-bold whitespace-nowrap"
               >
                 <AlertTriangle size={12} />
                 OBD2 Scanner
@@ -475,15 +475,16 @@ export default function App() {
               {/* ⌘K Search */}
               <button
                 onClick={() => setIsPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-inner text-steel-300 hover:text-white hover:border-forge-500/30 transition-all text-[10px] font-mono"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-steel-300 hover:text-white hover:border-forge-500/30 transition-all text-[10px] font-mono whitespace-nowrap"
               >
                 <Search size={12} />
                 Buscar
-                <kbd className="ml-1 px-1.5 py-0.5 rounded bg-steel-700 text-steel-400 text-[9px] border border-steel-500">⌘K</kbd>
+                <kbd className="hidden md:inline-block ml-1 px-1.5 py-0.5 rounded bg-steel-700 text-steel-400 text-[9px] border border-steel-500">⌘K</kbd>
               </button>
-              <div className="text-right hidden sm:block leading-tight">
-                <div className="text-xs font-bold text-white">{loggedInUser.name}</div>
-                <div className="text-[10px] text-forge-500 font-mono tracking-wide uppercase">
+
+              <div className="text-right block leading-tight ml-2">
+                <div className="text-xs font-bold text-white whitespace-nowrap">{loggedInUser.name}</div>
+                <div className="text-[10px] text-forge-500 font-mono tracking-wide uppercase whitespace-nowrap">
                   {role === Role.ADMIN ? 'Administrador' : role === Role.MECHANIC ? 'Mecánico' : 'Cliente'}
                 </div>
               </div>
@@ -491,7 +492,7 @@ export default function App() {
               {(role === Role.MECHANIC || role === Role.ADMIN) && (
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                  className="p-1 md:p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
                   title="Configuración"
                 >
                   <Settings size={18} />
@@ -500,10 +501,10 @@ export default function App() {
 
               <button
                 onClick={() => setIsProfileModalOpen(true)}
-                className="group relative flex items-center gap-2 rounded-full hover:bg-white/10 transition-all p-0.5 pr-1"
+                className="group relative flex items-center gap-1 md:gap-2 rounded-full hover:bg-white/10 transition-all p-0.5 pr-1 shrink-0"
                 title="Perfil"
               >
-                <div className="relative w-9 h-9 rounded-full bg-steel-600 border-2 border-steel-500 group-hover:border-forge-500 transition-colors shadow-lg overflow-hidden">
+                <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-full bg-steel-600 border-2 border-steel-500 group-hover:border-forge-500 transition-colors shadow-lg overflow-hidden shrink-0">
                   {loggedInUser.avatar ? (
                     <img src={loggedInUser.avatar} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -512,12 +513,12 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <ChevronDown size={14} className="text-gray-500 group-hover:text-white transition-colors mr-1" />
+                <ChevronDown size={14} className="text-gray-500 group-hover:text-white transition-colors mr-1 shrink-0" />
               </button>
 
               <button
                 onClick={handleLogout}
-                className="ml-1 text-gray-500 hover:text-red-500 transition-colors"
+                className="ml-1 p-1 md:p-2 text-gray-400 hover:text-red-500 transition-colors shrink-0"
                 title="Cerrar Sesión"
               >
                 <LogOut size={18} />
