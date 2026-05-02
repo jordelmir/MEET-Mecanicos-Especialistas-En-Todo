@@ -37,28 +37,28 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
             TopAppBar(
                 title = { Text("Reportes Pre/Post Scan", color = Color.White) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Text("←", color = Color.White) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             
             if (isGenerating) {
-                CircularProgressIndicator(color = Color(0xFF00FFCC))
+                CircularProgressIndicator(color = Color(0xFF39FF14))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Generando Reporte MEET ELITE...", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                Text("Generando Reporte MEET ELITE...", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 Text("Compilando telemetría de alta fidelidad y DTCs", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             } else if (reportFile != null) {
-                Text("✅ REPORTE GENERADO", color = Color(0xFF00FFCC), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                Text("✅ REPORTE GENERADO", color = Color(0xFF39FF14), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                 Spacer(modifier = Modifier.height(16.dp))
-                Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))) {
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(reportFile?.name ?: "Report.pdf", color = Color.White, fontWeight = FontWeight.Bold)
                         Text("Guardado en /Downloads", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { generator.shareReport(reportFile!!) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
-                            Text("COMPARTIR POR WHATSAPP / CORREO", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                        Button(onClick = { reportFile?.let { generator.shareReport(it) } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
+                            Text("COMPARTIR POR WHATSAPP / CORREO", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -133,7 +133,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                             reportFile = generatedFile
                         }
                     }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC), contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14), contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {

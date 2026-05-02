@@ -43,6 +43,7 @@ export function Timeline({
 
   const todaysOrders = useMemo(() => {
     return workOrders.filter(wo =>
+      wo.startTime.getFullYear() === currentDate.getFullYear() &&
       wo.startTime.getDate() === currentDate.getDate() &&
       wo.startTime.getMonth() === currentDate.getMonth()
     );

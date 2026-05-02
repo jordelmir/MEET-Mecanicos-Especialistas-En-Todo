@@ -36,23 +36,23 @@ fun GarageScreen(
                 title = { Text("Mi Garage", color = Color.White, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", color = Color(0xFF00FFCC), style = MaterialTheme.typography.titleLarge)
+                        Text("←", color = Color(0xFF39FF14), style = MaterialTheme.typography.titleLarge)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("vehicle_form") },
-                containerColor = Color.Black,
+                containerColor = Color(0xFF0A0E1A),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(12.dp))
+                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(12.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = Color(0xFF00FFCC))
+                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = Color(0xFF39FF14))
             }
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         if (vehicles.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -67,11 +67,11 @@ fun GarageScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = { navController.navigate("vehicle_form") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp))
+                        modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp))
                     ) {
-                        Text("＋ AÑADIR VEHÍCULO", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                        Text("＋ AÑADIR VEHÍCULO", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -82,16 +82,16 @@ fun GarageScreen(
             ) {
                 item {
                     Text("${vehicles.size} VEHÍCULO${if (vehicles.size > 1) "S" else ""} REGISTRADO${if (vehicles.size > 1) "S" else ""}",
-                        color = Color(0xFF00FFCC).copy(alpha = 0.5f),
+                        color = Color(0xFF39FF14).copy(alpha = 0.5f),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold)
                 }
                 items(vehicles) { vehicle ->
                     val isActive = vehicle.id == activeVehicle?.id
-                    val borderColor = if (isActive) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.15f)
+                    val borderColor = if (isActive) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.15f)
                     
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -119,13 +119,13 @@ fun GarageScreen(
                                 }
                                 if (isActive) {
                                     Surface(
-                                        color = Color(0xFF00FFCC).copy(alpha = 0.1f),
+                                        color = Color(0xFF39FF14).copy(alpha = 0.1f),
                                         shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(4.dp))
+                                        modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(4.dp))
                                     ) {
                                         Text(
                                             "● ACTIVO",
-                                            color = Color(0xFF00FFCC),
+                                            color = Color(0xFF39FF14),
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Black
@@ -140,7 +140,7 @@ fun GarageScreen(
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     "Toca para activar →",
-                                    color = Color(0xFF00FFCC).copy(alpha = 0.4f),
+                                    color = Color(0xFF39FF14).copy(alpha = 0.4f),
                                     style = MaterialTheme.typography.labelSmall
                                 )
                             }

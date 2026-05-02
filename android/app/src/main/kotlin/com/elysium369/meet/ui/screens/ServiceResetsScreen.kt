@@ -6,15 +6,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.elysium369.meet.ui.components.EliteScrollContainer
+import com.elysium369.meet.ui.components.eliteScrollbar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,6 +31,7 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
     var isRunning by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf("") }
     var showConfirmDialog by remember { mutableStateOf<ResetOption?>(null) }
+    val connectionState by viewModel.connectionState.collectAsState()
 
     val resetOptions = listOf(
         ResetOption("oil", "Reinicio de Aceite", "Restablece el contador de vida útil del aceite.", "🛢️"),
@@ -50,7 +58,8 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val option = showConfirmDialog!!
+                        val option = showConfirmDialog
+                        if (option != null) {
                         showConfirmDialog = null
                         scope.launch {
                             isRunning = true
@@ -63,10 +72,8 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                 "sas" -> viewModel.calibrateSAS()
                                 "throttle" -> viewModel.relearnThrottle()
                                 "dpf" -> viewModel.regenerateDPF()
-                                else -> {
-                                    kotlinx.coroutines.delay(1000)
-                                    false
-                                }
+                                "tpms" -> viewModel.resetTPMS()
+                                else -> false
                             }
                             
                             isRunning = false
@@ -76,9 +83,10 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                 "ERROR: Fallo al ejecutar ${option.title}. Verifica las condiciones de seguridad y compatibilidad."
                             }
                         }
+                        }
                     }
                 ) {
-                    Text("INICIAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    Text("INICIAR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -98,68 +106,96 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                         Text("←", color = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             
             if (isRunning) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth().height(2.dp), 
-                    color = Color(0xFF00FFCC),
-                    trackColor = Color(0xFF00FFCC).copy(alpha = 0.1f)
+                    color = Color(0xFF39FF14),
+                    trackColor = Color(0xFF39FF14).copy(alpha = 0.1f)
                 )
-                Text("EJECUTANDO RUTINA PROFESIONAL...", color = Color(0xFF00FFCC), modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold)
+                Text("EJECUTANDO RUTINA PROFESIONAL...", color = Color(0xFF39FF14), modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold)
             }
 
             if (resultMessage.isNotEmpty()) {
                 Surface(
-                    color = if (resultMessage.contains("ÉXITO")) Color(0xFF00FFCC).copy(alpha = 0.15f) else Color(0xFFFF003C).copy(alpha = 0.15f),
+                    color = if (resultMessage.contains("ÉXITO")) Color(0xFF39FF14).copy(alpha = 0.15f) else Color(0xFFFF003C).copy(alpha = 0.15f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, if (resultMessage.contains("ÉXITO")) Color(0xFF00FFCC) else Color(0xFFFF003C)),
+                    border = BorderStroke(1.dp, if (resultMessage.contains("ÉXITO")) Color(0xFF39FF14) else Color(0xFFFF003C)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
                 ) {
                     Text(resultMessage, modifier = Modifier.padding(16.dp), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                items(resetOptions) { option ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF151515)),
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
-                    ) {
-                        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = Color.Black,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.size(56.dp).border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            val listState = rememberLazyListState()
+            
+            EliteScrollContainer(modifier = Modifier.weight(1f), fadeColor = Color(0xFF0A0E1A)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp) // Space for scrollbar
+                        .eliteScrollbar(listState)
+                ) {
+                    items(resetOptions) { option ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(20.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(option.icon, style = MaterialTheme.typography.headlineSmall)
+                                Surface(
+                                    color = Color.Black,
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(option.icon, style = MaterialTheme.typography.headlineMedium)
+                                    }
                                 }
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(option.title, color = Color.White, fontWeight = FontWeight.ExtraBold)
-                                Text(option.description, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                            }
-                            Button(
-                                onClick = { showConfirmDialog = option },
-                                enabled = !isRunning && viewModel.connectionState.value == com.elysium369.meet.core.obd.ObdState.CONNECTED,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF00FFCC),
-                                    contentColor = Color.Black,
-                                    disabledContainerColor = Color.DarkGray
-                                )
-                            ) {
-                                Text("RESETEAR", fontWeight = FontWeight.Black)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        option.title,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        option.description,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Button(
+                                    onClick = { showConfirmDialog = option },
+                                    enabled = !isRunning && connectionState == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF39FF14),
+                                        contentColor = Color.Black,
+                                        disabledContainerColor = Color.DarkGray
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("RUN", fontWeight = FontWeight.Black)
+                                }
                             }
                         }
                     }

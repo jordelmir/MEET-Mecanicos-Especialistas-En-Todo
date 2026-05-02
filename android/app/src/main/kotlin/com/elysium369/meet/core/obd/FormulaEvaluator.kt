@@ -73,7 +73,10 @@ object FormulaEvaluator {
                 var x = parseFactor()
                 while (true) {
                     if (eat('*'.toInt())) x *= parseFactor() // multiplication
-                    else if (eat('/'.toInt())) x /= parseFactor() // division
+                    else if (eat('/'.toInt())) {
+                        val divisor = parseFactor()
+                        x = if (divisor == 0.0) 0.0 else x / divisor // zero-safe division
+                    }
                     else return x
                 }
             }

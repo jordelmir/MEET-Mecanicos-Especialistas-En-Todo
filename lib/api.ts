@@ -58,12 +58,13 @@ export async function createClient(client: Omit<Client, 'id' | 'joinDate' | 'loy
 
 export async function updateClient(id: string, updates: Partial<Client>): Promise<void> {
   const payload: any = {};
-  if (updates.name) payload.name = updates.name;
-  if (updates.phone) payload.phone = updates.phone;
-  if (updates.email) payload.email = updates.email;
-  if (updates.avatar) payload.avatar = updates.avatar;
-  if (updates.notes) payload.notes = updates.notes;
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.phone !== undefined) payload.phone = updates.phone;
+  if (updates.email !== undefined) payload.email = updates.email;
+  if (updates.avatar !== undefined) payload.avatar = updates.avatar;
+  if (updates.notes !== undefined) payload.notes = updates.notes;
   
+  if (Object.keys(payload).length === 0) return;
   const { error } = await supabase.from('clients').update(payload).eq('id', id);
   if (error) throw error;
 }
@@ -210,14 +211,15 @@ export async function createWorkOrder(wo: Omit<WorkOrder, 'id'>): Promise<WorkOr
 
 export async function updateWorkOrder(id: string, updates: Partial<WorkOrder>): Promise<void> {
   const payload: any = {};
-  if (updates.status) payload.status = updates.status;
-  if (updates.actualStartTime) payload.actual_start_time = updates.actualStartTime.toISOString();
-  if (updates.actualEndTime) payload.actual_end_time = updates.actualEndTime.toISOString();
-  if (updates.notes) payload.notes = updates.notes;
-  if (updates.diagnosticNotes) payload.diagnostic_notes = updates.diagnosticNotes;
-  if (updates.price) payload.price = updates.price;
-  if (updates.estimatedMinutes) payload.estimated_minutes = updates.estimatedMinutes;
+  if (updates.status !== undefined) payload.status = updates.status;
+  if (updates.actualStartTime !== undefined) payload.actual_start_time = updates.actualStartTime.toISOString();
+  if (updates.actualEndTime !== undefined) payload.actual_end_time = updates.actualEndTime.toISOString();
+  if (updates.notes !== undefined) payload.notes = updates.notes;
+  if (updates.diagnosticNotes !== undefined) payload.diagnostic_notes = updates.diagnosticNotes;
+  if (updates.price !== undefined) payload.price = updates.price;
+  if (updates.estimatedMinutes !== undefined) payload.estimated_minutes = updates.estimatedMinutes;
   
+  if (Object.keys(payload).length === 0) return;
   const { error } = await supabase.from('work_orders').update(payload).eq('id', id);
   if (error) throw error;
 }

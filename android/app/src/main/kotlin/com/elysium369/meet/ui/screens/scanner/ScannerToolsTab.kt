@@ -37,7 +37,7 @@ fun ScannerToolsTab(
         item { 
             Text(
                 "HERRAMIENTAS PRO", 
-                color = Color(0xFF00FFCC).copy(alpha = 0.5f), 
+                color = Color(0xFF39FF14).copy(alpha = 0.5f), 
                 style = MaterialTheme.typography.labelSmall, 
                 fontWeight = FontWeight.Bold
             ) 
@@ -50,7 +50,7 @@ fun ScannerToolsTab(
                 if (isConnected) "✅" else "🔌",
                 if (isConnected) "Conexión Activa — Datos en tiempo real" else "Conectar Adaptador OBD2",
                 if (isConnected) "Los datos de telemetría se actualizan desde la ECU del vehículo" else "Selecciona tu adaptador ELM327 para iniciar diagnóstico real",
-                if (isConnected) Color(0xFF00FFCC) else Color(0xFFFFD700)
+                if (isConnected) Color(0xFF39FF14) else Color(0xFFFFD700)
             ) {
                 if (!isConnected) {
                     navController.navigate("connect")
@@ -65,7 +65,7 @@ fun ScannerToolsTab(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().border(
                     1.dp, 
-                    if (isAiMonitoring) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.3f), 
+                    if (isAiMonitoring) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.3f), 
                     RoundedCornerShape(12.dp)
                 )
             ) {
@@ -74,8 +74,8 @@ fun ScannerToolsTab(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Monitoreo de Salud IA", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Surface(color = Color(0xFF00FFCC).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
-                                Text("BETA", color = Color(0xFF00FFCC), modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall)
+                            Surface(color = Color(0xFF39FF14).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
+                                Text("BETA", color = Color(0xFF39FF14), modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         Text(
@@ -88,8 +88,8 @@ fun ScannerToolsTab(
                         checked = isAiMonitoring,
                         onCheckedChange = { viewModel.toggleAiMonitoring(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF00FFCC),
-                            checkedTrackColor = Color(0xFF00FFCC).copy(alpha = 0.5f)
+                            checkedThumbColor = Color(0xFF39FF14),
+                            checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.5f)
                         )
                     )
                 }
@@ -99,11 +99,11 @@ fun ScannerToolsTab(
         // High-Speed Mode Toggle
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().border(
                     1.dp, 
-                    if (highSpeedMode) Color(0xFF00FFCC) else Color(0xFF00FFCC).copy(alpha = 0.3f), 
+                    if (highSpeedMode) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.3f), 
                     RoundedCornerShape(12.dp)
                 )
             ) {
@@ -121,8 +121,8 @@ fun ScannerToolsTab(
                         checked = highSpeedMode,
                         onCheckedChange = { viewModel.setHighSpeedMode(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF00FFCC),
-                            checkedTrackColor = Color(0xFF00FFCC).copy(alpha = 0.5f)
+                            checkedThumbColor = Color(0xFF39FF14),
+                            checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.5f)
                         )
                     )
                 }
@@ -131,7 +131,7 @@ fun ScannerToolsTab(
         
         // HUD Mode
         item {
-            ToolCard("🖥️", "HUD Mode", "Velocímetro para parabrisas", Color(0xFF00FFCC)) { onHudModeToggle(true) }
+            ToolCard("🖥️", "HUD Mode", "Velocímetro para parabrisas", Color(0xFF39FF14)) { onHudModeToggle(true) }
         }
         
         // Data Logging
@@ -150,18 +150,18 @@ fun ScannerToolsTab(
         item {
             var exportResult by remember { mutableStateOf<String?>(null) }
             Column {
-                ToolCard("📄", "Exportar CSV (${dataLog.size} puntos)", "Exportar datos grabados a archivo CSV", Color(0xFF00BFFF)) {
+                ToolCard("📄", "Exportar CSV (${dataLog.size} puntos)", "Exportar datos grabados a archivo CSV", Color(0xFF00AAFF)) {
                     val path = viewModel.saveCsvToFile()
                     exportResult = if (path != null) "✅ Guardado en: $path" else "⚠️ No hay datos grabados. Inicia la grabación primero."
                 }
                 if (exportResult != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.Black), 
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
                         shape = RoundedCornerShape(8.dp), 
-                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                     ) {
-                        Text(exportResult!!, color = Color(0xFF00FFCC), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+                        Text(exportResult.orEmpty(), color = Color(0xFF39FF14), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -173,12 +173,12 @@ fun ScannerToolsTab(
             val speed = liveData["010D"] ?: 0f
             val lPer100km = if (speed > 0 && maf > 0) (maf * 3600f) / (speed * 14.7f * 710f) * 100f else 0f
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black), 
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("⛽ CONSUMO EN TIEMPO REAL", color = Color(0xFF00FFCC).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("⛽ CONSUMO EN TIEMPO REAL", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("${String.format("%.1f", lPer100km)} L/100km", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
                     Text("MAF: ${String.format("%.1f", maf)} g/s • Speed: ${speed.toInt()} km/h", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
@@ -199,15 +199,16 @@ fun ScannerToolsTab(
                     if (speed > 0f && startTime == null) {
                         startTime = System.currentTimeMillis()
                     }
-                    if (speed >= 100f && startTime != null) {
-                        time0to100 = System.currentTimeMillis() - startTime!!
+                    val capturedStart = startTime
+                    if (speed >= 100f && capturedStart != null) {
+                        time0to100 = System.currentTimeMillis() - capturedStart
                         isTesting = false
                     }
                 }
             }
             
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black), 
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
                 shape = RoundedCornerShape(12.dp), 
                 modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFFD700).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             ) {
@@ -219,7 +220,7 @@ fun ScannerToolsTab(
                                 isTesting = !isTesting
                                 if (isTesting) { time0to100 = null; startTime = null }
                             }, 
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), 
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)), 
                             modifier = Modifier.border(1.dp, Color(0xFFFFD700), RoundedCornerShape(8.dp)), 
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -227,11 +228,13 @@ fun ScannerToolsTab(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    if (time0to100 != null) {
-                        Text("${String.format("%.2f", time0to100!! / 1000f)} segundos", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                    val capturedResult = time0to100
+                    val capturedStartDisplay = startTime
+                    if (capturedResult != null) {
+                        Text("${String.format("%.2f", capturedResult / 1000f)} segundos", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
                     } else if (isTesting) {
-                        if (startTime != null) {
-                            val currentRunTime = System.currentTimeMillis() - startTime!!
+                        if (capturedStartDisplay != null) {
+                            val currentRunTime = System.currentTimeMillis() - capturedStartDisplay
                             Text("${String.format("%.2f", currentRunTime / 1000f)} s...", color = Color(0xFFFFD700), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
                         } else {
                             Text("Acelera para comenzar...", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
@@ -250,13 +253,13 @@ fun ScannerToolsTab(
             val status = when {
                 voltage < 10f -> "BATERÍA MUERTA" to Color(0xFFFF003C)
                 voltage in 10f..11.8f -> "CARGA BAJA" to Color(0xFFFFD700)
-                voltage in 11.9f..12.8f -> "BATERÍA OK (Motor apagado)" to Color(0xFF00FFCC)
-                voltage in 12.9f..14.8f -> "ALTERNADOR OK (Cargando)" to Color(0xFF00FFCC)
+                voltage in 11.9f..12.8f -> "BATERÍA OK (Motor apagado)" to Color(0xFF39FF14)
+                voltage in 12.9f..14.8f -> "ALTERNADOR OK (Cargando)" to Color(0xFF39FF14)
                 voltage > 14.8f -> "SOBRECARGA" to Color(0xFFFF003C)
                 else -> "LEYENDO..." to Color.Gray
             }
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black), 
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
                 shape = RoundedCornerShape(12.dp), 
                 modifier = Modifier.fillMaxWidth().border(1.dp, status.second.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             ) {

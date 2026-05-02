@@ -14,6 +14,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,24 +39,25 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
     val scope = rememberCoroutineScope()
     
     val proFeatures = listOf(
-        ProFeature("topology", "Mapeo\nTopológico", "🕸️", Color(0xFF00FFCC), "topology"),
+        ProFeature("topology", "Mapeo\nTopológico", "🕸️", Color(0xFF39FF14), "topology"),
         ProFeature("active_tests", "Pruebas\nActivas", "⚙️", Color(0xFFFF003C), "active_tests"),
         ProFeature("resets", "Service\nResets", "🛠️", Color(0xFFFFD700), "service_resets"),
         ProFeature("reports", "Reportes\nPDF", "📄", Color(0xFFCC00FF), "reports"),
         ProFeature("ai", "IA\nDiagnóstico", "🧠", Color(0xFFCC00FF), "ai"),
-        ProFeature("dashboard", "Dashboards\nElite", "📈", Color(0xFF00FFCC), "custom_pid")
+        ProFeature("support_chat", "Soporte\nAI Chat", "💬", Color(0xFF39FF14), "support_chat"),
+        ProFeature("dashboard", "Dashboards\nElite", "📈", Color(0xFF39FF14), "custom_pid")
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("MEET PRO ELITE", color = Color.White, fontWeight = FontWeight.Black) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             
             // ELITE LOGO
             Image(
@@ -64,7 +67,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 modifier = Modifier
                     .size(120.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .border(2.dp, Color(0xFF00FFCC), RoundedCornerShape(16.dp))
+                    .border(2.dp, Color(0xFF39FF14), RoundedCornerShape(16.dp))
             )
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -84,20 +87,20 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 }
             } else {
                 Surface(
-                    color = Color(0xFF00FFCC).copy(alpha = 0.1f),
+                    color = Color(0xFF39FF14).copy(alpha = 0.1f),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)).padding(bottom = 16.dp)
+                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)).padding(bottom = 16.dp)
                 ) {
                     Text(
                         "✓ ADAPTADOR PROFESIONAL DETECTADO. Acceso Total Concedido.",
-                        color = Color(0xFF00FFCC),
+                        color = Color(0xFF39FF14),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(12.dp),
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-            Text("Funciones Nivel Agencia", color = Color(0xFF00FFCC), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Funciones Nivel Agencia", color = Color(0xFF39FF14), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text("Herramientas de diagnóstico avanzado, controles bidireccionales y reportes de nivel mundial.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(24.dp))
@@ -110,19 +113,17 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
             ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                    QosStat("Muestreo", "${"%.1f".format(qos.cmdsPerSecond)} Hz", if (qos.cmdsPerSecond > 10) Color(0xFF00FFCC) else Color.Yellow)
-                    QosStat("Latencia", "${qos.latencyMs}ms", if (qos.latencyMs < 100) Color(0xFF00FFCC) else Color.Red)
-                    QosStat("Estado", if (qos.isStable) "ESTABLE" else "INESTABLE", if (qos.isStable) Color(0xFF00FFCC) else Color.Red)
+                    QosStat("Muestreo", "${"%.1f".format(qos.cmdsPerSecond)} Hz", if (qos.cmdsPerSecond > 10) Color(0xFF39FF14) else Color.Yellow)
+                    QosStat("Latencia", "${qos.latencyMs}ms", if (qos.latencyMs < 100) Color(0xFF39FF14) else Color.Red)
+                    QosStat("Estado", if (qos.isStable) "ESTABLE" else "INESTABLE", if (qos.isStable) Color(0xFF39FF14) else Color.Red)
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
-            
             Spacer(modifier = Modifier.height(24.dp))
             
             // SMART SCAN BUTTON
             Button(
                 onClick = { scope.launch { viewModel.runSmartScan() } },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14)),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -131,24 +132,25 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
             
             val syncState by viewModel.cloudSyncState.collectAsState()
             if (syncState.isNotEmpty()) {
-                Text(syncState, color = Color(0xFF00FFCC), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
+                Text(syncState, color = Color(0xFF39FF14), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.heightIn(max = 600.dp)
             ) {
                 items(proFeatures) { feature ->
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.Black),
-                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .border(1.dp, feature.color.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .border(1.dp, feature.color.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                             .clickable { navController.navigate(feature.route) }
                     ) {
                         Column(

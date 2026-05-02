@@ -1,15 +1,19 @@
 package com.elysium369.meet.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -18,77 +22,185 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.obd.ObdState
+import java.text.SimpleDateFormat
+import java.util.*
+
+data class TerminalLine(
+    val text: String,
+    val type: TerminalLineType,
+    val timestamp: String = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+)
+
+enum class TerminalLineType {
+    SYSTEM,   // System messages (cyan)
+    COMMAND,  // User commands (green/neon)
+    RESPONSE, // OBD responses (white)
+    ERROR,    // Errors (red)
+    WARNING   // Warnings (yellow)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(viewModel: ObdViewModel) {
     var commandInput by remember { mutableStateOf("") }
-    var terminalOutput by remember { mutableStateOf(listOf<String>("> Terminal OBD2 Inicializada. Escribe un comando crudo (ej: 010C, AT RV)")) }
+    var terminalOutput by remember {
+        mutableStateOf(
+            listOf(
+                TerminalLine("MEET Terminal v2.0 — Raw OBD2 Interface", TerminalLineType.SYSTEM),
+                TerminalLine("Escribe un comando AT o PID (ej: ATZ, 010C, AT RV)", TerminalLineType.SYSTEM),
+                TerminalLine("─────────────────────────────────────────", TerminalLineType.SYSTEM)
+            )
+        )
+    }
     var isSending by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.connectionState.collectAsState()
+    val listState = rememberLazyListState()
 
-    val quickCommands = listOf("ATZ", "AT RV", "ATSP0", "0100", "010C", "0105", "03", "04")
+    val quickCommands = listOf("ATZ", "AT RV", "ATSP0", "ATDP", "0100", "010C", "0105", "010D", "03", "04", "09 02")
+
+    // Auto-scroll to bottom
+    LaunchedEffect(terminalOutput.size) {
+        if (terminalOutput.isNotEmpty()) {
+            listState.animateScrollToItem(terminalOutput.size - 1)
+        }
+    }
+
+    val statusColor = when (state) {
+        ObdState.CONNECTED -> Color(0xFF39FF14)
+        ObdState.CONNECTING -> Color(0xFFFFAA00)
+        else -> Color(0xFFFF003C)
+    }
+    val statusText = when (state) {
+        ObdState.CONNECTED -> "● CONECTADO"
+        ObdState.CONNECTING -> "● CONECTANDO..."
+        ObdState.DISCONNECTED -> "● DESCONECTADO"
+        ObdState.ERROR -> "● ERROR"
+        else -> "● IDLE"
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF121212))
-            .padding(16.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF060612), Color(0xFF0A0A18))
+                )
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = "Terminal Raw OBD2",
-            color = Color(0xFFFF6B35), // Naranja Técnico
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        // --- Header ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Terminal Raw OBD2",
+                    color = Color(0xFFFF6B35),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = statusText,
+                    color = statusColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            // Clear button
+            TextButton(
+                onClick = {
+                    terminalOutput = listOf(
+                        TerminalLine("Terminal limpiada.", TerminalLineType.SYSTEM)
+                    )
+                }
+            ) {
+                Text("LIMPIAR", color = Color(0xFFFF003C), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
 
-        // Terminal Output Area
+        // --- Terminal Output Area ---
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(Color.Black, RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF0A0E1A))
+                .border(1.dp, Color(0xFFFF6B35).copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                 .padding(8.dp)
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                reverseLayout = true
+                state = listState,
+                modifier = Modifier.fillMaxSize()
             ) {
-                items(terminalOutput.reversed()) { line ->
-                    Text(
-                        text = line,
-                        color = if (line.startsWith(">")) Color.Green else Color.LightGray,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
+                items(terminalOutput) { line ->
+                    val lineColor = when (line.type) {
+                        TerminalLineType.SYSTEM -> Color(0xFF00BCD4)
+                        TerminalLineType.COMMAND -> Color(0xFF39FF14)
+                        TerminalLineType.RESPONSE -> Color(0xFFE0E0E0)
+                        TerminalLineType.ERROR -> Color(0xFFFF003C)
+                        TerminalLineType.WARNING -> Color(0xFFFFAA00)
+                    }
+                    val prefix = when (line.type) {
+                        TerminalLineType.COMMAND -> "❯ "
+                        TerminalLineType.RESPONSE -> "  ← "
+                        TerminalLineType.ERROR -> "  ✗ "
+                        TerminalLineType.WARNING -> "  ⚠ "
+                        TerminalLineType.SYSTEM -> "  "
+                    }
+                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                        // Timestamp
+                        Text(
+                            text = "[${line.timestamp}] ",
+                            color = Color(0xFF555555),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                        // Content
+                        Text(
+                            text = "$prefix${line.text}",
+                            color = lineColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Input Area
+        // --- Input Area ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextField(
+            OutlinedTextField(
                 value = commandInput,
                 onValueChange = { commandInput = it.uppercase() },
                 modifier = Modifier.weight(1f),
-                colors = TextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color(0xFF39FF14),
                     unfocusedTextColor = Color.White,
-                    focusedContainerColor = Color(0xFF1E1E1E),
-                    unfocusedContainerColor = Color(0xFF1E1E1E),
+                    focusedContainerColor = Color(0xFF0A0E1A),
+                    unfocusedContainerColor = Color(0xFF0A0E1A),
                     cursorColor = Color(0xFFFF6B35),
-                    focusedIndicatorColor = Color(0xFFFF6B35)
+                    focusedBorderColor = Color(0xFFFF6B35),
+                    unfocusedBorderColor = Color(0xFFFF6B35).copy(alpha = 0.3f)
                 ),
-                placeholder = { Text("ATZ, 010C...", color = Color.Gray) },
-                singleLine = true
+                placeholder = {
+                    Text("ATZ, 010C, AT RV...", color = Color.Gray, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 14.sp),
+                shape = RoundedCornerShape(8.dp)
             )
             
             Spacer(modifier = Modifier.width(8.dp))
@@ -97,11 +209,14 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 onClick = {
                     val cmd = commandInput.trim()
                     if (cmd.isNotEmpty()) {
-                        terminalOutput = terminalOutput + listOf("> $cmd")
+                        terminalOutput = terminalOutput + TerminalLine(cmd, TerminalLineType.COMMAND)
                         commandInput = ""
                         
                         if (state != ObdState.CONNECTED) {
-                            terminalOutput = terminalOutput + listOf("ERROR: OBD is not connected")
+                            terminalOutput = terminalOutput + TerminalLine(
+                                "OBD no conectado. Conecta el adaptador primero.",
+                                TerminalLineType.ERROR
+                            )
                             return@Button
                         }
                         
@@ -109,9 +224,18 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         coroutineScope.launch {
                             try {
                                 val response = viewModel.sendRawCommand(cmd)
-                                terminalOutput = terminalOutput + listOf(response)
+                                terminalOutput = terminalOutput + TerminalLine(
+                                    response,
+                                    if (response.contains("ERROR") || response.contains("NO DATA") || response.contains("UNABLE"))
+                                        TerminalLineType.WARNING
+                                    else
+                                        TerminalLineType.RESPONSE
+                                )
                             } catch (e: Exception) {
-                                terminalOutput = terminalOutput + listOf("ERROR: ${e.message}")
+                                terminalOutput = terminalOutput + TerminalLine(
+                                    "Exception: ${e.message}",
+                                    TerminalLineType.ERROR
+                                )
                             } finally {
                                 isSending = false
                             }
@@ -121,28 +245,47 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 enabled = !isSending && commandInput.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFF6B35),
-                    disabledContainerColor = Color.DarkGray
+                    disabledContainerColor = Color(0xFF333333)
                 ),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.height(56.dp)
             ) {
-                Text("ENVIAR", fontWeight = FontWeight.Bold, color = Color.White)
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text("TX", fontWeight = FontWeight.Bold, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
+                }
             }
         }
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Quick commands chips
+        // --- Quick Commands ---
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             items(quickCommands) { cmd ->
                 AssistChip(
                     onClick = { commandInput = cmd },
-                    label = { Text(cmd, color = Color.White) },
-                    colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF2C2C2C))
+                    label = {
+                        Text(cmd, color = Color(0xFFFF6B35), fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = Color(0xFF0A0E1A)
+                    ),
+                    border = AssistChipDefaults.assistChipBorder(
+                        borderColor = Color(0xFFFF6B35).copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(6.dp)
                 )
             }
         }
+        
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }

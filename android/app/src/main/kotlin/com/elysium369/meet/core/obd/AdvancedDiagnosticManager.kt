@@ -12,10 +12,6 @@ class AdvancedDiagnosticManager(private val obdSession: ObdSession) {
      * Resets the Oil Life monitor.
      * Uses manufacturer-specific sequences.
      */
-    /**
-     * Resets the Oil Life monitor.
-     * Uses manufacturer-specific sequences.
-     */
     suspend fun resetOilService(manufacturer: String): Boolean {
         if (!obdSession.verifySafetyForProAction(listOf(SafetyCondition.ENGINE_OFF))) return false
 
@@ -218,7 +214,11 @@ class AdvancedDiagnosticManager(private val obdSession: ObdSession) {
     private fun calculateSecurityKeyVAG(seed: String, moduleId: String): String {
         // Simplified demo algorithm: XOR with module ID or a fixed constant
         // In a real app, this would query a cloud-based key generator or local DLL/Library
-        val seedInt = seed.toLong(16)
+        val cleanSeed = seed.replace(" ", "").replace(">", "").take(8)
+        if (cleanSeed.isEmpty() || !cleanSeed.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
+            return "00000000"
+        }
+        val seedInt = cleanSeed.toLong(16)
         val keyInt = seedInt xor 0x55AA55AA // Example XOR
         return keyInt.toString(16).padStart(8, '0').uppercase().takeLast(8)
     }

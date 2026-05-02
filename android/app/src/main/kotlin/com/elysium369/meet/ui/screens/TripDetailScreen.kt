@@ -33,10 +33,10 @@ fun TripDetailScreen(
                         Text("←", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color(0xFF121212)
+        containerColor = Color(0xFF060612)
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp),
@@ -44,7 +44,7 @@ fun TripDetailScreen(
         ) {
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
@@ -58,7 +58,7 @@ fun TripDetailScreen(
             
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
@@ -91,7 +91,7 @@ fun TripDetailScreen(
             
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {

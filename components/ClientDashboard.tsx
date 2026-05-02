@@ -12,7 +12,7 @@ interface ClientDashboardProps {
   onBookNew: () => void;
   onCancelOrder: (id: string) => void;
   onUpdateUser?: (client: Client) => void;
-  onSimulateAPKScan?: () => void;
+  onSimulateAPKScan?: (scanResult: any) => void;
 }
 
 export function ClientDashboard({ currentUser, workOrders, services, mechanics, freeWashThreshold, onBookNew, onCancelOrder, onUpdateUser, onSimulateAPKScan }: ClientDashboardProps) {

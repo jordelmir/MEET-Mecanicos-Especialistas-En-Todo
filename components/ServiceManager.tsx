@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Service, ServiceCategory } from '../types';
 import { formatDuration } from '../services/timeEngine';
-import { X, Plus, Pencil, Trash2, Wrench, Search, DollarSign, Clock, LayoutGrid } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, Wrench, Search, DollarSign, Clock, LayoutGrid, Save } from 'lucide-react';
 
 interface ServiceManagerProps {
   services: Service[];

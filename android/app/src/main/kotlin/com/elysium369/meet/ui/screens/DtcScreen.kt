@@ -14,6 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.EliteScrollContainer
+import com.elysium369.meet.ui.components.eliteScrollbar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,73 +37,94 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
             text = { Text("Esto enviará Mode 04 al vehículo. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine), y se resetearán los monitores de emisiones.\n\n¿Continuar?", color = Color.Gray) },
             confirmButton = { TextButton(onClick = { showClearDialog = false; coroutineScope.launch { viewModel.clearDtcs() } }) { Text("BORRAR", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Cancelar", color = Color.Gray) } },
-            containerColor = Color(0xFF0A0A0A)
+            containerColor = Color(0xFF0A0E1A)
         )
     }
 
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Column {
                 TopAppBar(
                     title = { Text("Diagnóstico DTC", color = Color.White, fontWeight = FontWeight.Bold) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A)),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A)),
                     actions = {
                         TextButton(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }) {
-                            Text("ESCANEAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                            Text("ESCANEAR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                         }
                         TextButton(onClick = { showClearDialog = true }) {
                             Text("BORRAR", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
                         }
                     }
                 )
-                TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0A0A), contentColor = Color(0xFF00FFCC)) {
+                TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0E1A), contentColor = Color(0xFF39FF14)) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Activos (${activeDtcs.size})", color = if (selectedTab == 0) Color(0xFFFF003C) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Pending (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Perm (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFF00BFFF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Monitores", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Pend. (${pendingDtcs.size})", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Perm. (${permanentDtcs.size})", color = if (selectedTab == 2) Color(0xFF00AAFF) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Monitores", color = if (selectedTab == 3) Color(0xFF39FF14) else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
                     Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold) })
                 }
             }
         },
-        containerColor = Color.Black
-    ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Clear result banner
-            if (clearResult != null) {
-                item {
-                    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.5f), RoundedCornerShape(8.dp))) {
-                        Text(clearResult!!, color = Color.White, modifier = Modifier.padding(12.dp))
+        containerColor = Color(0xFF0A0E1A)
+    ) { paddingValues ->
+        EliteScrollContainer(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .eliteScrollbar(listState),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (clearResult != null) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        ) {
+                            Text(clearResult.orEmpty(), color = Color.White, modifier = Modifier.padding(12.dp))
+                        }
                     }
                 }
-            }
 
-            when (selectedTab) {
-                0 -> { // Active DTCs (Mode 03)
-                    if (activeDtcs.isEmpty()) {
-                        item { EmptyDtcState("No hay códigos de falla activos", Color(0xFF00FFCC)) }
-                    } else {
-                        items(activeDtcs) { dtc -> DtcCard(dtc, "ACTIVO", Color(0xFFFF003C), navController, viewModel) }
+                when (selectedTab) {
+                    0 -> { // Active DTCs (Mode 03)
+                        if (activeDtcs.isEmpty()) {
+                            item { EmptyDtcState("No hay códigos de falla activos", Color(0xFF39FF14)) }
+                        } else {
+                            items(activeDtcs) { dtc -> DtcCard(dtc, "ACTIVO", Color(0xFFFF003C), navController, viewModel) }
+                        }
                     }
-                }
-                1 -> { // Pending DTCs (Mode 07)
-                    if (pendingDtcs.isEmpty()) {
-                        item { EmptyDtcState("No hay códigos pendientes.\nEstos son códigos que aún no encendieron la luz MIL.", Color(0xFFFFD700)) }
-                    } else {
-                        items(pendingDtcs) { dtc -> DtcCard(dtc, "PENDIENTE", Color(0xFFFFD700), navController, viewModel) }
+                    1 -> { // Pending DTCs (Mode 07)
+                        if (pendingDtcs.isEmpty()) {
+                            item { EmptyDtcState("No hay códigos pendientes.\nEstos son códigos que aún no encendieron la luz MIL.", Color(0xFFFFD700)) }
+                        } else {
+                            items(pendingDtcs) { dtc -> DtcCard(dtc, "PENDIENTE", Color(0xFFFFD700), navController, viewModel) }
+                        }
                     }
-                }
-                2 -> { // Permanent DTCs (Mode 0A)
-                    if (permanentDtcs.isEmpty()) {
-                        item { EmptyDtcState("No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente.", Color(0xFF00BFFF)) }
-                    } else {
-                        items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFF00BFFF), navController, viewModel) }
+                    2 -> { // Permanent DTCs (Mode 0A)
+                        if (permanentDtcs.isEmpty()) {
+                            item { EmptyDtcState("No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente.", Color(0xFF00AAFF)) }
+                        } else {
+                            items(permanentDtcs) { dtc -> DtcCard(dtc, "PERMANENTE", Color(0xFF00AAFF), navController, viewModel) }
+                        }
                     }
-                }
-                3 -> { // Readiness Monitors
-                    item { ReadinessMonitorsCard(readiness, coroutineScope, viewModel) }
-                }
-                4 -> { // Manual Search
-                    item { ManualSearchTab(navController) }
+                    3 -> { // Readiness Monitors
+                        item { ReadinessMonitorsCard(readiness, coroutineScope, viewModel) }
+                    }
+                    4 -> { // Manual Search
+                        item { ManualSearchTab(navController) }
+                    }
                 }
             }
         }
@@ -114,7 +137,7 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
     val desc = dtcInfo?.descriptionEs ?: com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
     val causes = dtcInfo?.possibleCauses
     
-    Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, color, RoundedCornerShape(4.dp))) {
@@ -133,14 +156,22 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
             
             val freezeFrame by viewModel.freezeFrameData.collectAsState()
             
-            if (freezeFrame.isNotEmpty() && freezeFrame["02"]?.contains(dtc) == true) {
-                Text("❄️ DATOS DE CUADRO CONGELADO:", color = Color(0xFF00BFFF), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
-                freezeFrame.filter { it.key != "02" }.forEach { (pid, valStr) ->
+            // Filter freeze frame entries scoped to THIS specific DTC code
+            val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
+            
+            if (scopedFrame.isNotEmpty()) {
+                Text("❄️ DATOS DE CUADRO CONGELADO:", color = Color(0xFF00AAFF), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                scopedFrame.forEach { (scopedKey, valStr) ->
+                    val pid = scopedKey.substringAfter(":")
                     val pidName = when(pid) {
+                        "03" -> "Estado Combustible"
+                        "04" -> "Carga Motor"
                         "05" -> "Temp. Refrigerante"
+                        "06" -> "Ajuste Comb. Corto"
+                        "07" -> "Ajuste Comb. Largo"
                         "0C" -> "RPM Motor"
                         "0D" -> "Velocidad"
-                        "04" -> "Carga Motor"
+                        "11" -> "Pos. Acelerador"
                         else -> "PID $pid"
                     }
                     Text("$pidName: $valStr", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
@@ -151,21 +182,21 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { navController.navigate("ai/$dtc") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("🤖 IA", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    Text("🤖 IA", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 }
                 
                 val coroutineScope = rememberCoroutineScope()
                 Button(
                     onClick = { coroutineScope.launch { viewModel.refreshFreezeFrame(dtc) } },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00BFFF), RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00AAFF), RoundedCornerShape(8.dp)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("❄️ FF DATA", color = Color(0xFF00BFFF), fontWeight = FontWeight.Bold)
+                    Text("❄️ FF DATA", color = Color(0xFF00AAFF), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -192,35 +223,35 @@ private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.core.obd.Readin
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Monitores de emisiones no leídos aún.", color = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)), modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
-                    Text("LEER MONITORES", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                Button(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)), modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
+                    Text("LEER MONITORES", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 }
             }
         }
     } else {
         // MIL Status
-        Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF00FFCC), RoundedCornerShape(12.dp))) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF39FF14), RoundedCornerShape(12.dp))) {
             Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("LUZ MIL (CHECK ENGINE)", color = Color.Gray, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Text(if (readiness.milOn) "🔴 ENCENDIDA" else "🟢 APAGADA", color = if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF00FFCC), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                    Text(if (readiness.milOn) "🔴 ENCENDIDA" else "🟢 APAGADA", color = if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF39FF14), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                 }
                 Text("${readiness.dtcCount} DTCs", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
         // Monitors
-        Text("MONITORES DE EMISIÓN", color = Color(0xFF00FFCC).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Text("MONITORES DE EMISIÓN", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         val passedCount = readiness.monitors.count { it.complete }
         val totalCount = readiness.monitors.size
-        Text("$passedCount / $totalCount completados", color = if (passedCount == totalCount) Color(0xFF00FFCC) else Color(0xFFFFD700), style = MaterialTheme.typography.bodySmall)
+        Text("$passedCount / $totalCount completados", color = if (passedCount == totalCount) Color(0xFF39FF14) else Color(0xFFFFD700), style = MaterialTheme.typography.bodySmall)
         Spacer(modifier = Modifier.height(8.dp))
         readiness.monitors.forEach { monitor ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).border(1.dp, (if (monitor.complete) Color(0xFF00FFCC) else Color(0xFFFFD700)).copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).border(1.dp, (if (monitor.complete) Color(0xFF39FF14) else Color(0xFFFFD700)).copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
                 Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(monitor.name, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                    Text(if (monitor.complete) "✅ Listo" else "⏳ Incompleto", color = if (monitor.complete) Color(0xFF00FFCC) else Color(0xFFFFD700), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                    Text(if (monitor.complete) "✅ Listo" else "⏳ Incompleto", color = if (monitor.complete) Color(0xFF39FF14) else Color(0xFFFFD700), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -239,11 +270,11 @@ private fun ManualSearchTab(navController: NavController) {
             onValueChange = { searchQuery = it.uppercase().trim() },
             label = { Text("Ingresar Código (Ej. P0300)", color = Color.Gray) },
             colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = Color(0xFF00FFCC),
+                focusedBorderColor = Color(0xFF39FF14),
                 unfocusedBorderColor = Color.Gray,
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
-                cursorColor = Color(0xFF00FFCC)
+                cursorColor = Color(0xFF39FF14)
             ),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
@@ -257,28 +288,29 @@ private fun ManualSearchTab(navController: NavController) {
                     searchResult = com.elysium369.meet.core.obd.DtcDatabaseHelper.searchDtc(searchQuery)
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Text("BUSCAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+            Text("BUSCAR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         if (searchResult != null) {
-            if (searchResult!!.isEmpty()) {
+            val results = searchResult.orEmpty()
+            if (results.isEmpty()) {
                 EmptyDtcState("No se encontró el código en la base de datos.", Color.Gray)
             } else {
-                Text("Resultados (${searchResult!!.size})", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                searchResult!!.forEach { dtc ->
+                Text("Resultados (${results.size})", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                results.forEach { dtc ->
                     val color = when (dtc.severity.uppercase()) {
                         "HIGH" -> Color(0xFFFF003C)
                         "MODERATE" -> Color(0xFFFFD700)
-                        else -> Color(0xFF00FFCC)
+                        else -> Color(0xFF39FF14)
                     }
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                     ) {
@@ -297,17 +329,17 @@ private fun ManualSearchTab(navController: NavController) {
                                 Text(dtc.descriptionEn, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                             }
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Posibles causas / Recomendación:", color = Color(0xFF00FFCC).copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("Posibles causas / Recomendación:", color = Color(0xFF39FF14).copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             Text(dtc.possibleCauses, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                             
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = { navController.navigate("ai/${dtc.code}") },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("🤖 CONSULTAR IA", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                Text("🤖 CONSULTAR IA", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                             }
                         }
                     }

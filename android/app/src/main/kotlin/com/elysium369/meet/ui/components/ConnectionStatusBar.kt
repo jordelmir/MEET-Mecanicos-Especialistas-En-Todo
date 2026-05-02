@@ -21,7 +21,7 @@ fun ConnectionStatusBar(viewModel: ObdViewModel) {
 
     val bgColor by animateColorAsState(
         when(state) {
-            ObdState.CONNECTED -> Color(0xFF00FFCC).copy(alpha = 0.15f)
+            ObdState.CONNECTED -> Color(0xFF39FF14).copy(alpha = 0.15f)
             ObdState.CONNECTING, ObdState.NEGOTIATING -> Color(0xFFFFD700).copy(alpha = 0.15f)
             ObdState.ERROR -> Color(0xFFFF003C).copy(alpha = 0.15f)
             else -> Color.Transparent
@@ -45,7 +45,7 @@ fun ConnectionStatusBar(viewModel: ObdViewModel) {
                         )
                     }
                     ObdState.CONNECTED -> {
-                        Text("●", color = Color(0xFF00FFCC), style = MaterialTheme.typography.labelSmall)
+                        Text("●", color = Color(0xFF39FF14), style = MaterialTheme.typography.labelSmall)
                     }
                     ObdState.ERROR -> {
                         Text("●", color = Color(0xFFFF003C), style = MaterialTheme.typography.labelSmall)

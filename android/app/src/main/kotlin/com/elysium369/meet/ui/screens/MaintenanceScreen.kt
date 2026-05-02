@@ -27,10 +27,10 @@ fun MaintenanceScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Text("←", color = Color.White) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color(0xFF121212)
+        containerColor = Color(0xFF060612)
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             items(alerts) { alert ->
@@ -42,7 +42,7 @@ fun MaintenanceScreen(
                 }
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {

@@ -39,7 +39,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     val defaultGauges = remember {
         listOf(
             GaugeConfig("1", "RPM", "010C", 0f, 8000f, "rpm"),
-            GaugeConfig("2", "Velocidad", "010D", 0f, 220f, "km/h"),
+            GaugeConfig("2", "Velocidad", "010D", 0f, 255f, "km/h"),
             GaugeConfig("3", "Temp Motor", "0105", -40f, 150f, "°C"),
             GaugeConfig("4", "Carga", "0104", 0f, 100f, "%"),
             GaugeConfig("5", "Voltaje", "AT RV", 10f, 16f, "V", GaugeType.WAVE),
@@ -79,10 +79,10 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
             ) {
                 val speed = liveData["010D"] ?: 0f
                 val rpm = liveData["010C"] ?: 0f
-                Text("${speed.toInt()}", color = Color(0xFF00FFCC), fontSize = 120.sp, fontWeight = FontWeight.Black)
-                Text("km/h", color = Color(0xFF00FFCC).copy(alpha = 0.5f), fontSize = 24.sp)
+                Text("${speed.toInt()}", color = Color(0xFF39FF14), fontSize = 120.sp, fontWeight = FontWeight.Black)
+                Text("km/h", color = Color(0xFF39FF14).copy(alpha = 0.5f), fontSize = 24.sp)
                 Spacer(modifier = Modifier.height(32.dp))
-                Text("${rpm.toInt()} RPM", color = Color(0xFF00BFFF), fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                Text("${rpm.toInt()} RPM", color = Color(0xFF00AAFF), fontSize = 48.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { hudMode = false }) { 
                     Text("SALIR HUD", color = Color.Gray) 
@@ -93,22 +93,23 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Column {
                 TopAppBar(
                     title = { Text("Scanner en Vivo", color = Color.White, fontWeight = FontWeight.Bold) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A)),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A)),
                     actions = {
                         // High Speed Mode Indicator
                         if (highSpeedMode) {
                             Surface(
-                                color = Color(0xFF00FFCC).copy(alpha = 0.2f),
+                                color = Color(0xFF39FF14).copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(4.dp))
+                                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(4.dp))
                             ) {
                                 Text(
                                     "HIGH-SPEED: ${qosMetrics.cmdsPerSecond.toInt()}Hz", 
-                                    color = Color(0xFF00FFCC), 
+                                    color = Color(0xFF39FF14), 
                                     fontWeight = FontWeight.Black, 
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
                                     style = MaterialTheme.typography.labelSmall
@@ -136,7 +137,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         }
                         if (state == ObdState.DISCONNECTED) {
                             TextButton(onClick = { navController.navigate("connect") }) { 
-                                Text("CONECTAR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold) 
+                                Text("CONECTAR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold) 
                             }
                         }
                     }
@@ -144,8 +145,8 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 
                 // CLOUD SYNC INDICATOR
                 if (cloudSyncState.isNotBlank() && cloudSyncState != "Desconectado") {
-                    val bgColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C).copy(alpha = 0.2f) else Color(0xFF00FFCC).copy(alpha = 0.1f)
-                    val textColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C) else Color(0xFF00FFCC)
+                    val bgColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C).copy(alpha = 0.2f) else Color(0xFF39FF14).copy(alpha = 0.1f)
+                    val textColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C) else Color(0xFF39FF14)
                     Surface(
                         color = bgColor,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).border(1.dp, textColor, RoundedCornerShape(4.dp)),
@@ -164,20 +165,20 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 
                 TabRow(
                     selectedTabIndex = selectedTab, 
-                    containerColor = Color(0xFF0A0A0A), 
-                    contentColor = Color(0xFF00FFCC), 
+                    containerColor = Color(0xFF0A0E1A), 
+                    contentColor = Color(0xFF39FF14), 
                     indicator = { tabPositions -> 
                         TabRowDefaults.Indicator(
                             Modifier.tabIndicatorOffset(tabPositions[selectedTab]), 
-                            color = Color(0xFF00FFCC), 
+                            color = Color(0xFF39FF14), 
                             height = 3.dp
                         ) 
                     }
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("DIAGNÓSTICO", color = if (selectedTab == 1) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("SENSORES", color = if (selectedTab == 2) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("TOOLS", color = if (selectedTab == 3) Color(0xFF00FFCC) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("DIAGNÓSTICO", color = if (selectedTab == 1) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("SENSORES", color = if (selectedTab == 2) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("HERRAM.", color = if (selectedTab == 3) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
                 }
             }
         },
@@ -187,14 +188,14 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 onClick = { 
                     navController.navigate("custom_pid")
                 },
-                containerColor = Color.Black, 
+                containerColor = Color(0xFF0A0E1A), 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(12.dp))
+                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(12.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar", tint = Color(0xFF00FFCC))
+                Icon(Icons.Default.Add, contentDescription = "Agregar", tint = Color(0xFF39FF14))
             }
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTab) {

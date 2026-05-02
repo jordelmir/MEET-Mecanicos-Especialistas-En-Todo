@@ -33,21 +33,21 @@ fun CustomPidEditorScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Text("←", color = Color.White) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
         floatingActionButton = {
             if (!showForm) {
                 FloatingActionButton(
                     onClick = { showForm = true }, 
-                    containerColor = Color.Black,
-                    modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(16.dp))
+                    containerColor = Color(0xFF0A0E1A),
+                    modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(16.dp))
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add PID", tint = Color(0xFF00FFCC))
+                    Icon(Icons.Default.Add, contentDescription = "Add PID", tint = Color(0xFF39FF14))
                 }
             }
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         if (showForm) {
             CustomPidForm(
@@ -60,7 +60,7 @@ fun CustomPidEditorScreen(
             )
         } else {
             Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
-                Text("PERSONALIZACIÓN DE TELEMETRÍA AVANZADA", color = Color(0xFF00FFCC).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("PERSONALIZACIÓN DE TELEMETRÍA AVANZADA", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Agrega direcciones UDS/Hexadecimales OEM para inyectar comandos directamente al bus CAN y crear tu propio dashboard visual.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -78,13 +78,13 @@ fun CustomPidEditorScreen(
                     LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         items(customPids) { pid ->
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             ) {
                                 Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Column {
-                                        Text("${pid.name}", color = Color(0xFF00FFCC), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                                        Text("${pid.name}", color = Color(0xFF39FF14), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text("TX: ${pid.mode} ${pid.pid} | Formula: ${pid.formula}", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                     }
@@ -123,7 +123,7 @@ fun CustomPidForm(
             value = name, onValueChange = { name = it }, 
             label = { Text("Nombre del Sensor", color = Color.Gray) }, 
             modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -131,13 +131,13 @@ fun CustomPidForm(
                 value = mode, onValueChange = { mode = it }, 
                 label = { Text("Service (Hex)", color = Color.Gray) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
             OutlinedTextField(
                 value = pid, onValueChange = { pid = it }, 
                 label = { Text("PID (Hex)", color = Color.Gray) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -146,13 +146,13 @@ fun CustomPidForm(
                 value = unit, onValueChange = { unit = it }, 
                 label = { Text("Unidad (ej: °C)", color = Color.Gray) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
             OutlinedTextField(
                 value = formula, onValueChange = { formula = it }, 
                 label = { Text("Ecuación (A,B...)", color = Color.Gray) }, 
                 modifier = Modifier.weight(2f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
         }
         
@@ -174,7 +174,7 @@ fun CustomPidForm(
                     ))
                 },
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14)),
                 shape = RoundedCornerShape(8.dp)
             ) { Text("INYECTAR PID", color = Color.Black, fontWeight = FontWeight.Black) }
         }

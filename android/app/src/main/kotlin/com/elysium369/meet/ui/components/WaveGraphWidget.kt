@@ -3,6 +3,7 @@ package com.elysium369.meet.ui.components
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,13 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,43 +35,37 @@ fun WaveGraphWidget(
     riskLevel: Float = 0.0f,
     historyData: List<Float>? = null
 ) {
-    // Fallback history if not provided externally
     val localHistory = remember { mutableStateListOf<Float>() }
-    
-    // Use external history if provided, otherwise use local
     val displayHistory = historyData ?: localHistory
 
-    // Animation for AI Alert
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = if (riskLevel > 0.7f) 1.0f else 0.7f,
+        initialValue = 0.3f,
+        targetValue = 0.9f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (riskLevel > 0.7f) 400 else 800, easing = FastOutSlowInEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseAlpha"
     )
     
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.1f,
+    val scanOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "pulseScale"
+        label = "scanOffset"
     )
 
-    // Determine the color based on thresholds
-    val lineColor = when {
-        isAnomaly -> Color(0xFFFF3366) // Vibrant Red for AI Anomaly
-        criticalThreshold != null && currentValue >= criticalThreshold -> Color(0xFFFF3366) // Red
-        warningThreshold != null && currentValue >= warningThreshold -> Color(0xFFFFB300) // Orange/Amber
-        else -> Color(0xFF00FFCC) // Neon Cyan (Safe)
+    val activeColor = when {
+        isAnomaly -> Color(0xFFFF003C)
+        criticalThreshold != null && currentValue >= criticalThreshold -> Color(0xFFFF003C)
+        warningThreshold != null && currentValue >= warningThreshold -> Color(0xFFFFD700)
+        else -> Color(0xFF39FF14)
     }
 
-    // Update local history if no external history is provided
     if (historyData == null) {
         LaunchedEffect(currentValue) {
             localHistory.add(currentValue)
@@ -84,176 +75,149 @@ fun WaveGraphWidget(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .background(Color(0xFF0A0E1A), RoundedCornerShape(16.dp))
+            .border(1.dp, activeColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .padding(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(label, color = Color.Gray, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
                     Text(
-                        text = "${String.format("%.1f", currentValue)}",
-                        color = Color.White,
+                        label.uppercase(), 
+                        color = Color.Gray, 
+                        fontSize = 10.sp, 
                         fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.bodyLarge
+                        letterSpacing = 1.sp
                     )
-                    Text(
-                        text = " $unit",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = String.format("%.1f", currentValue),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = " $unit",
+                            color = activeColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                        )
+                    }
                 }
-            }
-            if (isAnomaly) {
-                Surface(
-                    color = Color(0xFFFF3366).copy(alpha = pulseAlpha),
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier
-                        .graphicsLayer {
-                            scaleX = pulseScale
-                            scaleY = pulseScale
-                        }
-                        .border(1.dp, Color(0xFFFF3366), RoundedCornerShape(4.dp))
-                ) {
-                    Text(
-                        "AI ALERT", 
-                        color = Color.White, 
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 10.sp
-                    )
-                }
-            } else {
-                // Percentage indicator (subtle)
-                val percent = ((currentValue - minVal) / (maxVal - minVal)).coerceIn(0f, 1f) * 100
-                Surface(
-                    color = lineColor.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.border(0.5.dp, lineColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                ) {
-                    Text(
-                        "${percent.toInt()}%", 
-                        color = lineColor, 
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Canvas(modifier = Modifier.fillMaxWidth().height(80.dp)) {
-            val width = size.width
-            val height = size.height
-            
-            // 1. Draw background grid lines (improved)
-            for (i in 0..4) {
-                val y = (height / 4) * i
-                drawLine(
-                    color = Color.White.copy(alpha = 0.03f),
-                    start = Offset(0f, y),
-                    end = Offset(width, y),
-                    strokeWidth = 1f
-                )
-            }
-            
-            // Vertical grid lines
-            for (i in 0..10) {
-                val x = (width / 10) * i
-                drawLine(
-                    color = Color.White.copy(alpha = 0.02f),
-                    start = Offset(x, 0f),
-                    end = Offset(x, height),
-                    strokeWidth = 1f
-                )
-            }
-            
-            if (displayHistory.isEmpty()) return@Canvas
-            
-            val path = Path()
-            val maxPoints = if (historyData != null) 200 else 100
-            val currentPoints = displayHistory.size
-            val stepX = width / (maxPoints - 1).coerceAtLeast(1).toFloat()
-            
-            val range = (maxVal - minVal).coerceAtLeast(0.1f)
-            
-            displayHistory.forEachIndexed { index, value ->
-                val normalizedValue = ((value - minVal) / range).coerceIn(0f, 1f)
-                val x = width - ((currentPoints - 1 - index) * stepX)
-                val y = height - (normalizedValue * height)
                 
-                if (index == 0 || x < 0) {
-                    path.moveTo(x.coerceAtLeast(0f), y)
-                } else {
-                    path.lineTo(x, y)
-                }
-            }
-            
-            // 2. Fill area with gradient
-            val fillPath = Path().apply {
-                addPath(path)
-                val lastX = width
-                val firstX = (width - ((currentPoints - 1) * stepX)).coerceAtLeast(0f)
-                lineTo(lastX, height)
-                lineTo(firstX, height)
-                close()
-            }
-            
-            drawPath(
-                path = fillPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(lineColor.copy(alpha = 0.2f), Color.Transparent),
-                    startY = 0f,
-                    endY = height
-                )
-            )
-
-            // 3. Glowing Path (Outer Glow - Dynamic based on Anomaly)
-            val glowWidth = if (isAnomaly) 16f else 8f
-            drawPath(
-                path = path,
-                color = lineColor.copy(alpha = if (isAnomaly) pulseAlpha * 0.4f else 0.15f),
-                style = Stroke(width = glowWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-
-            // 4. Core Path with Gradient (LASER EFFECT)
-            drawPath(
-                path = path,
-                brush = Brush.linearGradient(
-                    colors = listOf(lineColor.copy(alpha = 0.7f), lineColor, lineColor.copy(alpha = 0.7f)),
-                    start = Offset(0f, 0f),
-                    end = Offset(width, height)
-                ),
-                style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-            
-            // 5. Dynamic Dot
-            if (displayHistory.isNotEmpty()) {
-                val lastValue = displayHistory.last()
-                val normalizedLast = ((lastValue - minVal) / range).coerceIn(0f, 1f)
-                val lastX = width
-                val lastY = height - (normalizedLast * height)
-                
-                // Outer ring pulse for anomalies
                 if (isAnomaly) {
-                    drawCircle(
-                        color = lineColor.copy(alpha = pulseAlpha * 0.5f), 
-                        radius = 12f * pulseScale, 
-                        center = Offset(lastX, lastY)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFFF003C).copy(alpha = 0.1f * pulseAlpha), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(0xFFFF003C).copy(alpha = pulseAlpha), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("CRITICAL", color = Color(0xFFFF003C), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Canvas(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                val width = size.width
+                val height = size.height
+                val range = (maxVal - minVal).coerceAtLeast(0.1f)
+
+                // 1. Cyber Grid
+                clipRect {
+                    val gridStep = 20.dp.toPx()
+                    for (x in 0..(width / gridStep).toInt()) {
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.03f),
+                            start = Offset(x * gridStep, 0f),
+                            end = Offset(x * gridStep, height),
+                            strokeWidth = 1f
+                        )
+                    }
+                    for (y in 0..(height / gridStep).toInt()) {
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.03f),
+                            start = Offset(0f, y * gridStep),
+                            end = Offset(width, y * gridStep),
+                            strokeWidth = 1f
+                        )
+                    }
                 }
 
-                drawCircle(color = lineColor.copy(alpha = 0.5f), radius = 8f, center = Offset(lastX, lastY))
-                drawCircle(color = Color.White, radius = 3.5f, center = Offset(lastX, lastY))
+                // 2. Scan Line Effect
+                drawLine(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.5f to activeColor.copy(alpha = 0.1f),
+                        1f to Color.Transparent
+                    ),
+                    start = Offset(width * scanOffset, 0f),
+                    end = Offset(width * scanOffset, height),
+                    strokeWidth = 40.dp.toPx()
+                )
+
+                if (displayHistory.isNotEmpty()) {
+                    val path = Path()
+                    val maxPoints = 100
+                    val stepX = width / (maxPoints - 1)
+                    val points = displayHistory.toList()
+                    
+                    points.forEachIndexed { index, value ->
+                        val normX = width - (points.size - 1 - index) * stepX
+                        val normY = height - ((value - minVal) / range) * height
+                        
+                        if (index == 0) path.moveTo(normX, normY)
+                        else path.lineTo(normX, normY)
+                    }
+
+                    // 3. Area Fill
+                    val fillPath = Path().apply {
+                        addPath(path)
+                        lineTo(width, height)
+                        lineTo(width - (points.size - 1) * stepX, height)
+                        close()
+                    }
+                    drawPath(
+                        path = fillPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(activeColor.copy(alpha = 0.2f), Color.Transparent),
+                            startY = 0f,
+                            endY = height
+                        )
+                    )
+
+                    // 4. Glowing Path
+                    drawPath(
+                        path = path,
+                        color = activeColor.copy(alpha = 0.2f),
+                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    )
+                    
+                    // 5. Core Laser Path
+                    drawPath(
+                        path = path,
+                        color = activeColor,
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    )
+
+                    // 6. Current Point Dot
+                    val lastValue = points.last()
+                    val lastX = width
+                    val lastY = height - ((lastValue - minVal) / range) * height
+                    
+                    drawCircle(color = activeColor.copy(alpha = 0.3f), radius = 8.dp.toPx(), center = Offset(lastX, lastY))
+                    drawCircle(color = Color.White, radius = 3.dp.toPx(), center = Offset(lastX, lastY))
+                }
             }
         }
     }

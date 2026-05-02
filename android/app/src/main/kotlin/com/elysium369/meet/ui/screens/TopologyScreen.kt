@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.ui.components.EliteScrollContainer
+import com.elysium369.meet.ui.components.eliteScrollbar
+import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
 
 enum class ModuleStatus { OK, FAULT, NO_COMM }
@@ -88,18 +91,18 @@ fun TopologyScreen(navController: NavController, viewModel: com.elysium369.meet.
             TopAppBar(
                 title = { Text("Mapeo Topológico", color = Color.White) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Text("←", color = Color.White) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             if (isScanning) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = Color(0xFF00FFCC))
+                        CircularProgressIndicator(color = Color(0xFF39FF14))
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Escaneando Red CAN...", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                        Text("Escaneando Red CAN...", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Enviando requests a módulos de control", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                     }
@@ -109,22 +112,22 @@ fun TopologyScreen(navController: NavController, viewModel: com.elysium369.meet.
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                         Text("⚠️", style = MaterialTheme.typography.displayMedium)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(scanError!!, color = Color(0xFFFFD700), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(scanError.orEmpty(), color = Color(0xFFFFD700), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(24.dp))
                         Button(
                             onClick = { navController.navigate("connect") },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                            modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                            modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("CONECTAR ADAPTADOR", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold) }
+                        ) { Text("CONECTAR ADAPTADOR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold) }
                     }
                 }
             } else {
-                Text("ARQUITECTURA DE RED DE MÓDULOS", color = Color(0xFF00FFCC).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("ARQUITECTURA DE RED DE MÓDULOS", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Visual Topology Canvas
-                Box(modifier = Modifier.fillMaxWidth().height(250.dp).background(Color(0xFF0A0A0A), RoundedCornerShape(12.dp)).border(1.dp, Color.DarkGray, RoundedCornerShape(12.dp))) {
+                Box(modifier = Modifier.fillMaxWidth().height(250.dp).background(Color(0xFF0A0E1A), RoundedCornerShape(12.dp)).border(1.dp, Color.DarkGray, RoundedCornerShape(12.dp))) {
                     Canvas(modifier = Modifier.fillMaxSize().padding(32.dp)) {
                         val canvasWidth = size.width
                         val canvasHeight = size.height
@@ -132,14 +135,14 @@ fun TopologyScreen(navController: NavController, viewModel: com.elysium369.meet.
                         val pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                         
                         modules.forEachIndexed { index, module ->
-                            val angle = (index * (360f / modules.size)) * (Math.PI / 180f)
+                            val angle = if (modules.isEmpty()) 0.0 else (index * (360.0 / modules.size)) * (Math.PI / 180.0)
                             val radius = canvasHeight / 2.5f
                             val nodePos = Offset(
                                 (gateway.x + radius * Math.cos(angle)).toFloat(),
                                 (gateway.y + radius * Math.sin(angle)).toFloat()
                             )
                             val lineColor = when (module.status) {
-                                ModuleStatus.OK -> Color(0xFF00FFCC)
+                                ModuleStatus.OK -> Color(0xFF39FF14)
                                 ModuleStatus.FAULT -> Color(0xFFFF003C)
                                 ModuleStatus.NO_COMM -> Color.Gray
                             }
@@ -151,28 +154,35 @@ fun TopologyScreen(navController: NavController, viewModel: com.elysium369.meet.
                 }
                 
                 Spacer(modifier = Modifier.height(24.dp))
-                Text("ESTADO DE MÓDULOS", color = Color(0xFF00FFCC).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("ESTADO DE MÓDULOS", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(modules.toList()) { mod ->
-                        val color = when (mod.status) {
-                            ModuleStatus.OK -> Color(0xFF00FFCC)
-                            ModuleStatus.FAULT -> Color(0xFFFF003C)
-                            ModuleStatus.NO_COMM -> Color.Gray
-                        }
-                        val statusText = when (mod.status) {
-                            ModuleStatus.OK -> "NORMAL"
-                            ModuleStatus.FAULT -> "DTC DETECTADO"
-                            ModuleStatus.NO_COMM -> "SIN COMUNICACIÓN"
-                        }
-                        Card(colors = CardDefaults.cardColors(containerColor = Color.Black), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
-                            Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Column {
-                                    Text(mod.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                    Text(mod.fullName, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                                }
-                                Surface(color = color.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, color, RoundedCornerShape(4.dp))) {
-                                    Text(statusText, color = color, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                
+                val listState = rememberLazyListState()
+                EliteScrollContainer(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().eliteScrollbar(listState)
+                    ) {
+                        items(modules.toList()) { mod ->
+                            val color = when (mod.status) {
+                                ModuleStatus.OK -> Color(0xFF39FF14)
+                                ModuleStatus.FAULT -> Color(0xFFFF003C)
+                                ModuleStatus.NO_COMM -> Color.Gray
+                            }
+                            val statusText = when (mod.status) {
+                                ModuleStatus.OK -> "NORMAL"
+                                ModuleStatus.FAULT -> "DTC DETECTADO"
+                                ModuleStatus.NO_COMM -> "SIN COMUNICACIÓN"
+                            }
+                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Column {
+                                        Text(mod.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(mod.fullName, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Surface(color = color.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, color, RoundedCornerShape(4.dp))) {
+                                        Text(statusText, color = color, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                    }
                                 }
                             }
                         }

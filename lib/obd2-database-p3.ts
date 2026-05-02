@@ -35,5 +35,4 @@ export const OBD2_DATABASE_P3: Record<string, DtcEntry> = {
   'P0496': { title: 'Flujo de Purga EVAP Alto', desc: 'Flujo excesivo de purga del sistema EVAP detectado.', fix: 'Reemplazar válvula de purga EVAP (posiblemente atascada abierta).', severity: 'low' },
   'P0497': { title: 'Flujo de Purga EVAP Bajo', desc: 'Flujo insuficiente de purga del sistema EVAP.', fix: 'Revisar válvula de purga EVAP, mangueras y canister.', severity: 'low' },
   'P0501': { title: 'Rango/Rendimiento del Sensor de Velocidad', desc: 'El sensor de velocidad reporta valores inconsistentes.', fix: 'Verificar sensor VSS, cable del velocímetro y engranajes.', severity: 'medium' },
-  'P0341': { title: 'Rango/Rendimiento del Sensor CMP', desc: 'Señal fuera de rango del sensor del árbol de levas.', fix: 'Verificar distribución, sensor CMP y cableado.', severity: 'high' },
 };

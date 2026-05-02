@@ -28,10 +28,10 @@ fun TripScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Historial de Viajes", color = Color.White, fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         if (trips.isEmpty()) {
             Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -46,7 +46,7 @@ fun TripScreen(
                 if (!isPremium) {
                     item {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                         ) {
@@ -57,7 +57,7 @@ fun TripScreen(
                                 Text("⭐", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column {
-                                    Text("Funciones Pro Bloqueadas", color = Color(0xFF00BFFF), fontWeight = FontWeight.Bold)
+                                    Text("Funciones Pro Bloqueadas", color = Color(0xFF00AAFF), fontWeight = FontWeight.Bold)
                                     Text("Exportación PDF, consumo de L/100km, y puntuación Eco-Score requieren suscripción.", 
                                         color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                 }
@@ -80,15 +80,15 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
     val durationMin = trip.durationSeconds / 60
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(sdf.format(Date(trip.startedAt)), color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                Text(sdf.format(Date(trip.startedAt)), color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 if (isPremium) {
-                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) Color(0xFF00FFCC) else Color.Yellow, fontWeight = FontWeight.Bold)
+                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) Color(0xFF39FF14) else Color.Yellow, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -101,10 +101,10 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { onExportPdf(trip) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC).copy(alpha = 0.2f)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14).copy(alpha = 0.2f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("📄 Exportar Reporte PDF", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    Text("📄 Exportar Reporte PDF", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -21,7 +21,7 @@ object PidRegistry {
     val STANDARD_PIDS = listOf(
         // ENGINE
         PidDefinition("01","0C","RPM","rpm",0f,8000f,6000f,7500f,{a,b,_,_ -> ((a*256f)+b)/4f}, PidCategory.ENGINE),
-        PidDefinition("01","0D","Velocidad","km/h",0f,260f,160f,220f,{a,_,_,_ -> a.toFloat()}, PidCategory.ENGINE),
+        PidDefinition("01","0D","Velocidad","km/h",0f,255f,160f,220f,{a,_,_,_ -> a.toFloat()}, PidCategory.ENGINE),
         PidDefinition("01","04","Carga Motor","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
         PidDefinition("01","0B","Presión MAP","kPa",0f,255f,200f,240f,{a,_,_,_ -> a.toFloat()}, PidCategory.ENGINE),
         PidDefinition("01","0E","Avance Enc.","°",-64f,63.5f,50f,60f,{a,_,_,_ -> a/2f-64f}, PidCategory.ENGINE),
@@ -34,6 +34,9 @@ object PidRegistry {
         PidDefinition("01","49","Pos. Pedal D","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
         PidDefinition("01","4A","Pos. Pedal E","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
         PidDefinition("01","4B","Pos. Pedal F","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
+        PidDefinition("01","61","Torque Motor","%",-125f,125f,100f,115f,{a,_,_,_ -> a.toFloat()-125f}, PidCategory.ENGINE, isPremium=true),
+        PidDefinition("01","62","Torque Demanda","%",-125f,125f,100f,115f,{a,_,_,_ -> a.toFloat()-125f}, PidCategory.ENGINE, isPremium=true),
+        PidDefinition("01","63","Torque Refer.","Nm",0f,65535f,0f,0f,{a,b,_,_ -> (a*256f)+b}, PidCategory.ENGINE, isPremium=true),
         
         // TEMPERATURE
         PidDefinition("01","05","Temp Motor","°C",-40f,215f,100f,110f,{a,_,_,_ -> a-40f}, PidCategory.TEMPERATURE),
@@ -45,12 +48,14 @@ object PidRegistry {
         // FUEL
         PidDefinition("01","2F","Nivel Comb.","%",0f,100f,15f,5f,{a,_,_,_ -> a*100f/255f}, PidCategory.FUEL),
         PidDefinition("01","10","Flujo MAF","g/s",0f,655f,200f,400f,{a,b,_,_ -> ((a*256f)+b)/100f}, PidCategory.FUEL),
-        PidDefinition("01","06","Trim Comb CT B1","%",-100f,99.2f,25f,40f,{a,_,_,_ -> a*100f/128f-100f}, PidCategory.FUEL),
-        PidDefinition("01","07","Trim Comb LT B1","%",-100f,99.2f,25f,40f,{a,_,_,_ -> a*100f/128f-100f}, PidCategory.FUEL, isPremium=true),
+        PidDefinition("01","06","Trim Comb CT B1","%",-100f,99.2f,25f,40f,{a,_,_,_ -> (a-128)*100f/128f}, PidCategory.FUEL),
+        PidDefinition("01","07","Trim Comb LT B1","%",-100f,99.2f,25f,40f,{a,_,_,_ -> (a-128)*100f/128f}, PidCategory.FUEL, isPremium=true),
         PidDefinition("01","0A","Presión Comb.","kPa",0f,765f,300f,400f,{a,_,_,_ -> a*3f}, PidCategory.FUEL),
         PidDefinition("01","22","Pres. Rail Rel.","kPa",0f,5177f,3000f,4000f,{a,b,_,_ -> ((a*256f)+b)*0.079f}, PidCategory.FUEL, isPremium=true),
         PidDefinition("01","23","Pres. Rail Abs.","kPa",0f,655350f,150000f,200000f,{a,b,_,_ -> ((a*256f)+b)*10f}, PidCategory.FUEL, isPremium=true),
         PidDefinition("01","51","Tipo Comb.","",0f,255f,0f,0f,{a,_,_,_ -> a.toFloat()}, PidCategory.FUEL),
+        PidDefinition("01","52","Etanol Comb.","%",0f,100f,85f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.FUEL, isPremium=true),
+        PidDefinition("01","5B","Vida Bat Híbrida","%",0f,100f,40f,20f,{a,_,_,_ -> a*100f/255f}, PidCategory.ELECTRICAL, isPremium=true),
         
         // ELECTRICAL
         PidDefinition("01","42","Voltaje ECU","V",0f,65.535f,15f,16f,{a,b,_,_ -> ((a*256f)+b)/1000f}, PidCategory.ELECTRICAL),
@@ -72,7 +77,6 @@ object PidRegistry {
         PidDefinition("01","44","Ratio Aire/Comb","",0f,2f,1.2f,1.5f,{a,b,_,_ -> 2f*((a*256f)+b)/65536f}, PidCategory.EMISSIONS, isPremium=true),
         
         // TRANSMISSION (Premium)
-        // TRANSMISSION (Premium)
         PidDefinition("01","A4","Temp Trans","°C",-40f,215f,110f,130f,{a,_,_,_ -> a-40f}, PidCategory.TRANSMISSION, isPremium=true),
         PidDefinition("01","3C","Temp Cat B1S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
         PidDefinition("01","3D","Temp Cat B2S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
@@ -91,7 +95,7 @@ object PidRegistry {
         ),
         "TOYOTA" to listOf(
             PidDefinition("21", "01", "Temp Bat HV", "°C", -40f, 100f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("21", "01", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { _, b, _, _ -> b / 2.55f }, PidCategory.ELECTRICAL, true)
+            PidDefinition("21", "02", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true)
         ),
         "GM" to listOf(
             PidDefinition("22", "1940", "Temp Trans Fluid", "°C", -40f, 150f, 110f, 125f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),

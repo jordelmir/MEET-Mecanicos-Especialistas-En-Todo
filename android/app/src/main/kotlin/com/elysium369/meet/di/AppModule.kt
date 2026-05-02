@@ -55,6 +55,9 @@ object AppModule {
     fun provideCustomPidDao(db: MeetDatabase): CustomPidDao = db.customPidDao()
 
     @Provides
+    fun provideDashboardDao(db: MeetDatabase): DashboardDao = db.dashboardDao()
+
+    @Provides
     @Singleton
     fun provideSupabaseClient(): io.github.jan.supabase.SupabaseClient {
         return com.elysium369.meet.data.supabase.SupabaseManager.client

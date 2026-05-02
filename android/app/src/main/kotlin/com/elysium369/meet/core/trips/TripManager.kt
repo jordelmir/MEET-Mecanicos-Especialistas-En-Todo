@@ -147,25 +147,34 @@ class TripManager @Inject constructor(
     }
 
     private fun calculateEcoScore(): Int {
-        if (speedHistory.size < 2) return 100
+        // Snapshot mutable lists to avoid ConcurrentModificationException
+        val speeds = speedHistory.toList()
+        val rpms = rpmHistory.toList()
+        val throttles = throttleHistory.toList()
+
+        if (speeds.size < 2) return 100
         
         var penalty = 0
         
         // Penalty: Harsh Acceleration (> 8 km/h change in approx 1s)
-        val harshAccels = speedHistory.windowed(2).count { (prev, curr) -> (curr - prev) > 8f }
+        val harshAccels = speeds.windowed(2).count { (prev, curr) -> (curr - prev) > 8f }
         penalty += harshAccels * 6
         
         // Penalty: High RPM (> 3500)
-        val highRpmPoints = rpmHistory.count { it > 3500f }
-        penalty += (highRpmPoints.toFloat() / rpmHistory.size * 60).toInt()
+        if (rpms.isNotEmpty()) {
+            val highRpmPoints = rpms.count { it > 3500f }
+            penalty += (highRpmPoints.toFloat() / rpms.size.coerceAtLeast(1) * 60).toInt()
+        }
         
         // Penalty: Hard Braking (< -12 km/h change)
-        val hardBraking = speedHistory.windowed(2).count { (prev, curr) -> (curr - prev) < -12f }
+        val hardBraking = speeds.windowed(2).count { (prev, curr) -> (curr - prev) < -12f }
         penalty += hardBraking * 10
         
         // Penalty: High Throttle Position (> 70%)
-        val highThrottle = throttleHistory.count { it > 70f }
-        penalty += (highThrottle.toFloat() / throttleHistory.size * 30).toInt()
+        if (throttles.isNotEmpty()) {
+            val highThrottle = throttles.count { it > 70f }
+            penalty += (highThrottle.toFloat() / throttles.size.coerceAtLeast(1) * 30).toInt()
+        }
 
         return (100 - penalty).coerceIn(0, 100)
     }

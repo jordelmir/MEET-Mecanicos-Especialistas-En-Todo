@@ -18,7 +18,7 @@ import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { WorkOrderReceipt } from './components/WorkOrderReceipt';
 import { useToast } from './components/ToastSystem';
-import { calculateEndTime } from './services/timeEngine';
+import { calculateEndTime, getStatusLabel } from './services/timeEngine';
 import { saveState, loadState } from './services/storage';
 import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
@@ -176,6 +176,8 @@ export default function App() {
   // ── METRICS ──
   const metrics: Metrics = useMemo(() => {
     const todaysOrders = visibleWorkOrders.filter(wo =>
+      wo.startTime.getFullYear() === currentDate.getFullYear() &&
+      wo.startTime.getMonth() === currentDate.getMonth() &&
       wo.startTime.getDate() === currentDate.getDate() &&
       wo.status !== WorkOrderStatus.CANCELLED
     );
@@ -371,7 +373,7 @@ export default function App() {
     const mech = mechanics.find(m => m.id === mechanicId)!;
     const service = services.find(s => s.id === serviceId)!;
 
-    const realDuration = Math.ceil(service.estimatedMinutes * mech.efficiencyFactor);
+    const realDuration = Math.ceil(service.estimatedMinutes / mech.efficiencyFactor);
     const endTime = calculateEndTime(time, service.estimatedMinutes, mech.efficiencyFactor);
 
     const newOrder: WorkOrder = {

@@ -17,15 +17,16 @@ class KeepAliveManager(
         lastReceivedTime = System.currentTimeMillis()
     }
 
-    fun start() {
+    fun start(scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())) {
         if (keepAliveJob?.isActive == true) return
-        keepAliveJob = CoroutineScope(Dispatchers.IO).launch {
+        keepAliveJob = scope.launch {
             while (isActive) {
                 delay(1800L)
                 if (System.currentTimeMillis() - lastReceivedTime >= 1800L) {
                     if (obdSession.state.value == ObdState.CONNECTED) {
                         try {
-                            obdSession.sendKeepAliveDirectly("0100\r")
+                            // sendKeepAliveDirectly already appends \r via sendCommandDirectly
+                            obdSession.sendKeepAliveDirectly("0100")
                         } catch (_: Exception) {}
                     }
                 }

@@ -55,17 +55,17 @@ fun AiDiagnosticScreen(
                         Text("⚙️", style = MaterialTheme.typography.titleMedium)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(
             modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)
         ) {
             if (isConfigOpen) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 ) {
@@ -170,13 +170,13 @@ fun AiDiagnosticScreen(
 
             if (dtcCode.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                         Text("Código a analizar", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-                        Text(dtcCode, color = Color(0xFF00FFCC), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(dtcCode, color = Color(0xFF39FF14), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -186,7 +186,7 @@ fun AiDiagnosticScreen(
             
             // AI Response
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             ) {
@@ -201,7 +201,7 @@ fun AiDiagnosticScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Consultando IA con el Freeze Frame actual. Por favor espera unos segundos...", color = Color.LightGray)
                     } else if (aiResponse != null) {
-                        Text(aiResponse!!, color = Color.White)
+                        Text(aiResponse.orEmpty(), color = Color.White)
                     } else if (dtcCode.isEmpty()) {
                         Text("¿En qué te puedo ayudar con el diagnóstico de tu vehículo hoy?", color = Color.LightGray)
                     }
@@ -211,12 +211,15 @@ fun AiDiagnosticScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             Button(
-                onClick = { /* Export PDF logic */ },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
-                shape = RoundedCornerShape(8.dp)
+                onClick = { 
+                    viewModel.generateFullReport(aiResponse)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
+                shape = RoundedCornerShape(8.dp),
+                enabled = aiResponse != null
             ) {
-                Text("EXPORTAR REPORTE IA (PDF)", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                Text("EXPORTAR REPORTE IA (PDF)", color = if (aiResponse != null) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold)
             }
         }
     }

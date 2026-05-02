@@ -23,7 +23,7 @@ fun DtcCard(
     var expanded by remember { mutableStateOf(false) }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()

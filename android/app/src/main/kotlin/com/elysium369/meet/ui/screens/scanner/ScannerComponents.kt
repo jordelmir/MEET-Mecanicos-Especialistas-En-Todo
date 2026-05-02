@@ -16,7 +16,7 @@ import com.elysium369.meet.core.obd.DtcDecoder
 @Composable
 fun DtcStatCard(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)), 
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
         shape = RoundedCornerShape(12.dp), 
         modifier = modifier.border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
     ) {
@@ -30,7 +30,7 @@ fun DtcStatCard(label: String, count: Int, color: Color, modifier: Modifier = Mo
 @Composable
 fun DtcItemCard(code: String, type: String, color: Color) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)), 
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
         shape = RoundedCornerShape(12.dp), 
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
     ) {
@@ -53,7 +53,7 @@ fun DtcItemCard(code: String, type: String, color: Color) {
 @OptIn(ExperimentalMaterial3Api::class)
 fun ToolCard(icon: String, title: String, desc: String, color: Color, onClick: () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Black), 
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
         shape = RoundedCornerShape(12.dp), 
         modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), 
         onClick = onClick

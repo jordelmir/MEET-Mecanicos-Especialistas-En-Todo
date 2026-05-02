@@ -36,10 +36,11 @@ class BleTransport(
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     
-    private val connectionLatch = CountDownLatch(1)
+    private var connectionLatch = CountDownLatch(1)
     
     // ACUMULADOR DE FRAGMENTOS — la clave para clones BLE
-    private val responseAccumulator = StringBuilder()
+    // Must be thread-safe: accessed from GATT Binder threads
+    private val responseAccumulator = StringBuffer()
     private val responseReady = Channel<String>(Channel.UNLIMITED)
     
     private var connected = false
@@ -47,6 +48,8 @@ class BleTransport(
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                // MEET ELITE: Request high priority for lower latency
+                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 // requestMtu(512) debe ser el PRIMER comando después de onConnectionStateChange
                 gatt.requestMtu(512)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -62,11 +65,13 @@ class BleTransport(
         
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                var found = false
                 for (service in gatt.services) {
                     if (SERVICE_UUIDS.contains(service.uuid)) {
                         for (char in service.characteristics) {
                             if (CHAR_WRITE_UUIDS.contains(char.uuid)) {
                                 writeChar = char
+                                found = true
                             }
                             if (CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
                                 gatt.setCharacteristicNotification(char, true)
@@ -80,9 +85,13 @@ class BleTransport(
                         }
                     }
                 }
-                connected = writeChar != null
+                connected = found
                 connectionLatch.countDown()
             }
+        }
+
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            // Handle write success/fail if needed for flow control
         }
 
         @Deprecated("Deprecated in Java")
@@ -109,38 +118,68 @@ class BleTransport(
             // Completa = contiene el prompt ">" de ELM327
             if (responseAccumulator.contains('>') ||
                 responseAccumulator.contains("NO DATA") ||
-                responseAccumulator.contains("ERROR")) {
+                responseAccumulator.contains("ERROR") ||
+                responseAccumulator.contains("STOPPED")) {
                 
                 val completeResponse = responseAccumulator.toString()
-                responseAccumulator.clear()
+                responseAccumulator.setLength(0)
                 responseReady.trySend(completeResponse)
             }
         }
     }
 
     override suspend fun connect() {
-        gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-        val success = connectionLatch.await(10, TimeUnit.SECONDS)
-        if (!success || !connected) {
-            throw Exception("Failed to establish BLE GATT connection")
+        // MEET ELITE: Multi-retry connection for flaky BLE stacks
+        var lastException: Exception? = null
+        for (attempt in 0 until 3) {
+            try {
+                gatt?.disconnect()
+                gatt?.close()
+                
+                // Reset latch for each connection attempt
+                connectionLatch = CountDownLatch(1)
+                
+                gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                val success = connectionLatch.await(8, TimeUnit.SECONDS)
+                
+                if (success && connected) return  // Actually exit the function on success
+                
+                kotlinx.coroutines.delay(1000)
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt == 2) throw e
+            }
+        }
+
+        if (!connected) {
+            throw Exception("Error de enlace BLE: El adaptador no respondió a la negociación GATT")
         }
     }
 
     override suspend fun disconnect() {
         gatt?.disconnect()
         gatt?.close()
+        gatt = null
         connected = false
     }
 
+    override suspend fun reconnect() {
+        disconnect()
+        kotlinx.coroutines.delay(1000)
+        connect()
+    }
+
     override suspend fun write(data: ByteArray) {
-        val char = writeChar ?: throw Exception("Not connected")
+        val char = writeChar ?: throw Exception("Error: Adaptador BLE no inicializado")
         char.value = data
-        gatt?.writeCharacteristic(char)
+        val success = gatt?.writeCharacteristic(char) ?: false
+        if (!success) {
+            throw java.io.IOException("Fallo al escribir en el radio BLE")
+        }
     }
 
     override suspend fun read(maxBytes: Int): ByteArray? {
-        // Here we just wait for the next full accumulated response or block
-        val resp = withTimeoutOrNull(2000) {
+        val resp = withTimeoutOrNull(3000) {
             responseReady.receive()
         }
         return resp?.toByteArray(Charsets.ISO_8859_1)

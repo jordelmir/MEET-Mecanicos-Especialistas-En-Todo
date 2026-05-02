@@ -48,6 +48,8 @@ class SyncWorker @AssistedInject constructor(
 
         Log.i("SyncWorker", "Found ${pendingSessions.size} pending sessions to sync")
 
+        val syncedIds = mutableListOf<String>()
+
         pendingSessions.forEach { entity ->
             val domainSession = DiagnosticSession(
                 id = entity.id,
@@ -60,12 +62,15 @@ class SyncWorker @AssistedInject constructor(
 
             try {
                 SupabaseManager.client.postgrest["scan_sessions"].upsert(domainSession)
-                sessionDao.markAsSynced(listOf(entity.id))
+                syncedIds.add(entity.id)
                 Log.d("SyncWorker", "Synced session ${entity.id}")
             } catch (e: Exception) {
-                Log.e("SyncWorker", "Failed to sync session ${entity.id}", e)
-                throw e
+                Log.e("SyncWorker", "Failed to sync session ${entity.id}, will retry later", e)
             }
+        }
+
+        if (syncedIds.isNotEmpty()) {
+            sessionDao.markAsSynced(syncedIds)
         }
     }
 
@@ -74,6 +79,8 @@ class SyncWorker @AssistedInject constructor(
         if (pendingTrips.isEmpty()) return
 
         Log.i("SyncWorker", "Found ${pendingTrips.size} pending trips to sync")
+
+        val syncedIds = mutableListOf<String>()
 
         pendingTrips.forEach { entity ->
             val domainTrip = com.elysium369.meet.data.supabase.Trip(
@@ -97,12 +104,15 @@ class SyncWorker @AssistedInject constructor(
 
             try {
                 SupabaseManager.client.postgrest["trips"].upsert(domainTrip)
-                tripDao.markAsSynced(listOf(entity.id))
+                syncedIds.add(entity.id)
                 Log.d("SyncWorker", "Synced trip ${entity.id}")
             } catch (e: Exception) {
-                Log.e("SyncWorker", "Failed to sync trip ${entity.id}", e)
-                throw e
+                Log.e("SyncWorker", "Failed to sync trip ${entity.id}, will retry later", e)
             }
+        }
+
+        if (syncedIds.isNotEmpty()) {
+            tripDao.markAsSynced(syncedIds)
         }
     }
 }

@@ -70,6 +70,8 @@ export function MechanicDashboard({
     return workOrders
       .filter(wo =>
         wo.mechanicId === mechanicId &&
+        wo.startTime.getFullYear() === today.getFullYear() &&
+        wo.startTime.getMonth() === today.getMonth() &&
         wo.startTime.getDate() === today.getDate() &&
         wo.status !== WorkOrderStatus.CANCELLED &&
         wo.status !== WorkOrderStatus.DELIVERED
@@ -81,6 +83,8 @@ export function MechanicDashboard({
     const today = new Date();
     return workOrders.filter(wo =>
       wo.mechanicId === mechanicId &&
+      wo.startTime.getFullYear() === today.getFullYear() &&
+      wo.startTime.getMonth() === today.getMonth() &&
       wo.startTime.getDate() === today.getDate() &&
       (wo.status === WorkOrderStatus.COMPLETED || wo.status === WorkOrderStatus.DELIVERED)
     ).length;

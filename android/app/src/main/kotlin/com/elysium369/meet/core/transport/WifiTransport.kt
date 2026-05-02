@@ -42,10 +42,17 @@ class WifiTransport(
         }
     }
 
+    override suspend fun reconnect() {
+        disconnect()
+        kotlinx.coroutines.delay(1000)
+        connect()
+    }
+
     override suspend fun write(data: ByteArray) {
         withContext(Dispatchers.IO) {
-            outputStream?.write(data)
-            outputStream?.flush()
+            val out = outputStream ?: throw java.io.IOException("WiFi socket no disponible")
+            out.write(data)
+            out.flush()
         }
     }
 
@@ -65,5 +72,5 @@ class WifiTransport(
     }
 
     override val isConnected: Boolean
-        get() = socket?.isConnected == true
+        get() = socket?.let { it.isConnected && !it.isClosed } ?: false
 }

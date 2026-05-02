@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PremiumScreen(onClose: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF121212)).padding(24.dp)
+        modifier = Modifier.fillMaxSize().background(Color(0xFF060612)).padding(24.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),

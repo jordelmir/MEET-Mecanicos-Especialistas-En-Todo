@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.obd.*
@@ -42,10 +43,30 @@ class ObdViewModel @Inject constructor(
     private val diagnosticManager: com.elysium369.meet.core.obd.AdvancedDiagnosticManager
 ) : ViewModel() {
 
-    // --- State Flows ---
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
-    val isAdapterPro: StateFlow<Boolean> = obdSession.isAdapterPro
+    
+    // --- Force Clone Mode ---
+    private val _forceCloneMode = MutableStateFlow(false)
+    val forceCloneMode: StateFlow<Boolean> = _forceCloneMode.asStateFlow()
+    
+    // isAdapterPro respects forceCloneMode override
+    val isAdapterPro: StateFlow<Boolean> = combine(
+        obdSession.isAdapterPro,
+        _forceCloneMode
+    ) { realPro, forceClone ->
+        if (forceClone) false else realPro
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    
+    // --- AI Configuration ---
+    data class AiConfig(
+        val provider: String = "gemini",  // gemini, openai, anthropic, ollama, custom
+        val apiKey: String = "",
+        val endpoint: String = "",
+        val modelName: String = ""
+    )
+    private val _aiConfig = MutableStateFlow(AiConfig())
+    val aiConfig: StateFlow<AiConfig> = _aiConfig.asStateFlow()
     
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
@@ -99,6 +120,24 @@ class ObdViewModel @Inject constructor(
     val activeTestStatus: StateFlow<ActiveTestStatus> = obdSession.activeTestStatus
     val availableActiveTests: List<ActiveTest> = PidRegistry.ACTIVE_TESTS
 
+    // --- AI and Health State ---
+    private val _anomalousPids = MutableStateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>>(emptyList())
+    val anomalousPids: StateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>> = _anomalousPids.asStateFlow()
+
+    private val _isAiMonitoring = MutableStateFlow(false)
+    val isAiMonitoring: StateFlow<Boolean> = _isAiMonitoring.asStateFlow()
+    private var aiMonitorJob: kotlinx.coroutines.Job? = null
+
+    private val _healthScore = MutableStateFlow(100)
+    val healthScore: StateFlow<Int> = _healthScore.asStateFlow()
+
+    // --- Logging State ---
+    private val _isLogging = MutableStateFlow(false)
+    val isLogging: StateFlow<Boolean> = _isLogging.asStateFlow()
+    private val _dataLog = MutableStateFlow<List<DataLogEntry>>(emptyList())
+    val dataLog: StateFlow<List<DataLogEntry>> = _dataLog.asStateFlow()
+    private var loggingJob: kotlinx.coroutines.Job? = null
+
     // --- Reactive Data from Room ---
     val trips: StateFlow<List<TripEntity>> = _selectedVehicle
         .flatMapLatest { vehicle ->
@@ -117,74 +156,174 @@ class ObdViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
-        // IMPORTANT: Use Dispatchers.Main (not .immediate) to force async dispatch.
-        // This guarantees all MutableStateFlow fields are fully initialized
-        // before any collector lambda runs, preventing NullPointerException.
-
-        // Collect live data from session
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            obdSession.liveData.collect { data -> 
-                _liveData.value = data
-                updateTelemetryHistory(data)
+        // PRODUCTION-GRADE: Each collector is isolated with try-catch to prevent
+        // a single flow failure from crashing the entire ViewModel during startup.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+            
+            // Collect live data from session
+            launch {
+                try {
+                    obdSession.liveData
+                        .collect { data -> 
+                            _liveData.value = data
+                            updateTelemetryHistory(data)
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "liveData collector crashed", e)
+                }
             }
-        }
 
-        // Collect VIN and detect manufacturer
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            obdSession.vin.collect { v -> 
-                _vin.value = v
-                v?.let { detectManufacturer(it) }
-                updateHealthScore()
+            // Collect VIN and detect manufacturer
+            launch {
+                try {
+                    obdSession.vin
+                        .collect { v -> 
+                            _vin.value = v
+                            v?.let { detectManufacturer(it) }
+                            updateHealthScore()
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "vin collector crashed", e)
+                }
             }
-        }
-        
-        // Auto-refresh diagnostics on connection
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            obdSession.state.collect { state ->
-                if (state == ObdState.CONNECTED) {
-                    refreshDiagnostics()
-                    obdSession.fetchVin()
-                    _currentOdometer.value = obdSession.readOdometer()
+            
+            // Auto-refresh diagnostics on connection
+            launch {
+                try {
+                    obdSession.state
+                        .collect { state ->
+                            if (state == ObdState.CONNECTED) {
+                                try {
+                                    refreshDiagnostics()
+                                    obdSession.fetchVin()
+                                    _currentOdometer.value = obdSession.readOdometer()
+                                } catch (e: Exception) {
+                                    android.util.Log.e("ObdVM", "Post-connect init error", e)
+                                }
+                            }
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "state collector crashed", e)
+                }
+            }
+
+            // Sync custom PIDs to session
+            launch {
+                try {
+                    customPidDao.getAllCustomPids()
+                        .collect { pids ->
+                            obdSession.setCustomPids(pids)
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "customPids collector crashed", e)
+                }
+            }
+
+            // Collect QoS from session
+            launch {
+                try {
+                    obdSession.qosMetrics
+                        .collect { metrics -> 
+                            _qosMetrics.value = metrics 
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "qos collector crashed", e)
+                }
+            }
+
+            // Auto-start AI monitoring if enabled
+            launch {
+                try {
+                    isAiMonitoring.collect { enabled ->
+                        if (enabled) startAiMonitoring() else aiMonitorJob?.cancel()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "AI monitor collector crashed", e)
+                }
+            }
+
+            // Reactive Health Score calculation
+            launch {
+                try {
+                    combine(
+                        _activeDtcs,
+                        _pendingDtcs,
+                        _anomalousPids,
+                        _liveData
+                    ) { active, pending, anomalies, live ->
+                        calculateHealthScore(active, pending, anomalies, live)
+                    }.collect { score ->
+                        _healthScore.value = score
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdVM", "healthScore collector crashed", e)
                 }
             }
         }
 
-        // Sync custom PIDs to session
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            customPids.collect { pids ->
-                obdSession.setCustomPids(pids)
-            }
-        }
-
-        // Check subscription
+        // Subscriptions — isolated from main flow collectors
         viewModelScope.launch {
-            _isPremium.value = try { subscriptionRepository.isPremium() } catch (_: Exception) { false }
-        }
-
-        // Collect QoS from session
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            obdSession.qosMetrics.collect { metrics -> _qosMetrics.value = metrics }
-        }
-
-        // Auto-start AI monitoring if enabled
-        viewModelScope.launch {
-            isAiMonitoring.collect { enabled ->
-                if (enabled) startAiMonitoring() else aiMonitorJob?.cancel()
+            _isPremium.value = try { 
+                subscriptionRepository.isPremium() 
+            } catch (_: Exception) { 
+                false 
             }
         }
 
-        // --- Reactive Health Score ---
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            combine(
-                _activeDtcs,
-                _pendingDtcs,
-                _anomalousPids,
-                _liveData
-            ) { active, pending, anomalies, live ->
-                calculateHealthScore(active, pending, anomalies, live)
-            }.collect { score ->
-                _healthScore.value = score
-            }
+        // Load persisted settings for Clone Mode & AI Config
+        val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+        _forceCloneMode.value = prefs.getBoolean("force_clone_mode", false)
+        val loadedConfig = AiConfig(
+            provider = prefs.getString("ai_provider", "gemini") ?: "gemini",
+            apiKey = prefs.getString("ai_api_key", "") ?: "",
+            endpoint = prefs.getString("ai_base_url", "") ?: "",
+            modelName = prefs.getString("ai_model_name", "") ?: ""
+        )
+        _aiConfig.value = loadedConfig
+        // Push to diagnostic engine on startup
+        if (loadedConfig.apiKey.isNotBlank()) {
+            val resolvedEp = resolveAiEndpoint(loadedConfig.provider, loadedConfig.endpoint, loadedConfig.modelName)
+            geminiDiagnostic.updateConfig(loadedConfig.apiKey, resolvedEp, loadedConfig.provider)
+        }
+    }
+
+    // --- Settings Actions ---
+
+    /** Toggle Force Clone Mode — treats any adapter as a clone for compatibility testing */
+    fun setForceCloneMode(enabled: Boolean) {
+        _forceCloneMode.value = enabled
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("force_clone_mode", enabled).apply()
+        Log.d("ObdVM", "Force Clone Mode: $enabled")
+    }
+
+    /** Save AI configuration and push to diagnostic engine */
+    fun saveAiConfig(provider: String, apiKey: String, endpoint: String, modelName: String) {
+        val config = AiConfig(provider, apiKey, endpoint, modelName)
+        _aiConfig.value = config
+        
+        val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE).edit()
+        prefs.putString("ai_provider", provider)
+        prefs.putString("ai_api_key", apiKey)
+        prefs.putString("ai_base_url", endpoint)
+        prefs.putString("ai_model_name", modelName)
+        prefs.apply()
+
+        // Push config to the diagnostic engine immediately
+        val resolvedEndpoint = resolveAiEndpoint(provider, endpoint, modelName)
+        geminiDiagnostic.updateConfig(apiKey, resolvedEndpoint, provider)
+        Log.d("ObdVM", "AI Config saved: provider=$provider, model=$modelName")
+    }
+
+    /** Resolve endpoint URL based on provider selection */
+    private fun resolveAiEndpoint(provider: String, customEndpoint: String, modelName: String): String? {
+        return when (provider) {
+            "gemini" -> null // use default Gemini endpoint inside GeminiDiagnostic
+            "openai" -> if (customEndpoint.isNotBlank()) customEndpoint else "https://api.openai.com/v1/chat/completions"
+            "anthropic" -> if (customEndpoint.isNotBlank()) customEndpoint else "https://api.anthropic.com/v1/messages"
+            "ollama" -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:11434/v1/chat/completions"
+            "custom" -> customEndpoint.ifBlank { null }
+            else -> null
         }
     }
 
@@ -202,9 +341,15 @@ class ObdViewModel @Inject constructor(
         _selectedVehicle.value = vehicle
         viewModelScope.launch {
             obdSession.connect()
-            if (obdSession.state.value == ObdState.CONNECTED) {
-                startForegroundService(vehicle.id)
-            }
+            // Wait for actual state change instead of checking synchronously
+            obdSession.state
+                .filter { it == ObdState.CONNECTED || it == ObdState.ERROR || it == ObdState.DISCONNECTED }
+                .first()
+                .let { finalState ->
+                    if (finalState == ObdState.CONNECTED) {
+                        startForegroundService(vehicle.id)
+                    }
+                }
         }
     }
 
@@ -231,7 +376,12 @@ class ObdViewModel @Inject constructor(
             vehicle_model = vehicle.model,
             vehicle_year = vehicle.year,
             dtcs_found = Json.encodeToString(currentDtcs),
-            severity = if (currentDtcs.isNotEmpty()) "high" else "low",
+            severity = when {
+                _permanentDtcs.value.isNotEmpty() -> "critical"
+                currentDtcs.isNotEmpty() -> "high"
+                _pendingDtcs.value.isNotEmpty() -> "moderate"
+                else -> "low"
+            },
             live_data_snapshot = Json.encodeToString(snapshot.mapValues { it.value.toString() })
         )
         
@@ -284,8 +434,10 @@ class ObdViewModel @Inject constructor(
         // 2. If DTCs found, fetch Freeze Frame for the first one
         if (_activeDtcs.value.isNotEmpty()) {
             _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
-            val ff = obdSession.readFreezeFrame(_activeDtcs.value.first())
-            _freezeFrameData.value = ff
+            val firstDtc = _activeDtcs.value.first()
+            val ff = obdSession.readFreezeFrame(firstDtc)
+            val scoped = ff.mapKeys { (key, _) -> "$firstDtc:$key" }
+            _freezeFrameData.value = _freezeFrameData.value + scoped
         }
         
         // 3. Check Battery Voltage & Alternator health
@@ -301,30 +453,54 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun detectManufacturer(vin: String) {
-        val wmi = if (vin.length >= 3) vin.substring(0, 3) else ""
+        if (vin.length < 3) {
+            _manufacturer.value = "GENERIC"
+            return
+        }
         
-        // Professional VIN Decoding (Simplified for demo, but extensible)
         val mfr = when {
-            vin.startsWith("1FM") || vin.startsWith("1FT") -> "FORD"
-            vin.startsWith("JTD") || vin.startsWith("JT1") -> "TOYOTA"
-            vin.startsWith("1GC") || vin.startsWith("1G1") || vin.startsWith("1G6") -> "GM"
-            vin.startsWith("WBA") || vin.startsWith("WBS") -> "BMW"
-            vin.startsWith("WVW") || vin.startsWith("WVW") -> "VOLKSWAGEN"
+            // North American Ford
+            vin.startsWith("1FM") || vin.startsWith("1FT") || vin.startsWith("1FA") || vin.startsWith("3FA") -> "FORD"
+            // Toyota / Lexus
+            vin.startsWith("JTD") || vin.startsWith("JT1") || vin.startsWith("JTN") || vin.startsWith("JTH") -> "TOYOTA"
+            // General Motors (Chevrolet, GMC, Cadillac, Buick)
+            vin.startsWith("1GC") || vin.startsWith("1G1") || vin.startsWith("1G6") || vin.startsWith("3G1") -> "GM"
+            // BMW
+            vin.startsWith("WBA") || vin.startsWith("WBS") || vin.startsWith("5UX") -> "BMW"
+            // Volkswagen / Audi / Seat / Skoda (VAG)
+            vin.startsWith("WVW") || vin.startsWith("WV2") || vin.startsWith("WAU") || vin.startsWith("TRU") -> "VOLKSWAGEN"
+            // Mercedes-Benz
+            vin.startsWith("WDB") || vin.startsWith("WDC") || vin.startsWith("WDD") || vin.startsWith("55S") -> "MERCEDES"
+            // Honda / Acura
+            vin.startsWith("JHM") || vin.startsWith("1HG") || vin.startsWith("2HG") || vin.startsWith("SHH") -> "HONDA"
+            // Nissan / Infiniti
+            vin.startsWith("JN1") || vin.startsWith("1N4") || vin.startsWith("1N6") || vin.startsWith("5N1") -> "NISSAN"
+            // Hyundai / Kia
+            vin.startsWith("KMH") || vin.startsWith("5NP") -> "HYUNDAI"
+            vin.startsWith("KNA") || vin.startsWith("KND") -> "KIA"
+            // Mazda
+            vin.startsWith("JM1") || vin.startsWith("JM3") || vin.startsWith("3MZ") -> "MAZDA"
+            // Subaru
+            vin.startsWith("JF1") || vin.startsWith("JF2") || vin.startsWith("4S3") -> "SUBARU"
+            // Peugeot / Citroën
             vin.startsWith("VF3") || vin.startsWith("VF7") -> "PEUGEOT"
-            vin.startsWith("ZFA") -> "FIAT"
-            vin.startsWith("SAL") -> "LAND_ROVER"
+            // Fiat / Chrysler (Stellantis)
+            vin.startsWith("ZFA") || vin.startsWith("1C4") || vin.startsWith("2C3") -> "FIAT"
+            // Land Rover / Jaguar
+            vin.startsWith("SAL") || vin.startsWith("SAJ") -> "LAND_ROVER"
             else -> "GENERIC"
         }
         
         _manufacturer.value = mfr
-        // Automatically inject OEM PIDs if they exist in the registry
         obdSession.enableOemPids(mfr)
     }
 
     suspend fun refreshFreezeFrame(dtc: String) {
         _cloudSyncState.value = "Refrescando Cuadro Congelado..."
         val ff = obdSession.readFreezeFrame(dtc)
-        _freezeFrameData.value = ff
+        // Merge into existing map with DTC-scoped keys to prevent cross-DTC contamination
+        val scoped = ff.mapKeys { (key, _) -> "$dtc:$key" }
+        _freezeFrameData.value = _freezeFrameData.value + scoped
         _cloudSyncState.value = "Cuadro Congelado actualizado."
     }
 
@@ -383,30 +559,52 @@ class ObdViewModel @Inject constructor(
     }
 
     fun generateFullReport(aiAnalysis: String?) {
-        val currentTrip = tripManager.currentTrip ?: return
+        val currentTrip = tripManager.currentTrip
         val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
         val dtcs = _activeDtcs.value
         val history = _telemetryHistory.value
         
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val tripData = com.elysium369.meet.data.supabase.Trip(
-                id = currentTrip.id,
-                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
-                vehicle_id = currentTrip.vehicleId,
-                session_id = currentTrip.sessionId,
-                started_at = currentTrip.startedAt,
-                ended_at = currentTrip.endedAt,
-                distance_km = currentTrip.distanceKm,
-                duration_seconds = currentTrip.durationSeconds,
-                avg_speed_kmh = currentTrip.avgSpeedKmh,
-                max_speed_kmh = currentTrip.maxSpeedKmh,
-                max_rpm = currentTrip.maxRpm,
-                avg_rpm = currentTrip.avgRpm,
-                max_temp_c = currentTrip.maxTempC,
-                fuel_efficiency = currentTrip.fuelEfficiency,
-                eco_score = currentTrip.ecoScore,
-                gps_track_json = currentTrip.gpsTrackJson
-            )
+            val tripData = if (currentTrip != null) {
+                com.elysium369.meet.data.supabase.Trip(
+                    id = currentTrip.id,
+                    user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                    vehicle_id = currentTrip.vehicleId,
+                    session_id = currentTrip.sessionId,
+                    started_at = currentTrip.startedAt,
+                    ended_at = currentTrip.endedAt,
+                    distance_km = currentTrip.distanceKm,
+                    duration_seconds = currentTrip.durationSeconds,
+                    avg_speed_kmh = currentTrip.avgSpeedKmh,
+                    max_speed_kmh = currentTrip.maxSpeedKmh,
+                    max_rpm = currentTrip.maxRpm,
+                    avg_rpm = currentTrip.avgRpm,
+                    max_temp_c = currentTrip.maxTempC,
+                    fuel_efficiency = currentTrip.fuelEfficiency,
+                    eco_score = currentTrip.ecoScore,
+                    gps_track_json = currentTrip.gpsTrackJson
+                )
+            } else {
+                // Create a synthetic trip for the report if none exists
+                com.elysium369.meet.data.supabase.Trip(
+                    id = UUID.randomUUID().toString(),
+                    user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                    vehicle_id = _selectedVehicle.value?.id ?: "N/A",
+                    session_id = "MANUAL_DIAGNOSTIC",
+                    started_at = System.currentTimeMillis(),
+                    ended_at = System.currentTimeMillis(),
+                    distance_km = 0f,
+                    duration_seconds = 0,
+                    avg_speed_kmh = 0f,
+                    max_speed_kmh = 0f,
+                    max_rpm = _liveData.value["010C"] ?: 0f,
+                    avg_rpm = _liveData.value["010C"] ?: 0f,
+                    max_temp_c = _liveData.value["0105"] ?: 0f,
+                    fuel_efficiency = null,
+                    eco_score = 100,
+                    gps_track_json = null
+                )
+            }
             
             val healthScore = _healthScore.value
             val alerts = maintenanceAlerts.value
@@ -528,6 +726,17 @@ class ObdViewModel @Inject constructor(
         return diagnosticManager.regenerateDPF(mfr)
     }
 
+    suspend fun resetTPMS(): Boolean {
+        return try {
+            obdSession.sendRawCommand("ATSH7E0")
+            obdSession.sendRawCommand("1003")
+            val resp = obdSession.sendRawCommand("3101000D") // TPMS Relearn Routine
+            resp.startsWith("71")
+        } catch (e: Exception) {
+            Log.e("ObdViewModel", "TPMS reset failed", e)
+            false
+        }
+    }
 
     fun exportTripToPdf(trip: TripEntity) {
         viewModelScope.launch {
@@ -576,6 +785,9 @@ class ObdViewModel @Inject constructor(
         return rawResults.map { (name, value) ->
             val color = when {
                 value.contains("ERROR", true) || value.contains("?") -> android.graphics.Color.RED
+                value.contains("N/A") || value.contains("Pendiente") -> android.graphics.Color.YELLOW
+                value.contains("Instrucción") || value.contains("Conecta") -> android.graphics.Color.CYAN
+                value.contains("Offline") || value.contains("Sin conexión") -> android.graphics.Color.YELLOW
                 value.contains("ms") && (value.replace(" ms", "").toIntOrNull() ?: 0) > 300 -> android.graphics.Color.YELLOW
                 else -> android.graphics.Color.GREEN
             }
@@ -610,13 +822,7 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    // --- Data Logging ---
-    private val _anomalousPids = MutableStateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>>(emptyList())
-    val anomalousPids: StateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>> = _anomalousPids.asStateFlow()
-
-    private val _isAiMonitoring = MutableStateFlow(false)
-    val isAiMonitoring: StateFlow<Boolean> = _isAiMonitoring.asStateFlow()
-    private var aiMonitorJob: kotlinx.coroutines.Job? = null
+    // AI and Logging moved to top
 
     fun toggleAiMonitoring(enabled: Boolean) {
         _isAiMonitoring.value = enabled
@@ -642,12 +848,6 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    private val _isLogging = MutableStateFlow(false)
-
-    val isLogging: StateFlow<Boolean> = _isLogging.asStateFlow()
-    private val _dataLog = MutableStateFlow<List<DataLogEntry>>(emptyList())
-    val dataLog: StateFlow<List<DataLogEntry>> = _dataLog.asStateFlow()
-    private var loggingJob: kotlinx.coroutines.Job? = null
 
     fun startDataLogging() {
         _isLogging.value = true
@@ -696,7 +896,8 @@ class ObdViewModel @Inject constructor(
                 // Share file
                 shareFile(file)
             } catch (e: Exception) {
-                // Log error
+                android.util.Log.e("ObdVM", "CSV export failed: ${e.message}", e)
+                _cloudSyncState.value = "❌ Error al exportar CSV: ${e.message}"
             }
         }
     }
@@ -718,8 +919,6 @@ class ObdViewModel @Inject constructor(
         context.startActivity(chooser)
     }
 
-    private val _healthScore = MutableStateFlow(100)
-    val healthScore: StateFlow<Int> = _healthScore.asStateFlow()
 
     private fun updateHealthScore() {
         _healthScore.value = calculateHealthScore()
@@ -748,8 +947,9 @@ class ObdViewModel @Inject constructor(
             else if (temp > 105f) score -= 10 // Warning
         }
 
-        // 2. Control Module Voltage (PID 0142) or Battery Voltage
-        val voltage = live["0142"] ?: live["AT RV"]
+        // 2. Control Module Voltage (PID 0142)
+        // Note: ATRV (ELM327 internal voltage) is not stored in liveData map
+        val voltage = live["0142"]
         if (voltage != null) {
             if (voltage < 11.5f) score -= 20 // Low battery/alternator
             else if (voltage < 12.2f && (live["010C"] ?: 0f) < 100f) score -= 5 // Weak battery at rest

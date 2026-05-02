@@ -6,10 +6,13 @@ import android.os.Build
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -31,18 +34,18 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Star
 
 val CyberpunkColorScheme = darkColorScheme(
-    primary = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-    onPrimary = androidx.compose.ui.graphics.Color.Black,
-    secondary = androidx.compose.ui.graphics.Color(0xFFFF6B35),
-    onSecondary = androidx.compose.ui.graphics.Color.Black,
-    tertiary = androidx.compose.ui.graphics.Color(0xFFCC00FF),
-    background = androidx.compose.ui.graphics.Color.Black,
-    onBackground = androidx.compose.ui.graphics.Color.White,
-    surface = androidx.compose.ui.graphics.Color(0xFF0A0A0A),
-    onSurface = androidx.compose.ui.graphics.Color.White,
-    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF141414),
-    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-    error = androidx.compose.ui.graphics.Color(0xFFFF003C)
+    primary = Color(0xFF39FF14),
+    onPrimary = Color.Black,
+    secondary = Color(0xFFFF6B35),
+    onSecondary = Color.Black,
+    tertiary = Color(0xFFCC00FF),
+    background = Color.Black,
+    onBackground = Color.White,
+    surface = Color(0xFF0A0E1A),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF141414),
+    onSurfaceVariant = Color(0xFF39FF14),
+    error = Color(0xFFFF003C)
 )
 
 
@@ -107,6 +110,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
     val selectedVehicle by obdViewModel.selectedVehicle.collectAsState()
 
     Scaffold(
+        containerColor = Color(0xFF060612),
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
             val currentRoute = navController.currentBackStackEntryAsState().value
@@ -128,7 +132,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
             composable("onboarding") {
                 OnboardingScreen(
@@ -205,6 +209,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("support_chat") {
+                val vehicle by obdViewModel.selectedVehicle.collectAsState()
+                val vehicleLabel = vehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Genérico"
+                SupportChatScreen(
+                    onBack = { navController.popBackStack() },
+                    vehicleInfo = vehicleLabel
+                )
+            }
             composable("pro_hub") {
                 ProHubScreen(navController = navController, viewModel = obdViewModel)
             }
@@ -271,8 +283,8 @@ fun MeetBottomNavigation(navController: NavController) {
         .value?.destination?.route
     
     NavigationBar(
-        containerColor = androidx.compose.ui.graphics.Color(0xFF0A0A0A),
-        contentColor = androidx.compose.ui.graphics.Color(0xFF00FFCC)
+        containerColor = Color(0xFF0A0E1A),
+        contentColor = Color(0xFF39FF14)
     ) {
         NavigationBarItem(
             icon = { Icon(Icons.Default.Home, "Home") },
@@ -280,11 +292,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "home",
             onClick = { navController.navigate("home") { launchSingleTop = true; restoreState = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-                unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
-                unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFF00FFCC).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFF39FF14),
+                selectedTextColor = Color(0xFF39FF14),
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color(0xFF39FF14).copy(alpha = 0.1f)
             )
         )
         NavigationBarItem(
@@ -293,11 +305,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "scanner",
             onClick = { navController.navigate("scanner") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFF00FFCC),
-                unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
-                unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFF00FFCC).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFF39FF14),
+                selectedTextColor = Color(0xFF39FF14),
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color(0xFF39FF14).copy(alpha = 0.1f)
             )
         )
         NavigationBarItem(
@@ -306,11 +318,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "dtc",
             onClick = { navController.navigate("dtc") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFFFF003C),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFFFF003C),
-                unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
-                unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFFFF003C).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFFF003C),
+                selectedTextColor = Color(0xFFFF003C),
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color(0xFFFF003C).copy(alpha = 0.1f)
             )
         )
         NavigationBarItem(
@@ -319,11 +331,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "garage",
             onClick = { navController.navigate("garage") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFFCC00FF),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFFCC00FF),
-                unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
-                unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFFCC00FF).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFCC00FF),
+                selectedTextColor = Color(0xFFCC00FF),
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color(0xFFCC00FF).copy(alpha = 0.1f)
             )
         )
         NavigationBarItem(
@@ -332,11 +344,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "pro_hub",
             onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = androidx.compose.ui.graphics.Color(0xFFFFD700),
-                selectedTextColor = androidx.compose.ui.graphics.Color(0xFFFFD700),
-                unselectedIconColor = androidx.compose.ui.graphics.Color.Gray,
-                unselectedTextColor = androidx.compose.ui.graphics.Color.Gray,
-                indicatorColor = androidx.compose.ui.graphics.Color(0xFFFFD700).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFFFD700),
+                selectedTextColor = Color(0xFFFFD700),
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color(0xFFFFD700).copy(alpha = 0.1f)
             )
         )
     }

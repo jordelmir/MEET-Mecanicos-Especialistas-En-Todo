@@ -149,9 +149,9 @@ class ElmNegotiator(private val transport: TransportInterface) {
     private suspend fun sendWithTimeout(cmd: String, timeoutMs: Long): String {
         return withContext(Dispatchers.IO) {
             transport.write(cmd.toByteArray())
-            // Emulate read loop
             val buffer = StringBuilder()
             var elapsed = 0L
+            val pollInterval = 10L
             while (elapsed < timeoutMs) {
                 val chunk = transport.read(1024)
                 if (chunk != null) {
@@ -160,10 +160,9 @@ class ElmNegotiator(private val transport: TransportInterface) {
                     if (buffer.contains(">")) {
                         break
                     }
-                } else {
-                    delay(10)
-                    elapsed += 10
                 }
+                delay(pollInterval)
+                elapsed += pollInterval
             }
             buffer.toString()
         }

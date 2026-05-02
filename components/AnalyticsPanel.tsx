@@ -33,6 +33,7 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
       d.setDate(d.getDate() - i);
       const dayStr = d.toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric' });
       const dayOrders = workOrders.filter(wo =>
+        wo.startTime.getFullYear() === d.getFullYear() &&
         wo.startTime.getDate() === d.getDate() &&
         wo.startTime.getMonth() === d.getMonth() &&
         wo.status !== WorkOrderStatus.CANCELLED

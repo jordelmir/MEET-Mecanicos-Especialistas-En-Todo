@@ -186,6 +186,20 @@ object CloudSyncRepository {
      * Returns "free", "pro", or "elite".
      */
     suspend fun getUserPlan(userId: String): String = withContext(Dispatchers.IO) {
-        "free" // Default — will be wired to RevenueCat/Stripe later
+        try {
+            val result = client.postgrest["subscriptions"]
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        eq("status", "active")
+                    }
+                }
+            @Serializable
+            data class SubInfo(val plan: String)
+            val sub = result.decodeSingleOrNull<SubInfo>()
+            sub?.plan ?: "free"
+        } catch (e: Exception) {
+            "free"
+        }
     }
 }

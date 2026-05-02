@@ -4,10 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,8 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.ObdViewModel
-import com.elysium369.meet.ui.components.GaugeWidget
+import com.elysium369.meet.ui.components.EliteScrollContainer
+import com.elysium369.meet.ui.components.eliteScrollbar
 import com.elysium369.meet.ui.components.WaveGraphWidget
+import com.elysium369.meet.ui.components.GaugeWidget
 
 @Composable
 fun ScannerDashboardTab(
@@ -34,17 +33,21 @@ fun ScannerDashboardTab(
     val anomalousPids by viewModel.anomalousPids.collectAsState()
     val healthScore by viewModel.healthScore.collectAsState()
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(if (isLandscape) 3 else 2),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
+    val gridState = rememberLazyGridState()
+
+    EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(if (isLandscape) 3 else 2),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().eliteScrollbar(gridState)
+        ) {
         // 1. VEHICLE HEALTH INDEX CARD (Spans full width)
         item(span = { GridItemSpan(if (isLandscape) 3 else 2) }) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -52,7 +55,7 @@ fun ScannerDashboardTab(
                         1.dp,
                         Brush.linearGradient(
                             listOf(
-                                if (healthScore > 80) Color(0xFF00FFCC) else if (healthScore > 50) Color(0xFFFFD700) else Color(0xFFFF003C),
+                                if (healthScore > 80) Color(0xFF39FF14) else if (healthScore > 50) Color(0xFFFFD700) else Color(0xFFFF003C),
                                 Color.Transparent
                             )
                         ),
@@ -83,7 +86,7 @@ fun ScannerDashboardTab(
 
                         // Circular Progress for Health
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(70.dp)) {
-                            val scoreColor = if (healthScore > 80) Color(0xFF00FFCC) else if (healthScore > 50) Color(0xFFFFD700) else Color(0xFFFF003C)
+                            val scoreColor = if (healthScore > 80) Color(0xFF39FF14) else if (healthScore > 50) Color(0xFFFFD700) else Color(0xFFFF003C)
                             CircularProgressIndicator(
                                 progress = healthScore / 100f,
                                 modifier = Modifier.fillMaxSize(),
@@ -143,45 +146,43 @@ fun ScannerDashboardTab(
                     .border(
                         1.dp,
                         if (isAnomaly) Color(0xFFFF3366).copy(alpha = pulseAlpha)
-                        else if (isPinned) Color(0xFF00FFCC)
-                        else Color(0xFF00FFCC).copy(alpha = 0.3f),
+                        else if (isPinned) Color(0xFF39FF14)
+                        else Color(0xFF39FF14).copy(alpha = 0.3f),
                         RoundedCornerShape(12.dp)
                     )
                     .padding(2.dp)
             ) {
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        IconButton(
-                            onClick = { if (isPinned) viewModel.unpinPid(gauge.pid) else viewModel.pinPid(gauge.pid) },
-                            modifier = Modifier.align(Alignment.TopEnd).size(32.dp)
-                        ) {
-                            Text(if (isPinned) "📌" else "📍", fontSize = 12.sp)
-                        }
-                    }
-                    if (gauge.type == GaugeType.WAVE) {
-                        WaveGraphWidget(
-                            label = gauge.label,
-                            currentValue = currentValue,
-                            minVal = gauge.minVal,
-                            maxVal = gauge.maxVal,
-                            unit = gauge.unit,
-                            isAnomaly = isAnomaly,
-                            historyData = telemetryHistory[gauge.pid]
-                        )
-                    } else {
-                        GaugeWidget(
-                            label = gauge.label,
-                            value = currentValue,
-                            minVal = gauge.minVal,
-                            maxVal = gauge.maxVal,
-                            unit = gauge.unit,
-                            warningThreshold = gauge.maxVal * 0.75f,
-                            criticalThreshold = gauge.maxVal * 0.90f,
-                            isAnomaly = isAnomaly
-                        )
-                    }
+                if (gauge.type == GaugeType.WAVE) {
+                    WaveGraphWidget(
+                        label = gauge.label,
+                        currentValue = currentValue,
+                        minVal = gauge.minVal,
+                        maxVal = gauge.maxVal,
+                        unit = gauge.unit,
+                        isAnomaly = isAnomaly,
+                        historyData = telemetryHistory[gauge.pid]
+                    )
+                } else {
+                    GaugeWidget(
+                        label = gauge.label,
+                        value = currentValue,
+                        minVal = gauge.minVal,
+                        maxVal = gauge.maxVal,
+                        unit = gauge.unit,
+                        warningThreshold = gauge.maxVal * 0.75f,
+                        criticalThreshold = gauge.maxVal * 0.90f,
+                        isAnomaly = isAnomaly
+                    )
+                }
+                // Pin button as overlay — doesn't consume vertical space
+                IconButton(
+                    onClick = { if (isPinned) viewModel.unpinPid(gauge.pid) else viewModel.pinPid(gauge.pid) },
+                    modifier = Modifier.align(Alignment.TopEnd).size(28.dp)
+                ) {
+                    Text(if (isPinned) "📌" else "📍", fontSize = 10.sp)
                 }
             }
+        }
         }
     }
 }

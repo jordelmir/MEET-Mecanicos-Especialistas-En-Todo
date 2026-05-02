@@ -16,10 +16,6 @@ data class MonitorStatus(
     val complete: Boolean
 )
 
-data class DataLogEntry(
-    val timestamp: Long,
-    val sensorData: Map<String, Float>
-)
 
 data class QosMetrics(
     val cmdsPerSecond: Float = 0f,

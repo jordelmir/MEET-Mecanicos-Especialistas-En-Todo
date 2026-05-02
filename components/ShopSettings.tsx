@@ -20,6 +20,7 @@ export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, 
   const [freeWashThreshold, setFreeWashThreshold] = useState(currentFreeWashThreshold);
 
   const handleSave = () => {
+    if (openHour >= closeHour) return; // Prevent invalid schedule range
     onSave({ rules, openHour, closeHour, timeSlice, freeWashThreshold });
     onClose();
   };

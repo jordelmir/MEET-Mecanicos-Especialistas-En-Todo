@@ -38,10 +38,10 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
                         Text("←", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             
@@ -53,7 +53,7 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
 
             Text(
                 "Controles Bidireccionales",
-                color = Color(0xFF00FFCC),
+                color = Color(0xFF39FF14),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -85,7 +85,7 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
         if (showSafetyWarning && selectedTest != null) {
             AlertDialog(
                 onDismissRequest = { showSafetyWarning = false },
-                containerColor = Color(0xFF1A1A1A),
+                containerColor = Color(0xFF0A0E1A),
                 title = { Text("ADVERTENCIA DE SEGURIDAD", color = Color(0xFFFF003C), fontWeight = FontWeight.Black) },
                 text = {
                     Column {
@@ -107,7 +107,7 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
                             selectedTest?.let { viewModel.runActiveTest(it) }
                             showSafetyWarning = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14))
                     ) {
                         Text("CONFIRMAR Y EJECUTAR", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
@@ -125,7 +125,7 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
 @Composable
 fun ActiveTestItem(test: ActiveTest, isEnabled: Boolean, onClick: () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = if (isEnabled) Color(0xFF111111) else Color(0xFF0A0A0A)),
+        colors = CardDefaults.cardColors(containerColor = if (isEnabled) Color(0xFF111111) else Color(0xFF0A0E1A)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -146,13 +146,13 @@ fun ActiveTestItem(test: ActiveTest, isEnabled: Boolean, onClick: () -> Unit) {
                 if (test.manufacturer != null) {
                     Text(
                         "Específico: ${test.manufacturer}",
-                        color = Color(0xFF00FFCC),
+                        color = Color(0xFF39FF14),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
-            Text("▶", color = if (isEnabled) Color(0xFF00FFCC) else Color.DarkGray)
+            Text("▶", color = if (isEnabled) Color(0xFF39FF14) else Color.DarkGray)
         }
     }
 }
@@ -160,15 +160,15 @@ fun ActiveTestItem(test: ActiveTest, isEnabled: Boolean, onClick: () -> Unit) {
 @Composable
 fun ActiveTestProgressCard(status: ActiveTestStatus, onStop: () -> Unit) {
     Surface(
-        color = Color(0xFF00FFCC).copy(alpha = 0.1f),
+        color = Color(0xFF39FF14).copy(alpha = 0.1f),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth().border(2.dp, Color(0xFF00FFCC), RoundedCornerShape(16.dp))
+        modifier = Modifier.fillMaxWidth().border(2.dp, Color(0xFF39FF14), RoundedCornerShape(16.dp))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
                     progress = status.progress,
-                    color = Color(0xFF00FFCC),
+                    color = Color(0xFF39FF14),
                     modifier = Modifier.size(24.dp),
                     strokeWidth = 3.dp
                 )
@@ -186,7 +186,7 @@ fun ActiveTestProgressCard(status: ActiveTestStatus, onStop: () -> Unit) {
                     status.currentValues.forEach { (name, value) ->
                         Column {
                             Text(name, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-                            Text("${value}", color = Color(0xFF00FFCC), fontWeight = FontWeight.Black)
+                            Text("${value}", color = Color(0xFF39FF14), fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -196,7 +196,7 @@ fun ActiveTestProgressCard(status: ActiveTestStatus, onStop: () -> Unit) {
             LinearProgressIndicator(
                 progress = status.progress,
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                color = Color(0xFF00FFCC),
+                color = Color(0xFF39FF14),
                 trackColor = Color.White.copy(alpha = 0.1f)
             )
         }

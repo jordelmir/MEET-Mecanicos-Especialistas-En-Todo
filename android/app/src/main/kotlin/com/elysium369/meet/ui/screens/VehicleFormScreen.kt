@@ -38,10 +38,10 @@ fun VehicleFormScreen(
                         Text("←", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
             )
         },
-        containerColor = Color.Black
+        containerColor = Color(0xFF0A0E1A)
     ) { padding ->
         Column(
             modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)
@@ -51,7 +51,7 @@ fun VehicleFormScreen(
                 onValueChange = { make = it },
                 label = { Text("Marca", color = Color.Gray) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -59,7 +59,7 @@ fun VehicleFormScreen(
                 onValueChange = { model = it },
                 label = { Text("Modelo", color = Color.Gray) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -68,7 +68,7 @@ fun VehicleFormScreen(
                 label = { Text("Año", color = Color.Gray) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
             )
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -78,7 +78,7 @@ fun VehicleFormScreen(
                     onValueChange = { vin = it },
                     label = { Text("VIN (Opcional)", color = Color.Gray) },
                     modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF00FFCC), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), focusedTextColor = Color.White, unfocusedTextColor = Color.White, unfocusedBorderColor = Color.DarkGray)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -88,7 +88,7 @@ fun VehicleFormScreen(
                             if (readVin != null) vin = readVin
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.height(56.dp).border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp))
                 ) {
@@ -103,11 +103,11 @@ fun VehicleFormScreen(
                     viewModel.saveVehicle(make, model, year, vin)
                     navController.popBackStack() 
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
-                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("GUARDAR VEHÍCULO", color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                Text("GUARDAR VEHÍCULO", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
             }
         }
     }

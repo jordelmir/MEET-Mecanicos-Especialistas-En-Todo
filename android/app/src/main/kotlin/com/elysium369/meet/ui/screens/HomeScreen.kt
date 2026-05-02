@@ -17,6 +17,9 @@ import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.obd.ObdState
 import java.util.Calendar
+import com.elysium369.meet.ui.components.EliteScrollContainer
+import com.elysium369.meet.ui.components.eliteScrollbar
+
 
 @Composable
 fun HomeScreen(
@@ -34,11 +37,13 @@ fun HomeScreen(
         else -> "Buenas noches"
     }
 
+    val scrollState = rememberScrollState()
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Header
@@ -51,13 +56,13 @@ fun HomeScreen(
         Text(
             "MEET • Diagnóstico Profesional",
             style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF00FFCC).copy(alpha = 0.5f)
+            color = Color(0xFF39FF14).copy(alpha = 0.5f)
         )
 
         // DTC Alert Banner
         if (activeDtcs.isNotEmpty()) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.dp, Color(0xFFFF003C), RoundedCornerShape(12.dp))
@@ -85,14 +90,14 @@ fun HomeScreen(
 
         // Active Vehicle Card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.Black),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("VEHÍCULO ACTIVO", color = Color(0xFF00FFCC).copy(alpha = 0.6f),
+                Text("VEHÍCULO ACTIVO", color = Color(0xFF39FF14).copy(alpha = 0.6f),
                     style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
                     letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -111,26 +116,26 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { navController.navigate("scanner") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                            .border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("IR AL SCANNER", fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
+                        Text("IR AL SCANNER", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
                     }
                 } else {
                     Text("Sin vehículo seleccionado", color = Color.Gray)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { navController.navigate("garage") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp)),
+                            .border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("SELECCIONAR VEHÍCULO", fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
+                        Text("SELECCIONAR VEHÍCULO", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
                     }
                 }
             }
@@ -138,11 +143,11 @@ fun HomeScreen(
 
         // OBD2 Connection Card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.Black),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF00FFCC).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
         ) {
             Row(
                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -150,7 +155,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("CONEXIÓN OBD2", color = Color(0xFF00FFCC).copy(alpha = 0.6f),
+                    Text("CONEXIÓN OBD2", color = Color(0xFF39FF14).copy(alpha = 0.6f),
                         style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     val statusText = when(obdState) {
@@ -161,7 +166,7 @@ fun HomeScreen(
                         ObdState.ERROR -> "ERROR"
                     }
                     val statusColor = when(obdState) {
-                        ObdState.CONNECTED -> Color(0xFF00FFCC)
+                        ObdState.CONNECTED -> Color(0xFF39FF14)
                         ObdState.ERROR -> Color(0xFFFF003C)
                         ObdState.CONNECTING, ObdState.NEGOTIATING -> Color(0xFFFFD700)
                         else -> Color.Gray
@@ -171,30 +176,34 @@ fun HomeScreen(
                 if (obdState != ObdState.CONNECTED && obdState != ObdState.CONNECTING) {
                     Button(
                         onClick = { navController.navigate("connect") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0A0A)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.border(1.dp, Color(0xFF00FFCC), RoundedCornerShape(8.dp))
+                        modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp))
                     ) {
-                        Text("CONECTAR", fontWeight = FontWeight.Bold, color = Color(0xFF00FFCC))
+                        Text("CONECTAR", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
                     }
                 }
             }
         }
 
         // Quick Actions
-        Text("ACCIONES RÁPIDAS", color = Color(0xFF00FFCC).copy(alpha = 0.6f),
+        Text("ACCIONES RÁPIDAS", color = Color(0xFF39FF14).copy(alpha = 0.6f),
             style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("⚡", "Scanner", Color(0xFF00FFCC), Modifier.weight(1f)) { navController.navigate("scanner") }
+            QuickActionCard("⚡", "Scanner", Color(0xFF39FF14), Modifier.weight(1f)) { navController.navigate("scanner") }
             QuickActionCard("⚠️", "DTCs", Color(0xFFFF003C), Modifier.weight(1f)) { navController.navigate("dtc") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("🚗", "Garage", Color(0xFF00BFFF), Modifier.weight(1f)) { navController.navigate("garage") }
-            QuickActionCard("🤖", "IA", Color(0xFF00FFCC), Modifier.weight(1f)) { navController.navigate("ai") }
+            QuickActionCard("🚗", "Garage", Color(0xFF00AAFF), Modifier.weight(1f)) { navController.navigate("garage") }
+            QuickActionCard("🤖", "IA", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("ai") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("🔧", "Terminal", Color(0xFF00FFCC), Modifier.weight(1f)) { navController.navigate("terminal") }
+            QuickActionCard("🔧", "Terminal", Color(0xFF00AAFF), Modifier.weight(1f)) { navController.navigate("terminal") }
+            QuickActionCard("💬", "Soporte", Color(0xFFFFD700), Modifier.weight(1f)) { navController.navigate("support_chat") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            QuickActionCard("📄", "Reportes", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("reports") }
             QuickActionCard("⚙️", "Ajustes", Color.Gray, Modifier.weight(1f)) { navController.navigate("settings") }
         }
     }
@@ -209,7 +218,7 @@ private fun QuickActionCard(
     onClick: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Black),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
         shape = RoundedCornerShape(12.dp),
         modifier = modifier
             .height(72.dp)
