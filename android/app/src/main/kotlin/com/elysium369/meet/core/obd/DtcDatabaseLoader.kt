@@ -18,7 +18,7 @@ class DtcDatabaseLoader(
 
     fun loadIfEmpty() {
         loaderScope.launch {
-            if (db.dtcDefinitionDao().getCount() == 0) {
+            if (db.dtcDefinitionDao().getCount() < 2000) {
                 try {
                     val stream = context.assets.open("dtc_database_es.json")
                     val reader = InputStreamReader(stream)
