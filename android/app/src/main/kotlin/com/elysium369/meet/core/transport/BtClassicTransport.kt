@@ -71,16 +71,15 @@ class BtClassicTransport(
                 delay(500)
 
                 val connectionMethods = mutableListOf<Pair<String, () -> BluetoothSocket?>>()
+                // Prioritize Insecure SPP for ELM327 clones which often fail auth handshake
+                connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
                 connectionMethods.add("Standard SPP" to { device.createRfcommSocketToServiceRecord(SPP_UUID) })
                 connectionMethods.add("Reflection CH1" to { 
                     createRfcommMethod?.invoke(device, 1) as? BluetoothSocket 
                 })
-                connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
-                for (channel in 1..2) {
-                    connectionMethods.add("Insecure CH$channel" to {
-                        createInsecureRfcommMethod?.invoke(device, channel) as? BluetoothSocket
-                    })
-                }
+                connectionMethods.add("Reflection CH2" to { 
+                    createRfcommMethod?.invoke(device, 2) as? BluetoothSocket 
+                })
 
                 var lastException: Exception? = null
 
@@ -89,16 +88,17 @@ class BtClassicTransport(
                     Log.i(TAG, "→ Trying method: $methodName")
                     try {
                         cleanup()
+                        delay(200) // Brief pause before creating socket
                         socket = createSocket()
                         if (socket == null) {
                             Log.w(TAG, "  ✗ $methodName returned null socket, skipping")
                             continue
                         }
                         
-                        Log.d(TAG, "  Socket created, attempting connect (8s timeout)...")
-                        withTimeout(8000) {
-                            socket?.connect()
-                        }
+                        Log.d(TAG, "  Socket created, attempting connect natively...")
+                        // Removed withTimeout because socket.connect() is blocking and uninterruptible
+                        // If it fails, it will natively throw an IOException within 12s
+                        socket?.connect()
                         
                         inputStream = BufferedInputStream(socket?.inputStream, 32768)
                         outputStream = BufferedOutputStream(socket?.outputStream, 1024)
@@ -116,11 +116,16 @@ class BtClassicTransport(
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
                         cleanup()
-                        delay(400)
+                        delay(500) // Delay before trying next method
                     }
                 }
                 
                 Log.e(TAG, "═══ BT CONNECT FAILED ═══ All methods exhausted. Total: ${System.currentTimeMillis() - connectStartTime}ms")
+                // Format error nicely for UI if it's the classic socket read failed error
+                val errMsg = lastException?.message ?: ""
+                if (errMsg.contains("read failed, socket might closed") || errMsg.contains("timeout")) {
+                    throw java.io.IOException("No se pudo enlazar al ELM327. Desvincula el dispositivo en los ajustes de Bluetooth de Android y vuelve a emparejarlo.")
+                }
                 throw lastException ?: java.io.IOException("ELITE LINK FAILURE: El adaptador no respondió a ninguna estrategia de enlace.")
             }
         }

@@ -131,7 +131,7 @@ class ObdSession(
             _statusMessage.value = "Conexión OK. Negociando ELM327..."
             _state.value = ObdState.NEGOTIATING
             
-            withTimeout(35000) {
+            withTimeout(90000) {
                 initializeAdapter()
             }
             
@@ -854,7 +854,10 @@ class ObdSession(
             val protocols = listOf("ATSP6","ATSP7","ATSP3","ATSP5","ATSP8","ATSP1","ATSP2")
             Log.d(TAG, "  Step B: Manual protocol sweep")
             for (cmd in protocols) {
+                if (!isRunning) break
                 try {
+                    val pName = cmd.removePrefix("ATSP")
+                    _statusMessage.value = "Escaneando protocolo $pName..."
                     Log.d(TAG, "  Trying $cmd...")
                     sendInitCommand(cmd, baseDelay)
                     val resp = sendCommandDirectly("0100", timeoutMs = 4000L)
@@ -945,7 +948,8 @@ class ObdSession(
                 val current = buffer.toString().uppercase()
                 // Fast exit on definitive error/empty responses
                 if (current.contains("NO DATA") || current.contains("UNABLE") ||
-                    current.contains("CAN ERROR")) break
+                    current.contains("CAN ERROR") || current.contains("STOPPED") || 
+                    current.contains("ERROR")) break
                 // "?" alone means invalid command — exit
                 if (current.trimEnd().endsWith("?")) break
             } else {
