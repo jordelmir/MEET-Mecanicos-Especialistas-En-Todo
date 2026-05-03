@@ -992,13 +992,13 @@ class ObdSession(
 
     suspend fun readBatteryVoltage(): Float {
         // First try ELM327 internal voltage sensor (works even if ignition is off)
-        val response = sendRawCommand("ATRV")
+        val response = if (isRunning) sendRawCommand("ATRV") else sendCommandDirectly("ATRV", 2000L)
         val elmVoltage = response.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 0f
         
         if (elmVoltage > 5f) return elmVoltage
         
         // If that fails, try Mode 01 PID 42 (Control Module Voltage)
-        val obdResponse = sendRawCommand("0142")
+        val obdResponse = if (isRunning) sendRawCommand("0142") else sendCommandDirectly("0142", 3000L)
         val clean = CanMultiFrameParser.parse(obdResponse).replace(" ", "")
         return if (clean.length >= 4) {
             val a = clean.substring(clean.length - 4, clean.length - 2).toInt(16)
