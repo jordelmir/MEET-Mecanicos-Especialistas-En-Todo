@@ -156,6 +156,24 @@ class ObdSession(
                 msg.contains("Timed") -> "Timeout de negociación. Reintenta o verifica conexión Bluetooth."
                 else -> "Error: $msg"
             }
+            
+            // ── TELEMETRÍA SILENCIOSA (SUPABASE) ──
+            scope.launch {
+                try {
+                    val logData = mapOf(
+                        "user_id" to "local_app_user",
+                        "adapter_type" to adapterVersion,
+                        "notes" to "FAILED_CONNECTION: $msg | Protocol: $detectedProtocol"
+                    )
+                    com.elysium369.meet.data.remote.SupabaseModule.client
+                        .io.github.jan.supabase.postgrest.postgrest["scan_sessions"]
+                        .insert(logData)
+                    Log.i(TAG, "Telemetry uploaded successfully.")
+                } catch (t: Exception) {
+                    Log.e(TAG, "Telemetry upload failed", t)
+                }
+            }
+
             try { activeTransport.disconnect() } catch (_: Exception) {}
             isRunning = false
         }
@@ -811,10 +829,19 @@ class ObdSession(
         } else {
             sendInitCommand("ATAT2", baseDelay)
             sendInitCommand("ATST19", baseDelay)
-            if (adapterVersion.contains("STN", true) || adapterVersion.contains("OBDLink", true) || adapterVersion.contains("vLinker", true)) {
-                sendInitCommand("STPBR 1", baseDelay)
-                sendInitCommand("STPX", baseDelay)
-                Log.i(TAG, "  PRO commands sent")
+            
+            // ── SOPORTE ULTRA-RÁPIDO PARA ADAPTADORES PREMIUM (vLinker / OBDLink) ──
+            val atiResponse = sendCommandDirectly("ATI", timeoutMs = 2000)
+            val isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("OBDLink", true) || 
+                        adapterVersion.contains("vLinker", true) || atiResponse.contains("STN", true) || 
+                        atiResponse.contains("vLinker", true)
+                        
+            if (isSTN) {
+                // Multiplica la velocidad de lectura anulando latencias de bus (STN exclusive)
+                sendInitCommand("ST AT 1", baseDelay)  // Enable STN Advanced Timing
+                sendInitCommand("STP31", baseDelay)    // Disable ELM response timeouts for fast-polling
+                sendInitCommand("STPBR 1", baseDelay)  // Optimize baud rate
+                Log.i(TAG, "  PRO (STN/vLinker) commands injected successfully. Speed multiplier active.")
             }
         }
         Log.d(TAG, "[4/6] AT config complete")

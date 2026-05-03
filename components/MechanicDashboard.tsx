@@ -106,13 +106,13 @@ export function MechanicDashboard({
               {currentMechanic.specialty} · Eficiencia: {Math.round(currentMechanic.efficiencyFactor * 100)}%
             </div>
           </div>
-          <div className="text-right hidden sm:block">
-            <div className="font-mono text-2xl font-bold text-forge-500">{myOrders.length}</div>
-            <div className="font-mono text-[10px] text-steel-300">Pendientes</div>
+          <div className="text-right text-xs sm:text-sm shrink-0">
+            <div className="font-mono text-xl sm:text-2xl font-bold text-forge-500">{myOrders.length}</div>
+            <div className="font-mono text-[9px] sm:text-[10px] text-steel-300">Pendientes</div>
           </div>
-          <div className="text-right hidden sm:block">
-            <div className="font-mono text-2xl font-bold text-green-400">{completedToday}</div>
-            <div className="font-mono text-[10px] text-steel-300">Completadas</div>
+          <div className="text-right text-xs sm:text-sm shrink-0">
+            <div className="font-mono text-xl sm:text-2xl font-bold text-green-400">{completedToday}</div>
+            <div className="font-mono text-[9px] sm:text-[10px] text-steel-300">Completadas</div>
           </div>
         </div>
       )}
@@ -201,11 +201,11 @@ export function MechanicDashboard({
                   <span>{order.startTime.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               </div>
-              <div className="text-right hidden sm:block">
-                <div className="font-mono text-sm font-bold text-forge-500">
+              <div className="text-right shrink-0">
+                <div className="font-mono text-xs sm:text-sm font-bold text-forge-500">
                   ₡{order.price.toLocaleString('es-CR')}
                 </div>
-                <div className="font-mono text-[10px] text-steel-300">{formatDuration(order.estimatedMinutes)}</div>
+                <div className="font-mono text-[9px] sm:text-[10px] text-steel-300">{formatDuration(order.estimatedMinutes)}</div>
               </div>
               {next && (
                 <button
