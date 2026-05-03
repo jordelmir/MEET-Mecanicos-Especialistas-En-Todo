@@ -8,6 +8,7 @@ import com.elysium369.meet.core.transport.TransportInterface
 import com.elysium369.meet.core.transport.WifiTransport
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import io.github.jan.supabase.postgrest.postgrest
 
 enum class ObdState {
     DISCONNECTED,
@@ -166,7 +167,7 @@ class ObdSession(
                         "notes" to "FAILED_CONNECTION: $msg | Protocol: $detectedProtocol"
                     )
                     com.elysium369.meet.data.remote.SupabaseModule.client
-                        .io.github.jan.supabase.postgrest.postgrest["scan_sessions"]
+                        .postgrest["scan_sessions"]
                         .insert(logData)
                     Log.i(TAG, "Telemetry uploaded successfully.")
                 } catch (t: Exception) {
