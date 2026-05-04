@@ -20,7 +20,7 @@ import com.elysium369.meet.data.local.entities.*
         DashboardEntity::class,
         DashboardWidgetEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -2,6 +2,9 @@ package com.elysium369.meet.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.elysium369.meet.core.ai.GeminiDiagnostic
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
@@ -17,6 +20,19 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    /**
+     * Migration from v5 → v6: No schema changes — this is a version bump to escape
+     * the poisoned createFromAsset + fallbackToDestructiveMigration combination
+     * that was wiping vehicle data on every version change.
+     */
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // No schema changes — this migration exists solely to preserve user data
+            // by replacing fallbackToDestructiveMigration with an explicit no-op migration.
+            android.util.Log.i("MeetDB", "Migration 5→6: Preserving all user data (no schema changes)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -25,8 +41,26 @@ object AppModule {
             MeetDatabase::class.java,
             "meet_database"
         )
-        .createFromAsset("databases/meet_dtc.db")
-        .fallbackToDestructiveMigration()
+        // ⛔ REMOVED: createFromAsset("databases/meet_dtc.db")
+        // ROOT CAUSE of vehicle data loss — this combined with fallbackToDestructiveMigration
+        // caused Room to wipe ALL tables (including vehicles) on any schema version mismatch,
+        // then recreate from the asset file which contains zero vehicle records.
+        // DTC definitions are now loaded programmatically via DtcDatabaseLoader on first launch.
+
+        // ⛔ REMOVED: fallbackToDestructiveMigration()
+        // This silently destroyed user data. We now use explicit migrations.
+
+        .addMigrations(MIGRATION_5_6)
+        .addCallback(object : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                android.util.Log.i("MeetDB", "Database created fresh — DtcDatabaseLoader will populate DTCs on first use")
+            }
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                android.util.Log.d("MeetDB", "Database opened successfully — user data intact")
+            }
+        })
         .build()
     }
 

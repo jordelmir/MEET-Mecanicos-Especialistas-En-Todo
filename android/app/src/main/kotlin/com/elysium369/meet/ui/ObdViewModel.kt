@@ -298,6 +298,23 @@ class ObdViewModel @Inject constructor(
         // Subscriptions and Cloud Sync — isolated from main flow collectors
         viewModelScope.launch {
             try {
+                // ─── STEP 1: ALWAYS restore selected vehicle from local persistence ───
+                // This runs BEFORE cloud sync to ensure instant UI readiness.
+                val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                val savedVehicleId = prefs.getString("selected_vehicle_id", null)
+                
+                if (savedVehicleId != null) {
+                    val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
+                    if (vehicle != null) {
+                        _selectedVehicle.value = vehicle
+                        android.util.Log.d("ObdVM", "✅ Restored selected vehicle: ${vehicle.make} ${vehicle.model}")
+                    } else {
+                        android.util.Log.w("ObdVM", "⚠️ Saved vehicle ID not found in DB — clearing preference")
+                        prefs.edit().remove("selected_vehicle_id").apply()
+                    }
+                }
+
+                // ─── STEP 2: Cloud sync (only if authenticated) ───
                 val user = SupabaseManager.client.auth.currentUserOrNull()
                 _isPremium.value = subscriptionRepository.isPremium()
                 
@@ -305,17 +322,6 @@ class ObdViewModel @Inject constructor(
                     _cloudSyncState.value = "Sincronizando garaje..."
                     vehicleRepository.syncVehiclesFromCloud(user.id)
                     _cloudSyncState.value = "Sincronización completa"
-                    
-                    // Restore selected vehicle
-                    val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-                    val savedVehicleId = prefs.getString("selected_vehicle_id", null)
-                    
-                    if (savedVehicleId != null) {
-                        val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
-                        if (vehicle != null) {
-                            _selectedVehicle.value = vehicle
-                        }
-                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ObdVM", "Startup sync/restore failed", e)
