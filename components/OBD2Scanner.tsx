@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, AlertTriangle, Info, ShieldAlert, X, Wrench } from 'lucide-react';
 
-import { supabase } from '../lib/supabase';
+import dtcDatabase from '../dtc_database.json';
 
 interface OBD2ScannerProps {
   onClose: () => void;
@@ -23,20 +23,19 @@ export function OBD2Scanner({ onClose }: OBD2ScannerProps) {
     setResult(null);
 
     try {
-      const { data, error } = await supabase
-        .from('dtc_codes')
-        .select('*')
-        .eq('code', cleanCode)
-        .single();
+      // Simulate network delay for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-      if (error || !data) {
+      const data = dtcDatabase.find(dtc => dtc.code === cleanCode);
+
+      if (!data) {
         setResult(null);
       } else {
         setResult({
           code: data.code,
-          title: data.description_es,
-          desc: data.description_en, // we stored desc in en
-          fix: data.possible_causes,
+          title: data.descriptionEs,
+          desc: data.descriptionEn, // we stored desc in en
+          fix: data.possibleCauses,
           severity: data.severity === 'HIGH' ? 'high' : data.severity === 'MODERATE' ? 'medium' : 'low'
         });
       }
@@ -139,7 +138,7 @@ export function OBD2Scanner({ onClose }: OBD2ScannerProps) {
         
         <div className="bg-steel-900/50 p-4 border-t border-white/5 text-center">
           <p className="text-[10px] text-steel-500 font-mono uppercase tracking-wider">
-            Powered by MEET Engine AI · 2026 Database
+            Powered by MEET Engine AI · Base de Datos Local
           </p>
         </div>
       </div>

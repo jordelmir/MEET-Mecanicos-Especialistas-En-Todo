@@ -29,6 +29,11 @@ data class Vehicle(
     val make: String,
     val model: String,
     val engine: String,
+    val displacement_cc: Int = 0,
+    val engine_tech: String = "",
+    val transmission_type: String = "",
+    val transmission_subtype: String = "",
+    val fuel_type: String = "",
     val vin: String,
     val plate: String
 )
@@ -106,12 +111,53 @@ class VehicleRepository @Inject constructor(
         }
     }
 
+    suspend fun syncVehiclesFromCloud(userId: String) {
+        try {
+            val cloudVehicles = SupabaseManager.client.postgrest["vehicles"]
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                    }
+                }.decodeList<Vehicle>()
+            
+            cloudVehicles.forEach { vehicle ->
+                vehicleDao.insertVehicle(vehicle.toEntity())
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VehicleRepository", "Failed to sync vehicles from cloud", e)
+        }
+    }
+
     suspend fun getVehicleById(id: String): Vehicle? {
         return vehicleDao.getVehicleById(id)?.toDomain()
     }
     
     suspend fun insertVehicle(vehicle: Vehicle) {
+        // Save locally
         vehicleDao.insertVehicle(vehicle.toEntity())
+        
+        // Sync to cloud
+        try {
+            SupabaseManager.client.postgrest["vehicles"].upsert(vehicle)
+        } catch (e: Exception) {
+            android.util.Log.e("VehicleRepository", "Failed to push vehicle to cloud", e)
+        }
+    }
+
+    suspend fun deleteVehicle(vehicle: Vehicle) {
+        // Delete locally
+        vehicleDao.deleteVehicle(vehicle.toEntity())
+        
+        // Delete from cloud
+        try {
+            SupabaseManager.client.postgrest["vehicles"].delete {
+                filter {
+                    eq("id", vehicle.id)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("VehicleRepository", "Failed to delete vehicle from cloud", e)
+        }
     }
 }
 
@@ -122,6 +168,11 @@ fun VehicleEntity.toDomain() = Vehicle(
     make = make,
     model = model,
     engine = engine,
+    displacement_cc = displacementCc,
+    engine_tech = engineTech,
+    transmission_type = transmissionType,
+    transmission_subtype = transmissionSubtype,
+    fuel_type = fuelType,
     vin = vin,
     plate = plate
 )
@@ -133,6 +184,11 @@ fun Vehicle.toEntity() = VehicleEntity(
     make = make,
     model = model,
     engine = engine,
+    displacementCc = displacement_cc,
+    engineTech = engine_tech,
+    transmissionType = transmission_type,
+    transmissionSubtype = transmission_subtype,
+    fuelType = fuel_type,
     vin = vin,
     plate = plate,
     photoPath = null,

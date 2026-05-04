@@ -14,6 +14,9 @@ interface VehicleDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: VehicleEntity)
+
+    @Delete
+    suspend fun deleteVehicle(vehicle: VehicleEntity)
 }
 
 @Dao
@@ -67,13 +70,16 @@ interface AdapterProfileDao {
 @Dao
 interface DtcDefinitionDao {
     @Query("SELECT * FROM dtc_definitions WHERE code = :code")
-    suspend fun getDefinition(code: String): DtcDefinitionEntity?
+    suspend fun getDefinitions(code: String): List<DtcDefinitionEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDefinitions(definitions: List<DtcDefinitionEntity>)
     
     @Query("SELECT COUNT(*) FROM dtc_definitions")
     suspend fun getCount(): Int
+
+    @Query("SELECT * FROM dtc_definitions WHERE code LIKE '%' || :query || '%'")
+    suspend fun searchDefinitions(query: String): List<DtcDefinitionEntity>
 }
 
 @Dao

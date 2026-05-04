@@ -1,0 +1,47 @@
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kaptGenerateStubsDebugKotlin UP-TO-DATE
+> Task :app:kaptDebugKotlin UP-TO-DATE
+
+> Task :app:compileDebugKotlin
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt:420:13 Unresolved reference: _statusMessage
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt:420:28 Variable expected
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt:448:59 Unresolved reference: DtcDefinitionEntity
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt:481:16 Unresolved reference: DtcDefinitionEntity
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/DtcScreen.kt:139:82 Unresolved reference: getLocalDescription
+e: file:///Users/jordelmirsdevhome/Downloads/Web%20Apps/MEET%20Mecanicos%20Especialistas%20En%20Todo/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/DtcScreen.kt:152:13 Overload resolution ambiguity: 
+public fun Text(text: AnnotatedString, modifier: Modifier = ..., color: Color = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., inlineContent: Map<String, InlineTextContent> = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., style: TextStyle = ...): Unit defined in androidx.compose.material3
+public fun Text(text: String, modifier: Modifier = ..., color: Color = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., style: TextStyle = ...): Unit defined in androidx.compose.material3
+
+> Task :app:compileDebugKotlin FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 5s
+17 actionable tasks: 2 executed, 15 up-to-date

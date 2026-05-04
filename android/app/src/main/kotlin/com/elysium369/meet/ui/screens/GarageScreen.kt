@@ -54,7 +54,8 @@ fun GarageScreen(
         },
         containerColor = Color(0xFF0A0E1A)
     ) { padding ->
-        if (vehicles.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (vehicles.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🚗", style = MaterialTheme.typography.displayLarge)
@@ -138,14 +139,66 @@ fun GarageScreen(
                             
                             if (!isActive) {
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    "Toca para activar →",
-                                    color = Color(0xFF39FF14).copy(alpha = 0.4f),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Toca para activar →",
+                                        color = Color(0xFF39FF14).copy(alpha = 0.4f),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = { viewModel.deleteVehicle(vehicle) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Text("🗑️", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            } else {
+                                // For active vehicle, maybe allow deletion via long press or a small button too
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                    IconButton(
+                                        onClick = { viewModel.deleteVehicle(vehicle) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Text("🗑️", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // --- Deletion Animation ---
+        val isDeleting by viewModel.isDeletingVehicle.collectAsState()
+        if (isDeleting) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    com.elysium369.meet.ui.components.EliteDeletionAnimation()
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        "ELIMINANDO VEHÍCULO...",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        "SINCRONIZANDO NUBE",
+                        color = Color(0xFFFF003C).copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
         }

@@ -28,7 +28,7 @@ fun DtcStatCard(label: String, count: Int, color: Color, modifier: Modifier = Mo
 }
 
 @Composable
-fun DtcItemCard(code: String, type: String, color: Color) {
+fun DtcItemCard(code: String, type: String, color: Color, description: String = "Consultando diagnóstico...") {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
         shape = RoundedCornerShape(12.dp), 
@@ -43,7 +43,7 @@ fun DtcItemCard(code: String, type: String, color: Color) {
                         Text(type, color = color, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                Text(DtcDecoder.getLocalDescription(code), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(description, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

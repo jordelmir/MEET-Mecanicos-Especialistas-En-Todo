@@ -26,6 +26,7 @@ class DtcDatabaseLoader(
                     reader.close()
                     stream.close()
 
+                    android.util.Log.d("DtcLoader", "Starting DTC database load from JSON...")
                     val jsonArray = JSONArray(jsonString)
                     val definitions = mutableListOf<DtcDefinitionEntity>()
                     
@@ -46,9 +47,12 @@ class DtcDatabaseLoader(
                         )
                     }
                     db.dtcDefinitionDao().insertDefinitions(definitions)
+                    android.util.Log.d("DtcLoader", "Successfully loaded ${definitions.size} DTC definitions into Room.")
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    android.util.Log.e("DtcLoader", "Error loading DTC database", e)
                 }
+            } else {
+                android.util.Log.d("DtcLoader", "DTC database already contains ${db.dtcDefinitionDao().getCount()} entries. Skipping load.")
             }
         }
     }

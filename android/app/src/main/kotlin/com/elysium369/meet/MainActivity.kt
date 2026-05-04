@@ -1,5 +1,4 @@
 package com.elysium369.meet
-import com.elysium369.meet.core.obd.DtcDatabaseHelper
 
 import android.os.Bundle
 import android.os.Build
@@ -64,8 +63,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DtcDatabaseHelper.init(this)
-        
         checkPermissions()
 
         setContent {

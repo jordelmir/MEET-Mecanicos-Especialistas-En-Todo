@@ -10,7 +10,12 @@ data class VehicleEntity(
     val year: Int,
     val make: String,
     val model: String,
-    val engine: String,
+    val engine: String, // Keep for backward compatibility or as summary
+    val displacementCc: Int,
+    val engineTech: String, // VVT, Turbo, etc
+    val transmissionType: String, // Manual, Automatic
+    val transmissionSubtype: String, // CVT, DSG, 6AT
+    val fuelType: String,
     val vin: String,
     val plate: String,
     val photoPath: String?,
@@ -81,9 +86,12 @@ data class AdapterProfileEntity(
     val failedConnections: Int
 )
 
-@Entity(tableName = "dtc_definitions")
+@Entity(
+    tableName = "dtc_definitions",
+    primaryKeys = ["code"]
+)
 data class DtcDefinitionEntity(
-    @PrimaryKey val code: String,
+    val code: String,
     val descriptionEs: String,
     val descriptionEn: String,
     val system: String,

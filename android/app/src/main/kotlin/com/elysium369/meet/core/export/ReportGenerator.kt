@@ -168,7 +168,7 @@ class ReportGenerator(private val context: Context) {
         } else {
             paint.color = Color.parseColor("#D32F2F")
             dtcs.forEach { dtc ->
-                canvas.drawText("• ERROR $dtc: ${com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)}", x, y, paint)
+                canvas.drawText("• ERROR $dtc: Código de diagnóstico automotriz", x, y, paint)
                 y += 20f
             }
         }

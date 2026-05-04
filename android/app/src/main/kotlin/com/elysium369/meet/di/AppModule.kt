@@ -24,7 +24,10 @@ object AppModule {
             context,
             MeetDatabase::class.java,
             "meet_database"
-        ).fallbackToDestructiveMigration().build()
+        )
+        .createFromAsset("databases/meet_dtc.db")
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides

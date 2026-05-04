@@ -19,6 +19,7 @@ import com.elysium369.meet.data.local.entities.CustomPidEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 import android.content.Context
 import android.content.Intent
@@ -26,6 +27,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
+import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 
 @HiltViewModel
 class ObdViewModel @Inject constructor(
@@ -38,6 +40,7 @@ class ObdViewModel @Inject constructor(
     private val tripDao: TripDao,
     private val maintenanceAlertDao: MaintenanceAlertDao,
     private val customPidDao: CustomPidDao,
+    private val dtcDefinitionDao: com.elysium369.meet.data.local.dao.DtcDefinitionDao,
     @ApplicationContext private val context: Context,
     private val reportGenerator: com.elysium369.meet.core.export.ReportGenerator,
     private val diagnosticManager: com.elysium369.meet.core.obd.AdvancedDiagnosticManager
@@ -71,6 +74,12 @@ class ObdViewModel @Inject constructor(
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
 
+    fun selectVehicle(vehicle: Vehicle?) {
+        _selectedVehicle.value = vehicle
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .edit().putString("selected_vehicle_id", vehicle?.id).apply()
+    }
+
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
@@ -94,6 +103,21 @@ class ObdViewModel @Inject constructor(
 
     private val _clearDtcResult = MutableStateFlow<String?>(null)
     val clearDtcResult: StateFlow<String?> = _clearDtcResult.asStateFlow()
+    
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    private val _isDeletingVehicle = MutableStateFlow(false)
+    val isDeletingVehicle: StateFlow<Boolean> = _isDeletingVehicle.asStateFlow()
+
+    private val _isClearing = MutableStateFlow(false)
+    val isClearing: StateFlow<Boolean> = _isClearing.asStateFlow()
+
+    private val _dtcDefinitions = MutableStateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>>(emptyMap())
+    val dtcDefinitions: StateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>> = _dtcDefinitions.asStateFlow()
+
+    private val _manualSearchResults = MutableStateFlow<List<com.elysium369.meet.data.local.entities.DtcDefinitionEntity>>(emptyList())
+    val manualSearchResults: StateFlow<List<com.elysium369.meet.data.local.entities.DtcDefinitionEntity>> = _manualSearchResults.asStateFlow()
 
     private val _manufacturer = MutableStateFlow<String>("GENERIC")
     val manufacturer: StateFlow<String> = _manufacturer.asStateFlow()
@@ -106,6 +130,15 @@ class ObdViewModel @Inject constructor(
 
     private val _cloudSyncState = MutableStateFlow("")
     val cloudSyncState: StateFlow<String> = _cloudSyncState.asStateFlow()
+
+    private val _language = MutableStateFlow("es") // "es" or "en"
+    val language: StateFlow<String> = _language.asStateFlow()
+
+    fun setLanguage(lang: String) {
+        _language.value = lang
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .edit().putString("app_language", lang).apply()
+    }
 
     private val _qosMetrics = MutableStateFlow(QosMetrics())
     val qosMetrics: StateFlow<QosMetrics> = _qosMetrics.asStateFlow()
@@ -147,13 +180,13 @@ class ObdViewModel @Inject constructor(
     val maintenanceAlerts: StateFlow<List<MaintenanceAlertEntity>> = _selectedVehicle
         .flatMapLatest { vehicle ->
             vehicle?.let { maintenanceAlertDao.getAlertsForVehicle(it.id) } ?: flowOf(emptyList())
-        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         // PRODUCTION-GRADE: Each collector is isolated with try-catch to prevent
@@ -261,18 +294,45 @@ class ObdViewModel @Inject constructor(
             }
         }
 
-        // Subscriptions — isolated from main flow collectors
+        // Subscriptions and Cloud Sync — isolated from main flow collectors
         viewModelScope.launch {
-            _isPremium.value = try { 
-                subscriptionRepository.isPremium() 
-            } catch (_: Exception) { 
-                false 
+            try {
+                val user = SupabaseManager.client.auth.currentUserOrNull()
+                _isPremium.value = subscriptionRepository.isPremium()
+                
+                user?.let {
+                    _cloudSyncState.value = "Sincronizando garaje..."
+                    vehicleRepository.syncVehiclesFromCloud(it.id)
+                    _cloudSyncState.value = "Sincronización completa"
+                    
+                    // Restore selected vehicle
+                    val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                    val savedVehicleId = prefs.getString("selected_vehicle_id", null)
+                    
+                    if (savedVehicleId != null) {
+                        val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
+                        if (vehicle != null) {
+                            _selectedVehicle.value = vehicle
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ObdVM", "Startup sync/restore failed", e)
+                _cloudSyncState.value = "Error de sincronización"
+            }
+
+            // Monitor vehicles count for debugging
+            launch {
+                vehicles.collect { list ->
+                    android.util.Log.d("ObdVM", "Total vehicles in DB: ${list.size}")
+                }
             }
         }
 
         // Load persisted settings for Clone Mode & AI Config
         val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
         _forceCloneMode.value = prefs.getBoolean("force_clone_mode", false)
+        _language.value = prefs.getString("app_language", "es") ?: "es"
         val loadedConfig = AiConfig(
             provider = prefs.getString("ai_provider", "gemini") ?: "gemini",
             apiKey = prefs.getString("ai_api_key", "") ?: "",
@@ -396,15 +456,119 @@ class ObdViewModel @Inject constructor(
         _liveData.value = emptyMap()
     }
 
+    fun deleteVehicle(vehicle: Vehicle) {
+        viewModelScope.launch {
+            _isDeletingVehicle.value = true
+            try {
+                vehicleRepository.deleteVehicle(vehicle)
+                if (_selectedVehicle.value?.id == vehicle.id) {
+                    _selectedVehicle.value = null
+                }
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Error deleting vehicle", e)
+            } finally {
+                // Small delay to allow animation to show
+                kotlinx.coroutines.delay(800)
+                _isDeletingVehicle.value = false
+            }
+        }
+    }
+
     suspend fun refreshDiagnostics() {
-        _activeDtcs.value = obdSession.readActiveDtcs()
-        _pendingDtcs.value = obdSession.readPendingDtcs()
-        _permanentDtcs.value = obdSession.readPermanentDtcs()
-        _readinessMonitors.value = obdSession.readReadinessMonitors()
-        updateHealthScore()
+        _isScanning.value = true
+        try {
+            _activeDtcs.value = obdSession.readActiveDtcs()
+            _pendingDtcs.value = obdSession.readPendingDtcs()
+            _permanentDtcs.value = obdSession.readPermanentDtcs()
+            _readinessMonitors.value = obdSession.readReadinessMonitors()
+            
+            // Fetch definitions for all new DTCs
+            val allCodes = (_activeDtcs.value + _pendingDtcs.value + _permanentDtcs.value).distinct()
+            fetchDtcDefinitions(allCodes)
+            
+            updateHealthScore()
+        } catch (e: Exception) {
+            android.util.Log.e("ObdVM", "Failed to refresh diagnostics", e)
+        } finally {
+            _isScanning.value = false
+        }
+    }
+
+    private fun fetchDtcDefinitions(codes: List<String>) {
+        viewModelScope.launch {
+            val newDefinitions = _dtcDefinitions.value.toMutableMap()
+            val vehicleMake = _selectedVehicle.value?.make?.uppercase()
+            codes.forEach { code ->
+                if (!newDefinitions.containsKey(code)) {
+                    val defs = dtcDefinitionDao.getDefinitions(code)
+                    if (defs.isNotEmpty()) {
+                        val bestDef = defs.first()
+                        newDefinitions[code] = bestDef
+                    } else {
+                        newDefinitions[code] = generateFallbackDefinition(code)
+                    }
+                }
+            }
+            _dtcDefinitions.value = newDefinitions
+        }
+    }
+
+    private fun generateFallbackDefinition(code: String): DtcDefinitionEntity {
+        val letter = code.firstOrNull()?.uppercaseChar() ?: 'P'
+        val digit1 = code.drop(1).firstOrNull() ?: '0'
+        val digit2 = code.drop(2).firstOrNull() ?: '0'
+        
+        val isGeneric = digit1 == '0' || (letter == 'P' && digit1 == '2') || (letter == 'U' && digit1 == '3')
+        val genericStr = if (isGeneric) "Genérico" else "Específico del Fabricante"
+        
+        val systemName = when (letter) {
+            'P' -> "Motor/Transmisión"
+            'C' -> "Chasis"
+            'B' -> "Carrocería"
+            'U' -> "Red/Comunicación"
+            else -> "General"
+        }
+        
+        val subsys = if (letter == 'P') {
+            when (digit2.uppercaseChar()) {
+                '0', '1', '2' -> " - Medición de aire y combustible"
+                '3' -> " - Sistema de encendido o falla de cilindro"
+                '4' -> " - Controles auxiliares de emisiones"
+                '5' -> " - Control de velocidad, ralentí y entradas auxiliares"
+                '6' -> " - Computadora y circuitos de salida"
+                '7', '8', '9' -> " - Transmisión"
+                'A', 'B', 'C', 'D', 'E', 'F' -> " - Propulsión/Híbrido"
+                else -> ""
+            }
+        } else ""
+
+        val desc = "DTC $genericStr de $systemName$subsys. Definición exacta no disponible localmente."
+        val severity = if ((letter == 'P' || letter == 'U') && (digit1 == '0' || digit1 == '2')) "HIGH" else "MODERATE"
+        val urgency = if (severity == "HIGH") "STOP_DRIVING" else "CAUTION"
+        
+        return DtcDefinitionEntity(
+            code = code,
+            descriptionEn = "DTC $code. Exact definition not available locally.",
+            descriptionEs = desc,
+            system = when (letter) { 'P' -> "ENGINE"; 'C' -> "CHASSIS"; 'B' -> "BODY"; 'U' -> "NETWORK"; else -> "GENERAL" },
+            severity = severity,
+            possibleCauses = "Requiere escaneo profesional avanzado. / Requires advanced professional scan.",
+            urgency = urgency
+        )
+    }
+
+    fun searchDtcManual(query: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (query.isBlank()) {
+                _manualSearchResults.value = emptyList()
+            } else {
+                _manualSearchResults.value = dtcDefinitionDao.searchDefinitions(query).take(50)
+            }
+        }
     }
 
     suspend fun clearDtcs(): Boolean {
+        _isClearing.value = true
         _clearDtcResult.value = "Enviando comando de borrado..."
         val success = obdSession.clearDtcs()
         if (success) {
@@ -416,6 +580,7 @@ class ObdViewModel @Inject constructor(
         } else {
             _clearDtcResult.value = "❌ Error al borrar códigos. Asegúrese que el motor esté apagado y en contacto (IGNITION ON)."
         }
+        _isClearing.value = false
         return success
     }
 
@@ -425,31 +590,36 @@ class ObdViewModel @Inject constructor(
     suspend fun runSmartScan() {
         if (connectionState.value != ObdState.CONNECTED) return
         
+        _isScanning.value = true
         _cloudSyncState.value = "Iniciando Escaneo Inteligente Elite..."
         
-        // 1. Scan DTCs
-        _cloudSyncState.value = "Buscando códigos de falla (DTCs)..."
-        refreshDiagnostics()
-        
-        // 2. If DTCs found, fetch Freeze Frame for the first one
-        if (_activeDtcs.value.isNotEmpty()) {
-            _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
-            val firstDtc = _activeDtcs.value.first()
-            val ff = obdSession.readFreezeFrame(firstDtc)
-            val scoped = ff.mapKeys { (key, _) -> "$firstDtc:$key" }
-            _freezeFrameData.value = _freezeFrameData.value + scoped
+        try {
+            // 1. Scan DTCs
+            _cloudSyncState.value = "Buscando códigos de falla (DTCs)..."
+            refreshDiagnostics()
+            
+            // 2. If DTCs found, fetch Freeze Frame for the first one
+            if (_activeDtcs.value.isNotEmpty()) {
+                _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
+                val firstDtc = _activeDtcs.value.first()
+                val ff = obdSession.readFreezeFrame(firstDtc)
+                val scoped = ff.mapKeys { (key, _) -> "$firstDtc:$key" }
+                _freezeFrameData.value = _freezeFrameData.value + scoped
+            }
+            
+            // 3. Check Battery Voltage & Alternator health
+            _cloudSyncState.value = "Analizando sistema eléctrico..."
+            val voltage = obdSession.readBatteryVoltage()
+            val batteryHealth = if (voltage > 12.4f) "Excelente" else if (voltage > 11.8f) "Normal" else "Baja (Cargar)"
+            
+            // 4. Update status with detailed report
+            _cloudSyncState.value = "Escaneo completado. Batería: $batteryHealth (${voltage}V)"
+            
+            // 5. Auto-save session to cloud
+            saveSessionResults()
+        } finally {
+            _isScanning.value = false
         }
-        
-        // 3. Check Battery Voltage & Alternator health
-        _cloudSyncState.value = "Analizando sistema eléctrico..."
-        val voltage = obdSession.readBatteryVoltage()
-        val batteryHealth = if (voltage > 12.4f) "Excelente" else if (voltage > 11.8f) "Normal" else "Baja (Cargar)"
-        
-        // 4. Update status with detailed report
-        _cloudSyncState.value = "Escaneo completado. Batería: $batteryHealth (${voltage}V)"
-        
-        // 5. Auto-save session to cloud
-        saveSessionResults()
     }
 
     private fun detectManufacturer(vin: String) {
@@ -805,20 +975,45 @@ class ObdViewModel @Inject constructor(
         try { context.startService(intent) } catch (_: Exception) {}
     }
 
-    fun saveVehicle(make: String, model: String, year: String, vin: String?) {
+    fun saveVehicle(
+        make: String,
+        model: String,
+        year: String,
+        engineDisplacement: String,
+        engineTech: String,
+        transmission: String,
+        transmissionType: String,
+        fuelType: String,
+        plate: String,
+        vin: String?
+    ) {
         viewModelScope.launch {
+            val displacement = engineDisplacement.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
+            val enginePart = listOf(engineDisplacement, engineTech).filter { it.isNotBlank() }.joinToString(" ")
+            val transPart = listOf(transmission, transmissionType).filter { it.isNotBlank() }.joinToString(" - ")
+            val fullEngineDesc = listOf(enginePart, transPart, fuelType).filter { it.isNotBlank() }.joinToString(" | ")
+            
             val vehicle = Vehicle(
                 id = UUID.randomUUID().toString(),
                 user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
                 year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,
-                engine = "N/A",
-                vin = vin ?: "N/A",
-                plate = "N/A"
+                engine = if (fullEngineDesc.isBlank()) "N/A" else fullEngineDesc,
+                displacement_cc = displacement,
+                engine_tech = engineTech,
+                transmission_type = transmission,
+                transmission_subtype = transmissionType,
+                fuel_type = fuelType,
+                vin = vin?.ifBlank { "NOT_READ" } ?: "NOT_READ",
+                plate = plate.ifBlank { "NOT_SET" }
             )
+            
+            android.util.Log.d("ObdVM", "Saving vehicle: ${vehicle.make} ${vehicle.model} (ID: ${vehicle.id})")
             vehicleRepository.insertVehicle(vehicle)
-            _selectedVehicle.value = vehicle
+            
+            // Fix: Call selectVehicle to ensure persistence of the selected ID
+            selectVehicle(vehicle)
         }
     }
 

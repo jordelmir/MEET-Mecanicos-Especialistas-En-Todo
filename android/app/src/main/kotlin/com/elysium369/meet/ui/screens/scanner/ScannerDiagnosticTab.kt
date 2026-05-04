@@ -45,17 +45,22 @@ fun ScannerDiagnosticTab(
     var aiAnalysisResult by remember { mutableStateOf<String?>(null) }
     var isAnalyzingAi by remember { mutableStateOf(false) }
 
+    val isScanning by viewModel.isScanning.collectAsState()
+    val isClearing by viewModel.isClearing.collectAsState()
+    val syncStatus by viewModel.cloudSyncState.collectAsState()
+
     val listState = rememberLazyListState()
 
-    EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .eliteScrollbar(listState), 
-            contentPadding = PaddingValues(16.dp), 
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .eliteScrollbar(listState), 
+                contentPadding = PaddingValues(16.dp), 
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
         // Topology Section
         item {
             Column {
@@ -318,6 +323,44 @@ fun ScannerDiagnosticTab(
                 Text("BORRAR CÓDIGOS DE FALLA (RESET)", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
             }
         }
+        }
+
+        // Diagnostic Overlay Animation
+        if (isScanning || isClearing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (isClearing) {
+                        com.elysium369.meet.ui.components.EliteDeletionAnimation()
+                    } else {
+                        com.elysium369.meet.ui.components.EliteScannerAnimation(
+                            scanText = if (isScanning) "DIAGNÓSTICO" else "MÓDULOS"
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+                    
+                    Text(
+                        text = if (isClearing) "BORRANDO MEMORIA ECU..." else "ANALIZANDO SISTEMAS...",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    
+                    Text(
+                        text = syncStatus.uppercase(),
+                        color = (if (isClearing) Color(0xFFFF003C) else Color(0xFF00E5FF)).copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 12.dp),
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
         }
     }
 }

@@ -480,7 +480,7 @@ class GeminiDiagnostic(
         val sb = StringBuilder()
         sb.append("⚠️ MODO OFFLINE/FALLBACK ACTIVADO\n\n")
         dtcList.forEach { code ->
-            val desc = com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(code)
+            val desc = "DTC $code detectado en el sistema"
             sb.append("🔹 Código $code: $desc\n")
         }
         return sb.toString()
