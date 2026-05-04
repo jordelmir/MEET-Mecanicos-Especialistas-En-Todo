@@ -23,7 +23,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +91,8 @@ fun VehicleFormScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    var isSaving by remember { mutableStateOf(false) }
+    var saveSuccess by remember { mutableStateOf(false) }
 
     // Brand Colors
     val neonCyan = Color(0xFF00E5FF)
@@ -399,12 +406,17 @@ fun VehicleFormScreen(
 
             Button(
                 onClick = {
-                    if (isFormValid) {
+                    if (isFormValid && !isSaving) {
+                        isSaving = true
                         viewModel.saveVehicle(make, model, year, engineDisplacement, engineTech, transmission, transmissionType, fuelType, plate, vin)
-                        navController.popBackStack()
+                        coroutineScope.launch {
+                            saveSuccess = true
+                            delay(1200) // Show success animation
+                            navController.popBackStack()
+                        }
                     }
                 },
-                enabled = isFormValid,
+                enabled = isFormValid && !isSaving,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
@@ -428,6 +440,52 @@ fun VehicleFormScreen(
             }
             
             Spacer(modifier = Modifier.height(40.dp))
+        }
+
+        // ─── Save Success Overlay ───
+        AnimatedVisibility(
+            visible = saveSuccess,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(300))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f)),
+                contentAlignment = Alignment.Center
+            ) {
+                val pulseScale by rememberInfiniteTransition(label = "successPulse").animateFloat(
+                    initialValue = 0.9f,
+                    targetValue = 1.1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(600, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulse"
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "✅",
+                        fontSize = 64.sp,
+                        modifier = Modifier.scale(pulseScale)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "$make $model",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "AGREGADO AL GARAGE",
+                        color = Color(0xFF39FF14),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                }
+            }
         }
     }
 }

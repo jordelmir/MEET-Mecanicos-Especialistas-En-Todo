@@ -77,12 +77,17 @@ class ObdViewModel @Inject constructor(
 
     fun selectVehicle(vehicle: Vehicle?) {
         _selectedVehicle.value = vehicle
+        // Reset sensor smoothers when switching vehicles to prevent cross-vehicle data contamination
+        sensorSmoother.resetAll()
         context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
             .edit().putString("selected_vehicle_id", vehicle?.id).apply()
     }
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
+
+    // Smooth sensor interpolation — eliminates erratic jumps from raw ELM327 readings
+    private val sensorSmoother = SensorSmootherManager()
 
     private val _activeDtcs = MutableStateFlow<List<String>>(emptyList())
     val activeDtcs: StateFlow<List<String>> = _activeDtcs.asStateFlow()
@@ -194,13 +199,15 @@ class ObdViewModel @Inject constructor(
         // a single flow failure from crashing the entire ViewModel during startup.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
             
-            // Collect live data from session
+            // Collect live data from session — smoothed for professional gauge transitions
             launch {
                 try {
                     obdSession.liveData
-                        .collect { data -> 
-                            _liveData.value = data
-                            updateTelemetryHistory(data)
+                        .collect { rawData -> 
+                            // Apply per-PID moving average + exponential interpolation
+                            val smoothedData = sensorSmoother.smoothAll(rawData)
+                            _liveData.value = smoothedData
+                            updateTelemetryHistory(smoothedData)
                         }
                 } catch (e: Exception) {
                     android.util.Log.e("ObdVM", "liveData collector crashed", e)
