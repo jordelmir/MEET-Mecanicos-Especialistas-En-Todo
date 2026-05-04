@@ -19,9 +19,15 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteScrollContainer
@@ -229,8 +235,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                         item { ManualSearchTab(navController, viewModel, isSpanish) }
                     }
                 }
+                }
             }
-            
+
             // --- Creative Scanning Overlay ---
             if (isScanning) {
                 EliteScanningAnimation(isSpanish)

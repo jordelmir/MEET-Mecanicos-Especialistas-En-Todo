@@ -8,6 +8,7 @@ import com.elysium369.meet.data.supabase.SubscriptionRepository
 import io.github.jan.supabase.gotrue.auth
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.data.supabase.VehicleRepository
+import com.elysium369.meet.data.supabase.SupabaseManager
 import com.elysium369.meet.data.supabase.SessionLogRepository
 import com.elysium369.meet.data.supabase.DiagnosticSession
 import com.elysium369.meet.data.local.dao.TripDao
@@ -300,9 +301,9 @@ class ObdViewModel @Inject constructor(
                 val user = SupabaseManager.client.auth.currentUserOrNull()
                 _isPremium.value = subscriptionRepository.isPremium()
                 
-                user?.let {
+                if (user != null) {
                     _cloudSyncState.value = "Sincronizando garaje..."
-                    vehicleRepository.syncVehiclesFromCloud(it.id)
+                    vehicleRepository.syncVehiclesFromCloud(user.id)
                     _cloudSyncState.value = "Sincronización completa"
                     
                     // Restore selected vehicle

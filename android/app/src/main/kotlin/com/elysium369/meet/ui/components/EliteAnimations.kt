@@ -69,7 +69,7 @@ fun EliteScannerAnimation(
                 drawCircle(
                     color = radarColor.copy(alpha = 0.15f),
                     radius = radius * pulse,
-                    style = Stroke(width = 2.dp)
+                    style = Stroke(width = 2.dp.toPx())
                 )
                 
                 // Static grid
@@ -78,7 +78,7 @@ fun EliteScannerAnimation(
                     drawCircle(
                         color = radarColor.copy(alpha = gridAlpha),
                         radius = radius * (i / 4f),
-                        style = Stroke(width = 1.dp)
+                        style = Stroke(width = 1.dp.toPx())
                     )
                 }
 
@@ -107,7 +107,7 @@ fun EliteScannerAnimation(
                             center.x + radius * cos(0f),
                             center.y + radius * sin(0f)
                         ),
-                        strokeWidth = 3.dp,
+                        strokeWidth = 3.dp.toPx(),
                         cap = StrokeCap.Round
                     )
                 }
@@ -212,7 +212,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHexagon(
         }
         close()
     }
-    drawPath(path, color, style = Stroke(width = 1.dp))
+    drawPath(path, color, style = Stroke(width = 1.dp.toPx()))
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCornerMarkers(
