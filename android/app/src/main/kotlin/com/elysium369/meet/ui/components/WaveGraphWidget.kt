@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextStyle
@@ -58,10 +59,10 @@ fun WaveGraphWidget(
     )
 
     val activeColor = when {
-        isAnomaly -> Color(0xFFFF003C)
-        criticalThreshold != null && currentValue >= criticalThreshold -> Color(0xFFFF003C)
-        warningThreshold != null && currentValue >= warningThreshold -> Color(0xFFFFD700)
-        else -> Color(0xFF39FF14)
+        isAnomaly -> com.elysium369.meet.ui.theme.MeetColors.error
+        criticalThreshold != null && currentValue >= criticalThreshold -> com.elysium369.meet.ui.theme.MeetColors.error
+        warningThreshold != null && currentValue >= warningThreshold -> MeetColors.warning
+        else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
     }
 
     if (historyData == null) {
@@ -80,7 +81,7 @@ fun WaveGraphWidget(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .background(Color(0xFF0A0E1A), RoundedCornerShape(16.dp))
+            .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark, RoundedCornerShape(16.dp))
             .border(1.dp, activeColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
@@ -92,16 +93,16 @@ fun WaveGraphWidget(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(label.uppercase(), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Text(label.uppercase(), color = MeetColors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = if (hasData) String.format("%.1f", currentValue) else "---",
-                            color = if (hasData) Color.White else Color(0xFF555577),
+                            color = if (hasData) Color.White else MeetColors.textMuted,
                             fontSize = 24.sp, fontWeight = FontWeight.Black
                         )
                         Text(
                             text = " $unit",
-                            color = if (hasData) activeColor else Color(0xFF555577),
+                            color = if (hasData) activeColor else MeetColors.textMuted,
                             fontSize = 12.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
                         )
@@ -112,18 +113,18 @@ fun WaveGraphWidget(
                 if (isAnomaly) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFF003C).copy(alpha = 0.1f * pulseAlpha), RoundedCornerShape(4.dp))
-                            .border(1.dp, Color(0xFFFF003C).copy(alpha = pulseAlpha), RoundedCornerShape(4.dp))
+                            .background(com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.1f * pulseAlpha), RoundedCornerShape(4.dp))
+                            .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = pulseAlpha), RoundedCornerShape(4.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text("CRITICAL", color = Color(0xFFFF003C), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Text("CRITICAL", color = com.elysium369.meet.ui.theme.MeetColors.error, fontSize = 10.sp, fontWeight = FontWeight.Black)
                     }
                 } else if (hasData && displayHistory.size > 5) {
                     // Mini stats
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("▲ ${String.format("%.0f", dataMax)}", color = Color(0xFFFF003C).copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("μ ${String.format("%.0f", dataAvg)}", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("▼ ${String.format("%.0f", dataMin)}", color = Color(0xFF39FF14).copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        Text("▲ ${String.format("%.0f", dataMax)}", color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        Text("μ ${String.format("%.0f", dataAvg)}", color = MeetColors.textSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        Text("▼ ${String.format("%.0f", dataMin)}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -151,11 +152,11 @@ fun WaveGraphWidget(
                 if (warningThreshold != null) {
                     val warnY = height - ((warningThreshold - minVal) / range) * height
                     drawLine(
-                        color = Color(0xFFFFD700).copy(alpha = 0.3f),
+                        color = MeetColors.warning.copy(alpha = 0.3f),
                         start = Offset(0f, warnY), end = Offset(width, warnY),
                         strokeWidth = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
                     )
-                    val warnLabel = textMeasurer.measure("⚠ ${warningThreshold.toInt()}", TextStyle(color = Color(0xFFFFD700).copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold))
+                    val warnLabel = textMeasurer.measure("⚠ ${warningThreshold.toInt()}", TextStyle(color = MeetColors.warning.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold))
                     drawText(warnLabel, topLeft = Offset(4.dp.toPx(), warnY - warnLabel.size.height - 2.dp.toPx()))
                 }
 
@@ -163,11 +164,11 @@ fun WaveGraphWidget(
                 if (criticalThreshold != null) {
                     val critY = height - ((criticalThreshold - minVal) / range) * height
                     drawLine(
-                        color = Color(0xFFFF003C).copy(alpha = 0.3f),
+                        color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.3f),
                         start = Offset(0f, critY), end = Offset(width, critY),
                         strokeWidth = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
                     )
-                    val critLabel = textMeasurer.measure("🔴 ${criticalThreshold.toInt()}", TextStyle(color = Color(0xFFFF003C).copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold))
+                    val critLabel = textMeasurer.measure("🔴 ${criticalThreshold.toInt()}", TextStyle(color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold))
                     drawText(critLabel, topLeft = Offset(4.dp.toPx(), critY - critLabel.size.height - 2.dp.toPx()))
                 }
 
@@ -213,18 +214,18 @@ fun WaveGraphWidget(
                     // No data: flat dashed line + pulse
                     val midY = height / 2f
                     drawLine(
-                        color = Color(0xFF555577).copy(alpha = noDataPulse),
+                        color = MeetColors.textMuted.copy(alpha = noDataPulse),
                         start = Offset(0f, midY), end = Offset(width, midY),
                         strokeWidth = 1.dp.toPx(),
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f))
                     )
-                    val noDataLabel = textMeasurer.measure("ESPERANDO DATOS...", TextStyle(color = Color(0xFF555577).copy(alpha = noDataPulse), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp))
+                    val noDataLabel = textMeasurer.measure("ESPERANDO DATOS...", TextStyle(color = MeetColors.textMuted.copy(alpha = noDataPulse), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp))
                     drawText(noDataLabel, topLeft = Offset(width / 2 - noDataLabel.size.width / 2, midY - noDataLabel.size.height - 8.dp.toPx()))
                 }
 
                 // Y-axis labels (min/max)
-                val minLabel = textMeasurer.measure("${minVal.toInt()}", TextStyle(color = Color.Gray.copy(alpha = 0.4f), fontSize = 7.sp))
-                val maxLabel = textMeasurer.measure("${maxVal.toInt()}", TextStyle(color = Color.Gray.copy(alpha = 0.4f), fontSize = 7.sp))
+                val minLabel = textMeasurer.measure("${minVal.toInt()}", TextStyle(color = MeetColors.textSecondary.copy(alpha = 0.4f), fontSize = 7.sp))
+                val maxLabel = textMeasurer.measure("${maxVal.toInt()}", TextStyle(color = MeetColors.textSecondary.copy(alpha = 0.4f), fontSize = 7.sp))
                 drawText(minLabel, topLeft = Offset(width - minLabel.size.width - 2.dp.toPx(), height - minLabel.size.height))
                 drawText(maxLabel, topLeft = Offset(width - maxLabel.size.width - 2.dp.toPx(), 0f))
             }

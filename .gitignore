@@ -20,7 +20,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 logs/
-*.log
 
 # --- Editor & IDE ---
 .vscode/*
@@ -56,12 +55,22 @@ temp_gradle/
 __pycache__/
 *.pyc
 
-# --- APK Releases (keep in releases/ only) ---
+# --- APK Releases (track only latest) ---
 !releases/*.apk
+
+# --- Temp / Debug Logs ---
+*.log
+crash_log.txt
+full_log.txt
+logcat_dump.txt
+android/error_log.txt
+android/screen.png
+*.bak
+
+# --- Reference Images (local only) ---
+imagenes_referencia/
 
 # --- OS Generated ---
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-.vercel
-.env*.local

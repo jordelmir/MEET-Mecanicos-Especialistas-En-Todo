@@ -19,11 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.components.ConnectionStatusBar
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
 import com.elysium369.meet.ui.components.WaveGraphWidget
 import com.elysium369.meet.ui.components.GaugeWidget
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.neonGlow
 import kotlinx.coroutines.delay
 
 @Composable
@@ -116,12 +119,12 @@ private fun AnimatedEntryItem(
     )
     val scale by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0.85f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessLow),
         label = "entryScale$index"
     )
     val offsetY by animateFloatAsState(
-        targetValue = if (isVisible) 0f else 30f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isVisible) 0f else 40f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
         label = "entryOffset$index"
     )
 
@@ -144,7 +147,7 @@ private fun HealthIndexCard(
     healthScore: Int,
     anomalousPids: List<com.elysium369.meet.core.ai.HealthAnomaly>
 ) {
-    val scoreColor = if (healthScore > 80) Color(0xFF39FF14) else if (healthScore > 50) Color(0xFFFFD700) else Color(0xFFFF003C)
+    val scoreColor = if (healthScore > 80) MeetColors.neonGreen else if (healthScore > 50) MeetColors.warning else MeetColors.error
 
     val infiniteTransition = rememberInfiniteTransition(label = "healthPulse")
     val borderGlow by infiniteTransition.animateFloat(
@@ -153,16 +156,17 @@ private fun HealthIndexCard(
         label = "borderGlow"
     )
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+    EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        borderColor = scoreColor.copy(alpha = borderGlow),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
-            .border(1.dp, Brush.linearGradient(listOf(scoreColor.copy(alpha = borderGlow), Color.Transparent)), RoundedCornerShape(16.dp))
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = scoreColor
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("ÍNDICE DE SALUD VEHICULAR", color = Color.Gray, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text("ÍNDICE DE SALUD VEHICULAR", color = MeetColors.textMuted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = when {
@@ -189,17 +193,18 @@ private fun HealthIndexCard(
 
             if (anomalousPids.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    color = Color(0xFFFF3366).copy(alpha = 0.08f),
+                EliteCard(
+                    backgroundColor = MeetColors.error.copy(alpha = 0.08f),
+                    borderColor = MeetColors.error.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFF3366).copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("⚠️", fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "IA detectó ${anomalousPids.size} anomalía${if (anomalousPids.size > 1) "s" else ""} preventiva${if (anomalousPids.size > 1) "s" else ""}",
-                            color = Color(0xFFFF3366), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold
+                            color = MeetColors.error, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -229,17 +234,17 @@ private fun GaugeCard(
     )
 
     val borderColor = when {
-        isAnomaly -> Color(0xFFFF003C).copy(alpha = borderAlpha)
-        isPinned -> Color(0xFF39FF14).copy(alpha = 0.6f)
-        else -> Color(0xFF39FF14).copy(alpha = 0.15f)
+        isAnomaly -> com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = borderAlpha)
+        isPinned -> com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.6f)
+        else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.15f)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF06060F), RoundedCornerShape(14.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
-            .padding(2.dp)
+    EliteCard(
+        backgroundColor = MeetColors.backgroundDark,
+        borderColor = borderColor,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth().padding(2.dp),
+        glowColor = borderColor
     ) {
         if (gauge.type == GaugeType.WAVE) {
             WaveGraphWidget(
@@ -265,23 +270,24 @@ private fun GaugeCard(
         }
 
         // Pin overlay
-        IconButton(
+        com.elysium369.meet.ui.components.EliteIconButton(
             onClick = onTogglePin,
-            modifier = Modifier.align(Alignment.TopEnd).size(28.dp)
-        ) {
-            Text(if (isPinned) "📌" else "📍", fontSize = 10.sp)
-        }
+            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp),
+            icon = {
+                Text(if (isPinned) "📌" else "📍", fontSize = 10.sp)
+            }
+        )
 
         // Pinned badge
         if (isPinned) {
             Box(
                 modifier = Modifier.align(Alignment.TopStart)
                     .padding(6.dp)
-                    .background(Color(0xFF39FF14).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                    .border(0.5.dp, Color(0xFF39FF14).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    .background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                    .border(0.5.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text("HI-FREQ", color = Color(0xFF39FF14), fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                Text("HI-FREQ", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
             }
         }
     }

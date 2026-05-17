@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
@@ -95,10 +96,10 @@ fun VehicleFormScreen(
     var saveSuccess by remember { mutableStateOf(false) }
 
     // Brand Colors
-    val neonCyan = Color(0xFF00E5FF)
-    val neonMagenta = Color(0xFFD500F9)
-    val darkBackground = Color(0xFF070B14)
-    val surfaceColor = Color(0xFF111726)
+    val neonCyan = MeetColors.cyberCyan
+    val neonMagenta = MeetColors.hotMagenta
+    val darkBackground = MeetColors.backgroundDeep
+    val surfaceColor = MeetColors.backgroundDark
 
     Scaffold(
         topBar = {
@@ -189,7 +190,7 @@ fun VehicleFormScreen(
                         Text(
                             t("Cada detalle permite a la IA MEET ajustar los algoritmos de diagnóstico para tu motor específico.", 
                               "Every detail allows MEET AI to tune diagnostic algorithms for your specific engine."),
-                            color = Color.Gray,
+                            color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -433,7 +434,7 @@ fun VehicleFormScreen(
             ) {
                 Text(
                     t("GUARDAR EN GARAGE PROFESIONAL", "SAVE TO PROFESSIONAL GARAGE"),
-                    color = if (isFormValid) neonCyan else Color.Gray,
+                    color = if (isFormValid) neonCyan else MeetColors.textMuted,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
                 )
@@ -451,7 +452,7 @@ fun VehicleFormScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f)),
+                    .background(MeetColors.backgroundDeep.copy(alpha = 0.92f)),
                 contentAlignment = Alignment.Center
             ) {
                 val pulseScale by rememberInfiniteTransition(label = "successPulse").animateFloat(
@@ -479,7 +480,7 @@ fun VehicleFormScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "AGREGADO AL GARAGE",
-                        color = Color(0xFF39FF14),
+                        color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp
@@ -510,7 +511,7 @@ fun cyberpunkTextFieldColors(accentColor: Color) = OutlinedTextFieldDefaults.col
     focusedBorderColor = accentColor,
     unfocusedBorderColor = accentColor.copy(alpha = 0.3f),
     focusedLabelColor = accentColor,
-    unfocusedLabelColor = Color.Gray,
+    unfocusedLabelColor = MeetColors.textMuted,
     focusedTextColor = Color.White,
     unfocusedTextColor = Color.White,
     cursorColor = accentColor

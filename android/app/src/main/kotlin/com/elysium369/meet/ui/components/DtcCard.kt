@@ -8,10 +8,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteOutlinedButton
 
 @Composable
 fun DtcCard(
@@ -22,12 +26,12 @@ fun DtcCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+    EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .fillMaxWidth(),
+        onClick = { expanded = !expanded }
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -40,9 +44,9 @@ fun DtcCard(
                 )
                 
                 val severityColor = when(definition?.severity) {
-                    "CRITICAL" -> Color.Red
-                    "MODERATE" -> Color.Yellow
-                    else -> Color.Gray
+                    "CRITICAL" -> com.elysium369.meet.ui.theme.MeetColors.error
+                    "MODERATE" -> com.elysium369.meet.ui.theme.MeetColors.warning
+                    else -> MeetColors.textSecondary
                 }
                 
                 Surface(
@@ -67,26 +71,29 @@ fun DtcCard(
 
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = Color.DarkGray)
+                Divider(color = MeetColors.borderBlue)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text("Posibles Causas:", color = Color.White, fontWeight = FontWeight.Bold)
-                Text(definition?.possibleCauses ?: "--", color = Color.Gray)
+                Text(definition?.possibleCauses ?: "--", color = MeetColors.textSecondary)
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Button(
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    EliteButton(
+                        text = "🤖 Consultar IA",
                         onClick = { onConsultIa(dtcCode) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
-                    ) {
-                        Text("🤖 Consultar IA")
-                    }
+                        color = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
+                        modifier = Modifier.weight(1f)
+                    )
                     
                     if (isPremium) {
-                        OutlinedButton(onClick = { /* Ver Freeze Frame */ }) {
-                            Text("Ver Freeze Frame", color = Color(0xFFFF6B35))
-                        }
+                        EliteOutlinedButton(
+                            text = "Freeze Frame",
+                            onClick = { /* Ver Freeze Frame */ },
+                            color = MeetColors.warning,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }

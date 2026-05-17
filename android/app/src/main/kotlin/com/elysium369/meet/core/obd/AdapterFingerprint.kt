@@ -11,6 +11,7 @@ class AdapterFingerprint(context: Context) {
         prefs.edit().apply {
             putString("${address}_chip", profile.chipVersion)
             putBoolean("${address}_clone", profile.isClone)
+            putString("${address}_protocol", profile.detectedProtocol.name)
             apply()
         }
     }
@@ -18,16 +19,16 @@ class AdapterFingerprint(context: Context) {
     fun getProfile(address: String): ElmNegotiator.AdapterProfile? {
         val chip = prefs.getString("${address}_chip", null) ?: return null
         val isClone = prefs.getBoolean("${address}_clone", true)
+        val protocolName = prefs.getString("${address}_protocol", ObdProtocol.AUTO.name)
+        val protocol = try { ObdProtocol.valueOf(protocolName!!) } catch (_: Exception) { ObdProtocol.AUTO }
         
         return ElmNegotiator.AdapterProfile(
             chipVersion = chip,
             isClone = isClone,
-            supportedProtocols = listOf(ObdProtocol.AUTO),
-            optimalBaudRate = 38400,
-            commandDelayMs = if (isClone) 80L else 30L,
-            supportsSTN = chip.contains("STN", true),
-            supportsHeaders = !isClone,
-            maxLineLength = if (isClone) 48 else 256
+            isSTN = chip.contains("STN", true) || chip.contains("vLinker", true),
+            detectedProtocol = protocol,
+            baseDelayMs = if (isClone) 70L else 20L,
+            maxLineLength = if (isClone) 64 else 512
         )
     }
 

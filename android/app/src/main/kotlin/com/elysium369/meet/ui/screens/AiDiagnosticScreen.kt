@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.EliteTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,34 +45,30 @@ fun AiDiagnosticScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("MEET AI", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Text("←", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    }
-                },
+            EliteTopAppBar(
+                title = "MEET iA",
+                onBackClick = onBack,
+                backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     IconButton(onClick = { isConfigOpen = !isConfigOpen }) {
                         Text("⚙️", style = MaterialTheme.typography.titleMedium)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+                }
             )
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = MeetColors.backgroundDark
     ) { padding ->
         Column(
             modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)
         ) {
             if (isConfigOpen) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                    colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).border(1.dp, MeetColors.electricBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Configuración de Motor IA", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
+                        Text("Configuración de Motor IA", color = MeetColors.electricBlue, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         // Providers
@@ -85,7 +83,7 @@ fun AiDiagnosticScreen(
                                 value = provider,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Proveedor IA", color = Color.Gray) },
+                                label = { Text("Proveedor IA", color = MeetColors.textMuted) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                                 modifier = Modifier.menuAnchor().fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -111,7 +109,7 @@ fun AiDiagnosticScreen(
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            label = { Text("API Key (Vacío para Local)", color = Color.Gray) },
+                            label = { Text("API Key (Vacío para Local)", color = MeetColors.textMuted) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                         )
@@ -122,7 +120,7 @@ fun AiDiagnosticScreen(
                             OutlinedTextField(
                                 value = baseUrl,
                                 onValueChange = { baseUrl = it },
-                                label = { Text("Custom Base URL (Ej. http://192.168.1.100:11434)", color = Color.Gray) },
+                                label = { Text("Custom Base URL (Ej. http://192.168.1.100:11434)", color = MeetColors.textMuted) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                             )
@@ -139,7 +137,7 @@ fun AiDiagnosticScreen(
                                     .remove("ai_base_url")
                                     .apply()
                             }) {
-                                Text("Limpiar", color = Color(0xFFFF003C))
+                                Text("Limpiar", color = com.elysium369.meet.ui.theme.MeetColors.error)
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
@@ -159,7 +157,7 @@ fun AiDiagnosticScreen(
                                         }
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCC00FF))
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue)
                             ) {
                                 Text("Guardar API", color = Color.Black, fontWeight = FontWeight.Bold)
                             }
@@ -170,40 +168,40 @@ fun AiDiagnosticScreen(
 
             if (dtcCode.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                    colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    modifier = Modifier.fillMaxWidth().border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                        Text("Código a analizar", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-                        Text(dtcCode, color = Color(0xFF39FF14), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text("Código a analizar", color = MeetColors.textMuted, style = MaterialTheme.typography.labelSmall)
+                        Text(dtcCode, color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
             } else {
-                Text("Chat Libre con IA", color = Color.Gray, modifier = Modifier.padding(bottom = 16.dp))
+                Text("Chat Libre con IA", color = MeetColors.textSecondary, modifier = Modifier.padding(bottom = 16.dp))
             }
             
             // AI Response
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, MeetColors.electricBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxSize().verticalScroll(rememberScrollState())) {
                     Text("🤖 IA Preparada ($provider)", color = Color.White, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     if (apiKey.isEmpty() && provider != "Local/Ollama") {
-                        Text("⚠️ No has configurado tu API Key. Toca el engranaje arriba a la derecha para configurarla.", color = Color(0xFFFFD700))
+                        Text("⚠️ No has configurado tu API Key. Toca el engranaje arriba a la derecha para configurarla.", color = MeetColors.warning)
                     } else if (isLoading) {
-                        CircularProgressIndicator(color = Color(0xFFCC00FF))
+                        CircularProgressIndicator(color = MeetColors.electricBlue)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Consultando IA con el Freeze Frame actual. Por favor espera unos segundos...", color = Color.LightGray)
+                        Text("Consultando IA con el Freeze Frame actual. Por favor espera unos segundos...", color = MeetColors.textSecondary)
                     } else if (aiResponse != null) {
                         Text(aiResponse.orEmpty(), color = Color.White)
                     } else if (dtcCode.isEmpty()) {
-                        Text("¿En qué te puedo ayudar con el diagnóstico de tu vehículo hoy?", color = Color.LightGray)
+                        Text("¿En qué te puedo ayudar con el diagnóstico de tu vehículo hoy?", color = MeetColors.textSecondary)
                     }
                 }
             }
@@ -214,12 +212,12 @@ fun AiDiagnosticScreen(
                 onClick = { 
                     viewModel.generateFullReport(aiResponse)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
+                colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
+                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
                 enabled = aiResponse != null
             ) {
-                Text("EXPORTAR REPORTE IA (PDF)", color = if (aiResponse != null) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold)
+                Text("EXPORTAR REPORTE IA (PDF)", color = if (aiResponse != null) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textMuted, fontWeight = FontWeight.Bold)
             }
         }
     }

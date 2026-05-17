@@ -19,35 +19,52 @@ import java.util.ArrayDeque
  */
 class SmoothSensorValue(
     private val windowSize: Int = 5,
-    private val smoothingFactor: Float = 0.15f
+    private val smoothingFactor: Float = 0.15f,
+    private val outlierTolerance: Float? = null
 ) {
     private var currentDisplayValue: Float = 0f
     private var targetValue: Float = 0f
     private val history = ArrayDeque<Float>(windowSize + 1)
     private var initialized = false
+    private var rejectedCount = 0
 
     /**
      * Feed a new raw sensor reading. Returns the smoothed display value.
      *
      * The smoothing pipeline:
-     * 1. Add to moving average window
-     * 2. Compute windowed average (noise filter)
-     * 3. Exponentially interpolate from current display value toward average
+     * 1. Outlier Rejection: Reject impossible physical jumps.
+     * 2. Add to moving average window
+     * 3. Compute windowed average (noise filter)
+     * 4. Exponentially interpolate from current display value toward average
      */
     fun update(rawValue: Float): Float {
+        if (!initialized) {
+            // First reading — snap to value immediately
+            currentDisplayValue = rawValue
+            targetValue = rawValue
+            history.addLast(rawValue)
+            initialized = true
+            return currentDisplayValue
+        }
+
+        // Outlier Rejection logic
+        if (outlierTolerance != null) {
+            val jump = Math.abs(rawValue - targetValue)
+            if (jump > outlierTolerance) {
+                // Ignore reading if it's too erratic, but don't ignore forever if it's a valid new state
+                rejectedCount++
+                if (rejectedCount < 5) {
+                    return currentDisplayValue // Ignore this spike
+                }
+            }
+        }
+        rejectedCount = 0 // Valid reading, reset counter
+
         // Moving average filter — removes ELM327 noise spikes
         history.addLast(rawValue)
         if (history.size > windowSize) history.removeFirst()
 
         val averagedTarget = history.average().toFloat()
-
-        if (!initialized) {
-            // First reading — snap to value immediately
-            currentDisplayValue = averagedTarget
-            targetValue = averagedTarget
-            initialized = true
-            return currentDisplayValue
-        }
 
         targetValue = averagedTarget
 
@@ -117,7 +134,8 @@ class SensorSmootherManager {
         val smoother = smoothers.getOrPut(pid) {
             SmoothSensorValue(
                 windowSize = getWindowSizeForPid(pid),
-                smoothingFactor = getSmoothingFactorForPid(pid)
+                smoothingFactor = getSmoothingFactorForPid(pid),
+                outlierTolerance = getOutlierToleranceForPid(pid)
             )
         }
         return smoother.update(rawValue)
@@ -180,6 +198,23 @@ class SensorSmootherManager {
             "2F", "0A", "46", "33", "1F" -> 0.30f  // Fuel, Pressure, Ambient, Runtime
             // Default
             else -> 0.15f
+        }
+    }
+
+    private fun getOutlierToleranceForPid(pid: String): Float? {
+        return when (pid) {
+            // RPM can jump fast, but not 3000 in 1 update
+            "0C" -> 2000f
+            // Speed can jump but not 100km/h in 1 update
+            "0D" -> 40f
+            // Temperature changes slowly, 15 degrees max jump
+            "05", "46", "5C", "0F" -> 15f
+            // Voltage (usually PID 42) doesn't jump 2V instantly
+            "42" -> 2.0f
+            // Percentage limits (0-100), shouldn't jump 50% in one tick usually
+            "11", "04", "2F" -> 40f
+            // Fallback for others
+            else -> null
         }
     }
 }

@@ -21,6 +21,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import com.elysium369.meet.core.alerts.AlertManager
 import javax.inject.Inject
 import android.content.Context
 import android.content.Intent
@@ -29,6 +30,14 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
+import com.elysium369.meet.data.local.entities.DtcEventEntity
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.elysium369.meet.core.sync.SyncWorker
+import com.elysium369.meet.core.livelink.LiveLinkServer
+import com.elysium369.meet.core.livelink.TelemetrySnapshot
 
 @HiltViewModel
 class ObdViewModel @Inject constructor(
@@ -41,10 +50,14 @@ class ObdViewModel @Inject constructor(
     private val tripDao: TripDao,
     private val maintenanceAlertDao: MaintenanceAlertDao,
     private val customPidDao: CustomPidDao,
+    private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao,
     private val dtcDefinitionDao: com.elysium369.meet.data.local.dao.DtcDefinitionDao,
     @ApplicationContext private val context: Context,
     private val reportGenerator: com.elysium369.meet.core.export.ReportGenerator,
-    private val diagnosticManager: com.elysium369.meet.core.obd.AdvancedDiagnosticManager
+    private val diagnosticManager: com.elysium369.meet.core.obd.AdvancedDiagnosticManager,
+    private val localExpertSystem: com.elysium369.meet.core.obd.LocalExpertSystem,
+    private val alertManager: AlertManager,
+    private val predictiveHealthEngine: com.elysium369.meet.core.health.PredictiveHealthEngine
 ) : ViewModel() {
 
     val connectionState: StateFlow<ObdState> = obdSession.state
@@ -53,6 +66,11 @@ class ObdViewModel @Inject constructor(
     // --- Force Clone Mode ---
     private val _forceCloneMode = MutableStateFlow(false)
     val forceCloneMode: StateFlow<Boolean> = _forceCloneMode.asStateFlow()
+
+    // ── LiveLink (Opt-in remote telemetry) ──
+    private var _liveLinkServer: LiveLinkServer? = null
+    fun attachLiveLinkServer(server: LiveLinkServer) { _liveLinkServer = server }
+    fun detachLiveLinkServer() { _liveLinkServer = null }
     
     // isAdapterPro respects forceCloneMode override
     val isAdapterPro: StateFlow<Boolean> = combine(
@@ -89,14 +107,36 @@ class ObdViewModel @Inject constructor(
     // Smooth sensor interpolation — eliminates erratic jumps from raw ELM327 readings
     private val sensorSmoother = SensorSmootherManager()
 
-    private val _activeDtcs = MutableStateFlow<List<String>>(emptyList())
-    val activeDtcs: StateFlow<List<String>> = _activeDtcs.asStateFlow()
+    private var currentSessionId: String = UUID.randomUUID().toString()
 
-    private val _pendingDtcs = MutableStateFlow<List<String>>(emptyList())
-    val pendingDtcs: StateFlow<List<String>> = _pendingDtcs.asStateFlow()
+    val activeDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
+        vehicle?.let { 
+            dtcDao.getUnresolvedDtcsForVehicle(it.id)
+                .map { list -> list.filter { it.status == "ACTIVE" } }
+        } ?: flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private val _permanentDtcs = MutableStateFlow<List<String>>(emptyList())
-    val permanentDtcs: StateFlow<List<String>> = _permanentDtcs.asStateFlow()
+    val pendingDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
+        vehicle?.let { 
+            dtcDao.getUnresolvedDtcsForVehicle(it.id)
+                .map { list -> list.filter { it.status == "PENDING" } }
+        } ?: flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val permanentDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
+        vehicle?.let { 
+            dtcDao.getUnresolvedDtcsForVehicle(it.id)
+                .map { list -> list.filter { it.status == "PERMANENT" } }
+        } ?: flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Backwards compatibility for logic that only needs the strings
+    val activeDtcs: StateFlow<List<String>> = activeDtcEvents.map { list -> list.map { it.code } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val pendingDtcs: StateFlow<List<String>> = pendingDtcEvents.map { list -> list.map { it.code } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val permanentDtcs: StateFlow<List<String>> = permanentDtcEvents.map { list -> list.map { it.code } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _readinessMonitors = MutableStateFlow<ReadinessResult?>(null)
     val readinessMonitors: StateFlow<ReadinessResult?> = _readinessMonitors.asStateFlow()
@@ -128,6 +168,33 @@ class ObdViewModel @Inject constructor(
     private val _manufacturer = MutableStateFlow<String>("GENERIC")
     val manufacturer: StateFlow<String> = _manufacturer.asStateFlow()
 
+    private val _aiDtcExplanations = MutableStateFlow<Map<String, String>>(emptyMap())
+    val aiDtcExplanations: StateFlow<Map<String, String>> = _aiDtcExplanations.asStateFlow()
+
+    fun fetchAiExplanationForDtc(dtc: String, fallbackDescription: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (_aiDtcExplanations.value.containsKey(dtc)) return@launch
+            
+            val vehicle = _selectedVehicle.value
+            val vInfo = if (vehicle != null) "${vehicle.year} ${vehicle.make} ${vehicle.model}" else "Vehículo Genérico"
+            
+            try {
+                // Update AI status to loading
+                _aiDtcExplanations.update { it + (dtc to "CARGANDO...") }
+                
+                val result = geminiDiagnostic.analyzeDtc(
+                    dtcList = listOf(dtc),
+                    vehicleInfo = vInfo,
+                    liveData = emptyMap()
+                )
+                
+                _aiDtcExplanations.update { it + (dtc to result.analysisText) }
+            } catch (e: Exception) {
+                _aiDtcExplanations.update { it + (dtc to "ERROR: No se pudo conectar con la IA. Use el manual offline.") }
+            }
+        }
+    }
+
     private val _isPremium = MutableStateFlow(false)
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
@@ -153,11 +220,43 @@ class ObdViewModel @Inject constructor(
     private val _telemetryHistory = MutableStateFlow<Map<String, List<Float>>>(emptyMap())
     val telemetryHistory: StateFlow<Map<String, List<Float>>> = _telemetryHistory.asStateFlow()
 
+    // Oscilloscope Buffer (High-Frequency with Timestamps)
+    private val _oscilloscopeBuffer = MutableStateFlow<Map<String, List<Pair<Long, Float>>>>(emptyMap())
+    val oscilloscopeBuffer: StateFlow<Map<String, List<Pair<Long, Float>>>> = _oscilloscopeBuffer.asStateFlow()
+
     val highSpeedMode: StateFlow<Boolean> = obdSession.highSpeedMode
     val pinnedPids: StateFlow<Set<String>> = obdSession.pinnedPids
 
     val activeTestStatus: StateFlow<ActiveTestStatus> = obdSession.activeTestStatus
     val availableActiveTests: List<ActiveTest> = PidRegistry.ACTIVE_TESTS
+
+    // ── Vehicle Identification (Car Scanner Pro style) ──
+    val detectedProtocol: StateFlow<String> = obdSession.detectedProtocolFlow
+    val adapterVersion: StateFlow<String> = obdSession.adapterVersionFlow
+    val isCloneAdapter: StateFlow<Boolean> = obdSession.isCloneAdapterFlow
+    val calibrationId: StateFlow<String?> = obdSession.calibrationId
+    val ecuName: StateFlow<String?> = obdSession.ecuName
+
+    // --- Network Topology ---
+    val networkTopology: StateFlow<List<NetworkModule>> = obdSession.networkTopology
+    val isScanningTopology: StateFlow<Boolean> = obdSession.isScanningTopology
+
+    fun scanNetworkTopology() {
+        viewModelScope.launch(Dispatchers.IO) {
+            obdSession.scanNetworkTopology()
+        }
+    }
+
+    // --- Digital Oscilloscope ---
+    val oscilloscopeStream: SharedFlow<Pair<Long, Float>> = obdSession.oscilloscopeStream
+
+    fun startOscilloscope(pidCode: String) {
+        obdSession.startOscilloscope(pidCode)
+    }
+
+    fun stopOscilloscope() {
+        obdSession.stopOscilloscope()
+    }
 
     // --- AI and Health State ---
     private val _anomalousPids = MutableStateFlow<List<com.elysium369.meet.core.ai.HealthAnomaly>>(emptyList())
@@ -169,6 +268,19 @@ class ObdViewModel @Inject constructor(
 
     private val _healthScore = MutableStateFlow(100)
     val healthScore: StateFlow<Int> = _healthScore.asStateFlow()
+
+    private val _localDiagnostics = MutableStateFlow<List<ExpertDiagnosticProcedure>>(emptyList())
+    val localDiagnostics: StateFlow<List<ExpertDiagnosticProcedure>> = _localDiagnostics.asStateFlow()
+
+    // --- Predictive Health Engine State ---
+    private val _predictiveHealthReport = MutableStateFlow<com.elysium369.meet.core.health.PredictiveHealthReport?>(null)
+    val predictiveHealthReport: StateFlow<com.elysium369.meet.core.health.PredictiveHealthReport?> = _predictiveHealthReport.asStateFlow()
+
+    private val _isAnalyzingHealth = MutableStateFlow(false)
+    val isAnalyzingHealth: StateFlow<Boolean> = _isAnalyzingHealth.asStateFlow()
+
+    private val healthSessionId = UUID.randomUUID().toString()
+    private var sensorRecordingCounter = 0
 
     // --- Logging State ---
     private val _isLogging = MutableStateFlow(false)
@@ -204,10 +316,65 @@ class ObdViewModel @Inject constructor(
                 try {
                     obdSession.liveData
                         .collect { rawData -> 
+                            val timestamp = System.currentTimeMillis()
                             // Apply per-PID moving average + exponential interpolation
-                            val smoothedData = sensorSmoother.smoothAll(rawData)
+                            val smoothedData = sensorSmoother.smoothAll(rawData).toMutableMap()
+                            
+                            // Restore raw voltage for oscilloscope and fast gauges (bypass second smoothing)
+                            rawData["0142"]?.let { smoothedData["0142"] = it }
+                            rawData["42"]?.let { smoothedData["42"] = it }
+                            
                             _liveData.value = smoothedData
+                            _localDiagnostics.value = localExpertSystem.analyzeLiveTelemetry(smoothedData)
                             updateTelemetryHistory(smoothedData)
+                            updateOscilloscopeBuffer(timestamp, rawData)
+
+                            // ── LiveLink broadcast (only if server is active) ──
+                            _liveLinkServer?.let { server ->
+                                if (server.isRunning.value) {
+                                    launch(Dispatchers.IO) {
+                                        try {
+                                            val snap = TelemetrySnapshot(
+                                                rpm = smoothedData["010C"]?.toInt() ?: 0,
+                                                speed = smoothedData["010D"]?.toInt() ?: 0,
+                                                coolantTemp = smoothedData["0105"]?.toInt() ?: 0,
+                                                intakeTemp = smoothedData["010F"]?.toInt() ?: 0,
+                                                throttlePos = smoothedData["0111"] ?: 0f,
+                                                engineLoad = smoothedData["0104"] ?: 0f,
+                                                fuelPressure = smoothedData["010A"]?.toInt() ?: 0,
+                                                timingAdvance = smoothedData["010E"] ?: 0f,
+                                                mafRate = smoothedData["0110"] ?: 0f,
+                                                voltage = smoothedData["0142"] ?: smoothedData["42"] ?: 0f,
+                                                fuelTrim1 = smoothedData["0106"] ?: 0f,
+                                                fuelTrim2 = smoothedData["0108"] ?: 0f,
+                                                healthScore = -1,
+                                                activeDtcs = activeDtcs.value,
+                                                vehicleName = _selectedVehicle.value?.let { "${it.year} ${it.make} ${it.model}" } ?: ""
+                                            )
+                                            server.broadcastTelemetry(snap)
+                                        } catch (_: Exception) {}
+                                    }
+                                }
+                            }
+                            
+                            // Record sensor data every ~30 readings for predictive health
+                            sensorRecordingCounter++
+                            if (sensorRecordingCounter % 30 == 0) {
+                                val vehicle = _selectedVehicle.value
+                                if (vehicle != null) {
+                                    launch(Dispatchers.IO) {
+                                        try {
+                                            predictiveHealthEngine.recordSensorBatch(
+                                                vehicleId = vehicle.id,
+                                                sessionId = healthSessionId,
+                                                liveData = smoothedData
+                                            )
+                                        } catch (e: Exception) {
+                                            Log.e("ObdVM", "Sensor recording failed", e)
+                                        }
+                                    }
+                                }
+                            }
                         }
                 } catch (e: Exception) {
                     android.util.Log.e("ObdVM", "liveData collector crashed", e)
@@ -287,8 +454,8 @@ class ObdViewModel @Inject constructor(
             launch {
                 try {
                     combine(
-                        _activeDtcs,
-                        _pendingDtcs,
+                        activeDtcs,
+                        pendingDtcs,
                         _anomalousPids,
                         _liveData
                     ) { active, pending, anomalies, live ->
@@ -413,6 +580,7 @@ class ObdViewModel @Inject constructor(
 
     fun startDiagnosticSession(vehicle: Vehicle) {
         _selectedVehicle.value = vehicle
+        currentSessionId = UUID.randomUUID().toString()
         viewModelScope.launch {
             obdSession.connect()
             // Wait for actual state change instead of checking synchronously
@@ -437,9 +605,47 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    fun disconnect() {
+        viewModelScope.launch {
+            saveSessionResults()
+            obdSession.disconnect()
+            context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
+        }
+    }
+
+    fun resetTrip() {
+        obdSession.resetTrip()
+    }
+
+    // --- Mode 06 Noncontinuous Monitors ---
+    val mode06Results = obdSession.mode06Results
+    private val _isReadingMode06 = MutableStateFlow(false)
+    val isReadingMode06: StateFlow<Boolean> = _isReadingMode06.asStateFlow()
+
+    fun readMode06() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isReadingMode06.value = true
+            try {
+                obdSession.readMode06Results()
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Mode 06 failed", e)
+            } finally {
+                _isReadingMode06.value = false
+            }
+        }
+    }
+
+    // --- Driving/Standing Time ---
+    val drivingTimeSeconds = obdSession.drivingTimeSeconds
+    val standingTimeSeconds = obdSession.standingTimeSeconds
+
+    fun resetDrivingTime() {
+        obdSession.resetDrivingTime()
+    }
+
     private suspend fun saveSessionResults() {
         val vehicle = _selectedVehicle.value ?: return
-        val currentDtcs = _activeDtcs.value
+        val currentDtcs = activeDtcs.value
         val snapshot = _liveData.value
         
         val session = DiagnosticSession(
@@ -451,9 +657,9 @@ class ObdViewModel @Inject constructor(
             vehicle_year = vehicle.year,
             dtcs_found = Json.encodeToString(currentDtcs),
             severity = when {
-                _permanentDtcs.value.isNotEmpty() -> "critical"
+                permanentDtcs.value.isNotEmpty() -> "critical"
                 currentDtcs.isNotEmpty() -> "high"
-                _pendingDtcs.value.isNotEmpty() -> "moderate"
+                pendingDtcs.value.isNotEmpty() -> "moderate"
                 else -> "low"
             },
             live_data_snapshot = Json.encodeToString(snapshot.mapValues { it.value.toString() })
@@ -463,9 +669,8 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun clearState() {
-        _activeDtcs.value = emptyList()
-        _pendingDtcs.value = emptyList()
-        _permanentDtcs.value = emptyList()
+        // DTCs are now persistent in DB, we don't clear them here manually
+        // they will reload based on _selectedVehicle change
         _readinessMonitors.value = null
         _liveData.value = emptyMap()
     }
@@ -488,24 +693,128 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    suspend fun refreshDiagnostics() {
-        _isScanning.value = true
+    suspend fun refreshDiagnostics(manageState: Boolean = true) {
+        if (manageState) _isScanning.value = true
+        if (obdSession.state.value != ObdState.CONNECTED) {
+            // Simulate attempt to allow UI animations to play
+            kotlinx.coroutines.delay(1500)
+            if (manageState) _isScanning.value = false
+            return
+        }
         try {
-            _activeDtcs.value = obdSession.readActiveDtcs()
-            _pendingDtcs.value = obdSession.readPendingDtcs()
-            _permanentDtcs.value = obdSession.readPermanentDtcs()
+            val freshActive = obdSession.readActiveDtcs()
+            val freshPending = obdSession.readPendingDtcs()
+            val freshPermanent = obdSession.readPermanentDtcs()
+            
+            saveDetectedDtcs(freshActive, "ACTIVE")
+            saveDetectedDtcs(freshPending, "PENDING")
+            saveDetectedDtcs(freshPermanent, "PERMANENT")
+            
             _readinessMonitors.value = obdSession.readReadinessMonitors()
             
+            // Read Mode 06 results to detect specific cylinder misfires
+            val mode06Results = obdSession.readMode06Results()
+            val allCodes = (activeDtcs.value + pendingDtcs.value + permanentDtcs.value).toMutableList()
+            
+            // If we have a generic misfire or we want to surface specific ones
+            if (allCodes.any { it.startsWith("P030") }) {
+                mode06Results.forEach { result ->
+                    val midPrefix = result.mid.replace("$", "").uppercase()
+                    if (midPrefix in listOf("A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "AA", "AB", "AC", "AD")) {
+                        // If it failed or has a non-zero value, it's a misfire on this cylinder
+                        if (!result.passed || result.value > 0) {
+                            val cylIdx = when(midPrefix) {
+                                "A2" -> 1; "A3" -> 2; "A4" -> 3; "A5" -> 4;
+                                "A6" -> 5; "A7" -> 6; "A8" -> 7; "A9" -> 8;
+                                "AA" -> 9; "AB" -> 10; "AC" -> 11; "AD" -> 12;
+                                else -> 0
+                            }
+                            if (cylIdx > 0) {
+                                val cylCode = "P03" + String.format("%02d", cylIdx)
+                                if (!allCodes.contains(cylCode)) {
+                                    allCodes.add(cylCode)
+                                    // Guardar en DB para persistencia
+                                    saveDetectedDtcs(listOf(cylCode), "ACTIVE")
+                                    saveDetectedDtcs(listOf(cylCode), "PENDING")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Fetch definitions for all new DTCs
-            val allCodes = (_activeDtcs.value + _pendingDtcs.value + _permanentDtcs.value).distinct()
-            fetchDtcDefinitions(allCodes)
+            fetchDtcDefinitions((activeDtcs.value + pendingDtcs.value + permanentDtcs.value).distinct())
             
             updateHealthScore()
         } catch (e: Exception) {
             android.util.Log.e("ObdVM", "Failed to refresh diagnostics", e)
         } finally {
-            _isScanning.value = false
+            if (manageState) _isScanning.value = false
         }
+    }
+
+    private suspend fun saveDetectedDtcs(codes: List<String>, status: String) {
+        val vehicle = _selectedVehicle.value ?: return
+        val now = System.currentTimeMillis()
+        
+        codes.forEach { code ->
+            val existing = dtcDao.getUnresolvedDtc(vehicle.id, code, status)
+            if (existing != null) {
+                // Accumulate: Update freshness and count
+                val isNewSession = existing.sessionId != currentSessionId
+                val updated = existing.copy(
+                    lastSeenAt = now,
+                    occurrenceCount = if (isNewSession) existing.occurrenceCount + 1 else existing.occurrenceCount,
+                    sessionId = currentSessionId, // Update to latest session that saw it
+                    synced = false // Mark for re-sync
+                )
+                dtcDao.insertDtc(updated)
+            } else {
+                // Fetch definition for initial discovery
+                val defs = dtcDefinitionDao.getDefinitions(code)
+                val description = if (defs.isNotEmpty()) defs.first().descriptionEs else ""
+                val severity = if (defs.isNotEmpty()) defs.first().severity else "UNKNOWN"
+
+                // New discovery: Store as persistent event
+                val newEvent = DtcEventEntity(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = currentSessionId,
+                    vehicleId = vehicle.id,
+                    code = code,
+                    description = description,
+                    severity = severity,
+                    status = status,
+                    firstSeenAt = now,
+                    lastSeenAt = now,
+                    resolvedAt = null,
+                    occurrenceCount = 1,
+                    freezeFrameJson = null,
+                    synced = false
+                )
+                dtcDao.insertDtc(newEvent)
+                
+                // Alert the user only for truly new detections
+                if (status == "ACTIVE") {
+                    alertManager.triggerNewDtcAlert(code)
+                }
+            }
+        }
+        
+        // Trigger background sync after saving/updating DTCs
+        scheduleSync()
+    }
+
+    private fun scheduleSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueue(syncRequest)
     }
 
     private fun fetchDtcDefinitions(codes: List<String>) {
@@ -587,10 +896,13 @@ class ObdViewModel @Inject constructor(
         val success = obdSession.clearDtcs()
         if (success) {
             _clearDtcResult.value = "✅ Códigos borrados exitosamente"
-            _activeDtcs.value = emptyList()
-            _pendingDtcs.value = emptyList()
+            _selectedVehicle.value?.let { vehicle ->
+                dtcDao.resolveAllDtcsForVehicle(vehicle.id, System.currentTimeMillis())
+            }
             _freezeFrameData.value = emptyMap()
             updateHealthScore()
+            // Schedule sync to push resolution events to cloud
+            scheduleSync()
         } else {
             _clearDtcResult.value = "❌ Error al borrar códigos. Asegúrese que el motor esté apagado y en contacto (IGNITION ON)."
         }
@@ -610,12 +922,12 @@ class ObdViewModel @Inject constructor(
         try {
             // 1. Scan DTCs
             _cloudSyncState.value = "Buscando códigos de falla (DTCs)..."
-            refreshDiagnostics()
+            refreshDiagnostics(manageState = false)
             
             // 2. If DTCs found, fetch Freeze Frame for the first one
-            if (_activeDtcs.value.isNotEmpty()) {
+            if (activeDtcs.value.isNotEmpty()) {
                 _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
-                val firstDtc = _activeDtcs.value.first()
+                val firstDtc = activeDtcs.value.first()
                 val ff = obdSession.readFreezeFrame(firstDtc)
                 val scoped = ff.mapKeys { (key, _) -> "$firstDtc:$key" }
                 _freezeFrameData.value = _freezeFrameData.value + scoped
@@ -696,7 +1008,14 @@ class ObdViewModel @Inject constructor(
         return obdSession.setProtocol(protocol)
     }
 
-    suspend fun scanModules() = obdSession.scanModules()
+    suspend fun scanModules(): List<com.elysium369.meet.core.obd.NetworkModule> {
+        _isScanning.value = true
+        return try {
+            obdSession.scanModules()
+        } finally {
+            _isScanning.value = false
+        }
+    }
 
     suspend fun sendRawCommand(cmd: String): String {
         return obdSession.sendRawCommand(cmd)
@@ -745,7 +1064,7 @@ class ObdViewModel @Inject constructor(
     fun generateFullReport(aiAnalysis: String?) {
         val currentTrip = tripManager.currentTrip
         val vehicleInfo = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
-        val dtcs = _activeDtcs.value
+        val dtcs = activeDtcs.value
         val history = _telemetryHistory.value
         
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -871,6 +1190,33 @@ class ObdViewModel @Inject constructor(
         _telemetryHistory.value = newHistory
     }
 
+    private fun updateOscilloscopeBuffer(timestamp: Long, rawData: Map<String, Float>) {
+        val pinned = pinnedPids.value
+        // We always want to buffer the battery voltage for the oscilloscope
+        val hasVoltage = rawData.containsKey("0142") || rawData.containsKey("42")
+        if (pinned.isEmpty() && !hasVoltage) return
+
+        val currentBuffer = _oscilloscopeBuffer.value
+        val newBuffer = currentBuffer.toMutableMap()
+        val maxPoints = 1000 // High frequency buffer capacity
+
+        val targets = pinned.toMutableSet()
+        if (hasVoltage) {
+            targets.add(if (rawData.containsKey("0142")) "0142" else "42")
+        }
+
+        targets.forEach { pid ->
+            val value = rawData[pid] ?: return@forEach
+            val list = currentBuffer[pid]?.toMutableList() ?: mutableListOf()
+            list.add(Pair(timestamp, value))
+            if (list.size > maxPoints) {
+                list.removeAt(0) // Remove oldest
+            }
+            newBuffer[pid] = list
+        }
+        _oscilloscopeBuffer.value = newBuffer
+    }
+
     // --- Active Testing (Bidirectional) ---
     fun runActiveTest(test: ActiveTest) {
         obdSession.runActiveTest(test)
@@ -948,7 +1294,7 @@ class ObdViewModel @Inject constructor(
 
             // In a real scenario, we might want to fetch DTCs for this trip
             // For now, use active DTCs if it's the current session, or empty
-            val dtcs = if (trip.endedAt == null) _activeDtcs.value else emptyList()
+            val dtcs = if (trip.endedAt == null) activeDtcs.value else emptyList<String>()
             
             val file = reportGenerator.generatePdfReport(
                 trip = domainTrip,
@@ -1134,8 +1480,8 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun calculateHealthScore(
-        active: List<String> = _activeDtcs.value,
-        pending: List<String> = _pendingDtcs.value,
+        active: List<String> = activeDtcs.value,
+        pending: List<String> = pendingDtcs.value,
         anomalies: List<com.elysium369.meet.core.ai.HealthAnomaly> = _anomalousPids.value,
         live: Map<String, Float> = _liveData.value
     ): Int {
@@ -1174,6 +1520,50 @@ class ObdViewModel @Inject constructor(
         // (Placeholder for more complex logic if misfire PIDs are available)
         
         return score.coerceIn(5, 100)
+    }
+
+    // --- Predictive Health Analysis ---
+    fun runPredictiveAnalysis() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isAnalyzingHealth.value = true
+            try {
+                val vehicle = _selectedVehicle.value
+                if (vehicle != null) {
+                    val report = predictiveHealthEngine.computeHealthReport(
+                        vehicleId = vehicle.id,
+                        currentLiveData = _liveData.value,
+                        activeDtcCount = activeDtcs.value.size,
+                        pendingDtcCount = pendingDtcs.value.size,
+                        anomalyCount = _anomalousPids.value.size
+                    )
+                    _predictiveHealthReport.value = report
+                } else {
+                    // No vehicle selected — compute with empty vehicle ID
+                    val report = predictiveHealthEngine.computeHealthReport(
+                        vehicleId = "default",
+                        currentLiveData = _liveData.value,
+                        activeDtcCount = activeDtcs.value.size,
+                        pendingDtcCount = pendingDtcs.value.size,
+                        anomalyCount = _anomalousPids.value.size
+                    )
+                    _predictiveHealthReport.value = report
+                }
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Predictive analysis failed", e)
+            } finally {
+                _isAnalyzingHealth.value = false
+            }
+        }
+    }
+
+    suspend fun analyzeOscilloscopeTelemetry(vehicleInfo: String, data: Map<String, List<Pair<Long, Float>>>): com.elysium369.meet.core.ai.DiagnosticResult {
+        val currentConfig = _aiConfig.value
+        geminiDiagnostic.updateConfig(
+            newApiKey = currentConfig.apiKey,
+            newEndpoint = currentConfig.endpoint,
+            newProvider = currentConfig.provider
+        )
+        return geminiDiagnostic.analyzeLiveTelemetry(vehicleInfo, data)
     }
 }
 

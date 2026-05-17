@@ -78,6 +78,23 @@ data class Trip(
     val created_at: String? = null
 )
 
+@Serializable
+data class DtcEvent(
+    val id: String,
+    val session_id: String,
+    val vehicle_id: String,
+    val code: String,
+    val description: String,
+    val severity: String,
+    val status: String,
+    val first_seen_at: Long,
+    val last_seen_at: Long,
+    val resolved_at: Long?,
+    val occurrence_count: Int,
+    val freeze_frame: String? = null,
+    val created_at: String? = null
+)
+
 object SupabaseManager {
     val client get() = com.elysium369.meet.data.remote.SupabaseModule.client
 
@@ -313,3 +330,18 @@ class SubscriptionRepository @Inject constructor() {
         return SupabaseManager.isUserPremium()
     }
 }
+
+fun com.elysium369.meet.data.local.entities.DtcEventEntity.toDomain() = DtcEvent(
+    id = id,
+    session_id = sessionId,
+    vehicle_id = vehicleId,
+    code = code,
+    description = description,
+    severity = severity,
+    status = status,
+    first_seen_at = firstSeenAt,
+    last_seen_at = lastSeenAt,
+    resolved_at = resolvedAt,
+    occurrence_count = occurrenceCount,
+    freeze_frame = freezeFrameJson
+)

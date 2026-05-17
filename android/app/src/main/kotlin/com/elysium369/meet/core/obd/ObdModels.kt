@@ -62,4 +62,43 @@ data class ActiveTestStatus(
     val currentValues: Map<String, Float> = emptyMap()
 )
 
+/**
+ * Professional Mode 06 Test Result.
+ * Includes parsed metrics, unit conversion and expert insights.
+ */
+data class Mode06TestResult(
+    val mid: String, // Monitor ID (e.g. "$01")
+    val tid: String, // Test ID (e.g. "$01")
+    val value: Float,
+    val minLimit: Float?,
+    val maxLimit: Float?,
+    val unit: String,
+    val passed: Boolean,
+    val testName: String,
+    val componentName: String,
+    val proTip: String? = null,
+    val severity: DiagnosticSeverity = DiagnosticSeverity.INFO
+)
+
+enum class DiagnosticSeverity {
+    INFO, MODERATE, HIGH, CRITICAL
+}
+
+data class TopFix(
+    val code: String,
+    val title: String,
+    val fix: String,
+    val severity: DiagnosticSeverity,
+    val probability: Int,
+    val parts: List<String>,
+    val laborHours: Float
+)
+
+data class DtcAnalysis(
+    val code: String,
+    val description: String,
+    val topFix: TopFix? = null,
+    val severity: DiagnosticSeverity = DiagnosticSeverity.INFO
+)
+
 class ObdConnectionException(message: String) : Exception(message)

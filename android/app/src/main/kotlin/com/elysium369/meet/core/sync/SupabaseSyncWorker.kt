@@ -46,7 +46,30 @@ class SupabaseSyncWorker(
             val supabase = SupabaseManager.client
             supabase.postgrest["diagnostic_sessions"].insert(pendingSessions)
 
-            // 3. Mark as synced in local DB
+            // 3. Sync pending DTCs
+            val pendingDtcs = db.dtcDao().getPendingSyncDtcs()
+            if (pendingDtcs.isNotEmpty()) {
+                val domainDtcs = pendingDtcs.map { 
+                    com.elysium369.meet.data.supabase.DtcEvent(
+                        id = it.id,
+                        session_id = it.sessionId,
+                        vehicle_id = it.vehicleId,
+                        code = it.code,
+                        description = it.description,
+                        severity = it.severity,
+                        status = it.status,
+                        first_seen_at = it.firstSeenAt,
+                        last_seen_at = it.lastSeenAt,
+                        resolved_at = it.resolvedAt,
+                        occurrence_count = it.occurrenceCount,
+                        freeze_frame = it.freezeFrameJson
+                    )
+                }
+                supabase.postgrest["dtc_events"].upsert(domainDtcs)
+                db.dtcDao().markDtcsAsSynced(pendingDtcs.map { it.id })
+            }
+
+            // 4. Mark as synced in local DB
             db.sessionDao().markAsSynced(pendingEntities.map { it.id })
 
             Result.success()

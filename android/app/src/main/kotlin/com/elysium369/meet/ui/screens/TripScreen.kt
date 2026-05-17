@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elysium369.meet.data.local.entities.TripEntity
@@ -28,14 +29,14 @@ fun TripScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Historial de Viajes", color = Color.White, fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             )
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         if (trips.isEmpty()) {
             Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No hay viajes registrados aún.", color = Color.Gray)
+                Text("No hay viajes registrados aún.", color = MeetColors.textSecondary)
             }
         } else {
             LazyColumn(
@@ -45,8 +46,9 @@ fun TripScreen(
             ) {
                 if (!isPremium) {
                     item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                        com.elysium369.meet.ui.components.EliteCard(
+                            backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+                            borderColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                         ) {
@@ -57,7 +59,7 @@ fun TripScreen(
                                 Text("⭐", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column {
-                                    Text("Funciones Pro Bloqueadas", color = Color(0xFF00AAFF), fontWeight = FontWeight.Bold)
+                                    Text("Funciones Pro Bloqueadas", color = com.elysium369.meet.ui.theme.MeetColors.electricBlue, fontWeight = FontWeight.Bold)
                                     Text("Exportación PDF, consumo de L/100km, y puntuación Eco-Score requieren suscripción.", 
                                         color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                 }
@@ -79,16 +81,17 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
     val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
     val durationMin = trip.durationSeconds / 60
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+    com.elysium369.meet.ui.components.EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        borderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(sdf.format(Date(trip.startedAt)), color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
+                Text(sdf.format(Date(trip.startedAt)), color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                 if (isPremium) {
-                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) Color(0xFF39FF14) else Color.Yellow, fontWeight = FontWeight.Bold)
+                    Text("Eco: ${trip.ecoScore}/100", color = if (trip.ecoScore > 80) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.warning, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -99,13 +102,12 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
             }
             if (isPremium) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(
+                com.elysium369.meet.ui.components.EliteButton(
                     onClick = { onExportPdf(trip) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14).copy(alpha = 0.2f)),
+                    text = "📄 EXPORTAR REPORTE PDF",
+                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("📄 Exportar Reporte PDF", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
-                }
+                )
             }
         }
     }
@@ -115,6 +117,6 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
 fun TripStatBox(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-        Text(label, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text(label, color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
     }
 }

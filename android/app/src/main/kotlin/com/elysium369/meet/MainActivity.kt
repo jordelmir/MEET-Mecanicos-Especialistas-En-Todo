@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -20,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.screens.*
+import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,18 +35,28 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Star
 
 val CyberpunkColorScheme = darkColorScheme(
-    primary = Color(0xFF39FF14),
+    primary = Color(0xFF00FFD4),
     onPrimary = Color.Black,
-    secondary = Color(0xFFFF6B35),
+    secondary = Color(0xFFBB00FF),
     onSecondary = Color.Black,
-    tertiary = Color(0xFFCC00FF),
-    background = Color.Black,
-    onBackground = Color.White,
-    surface = Color(0xFF0A0E1A),
-    onSurface = Color.White,
-    surfaceVariant = Color(0xFF141414),
-    onSurfaceVariant = Color(0xFF39FF14),
-    error = Color(0xFFFF003C)
+    tertiary = Color(0xFF00E5FF),
+    background = Color(0xFF050B15),
+    onBackground = Color(0xFFF0F2F5),
+    surface = Color(0xFF0F1B30),
+    onSurface = Color(0xFFF0F2F5),
+    surfaceVariant = Color(0xFF152640),
+    onSurfaceVariant = Color(0xFF00FFD4),
+    surfaceContainerHighest = Color(0xFF1A3050),
+    surfaceContainerHigh = Color(0xFF152B48),
+    surfaceContainer = Color(0xFF112240),
+    surfaceContainerLow = Color(0xFF0D1C35),
+    surfaceContainerLowest = Color(0xFF08142A),
+    inverseSurface = Color(0xFF00FFD4),
+    inverseOnSurface = Color(0xFF050B15),
+    outline = Color(0xFF1E3355),
+    outlineVariant = Color(0xFF152640),
+    error = Color(0xFFFF1744),
+    errorContainer = Color(0xFF3D0012)
 )
 
 
@@ -92,6 +104,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MeetApp(obdViewModel: ObdViewModel) {
     val navController = rememberNavController()
+    val liveLinkServer = remember { LiveLinkServer() }
+
+    // Stop server when leaving composition
+    DisposableEffect(Unit) {
+        obdViewModel.attachLiveLinkServer(liveLinkServer)
+        onDispose { 
+            liveLinkServer.stop()
+            obdViewModel.detachLiveLinkServer()
+        }
+    }
     
     // Verificar si onboarding ya fue completado
     val context = LocalContext.current
@@ -229,6 +251,18 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             composable("reports") {
                 ReportScreen(navController = navController, viewModel = obdViewModel)
             }
+            composable("oscilloscope") {
+                OscilloscopeScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = obdViewModel
+                )
+            }
+            composable("expert_diagnostic") {
+                com.elysium369.meet.ui.screens.ExpertDiagnosticScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
             composable("settings") {
                 SettingsScreen(
                     navController = navController,
@@ -239,6 +273,21 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 PremiumScreen(
                     onClose = { navController.popBackStack() }
                 )
+            }
+            composable("health_score") {
+                HealthScoreScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("component_locator") {
+                ComponentLocatorScreen(navController = navController)
+            }
+            composable("adaptation") {
+                AdaptationScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("live_link") {
+                LiveLinkScreen(navController = navController, liveLinkServer = liveLinkServer)
             }
             composable("connect") {
                 AdapterSearchSheet(
@@ -280,72 +329,72 @@ fun MeetBottomNavigation(navController: NavController) {
         .value?.destination?.route
     
     NavigationBar(
-        containerColor = Color(0xFF0A0E1A),
-        contentColor = Color(0xFF39FF14)
+        containerColor = Color(0xFF070B14),
+        contentColor = Color(0xFF00FFD4)
     ) {
         NavigationBarItem(
             icon = { Icon(Icons.Default.Home, "Home") },
-            label = { Text("Inicio") },
+            label = { Text("Inicio", fontSize = 10.sp) },
             selected = currentRoute == "home",
             onClick = { navController.navigate("home") { launchSingleTop = true; restoreState = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF39FF14),
-                selectedTextColor = Color(0xFF39FF14),
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFF39FF14).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFF00FFD4),
+                selectedTextColor = Color(0xFF00FFD4),
+                unselectedIconColor = Color(0xFF3D4E63),
+                unselectedTextColor = Color(0xFF3D4E63),
+                indicatorColor = Color(0xFF00FFD4).copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
             icon = { Icon(Icons.Default.Build, "Scanner") },
-            label = { Text("Scanner") },
+            label = { Text("Scanner", fontSize = 10.sp) },
             selected = currentRoute == "scanner",
             onClick = { navController.navigate("scanner") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF39FF14),
-                selectedTextColor = Color(0xFF39FF14),
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFF39FF14).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFF00E5FF),
+                selectedTextColor = Color(0xFF00E5FF),
+                unselectedIconColor = Color(0xFF3D4E63),
+                unselectedTextColor = Color(0xFF3D4E63),
+                indicatorColor = Color(0xFF00E5FF).copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
             icon = { Icon(Icons.Default.Warning, "DTCs") },
-            label = { Text("DTCs") },
+            label = { Text("DTCs", fontSize = 10.sp) },
             selected = currentRoute == "dtc",
             onClick = { navController.navigate("dtc") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFFF003C),
-                selectedTextColor = Color(0xFFFF003C),
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFFFF003C).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFFF1744),
+                selectedTextColor = Color(0xFFFF1744),
+                unselectedIconColor = Color(0xFF3D4E63),
+                unselectedTextColor = Color(0xFF3D4E63),
+                indicatorColor = Color(0xFFFF1744).copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
             icon = { Icon(Icons.Default.List, "Garage") },
-            label = { Text("Garage") },
+            label = { Text("Garage", fontSize = 10.sp) },
             selected = currentRoute == "garage",
             onClick = { navController.navigate("garage") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFCC00FF),
-                selectedTextColor = Color(0xFFCC00FF),
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFFCC00FF).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFBB00FF),
+                selectedTextColor = Color(0xFFBB00FF),
+                unselectedIconColor = Color(0xFF3D4E63),
+                unselectedTextColor = Color(0xFF3D4E63),
+                indicatorColor = Color(0xFFBB00FF).copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
             icon = { Icon(Icons.Default.Star, "PRO") },
-            label = { Text("PRO") },
+            label = { Text("PRO", fontSize = 10.sp) },
             selected = currentRoute == "pro_hub",
             onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFFFD700),
-                selectedTextColor = Color(0xFFFFD700),
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFFFFD700).copy(alpha = 0.1f)
+                selectedIconColor = Color(0xFFFF00AA),
+                selectedTextColor = Color(0xFFFF00AA),
+                unselectedIconColor = Color(0xFF3D4E63),
+                unselectedTextColor = Color(0xFF3D4E63),
+                indicatorColor = Color(0xFFFF00AA).copy(alpha = 0.08f)
             )
         )
     }

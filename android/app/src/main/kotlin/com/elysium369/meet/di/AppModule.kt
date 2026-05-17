@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.elysium369.meet.core.ai.GeminiDiagnostic
+import com.elysium369.meet.core.health.PredictiveHealthEngine
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
 
@@ -199,6 +200,59 @@ object AppModule {
         override fun migrate(db: SupportSQLiteDatabase) = migrateToV6(db, 5)
     }
 
+    // ── v6/v7 → v8: Predictive Health Engine tables ──
+    private fun migrateToV8(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→8: Adding predictive health tables")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `sensor_history` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `pid` TEXT NOT NULL,
+            `pidLabel` TEXT NOT NULL,
+            `value` REAL NOT NULL,
+            `unit` TEXT NOT NULL,
+            `timestamp` INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_sensor_history_vehicleId_pid_timestamp` ON `sensor_history` (`vehicleId`, `pid`, `timestamp`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_sensor_history_sessionId` ON `sensor_history` (`sessionId`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `health_snapshots` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `overallScore` INTEGER NOT NULL,
+            `engineScore` INTEGER NOT NULL,
+            `fuelScore` INTEGER NOT NULL,
+            `coolingScore` INTEGER NOT NULL,
+            `electricalScore` INTEGER NOT NULL,
+            `emissionsScore` INTEGER NOT NULL,
+            `activeDtcCount` INTEGER NOT NULL,
+            `pendingDtcCount` INTEGER NOT NULL,
+            `anomalyCount` INTEGER NOT NULL,
+            `sensorSummaryJson` TEXT NOT NULL,
+            `timestamp` INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_snapshots_vehicleId_timestamp` ON `health_snapshots` (`vehicleId`, `timestamp`)")
+        android.util.Log.i("MeetDB", "Migration $from→8: Complete")
+    }
+
+    private fun migrateToV9(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→9: Patching dtc_events missing columns")
+        try { db.execSQL("ALTER TABLE `dtc_events` ADD COLUMN `lastSeenAt` INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+        try { db.execSQL("ALTER TABLE `dtc_events` ADD COLUMN `synced` INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+        android.util.Log.i("MeetDB", "Migration $from→9: Complete")
+    }
+
+    private val MIGRATION_6_9 = object : Migration(6, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) { migrateToV8(db, 6); migrateToV9(db, 6) }
+    }
+    private val MIGRATION_7_9 = object : Migration(7, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) { migrateToV8(db, 7); migrateToV9(db, 7) }
+    }
+    private val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV9(db, 8)
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -216,7 +270,7 @@ object AppModule {
         // ⛔ REMOVED: fallbackToDestructiveMigration()
         // This silently destroyed user data. We now use explicit migrations.
 
-        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6)
+        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9)
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
@@ -259,6 +313,19 @@ object AppModule {
 
     @Provides
     fun provideDashboardDao(db: MeetDatabase): DashboardDao = db.dashboardDao()
+
+    @Provides
+    fun provideSensorHistoryDao(db: MeetDatabase): SensorHistoryDao = db.sensorHistoryDao()
+
+    @Provides
+    fun provideHealthSnapshotDao(db: MeetDatabase): HealthSnapshotDao = db.healthSnapshotDao()
+
+    @Provides
+    @Singleton
+    fun providePredictiveHealthEngine(
+        sensorHistoryDao: SensorHistoryDao,
+        healthSnapshotDao: HealthSnapshotDao
+    ): PredictiveHealthEngine = PredictiveHealthEngine(sensorHistoryDao, healthSnapshotDao)
 
     @Provides
     @Singleton

@@ -5,6 +5,7 @@ interface TransportInterface {
     suspend fun disconnect()
     suspend fun reconnect()
     suspend fun write(data: ByteArray)
-    suspend fun read(maxBytes: Int): ByteArray?
+    suspend fun read(maxBytes: Int, timeoutMs: Long = 600L): ByteArray?
+    suspend fun drain()
     val isConnected: Boolean
 }

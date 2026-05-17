@@ -9,12 +9,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteTopAppBar
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,24 +39,20 @@ fun CloneTestScreen(
     val scope = rememberCoroutineScope()
 
     // Derive overall verdict
-    val passCount = results.count { it.color == Color(0xFF39FF14) || it.color == Color.Green }
-    val warnCount = results.count { it.color == Color(0xFFFFAA00) || it.color == Color.Yellow }
-    val failCount = results.count { it.color == Color(0xFFFF003C) || it.color == Color.Red }
+    val passCount = results.count { it.color == com.elysium369.meet.ui.theme.MeetColors.neonGreen || it.color == com.elysium369.meet.ui.theme.MeetColors.neonGreen }
+    val warnCount = results.count { it.color == MeetColors.warning || it.color == com.elysium369.meet.ui.theme.MeetColors.warning }
+    val failCount = results.count { it.color == com.elysium369.meet.ui.theme.MeetColors.error || it.color == com.elysium369.meet.ui.theme.MeetColors.error }
     val totalTests = results.size
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Diagnóstico de Adaptador", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("Verificación de Hardware OBD2", color = Color(0xFFFF6B35), fontSize = 11.sp)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+            EliteTopAppBar(
+                title = "Diagnóstico de Adaptador",
+                subtitle = "Verificación de Hardware OBD2",
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )
         },
-        containerColor = Color(0xFF060612)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
     ) { padding ->
         Column(
             modifier = Modifier
@@ -61,17 +61,15 @@ fun CloneTestScreen(
                 .padding(16.dp)
         ) {
             // --- Info Card ---
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFFF6B35).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            EliteCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = MeetColors.warning.copy(alpha = 0.5f),
+                glowColor = MeetColors.warning
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "🔬 Modo de Prueba de Campo",
-                        color = Color(0xFFFF6B35),
+                        color = MeetColors.warning,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -90,7 +88,7 @@ fun CloneTestScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- Run Button ---
-            Button(
+            EliteButton(
                 onClick = {
                     isRunning = true
                     results = emptyList()
@@ -111,28 +109,11 @@ fun CloneTestScreen(
                         isRunning = false
                     }
                 },
-                enabled = !isRunning,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF6B35),
-                    disabledContainerColor = Color(0xFF333333)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isRunning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("EJECUTANDO PRUEBAS...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                } else {
-                    Text("⚡ INICIAR DIAGNÓSTICO", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
+                isEnabled = !isRunning,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                color = MeetColors.warning,
+                text = if (isRunning) "EJECUTANDO PRUEBAS..." else "⚡ INICIAR DIAGNÓSTICO"
+            )
 
             // --- Progress Bar ---
             AnimatedVisibility(visible = isRunning) {
@@ -143,28 +124,24 @@ fun CloneTestScreen(
                         .padding(top = 8.dp)
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp)),
-                    color = Color(0xFFFF6B35),
-                    trackColor = Color(0xFF1A1A2E)
+                    color = MeetColors.warning,
+                    trackColor = MeetColors.backgroundDeep
                 )
             }
 
             // --- Results Summary ---
             AnimatedVisibility(visible = results.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                    shape = RoundedCornerShape(10.dp),
+                val resultColor = when {
+                    failCount > 0 -> com.elysium369.meet.ui.theme.MeetColors.error
+                    warnCount > 0 -> MeetColors.warning
+                    else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                }
+                EliteCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp)
-                        .border(
-                            1.dp,
-                            when {
-                                failCount > 0 -> Color(0xFFFF003C)
-                                warnCount > 0 -> Color(0xFFFFAA00)
-                                else -> Color(0xFF39FF14)
-                            }.copy(alpha = 0.5f),
-                            RoundedCornerShape(10.dp)
-                        )
+                        .padding(top = 16.dp),
+                    borderColor = resultColor.copy(alpha = 0.5f),
+                    glowColor = resultColor
                 ) {
                     Row(
                         modifier = Modifier
@@ -177,62 +154,62 @@ fun CloneTestScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 "$passCount",
-                                color = Color(0xFF39FF14),
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
-                            Text("PASS", color = Color(0xFF39FF14), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("PASS", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                         // Divider
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
                                 .height(40.dp)
-                                .background(Color.Gray.copy(alpha = 0.3f))
+                                .background(com.elysium369.meet.ui.theme.MeetColors.borderBlue)
                         )
                         // Warn
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 "$warnCount",
-                                color = Color(0xFFFFAA00),
+                                color = MeetColors.warning,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
-                            Text("WARN", color = Color(0xFFFFAA00), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("WARN", color = MeetColors.warning, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                         // Divider
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
                                 .height(40.dp)
-                                .background(Color.Gray.copy(alpha = 0.3f))
+                                .background(com.elysium369.meet.ui.theme.MeetColors.borderBlue)
                         )
                         // Fail
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 "$failCount",
-                                color = Color(0xFFFF003C),
+                                color = com.elysium369.meet.ui.theme.MeetColors.error,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
-                            Text("FAIL", color = Color(0xFFFF003C), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("FAIL", color = com.elysium369.meet.ui.theme.MeetColors.error, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                         // Divider
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
                                 .height(40.dp)
-                                .background(Color.Gray.copy(alpha = 0.3f))
+                                .background(com.elysium369.meet.ui.theme.MeetColors.borderBlue)
                         )
                         // Verdict
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             val verdictColor = when {
-                                failCount > 0 -> Color(0xFFFF003C)
-                                warnCount > totalTests / 2 -> Color(0xFFFFAA00)
-                                else -> Color(0xFF39FF14)
+                                failCount > 0 -> com.elysium369.meet.ui.theme.MeetColors.error
+                                warnCount > totalTests / 2 -> MeetColors.warning
+                                else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
                             }
                             val verdictLabel = when {
                                 failCount > 0 -> "CLON"
@@ -260,12 +237,10 @@ fun CloneTestScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 items(results) { res ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, res.color.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = res.color.copy(alpha = 0.5f),
+                        glowColor = res.color
                     ) {
                         Row(
                             modifier = Modifier

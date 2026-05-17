@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.obd
 
+import android.util.Log
 import com.elysium369.meet.core.transport.TransportInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -7,162 +8,207 @@ import kotlinx.coroutines.withContext
 
 class ElmNegotiator(private val transport: TransportInterface) {
 
+    private val TAG = "MEET_NEGOTIATOR"
+
     data class AdapterProfile(
         val chipVersion: String,
         val isClone: Boolean,
-        val supportedProtocols: List<ObdProtocol>,
-        val optimalBaudRate: Int,
-        val commandDelayMs: Long,
-        val supportsSTN: Boolean,
-        val supportsHeaders: Boolean,
+        val isSTN: Boolean,
+        val detectedProtocol: ObdProtocol,
+        val baseDelayMs: Long,
         val maxLineLength: Int
     )
 
-    suspend fun negotiate(): AdapterProfile {
-        val baudRates = listOf(38400, 9600, 115200)
-        var activeBaud = 38400
-        var rawId = ""
-
-        for (baud in baudRates) {
-            // Note: TransportInterface would need setBaudRate, or we assume it's set natively
-            // transport.setBaudRate(baud) 
-            delay(100)
-            val response = sendWithTimeout("ATZ\r", timeoutMs = 2000)
-            if (response.contains("ELM") || response.contains("STN") || response.contains("OBD")) {
-                activeBaud = baud
-                rawId = response
-                break
-            }
-            val wsResponse = sendWithTimeout("AT WS\r", timeoutMs = 1500)
-            if (wsResponse.contains("ELM") || wsResponse.isNotBlank()) {
-                activeBaud = baud
-                rawId = wsResponse
-                break
-            }
-        }
-
-        if (rawId.isBlank()) {
-            val blindResponse = sendWithTimeout("0100\r", timeoutMs = 3000)
-            if (blindResponse.contains("41 00") || blindResponse.contains("4100")) {
-                return buildMinimalProfile()
-            }
-            throw ObdConnectionException("Adaptador no responde en ningún baudrate")
-        }
-
-        // Test for STN specific commands
-        val stnTest = sendWithTimeout("ST I\r", timeoutMs = 1000)
-        val isSTN = stnTest.contains("STN", true)
-
-        // Test for genuine ELM327 v2.x commands (Clones usually fail these)
-        val csTest = sendWithTimeout("AT CS\r", timeoutMs = 1000) // Get CAN stats (v2.1+)
-        val isGenuineV2 = !csTest.contains("?") && !csTest.contains("ERROR")
-
-        // Test for buffer size (v1.5 clones have small buffers)
-        sendWithTimeout("AT L1\r", timeoutMs = 500) // Linefeeds ON
-        sendWithTimeout("AT D\r", timeoutMs = 500) // Reset to defaults
+    /**
+     * Executes the full ELM327/STN negotiation sequence.
+     * @param hintProtocol Optional protocol to try first to speed up connection
+     * @param onProgress Callback for UI status updates
+     */
+    suspend fun negotiate(
+        hintProtocol: ObdProtocol = ObdProtocol.AUTO,
+        onProgress: (String) -> Unit
+    ): AdapterProfile {
+        Log.i(TAG, "═══ NEGOTIATION START ═══ (hint=${hintProtocol.displayName})")
+        transport.drain()
         
-        val isClone = !isSTN && !isGenuineV2
+        // 1. Physical Warm-up
+        onProgress("Sincronizando enlace físico...")
+        for (i in 1..2) {
+            transport.write("\r".toByteArray())
+            delay(50)
+        }
+        transport.drain()
 
-        val initSequence = buildInitSequence(isClone, isSTN)
-        for ((cmd, _) in initSequence) {
-            val resp = sendWithTimeout(cmd, timeoutMs = if (isClone) 800 else 400)
-            if (!resp.contains("OK") && !isClone) {
-                // logWarning("Comando $cmd no recibió OK: $resp")
+        // 2. Identification (ATZ / AT WS)
+        onProgress("Identificando adaptador...")
+        var idResponse = ""
+        for (attempt in 1..3) {
+            idResponse = sendWithTimeout("ATZ\r", 2500)
+            if (isValidIdResponse(idResponse)) break
+            
+            if (attempt == 2) {
+                idResponse = sendWithTimeout("AT WS\r", 2000)
+                if (isValidIdResponse(idResponse)) break
             }
-            delay(if (isClone) 50 else 20)
+            delay(300)
+            transport.drain()
         }
 
-        sendWithTimeout("ATSP0\r", 1000)
-        delay(500)
-        sendWithTimeout("0100\r", 2000)
-        delay(2000)
-        val protocolResponse = sendWithTimeout("ATDP\r", timeoutMs = 1000)
-        val detectedProtocol = parseProtocol(protocolResponse)
+        // Blind fallback for silent clones
+        if (!isValidIdResponse(idResponse)) {
+            val blindTest = sendWithTimeout("0100\r", 3000)
+            if (blindTest.contains("4100") || blindTest.contains("41 00")) {
+                idResponse = "ELM327 v1.5 (Silent Clone)"
+            } else {
+                throw ObdConnectionException("Adaptador no responde. Verifica el encendido.")
+            }
+        }
 
+        val isClone = detectClone(idResponse)
+        val chipVersion = parseChipVersion(idResponse)
+        
+        // Test for STN specific support
+        val stiResponse = sendWithTimeout("STI\r", 800)
+        val isSTN = stiResponse.contains("STN", true) || idResponse.contains("STN", true) || idResponse.contains("vLinker", true)
+
+        val baseDelay = if (isClone) 60L else 15L
+        
+        Log.i(TAG, "Adapter Identified: $chipVersion | Clone=$isClone | STN=$isSTN")
+        onProgress("Adaptador: $chipVersion")
+
+        // 3. Stabilization
+        delay(if (isClone) 800 else 100)
+        transport.drain()
+
+        // 4. Initial AT Configuration
+        val initSequence = buildInitSequence(isClone, isSTN)
+        for (cmd in initSequence) {
+            sendWithTimeout("$cmd\r", 800)
+            delay(baseDelay)
+        }
+
+        // 5. Protocol Negotiation
+        onProgress("Buscando protocolo del vehículo...")
+        val protocol = sweepProtocols(hintProtocol, isClone, baseDelay, onProgress)
+
+        Log.i(TAG, "═══ NEGOTIATION SUCCESS ═══ Protocol: ${protocol.displayName}")
+        
         return AdapterProfile(
-            chipVersion = if (isSTN) stnTest else if (isGenuineV2) "ELM327 v2.1 (Original)" else "ELM327 v1.5 (Clone)",
+            chipVersion = chipVersion,
             isClone = isClone,
-            supportedProtocols = listOf(detectedProtocol),
-            optimalBaudRate = if (isSTN) 115200 else activeBaud,
-            commandDelayMs = if (isClone) 70L else 20L,
-            supportsSTN = isSTN,
-            supportsHeaders = true,
+            isSTN = isSTN,
+            detectedProtocol = protocol,
+            baseDelayMs = baseDelay,
             maxLineLength = if (isClone) 64 else 512
         )
     }
 
-    private fun buildInitSequence(isClone: Boolean, supportsSTN: Boolean): List<Pair<String, String>> = buildList {
-        add("ATE0\r" to "OK")
-        add("ATL0\r" to "OK")
-        add("ATS0\r" to "OK")
-        add("ATH0\r" to "OK")
-        add("ATCAF1\r" to "OK")
+    private suspend fun sweepProtocols(
+        hint: ObdProtocol,
+        isClone: Boolean,
+        baseDelay: Long,
+        onProgress: (String) -> Unit
+    ): ObdProtocol {
+        // Step 5a: Try hint first if specific
+        if (hint != ObdProtocol.AUTO) {
+            onProgress("Probando protocolo guardado: ${hint.displayName}...")
+            sendWithTimeout("ATSP${hint.atspCode}\r", 1000)
+            delay(baseDelay)
+            val resp = sendWithTimeout("0100\r", 4000)
+            if (resp.contains("4100") || resp.contains("41 00")) {
+                return hint
+            }
+            Log.w(TAG, "Hint protocol ${hint.name} failed, falling back to auto-search")
+            sendWithTimeout("ATSP0\r", 800) // Reset to auto
+            delay(baseDelay)
+        }
+
+        // Step 5b: Try ATSP0 (Auto)
+        sendWithTimeout("ATSP0\r", 1000)
+        delay(baseDelay)
         
-        if (!isClone) {
-            add("ATAT1\r" to "OK")
-            add("ATSTFF\r" to "OK")
+        for (attempt in 1..2) {
+            onProgress("Auto-detectando protocolo ($attempt/2)...")
+            val resp = sendWithTimeout("0100\r", 5000)
+            if (resp.contains("4100") || resp.contains("41 00")) {
+                return detectActiveProtocol()
+            }
+            if (resp.contains("UNABLE") || resp.contains("ERROR")) break
+            delay(400)
+        }
+
+        // Step 5c: Manual Sweep if Auto fails
+        val manualList = listOf("6", "7", "8", "9", "3", "5", "4", "1", "2", "A") // CAN 11/29, ISO, KWP, J1850, J1939
+        for (pCode in manualList) {
+            if (pCode == hint.atspCode) continue // Already tried
+            
+            onProgress("Escaneando protocolo $pCode...")
+            sendWithTimeout("ATSP$pCode\r", 1000)
+            delay(baseDelay)
+            val resp = sendWithTimeout("0100\r", 3000)
+            if (resp.contains("4100") || resp.contains("41 00")) {
+                return detectActiveProtocol()
+            }
+        }
+
+        throw ObdConnectionException("No se pudo enlazar con la ECU del vehículo. Verifica el contacto (IGN ON).")
+    }
+
+    private suspend fun detectActiveProtocol(): ObdProtocol {
+        val dpn = sendWithTimeout("ATDPN\r", 1000).replace("A", "").trim()
+        val protocolCode = if (dpn.length >= 1) dpn.substring(0, 1) else "0"
+        return ObdProtocol.values().find { it.atspCode == protocolCode } ?: ObdProtocol.AUTO
+    }
+
+    private fun buildInitSequence(isClone: Boolean, isSTN: Boolean): List<String> = buildList {
+        add("ATE0") // Echo off
+        add("ATL0") // Linefeeds off
+        add("ATS0") // Spaces off
+        add("ATH0") // Headers off
+        add("ATCAF1") // CAN Auto Formatting on
+        
+        if (isClone) {
+            add("ATAT1") // Adaptive Timing 1
+            add("ATST64") // Set Timeout
         } else {
-            add("ATST64\r" to "OK")
+            add("ATAT2") // Adaptive Timing 2 (Aggressive)
+            add("ATST32") 
         }
-        
-        if (supportsSTN) {
-            add("STPX H:7DF, D:01 00\r" to "")
+
+        if (isSTN) {
+            add("ST AT 1") // STN Advanced Timing
+            add("STP31")   // Optimization
+            add("STPBR 1") // Baud rate optimization
         }
     }
 
-    private fun detectClone(idResponse: String): Boolean {
-        val cloneSignatures = listOf(
-            "ELM327 v1.5",
-            "ELM327 v2.1",
-            "OBDII v1.5",
-            "ELM327 v1.3a"
-        )
-        val genuineSignatures = listOf("STN1", "STN2", "OBDLink", "Kiwi")
-        
-        if (genuineSignatures.any { idResponse.contains(it, ignoreCase = true) }) {
-            return false
-        }
-        return cloneSignatures.any { idResponse.contains(it, ignoreCase = true) }
-            || !idResponse.contains("ELM327 v2.2")
+    private fun isValidIdResponse(resp: String): Boolean {
+        return resp.contains("ELM", true) || resp.contains("STN", true) || 
+               resp.contains("OBD", true) || resp.contains(">")
     }
 
-    private fun parseProtocol(dpResponse: String): ObdProtocol = when {
-        dpResponse.contains("ISO 15765", ignoreCase = true) -> ObdProtocol.CAN_ISO15765
-        dpResponse.contains("11bit", ignoreCase = true) -> ObdProtocol.CAN_11BIT_500K
-        dpResponse.contains("29bit", ignoreCase = true) -> ObdProtocol.CAN_29BIT_500K
-        dpResponse.contains("ISO 9141", ignoreCase = true) -> ObdProtocol.ISO9141
-        dpResponse.contains("KWP", ignoreCase = true) -> ObdProtocol.KWP2000
-        dpResponse.contains("J1850", ignoreCase = true) -> ObdProtocol.J1850_PWM
-        else -> ObdProtocol.AUTO
-    }
-
-    private fun buildMinimalProfile(): AdapterProfile {
-        return AdapterProfile(
-            "Unknown Clone", true, listOf(ObdProtocol.AUTO), 38400, 100L, false, false, 48
-        )
+    private fun detectClone(resp: String): Boolean {
+        if (resp.contains("STN", true) || resp.contains("OBDLink", true) || resp.contains("vLinker", true)) return false
+        if (resp.contains("v2.2", true)) return false
+        return true // Default to clone safety for anything else
     }
 
     private fun parseChipVersion(raw: String): String {
-        return raw.replace(">", "").trim().replace("\r", "")
+        return raw.replace(">", "").replace("\r", "").replace("\n", "").trim()
     }
 
     private suspend fun sendWithTimeout(cmd: String, timeoutMs: Long): String {
         return withContext(Dispatchers.IO) {
             transport.write(cmd.toByteArray())
             val buffer = StringBuilder()
-            var elapsed = 0L
-            val pollInterval = 10L
-            while (elapsed < timeoutMs) {
-                val chunk = transport.read(1024)
+            val startTime = System.currentTimeMillis()
+            
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                val chunk = transport.read(1024, timeoutMs = 200)
                 if (chunk != null) {
-                    val str = String(chunk)
-                    buffer.append(str)
-                    if (buffer.contains(">")) {
-                        break
-                    }
+                    buffer.append(String(chunk, Charsets.ISO_8859_1))
+                    if (buffer.contains(">")) break
                 }
-                delay(pollInterval)
-                elapsed += pollInterval
             }
             buffer.toString()
         }

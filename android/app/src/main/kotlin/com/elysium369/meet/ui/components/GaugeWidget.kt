@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
@@ -40,8 +41,8 @@ fun GaugeWidget(
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(
-            dampingRatio = 0.6f,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = 0.45f, // Increased bounciness for inertial overshoot
+            stiffness = Spring.StiffnessMediumLow // Faster response
         ),
         label = "gaugeAnimation"
     )
@@ -87,11 +88,11 @@ fun GaugeWidget(
 
     // Color logic
     val activeColor = when {
-        !hasData -> Color(0xFF555577)
-        isAnomaly -> Color(0xFFFF003C)
-        criticalThreshold != null && animatedValue >= criticalThreshold -> Color(0xFFFF003C)
-        warningThreshold != null && animatedValue >= warningThreshold -> Color(0xFFFFD700)
-        else -> Color(0xFF39FF14)
+        !hasData -> MeetColors.textMuted
+        isAnomaly -> com.elysium369.meet.ui.theme.MeetColors.error
+        criticalThreshold != null && animatedValue >= criticalThreshold -> com.elysium369.meet.ui.theme.MeetColors.error
+        warningThreshold != null && animatedValue >= warningThreshold -> MeetColors.warning
+        else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
     }
     
     val warnFraction = if (warningThreshold != null && maxVal > minVal) 
@@ -126,7 +127,7 @@ fun GaugeWidget(
 
             // ── 1. BACKGROUND ARC ──
             drawArc(
-                color = Color(0xFF060612),
+                color = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
                 startAngle = startAngle,
                 sweepAngle = sweepAngle,
                 useCenter = false,
@@ -142,7 +143,7 @@ fun GaugeWidget(
             val critSweep = (1f - critFraction) * sweepAngle
             
             drawArc(
-                color = Color(0xFFFFD700).copy(alpha = 0.12f),
+                color = MeetColors.warning.copy(alpha = 0.12f),
                 startAngle = warnStart,
                 sweepAngle = warnSweep,
                 useCenter = false,
@@ -151,7 +152,7 @@ fun GaugeWidget(
                 size = Size(radius * 2, radius * 2)
             )
             drawArc(
-                color = Color(0xFFFF003C).copy(alpha = 0.12f),
+                color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.12f),
                 startAngle = critStart,
                 sweepAngle = critSweep,
                 useCenter = false,
@@ -182,11 +183,11 @@ fun GaugeWidget(
                 
                 val tickFraction = i.toFloat() / tickCount
                 val tickColor = when {
-                    !hasData -> Color(0xFF333355)
+                    !hasData -> MeetColors.textMuted
                     tickFraction <= progress -> activeColor
-                    tickFraction >= critFraction -> Color(0xFFFF003C).copy(alpha = 0.25f)
-                    tickFraction >= warnFraction -> Color(0xFFFFD700).copy(alpha = 0.2f)
-                    else -> Color.DarkGray
+                    tickFraction >= critFraction -> com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.25f)
+                    tickFraction >= warnFraction -> MeetColors.warning.copy(alpha = 0.2f)
+                    else -> MeetColors.borderBlue
                 }
                 drawLine(
                     color = tickColor.copy(alpha = if (isMajor) 0.9f else if (i % 5 == 0) 0.5f else 0.3f),
@@ -209,7 +210,7 @@ fun GaugeWidget(
                     val measuredText = textMeasurer.measure(
                         text = labelText,
                         style = TextStyle(
-                            color = Color.Gray.copy(alpha = 0.6f),
+                            color = MeetColors.textSecondary.copy(alpha = 0.6f),
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -267,6 +268,17 @@ fun GaugeWidget(
                     strokeWidth = 6.dp.toPx(),
                     cap = StrokeCap.Round
                 )
+                // Needle glow
+                drawLine(
+                    color = activeColor.copy(alpha = 0.5f),
+                    start = center,
+                    end = Offset(
+                        (center.x + needleLength * cos(needleRad)).toFloat(),
+                        (center.y + needleLength * sin(needleRad)).toFloat()
+                    ),
+                    strokeWidth = 5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
                 // Needle core
                 drawLine(
                     color = activeColor,
@@ -285,7 +297,7 @@ fun GaugeWidget(
                 drawCircle(color = activeColor.copy(alpha = 0.5f), radius = 8.dp.toPx(), center = center, style = Stroke(1.dp.toPx()))
             } else {
                 // ── NO DATA: Scanning arc animation ──
-                val scanColor = Color(0xFF39FF14).copy(alpha = 0.4f * pulseAlpha)
+                val scanColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.4f * pulseAlpha)
                 drawArc(
                     brush = Brush.sweepGradient(
                         0f to Color.Transparent,
@@ -303,11 +315,11 @@ fun GaugeWidget(
                 
                 // Center pulsing dot
                 drawCircle(
-                    color = Color(0xFF39FF14).copy(alpha = pulseAlpha * 0.3f),
+                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = pulseAlpha * 0.3f),
                     radius = 12.dp.toPx() * pulseAlpha,
                     center = center
                 )
-                drawCircle(color = Color(0xFF39FF14).copy(alpha = 0.4f), radius = 3.dp.toPx(), center = center)
+                drawCircle(color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.4f), radius = 3.dp.toPx(), center = center)
             }
             
             // ── 6. MIN / MAX LABELS at arc endpoints ──
@@ -320,8 +332,8 @@ fun GaugeWidget(
                           else if (maxVal == maxVal.toInt().toFloat()) "${maxVal.toInt()}" 
                           else String.format("%.0f", maxVal)
             
-            val minMeasured = textMeasurer.measure(minText, TextStyle(color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold))
-            val maxMeasured = textMeasurer.measure(maxText, TextStyle(color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold))
+            val minMeasured = textMeasurer.measure(minText, TextStyle(color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold))
+            val maxMeasured = textMeasurer.measure(maxText, TextStyle(color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold))
             
             drawText(
                 textLayoutResult = minMeasured,
@@ -346,7 +358,7 @@ fun GaugeWidget(
         ) {
             Text(
                 text = label.uppercase(),
-                color = Color.Gray.copy(alpha = 0.7f),
+                color = MeetColors.textSecondary.copy(alpha = 0.7f),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.2.sp
@@ -372,7 +384,7 @@ fun GaugeWidget(
             } else {
                 Text(
                     "SIN SEÑAL",
-                    color = Color(0xFF555577).copy(alpha = pulseAlpha),
+                    color = MeetColors.textMuted.copy(alpha = pulseAlpha),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp
@@ -382,7 +394,7 @@ fun GaugeWidget(
             if (isAnomaly && hasData) {
                 Text(
                     "⚠ ANOMALÍA",
-                    color = Color(0xFFFF003C).copy(alpha = pulseAlpha),
+                    color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = pulseAlpha),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp

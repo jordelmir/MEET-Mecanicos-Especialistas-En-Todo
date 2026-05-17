@@ -31,6 +31,8 @@ import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.data.supabase.Vehicle
 import kotlinx.coroutines.delay
+import com.elysium369.meet.ui.components.EliteDialog
+import com.elysium369.meet.ui.theme.MeetColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,36 +49,23 @@ fun GarageScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Mi Garage", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(
-                            "${vehicles.size} vehículo${if (vehicles.size != 1) "s" else ""}",
-                            color = Color(0xFF39FF14).copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", color = Color(0xFF39FF14), style = MaterialTheme.typography.titleLarge)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+            com.elysium369.meet.ui.components.EliteTopAppBar(
+                title = "Mi Garage\n${vehicles.size} vehículo${if (vehicles.size != 1) "s" else ""}",
+                onBackClick = { navController.popBackStack() },
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("vehicle_form") },
-                containerColor = Color(0xFF0A0E1A),
+                containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(12.dp))
+                modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = Color(0xFF39FF14))
+                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (vehicles.isEmpty()) {
@@ -85,20 +74,17 @@ fun GarageScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("🚗", style = MaterialTheme.typography.displayLarge)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("No tienes vehículos registrados", color = Color.Gray,
+                        Text("No tienes vehículos registrados", color = MeetColors.textSecondary,
                             style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Registra tu primer vehículo para empezar", color = Color.DarkGray,
+                        Text("Registra tu primer vehículo para empezar", color = MeetColors.textMuted,
                             style = MaterialTheme.typography.bodySmall)
                         Spacer(modifier = Modifier.height(24.dp))
-                        Button(
+                        com.elysium369.meet.ui.components.EliteButton(
                             onClick = { navController.navigate("vehicle_form") },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp))
-                        ) {
-                            Text("＋ AÑADIR VEHÍCULO", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
-                        }
+                            text = "＋ AÑADIR VEHÍCULO",
+                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                        )
                     }
                 }
             } else {
@@ -109,7 +95,7 @@ fun GarageScreen(
                     item {
                         Text(
                             "${vehicles.size} VEHÍCULO${if (vehicles.size > 1) "S" else ""} REGISTRADO${if (vehicles.size > 1) "S" else ""}",
-                            color = Color(0xFF39FF14).copy(alpha = 0.5f),
+                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -151,7 +137,7 @@ fun GarageScreen(
                         )
                         Text(
                             "SINCRONIZANDO NUBE",
-                            color = Color(0xFFFF003C).copy(alpha = 0.7f),
+                            color = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.7f),
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(top = 8.dp)
                         )
@@ -163,60 +149,16 @@ fun GarageScreen(
 
     // ─── Delete Confirmation Dialog ───
     vehicleToDelete?.let { vehicle ->
-        AlertDialog(
-            onDismissRequest = { vehicleToDelete = null },
-            containerColor = Color(0xFF0D1117),
-            shape = RoundedCornerShape(16.dp),
-            icon = {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFF003C).copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF003C), modifier = Modifier.size(28.dp))
-                }
+        EliteDialog(
+            title = "¿Eliminar Vehículo?",
+            message = "${vehicle.make} ${vehicle.model} (${vehicle.year})\n\nEsta acción eliminará el vehículo de tu garage local y de la nube. No se puede deshacer.",
+            onDismiss = { vehicleToDelete = null },
+            onConfirm = {
+                viewModel.deleteVehicle(vehicle)
+                vehicleToDelete = null
             },
-            title = {
-                Text(
-                    "¿Eliminar Vehículo?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        "${vehicle.make} ${vehicle.model} (${vehicle.year})",
-                        color = Color(0xFFFF003C),
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Esta acción eliminará el vehículo de tu garage local y de la nube. No se puede deshacer.",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteVehicle(vehicle)
-                        vehicleToDelete = null
-                    }
-                ) {
-                    Text("ELIMINAR", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { vehicleToDelete = null }) {
-                    Text("CANCELAR", color = Color.Gray)
-                }
-            }
+            confirmText = "ELIMINAR",
+            isDestructive = true
         )
     }
 }
@@ -246,24 +188,24 @@ private fun AnimatedVehicleCard(
         label = "card_offset"
     )
 
-    val borderColor = if (isActive) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.15f)
+    val borderColor = if (isActive) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.15f)
     val glowBrush = if (isActive) {
         Brush.verticalGradient(
-            listOf(Color(0xFF39FF14).copy(alpha = 0.05f), Color.Transparent)
+            listOf(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f), Color.Transparent)
         )
     } else {
         Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
     }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-        shape = RoundedCornerShape(12.dp),
+    com.elysium369.meet.ui.components.EliteCard(
         modifier = Modifier
             .fillMaxWidth()
             .offset(y = animatedOffset)
             .alpha(animatedAlpha)
-            .border(if (isActive) 2.dp else 1.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable { onSelect() }
+            .clickable { onSelect() },
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        glowColor = if (isActive) com.elysium369.meet.ui.theme.MeetColors.neonGreen else Color.Transparent,
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier
@@ -286,19 +228,19 @@ private fun AnimatedVehicleCard(
                     )
                     Text(
                         "${vehicle.year}",
-                        color = Color.Gray,
+                        color = MeetColors.textMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 if (isActive) {
                     Surface(
-                        color = Color(0xFF39FF14).copy(alpha = 0.1f),
+                        color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(4.dp))
+                        modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(4.dp))
                     ) {
                         Text(
                             "● ACTIVO",
-                            color = Color(0xFF39FF14),
+                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black
@@ -317,15 +259,15 @@ private fun AnimatedVehicleCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     if (vehicle.vin != "NOT_READ") {
-                        Text("VIN: ${vehicle.vin}", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                        Text("VIN: ${vehicle.vin}", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                     }
                     if (vehicle.plate != "NOT_SET") {
-                        Text("Placa: ${vehicle.plate}", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                        Text("Placa: ${vehicle.plate}", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                     }
                     if (vehicle.engine != "N/A") {
                         Text(
                             vehicle.engine,
-                            color = Color(0xFF4FC3F7).copy(alpha = 0.6f),
+                            color = MeetColors.cyberCyan.copy(alpha = 0.6f),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -341,7 +283,7 @@ private fun AnimatedVehicleCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Eliminar",
-                        tint = Color(0xFFFF003C).copy(alpha = 0.5f),
+                        tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -350,7 +292,7 @@ private fun AnimatedVehicleCard(
             if (!isActive) {
                 Text(
                     "Toca para activar →",
-                    color = Color(0xFF39FF14).copy(alpha = 0.3f),
+                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(top = 4.dp)
                 )

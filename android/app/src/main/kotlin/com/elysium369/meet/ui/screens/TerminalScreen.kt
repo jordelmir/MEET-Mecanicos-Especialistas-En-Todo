@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.ui.theme.MeetColors
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -67,9 +69,9 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     }
 
     val statusColor = when (state) {
-        ObdState.CONNECTED -> Color(0xFF39FF14)
-        ObdState.CONNECTING -> Color(0xFFFFAA00)
-        else -> Color(0xFFFF003C)
+        ObdState.CONNECTED -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+        ObdState.CONNECTING -> MeetColors.warning
+        else -> com.elysium369.meet.ui.theme.MeetColors.error
     }
     val statusText = when (state) {
         ObdState.CONNECTED -> "● CONECTADO"
@@ -82,11 +84,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF060612), Color(0xFF0A0A18))
-                )
-            )
+            .background(MeetColors.carbonGradient)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         // --- Header ---
@@ -100,7 +98,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
             Column {
                 Text(
                     text = "Terminal Raw OBD2",
-                    color = Color(0xFFFF6B35),
+                    color = MeetColors.warning,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
@@ -121,7 +119,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     )
                 }
             ) {
-                Text("LIMPIAR", color = Color(0xFFFF003C), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text("LIMPIAR", color = com.elysium369.meet.ui.theme.MeetColors.error, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
         }
 
@@ -131,8 +129,8 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 .weight(1f)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF0A0E1A))
-                .border(1.dp, Color(0xFFFF6B35).copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
+                .border(1.dp, MeetColors.warning.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                 .padding(8.dp)
         ) {
             LazyColumn(
@@ -141,11 +139,11 @@ fun TerminalScreen(viewModel: ObdViewModel) {
             ) {
                 items(terminalOutput) { line ->
                     val lineColor = when (line.type) {
-                        TerminalLineType.SYSTEM -> Color(0xFF00BCD4)
-                        TerminalLineType.COMMAND -> Color(0xFF39FF14)
-                        TerminalLineType.RESPONSE -> Color(0xFFE0E0E0)
-                        TerminalLineType.ERROR -> Color(0xFFFF003C)
-                        TerminalLineType.WARNING -> Color(0xFFFFAA00)
+                        TerminalLineType.SYSTEM -> MeetColors.electricBlue
+                        TerminalLineType.COMMAND -> MeetColors.neonGreen
+                        TerminalLineType.RESPONSE -> MeetColors.textPrimary
+                        TerminalLineType.ERROR -> MeetColors.error
+                        TerminalLineType.WARNING -> MeetColors.warning
                     }
                     val prefix = when (line.type) {
                         TerminalLineType.COMMAND -> "❯ "
@@ -158,7 +156,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         // Timestamp
                         Text(
                             text = "[${line.timestamp}] ",
-                            color = Color(0xFF555555),
+                            color = MeetColors.textMuted,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 10.sp
                         )
@@ -187,16 +185,16 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 onValueChange = { commandInput = it.uppercase() },
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color(0xFF39FF14),
+                    focusedTextColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                     unfocusedTextColor = Color.White,
-                    focusedContainerColor = Color(0xFF0A0E1A),
-                    unfocusedContainerColor = Color(0xFF0A0E1A),
-                    cursorColor = Color(0xFFFF6B35),
-                    focusedBorderColor = Color(0xFFFF6B35),
-                    unfocusedBorderColor = Color(0xFFFF6B35).copy(alpha = 0.3f)
+                    focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+                    unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+                    cursorColor = MeetColors.warning,
+                    focusedBorderColor = MeetColors.warning,
+                    unfocusedBorderColor = MeetColors.warning.copy(alpha = 0.3f)
                 ),
                 placeholder = {
-                    Text("ATZ, 010C, AT RV...", color = Color.Gray, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                    Text("ATZ, 010C, AT RV...", color = MeetColors.textMuted, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                 },
                 singleLine = true,
                 textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 14.sp),
@@ -244,8 +242,8 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 },
                 enabled = !isSending && commandInput.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF6B35),
-                    disabledContainerColor = Color(0xFF333333)
+                    containerColor = MeetColors.warning,
+                    disabledContainerColor = MeetColors.backgroundDark
                 ),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.height(56.dp)
@@ -273,13 +271,14 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 AssistChip(
                     onClick = { commandInput = cmd },
                     label = {
-                        Text(cmd, color = Color(0xFFFF6B35), fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(cmd, color = MeetColors.warning, fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     },
                     colors = AssistChipDefaults.assistChipColors(
-                        containerColor = Color(0xFF0A0E1A)
+                        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
                     ),
-                    border = AssistChipDefaults.assistChipBorder(
-                        borderColor = Color(0xFFFF6B35).copy(alpha = 0.3f)
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MeetColors.warning.copy(alpha = 0.3f)
                     ),
                     shape = RoundedCornerShape(6.dp)
                 )

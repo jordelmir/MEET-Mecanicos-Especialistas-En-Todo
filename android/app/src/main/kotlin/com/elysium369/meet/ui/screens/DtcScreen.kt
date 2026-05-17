@@ -32,8 +32,12 @@ import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
+import com.elysium369.meet.ui.components.neonGlow
 import kotlinx.coroutines.launch
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
+import com.elysium369.meet.data.local.KnowledgeBaseRepository
+import com.elysium369.meet.ui.components.EliteDialog
+import com.elysium369.meet.ui.theme.MeetColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,13 +56,13 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val isClearing by viewModel.isClearing.collectAsState()
 
     if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text(if(isSpanish) "⚠️ Borrar Códigos" else "⚠️ Clear Codes", color = Color.White) },
-            text = { Text(if(isSpanish) "Esto enviará Mode 04 al vehículo. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine), y se resetearán los monitores de emisiones.\n\n¿Continuar?" else "This will send Mode 04 to the vehicle. ALL active and pending DTCs will be cleared, the MIL (Check Engine) light will be turned off, and emission monitors will be reset.\n\nContinue?", color = Color.Gray) },
-            confirmButton = { TextButton(onClick = { showClearDialog = false; coroutineScope.launch { viewModel.clearDtcs() } }) { Text(if(isSpanish) "BORRAR" else "CLEAR", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text(if(isSpanish) "Cancelar" else "Cancel", color = Color.Gray) } },
-            containerColor = Color(0xFF0A0E1A)
+        EliteDialog(
+            title = if(isSpanish) "⚠️ Borrar Códigos" else "⚠️ Clear Codes",
+            message = if(isSpanish) "Esto enviará Mode 04 al vehículo. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine), y se resetearán los monitores de emisiones.\n\n¿Continuar?" else "This will send Mode 04 to the vehicle. ALL active and pending DTCs will be cleared, the MIL (Check Engine) light will be turned off, and emission monitors will be reset.\n\nContinue?",
+            onDismiss = { showClearDialog = false },
+            onConfirm = { showClearDialog = false; coroutineScope.launch { viewModel.clearDtcs() } },
+            confirmText = if(isSpanish) "BORRAR" else "CLEAR",
+            isDestructive = true
         )
     }
 
@@ -70,10 +74,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
             Column {
                 TopAppBar(
                     title = { Text(if(isSpanish) "Diagnóstico DTC" else "DTC Diagnostics", color = Color.White, fontWeight = FontWeight.Bold) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A)),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                     actions = {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
-                            Text("EN", color = if(isSpanish) Color.Gray else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Text("EN", color = if(isSpanish) MeetColors.textSecondary else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                             Switch(
                                 checked = isSpanish,
                                 onCheckedChange = { 
@@ -81,27 +85,27 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     viewModel.setLanguage(if(it) "es" else "en")
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFF39FF14),
-                                    checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.3f),
-                                    uncheckedThumbColor = Color(0xFF00AAFF),
-                                    uncheckedTrackColor = Color(0xFF00AAFF).copy(alpha = 0.3f)
+                                    checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                                    checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                                    uncheckedThumbColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
+                                    uncheckedTrackColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f)
                                 ),
                                 modifier = Modifier.padding(horizontal = 4.dp).height(24.dp)
                             )
-                            Text("ES", color = if(isSpanish) Color.White else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Text("ES", color = if(isSpanish) Color.White else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 )
-                TabRow(selectedTabIndex = selectedTab, containerColor = Color(0xFF0A0E1A), contentColor = Color(0xFF39FF14)) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(if(isSpanish) "Activos" else "Active", color = if (selectedTab == 0) Color(0xFFFF003C) else Color.Gray, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if(isSpanish) "Pend." else "Pend.", color = if (selectedTab == 1) Color(0xFFFFD700) else Color.Gray, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if(isSpanish) "Perm." else "Perm.", color = if (selectedTab == 2) Color(0xFF00AAFF) else Color.Gray, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if(isSpanish) "Monitores" else "Monitors", color = if (selectedTab == 3) Color(0xFF39FF14) else Color.Gray, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("Manual", color = if (selectedTab == 4) Color.White else Color.Gray, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                TabRow(selectedTabIndex = selectedTab, containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, contentColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(if(isSpanish) "Activos" else "Active", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.error else MeetColors.textSecondary, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if(isSpanish) "Pend." else "Pend.", color = if (selectedTab == 1) MeetColors.warning else MeetColors.textSecondary, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if(isSpanish) "Perm." else "Perm.", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.electricBlue else MeetColors.textSecondary, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if(isSpanish) "Monitores" else "Monitors", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("Manual", color = if (selectedTab == 4) Color.White else MeetColors.textSecondary, modifier = Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
                 }
             }
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             EliteScrollContainer(
@@ -125,9 +129,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
-                                .border(1.dp, if(isScanning) Color.Transparent else Color(0xFF39FF14), RoundedCornerShape(8.dp))
+                                .border(1.dp, if(isScanning) Color.Transparent else com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(8.dp))
                                 .background(
-                                    if(isScanning) Brush.horizontalGradient(listOf(Color(0xFF39FF14).copy(alpha = 0.1f), Color.Transparent))
+                                    if(isScanning) Brush.horizontalGradient(listOf(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f), Color.Transparent))
                                     else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                                     RoundedCornerShape(8.dp)
                                 ),
@@ -146,12 +150,12 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                         ),
                                         label = "alpha"
                                     )
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color(0xFF39FF14).copy(alpha = alpha), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = alpha), strokeWidth = 2.dp)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if(isSpanish) "ESCANEANDO..." else "SCANNING...", color = Color(0xFF39FF14).copy(alpha = alpha), fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                    Text(if(isSpanish) "ESCANEANDO..." else "SCANNING...", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = alpha), fontWeight = FontWeight.Black, fontSize = 12.sp)
                                 }
                             } else {
-                                Text(if(isSpanish) "ESCANEAR" else "SCAN", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
+                                Text(if(isSpanish) "ESCANEAR" else "SCAN", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                             }
                         }
                         Button(
@@ -160,9 +164,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
-                                .border(1.dp, if(isClearing) Color.Transparent else Color(0xFFFF003C), RoundedCornerShape(8.dp))
+                                .border(1.dp, if(isClearing) Color.Transparent else com.elysium369.meet.ui.theme.MeetColors.error, RoundedCornerShape(8.dp))
                                 .background(
-                                    if(isClearing) Brush.horizontalGradient(listOf(Color(0xFFFF003C).copy(alpha = 0.1f), Color.Transparent))
+                                    if(isClearing) Brush.horizontalGradient(listOf(com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.1f), Color.Transparent))
                                     else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                                     RoundedCornerShape(8.dp)
                                 ),
@@ -181,12 +185,12 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                         ),
                                         label = "scale"
                                     )
-                                    Box(modifier = Modifier.size(12.dp).graphicsLayer(scaleX = scale, scaleY = scale).background(Color(0xFFFF003C), CircleShape))
+                                    Box(modifier = Modifier.size(12.dp).graphicsLayer(scaleX = scale, scaleY = scale).background(com.elysium369.meet.ui.theme.MeetColors.error, CircleShape))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if(isSpanish) "BORRANDO..." else "CLEARING...", color = Color(0xFFFF003C), fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                    Text(if(isSpanish) "BORRANDO..." else "CLEARING...", color = com.elysium369.meet.ui.theme.MeetColors.error, fontWeight = FontWeight.Black, fontSize = 12.sp)
                                 }
                             } else {
-                                Text(if(isSpanish) "BORRAR DTCs" else "CLEAR DTCs", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
+                                Text(if(isSpanish) "BORRAR DTCs" else "CLEAR DTCs", color = com.elysium369.meet.ui.theme.MeetColors.error, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -194,38 +198,35 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 
                 if (clearResult != null) {
                     item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        com.elysium369.meet.ui.components.EliteCard(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(clearResult.orEmpty(), color = Color.White, modifier = Modifier.padding(12.dp))
                         }
                     }
                 }
 
+                val allDtcs = activeDtcs + pendingDtcs + permanentDtcs
                 when (selectedTab) {
                     0 -> { // Active DTCs (Mode 03)
                         if (activeDtcs.isEmpty()) {
-                            item { EmptyDtcState(if(isSpanish) "No hay códigos de falla activos" else "No active fault codes", Color(0xFF39FF14)) }
+                            item { EmptyDtcState(if(isSpanish) "No hay códigos de falla activos" else "No active fault codes", com.elysium369.meet.ui.theme.MeetColors.neonGreen) }
                         } else {
-                            items(activeDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "ACTIVO" else "ACTIVE", Color(0xFFFF003C), navController, viewModel, isSpanish) }
+                            items(activeDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "ACTIVO" else "ACTIVE", com.elysium369.meet.ui.theme.MeetColors.error, navController, viewModel, isSpanish, allDtcs) }
                         }
                     }
                     1 -> { // Pending DTCs (Mode 07)
                         if (pendingDtcs.isEmpty()) {
-                            item { EmptyDtcState(if(isSpanish) "No hay códigos pendientes.\nEstos son códigos que aún no encendieron la luz MIL." else "No pending codes.\nThese codes have not yet turned on the MIL.", Color(0xFFFFD700)) }
+                            item { EmptyDtcState(if(isSpanish) "No hay códigos pendientes.\nEstos son códigos que aún no encendieron la luz MIL." else "No pending codes.\nThese codes have not yet turned on the MIL.", MeetColors.warning) }
                         } else {
-                            items(pendingDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "PENDIENTE" else "PENDING", Color(0xFFFFD700), navController, viewModel, isSpanish) }
+                            items(pendingDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "PENDIENTE" else "PENDING", MeetColors.warning, navController, viewModel, isSpanish, allDtcs) }
                         }
                     }
                     2 -> { // Permanent DTCs (Mode 0A)
                         if (permanentDtcs.isEmpty()) {
-                            item { EmptyDtcState(if(isSpanish) "No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente." else "No permanent codes.\nThese codes CANNOT be manually cleared.", Color(0xFF00AAFF)) }
+                            item { EmptyDtcState(if(isSpanish) "No hay códigos permanentes.\nEstos son códigos que NO se pueden borrar manualmente." else "No permanent codes.\nThese codes CANNOT be manually cleared.", com.elysium369.meet.ui.theme.MeetColors.electricBlue) }
                         } else {
-                            items(permanentDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "PERMANENTE" else "PERMANENT", Color(0xFF00AAFF), navController, viewModel, isSpanish) }
+                            items(permanentDtcs) { dtc -> DtcCard(dtc, if(isSpanish) "PERMANENTE" else "PERMANENT", com.elysium369.meet.ui.theme.MeetColors.electricBlue, navController, viewModel, isSpanish, allDtcs) }
                         }
                     }
                     3 -> { // Readiness Monitors
@@ -281,8 +282,8 @@ fun EliteScanningAnimation(isSpanish: Boolean) {
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         Color.Transparent,
-                        Color(0xFF39FF14).copy(alpha = 0.3f),
-                        Color(0xFF39FF14).copy(alpha = 0.05f),
+                        com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                        com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f),
                         Color.Transparent
                     ),
                     startY = currentY - 100,
@@ -294,7 +295,7 @@ fun EliteScanningAnimation(isSpanish: Boolean) {
             
             // Glow line
             drawLine(
-                color = Color(0xFF39FF14),
+                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                 start = androidx.compose.ui.geometry.Offset(0f, currentY),
                 end = androidx.compose.ui.geometry.Offset(width, currentY),
                 strokeWidth = 2.dp.toPx()
@@ -308,7 +309,7 @@ fun EliteScanningAnimation(isSpanish: Boolean) {
             Surface(
                 color = Color.Black,
                 shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(24.dp))
+                modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(24.dp))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
@@ -316,13 +317,13 @@ fun EliteScanningAnimation(isSpanish: Boolean) {
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color(0xFF39FF14),
+                        color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                         strokeWidth = 3.dp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         if(isSpanish) "ESCANEANDO SISTEMAS..." else "SCANNING SYSTEMS...",
-                        color = Color(0xFF39FF14),
+                        color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                         fontWeight = FontWeight.Black,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -365,14 +366,14 @@ fun EliteClearingAnimation(isSpanish: Boolean) {
             modifier = Modifier
                 .size(200.dp)
                 .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
-                .border(2.dp, Color(0xFFFF003C).copy(alpha = pulseAlpha), CircleShape)
+                .border(2.dp, com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = pulseAlpha), CircleShape)
         )
         
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = Icons.Default.Search, 
                 contentDescription = null,
-                tint = Color(0xFFFF003C),
+                tint = com.elysium369.meet.ui.theme.MeetColors.error,
                 modifier = Modifier.size(64.dp)
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -384,7 +385,7 @@ fun EliteClearingAnimation(isSpanish: Boolean) {
             )
             Text(
                 if(isSpanish) "POR FAVOR ESPERE" else "PLEASE WAIT",
-                color = Color(0xFFFF003C),
+                color = com.elysium369.meet.ui.theme.MeetColors.error,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.labelLarge
             )
@@ -393,7 +394,7 @@ fun EliteClearingAnimation(isSpanish: Boolean) {
 }
 
 @Composable
-private fun DtcCard(dtc: String, severity: String, color: Color, navController: NavController, viewModel: ObdViewModel, isSpanish: Boolean) {
+private fun DtcCard(dtc: String, severity: String, color: Color, navController: NavController, viewModel: ObdViewModel, isSpanish: Boolean, allDtcs: List<String> = emptyList()) {
     val definitions by viewModel.dtcDefinitions.collectAsState()
     val dtcInfo = definitions[dtc]
     
@@ -404,7 +405,19 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
         dtcInfo?.descriptionEs ?: fallbackDesc
     }
     
-    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
+    val vehicle by viewModel.selectedVehicle.collectAsState()
+    val knowledgeGuide = com.elysium369.meet.data.local.KnowledgeBaseRepository.getGuideForDtc(
+        dtc = dtc, 
+        description = dtcInfo?.descriptionEs, 
+        isSpanish = isSpanish,
+        vehicleMake = vehicle?.make,
+        vehicleModel = vehicle?.model
+    )
+    
+    com.elysium369.meet.ui.components.EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = color
+    ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, color, RoundedCornerShape(4.dp))) {
@@ -416,11 +429,154 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
             Spacer(modifier = Modifier.height(8.dp))
             Text(desc, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
             
-            if (dtcInfo != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                val title = if (isSpanish) "🧠 SÍNTESIS EXPERTA (LOCAL):" else "🧠 EXPERT SYNTHESIS (LOCAL):"
-                Text(title, color = Color(0xFF00AAFF).copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                Text(generateExpertSynthesis(dtcInfo, isSpanish), color = Color(0xFF00AAFF).copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+            if (dtc == "P0300") {
+                val misfireCodes = allDtcs.filter { it.matches(Regex("P030[1-9]|P031[0-2]")) }
+                if (misfireCodes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val cylinders = misfireCodes.joinToString(", ")
+                    Surface(color = MeetColors.warning.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MeetColors.warning.copy(alpha = 0.5f), RoundedCornerShape(8.dp))) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(if(isSpanish) "⚠️ CILINDROS ESPECÍFICOS DETECTADOS:" else "⚠️ SPECIFIC CYLINDERS DETECTED:", color = MeetColors.warning, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                            Text(cylinders, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(color = MeetColors.warning.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MeetColors.warning.copy(alpha = 0.5f), RoundedCornerShape(8.dp))) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(if(isSpanish) "⚠️ CILINDROS ESPECÍFICOS NO ENCONTRADOS:" else "⚠️ SPECIFIC CYLINDERS NOT FOUND:", color = MeetColors.warning, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                            Text(if(isSpanish) "La computadora (ECU) de este vehículo no registró códigos individuales. ESTO ES NORMAL en esta marca. Siga la técnica manual de 'balance de cilindros' desconectando cada bobina una a la vez para ubicar la falla." else "ECU hasn't logged specific codes. Normal for this make. Perform manual cylinder drop test.", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ═══ URGENCY + DRIVABILITY BANNER ═══
+            val urgColor = when(knowledgeGuide.urgency) {
+                "inmediata" -> MeetColors.error
+                "pronto" -> MeetColors.warning
+                else -> MeetColors.neonGreen
+            }
+            val urgText = when(knowledgeGuide.urgency) {
+                "inmediata" -> if(isSpanish) "🚨 ATENCIÓN INMEDIATA" else "🚨 IMMEDIATE ATTENTION"
+                "pronto" -> if(isSpanish) "⚠️ REPARAR PRONTO" else "⚠️ REPAIR SOON"
+                else -> if(isSpanish) "✅ RUTINARIA" else "✅ ROUTINE"
+            }
+            val driveText = if(knowledgeGuide.canDrive) {
+                if(isSpanish) "✅ Puede conducir con precaución" else "✅ Can drive with caution"
+            } else {
+                if(isSpanish) "🚫 NO CONDUZCA — Riesgo de daño mayor" else "🚫 DO NOT DRIVE — Risk of further damage"
+            }
+            val driveColor = if(knowledgeGuide.canDrive) MeetColors.neonGreen else MeetColors.error
+
+            Surface(color = urgColor.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, urgColor.copy(alpha = 0.6f), RoundedCornerShape(8.dp))) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(urgText, color = urgColor, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (knowledgeGuide.sourcesCount > 0) {
+                            Text("📚 ${knowledgeGuide.sourcesCount} fuentes", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(driveText, color = driveColor, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ═══ COST + TIME BAR ═══
+            if (knowledgeGuide.costEstimate != null) {
+                Surface(color = Color(0xFF1A1A2E), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF2D2D44), RoundedCornerShape(8.dp))) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(if(isSpanish) "💰 COSTO ESTIMADO" else "💰 ESTIMATED COST", color = MeetColors.neonGreen, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                            Text("$${knowledgeGuide.costEstimate.minCost.toInt()} — $${knowledgeGuide.costEstimate.maxCost.toInt()} USD", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(if(isSpanish) "⏱️ TIEMPO" else "⏱️ TIME", color = MeetColors.electricBlue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                            Text("${knowledgeGuide.timeHours}h", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // ═══ SYSTEM + STANDARD ═══
+            Surface(color = MeetColors.electricBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row {
+                        Text(if(isSpanish) "⚙️ SISTEMA: " else "⚙️ SYSTEM: ", color = MeetColors.electricBlue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                        Text(knowledgeGuide.systemAffected, color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(knowledgeGuide.standard, color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ═══ SYMPTOMS ═══
+            if (knowledgeGuide.symptoms.isNotEmpty()) {
+                Surface(color = MeetColors.warning.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MeetColors.warning.copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(if(isSpanish) "🔍 SÍNTOMAS" else "🔍 SYMPTOMS", color = MeetColors.warning, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        knowledgeGuide.symptoms.forEach { symptom ->
+                            Text("  • " + (if(isSpanish) translateDtcText(symptom) else symptom), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(2.dp))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // ═══ RANKED CAUSES ═══
+            Surface(color = Color(0xFF1A1A2E), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF2D2D44), RoundedCornerShape(8.dp))) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(if(isSpanish) "🎯 CAUSAS PROBABLES" else "🎯 PROBABLE CAUSES", color = Color(0xFFFF6B6B), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    knowledgeGuide.possibleCauses.forEach { cause ->
+                        Text("  " + (if(isSpanish) translateDtcText(cause) else cause), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Spacer(modifier = Modifier.height(3.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ═══ DIAGNOSTIC STEPS ═══
+            Surface(color = MeetColors.neonGreen.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(if(isSpanish) "🛠️ PROCEDIMIENTO DE DIAGNÓSTICO" else "🛠️ DIAGNOSTIC PROCEDURE", color = MeetColors.neonGreen, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                    Text(if(isSpanish) "(Ordenado de menor a mayor costo)" else "(Ordered from lowest to highest cost)", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Split solution into steps and render each
+                    val solutionText = if(isSpanish) translateDtcText(knowledgeGuide.recommendedSolution) else knowledgeGuide.recommendedSolution
+                    val lines = solutionText.split("\n").filter { it.isNotBlank() }
+                    // Find lines that look like steps (start with number or contain diagnostic info)
+                    val stepLines = lines.filter { line ->
+                        val t = line.trim()
+                        t.startsWith("1.") || t.startsWith("2.") || t.startsWith("3.") || t.startsWith("4.") || t.startsWith("5.") || t.startsWith("6.") || t.startsWith("7.")
+                    }
+                    val headerLines = lines.filter { line ->
+                        val t = line.trim()
+                        t.startsWith("━") || t.startsWith("═") || t.contains("GUÍA") || t.contains("Sistema:") || t.contains("Descripción:") || t.contains("Urgencia:") || t.contains("Puede conducir") || t.contains("Costo estimado") || t.contains("Tiempo estimado") || t.contains("📚") || t.startsWith("•")
+                    }
+                    if (stepLines.isNotEmpty()) {
+                        stepLines.forEachIndexed { idx, step ->
+                            val stepColor = if (step.contains("⚠️") || step.contains("SEGURIDAD") || step.contains("PRECAUCIÓN")) MeetColors.error else Color.White
+                            Surface(color = if(idx % 2 == 0) Color.White.copy(alpha = 0.03f) else Color.Transparent, shape = RoundedCornerShape(4.dp)) {
+                                Text(step.trim(), color = stepColor, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp))
+                            }
+                        }
+                    } else {
+                        Text(solutionText, color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(12.dp))
@@ -431,7 +587,7 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
             val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
             
             if (scopedFrame.isNotEmpty()) {
-                Text(if(isSpanish) "❄️ DATOS DE CUADRO CONGELADO:" else "❄️ FREEZE FRAME DATA:", color = Color(0xFF00AAFF), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                Text(if(isSpanish) "❄️ DATOS DE CUADRO CONGELADO:" else "❄️ FREEZE FRAME DATA:", color = com.elysium369.meet.ui.theme.MeetColors.electricBlue, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
                 scopedFrame.forEach { (scopedKey, valStr) ->
                     val pid = scopedKey.substringAfter(":")
                     val pidNameEs = when(pid) {
@@ -462,24 +618,20 @@ private fun DtcCard(dtc: String, severity: String, color: Color, navController: 
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                com.elysium369.meet.ui.components.EliteTextButton(
+                    text = if(isSpanish) "🤖 CONSULTAR IA" else "🤖 CONSULT AI",
                     onClick = { navController.navigate("ai/$dtc") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(if(isSpanish) "🤖 CONSULTAR IA" else "🤖 CONSULT AI", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                }
+                    modifier = Modifier.weight(1f),
+                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                )
                 
                 val coroutineScope = rememberCoroutineScope()
-                Button(
+                com.elysium369.meet.ui.components.EliteTextButton(
+                    text = "❄️ FF DATA",
                     onClick = { coroutineScope.launch { viewModel.refreshFreezeFrame(dtc) } },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFF00AAFF), RoundedCornerShape(8.dp)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("❄️ FF DATA", color = Color(0xFF00AAFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                }
+                    modifier = Modifier.weight(1f),
+                    color = com.elysium369.meet.ui.theme.MeetColors.electricBlue
+                )
             }
         }
     }
@@ -503,42 +655,50 @@ private fun ReadinessMonitorsCard(readiness: com.elysium369.meet.core.obd.Readin
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("📊", style = MaterialTheme.typography.displayMedium)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(if(isSpanish) "Monitores de emisiones no leídos aún." else "Emission monitors not read yet.", color = Color.Gray)
+                Text(if(isSpanish) "Monitores de emisiones no leídos aún." else "Emission monitors not read yet.", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)), modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)), shape = RoundedCornerShape(8.dp)) {
-                    Text(if(isSpanish) "LEER MONITORES" else "READ MONITORS", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
-                }
+                com.elysium369.meet.ui.components.EliteTextButton(
+                    text = if(isSpanish) "LEER MONITORES" else "READ MONITORS",
+                    onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } },
+                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                )
             }
         }
     } else {
         // MIL Status
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().border(1.dp, if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF39FF14), RoundedCornerShape(12.dp))) {
+        com.elysium369.meet.ui.components.EliteCard(
+            modifier = Modifier.fillMaxWidth(),
+            borderColor = if (readiness.milOn) com.elysium369.meet.ui.theme.MeetColors.error else com.elysium369.meet.ui.theme.MeetColors.neonGreen
+        ) {
             Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
-                    Text(if(isSpanish) "LUZ MIL (CHECK ENGINE)" else "MIL (CHECK ENGINE)", color = Color.Gray, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text(if(isSpanish) "LUZ MIL (CHECK ENGINE)" else "MIL (CHECK ENGINE)", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     val encendida = if(isSpanish) "🔴 ENCENDIDA" else "🔴 ON"
                     val apagada = if(isSpanish) "🟢 APAGADA" else "🟢 OFF"
-                    Text(if (readiness.milOn) encendida else apagada, color = if (readiness.milOn) Color(0xFFFF003C) else Color(0xFF39FF14), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                    Text(if (readiness.milOn) encendida else apagada, color = if (readiness.milOn) com.elysium369.meet.ui.theme.MeetColors.error else com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                 }
                 Text("${readiness.dtcCount} DTCs", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
         // Monitors
-        Text(if(isSpanish) "MONITORES DE EMISIÓN" else "EMISSION MONITORS", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Text(if(isSpanish) "MONITORES DE EMISIÓN" else "EMISSION MONITORS", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         val passedCount = readiness.monitors.count { it.complete }
         val totalCount = readiness.monitors.size
         val completados = if(isSpanish) "completados" else "completed"
-        Text("$passedCount / $totalCount $completados", color = if (passedCount == totalCount) Color(0xFF39FF14) else Color(0xFFFFD700), style = MaterialTheme.typography.bodySmall)
+        Text("$passedCount / $totalCount $completados", color = if (passedCount == totalCount) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.warning, style = MaterialTheme.typography.bodySmall)
         Spacer(modifier = Modifier.height(8.dp))
         readiness.monitors.forEach { monitor ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).border(1.dp, (if (monitor.complete) Color(0xFF39FF14) else Color(0xFFFFD700)).copy(alpha = 0.3f), RoundedCornerShape(8.dp))) {
+            com.elysium369.meet.ui.components.EliteCard(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                borderColor = if (monitor.complete) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.warning
+            ) {
                 Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(monitor.name, color = Color.White, style = MaterialTheme.typography.bodyMedium)
                     val listo = if(isSpanish) "✅ Listo" else "✅ Ready"
                     val inc = if(isSpanish) "⏳ Incompleto" else "⏳ Inc."
-                    Text(if (monitor.complete) listo else inc, color = if (monitor.complete) Color(0xFF39FF14) else Color(0xFFFFD700), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                    Text(if (monitor.complete) listo else inc, color = if (monitor.complete) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.warning, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -566,13 +726,13 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it.uppercase().trim() },
-            label = { Text(if(isSpanish) "Ingresar Código (Ej. P0300)" else "Enter Code (e.g. P0300)", color = Color.Gray) },
+            label = { Text(if(isSpanish) "Ingresar Código (Ej. P0300)" else "Enter Code (e.g. P0300)", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary) },
             colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = Color(0xFF39FF14),
-                unfocusedBorderColor = Color.Gray,
+                focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                unfocusedBorderColor = MeetColors.textSecondary,
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
-                cursorColor = Color(0xFF39FF14)
+                cursorColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen
             ),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
@@ -581,36 +741,33 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
         Spacer(modifier = Modifier.height(16.dp))
         
         if (searchQuery.isNotEmpty() && searchResults.isEmpty()) {
-            Button(
+            com.elysium369.meet.ui.components.EliteTextButton(
+                text = if(isSpanish) "BUSCAR" else "SEARCH",
                 onClick = { viewModel.searchDtcManual(searchQuery) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(if(isSpanish) "BUSCAR" else "SEARCH", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
-            }
+                modifier = Modifier.fillMaxWidth(),
+                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         if (searchResults.isNotEmpty() || searchQuery.isNotEmpty()) {
             if (searchResults.isEmpty() && searchQuery.length >= 3) {
-                EmptyDtcState(if(isSpanish) "No se encontró el código en la base de datos." else "Code not found in the database.", Color.Gray)
+                EmptyDtcState(if(isSpanish) "No se encontró el código en la base de datos." else "Code not found in the database.", MeetColors.textSecondary)
             } else {
                 Text(if(isSpanish) "Resultados (${searchResults.size})" else "Results (${searchResults.size})", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
                 searchResults.forEach { dtc ->
                     val color = when (dtc.severity.uppercase()) {
-                        "HIGH" -> Color(0xFFFF003C)
-                        "MODERATE" -> Color(0xFFFFD700)
-                        else -> Color(0xFF39FF14)
+                        "HIGH" -> com.elysium369.meet.ui.theme.MeetColors.error
+                        "MODERATE" -> MeetColors.warning
+                        else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
                     }
                     
                     val desc = if (isSpanish) translateDtcText(dtc.descriptionEs) else dtc.descriptionEs
                     
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    com.elysium369.meet.ui.components.EliteCard(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        borderColor = color
                     ) {
                         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -624,19 +781,87 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                             Text(desc, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                             
                             Spacer(modifier = Modifier.height(12.dp))
-                            val title = if (isSpanish) "🧠 SÍNTESIS EXPERTA (LOCAL):" else "🧠 EXPERT SYNTHESIS (LOCAL):"
-                            Text(title, color = Color(0xFF00AAFF).copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            Text(generateExpertSynthesis(dtc, isSpanish), color = Color(0xFF00AAFF).copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
-                            
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { navController.navigate("ai/${dtc.code}") },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(if(isSpanish) "🤖 CONSULTAR IA" else "🤖 CONSULT AI", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold)
+
+                            // ═══ LOAD ELITE GUIDE ═══
+                            val guide = com.elysium369.meet.data.local.KnowledgeBaseRepository.getGuideForDtc(dtc.code, dtc.descriptionEs, isSpanish)
+
+                            // ═══ URGENCY BANNER ═══
+                            val urgColor2 = when(guide.urgency) {
+                                "inmediata" -> MeetColors.error
+                                "pronto" -> MeetColors.warning
+                                else -> MeetColors.neonGreen
                             }
+                            val urgText2 = when(guide.urgency) {
+                                "inmediata" -> if(isSpanish) "🚨 ATENCIÓN INMEDIATA" else "🚨 IMMEDIATE"
+                                "pronto" -> if(isSpanish) "⚠️ REPARAR PRONTO" else "⚠️ REPAIR SOON"
+                                else -> if(isSpanish) "✅ RUTINARIA" else "✅ ROUTINE"
+                            }
+                            val driveText2 = if(guide.canDrive) {
+                                if(isSpanish) "✅ Puede conducir" else "✅ Can drive"
+                            } else {
+                                if(isSpanish) "🚫 NO CONDUZCA" else "🚫 DO NOT DRIVE"
+                            }
+                            Surface(color = urgColor2.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth().border(1.dp, urgColor2.copy(alpha = 0.5f), RoundedCornerShape(6.dp))) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(urgText2, color = urgColor2, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        if (guide.sourcesCount > 0) Text("📚 ${guide.sourcesCount}", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(driveText2, color = if(guide.canDrive) MeetColors.neonGreen else MeetColors.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // ═══ COST + TIME ═══
+                            if (guide.costEstimate != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Surface(color = Color(0xFF1A1A2E), shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                    Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("💰 $${guide.costEstimate.minCost.toInt()}–$${guide.costEstimate.maxCost.toInt()} USD", color = MeetColors.neonGreen, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Black)
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Text("⏱️ ${guide.timeHours}h", color = MeetColors.electricBlue, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            // ═══ SYMPTOMS ═══
+                            if (guide.symptoms.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(if(isSpanish) "🔍 SÍNTOMAS:" else "🔍 SYMPTOMS:", color = MeetColors.warning, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                                guide.symptoms.forEach { s ->
+                                    Text("  • $s", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+
+                            // ═══ RANKED CAUSES ═══
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(if(isSpanish) "🎯 CAUSAS PROBABLES:" else "🎯 PROBABLE CAUSES:", color = Color(0xFFFF6B6B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                            guide.possibleCauses.forEach { c ->
+                                Text("  $c", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                            }
+
+                            // ═══ DIAGNOSTIC STEPS ═══
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(if(isSpanish) "🛠️ DIAGNÓSTICO (menor→mayor costo):" else "🛠️ DIAGNOSIS (low→high cost):", color = MeetColors.neonGreen, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                            val steps = guide.recommendedSolution.split("\n").filter { line ->
+                                val t = line.trim()
+                                t.startsWith("1.") || t.startsWith("2.") || t.startsWith("3.") || t.startsWith("4.") || t.startsWith("5.") || t.startsWith("6.") || t.startsWith("7.")
+                            }
+                            if (steps.isNotEmpty()) {
+                                steps.forEach { step ->
+                                    val sColor = if (step.contains("⚠️") || step.contains("PRECAUCIÓN")) MeetColors.error else Color.White.copy(alpha = 0.85f)
+                                    Text(step.trim(), color = sColor, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 2.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            com.elysium369.meet.ui.components.EliteTextButton(
+                                text = if(isSpanish) "🤖 CONSULTAR IA" else "🤖 CONSULT AI",
+                                onClick = { navController.navigate("ai/${dtc.code}") },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                            )
                         }
                     }
                 }

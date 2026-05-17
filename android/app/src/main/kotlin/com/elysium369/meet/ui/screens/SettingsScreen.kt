@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
+import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.ObdViewModel
 import android.content.Context
 import android.widget.Toast
@@ -47,6 +48,14 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     var showSavedBanner by remember { mutableStateOf(false) }
     var providerExpanded by remember { mutableStateOf(false) }
 
+    // --- Local Workshop Profile state ---
+    val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+    var workshopName by remember { mutableStateOf(prefs.getString("workshop_name", "") ?: "") }
+    var workshopAddress by remember { mutableStateOf(prefs.getString("workshop_address", "") ?: "") }
+    var workshopPhone by remember { mutableStateOf(prefs.getString("workshop_phone", "") ?: "") }
+    var workshopEmail by remember { mutableStateOf(prefs.getString("workshop_email", "") ?: "") }
+    var showWorkshopSaved by remember { mutableStateOf(false) }
+
     // Sync when aiConfig changes externally
     LaunchedEffect(aiConfig) {
         selectedProvider = aiConfig.provider
@@ -65,22 +74,13 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Ajustes Avanzados", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("Configuración del Sistema", color = Color(0xFF39FF14), fontSize = 11.sp)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", color = Color(0xFF39FF14), style = MaterialTheme.typography.titleLarge)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+            com.elysium369.meet.ui.components.EliteTopAppBar(
+                title = "Ajustes Avanzados\nConfiguración del Sistema", // we can improve this
+                onBackClick = { navController.popBackStack() },
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -93,7 +93,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             //  SECCIÓN 1: ADAPTADOR OBD2 & MODO CLON FORZADO
             // ============================================================
             item {
-                CyberpunkSettingsSection("ADAPTADOR OBD2", Color(0xFF39FF14)) {
+                CyberpunkSettingsSection("ADAPTADOR OBD2", com.elysium369.meet.ui.theme.MeetColors.neonGreen) {
                     SettingsRow("Tipo de Conexión", "WiFi (192.168.0.10:35000)")
 
                     // --- FORCE CLONE MODE: FUNCTIONAL TOGGLE ---
@@ -109,7 +109,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             Text(
                                 if (forceCloneMode) "Activo — adaptador tratado como clon"
                                 else "Desactivado — detección automática",
-                                color = if (forceCloneMode) Color(0xFFFFAA00) else Color.Gray,
+                                color = if (forceCloneMode) MeetColors.warning else MeetColors.textSecondary,
                                 fontSize = 11.sp
                             )
                         }
@@ -117,27 +117,26 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             checked = forceCloneMode,
                             onCheckedChange = { viewModel.setForceCloneMode(it) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFFFFAA00),
-                                checkedTrackColor = Color(0xFFFFAA00).copy(alpha = 0.3f),
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.2f)
+                                checkedThumbColor = MeetColors.warning,
+                                checkedTrackColor = MeetColors.warning.copy(alpha = 0.3f),
+                                uncheckedThumbColor = MeetColors.textSecondary,
+                                uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
                             )
                         )
                     }
 
                     // Clone mode info
                     AnimatedVisibility(visible = forceCloneMode) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFAA00).copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        com.elysium369.meet.ui.components.EliteCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            backgroundColor = MeetColors.warning.copy(alpha = 0.1f),
+                            glowColor = MeetColors.warning,
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 "⚠️ El sistema usará protocolos de compatibilidad para adaptadores genéricos ELM327. " +
                                 "Funciones avanzadas (STN, OBDLink) estarán deshabilitadas.",
-                                color = Color(0xFFFFAA00),
+                                color = MeetColors.warning,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(12.dp),
                                 lineHeight = 16.sp
@@ -151,7 +150,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             //  SECCIÓN 2: INTELIGENCIA ARTIFICIAL — FULLY FUNCTIONAL
             // ============================================================
             item {
-                CyberpunkSettingsSection("INTELIGENCIA ARTIFICIAL", Color(0xFFCC00FF)) {
+                CyberpunkSettingsSection("INTELIGENCIA ARTIFICIAL", MeetColors.electricBlue) {
 
                     // --- Provider Selector ---
                     Text("Proveedor IA", color = Color.White, fontWeight = FontWeight.Medium)
@@ -171,10 +170,10 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFFCC00FF),
-                                unfocusedBorderColor = Color(0xFFCC00FF).copy(alpha = 0.3f),
-                                focusedContainerColor = Color(0xFF060612),
-                                unfocusedContainerColor = Color(0xFF060612)
+                                focusedBorderColor = MeetColors.electricBlue,
+                                unfocusedBorderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                                focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
                             ),
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -210,25 +209,25 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                         value = apiKeyInput,
                         onValueChange = { apiKeyInput = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("sk-... / AIza... / tu-api-key", color = Color.Gray, fontSize = 13.sp) },
+                        placeholder = { Text("sk-... / AIza... / tu-api-key", color = MeetColors.textSecondary, fontSize = 13.sp) },
                         visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { showApiKey = !showApiKey }) {
                                 Icon(
                                     if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = "Toggle visibility",
-                                    tint = Color(0xFFCC00FF)
+                                    tint = MeetColors.electricBlue
                                 )
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFFCC00FF),
-                            unfocusedBorderColor = Color(0xFFCC00FF).copy(alpha = 0.3f),
-                            focusedContainerColor = Color(0xFF060612),
-                            unfocusedContainerColor = Color(0xFF060612),
-                            cursorColor = Color(0xFFCC00FF)
+                            focusedBorderColor = MeetColors.electricBlue,
+                            unfocusedBorderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                            focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                            unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                            cursorColor = MeetColors.electricBlue
                         ),
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true
@@ -244,15 +243,15 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 value = endpointInput,
                                 onValueChange = { endpointInput = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("https://api.example.com/v1/chat", color = Color.Gray, fontSize = 13.sp) },
+                                placeholder = { Text("https://api.example.com/v1/chat", color = MeetColors.textSecondary, fontSize = 13.sp) },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
                                     unfocusedTextColor = Color.White,
-                                    focusedBorderColor = Color(0xFFCC00FF),
-                                    unfocusedBorderColor = Color(0xFFCC00FF).copy(alpha = 0.3f),
-                                    focusedContainerColor = Color(0xFF060612),
-                                    unfocusedContainerColor = Color(0xFF060612),
-                                    cursorColor = Color(0xFFCC00FF)
+                                    focusedBorderColor = MeetColors.electricBlue,
+                                    unfocusedBorderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                                    focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                    cursorColor = MeetColors.electricBlue
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 singleLine = true
@@ -270,15 +269,15 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 value = modelNameInput,
                                 onValueChange = { modelNameInput = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("gpt-4o, llama3, mistral...", color = Color.Gray, fontSize = 13.sp) },
+                                placeholder = { Text("gpt-4o, llama3, mistral...", color = MeetColors.textSecondary, fontSize = 13.sp) },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
                                     unfocusedTextColor = Color.White,
-                                    focusedBorderColor = Color(0xFFCC00FF),
-                                    unfocusedBorderColor = Color(0xFFCC00FF).copy(alpha = 0.3f),
-                                    focusedContainerColor = Color(0xFF060612),
-                                    unfocusedContainerColor = Color(0xFF060612),
-                                    cursorColor = Color(0xFFCC00FF)
+                                    focusedBorderColor = MeetColors.electricBlue,
+                                    unfocusedBorderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                                    focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                    cursorColor = MeetColors.electricBlue
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 singleLine = true
@@ -289,40 +288,32 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // --- Save Button ---
-                    Button(
-                        onClick = {
-                            viewModel.saveAiConfig(selectedProvider, apiKeyInput, endpointInput, modelNameInput)
-                            showSavedBanner = true
-                            Toast.makeText(context, "✅ Configuración IA guardada", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFCC00FF)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = apiKeyInput.isNotBlank() || selectedProvider == "ollama"
-                    ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Guardar Configuración IA", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                    com.elysium369.meet.ui.components.EliteButton(
+                            onClick = {
+                                viewModel.saveAiConfig(selectedProvider, apiKeyInput, endpointInput, modelNameInput)
+                                showSavedBanner = true
+                                Toast.makeText(context, "✅ Configuración IA guardada", Toast.LENGTH_SHORT).show()
+                            },
+                            text = "Guardar Configuración IA",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            color = MeetColors.electricBlue,
+                            isEnabled = apiKeyInput.isNotBlank() || selectedProvider == "ollama"
+                        )
 
                     // --- Saved confirmation ---
                     AnimatedVisibility(visible = showSavedBanner) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF39FF14).copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                                .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        com.elysium369.meet.ui.components.EliteCard(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            backgroundColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f),
+                            glowColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 "✅ Motor IA configurado: ${providers.find { it.first == selectedProvider }?.second}. " +
                                 "Los cambios se aplican inmediatamente en la sección de chat IA.",
-                                color = Color(0xFF39FF14),
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(12.dp),
                                 lineHeight = 16.sp
@@ -341,7 +332,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             "custom" -> "🌐 Ingresa la URL de cualquier API compatible con OpenAI."
                             else -> ""
                         },
-                        color = Color.Gray,
+                        color = MeetColors.textSecondary,
                         fontSize = 11.sp,
                         lineHeight = 14.sp
                     )
@@ -349,10 +340,107 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             }
 
             // ============================================================
+            //  SECCIÓN 2.5: PERFIL DEL TALLER (Reportes Marca Blanca)
+            // ============================================================
+            item {
+                CyberpunkSettingsSection("PERFIL DEL TALLER (REMPORTES PDF)", MeetColors.neonGreen) {
+                    Text("Configura los datos que aparecerán en la cabecera de tus reportes PDF.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    OutlinedTextField(
+                        value = workshopName,
+                        onValueChange = { workshopName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nombre del Taller", color = MeetColors.textSecondary) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                            focusedBorderColor = MeetColors.neonGreen, unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                            focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep, unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
+                        ),
+                        singleLine = true, shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedTextField(
+                        value = workshopAddress,
+                        onValueChange = { workshopAddress = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Dirección", color = MeetColors.textSecondary) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                            focusedBorderColor = MeetColors.neonGreen, unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                            focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep, unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
+                        ),
+                        singleLine = true, shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = workshopPhone,
+                            onValueChange = { workshopPhone = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("Teléfono", color = MeetColors.textSecondary) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                                focusedBorderColor = MeetColors.neonGreen, unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep, unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
+                            ),
+                            singleLine = true, shape = RoundedCornerShape(8.dp)
+                        )
+                        OutlinedTextField(
+                            value = workshopEmail,
+                            onValueChange = { workshopEmail = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("Email / Web", color = MeetColors.textSecondary) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                                focusedBorderColor = MeetColors.neonGreen, unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                focusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep, unfocusedContainerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
+                            ),
+                            singleLine = true, shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    com.elysium369.meet.ui.components.EliteButton(
+                        onClick = {
+                            prefs.edit().apply {
+                                putString("workshop_name", workshopName)
+                                putString("workshop_address", workshopAddress)
+                                putString("workshop_phone", workshopPhone)
+                                putString("workshop_email", workshopEmail)
+                                apply()
+                            }
+                            showWorkshopSaved = true
+                            Toast.makeText(context, "✅ Perfil de taller guardado", Toast.LENGTH_SHORT).show()
+                        },
+                        text = "Guardar Perfil de Taller",
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        color = MeetColors.neonGreen
+                    )
+
+                    AnimatedVisibility(visible = showWorkshopSaved) {
+                        com.elysium369.meet.ui.components.EliteCard(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            backgroundColor = MeetColors.neonGreen.copy(alpha = 0.1f),
+                            glowColor = MeetColors.neonGreen,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                "✅ Los próximos reportes PDF generados llevarán tu marca personal.",
+                                color = MeetColors.neonGreen, fontSize = 11.sp, modifier = Modifier.padding(12.dp), lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
             //  SECCIÓN 3: UNIDADES
             // ============================================================
             item {
-                CyberpunkSettingsSection("UNIDADES", Color(0xFF39FF14)) {
+                CyberpunkSettingsSection("UNIDADES", com.elysium369.meet.ui.theme.MeetColors.neonGreen) {
                     SettingsRow("Velocidad", "km/h")
                     SettingsRow("Temperatura", "Celsius (°C)")
                 }
@@ -362,22 +450,17 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             //  SECCIÓN 4: DEBUG
             // ============================================================
             item {
-                CyberpunkSettingsSection("DEBUG", Color(0xFFFF003C)) {
-                    Button(
+                CyberpunkSettingsSection("DEBUG", com.elysium369.meet.ui.theme.MeetColors.error) {
+                    com.elysium369.meet.ui.components.EliteButton(
                         onClick = {
                             context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
                                 .edit().remove("onboarding_completed").apply()
                             Toast.makeText(context, "Onboarding reseteado", Toast.LENGTH_SHORT).show()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .border(1.dp, Color(0xFFFF003C), RoundedCornerShape(8.dp)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Resetear Onboarding", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
-                    }
+                        text = "Resetear Onboarding",
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        color = com.elysium369.meet.ui.theme.MeetColors.error
+                    )
                 }
             }
 
@@ -385,19 +468,14 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             //  SECCIÓN 5: CUENTA
             // ============================================================
             item {
-                CyberpunkSettingsSection("CUENTA", Color(0xFF39FF14)) {
-                    SettingsRow("Estado", "MEET Pro Premium", valueColor = Color(0xFF39FF14))
-                    Button(
+                CyberpunkSettingsSection("CUENTA", com.elysium369.meet.ui.theme.MeetColors.neonGreen) {
+                    SettingsRow("Estado", "MEET Pro Premium", valueColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                    com.elysium369.meet.ui.components.EliteButton(
                         onClick = { },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(8.dp)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Gestionar Suscripción", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
-                    }
+                        text = "Gestionar Suscripción",
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        color = MeetColors.electricBlue
+                    )
                 }
             }
 
@@ -409,10 +487,11 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
 
 @Composable
 fun CyberpunkSettingsSection(title: String, accentColor: Color, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+    com.elysium369.meet.ui.components.EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = accentColor,
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier
             .padding(16.dp)
@@ -426,7 +505,7 @@ fun CyberpunkSettingsSection(title: String, accentColor: Color, content: @Compos
 }
 
 @Composable
-fun SettingsRow(label: String, value: String, isToggle: Boolean = false, valueColor: Color = Color.Gray) {
+fun SettingsRow(label: String, value: String, isToggle: Boolean = false, valueColor: Color = MeetColors.textSecondary) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -440,8 +519,8 @@ fun SettingsRow(label: String, value: String, isToggle: Boolean = false, valueCo
                 checked = false,
                 onCheckedChange = {},
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color(0xFF39FF14),
-                    checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.3f)
+                    checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                    checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f)
                 )
             )
         } else {

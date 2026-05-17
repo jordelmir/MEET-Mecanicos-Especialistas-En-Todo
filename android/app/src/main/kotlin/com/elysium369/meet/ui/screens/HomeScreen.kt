@@ -1,25 +1,38 @@
 package com.elysium369.meet.ui.screens
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.obd.ObdState
 import java.util.Calendar
-import com.elysium369.meet.ui.components.EliteScrollContainer
-import com.elysium369.meet.ui.components.eliteScrollbar
+import com.elysium369.meet.ui.components.*
+import com.elysium369.meet.ui.theme.MeetColors
 
+// ═══════════════════════════════════════════════════════════════
+// HOME SCREEN V2 — Phantom Carbon Edition
+// ═══════════════════════════════════════════════════════════════
 
 @Composable
 fun HomeScreen(
@@ -29,7 +42,10 @@ fun HomeScreen(
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
     val obdState by viewModel.connectionState.collectAsState()
     val activeDtcs by viewModel.activeDtcs.collectAsState()
-    
+    val protocol by viewModel.detectedProtocol.collectAsState()
+    val adapterVer by viewModel.adapterVersion.collectAsState()
+    val isClone by viewModel.isCloneAdapter.collectAsState()
+
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when (hour) {
         in 0..11 -> "Buenos días"
@@ -38,173 +54,283 @@ fun HomeScreen(
     }
 
     val scrollState = rememberScrollState()
-    
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Header
-        Text(
-            "$greeting, Mecánico",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "MEET • Diagnóstico Profesional",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF39FF14).copy(alpha = 0.5f)
-        )
 
-        // DTC Alert Banner
-        if (activeDtcs.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFFF003C), RoundedCornerShape(12.dp))
-                    .clickable { navController.navigate("dtc") },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("⚠️ ${activeDtcs.size} DTCs Detectados", color = Color(0xFFFF003C), fontWeight = FontWeight.Bold)
-                    Surface(
-                        color = Color(0xFFFF003C).copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.border(1.dp, Color(0xFFFF003C), RoundedCornerShape(4.dp))
-                    ) {
-                        Text("VER →", color = Color(0xFFFF003C), fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
+    Box(modifier = Modifier.fillMaxSize().background(MeetColors.backgroundDeep)) {
+        // Background ambient glow
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(MeetColors.electricBlue.copy(alpha = 0.04f), Color.Transparent),
+                    center = Offset(size.width * 0.8f, size.height * 0.1f),
+                    radius = size.width * 0.6f
+                ),
+                center = Offset(size.width * 0.8f, size.height * 0.1f),
+                radius = size.width * 0.6f
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(MeetColors.neonGreen.copy(alpha = 0.03f), Color.Transparent),
+                    center = Offset(size.width * 0.2f, size.height * 0.9f),
+                    radius = size.width * 0.5f
+                ),
+                center = Offset(size.width * 0.2f, size.height * 0.9f),
+                radius = size.width * 0.5f
+            )
         }
 
-        // Active Vehicle Card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-            shape = RoundedCornerShape(12.dp),
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("VEHÍCULO ACTIVO", color = Color(0xFF39FF14).copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                    letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing)
-                Spacer(modifier = Modifier.height(8.dp))
-                if (activeVehicle != null) {
-                    Text(
-                        "${activeVehicle?.make} ${activeVehicle?.model} ${activeVehicle?.year}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "VIN: ${activeVehicle?.vin ?: "N/A"}",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { navController.navigate("scanner") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("IR AL SCANNER", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
-                    }
-                } else {
-                    Text("Sin vehículo seleccionado", color = Color.Gray)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { navController.navigate("garage") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("SELECCIONAR VEHÍCULO", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
-                    }
-                }
-            }
-        }
-
-        // OBD2 Connection Card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // ── Hero Header ──
+            AnimatedEntrance(0) {
                 Column {
-                    Text("CONEXIÓN OBD2", color = Color(0xFF39FF14).copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val statusText = when(obdState) {
-                        ObdState.CONNECTED -> "CONECTADO"
-                        ObdState.DISCONNECTED -> "DESCONECTADO"
-                        ObdState.CONNECTING -> "CONECTANDO..."
-                        ObdState.NEGOTIATING -> "NEGOCIANDO..."
-                        ObdState.ERROR -> "ERROR"
+                    Text(
+                        greeting,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MeetColors.textSecondary
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "MEET",
+                            style = MaterialTheme.typography.displayLarge,
+                            color = MeetColors.neonGreen,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "OBD2",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MeetColors.electricBlue,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    val statusColor = when(obdState) {
-                        ObdState.CONNECTED -> Color(0xFF39FF14)
-                        ObdState.ERROR -> Color(0xFFFF003C)
-                        ObdState.CONNECTING, ObdState.NEGOTIATING -> Color(0xFFFFD700)
-                        else -> Color.Gray
-                    }
-                    Text(statusText, color = statusColor, fontWeight = FontWeight.Black)
+                    Text(
+                        "DIAGNÓSTICO PROFESIONAL",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MeetColors.textMuted,
+                        letterSpacing = 3.sp
+                    )
                 }
-                if (obdState != ObdState.CONNECTED && obdState != ObdState.CONNECTING) {
-                    Button(
-                        onClick = { navController.navigate("connect") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp))
+            }
+
+            // ── DTC Alert Banner ──
+            if (activeDtcs.isNotEmpty()) {
+                AnimatedEntrance(1) {
+                    EliteCard(
+                        glowColor = MeetColors.neonGreen,
+                        borderColor = MeetColors.neonGreen.copy(alpha = 0.4f),
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(14.dp),
+                        onClick = { navController.navigate("dtc") },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("CONECTAR", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
+                        Row(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(MeetColors.neonGreen, CircleShape)
+                                        .then(Modifier.pulseOnHover())
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "${activeDtcs.size} FALLAS DETECTADAS",
+                                        color = MeetColors.neonGreen,
+                                        fontWeight = FontWeight.Black,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                    Text(
+                                        "Toque para ver detalles",
+                                        color = MeetColors.neonGreen.copy(alpha = 0.5f),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Text("→", color = MeetColors.neonGreen, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
             }
-        }
 
-        // Quick Actions
-        Text("ACCIONES RÁPIDAS", color = Color(0xFF39FF14).copy(alpha = 0.6f),
-            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("⚡", "Scanner", Color(0xFF39FF14), Modifier.weight(1f)) { navController.navigate("scanner") }
-            QuickActionCard("⚠️", "DTCs", Color(0xFFFF003C), Modifier.weight(1f)) { navController.navigate("dtc") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("🚗", "Garage", Color(0xFF00AAFF), Modifier.weight(1f)) { navController.navigate("garage") }
-            QuickActionCard("🤖", "IA", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("ai") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("🔧", "Terminal", Color(0xFF00AAFF), Modifier.weight(1f)) { navController.navigate("terminal") }
-            QuickActionCard("💬", "Soporte", Color(0xFFFFD700), Modifier.weight(1f)) { navController.navigate("support_chat") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard("📄", "Reportes", Color(0xFFCC00FF), Modifier.weight(1f)) { navController.navigate("reports") }
-            QuickActionCard("⚙️", "Ajustes", Color.Gray, Modifier.weight(1f)) { navController.navigate("settings") }
+            // ── Vehicle Card ──
+            AnimatedEntrance(2) {
+                EliteCard(
+                    glowColor = MeetColors.neonGreen,
+                    borderColor = MeetColors.neonGreen.copy(alpha = 0.15f),
+                    backgroundColor = MeetColors.cardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                        PhantomSectionHeader("Vehículo Activo")
+                        Spacer(Modifier.height(12.dp))
+                        if (activeVehicle != null) {
+                            Text(
+                                "${activeVehicle?.make} ${activeVehicle?.model}",
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Black
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "${activeVehicle?.year}",
+                                    color = MeetColors.electricBlue,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    "VIN: ${activeVehicle?.vin ?: "N/A"}",
+                                    color = MeetColors.textMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            EliteButton(
+                                text = "IR AL SCANNER",
+                                onClick = { navController.navigate("scanner") },
+                                color = MeetColors.neonGreen,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text("Sin vehículo seleccionado", color = MeetColors.textMuted,
+                                style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.height(12.dp))
+                            EliteOutlinedButton(
+                                text = "SELECCIONAR VEHÍCULO",
+                                onClick = { navController.navigate("garage") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Connection Status ──
+            AnimatedEntrance(3) {
+                EliteCard(
+                    glowColor = when (obdState) {
+                        ObdState.CONNECTED -> MeetColors.neonGreen
+                        ObdState.ERROR -> MeetColors.error
+                        else -> null
+                    },
+                    borderColor = when (obdState) {
+                        ObdState.CONNECTED -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                        ObdState.ERROR -> MeetColors.error.copy(alpha = 0.2f)
+                        else -> MeetColors.borderSubtle
+                    },
+                    backgroundColor = MeetColors.cardBackground,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            // Animated status dot
+                            val statusColor = when (obdState) {
+                                ObdState.CONNECTED -> MeetColors.neonGreen
+                                ObdState.ERROR -> MeetColors.neonGreen
+                                ObdState.CONNECTING, ObdState.NEGOTIATING -> MeetColors.warning
+                                else -> MeetColors.textMuted
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(statusColor, CircleShape)
+                                    .then(
+                                        if (obdState == ObdState.CONNECTED) Modifier.pulseOnHover()
+                                        else Modifier
+                                    )
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    when (obdState) {
+                                        ObdState.CONNECTED -> "CONECTADO"
+                                        ObdState.DISCONNECTED -> "DESCONECTADO"
+                                        ObdState.CONNECTING -> "CONECTANDO..."
+                                        ObdState.NEGOTIATING -> "NEGOCIANDO..."
+                                        ObdState.ERROR -> "ERROR"
+                                    },
+                                    color = statusColor,
+                                    fontWeight = FontWeight.Black,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                if (obdState == ObdState.CONNECTED && protocol.isNotBlank()) {
+                                    Text(protocol, color = MeetColors.textMuted, fontSize = 10.sp, maxLines = 1)
+                                }
+                                if (obdState == ObdState.CONNECTED && isClone && adapterVer.isNotBlank()) {
+                                    Text("⚠ Clon ELM327", color = MeetColors.neonGreen, fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        if (obdState == ObdState.CONNECTED) {
+                            EliteOutlinedButton(text = "OFF", onClick = { viewModel.disconnect() },
+                                color = MeetColors.neonGreen)
+                        } else if (obdState != ObdState.CONNECTING && obdState != ObdState.NEGOTIATING) {
+                            EliteOutlinedButton(text = "CONECTAR",
+                                onClick = { navController.navigate("connect") })
+                        }
+                    }
+                }
+            }
+
+            // Vehicle Identification Card
+            AnimatedEntrance(4) {
+                VehicleIdentificationCard(viewModel = viewModel)
+            }
+
+            // ── Quick Actions Grid ──
+            PhantomSectionHeader("Acciones Rápidas")
+
+            val actions = listOf(
+                Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner",
+                Triple("⚠️", "DTCs", MeetColors.error) to "dtc",
+                Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage",
+                Triple("🤖", "IA", MeetColors.electricBlue) to "ai",
+                Triple("🔧", "Terminal", MeetColors.cyberCyan) to "terminal",
+                Triple("💬", "Soporte", MeetColors.warning) to "support_chat",
+                Triple("📄", "Reportes", MeetColors.electricBlue) to "reports",
+                Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
+                Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link",
+                Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub"
+            )
+
+            actions.chunked(2).forEachIndexed { rowIdx, row ->
+                AnimatedEntrance(5 + rowIdx) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        row.forEach { (meta, route) ->
+                            QuickActionCard(
+                                icon = meta.first,
+                                label = meta.second,
+                                accentColor = meta.third,
+                                modifier = Modifier.weight(1f)
+                            ) { navController.navigate(route) }
+                        }
+                        // Pad odd row
+                        if (row.size < 2) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -217,22 +343,27 @@ private fun QuickActionCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier
-            .height(72.dp)
-            .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .clickable { onClick() }
+    EliteCard(
+        glowColor = accentColor,
+        borderColor = accentColor.copy(alpha = 0.15f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(14.dp),
+        onClick = onClick,
+        modifier = modifier.height(68.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxSize(),
+            modifier = Modifier.padding(horizontal = 14.dp).fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(icon, style = MaterialTheme.typography.titleLarge)
-            Text(label, color = Color.White, fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodyMedium)
+            Text(icon, fontSize = 22.sp)
+            Text(
+                label,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyMedium,
+                letterSpacing = 0.3.sp
+            )
         }
     }
 }

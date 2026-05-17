@@ -39,8 +39,26 @@ interface DtcDao {
     @Query("SELECT * FROM dtc_events WHERE sessionId = :sessionId")
     fun getDtcsForSession(sessionId: String): Flow<List<DtcEventEntity>>
 
+    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
+    fun getUnresolvedDtcsForVehicle(vehicleId: String): Flow<List<DtcEventEntity>>
+    
+    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND code = :code AND status = :status AND resolvedAt IS NULL LIMIT 1")
+    suspend fun getUnresolvedDtc(vehicleId: String, code: String, status: String): DtcEventEntity?
+
+    @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, synced = 0 WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
+    suspend fun resolveAllDtcsForVehicle(vehicleId: String, resolvedAt: Long)
+
+    @Query("SELECT * FROM dtc_events WHERE synced = 0")
+    suspend fun getPendingSyncDtcs(): List<DtcEventEntity>
+
+    @Query("UPDATE dtc_events SET synced = 1 WHERE id IN (:ids)")
+    suspend fun markDtcsAsSynced(ids: List<String>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDtc(dtc: DtcEventEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDtcs(dtcs: List<DtcEventEntity>)
 }
 
 @Dao

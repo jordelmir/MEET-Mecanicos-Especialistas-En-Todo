@@ -178,11 +178,19 @@ class BleTransport(
         }
     }
 
-    override suspend fun read(maxBytes: Int): ByteArray? {
-        val resp = withTimeoutOrNull(3000) {
+    override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
+        val resp = withTimeoutOrNull(timeoutMs) {
             responseReady.receive()
         }
         return resp?.toByteArray(Charsets.ISO_8859_1)
+    }
+
+    override suspend fun drain() {
+        // MEET ELITE: Clear all pending responses in the channel and the string accumulator
+        responseAccumulator.setLength(0)
+        while (!responseReady.isEmpty) {
+            responseReady.tryReceive()
+        }
     }
 
     override val isConnected: Boolean

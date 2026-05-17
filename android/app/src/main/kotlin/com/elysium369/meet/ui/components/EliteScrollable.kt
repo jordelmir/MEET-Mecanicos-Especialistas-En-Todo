@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -109,7 +110,7 @@ fun Modifier.eliteScrollPhysics(): Modifier {
 @Composable
 fun Modifier.eliteScrollbar(
     state: LazyListState,
-    color: Color = Color(0xFF39FF14),
+    color: Color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
     width: Dp = 6.dp
 ): Modifier {
     val isScrolling = state.isScrollInProgress
@@ -185,7 +186,7 @@ fun Modifier.eliteScrollbar(
 @Composable
 fun Modifier.eliteScrollbar(
     state: LazyGridState,
-    color: Color = Color(0xFF39FF14),
+    color: Color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
     width: Dp = 4.dp
 ): Modifier {
     val isScrolling = state.isScrollInProgress
@@ -250,7 +251,7 @@ fun Modifier.eliteScrollbar(
 @Composable
 fun Modifier.eliteScrollbar(
     state: ScrollState,
-    color: Color = Color(0xFF39FF14),
+    color: Color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
     width: Dp = 4.dp
 ): Modifier {
     val isScrolling = state.isScrollInProgress
@@ -405,8 +406,8 @@ private fun drawEliteScrollbar(
 fun EliteScrollContainer(
     modifier: Modifier = Modifier,
     fadeHeight: Dp = 140.dp,
-    fadeColor: Color = Color(0xFF0A0E1A),
-    accentColor: Color = Color(0xFF39FF14),
+    fadeColor: Color = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+    accentColor: Color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
     content: @Composable BoxScope.() -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "hologram")

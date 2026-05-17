@@ -24,7 +24,8 @@ import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TVDashboard } from './components/TVDashboard';
 import { OBD2Scanner } from './components/OBD2Scanner';
-import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle } from 'lucide-react';
+import { LiveLinkDashboard } from './components/LiveLinkDashboard';
+import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle, Radio } from 'lucide-react';
 
 export default function App() {
   // ── AUTH STATE ──
@@ -76,6 +77,7 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTVModeOpen, setIsTVModeOpen] = useState(false);
   const [isOBD2Open, setIsOBD2Open] = useState(false);
+  const [isLiveLinkOpen, setIsLiveLinkOpen] = useState(false);
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -471,6 +473,14 @@ export default function App() {
                 <AlertTriangle size={12} />
                 OBD2 Scanner
               </button>
+              {/* Live Link Button */}
+              <button
+                onClick={() => setIsLiveLinkOpen(true)}
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-green-400 hover:text-green-300 hover:border-green-500/50 transition-all text-[10px] font-mono font-bold whitespace-nowrap"
+              >
+                <Radio size={12} />
+                Live Link
+              </button>
               
               {/* ⌘K Search */}
               <button
@@ -763,6 +773,11 @@ export default function App() {
           role={role}
           onClose={() => setIsCatalogOpen(false)}
         />
+      )}
+
+      {/* Live Link Dashboard */}
+      {isLiveLinkOpen && (
+        <LiveLinkDashboard onClose={() => setIsLiveLinkOpen(false)} />
       )}
 
       {/* OBD2 Scanner Modal */}

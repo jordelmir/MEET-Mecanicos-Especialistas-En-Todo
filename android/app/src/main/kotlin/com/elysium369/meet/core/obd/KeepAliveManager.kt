@@ -25,8 +25,10 @@ class KeepAliveManager(
                 if (System.currentTimeMillis() - lastReceivedTime >= 1800L) {
                     if (obdSession.state.value == ObdState.CONNECTED) {
                         try {
-                            // sendKeepAliveDirectly already appends \r via sendCommandDirectly
-                            obdSession.sendKeepAliveDirectly("0100")
+                            // If UDS session is active (e.g. for Active Tests), send Tester Present (3E 80)
+                            // otherwise send standard OBD2 0100 heartbeat.
+                            val command = if (obdSession.isUdsSessionActive.value) "3E80" else "0100"
+                            obdSession.sendKeepAliveDirectly(command)
                         } catch (_: Exception) {}
                     }
                 }

@@ -23,9 +23,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.elysium369.meet.core.ai.ChatMessage
 import com.elysium369.meet.ui.SupportChatViewModel
+import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.launch
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
+import com.elysium369.meet.ui.components.EliteTopAppBar
+import com.elysium369.meet.ui.components.EliteTextButton
+import com.elysium369.meet.ui.components.EliteIconButton
+import com.elysium369.meet.ui.components.EliteCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,37 +54,26 @@ fun SupportChatScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("MEET AI Support", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(vehicleInfo, color = Color(0xFF39FF14), fontSize = 12.sp)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Text("←", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    }
-                },
+            EliteTopAppBar(
+                title = "MEET AI Support - $vehicleInfo",
+                onBackClick = onBack,
                 actions = {
-                    TextButton(onClick = { viewModel.clearChat() }) {
-                        Text("Limpiar", color = Color(0xFFFF003C))
-                    }
+                    EliteTextButton(
+                        text = "Limpiar",
+                        onClick = { viewModel.clearChat() },
+                        color = com.elysium369.meet.ui.theme.MeetColors.error
+                    )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFF050505), Color.Black)
-                    )
-                )
+                .background(MeetColors.carbonGradient)
         ) {
             // Chat Messages Area
             Box(modifier = Modifier.weight(1f)) {
@@ -106,13 +100,13 @@ fun SupportChatScreen(
             }
 
             // Input Area
-            Surface(
-                color = Color(0xFF0A0E1A),
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .background(MeetColors.backgroundDark)
+                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
             ) {
                 Row(
                     modifier = Modifier
@@ -122,7 +116,7 @@ fun SupportChatScreen(
                     TextField(
                         value = inputText,
                         onValueChange = { inputText = it },
-                        placeholder = { Text("Describe el problema...", color = Color.Gray) },
+                        placeholder = { Text("Describe el problema...", color = MeetColors.textSecondary) },
                         modifier = Modifier.weight(1f),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -136,21 +130,18 @@ fun SupportChatScreen(
                         maxLines = 4
                     )
                     
-                    IconButton(
+                    EliteIconButton(
+                        icon = {
+                            Icon(Icons.Default.Send, contentDescription = "Send", tint = if (!isLoading && inputText.isNotBlank()) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary)
+                        },
                         onClick = {
                             if (inputText.isNotBlank()) {
                                 viewModel.sendMessage(inputText, vehicleInfo)
                                 inputText = ""
                             }
                         },
-                        enabled = !isLoading && inputText.isNotBlank(),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color(0xFF39FF14),
-                            disabledContentColor = Color.Gray
-                        )
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send")
-                    }
+                        isEnabled = !isLoading && inputText.isNotBlank()
+                    )
                 }
             }
         }
@@ -161,9 +152,9 @@ fun SupportChatScreen(
 fun ChatBubble(message: ChatMessage) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val backgroundColor = if (isUser) Color(0xFF0A0E1A) else Color(0xFF001A1A)
-    val borderColor = if (isUser) Color(0xFFCC00FF).copy(alpha = 0.5f) else Color(0xFF39FF14).copy(alpha = 0.5f)
-    val textColor = if (isUser) Color.White else Color(0xFFE0E0E0)
+    val backgroundColor = if (isUser) MeetColors.cardBackground else MeetColors.backgroundDark
+    val borderColor = if (isUser) MeetColors.electricBlue.copy(alpha = 0.5f) else MeetColors.neonGreen.copy(alpha = 0.5f)
+    val textColor = if (isUser) Color.White else MeetColors.textPrimary
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -202,7 +193,7 @@ fun ChatBubble(message: ChatMessage) {
         }
         Text(
             text = if (isUser) "Tú" else "MEET AI",
-            color = Color.Gray,
+            color = MeetColors.textSecondary,
             fontSize = 10.sp,
             modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp)
         )
@@ -215,17 +206,17 @@ fun TypingIndicator() {
         modifier = Modifier
             .padding(8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF001A1A))
-            .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+            .background(MeetColors.backgroundDark)
+            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(16.dp),
             strokeWidth = 2.dp,
-            color = Color(0xFF39FF14)
+            color = MeetColors.neonGreen
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text("MEET AI está analizando...", color = Color(0xFF39FF14), fontSize = 12.sp)
+        Text("MEET AI está analizando...", color = MeetColors.neonGreen, fontSize = 12.sp)
     }
 }

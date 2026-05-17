@@ -56,18 +56,34 @@ class WifiTransport(
         }
     }
 
-    override suspend fun read(maxBytes: Int): ByteArray? {
+    override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
         return withContext(Dispatchers.IO) {
             val stream = inputStream ?: return@withContext null
-            if (stream.available() > 0) {
-                val buffer = ByteArray(maxBytes)
-                val bytesRead = stream.read(buffer)
-                if (bytesRead > 0) {
-                    buffer.copyOf(bytesRead)
-                } else null
-            } else {
-                null
+            val startTime = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (stream.available() > 0) {
+                    val buffer = ByteArray(maxBytes)
+                    val bytesRead = stream.read(buffer)
+                    if (bytesRead > 0) {
+                        return@withContext buffer.copyOf(bytesRead)
+                    }
+                }
+                kotlinx.coroutines.delay(5)
             }
+            null
+        }
+    }
+
+    override suspend fun drain() {
+        withContext(Dispatchers.IO) {
+            val stream = inputStream ?: return@withContext
+            try {
+                var available = stream.available()
+                while (available > 0) {
+                    stream.skip(available.toLong())
+                    available = stream.available()
+                }
+            } catch (_: Exception) {}
         }
     }
 

@@ -3,3 +3,4 @@
 -keep class io.github.jan.supabase.** { *; }
 -dontwarn okio.**
 -keep class com.github.mikephil.charting.** { *; }
+-dontwarn org.slf4j.impl.StaticLoggerBinder

@@ -178,6 +178,32 @@ object CloudSyncRepository {
         }
 
     // ========================================================================
+    // TELEMETRY
+    // ========================================================================
+    
+    suspend fun logSessionTelemetry(
+        userId: String,
+        adapterType: String,
+        notes: String,
+        protocol: String = "",
+        isSuccess: Boolean = false
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val logData = mapOf(
+                "user_id" to userId,
+                "adapter_type" to adapterType,
+                "notes" to notes,
+                "protocol" to protocol,
+                "is_success" to isSuccess
+            )
+            client.postgrest["scan_sessions"].insert(logData)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // ========================================================================
     // SUBSCRIPTION CHECK
     // ========================================================================
     

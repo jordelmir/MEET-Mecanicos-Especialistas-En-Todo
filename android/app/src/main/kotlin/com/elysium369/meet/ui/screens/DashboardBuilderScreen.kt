@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -73,7 +74,7 @@ fun DashboardBuilderScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF050505))
+                    .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDeep)
             ) {
                 // ── Main Header ──
                 Box(
@@ -102,14 +103,14 @@ fun DashboardBuilderScreen(
                             ) {
                                 Text(
                                     dashboards.find { it.id == currentDashboardId }?.name ?: "SELECCIONAR DASHBOARD",
-                                    color = Color(0xFF39FF14),
+                                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Black
                                 )
                                 Icon(
                                     Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
-                                    tint = Color(0xFF39FF14),
+                                    tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -121,7 +122,7 @@ fun DashboardBuilderScreen(
                                 clipboardManager.setText(AnnotatedString(layout))
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }) {
-                                Icon(Icons.Default.Share, contentDescription = "Exportar", tint = Color(0xFF39FF14))
+                                Icon(Icons.Default.Share, contentDescription = "Exportar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                             }
 
                             IconButton(onClick = {
@@ -131,21 +132,21 @@ fun DashboardBuilderScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
                             }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = "Importar", tint = Color(0xFF39FF14))
+                                Icon(Icons.Default.ContentPaste, contentDescription = "Importar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                             }
 
                             IconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showTemplatesDialog = true
                             }) {
-                                Icon(Icons.Default.DashboardCustomize, contentDescription = "Plantillas", tint = Color.Yellow)
+                                Icon(Icons.Default.DashboardCustomize, contentDescription = "Plantillas", tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                             }
 
-                            Box(modifier = Modifier.width(1.dp).height(24.dp).padding(horizontal = 8.dp).background(Color.DarkGray))
+                            Box(modifier = Modifier.width(1.dp).height(24.dp).padding(horizontal = 8.dp).background(MeetColors.borderBlue))
 
                             Text(
                                 "LIVE",
-                                color = if (previewMode) Color(0xFF39FF14) else Color.Gray,
+                                color = if (previewMode) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(end = 8.dp)
@@ -157,10 +158,10 @@ fun DashboardBuilderScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFF39FF14),
-                                    checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.3f),
-                                    uncheckedThumbColor = Color.Gray,
-                                    uncheckedTrackColor = Color.DarkGray
+                                    checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                                    checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                                    uncheckedThumbColor = MeetColors.textMuted,
+                                    uncheckedTrackColor = MeetColors.borderBlue
                                 )
                             )
                             Spacer(modifier = Modifier.width(16.dp))
@@ -169,17 +170,17 @@ fun DashboardBuilderScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     showAddWidgetDialog = true
                                 },
-                                color = Color(0xFF39FF14).copy(alpha = 0.1f),
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f),
                                 shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF39FF14).copy(alpha = 0.5f))
+                                border = androidx.compose.foundation.BorderStroke(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF39FF14), modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("WIDGET", color = Color(0xFF39FF14), fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                    Text("WIDGET", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -193,7 +194,7 @@ fun DashboardBuilderScreen(
                         .height(1.dp)
                         .background(
                             Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color(0xFF39FF14).copy(alpha = 0.3f), Color.Transparent)
+                                listOf(Color.Transparent, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f), Color.Transparent)
                             )
                         )
                 )
@@ -202,7 +203,7 @@ fun DashboardBuilderScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF080808))
+                        .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -216,13 +217,13 @@ fun DashboardBuilderScreen(
                             label = "statusAlpha"
                         )
                         Box(modifier = Modifier.size(6.dp).background(
-                            if (previewMode) Color(0xFF39FF14).copy(alpha = statusAlpha) else Color.Gray,
+                            if (previewMode) com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = statusAlpha) else com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             CircleShape
                         ))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             if (previewMode) "SYSTEM: LIVE DIAGNOSTICS" else "SYSTEM: STANDBY MODE",
-                            color = if (previewMode) Color(0xFF39FF14).copy(alpha = 0.7f) else Color.Gray,
+                            color = if (previewMode) com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.7f) else com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
                             fontSize = 8.sp,
@@ -233,7 +234,7 @@ fun DashboardBuilderScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "BUFFER: 1024ms • CORE: v3.1.0 • LOAD: 14%",
-                            color = Color.Gray.copy(alpha = 0.5f),
+                            color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 8.sp,
                             letterSpacing = 0.5.sp
@@ -241,7 +242,7 @@ fun DashboardBuilderScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             "W:${widgets.size} [GRID:DYNAMIC]",
-                            color = Color(0xFF39FF14).copy(alpha = 0.4f),
+                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.4f),
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
@@ -253,7 +254,7 @@ fun DashboardBuilderScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF39FF14).copy(alpha = 0.05f))
+                        .background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f))
                         .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
                     val tickerOffset = rememberInfiniteTransition().animateFloat(
@@ -264,11 +265,11 @@ fun DashboardBuilderScreen(
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF39FF14), modifier = Modifier.size(12.dp))
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "AI INSIGHT: $aiInsight",
-                            color = Color(0xFF39FF14),
+                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
                             fontSize = 9.sp,
@@ -279,7 +280,7 @@ fun DashboardBuilderScreen(
                 }
             }
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         Box(
             modifier = Modifier
@@ -371,9 +372,9 @@ fun DashboardBuilderScreen(
 fun TemplateSelectorDialog(onSelect: (String) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF080808)),
+            colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.cardBackground),
             shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth().padding(16.dp).border(1.dp, Color.Yellow.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+            modifier = Modifier.fillMaxWidth().padding(16.dp).border(1.dp, com.elysium369.meet.ui.theme.MeetColors.warning.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("DASHBOARD MASTER TEMPLATES", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
@@ -388,16 +389,16 @@ fun TemplateSelectorDialog(onSelect: (String) -> Unit, onDismiss: () -> Unit) {
                 templates.forEach { (title, desc) ->
                     Surface(
                         onClick = { onSelect(title) },
-                        color = Color(0xFF060612),
+                        color = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Yellow)
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(title, color = Color.White, fontWeight = FontWeight.Black)
-                                Text(desc, color = Color.Gray, fontSize = 10.sp)
+                                Text(desc, color = com.elysium369.meet.ui.theme.MeetColors.textSecondary, fontSize = 10.sp)
                             }
                         }
                     }
@@ -438,20 +439,20 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
                 modifier = Modifier
                     .size(160.dp)
                     .graphicsLayer(scaleX = scale, scaleY = scale)
-                    .background(Color(0xFF39FF14).copy(alpha = 0.02f), CircleShape)
-                    .border(1.dp, Color(0xFF39FF14).copy(alpha = alpha), CircleShape)
+                    .background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.02f), CircleShape)
+                    .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = alpha), CircleShape)
             )
             Box(
                 modifier = Modifier
                     .size(120.dp)
                     .graphicsLayer(scaleX = scale * 0.8f, scaleY = scale * 0.8f)
-                    .background(Color(0xFF39FF14).copy(alpha = 0.05f), CircleShape)
-                    .border(1.dp, Color(0xFF39FF14).copy(alpha = alpha * 1.5f), CircleShape)
+                    .background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f), CircleShape)
+                    .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = alpha * 1.5f), CircleShape)
             )
             Icon(
                 Icons.Default.Dashboard,
                 contentDescription = null,
-                tint = Color(0xFF39FF14),
+                tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                 modifier = Modifier.size(56.dp)
             )
         }
@@ -470,7 +471,7 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
         
         Text(
             "Inicia la construcción de tu terminal de diagnóstico personalizada inyectando PIDs estándar o comandos OEM exclusivos.",
-            color = Color.Gray,
+            color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 24.dp)
@@ -480,7 +481,7 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
         
         Button(
             onClick = onAdd,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14)),
+            colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen),
             shape = RoundedCornerShape(4.dp),
             modifier = Modifier
                 .height(56.dp)
@@ -539,7 +540,7 @@ fun DashboardGrid(
         // Move Mode Toggle FAB
         ExtendedFloatingActionButton(
             onClick = onToggleMoveMode,
-            containerColor = if (isMoveMode) Color.Yellow else Color(0xFF39FF14),
+            containerColor = if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen,
             contentColor = Color.Black,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -568,7 +569,7 @@ fun WidgetCard(
     onMoveDown: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val widgetColor = try { Color(android.graphics.Color.parseColor(widget.color)) } catch(e: Exception) { Color(0xFF39FF14) }
+    val widgetColor = try { Color(android.graphics.Color.parseColor(widget.color)) } catch(e: Exception) { com.elysium369.meet.ui.theme.MeetColors.neonGreen }
     var simValue by remember { mutableFloatStateOf((widget.minVal + widget.maxVal) / 2f) }
     
     // Live Value Arbitration: External Live > Preview Simulation > Default
@@ -657,11 +658,11 @@ fun WidgetCard(
                 alpha = if (anomalyActive) glitchAlpha else 1f
             )
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0A0E1A))
+            .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             .border(
                 1.dp, 
-                if (isMoveMode) Color.Yellow.copy(alpha = glowAlpha) 
-                else if (anomalyActive) Color.Red.copy(alpha = anomalyAlpha)
+                if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning.copy(alpha = glowAlpha) 
+                else if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = anomalyAlpha)
                 else widgetColor.copy(alpha = 0.15f), 
                 RoundedCornerShape(16.dp)
             )
@@ -704,11 +705,11 @@ fun WidgetCard(
                         maxLines = 1
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(4.dp).background(if (anomalyActive) Color.Red else widgetColor, CircleShape))
+                        Box(modifier = Modifier.size(4.dp).background(if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error else widgetColor, CircleShape))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "ID: ${widget.pid} • ${widget.unit}${if (anomalyActive) " • [CRITICAL]" else ""}",
-                            color = if (anomalyActive) Color.Red.copy(alpha = 0.8f) else widgetColor.copy(alpha = 0.6f),
+                            color = if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.8f) else widgetColor.copy(alpha = 0.6f),
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
@@ -722,13 +723,13 @@ fun WidgetCard(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onMoveUp()
                         }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = Color.Yellow)
+                            Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                         }
                         IconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onMoveDown()
                         }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = Color.Yellow)
+                            Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                         }
                     }
                 } else {
@@ -742,7 +743,7 @@ fun WidgetCard(
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Eliminar",
-                            tint = Color.Red.copy(alpha = 0.4f),
+                            tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.4f),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -779,14 +780,14 @@ fun WidgetCard(
 
                             Text(
                                 String.format("%.1f", liveValue),
-                                color = (if (anomalyActive) Color.Red else widgetColor).copy(alpha = digitAlpha),
+                                color = (if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error else widgetColor).copy(alpha = digitAlpha),
                                 fontSize = if (widget.gridH > 1) 72.sp else 42.sp,
                                 fontWeight = FontWeight.Black,
                                 style = MaterialTheme.typography.headlineLarge
                             )
                             Text(
                                 widget.unit.uppercase(),
-                                color = Color.Gray,
+                                color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 3.sp
@@ -796,7 +797,7 @@ fun WidgetCard(
                             val pct = ((liveValue - widget.minVal) / range * 100).coerceIn(0f, 100f)
                             Text(
                                 "${String.format("%.0f", pct)}% OF RANGE",
-                                color = Color.Gray.copy(alpha = 0.4f),
+                                color = com.elysium369.meet.ui.theme.MeetColors.textMuted,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
@@ -822,14 +823,14 @@ fun WidgetCard(
                             ) {
                                 Text(
                                     "MIN ${String.format("%.0f", widget.minVal)}",
-                                    color = Color.Gray.copy(alpha = 0.3f),
+                                    color = com.elysium369.meet.ui.theme.MeetColors.textMuted,
                                     fontSize = 7.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.5.sp
                                 )
                                 Text(
                                     "MAX ${String.format("%.0f", widget.maxVal)}",
-                                    color = Color.Gray.copy(alpha = 0.3f),
+                                    color = com.elysium369.meet.ui.theme.MeetColors.textMuted,
                                     fontSize = 7.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.5.sp
@@ -860,7 +861,7 @@ fun WidgetCard(
                                 Brush.horizontalGradient(
                                     listOf(
                                         widgetColor.copy(alpha = 0.3f),
-                                        if (anomalyActive) Color.Red else widgetColor,
+                                        if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error else widgetColor,
                                         if (anomalyActive) Color.White else widgetColor
                                     )
                                 )
@@ -875,11 +876,11 @@ fun WidgetCard(
                 ) {
                     if (anomalyActive) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = Color.Red, modifier = Modifier.size(10.dp))
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.error, modifier = Modifier.size(10.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 "ANOMALÍA CRÍTICA",
-                                color = Color.Red,
+                                color = com.elysium369.meet.ui.theme.MeetColors.error,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.sp
@@ -896,7 +897,7 @@ fun WidgetCard(
                     }
                     Text(
                         "VAL: ${String.format("%.2f", liveValue)} ${widget.unit}",
-                        color = Color.Gray.copy(alpha = 0.5f),
+                        color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Black,
                         style = MaterialTheme.typography.labelSmall
@@ -929,7 +930,7 @@ fun AddWidgetDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+            colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep),
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -990,16 +991,16 @@ fun AddWidgetDialog(
                         Surface(
                             onClick = { expanded = true },
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF060612),
+                            color = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
                             shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderBlue)
                         ) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = if (selectedPid == null) "Seleccionar Sensor..." 
                                            else (PidRegistry.STANDARD_PIDS.find { "${it.mode}${it.pid}" == selectedPid }?.name 
                                                  ?: customPids.find { it.id == selectedPid }?.name ?: "Desconocido"),
-                                    color = if (selectedPid == null) Color.Gray else Color.White,
+                                    color = if (selectedPid == null) MeetColors.textMuted else Color.White,
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -1011,17 +1012,17 @@ fun AddWidgetDialog(
                     DropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
-                        modifier = Modifier.background(Color(0xFF0A0E1A)).fillMaxWidth(0.7f).heightIn(max = 300.dp)
+                        modifier = Modifier.background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark).fillMaxWidth(0.7f).heightIn(max = 300.dp)
                     ) {
                         PidRegistry.STANDARD_PIDS.forEach { pid ->
                             DropdownMenuItem(
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(modifier = Modifier.size(8.dp).background(if(pid.isPremium) Color.Yellow else Color.Gray, CircleShape))
+                                        Box(modifier = Modifier.size(8.dp).background(if(pid.isPremium) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.textSecondary, CircleShape))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(pid.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                            Text("${pid.mode}${pid.pid} • ${pid.unit}", color = Color.Gray, fontSize = 9.sp)
+                                            Text("${pid.mode}${pid.pid} • ${pid.unit}", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary, fontSize = 9.sp)
                                         }
                                     }
                                 },
@@ -1120,10 +1121,10 @@ fun SizeButton(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
         modifier = modifier.height(40.dp),
         shape = RoundedCornerShape(8.dp),
         color = if (selected) Color.White.copy(alpha = 0.1f) else Color.Transparent,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Color.White else Color.DarkGray)
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Color.White else MeetColors.borderBlue)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(label, color = if (selected) Color.White else Color.Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(label, color = if (selected) Color.White else com.elysium369.meet.ui.theme.MeetColors.textSecondary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
     }
 }
@@ -1142,15 +1143,15 @@ fun WidgetTypeButton(
         modifier = modifier.height(54.dp),
         shape = RoundedCornerShape(12.dp),
         color = if (selected) color.copy(alpha = 0.1f) else Color.Black,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) color else Color.DarkGray)
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) color else MeetColors.borderBlue)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(4.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = if (selected) color else Color.Gray, modifier = Modifier.size(16.dp))
-            Text(label, color = if (selected) color else Color.Gray, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp)
+            Icon(icon, contentDescription = null, tint = if (selected) color else com.elysium369.meet.ui.theme.MeetColors.textSecondary, modifier = Modifier.size(16.dp))
+            Text(label, color = if (selected) color else com.elysium369.meet.ui.theme.MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp)
         }
     }
 }
@@ -1171,16 +1172,16 @@ fun DashboardSelectionDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF080808)),
+            colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.cardBackground),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .border(1.dp, Color(0xFF39FF14).copy(alpha = 0.2f), RoundedCornerShape(20.dp))
+                .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(4.dp, 20.dp).background(Color(0xFF39FF14)))
+                    Box(modifier = Modifier.size(4.dp, 20.dp).background(com.elysium369.meet.ui.theme.MeetColors.neonGreen))
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         "CENTRAL DE DASHBOARDS", 
@@ -1201,11 +1202,11 @@ fun DashboardSelectionDialog(
                         val isSelected = db.id == currentId
                         Surface(
                             onClick = { onSelect(db.id) },
-                            color = if (isSelected) Color(0xFF39FF14).copy(alpha = 0.1f) else Color(0xFF060612),
+                            color = if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f) else com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp, 
-                                if (isSelected) Color(0xFF39FF14) else Color.Transparent
+                                if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else Color.Transparent
                             )
                         ) {
                             Row(
@@ -1219,24 +1220,24 @@ fun DashboardSelectionDialog(
                                     Icon(
                                         if (db.isDefault) Icons.Default.Lock else Icons.Default.Dashboard,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color(0xFF39FF14) else Color.Gray,
+                                        tint = if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
                                         db.name.uppercase(),
-                                        color = if (isSelected) Color(0xFF39FF14) else Color.White,
+                                        color = if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else Color.White,
                                         fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
                                 
                                 IconButton(onClick = { onClone(db.id, "${db.name} (CLON)") }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Clonar", tint = Color(0xFF39FF14).copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Clonar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                 }
                                 if (!db.isDefault) {
                                     IconButton(onClick = { onDelete(db) }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -1253,7 +1254,7 @@ fun DashboardSelectionDialog(
                         label = { Text("IDENTIFICADOR DEL DASHBOARD", fontSize = 10.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF39FF14),
+                            focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
                         ),
@@ -1263,7 +1264,7 @@ fun DashboardSelectionDialog(
                     Button(
                         onClick = { if (newDashboardName.isNotEmpty()) onCreate(newDashboardName) },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14)),
+                        colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("INICIALIZAR", color = Color.Black, fontWeight = FontWeight.Black)
@@ -1272,12 +1273,12 @@ fun DashboardSelectionDialog(
                     OutlinedButton(
                         onClick = { isCreating = true },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF39FF14)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF39FF14), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("NUEVO DASHBOARD", color = Color(0xFF39FF14), fontWeight = FontWeight.Black)
+                        Text("NUEVO DASHBOARD", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -1289,7 +1290,7 @@ fun DashboardSelectionDialog(
 fun CyberBackground() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val gridSize = 40.dp.toPx()
-        val color = Color(0xFF39FF14).copy(alpha = 0.03f)
+        val color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.03f)
         
         // Main Grid
         for (x in 0..size.width.toInt() step gridSize.toInt()) {
@@ -1341,7 +1342,7 @@ fun GlobalScreenOverlay() {
 
         // Moving scanline
         drawLine(
-            color = Color(0xFF39FF14).copy(alpha = 0.05f),
+            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f),
             start = androidx.compose.ui.geometry.Offset(0f, size.height * scanlineY),
             end = androidx.compose.ui.geometry.Offset(size.width, size.height * scanlineY),
             strokeWidth = 2.dp.toPx()

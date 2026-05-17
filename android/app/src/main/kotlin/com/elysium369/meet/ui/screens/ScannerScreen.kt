@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,6 +23,9 @@ import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.screens.scanner.*
+import com.elysium369.meet.ui.components.EliteTopAppBar
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.neonGlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,18 +42,51 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
 
     val defaultGauges = remember {
         listOf(
+            // ═══════ DIRECT OBD SENSORS ═══════
             GaugeConfig("1", "RPM", "010C", 0f, 8000f, "rpm"),
             GaugeConfig("2", "Velocidad", "010D", 0f, 255f, "km/h"),
             GaugeConfig("3", "Temp Motor", "0105", -40f, 150f, "°C"),
-            GaugeConfig("4", "Carga", "0104", 0f, 100f, "%"),
-            GaugeConfig("5", "Voltaje", "AT RV", 10f, 16f, "V", GaugeType.WAVE),
+            GaugeConfig("4", "Carga Motor", "0104", 0f, 100f, "%"),
+            GaugeConfig("5", "Voltaje Módulo OBD", "0142", 10f, 16f, "V", GaugeType.WAVE),
             GaugeConfig("6", "Presión MAP", "010B", 0f, 255f, "kPa"),
             GaugeConfig("7", "Flujo MAF", "0110", 0f, 655f, "g/s", GaugeType.WAVE),
-            GaugeConfig("8", "Acelerador", "0111", 0f, 100f, "%", GaugeType.WAVE),
+            GaugeConfig("8", "Pos. Acelerador", "0111", 0f, 100f, "%", GaugeType.WAVE),
             GaugeConfig("9", "Temp Admisión", "010F", -40f, 150f, "°C"),
             GaugeConfig("10", "Avance Enc.", "010E", -64f, 64f, "°", GaugeType.WAVE),
-            GaugeConfig("11", "Combustible", "012F", 0f, 100f, "%"),
-            GaugeConfig("12", "Pres. Comb.", "0123", 0f, 6550f, "kPa")
+            GaugeConfig("11", "Nivel Comb.", "012F", 0f, 100f, "%"),
+            GaugeConfig("12", "Trim Comb CT B1", "0106", -100f, 100f, "%", GaugeType.WAVE),
+            GaugeConfig("13", "Trim Comb LT B1", "0107", -100f, 100f, "%", GaugeType.WAVE),
+            GaugeConfig("14", "O2 B1S1 Voltaje", "0114", 0f, 1.3f, "V", GaugeType.WAVE),
+            GaugeConfig("15", "O2 B1S2 Voltaje", "0115", 0f, 1.3f, "V", GaugeType.WAVE),
+            GaugeConfig("16", "Presión Comb.", "010A", 0f, 765f, "kPa"),
+            GaugeConfig("17", "Presión Baro", "0133", 0f, 255f, "kPa"),
+            GaugeConfig("18", "Tiempo Motor", "011F", 0f, 65535f, "s"),
+            GaugeConfig("19", "Estado Sist. Comb.", "CALC_FUEL_STATUS_CODE", 0f, 16f, ""),
+            GaugeConfig("50", "Estándar OBD", "CALC_OBD_STANDARD", 0f, 50f, ""),
+            GaugeConfig("51", "Hora Actual", "CALC_CURRENT_TIME", 0f, 2359f, ""),
+            GaugeConfig("52", "Estado MIL", "CALC_MIL_STATUS", 0f, 1f, ""),
+            GaugeConfig("53", "Conteo DTCs", "CALC_DTC_COUNT", 0f, 127f, ""),
+            // ═══════ CALCULATED SENSORS ═══════
+            GaugeConfig("20", "Consumo Instant.", "CALC_FUEL_RATE", 0f, 30f, "L/h", GaugeType.WAVE),
+            GaugeConfig("21", "Consumo L/100km", "CALC_FUEL_CONSUMPTION", 0f, 50f, "L/100km", GaugeType.WAVE),
+            GaugeConfig("22", "Aceleración", "CALC_ACCELERATION", -2f, 2f, "g", GaugeType.WAVE),
+            GaugeConfig("23", "Boost Calculado", "CALC_BOOST", -1f, 2f, "bar", GaugeType.WAVE),
+            GaugeConfig("24", "Potencia Motor", "CALC_POWER", 0f, 300f, "hp", GaugeType.WAVE),
+            GaugeConfig("25", "RPM ×1000", "CALC_RPM_K", 0f, 8f, "rpm×1k"),
+            // ═══════ TRIP ACCUMULATORS ═══════
+            GaugeConfig("30", "Vel. Promedio", "CALC_AVG_SPEED", 0f, 200f, "km/h"),
+            GaugeConfig("31", "Distancia Viaje", "CALC_TRIP_DISTANCE", 0f, 500f, "km"),
+            GaugeConfig("32", "Distancia Total", "CALC_TOTAL_DISTANCE", 0f, 9999f, "km"),
+            GaugeConfig("33", "Combustible Usado", "CALC_FUEL_USED", 0f, 50f, "L"),
+            GaugeConfig("34", "Combustible Total", "CALC_FUEL_USED_TOTAL", 0f, 999f, "L"),
+            GaugeConfig("35", "Consumo Promedio", "CALC_AVG_CONSUMPTION", 0f, 30f, "L/100km"),
+            GaugeConfig("36", "Consumo Prom. Total", "CALC_AVG_CONSUMPTION_TOTAL", 0f, 30f, "L/100km"),
+            GaugeConfig("37", "Consumo Prom. 10s", "CALC_AVG_CONSUMPTION_10S", 0f, 50f, "L/100km", GaugeType.WAVE),
+            // ═══════ FUEL PRICE ═══════
+            GaugeConfig("40", "Precio Comb. Viaje", "CALC_FUEL_PRICE", 0f, 500f, "$"),
+            GaugeConfig("41", "Precio Comb. Total", "CALC_FUEL_PRICE_TOTAL", 0f, 9999f, "$"),
+            // ═══════ FUEL ECONOMIZER ═══════
+            GaugeConfig("42", "Economizador Comb.", "CALC_FUEL_ECON", 0f, 1f, "")
         )
     }
 
@@ -71,7 +108,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
 
     // HUD Mode Overlay
     if (hudMode) {
-        Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
+        Surface(color = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(32.dp), 
                 horizontalAlignment = Alignment.CenterHorizontally, 
@@ -79,14 +116,16 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
             ) {
                 val speed = liveData["010D"] ?: 0f
                 val rpm = liveData["010C"] ?: 0f
-                Text("${speed.toInt()}", color = Color(0xFF39FF14), fontSize = 120.sp, fontWeight = FontWeight.Black)
-                Text("km/h", color = Color(0xFF39FF14).copy(alpha = 0.5f), fontSize = 24.sp)
+                Text("${speed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
+                Text("km/h", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), fontSize = 24.sp)
                 Spacer(modifier = Modifier.height(32.dp))
-                Text("${rpm.toInt()} RPM", color = Color(0xFF00AAFF), fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                Text("${rpm.toInt()} RPM", color = com.elysium369.meet.ui.theme.MeetColors.electricBlue, fontSize = 48.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { hudMode = false }) { 
-                    Text("SALIR HUD", color = Color.Gray) 
-                }
+                com.elysium369.meet.ui.components.EliteTextButton(
+                    onClick = { hudMode = false }, 
+                    text = "SALIR HUD",
+                    color = MeetColors.textSecondary
+                )
             }
         }
         return
@@ -96,20 +135,19 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         contentWindowInsets = WindowInsets(0),
         topBar = {
             Column {
-                TopAppBar(
-                    title = { Text("Scanner en Vivo", color = Color.White, fontWeight = FontWeight.Bold) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A)),
+                EliteTopAppBar(
+                    title = "Scanner en Vivo",
                     actions = {
                         // High Speed Mode Indicator
                         if (highSpeedMode) {
-                            Surface(
-                                color = Color(0xFF39FF14).copy(alpha = 0.2f),
+                            com.elysium369.meet.ui.components.EliteCard(
+                                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(4.dp))
+                                borderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen
                             ) {
                                 Text(
                                     "HIGH-SPEED: ${qosMetrics.cmdsPerSecond.toInt()}Hz", 
-                                    color = Color(0xFF39FF14), 
+                                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, 
                                     fontWeight = FontWeight.Black, 
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
                                     style = MaterialTheme.typography.labelSmall
@@ -120,14 +158,14 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         
                         // Logging indicator
                         if (isLogging) {
-                            Surface(
-                                color = Color(0xFFFF003C).copy(alpha = 0.2f), 
+                            com.elysium369.meet.ui.components.EliteCard(
+                                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.2f), 
                                 shape = RoundedCornerShape(4.dp), 
-                                modifier = Modifier.border(1.dp, Color(0xFFFF003C), RoundedCornerShape(4.dp))
+                                borderColor = com.elysium369.meet.ui.theme.MeetColors.error
                             ) {
                                 Text(
                                     "● REC ${dataLog.size}", 
-                                    color = Color(0xFFFF003C), 
+                                    color = com.elysium369.meet.ui.theme.MeetColors.error, 
                                     fontWeight = FontWeight.Black, 
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
                                     style = MaterialTheme.typography.labelSmall
@@ -136,26 +174,29 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                             Spacer(modifier = Modifier.width(8.dp))
                         }
                         if (state == ObdState.DISCONNECTED) {
-                            TextButton(onClick = { navController.navigate("connect") }) { 
-                                Text("CONECTAR", color = Color(0xFF39FF14), fontWeight = FontWeight.Bold) 
-                            }
+                            com.elysium369.meet.ui.components.EliteTextButton(
+                                onClick = { navController.navigate("connect") },
+                                text = "CONECTAR",
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                            )
                         }
                     }
                 )
                 
                 // CLOUD SYNC INDICATOR
                 if (cloudSyncState.isNotBlank() && cloudSyncState != "Desconectado") {
-                    val bgColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C).copy(alpha = 0.2f) else Color(0xFF39FF14).copy(alpha = 0.1f)
-                    val textColor = if (cloudSyncState.contains("❌")) Color(0xFFFF003C) else Color(0xFF39FF14)
-                    Surface(
-                        color = bgColor,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).border(1.dp, textColor, RoundedCornerShape(4.dp)),
-                        shape = RoundedCornerShape(4.dp)
+                    val bgColor = if (cloudSyncState.contains("❌")) com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.2f) else com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f)
+                    val textColor = if (cloudSyncState.contains("❌")) com.elysium369.meet.ui.theme.MeetColors.error else com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                    com.elysium369.meet.ui.components.EliteCard(
+                        backgroundColor = bgColor,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(4.dp),
+                        borderColor = textColor
                     ) {
                         Text(
                             text = cloudSyncState,
                             color = textColor,
-                            modifier = Modifier.padding(8.dp),
+                            modifier = Modifier.padding(8.dp).fillMaxWidth(),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
@@ -163,22 +204,27 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                     }
                 }
                 
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab, 
-                    containerColor = Color(0xFF0A0E1A), 
-                    contentColor = Color(0xFF39FF14), 
+                    containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
+                    contentColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                    edgePadding = 8.dp,
                     indicator = { tabPositions -> 
-                        TabRowDefaults.Indicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]), 
-                            color = Color(0xFF39FF14), 
-                            height = 3.dp
-                        ) 
+                        if (selectedTab < tabPositions.size) {
+                            TabRowDefaults.Indicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTab]), 
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, 
+                                height = 3.dp
+                            )
+                        }
                     }
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("DIAGNÓSTICO", color = if (selectedTab == 1) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("SENSORES", color = if (selectedTab == 2) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("HERRAM.", color = if (selectedTab == 3) Color(0xFF39FF14) else Color.Gray, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("DIAGNÓSTICO", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("SENSORES", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("HERRAM.", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("MONITORES", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text("ESTADÍSTICAS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
                 }
             }
         },
@@ -188,14 +234,16 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 onClick = { 
                     navController.navigate("custom_pid")
                 },
-                containerColor = Color(0xFF0A0E1A), 
+                containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(12.dp))
+                modifier = Modifier
+                    .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp))
+                    .neonGlow(com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp), minElevation = 4f, maxElevation = 12f)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar", tint = Color(0xFF39FF14))
+                Icon(Icons.Default.Add, contentDescription = "Agregar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTab) {
@@ -203,6 +251,8 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 1 -> ScannerDiagnosticTab(viewModel, snackbarHostState)
                 2 -> ScannerSensorsTab(viewModel, defaultGauges)
                 3 -> ScannerToolsTab(viewModel, navController, onHudModeToggle = { hudMode = it })
+                4 -> ScannerMonitorsTab(viewModel)
+                5 -> ScannerStatisticsTab(viewModel, isLandscape)
             }
         }
     }

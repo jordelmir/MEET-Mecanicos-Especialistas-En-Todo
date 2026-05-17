@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,21 +34,21 @@ fun CustomPidEditorScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Text("←", color = Color.White) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             )
         },
         floatingActionButton = {
             if (!showForm) {
                 FloatingActionButton(
                     onClick = { showForm = true }, 
-                    containerColor = Color(0xFF0A0E1A),
-                    modifier = Modifier.border(1.dp, Color(0xFF39FF14), RoundedCornerShape(16.dp))
+                    containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+                    modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(16.dp))
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add PID", tint = Color(0xFF39FF14))
+                    Icon(Icons.Default.Add, contentDescription = "Add PID", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                 }
             }
         },
-        containerColor = Color(0xFF0A0E1A)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
         if (showForm) {
             CustomPidForm(
@@ -60,9 +61,9 @@ fun CustomPidEditorScreen(
             )
         } else {
             Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
-                Text("PERSONALIZACIÓN DE TELEMETRÍA AVANZADA", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("PERSONALIZACIÓN DE TELEMETRÍA AVANZADA", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Agrega direcciones UDS/Hexadecimales OEM para inyectar comandos directamente al bus CAN y crear tu propio dashboard visual.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text("Agrega direcciones UDS/Hexadecimales OEM para inyectar comandos directamente al bus CAN y crear tu propio dashboard visual.", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 if (customPids.isEmpty()) {
@@ -71,25 +72,25 @@ fun CustomPidEditorScreen(
                             Text("🔧", style = MaterialTheme.typography.displayLarge)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("SIN SENSORES CUSTOM", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-                            Text("Toca el + para inyectar un nuevo PID OEM", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                            Text("Toca el + para inyectar un nuevo PID OEM", color = MeetColors.borderBlue, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         items(customPids) { pid ->
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                                colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).border(1.dp, com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             ) {
                                 Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Column {
-                                        Text("${pid.name}", color = Color(0xFF39FF14), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                                        Text("${pid.name}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text("TX: ${pid.mode} ${pid.pid} | Formula: ${pid.formula}", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Surface(color = Color(0xFFCC00FF).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, Color(0xFFCC00FF), RoundedCornerShape(4.dp))) {
-                                        Text(pid.unit, color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
+                                    Surface(color = MeetColors.electricBlue.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp), modifier = Modifier.border(1.dp, MeetColors.electricBlue, RoundedCornerShape(4.dp))) {
+                                        Text(pid.unit, color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -114,45 +115,45 @@ fun CustomPidForm(
     var formula by remember { mutableStateOf("") }
 
     Column(modifier = modifier) {
-        Text("CONFIGURACIÓN DE PID OEM", color = Color(0xFFCC00FF), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+        Text("CONFIGURACIÓN DE PID OEM", color = MeetColors.electricBlue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Precaución: Escribir parámetros incorrectos en el Bus CAN puede causar códigos de error (U0100).", color = Color(0xFFFF003C), style = MaterialTheme.typography.bodySmall)
+        Text("Precaución: Escribir parámetros incorrectos en el Bus CAN puede causar códigos de error (U0100).", color = com.elysium369.meet.ui.theme.MeetColors.error, style = MaterialTheme.typography.bodySmall)
         Spacer(modifier = Modifier.height(24.dp))
         
         OutlinedTextField(
             value = name, onValueChange = { name = it }, 
-            label = { Text("Nombre del Sensor", color = Color.Gray) }, 
+            label = { Text("Nombre del Sensor", color = MeetColors.textMuted) }, 
             modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
                 value = mode, onValueChange = { mode = it }, 
-                label = { Text("Service (Hex)", color = Color.Gray) }, 
+                label = { Text("Service (Hex)", color = MeetColors.textMuted) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
             OutlinedTextField(
                 value = pid, onValueChange = { pid = it }, 
-                label = { Text("PID (Hex)", color = Color.Gray) }, 
+                label = { Text("PID (Hex)", color = MeetColors.textMuted) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
                 value = unit, onValueChange = { unit = it }, 
-                label = { Text("Unidad (ej: °C)", color = Color.Gray) }, 
+                label = { Text("Unidad (ej: °C)", color = MeetColors.textMuted) }, 
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
             OutlinedTextField(
                 value = formula, onValueChange = { formula = it }, 
-                label = { Text("Ecuación (A,B...)", color = Color.Gray) }, 
+                label = { Text("Ecuación (A,B...)", color = MeetColors.textMuted) }, 
                 modifier = Modifier.weight(2f),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue, focusedTextColor = Color.White, unfocusedTextColor = Color.LightGray)
             )
         }
         
@@ -162,7 +163,7 @@ fun CustomPidForm(
             OutlinedButton(
                 onClick = onCancel, 
                 modifier = Modifier.weight(1f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderBlue),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) { Text("CANCELAR") }
             Button(
@@ -174,7 +175,7 @@ fun CustomPidForm(
                     ))
                 },
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39FF14)),
+                colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen),
                 shape = RoundedCornerShape(8.dp)
             ) { Text("INYECTAR PID", color = Color.Black, fontWeight = FontWeight.Black) }
         }

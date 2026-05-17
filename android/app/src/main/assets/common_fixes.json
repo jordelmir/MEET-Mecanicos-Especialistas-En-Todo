@@ -1,0 +1,47 @@
+[
+  {
+    "code": "P0420",
+    "title": "Catalyst System Efficiency Below Threshold (Bank 1)",
+    "fix": "Reemplazo del Convertidor Catalítico del Banco 1. Antes de reemplazar, verifique que no existan fugas de escape ni fallas de encendido que puedan haber dañado el catalizador.",
+    "severity": "HIGH",
+    "probability": 90,
+    "parts": ["Convertidor Catalítico", "Empacaduras de escape"],
+    "labor_hours": 2.5
+  },
+  {
+    "code": "P0171",
+    "title": "System Too Lean (Bank 1)",
+    "fix": "Localización y reparación de fuga de vacío en el múltiple de admisión o reemplazo del sensor MAF sucio/defectuoso.",
+    "severity": "HIGH",
+    "probability": 75,
+    "parts": ["Limpiador de MAF", "Mangueras de vacío", "Empaque de admisión"],
+    "labor_hours": 1.5
+  },
+  {
+    "code": "P0300",
+    "title": "Random or Multiple Cylinder Misfire Detected",
+    "fix": "Reemplazo de bujías y/o bobinas de encendido. Verifique también la presión de combustible si el fallo persiste en múltiples cilindros.",
+    "severity": "CRITICAL",
+    "probability": 85,
+    "parts": ["Bujías", "Bobinas de encendido"],
+    "labor_hours": 1.0
+  },
+  {
+    "code": "P0113",
+    "title": "Intake Air Temperature Sensor 1 Circuit High Bank 1",
+    "fix": "Limpieza o reemplazo del sensor IAT (a menudo parte del MAF). Verifique el cableado por circuito abierto.",
+    "severity": "MODERATE",
+    "probability": 95,
+    "parts": ["Sensor IAT / MAF"],
+    "labor_hours": 0.5
+  },
+  {
+    "code": "P0507",
+    "title": "Idle Control System RPM Higher Than Expected",
+    "fix": "Limpieza del cuerpo de aceleración y recalibración de ralentí. Busque fugas de vacío después de la mariposa.",
+    "severity": "MODERATE",
+    "probability": 70,
+    "parts": ["Limpiador de cuerpo de aceleración"],
+    "labor_hours": 1.0
+  }
+]

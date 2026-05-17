@@ -47,9 +47,11 @@ data class DtcEventEntity(
     val severity: String,
     val status: String, // ACTIVE/PENDING/PERMANENT
     val firstSeenAt: Long,
+    val lastSeenAt: Long,
     val resolvedAt: Long?,
     val occurrenceCount: Int,
-    val freezeFrameJson: String?
+    val freezeFrameJson: String?,
+    val synced: Boolean = false
 )
 
 @Entity(tableName = "trips")

@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -19,56 +20,56 @@ fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
 
-    Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MeetColors.backgroundDeep, modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("MEET", style = MaterialTheme.typography.displayLarge, color = Color(0xFF39FF14), fontWeight = FontWeight.Black)
-            Text("Mecánicos Especialistas En Todo", color = Color(0xFF39FF14).copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 32.dp))
+            Text("MEET", style = MaterialTheme.typography.displayLarge, color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black)
+            Text("Mecánicos Especialistas En Todo", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 32.dp))
 
             OutlinedTextField(
                 value = email, onValueChange = { email = it },
-                label = { Text("Email", color = Color.Gray) },
+                label = { Text("Email", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = password, onValueChange = { password = it },
-                label = { Text("Contraseña", color = Color.Gray) },
+                label = { Text("Contraseña", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF39FF14), unfocusedBorderColor = Color.DarkGray)
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderBlue)
             )
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = { loading = true; onAuthSuccess() },
-                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFF39FF14), RoundedCornerShape(8.dp)),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)),
+                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(8.dp)),
+                colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                if (loading) CircularProgressIndicator(color = Color(0xFF39FF14), modifier = Modifier.size(24.dp))
-                else Text(if (isLogin) "INICIAR SESIÓN" else "REGISTRARSE", fontWeight = FontWeight.Bold, color = Color(0xFF39FF14))
+                if (loading) CircularProgressIndicator(color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(24.dp))
+                else Text(if (isLogin) "INICIAR SESIÓN" else "REGISTRARSE", fontWeight = FontWeight.Bold, color = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
 
             TextButton(onClick = { isLogin = !isLogin }) {
-                Text(if (isLogin) "¿No tienes cuenta? Regístrate" else "¿Ya tienes cuenta? Inicia sesión", color = Color.Gray)
+                Text(if (isLogin) "¿No tienes cuenta? Regístrate" else "¿Ya tienes cuenta? Inicia sesión", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = Color(0xFF39FF14).copy(alpha = 0.15f))
+            Divider(color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.15f))
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
                 onClick = onOfflineMode,
-                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0xFFCC00FF).copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, MeetColors.electricBlue.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF0A0E1A))
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             ) {
-                Text("Entrar sin cuenta (Modo Offline)", color = Color(0xFFCC00FF), fontWeight = FontWeight.Bold)
+                Text("Entrar sin cuenta (Modo Offline)", color = MeetColors.electricBlue, fontWeight = FontWeight.Bold)
             }
         }
     }

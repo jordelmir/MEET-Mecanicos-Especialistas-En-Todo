@@ -1,6 +1,7 @@
 package com.elysium369.meet.ui.screens.scanner
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,11 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteOutlinedButton
+import com.elysium369.meet.ui.components.EliteIconButton
 
 @Composable
 fun ScannerToolsTab(
@@ -37,7 +43,7 @@ fun ScannerToolsTab(
         item { 
             Text(
                 "HERRAMIENTAS PRO", 
-                color = Color(0xFF39FF14).copy(alpha = 0.5f), 
+                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), 
                 style = MaterialTheme.typography.labelSmall, 
                 fontWeight = FontWeight.Bold
             ) 
@@ -50,7 +56,7 @@ fun ScannerToolsTab(
                 if (isConnected) "✅" else "🔌",
                 if (isConnected) "Conexión Activa — Datos en tiempo real" else "Conectar Adaptador OBD2",
                 if (isConnected) "Los datos de telemetría se actualizan desde la ECU del vehículo" else "Selecciona tu adaptador ELM327 para iniciar diagnóstico real",
-                if (isConnected) Color(0xFF39FF14) else Color(0xFFFFD700)
+                if (isConnected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.warning
             ) {
                 if (!isConnected) {
                     navController.navigate("connect")
@@ -60,27 +66,24 @@ fun ScannerToolsTab(
         
         // AI Health Monitoring Toggle
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF001A1A)),
+            EliteCard(
+                backgroundColor = MeetColors.backgroundDeep,
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().border(
-                    1.dp, 
-                    if (isAiMonitoring) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.3f), 
-                    RoundedCornerShape(12.dp)
-                )
+                borderColor = if (isAiMonitoring) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Monitoreo de Salud IA", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Surface(color = Color(0xFF39FF14).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
-                                Text("BETA", color = Color(0xFF39FF14), modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall)
+                            Box(modifier = Modifier.background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.2f), RoundedCornerShape(4.dp))) {
+                                Text("BETA", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         Text(
                             "Análisis continuo de telemetría en segundo plano para detección proactiva de fallas.",
-                            color = Color.Gray, 
+                            color = MeetColors.textSecondary, 
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -88,8 +91,8 @@ fun ScannerToolsTab(
                         checked = isAiMonitoring,
                         onCheckedChange = { viewModel.toggleAiMonitoring(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF39FF14),
-                            checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.5f)
+                            checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                            checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f)
                         )
                     )
                 }
@@ -98,14 +101,11 @@ fun ScannerToolsTab(
 
         // High-Speed Mode Toggle
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+            EliteCard(
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().border(
-                    1.dp, 
-                    if (highSpeedMode) Color(0xFF39FF14) else Color(0xFF39FF14).copy(alpha = 0.3f), 
-                    RoundedCornerShape(12.dp)
-                )
+                borderColor = if (highSpeedMode) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -113,7 +113,7 @@ fun ScannerToolsTab(
                         Text(
                             if (isAdapterPro) "Optimizando para hardware profesional (STN/OBDLink)" 
                             else "Adaptador ELM327 detectado. Velocidad limitada por seguridad.",
-                            color = Color.Gray, 
+                            color = MeetColors.textSecondary, 
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -121,8 +121,8 @@ fun ScannerToolsTab(
                         checked = highSpeedMode,
                         onCheckedChange = { viewModel.setHighSpeedMode(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF39FF14),
-                            checkedTrackColor = Color(0xFF39FF14).copy(alpha = 0.5f)
+                            checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                            checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f)
                         )
                     )
                 }
@@ -131,7 +131,7 @@ fun ScannerToolsTab(
         
         // HUD Mode
         item {
-            ToolCard("🖥️", "HUD Mode", "Velocímetro para parabrisas", Color(0xFF39FF14)) { onHudModeToggle(true) }
+            ToolCard("🖥️", "HUD Mode", "Velocímetro para parabrisas", com.elysium369.meet.ui.theme.MeetColors.neonGreen) { onHudModeToggle(true) }
         }
         
         // Data Logging
@@ -140,7 +140,7 @@ fun ScannerToolsTab(
                 if (isLogging) "⏹️" else "⏺️", 
                 if (isLogging) "Detener Grabación (${dataLog.size} pts)" else "Iniciar Grabación", 
                 "Grabar datos de sensores en tiempo real (cada 500ms)", 
-                Color(0xFFFF003C)
+                com.elysium369.meet.ui.theme.MeetColors.error
             ) { 
                 if (isLogging) viewModel.stopDataLogging() else viewModel.startDataLogging() 
             }
@@ -150,18 +150,19 @@ fun ScannerToolsTab(
         item {
             var exportResult by remember { mutableStateOf<String?>(null) }
             Column {
-                ToolCard("📄", "Exportar CSV (${dataLog.size} puntos)", "Exportar datos grabados a archivo CSV", Color(0xFF00AAFF)) {
+                ToolCard("📄", "Exportar CSV (${dataLog.size} puntos)", "Exportar datos grabados a archivo CSV", com.elysium369.meet.ui.theme.MeetColors.electricBlue) {
                     val path = viewModel.saveCsvToFile()
                     exportResult = if (path != null) "✅ Guardado en: $path" else "⚠️ No hay datos grabados. Inicia la grabación primero."
                 }
                 if (exportResult != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
+                    EliteCard(
+                        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                         shape = RoundedCornerShape(8.dp), 
-                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        borderColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(exportResult.orEmpty(), color = Color(0xFF39FF14), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+                        Text(exportResult.orEmpty(), color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -172,16 +173,17 @@ fun ScannerToolsTab(
             val maf = liveData["0110"] ?: 0f
             val speed = liveData["010D"] ?: 0f
             val lPer100km = if (speed > 0 && maf > 0) (maf * 3600f) / (speed * 14.7f * 710f) * 100f else 0f
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
+            EliteCard(
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFF00AAFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                borderColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("⛽ CONSUMO EN TIEMPO REAL", color = Color(0xFF39FF14).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("⛽ CONSUMO EN TIEMPO REAL", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("${String.format("%.1f", lPer100km)} L/100km", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                    Text("MAF: ${String.format("%.1f", maf)} g/s • Speed: ${speed.toInt()} km/h", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                    Text("MAF: ${String.format("%.1f", maf)} g/s • Speed: ${speed.toInt()} km/h", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -207,25 +209,23 @@ fun ScannerToolsTab(
                 }
             }
             
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
+            EliteCard(
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFFFD700).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                borderColor = MeetColors.warning.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🏁 TEST 0-100 KM/H", color = Color(0xFFFFD700).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        Button(
+                        Text("🏁 TEST 0-100 KM/H", color = MeetColors.warning.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        com.elysium369.meet.ui.components.EliteTextButton(
                             onClick = { 
                                 isTesting = !isTesting
                                 if (isTesting) { time0to100 = null; startTime = null }
                             }, 
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A0E1A)), 
-                            modifier = Modifier.border(1.dp, Color(0xFFFFD700), RoundedCornerShape(8.dp)), 
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(if (isTesting) "CANCELAR" else "INICIAR", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                        }
+                            text = if (isTesting) "CANCELAR" else "INICIAR",
+                            color = MeetColors.warning
+                        )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     val capturedResult = time0to100
@@ -235,14 +235,14 @@ fun ScannerToolsTab(
                     } else if (isTesting) {
                         if (capturedStartDisplay != null) {
                             val currentRunTime = System.currentTimeMillis() - capturedStartDisplay
-                            Text("${String.format("%.2f", currentRunTime / 1000f)} s...", color = Color(0xFFFFD700), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                            Text("${String.format("%.2f", currentRunTime / 1000f)} s...", color = MeetColors.warning, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
                         } else {
-                            Text("Acelera para comenzar...", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                            Text("Acelera para comenzar...", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
-                        Text("Presiona iniciar y acelera", color = Color.DarkGray, style = MaterialTheme.typography.bodyMedium)
+                        Text("Presiona iniciar y acelera", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("Speed: ${speed.toInt()} km/h", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                    Text("Speed: ${speed.toInt()} km/h", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -251,17 +251,18 @@ fun ScannerToolsTab(
         item {
             val voltage = liveData["AT RV"] ?: (liveData["0142"] ?: 0f)
             val status = when {
-                voltage < 10f -> "BATERÍA MUERTA" to Color(0xFFFF003C)
-                voltage in 10f..11.8f -> "CARGA BAJA" to Color(0xFFFFD700)
-                voltage in 11.9f..12.8f -> "BATERÍA OK (Motor apagado)" to Color(0xFF39FF14)
-                voltage in 12.9f..14.8f -> "ALTERNADOR OK (Cargando)" to Color(0xFF39FF14)
-                voltage > 14.8f -> "SOBRECARGA" to Color(0xFFFF003C)
-                else -> "LEYENDO..." to Color.Gray
+                voltage < 10f -> "BATERÍA MUERTA" to com.elysium369.meet.ui.theme.MeetColors.error
+                voltage in 10f..11.8f -> "CARGA BAJA" to MeetColors.warning
+                voltage in 11.9f..12.8f -> "BATERÍA OK (Motor apagado)" to com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                voltage in 12.9f..14.8f -> "ALTERNADOR OK (Cargando)" to com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                voltage > 14.8f -> "SOBRECARGA" to com.elysium369.meet.ui.theme.MeetColors.error
+                else -> "LEYENDO..." to MeetColors.textMuted
             }
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
+            EliteCard(
+                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                 shape = RoundedCornerShape(12.dp), 
-                modifier = Modifier.fillMaxWidth().border(1.dp, status.second.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                borderColor = status.second.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("🔋 SALUD DE BATERÍA", color = status.second.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)

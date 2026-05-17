@@ -11,7 +11,6 @@ object DtcDecoder {
      * @param mode El modo OBD2 (03, 07, 0A) para validar el prefijo de respuesta.
      */
     fun decode(response: String, mode: String): List<String> {
-        // 1. Unificar multi-frame si es necesario
         val fullHex = CanMultiFrameParser.parse(response)
         
         if (fullHex.isEmpty() || fullHex.contains("NODATA") || fullHex.contains("?")) {
@@ -19,36 +18,26 @@ object DtcDecoder {
         }
 
         val codes = mutableListOf<String>()
-        
-        // 2. Identificar prefijo de respuesta (Mode + 0x40)
-        // Mode 03 -> 43, Mode 07 -> 47, Mode 0A -> 4A
         val expectedPrefix = when(mode.uppercase()) {
             "03" -> "43"
             "07" -> "47"
             "0A" -> "4A"
-            else -> mode // Por si se pasa un modo personalizado
+            else -> mode
         }
 
-        val startIndex = fullHex.indexOf(expectedPrefix)
-        if (startIndex < 0) return emptyList()
-
-        // 3. Extraer data real
-        // Algunos ECUs insertan un byte con la cantidad de DTCs justo después del prefijo
-        var dataIdx = startIndex + 2
+        // Split by the expected prefix. This handles multiple ECU responses cleanly.
+        // Example: "430300000000430000000000" splits to ["", "0300000000", "0000000000"]
+        val chunks = fullHex.split(expectedPrefix)
         
-        // Si el byte siguiente es pequeño (ej: 01-0F) y el resto del mensaje es largo, 
-        // podría ser el contador de DTCs. Sin embargo, en OBD2 estándar J1979, 
-        // los códigos empiezan inmediatamente en modo 03/07/0A.
-        
-        val dataString = fullHex.substring(dataIdx)
-
-        // 4. Iterar en chunks de 4 hex chars (2 bytes por DTC)
-        for (i in 0 until dataString.length - 3 step 4) {
-            val hexCode = dataString.substring(i, i + 4)
-            // 0000 es relleno, no un código real
-            if (hexCode == "0000") continue
-
-            codes.add(hexToDtc(hexCode))
+        for (chunk in chunks) {
+            if (chunk.isBlank()) continue
+            
+            // Iterate in chunks of 4 hex chars (2 bytes per DTC)
+            for (i in 0 until chunk.length - 3 step 4) {
+                val hexCode = chunk.substring(i, i + 4)
+                if (hexCode == "0000") continue
+                codes.add(hexToDtc(hexCode))
+            }
         }
 
         return codes.distinct()

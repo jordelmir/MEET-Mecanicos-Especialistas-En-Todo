@@ -49,44 +49,59 @@ object CanMultiFrameParser {
     private fun stripIsoTpPci(hex: String): String {
         if (hex.length < 4) return hex
         
-        // If the hex starts with '1' (FF) and we have multiple segments
-        if (hex.startsWith("1") && hex.length > 32) {
-            val sb = StringBuilder()
-            // The length is in the first 3 nibbles after '1'
-            // byte 0: [1][Length High], byte 1: [Length Low]
-            // We usually want to skip these 2 bytes (4 hex chars)
+        // Professional ISO-TP (ISO 15765-2) Handling
+        // Frame Types:
+        // 0: Single Frame (SF) - 0[Length] [Data...]
+        // 1: First Frame (FF) - 1[Length High] [Length Low] [Data...]
+        // 2: Consecutive Frame (CF) - 2[Index] [Data...]
+        // 3: Flow Control (FC) - 3[Type] [BS] [STmin]
+
+        val sb = StringBuilder()
+        var i = 0
+        
+        // If it doesn't look like ISO-TP PCI (e.g. standard OBD2 4x yy response from ELM), 
+        // but ELM often appends multiple lines.
+        
+        while (i < hex.length) {
+            val byte1Hex = hex.substring(i, i + 2)
+            val byte1 = try { byte1Hex.toInt(16) } catch (_: Exception) { 0 }
+            val frameType = (byte1 shr 4) and 0x0F
             
-            // Note: ELM327 with ATCAF1 usually already handled this, 
-            // but for raw mode or STN custom frames we do it manually.
-            
-            var i = 0
-            while (i < hex.length) {
-                val type = hex[i]
-                when (type) {
-                    '1' -> { // First Frame
-                        // Skip PCI (4 hex chars)
-                        if (i + 4 <= hex.length) {
-                            sb.append(hex.substring(i + 4, minOf(i + 16, hex.length)))
-                            i += 16 // Standard CAN frame is 8 bytes = 16 hex
-                        } else break
+            when (frameType) {
+                0 -> { // Single Frame
+                    val length = byte1 and 0x0F
+                    val dataEnd = minOf(i + 2 + (length * 2), hex.length)
+                    sb.append(hex.substring(i + 2, dataEnd))
+                    i += 16 // Assume standard 8-byte CAN frame spacing
+                }
+                1 -> { // First Frame
+                    // PCI is 2 bytes (4 hex chars)
+                    val dataEnd = minOf(i + 16, hex.length)
+                    if (i + 4 < dataEnd) {
+                        sb.append(hex.substring(i + 4, dataEnd))
                     }
-                    '2' -> { // Consecutive Frame
-                        // Skip PCI (2 hex chars: '2' + index)
-                        if (i + 2 <= hex.length) {
-                            sb.append(hex.substring(i + 2, minOf(i + 16, hex.length)))
-                            i += 16
-                        } else break
+                    i += 16
+                }
+                2 -> { // Consecutive Frame
+                    // PCI is 1 byte (2 hex chars)
+                    val dataEnd = minOf(i + 16, hex.length)
+                    if (i + 2 < dataEnd) {
+                        sb.append(hex.substring(i + 2, dataEnd))
                     }
-                    else -> {
-                        // Not standard ISO-TP PCI or already stripped by ELM
-                        return hex 
-                    }
+                    i += 16
+                }
+                else -> {
+                    // Not a standard ISO-TP PCI we want to strip, 
+                    // or maybe it's just raw data from an ELM that already stripped it.
+                    // If we can't identify it, we take the whole block of 16 (if possible)
+                    val end = minOf(i + 16, hex.length)
+                    sb.append(hex.substring(i, end))
+                    i += 16
                 }
             }
-            return sb.toString()
         }
         
-        return hex
+        return sb.toString()
     }
 
     /**

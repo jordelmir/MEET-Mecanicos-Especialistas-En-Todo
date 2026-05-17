@@ -8,17 +8,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.obd.DtcDecoder
 
+import com.elysium369.meet.ui.components.EliteCard
+
 @Composable
 fun DtcStatCard(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
-        shape = RoundedCornerShape(12.dp), 
-        modifier = modifier.border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+    EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        borderColor = color.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(12.dp),
+        glowColor = color.copy(alpha = 0.2f),
+        modifier = modifier
     ) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, color = color.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
@@ -28,42 +33,71 @@ fun DtcStatCard(label: String, count: Int, color: Color, modifier: Modifier = Mo
 }
 
 @Composable
-fun DtcItemCard(code: String, type: String, color: Color, description: String = "Consultando diagnóstico...") {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
-        shape = RoundedCornerShape(12.dp), 
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+fun DtcItemCard(
+    code: String, 
+    type: String, 
+    color: Color, 
+    description: String = "Consultando diagnóstico...",
+    occurrenceCount: Int = 1,
+    lastSeenAt: Long = 0L
+) {
+    val timeStr = if (lastSeenAt > 0) {
+        val diff = System.currentTimeMillis() - lastSeenAt
+        when {
+            diff < 60000 -> "Detectado ahora"
+            diff < 3600000 -> "Hace ${diff / 60000} min"
+            diff < 86400000 -> "Hace ${diff / 3600000} h"
+            else -> "Detectado hace ${diff / 86400000} d"
+        }
+    } else ""
+
+    EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        borderColor = color.copy(alpha = 0.4f),
+        shape = RoundedCornerShape(12.dp),
+        glowColor = color.copy(alpha = 0.2f),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(code, color = color, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
-                        Text(type, color = color, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
+                    com.elysium369.meet.ui.components.EliteCard(backgroundColor = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+                        Text(type.uppercase(), color = color, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                    if (occurrenceCount > 1) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("x$occurrenceCount", color = MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (timeStr.isNotEmpty()) {
+                        Text(timeStr, color = MeetColors.textSecondary.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                Text(description, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(description, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun ToolCard(icon: String, title: String, desc: String, color: Color, onClick: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)), 
-        shape = RoundedCornerShape(12.dp), 
-        modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), 
-        onClick = onClick
+    EliteCard(
+        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+        borderColor = color.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        glowColor = color.copy(alpha = 0.5f)
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(icon, style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Text(desc, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(desc, color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

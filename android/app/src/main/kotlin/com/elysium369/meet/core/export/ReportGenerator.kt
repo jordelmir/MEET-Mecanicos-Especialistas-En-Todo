@@ -59,16 +59,47 @@ class ReportGenerator(private val context: Context) {
         val contentWidth = 495f
 
         // --- Header Section ---
-        val headerHeight = 100f
-        canvas.drawRect(0f, 0f, 595f, headerHeight, Paint().apply { color = Color.BLACK })
+        val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+        val workshopName = prefs.getString("workshop_name", "")?.takeIf { it.isNotBlank() }
+        val workshopAddress = prefs.getString("workshop_address", "") ?: ""
+        val workshopPhone = prefs.getString("workshop_phone", "") ?: ""
+        val workshopEmail = prefs.getString("workshop_email", "") ?: ""
+
+        val headerHeight = 115f
+        canvas.drawRect(0f, 0f, 595f, headerHeight, Paint().apply { color = Color.parseColor("#0A0A0A") })
         
-        y = 55f
-        canvas.drawText("MEET", x, y, titlePaint)
-        titlePaint.textSize = 12f
-        canvas.drawText("ELITE DIAGNOSTIC", x + 75f, y - 4f, titlePaint)
+        y = 45f
+        if (workshopName != null) {
+            titlePaint.color = Color.WHITE
+            canvas.drawText(workshopName.uppercase(), x, y, titlePaint)
+            
+            paint.color = Color.LTGRAY
+            paint.textSize = 9f
+            paint.isFakeBoldText = false
+            var subY = y + 15f
+            if (workshopAddress.isNotBlank()) {
+                canvas.drawText(workshopAddress, x, subY, paint)
+                subY += 12f
+            }
+            if (workshopPhone.isNotBlank() || workshopEmail.isNotBlank()) {
+                val separator = if (workshopPhone.isNotBlank() && workshopEmail.isNotBlank()) "  |  " else ""
+                canvas.drawText("$workshopPhone$separator$workshopEmail", x, subY, paint)
+            }
+            
+            paint.color = Color.parseColor("#00FFCC")
+            paint.textSize = 8f
+            paint.isFakeBoldText = true
+            canvas.drawText("POWERED BY MEET ELITE", 335f, 25f, paint)
+        } else {
+            canvas.drawText("MEET", x, y, titlePaint)
+            titlePaint.textSize = 12f
+            canvas.drawText("ELITE DIAGNOSTIC", x + 75f, y - 4f, titlePaint)
+        }
         
-        y = 80f
+        y = headerHeight - 15f
         paint.color = Color.parseColor("#00FFCC")
+        paint.textSize = 10f
+        paint.isFakeBoldText = true
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         canvas.drawText("CERTIFICADO DE SALUD VEHICULAR - ${sdf.format(Date(trip.started_at))}", x, y, paint)
         

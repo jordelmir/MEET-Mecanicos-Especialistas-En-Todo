@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.ai
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -76,41 +77,59 @@ class GeminiDiagnostic(
             }.joinToString("\n")
 
             val prompt = """
-                Eres un mecánico automotriz ELITE con 20 años de experiencia, experto en diagnóstico de alta tecnología y análisis de osciloscopio.
+                # SISTEMA DE DIAGNÓSTICO MAESTRO MEET AI (NIVEL ELITE)
                 
-                VEHÍCULO: $vehicleInfo.
-                CÓDIGOS DTC: ${if (dtcList.isEmpty()) "Ninguno" else dtcList.joinToString(", ")}.
-                DATOS EN VIVO: $liveData.
+                Eres un Ingeniero de Diagnóstico Automotriz con Certificación Master L1 (ASE) y 25 años de experiencia liderando talleres de alta gama. 
+                Tu conocimiento abarca desde mecánica clásica hasta sistemas híbridos/eléctricos complejos y protocolos de red CAN-FD.
                 
-                TELEMETRÍA ( waveforms / patrones de sensores ):
-                ${telemetrySummary}
+                ## CONTEXTO TÉCNICO:
+                - **VEHÍCULO:** $vehicleInfo.
+                - **CÓDIGOS DTC DETECTADOS:** ${if (dtcList.isEmpty()) "NINGUNO (Análisis Preventivo)" else dtcList.joinToString(", ")}.
+                - **DATOS EN VIVO (Snapshots):** $liveData.
                 
-                TU MISIÓN:
-                1. Analiza los DTCs en conjunto con la telemetría. ¿Hay una correlación? (Ej: Voltaje bajo en MAF + DTC P0101).
-                2. Detecta anomalías en las gráficas: ¿Ves picos erráticos, caídas de voltaje o falta de respuesta (flatline)?
-                3. Proporciona un Diagnóstico Maestro:
-                   - Causas probables (foco en componentes físicos vs sensores dañados).
-                   - Urgencia: CRÍTICO / MODERADO / INFORMATIVO.
-                   - Plan de Acción: "Primero revisa X, luego mide Y".
-                4. Costo Estimado (Latinoamérica).
-                5. Seguridad: ¿Puede el usuario conducir al taller?
+                ## ANÁLISIS DE TELEMETRÍA (WAVEFORMS/TENDENCIAS):
+                ${if (telemetrySummary.isBlank()) "No se proporcionó historial de telemetría." else telemetrySummary}
                 
-                Responde con un tono profesional, tecnológico y directo. Usa formato Markdown con emojis.
+                ## TU MISIÓN CRÍTICA:
+                Realiza un diagnóstico profundo e integral siguiendo estos pilares:
                 
-                IMPORTANTE: Al final de tu respuesta, DEBES incluir un bloque JSON con este formato exacto:
+                1. **Correlación de Datos:** No analices los DTCs de forma aislada. Cruza los DTCs con los datos en vivo y la telemetría. (Ej: Si hay P0171, busca valores de Fuel Trim y presión de combustible).
+                2. **Detección de Anomalías en Señal:** Identifica patrones anormales en las gráficas (ruido eléctrico, falta de respuesta, voltajes fuera de rango teórico).
+                3. **DIAGNÓSTICO MAESTRO:** Explica la "Causa Raíz" más probable. Diferencia claramente entre un componente fallido, un problema de cableado/red, o una falla mecánica interna.
+                
+                ## FORMATO DE RESPUESTA REQUERIDO (WOW FACTOR):
+                Responde en **ESPAÑOL** con estructura Markdown impecable:
+                
+                - **RESUMEN EJECUTIVO:** (Usa emojis técnicos: 🛡️, ⚙️, ⚡).
+                - **ANÁLISIS TÉCNICO:** Detalle de por qué los datos indican esa falla.
+                - **GUÍA PASO A PASO (PROCEDIMIENTO):**
+                    1. Acción inmediata (Seguridad).
+                    2. Prueba específica con multímetro/osciloscopio.
+                    3. Inspección física recomendada.
+                - **NIVEL DE RIESGO:** (CRÍTICO / MODERADO / INFORMATIVO).
+                - **ESTIMACIÓN DE REPARACIÓN:** (Rango de costo en USD y complejidad).
+                - **RECOMENDACIÓN FINAL:** ¿Es seguro conducir?
+                
+                ---
+                **IMPORTANTE:** Al final de tu respuesta, DEBES incluir un bloque JSON con este formato exacto para que el sistema MEET pueda procesar los datos:
                 ```json
                 {
                   "anomalous_pids": ["010C", "0105"],
-                  "confidence": 0.95
+                  "confidence": 0.98,
+                  "urgency": "CRITICAL"
                 }
                 ```
-                (Si no hay anomalías, devuelve una lista vacía).
+                (Si no hay anomalías, devuelve una lista vacía en "anomalous_pids").
             """.trimIndent()
 
             try {
                 val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
-                return@withContext parseDiagnosticResponse(response ?: runFallbackDiagnosis(dtcList))
+                if (response == null) {
+                    return@withContext DiagnosticResult(runFallbackDiagnosis(dtcList))
+                }
+                return@withContext parseDiagnosticResponse(response)
             } catch (e: Exception) {
+                Log.e("GeminiDiag", "Error in AI Analysis", e)
                 return@withContext DiagnosticResult(runFallbackDiagnosis(dtcList))
             }
         }
@@ -330,6 +349,81 @@ class GeminiDiagnostic(
                 // Silent failure for background check
             }
             emptyList<HealthAnomaly>()
+        }
+    }
+
+    suspend fun analyzeLiveTelemetry(
+        vehicleInfo: String,
+        oscilloscopeData: Map<String, List<Pair<Long, Float>>>
+    ): DiagnosticResult {
+        return withContext(Dispatchers.IO) {
+            if (oscilloscopeData.isEmpty()) {
+                return@withContext DiagnosticResult("No hay datos de telemetría para analizar.")
+            }
+
+            val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty()
+            
+            if (!hasValidKey && !isCustomEndpoint) {
+                return@withContext DiagnosticResult("Modo Offline: Se requiere conexión a AI para análisis de osciloscopio.")
+            }
+
+            val endpoint = if (isCustomEndpoint) (customEndpointUrl ?: return@withContext DiagnosticResult("Error")) else "$defaultEndpoint?key=$apiKey"
+            
+            val telemetrySummary = oscilloscopeData.map { (pid, dataPoints) ->
+                val values = dataPoints.map { it.second }
+                val stats = if (values.isNotEmpty()) {
+                    "Min: ${values.minOrNull()}, Max: ${values.maxOrNull()}, Avg: ${String.format("%.2f", values.average())}, Variación: ${String.format("%.2f", values.maxOrNull()!! - values.minOrNull()!!)}"
+                } else "Sin datos"
+                
+                // Sample some points for the AI (e.g., evenly spaced to show the wave)
+                val sampleSize = minOf(20, values.size)
+                val step = if (sampleSize > 0) values.size / sampleSize else 1
+                val sampledValues = values.filterIndexed { index, _ -> index % step == 0 }.take(sampleSize).map { String.format("%.2f", it) }
+                
+                "Sensor $pid: $stats\nSecuencia de muestra (forma de onda): [${sampledValues.joinToString(", ")}]"
+            }.joinToString("\n\n")
+
+            val prompt = """
+                # SISTEMA DE ANÁLISIS DE OSCILOSCOPIO Y TELEMETRÍA DE ALTA FRECUENCIA
+                
+                Eres un Especialista en Diagnóstico Automotriz Avanzado con osciloscopio y analizador de motores.
+                
+                ## CONTEXTO TÉCNICO:
+                - **VEHÍCULO:** $vehicleInfo.
+                - **DATOS DE OSCILOSCOPIO (Alta Frecuencia):** 
+                $telemetrySummary
+                
+                ## TU MISIÓN:
+                1. **Análisis de Señal:** Analiza la "Secuencia de muestra" para determinar si la forma de onda es normal, tiene ruido, picos anómalos o caídas repentinas.
+                2. **Diagnóstico del Componente:** Basado en el PID y la forma de onda (Ej: Si el PID 42/0142 es Voltaje de Batería, un rango de 13.5V a 14.5V estable es normal con el motor encendido. Si hay rizado de CA grande o caídas, el alternador o batería fallan).
+                3. **Recomendaciones Reales:** Da pasos de acción precisos.
+                
+                ## FORMATO DE RESPUESTA:
+                - **ANÁLISIS DE ONDA:** (Interpretación de la gráfica)
+                - **DIAGNÓSTICO:** (Cuál es el estado del sistema)
+                - **ACCIÓN RECOMENDADA:** (Qué debe revisar físicamente el mecánico)
+                
+                Debes incluir un bloque JSON al final con los PIDs anómalos, igual que en el diagnóstico maestro:
+                ```json
+                {
+                  "anomalous_pids": ["0142"],
+                  "confidence": 0.95,
+                  "urgency": "HIGH"
+                }
+                ```
+            """.trimIndent()
+
+            try {
+                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                if (response == null) {
+                    return@withContext DiagnosticResult("Error en el análisis de telemetría.")
+                }
+                return@withContext parseDiagnosticResponse(response)
+            } catch (e: Exception) {
+                Log.e("GeminiDiag", "Error in Oscilloscope AI Analysis", e)
+                return@withContext DiagnosticResult("Error al contactar al servidor de IA.")
+            }
         }
     }
 

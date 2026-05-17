@@ -55,17 +55,23 @@ class BtClassicTransport(
                     Log.e(TAG, "✗ MAC inválida: $macAddress", e)
                     throw java.io.IOException("Dirección MAC inválida: $macAddress")
                 }
-                Log.d(TAG, "Device resolved: name=${device.name}, type=${device.type}, bondState=${device.bondState}")
+                
+                val deviceName = runCatching { device.name }.getOrDefault("Unknown")
+                val deviceType = runCatching { device.type }.getOrDefault(0)
+                val bondState = runCatching { device.bondState }.getOrDefault(BluetoothDevice.BOND_NONE)
+                
+                Log.d(TAG, "Device resolved: name=$deviceName, type=$deviceType, bondState=$bondState")
                 
                 // 1. HARD RESET — Ensure radio is clean and not searching
                 try {
-                    if (bluetoothAdapter.isDiscovering) {
+                    val isScanning = runCatching { bluetoothAdapter.isDiscovering }.getOrDefault(false)
+                    if (isScanning) {
                         Log.d(TAG, "Cancelling active BT discovery...")
-                        bluetoothAdapter.cancelDiscovery()
+                        runCatching { bluetoothAdapter.cancelDiscovery() }
                         delay(200)
                     }
-                } catch (e: SecurityException) { 
-                    Log.w(TAG, "SecurityException on cancelDiscovery", e)
+                } catch (e: Exception) { 
+                    Log.w(TAG, "Error handling discovery state", e)
                 }
                 
                 delay(500)
@@ -89,15 +95,23 @@ class BtClassicTransport(
                     try {
                         cleanup()
                         delay(200) // Brief pause before creating socket
-                        socket = createSocket()
+                        
+                        socket = try {
+                            createSocket()
+                        } catch (e: SecurityException) {
+                            Log.e(TAG, "  ✗ SecurityException on socket creation: ${e.message}")
+                            null
+                        } catch (e: Exception) {
+                            Log.e(TAG, "  ✗ Error creating socket: ${e.message}")
+                            null
+                        }
+
                         if (socket == null) {
                             Log.w(TAG, "  ✗ $methodName returned null socket, skipping")
                             continue
                         }
                         
                         Log.d(TAG, "  Socket created, attempting connect natively...")
-                        // Removed withTimeout because socket.connect() is blocking and uninterruptible
-                        // If it fails, it will natively throw an IOException within 12s
                         socket?.connect()
                         
                         inputStream = BufferedInputStream(socket?.inputStream, 32768)
@@ -174,7 +188,7 @@ class BtClassicTransport(
 
     private val readBuffer = ByteArray(8192) // Larger buffer for heavy duty logs
 
-    override suspend fun read(maxBytes: Int): ByteArray? {
+    override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
         return withContext(Dispatchers.IO) {
             val stream = inputStream ?: return@withContext null
             try {
@@ -183,7 +197,7 @@ class BtClassicTransport(
                 val timeoutLimit = 600 // 600ms to accommodate slow clone responses
                 val pollInterval = 5L  // 5ms polling for good latency balance
 
-                while (totalWaited < timeoutLimit) {
+                while (totalWaited < timeoutMs) {
                     val available = stream.available()
                     if (available > 0) {
                         val toRead = minOf(available, maxBytes, readBuffer.size)
@@ -204,7 +218,7 @@ class BtClassicTransport(
      * Purges the input stream to ensure no residual data corrupts the next command response.
      * Essential for high-frequency PID polling.
      */
-    suspend fun drain() {
+    override suspend fun drain() {
         withContext(Dispatchers.IO) {
             val stream = inputStream ?: return@withContext
             try {

@@ -8,14 +8,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteTextButton
 
 @Composable
 fun PremiumScreen(onClose: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF060612)).padding(24.dp)
+        modifier = Modifier.fillMaxSize().background(com.elysium369.meet.ui.theme.MeetColors.backgroundDeep).padding(24.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -25,7 +28,7 @@ fun PremiumScreen(onClose: () -> Unit) {
             
             Text(
                 text = "MEET Pro",
-                color = Color(0xFFFF6B35),
+                color = MeetColors.warning,
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black
             )
@@ -46,20 +49,20 @@ fun PremiumScreen(onClose: () -> Unit) {
             
             Spacer(modifier = Modifier.weight(1f))
             
-            Button(
+            EliteButton(
+                text = "SUSCRIBIRSE POR $4.99/MES",
                 onClick = { /* Subscribe */ },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B35)),
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("SUSCRIBIRSE POR $4.99/MES", fontWeight = FontWeight.Bold)
-            }
+                color = MeetColors.warning,
+                textColor = Color.White
+            )
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            TextButton(onClick = onClose) {
-                Text("Continuar Gratis", color = Color.Gray)
-            }
+            EliteTextButton(
+                text = "Continuar Gratis",
+                onClick = onClose,
+                color = Color.Gray
+            )
         }
     }
 }
@@ -70,7 +73,7 @@ fun PremiumFeatureRow(text: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(8.dp).background(Color(0xFFFF6B35), shape = RoundedCornerShape(4.dp)))
+        Box(modifier = Modifier.size(8.dp).background(MeetColors.warning, shape = RoundedCornerShape(4.dp)))
         Spacer(modifier = Modifier.width(16.dp))
         Text(text, color = Color.White, style = MaterialTheme.typography.bodyLarge)
     }

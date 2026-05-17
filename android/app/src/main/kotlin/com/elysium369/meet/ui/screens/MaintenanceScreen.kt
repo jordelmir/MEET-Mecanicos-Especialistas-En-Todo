@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elysium369.meet.data.local.entities.MaintenanceAlertEntity
@@ -27,22 +28,22 @@ fun MaintenanceScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Text("←", color = Color.White) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E1A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             )
         },
-        containerColor = Color(0xFF060612)
+        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             items(alerts) { alert ->
                 val remaining = alert.nextDueKm - currentOdometer
                 val (statusColor, statusText) = when {
-                    remaining <= 0 -> Color.Red to "VENCIDO"
-                    remaining <= 500 -> Color.Yellow to "PRÓXIMO"
-                    else -> Color.Green to "AL DÍA"
+                    remaining <= 0 -> com.elysium369.meet.ui.theme.MeetColors.error to "VENCIDO"
+                    remaining <= 500 -> com.elysium369.meet.ui.theme.MeetColors.warning to "PRÓXIMO"
+                    else -> com.elysium369.meet.ui.theme.MeetColors.neonGreen to "AL DÍA"
                 }
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+                    colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
@@ -53,15 +54,15 @@ fun MaintenanceScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Intervalo: ${alert.intervalKm} km", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
-                        Text("Último cambio: ${alert.lastDoneKm} km", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                        Text("Intervalo: ${alert.intervalKm} km", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
+                        Text("Último cambio: ${alert.lastDoneKm} km", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
                         Text("Próximo cambio: ${alert.nextDueKm} km", color = Color.White, style = MaterialTheme.typography.bodyMedium)
                         
-                        if (statusColor != Color.Green) {
+                        if (statusColor != com.elysium369.meet.ui.theme.MeetColors.neonGreen) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(
                                 onClick = { onMarkAsDone(alert) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333)),
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cardBackground),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Marcar como Realizado ahora", color = Color.White)

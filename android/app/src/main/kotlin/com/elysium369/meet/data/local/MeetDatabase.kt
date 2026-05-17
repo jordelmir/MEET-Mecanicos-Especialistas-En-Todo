@@ -18,9 +18,11 @@ import com.elysium369.meet.data.local.entities.*
         AiConsultEntity::class,
         CustomPidEntity::class,
         DashboardEntity::class,
-        DashboardWidgetEntity::class
+        DashboardWidgetEntity::class,
+        SensorHistoryEntity::class,
+        HealthSnapshotEntity::class
     ],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,4 +37,6 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun aiConsultDao(): AiConsultDao
     abstract fun customPidDao(): CustomPidDao
     abstract fun dashboardDao(): DashboardDao
+    abstract fun sensorHistoryDao(): SensorHistoryDao
+    abstract fun healthSnapshotDao(): HealthSnapshotDao
 }

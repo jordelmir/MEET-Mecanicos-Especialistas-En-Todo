@@ -23,6 +23,8 @@ object PidRegistry {
         PidDefinition("01","0C","RPM","rpm",0f,8000f,6000f,7500f,{a,b,_,_ -> ((a*256f)+b)/4f}, PidCategory.ENGINE),
         PidDefinition("01","0D","Velocidad","km/h",0f,255f,160f,220f,{a,_,_,_ -> a.toFloat()}, PidCategory.ENGINE),
         PidDefinition("01","04","Carga Motor","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
+        PidDefinition("01","01","Estado Monitor","",0f,255f,0f,0f,{a,_,_,_ -> a.toFloat()}, PidCategory.EMISSIONS),
+        PidDefinition("01","03","Estado Sist. Comb.","",0f,8f,0f,0f,{a,_,_,_ -> a.toFloat()}, PidCategory.FUEL),
         PidDefinition("01","0B","Presión MAP","kPa",0f,255f,200f,240f,{a,_,_,_ -> a.toFloat()}, PidCategory.ENGINE),
         PidDefinition("01","0E","Avance Enc.","°",-64f,63.5f,50f,60f,{a,_,_,_ -> a/2f-64f}, PidCategory.ENGINE),
         PidDefinition("01","11","Pos. Mariposa","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),

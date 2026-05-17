@@ -14,6 +14,9 @@ import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.Json
 import android.util.Log
+import com.elysium369.meet.data.supabase.toDomain
+import com.elysium369.meet.data.supabase.DtcEvent
+import com.elysium369.meet.data.supabase.Trip
 
 /**
  * SyncWorker — Professional background synchronization engine.
@@ -24,7 +27,8 @@ class SyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val sessionDao: DiagnosticSessionDao,
-    private val tripDao: TripDao
+    private val tripDao: TripDao,
+    private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -35,6 +39,7 @@ class SyncWorker @AssistedInject constructor(
         return try {
             syncSessions(userId)
             syncTrips(userId)
+            syncDtcs(userId)
             Result.success()
         } catch (e: Exception) {
             Log.e("SyncWorker", "Sync failed", e)
@@ -83,7 +88,7 @@ class SyncWorker @AssistedInject constructor(
         val syncedIds = mutableListOf<String>()
 
         pendingTrips.forEach { entity ->
-            val domainTrip = com.elysium369.meet.data.supabase.Trip(
+            val domainTrip = Trip(
                 id = entity.id,
                 user_id = userId,
                 vehicle_id = entity.vehicleId,
@@ -113,6 +118,31 @@ class SyncWorker @AssistedInject constructor(
 
         if (syncedIds.isNotEmpty()) {
             tripDao.markAsSynced(syncedIds)
+        }
+    }
+
+    private suspend fun syncDtcs(userId: String) {
+        val pendingDtcs = dtcDao.getPendingSyncDtcs()
+        if (pendingDtcs.isEmpty()) return
+
+        Log.i("SyncWorker", "Found ${pendingDtcs.size} pending DTCs to sync")
+
+        val syncedIds = mutableListOf<String>()
+        val supabase = SupabaseManager.client
+
+        pendingDtcs.forEach { entity ->
+            val domainDtc = entity.toDomain()
+            try {
+                supabase.postgrest["dtc_events"].upsert(domainDtc)
+                syncedIds.add(entity.id)
+                Log.d("SyncWorker", "Synced DTC ${entity.code} for vehicle ${entity.vehicleId}")
+            } catch (e: Exception) {
+                Log.e("SyncWorker", "Failed to sync DTC ${entity.id}, will retry later", e)
+            }
+        }
+
+        if (syncedIds.isNotEmpty()) {
+            dtcDao.markDtcsAsSynced(syncedIds)
         }
     }
 }
