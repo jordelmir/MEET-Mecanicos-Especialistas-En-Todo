@@ -29,8 +29,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "3.3.3"
+        versionCode = 14
+        versionName = "3.4.0"
 
         // Supabase credentials from local.properties (never committed to git)
         buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("MEET_SUPABASE_URL", "")}\"")
