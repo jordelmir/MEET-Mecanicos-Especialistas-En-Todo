@@ -94,19 +94,22 @@ fun HomeScreen(
                         color = MeetColors.textSecondary
                     )
                     Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
                         Text(
-                            "MEET",
-                            style = MaterialTheme.typography.displayLarge,
+                            "ELYSIUM",
+                            style = MaterialTheme.typography.displayMedium,
                             color = MeetColors.neonGreen,
                             fontWeight = FontWeight.Black
                         )
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            "OBD2",
-                            style = MaterialTheme.typography.headlineLarge,
+                            "VANGUARD",
+                            style = MaterialTheme.typography.headlineMedium,
                             color = MeetColors.electricBlue,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
                     Text(
@@ -304,8 +307,13 @@ fun HomeScreen(
                 Triple("🤖", "IA", MeetColors.electricBlue) to "ai",
                 Triple("🔧", "Terminal", MeetColors.cyberCyan) to "terminal",
                 Triple("💬", "Soporte", MeetColors.warning) to "support_chat",
+                Triple("💬", "Chat Flota", MeetColors.electricBlue) to "fleet_chat_list/b1",
                 Triple("📄", "Reportes", MeetColors.electricBlue) to "reports",
-                Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
+                Triple("🔮", "HUD Reflejo", MeetColors.neonGreen) to "hud",
+                Triple("📋", "DVIR Diario", MeetColors.cyberCyan) to "dvir",
+                Triple("🩺", "Salud AI", MeetColors.electricBlue) to "health_score",
+                Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance",
+                Triple("🍃", "Eco Viajes", MeetColors.neonGreen) to "trips",
                 Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link",
                 Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub"
             )

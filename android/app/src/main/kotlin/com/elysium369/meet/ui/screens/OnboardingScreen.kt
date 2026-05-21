@@ -171,13 +171,13 @@ private fun OnboardingStep1() {
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            "MEET",
+            "ELYSIUM",
             style = MaterialTheme.typography.displayLarge,
             color = MeetColors.neonGreen,
             fontWeight = FontWeight.Black
         )
         Text(
-            "OBD2",
+            "VANGUARD",
             style = MaterialTheme.typography.headlineLarge,
             color = MeetColors.electricBlue,
             fontWeight = FontWeight.Bold

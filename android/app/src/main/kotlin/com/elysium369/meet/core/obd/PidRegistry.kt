@@ -114,34 +114,294 @@ object PidRegistry {
     )
 
     val ACTIVE_TESTS = listOf(
+        // ══════════════════════════════════════════════════════
+        // SISTEMA DE COMBUSTIBLE
+        // ══════════════════════════════════════════════════════
         ActiveTest(
             id = "FUEL_PUMP",
             name = "Prueba Bomba Combustible",
-            description = "Activa la bomba de combustible por 5 segundos para verificar presión.",
-            startCommand = "300101", // Example UDS command
+            description = "Activa la bomba de combustible por 5 segundos para verificar presión y flujo. " +
+                "PROCEDIMIENTO: Conecte un manómetro al riel. La presión debe subir a spec del fabricante (35-65 PSI típico) " +
+                "y mantenerse estable sin caer más de 5 PSI en 10 minutos tras apagar.",
+            startCommand = "300101",
             stopCommand = "300100",
             durationMs = 5000,
-            monitoredPids = listOf("010A"), // Monitor Fuel Pressure
+            monitoredPids = listOf("010A"),
             safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
         ),
         ActiveTest(
+            id = "INJECTOR_BALANCE",
+            name = "Balance de Inyectores",
+            description = "Pulsa cada inyector individualmente y mide la caída de presión en el riel. " +
+                "PROCEDIMIENTO: Se activa cada inyector por un pulso corto (50ms). La caída de presión " +
+                "debe ser uniforme entre todos los cilindros (±10%). Una caída menor indica inyector obstruido; " +
+                "una caída mayor indica inyector con fuga o atascado abierto.",
+            startCommand = "3001FF",
+            stopCommand = "300100",
+            durationMs = 15000,
+            monitoredPids = listOf("010A", "0106"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // SISTEMA DE EMISIONES / EVAP
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
             id = "EVAP_VENT",
             name = "Solenoide EVAP Vent",
-            description = "Cicla la válvula de ventilación del sistema EVAP.",
-            startCommand = "2F011003", // Example Mode 2F (IO Control)
+            description = "Cicla la válvula de ventilación del sistema evaporativo (EVAP). " +
+                "PROCEDIMIENTO: Escuche un 'click' audible del solenoide cerca del cánister de carbón. " +
+                "Si no se escucha, el solenoide puede estar quemado o desconectado. " +
+                "NOTA: Esta prueba es esencial para resolver códigos P0440-P0457.",
+            startCommand = "2F011003",
             stopCommand = "2F011000",
             durationMs = 10000,
             safetyConditions = listOf(SafetyCondition.ENGINE_OFF)
         ),
         ActiveTest(
+            id = "EVAP_PURGE",
+            name = "Válvula de Purga EVAP",
+            description = "Activa la válvula de purga canister que controla el flujo de vapores al múltiple. " +
+                "PROCEDIMIENTO: Con motor en ralentí, active la válvula. Las RPM deben bajar ligeramente " +
+                "(vapores de gasolina enriquecen la mezcla). Si NO hay cambio, la válvula está atascada cerrada. " +
+                "Si las RPM caen demasiado, está atascada abierta. Códigos relacionados: P0441, P0446.",
+            startCommand = "2F011103",
+            stopCommand = "2F011100",
+            durationMs = 8000,
+            monitoredPids = listOf("010C", "0106"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY)
+        ),
+        ActiveTest(
+            id = "EGR_VALVE",
+            name = "Válvula EGR",
+            description = "Abre la válvula de Recirculación de Gases de Escape (EGR). " +
+                "PROCEDIMIENTO: En ralentí, al abrir la EGR debe ingresar gas inerte al cilindro, " +
+                "causando ralentí inestable o incluso que el motor se apague. Si NO hay efecto, " +
+                "la EGR está atascada cerrada o los pasajes de EGR están tapados con carbón. " +
+                "Códigos relacionados: P0400-P0409.",
+            startCommand = "2F011203",
+            stopCommand = "2F011200",
+            durationMs = 5000,
+            monitoredPids = listOf("010C", "0104", "012C"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY)
+        ),
+        ActiveTest(
+            id = "SECONDARY_AIR",
+            name = "Bomba de Aire Secundario (AIR)",
+            description = "Activa la bomba de aire secundario que inyecta aire fresco en el múltiple de escape " +
+                "para calentar el catalizador más rápido durante arranques en frío. " +
+                "PROCEDIMIENTO: Debe escucharse el zumbido de la bomba eléctrica y sentir aire en el tubo de salida. " +
+                "Si no funciona, verifique relé, fusible y motor de la bomba. Códigos: P0410-P0419.",
+            startCommand = "2F011303",
+            stopCommand = "2F011300",
+            durationMs = 10000,
+            monitoredPids = listOf("0114", "0106"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // SISTEMA DE ENFRIAMIENTO
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "COOLING_FAN_LOW",
+            name = "Electroventilador — Velocidad Baja",
+            description = "Activa el ventilador del radiador en velocidad baja. " +
+                "PROCEDIMIENTO: El ventilador debe girar de inmediato. Si no lo hace: " +
+                "1) Verifique relé de baja velocidad, 2) Verifique fusible, 3) Verifique motor del ventilador " +
+                "con voltaje directo de batería. Si gira con voltaje directo pero no con la prueba, " +
+                "el problema es el relé o el circuito de control de la PCM.",
+            startCommand = "2F010103",
+            stopCommand = "2F010100",
+            durationMs = 10000,
+            monitoredPids = listOf("0105"),
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+        ActiveTest(
+            id = "COOLING_FAN_HIGH",
+            name = "Electroventilador — Velocidad Alta",
+            description = "Activa el ventilador del radiador en velocidad alta. " +
+                "PROCEDIMIENTO: El ventilador debe girar a máxima velocidad con mayor ruido. " +
+                "Esta velocidad se usa cuando el A/C está encendido o la temperatura supera ~108°C. " +
+                "Si la velocidad baja funciona pero alta no, el problema es el relé de alta velocidad " +
+                "o la resistencia del módulo de control del ventilador.",
+            startCommand = "2F010203",
+            stopCommand = "2F010200",
+            durationMs = 10000,
+            monitoredPids = listOf("0105"),
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // SISTEMA DE ACELERACIÓN / RALENTÍ
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "IDLE_SPEED_UP",
+            name = "Elevar RPM de Ralentí",
+            description = "Comanda a la PCM que suba las RPM de ralentí (típicamente +200 RPM). " +
+                "PROCEDIMIENTO: Las RPM deben subir suavemente. Esto confirma que el sistema de control de ralentí " +
+                "(IAC o cuerpo de aceleración electrónico) responde correctamente. Si las RPM no cambian, " +
+                "el motor del IAC puede estar atascado o el cuerpo de aceleración sucio/dañado.",
+            startCommand = "2F010503",
+            stopCommand = "2F010500",
+            durationMs = 8000,
+            monitoredPids = listOf("010C", "0111"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.TRANS_IN_PARK)
+        ),
+        ActiveTest(
+            id = "THROTTLE_BODY",
+            name = "Cuerpo de Aceleración (TAC)",
+            description = "Comanda apertura/cierre del cuerpo de aceleración electrónico (Drive-by-Wire). " +
+                "PROCEDIMIENTO: La mariposa debe moverse suavemente de 0% a ~25% y volver. " +
+                "Si hay puntos muertos, ruido, o no se mueve, el motor del TAC está dañado. " +
+                "ADVERTENCIA: Nunca limpie un TAC electrónico con solventes agresivos, use solo spray dieléctrico.",
+            startCommand = "2F011403",
+            stopCommand = "2F011400",
+            durationMs = 6000,
+            monitoredPids = listOf("0111", "010C"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // TRANSMISIÓN AUTOMÁTICA
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "TCC_SOLENOID",
+            name = "Solenoide TCC (Lock-Up Convertidor)",
+            description = "Activa el embrague del convertidor de torque (TCC). " +
+                "PROCEDIMIENTO: En carretera a ~60 km/h en D, al activar las RPM deben bajar ~200-400 RPM " +
+                "(el convertidor se bloquea mecánicamente). Si NO hay cambio de RPM, el solenoide TCC " +
+                "está defectuoso o hay desgaste en el embrague del convertidor. Códigos: P0740-P0744.",
+            startCommand = "2F020103",
+            stopCommand = "2F020100",
+            durationMs = 8000,
+            monitoredPids = listOf("010C", "010D"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING)
+        ),
+        ActiveTest(
+            id = "SHIFT_SOLENOID_A",
+            name = "Solenoide de Cambio A (1-2)",
+            description = "Activa el solenoide de cambio A de la transmisión automática. " +
+                "PROCEDIMIENTO: Debe escucharse un 'click' del solenoide. En vehículos con transmisión " +
+                "electrónica (4L60E, 4T65E, etc.), este solenoide controla el cambio de 1ra a 2da. " +
+                "Mida resistencia del solenoide: 20-30Ω es normal. Códigos: P0750-P0756.",
+            startCommand = "2F020203",
+            stopCommand = "2F020200",
+            durationMs = 5000,
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.TRANS_IN_PARK)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // AIRE ACONDICIONADO
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "AC_COMPRESSOR",
+            name = "Embrague Compresor A/C",
+            description = "Activa el embrague electromagnético del compresor de A/C. " +
+                "PROCEDIMIENTO: Debe escucharse el 'click' del embrague y las RPM deben subir ligeramente " +
+                "(la PCM compensa la carga extra). La polea del compresor debe girar junto con el eje. " +
+                "Si no se activa: verifique presión de refrigerante (interruptor de baja), relé del A/C, " +
+                "y bobina del embrague (~3-5Ω de resistencia).",
+            startCommand = "2F010303",
+            stopCommand = "2F010300",
+            durationMs = 10000,
+            monitoredPids = listOf("010C", "0104"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // FRENOS / ABS
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
             id = "ABS_PUMP",
             name = "Purga Bomba ABS",
-            description = "Activa el motor de la bomba ABS para purgado de aire.",
+            description = "Activa el motor de la bomba hidráulica del ABS para purgado de aire. " +
+                "PROCEDIMIENTO: La bomba debe zumbar durante la prueba. Esta función es ESENCIAL " +
+                "después de reemplazar caliper, cilindro maestro, o líneas de freno. " +
+                "ADVERTENCIA: Mantenga el depósito de líquido de frenos lleno durante toda la prueba. " +
+                "Purgue en el orden: rueda más lejana al maestro → más cercana.",
             manufacturer = "GM",
-            startCommand = "22123401", // Mocked GM specific
+            startCommand = "22123401",
             stopCommand = "22123400",
             durationMs = 3000,
             safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // DIÉSEL — Bujías Incandescentes
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "GLOW_PLUGS",
+            name = "Bujías Incandescentes (Diésel)",
+            description = "Activa las bujías incandescentes (glow plugs) para verificar su funcionamiento. " +
+                "PROCEDIMIENTO: Cada bujía debe consumir 5-10A. Mida con pinza amperimétrica en cada cable. " +
+                "Una bujía con consumo 0A está abierta. Después de 10 seg, la punta debe estar al rojo vivo. " +
+                "NOTA: En motores diésel modernos (common rail), bujías defectuosas causan humo blanco " +
+                "y dificultad para arrancar en frío. Códigos: P0380-P0386.",
+            startCommand = "2F010603",
+            stopCommand = "2F010600",
+            durationMs = 10000,
+            monitoredPids = listOf("0142"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+
+        // ══════════════════════════════════════════════════════
+        // TURBO
+        // ══════════════════════════════════════════════════════
+        ActiveTest(
+            id = "TURBO_WASTEGATE",
+            name = "Wastegate / Válvula de Alivio Turbo",
+            description = "Comanda la apertura de la wastegate electrónica del turbocompresor. " +
+                "PROCEDIMIENTO: Con motor en ralentí, la wastegate debe moverse libremente. " +
+                "Verifique que el vástago del actuador se mueva suavemente sin juego excesivo. " +
+                "Si no responde, el actuador (vacío o electrónico) puede estar atascado por carbón o dañado. " +
+                "Un wastegate que no cierra = falta de potencia/boost. Uno que no abre = sobre-boost peligroso.",
+            startCommand = "2F011503",
+            stopCommand = "2F011500",
+            durationMs = 8000,
+            monitoredPids = listOf("010B"),
+            safetyConditions = listOf(SafetyCondition.ENGINE_RUNNING, SafetyCondition.VEHICLE_STATIONARY)
+        ),
+        ActiveTest(
+            id = "HORN_TEST",
+            name = "Bocina / Claxon",
+            description = "Activa la bocina (claxon) del vehículo de forma intermitente por 4 segundos. " +
+                "PROCEDIMIENTO: Escuche un tono acústico claro. Si no suena: verifique el fusible de la bocina, " +
+                "el relé de bocina en la caja de fusibles del compartimiento del motor (BJB), y el cableado del actuador.",
+            startCommand = "2F012003",
+            stopCommand = "2F012000",
+            durationMs = 4000,
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY, SafetyCondition.BATTERY_ABOVE_12V)
+        ),
+        ActiveTest(
+            id = "HEADLIGHT_TEST",
+            name = "Faros Delanteros",
+            description = "Activa los faros delanteros (luces principales) por 6 segundos. " +
+                "PROCEDIMIENTO: Verifique visualmente que ambos faros se enciendan. Si uno o ambos fallan, " +
+                "inspeccione bulbos, relés e interruptor del panel.",
+            startCommand = "2F012103",
+            stopCommand = "2F012100",
+            durationMs = 6000,
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY)
+        ),
+        ActiveTest(
+            id = "WIPER_TEST",
+            name = "Limpiaparabrisas",
+            description = "Cicla el motor del limpiaparabrisas en velocidad baja por 5 segundos. " +
+                "PROCEDIMIENTO: Las plumas deben barrer el parabrisas suavemente. Ideal para comprobar motor del wiper y varillaje.",
+            startCommand = "2F012203",
+            stopCommand = "2F012200",
+            durationMs = 5000,
+            safetyConditions = listOf(SafetyCondition.VEHICLE_STATIONARY)
+        ),
+        ActiveTest(
+            id = "RADIATOR_FAN_TEST",
+            name = "Ventilador del Radiador (Alta)",
+            description = "Enciende el ventilador del radiador a velocidad alta por 8 segundos. " +
+                "PROCEDIMIENTO: El ventilador debe zumbar con fuerza. Útil para verificar relé de alta y motor del ventilador.",
+            startCommand = "2F012303",
+            stopCommand = "2F012300",
+            durationMs = 8000,
+            safetyConditions = listOf(SafetyCondition.ENGINE_OFF, SafetyCondition.BATTERY_ABOVE_12V)
         )
     )
 

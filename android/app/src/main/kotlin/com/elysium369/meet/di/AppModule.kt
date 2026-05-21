@@ -253,6 +253,238 @@ object AppModule {
         override fun migrate(db: SupportSQLiteDatabase) = migrateToV9(db, 8)
     }
 
+    // ── v9 → v10: Maintenance Logs & Repair History ──
+    private fun migrateToV10(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→10: Adding maintenance & repair tables")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `maintenance_logs` (
+            `id` TEXT NOT NULL PRIMARY KEY,
+            `vehicleId` TEXT NOT NULL,
+            `category` TEXT NOT NULL,
+            `description` TEXT NOT NULL,
+            `brand` TEXT NOT NULL,
+            `specification` TEXT NOT NULL,
+            `datePerformed` INTEGER NOT NULL,
+            `odometerAtService` INTEGER NOT NULL,
+            `intervalKm` INTEGER NOT NULL,
+            `intervalMonths` INTEGER NOT NULL,
+            `nextDueKm` INTEGER NOT NULL,
+            `nextDueDate` INTEGER NOT NULL,
+            `cost` REAL NOT NULL,
+            `currency` TEXT NOT NULL,
+            `workshopName` TEXT NOT NULL,
+            `notes` TEXT NOT NULL,
+            `receiptPhotoPath` TEXT,
+            `createdAt` INTEGER NOT NULL
+        )""")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `repair_history` (
+            `id` TEXT NOT NULL PRIMARY KEY,
+            `vehicleId` TEXT NOT NULL,
+            `partCategory` TEXT NOT NULL,
+            `partName` TEXT NOT NULL,
+            `partNumber` TEXT NOT NULL,
+            `brand` TEXT NOT NULL,
+            `isOem` INTEGER NOT NULL DEFAULT 0,
+            `reason` TEXT NOT NULL,
+            `relatedDtc` TEXT,
+            `datePerformed` INTEGER NOT NULL,
+            `odometerAtRepair` INTEGER NOT NULL,
+            `expectedLifeKm` INTEGER,
+            `expectedLifeMonths` INTEGER,
+            `nextReplacementKm` INTEGER,
+            `isPeriodic` INTEGER NOT NULL DEFAULT 0,
+            `laborCost` REAL NOT NULL,
+            `partCost` REAL NOT NULL,
+            `totalCost` REAL NOT NULL,
+            `currency` TEXT NOT NULL,
+            `workshopName` TEXT NOT NULL,
+            `warrantyMonths` INTEGER NOT NULL,
+            `warrantyKm` INTEGER NOT NULL,
+            `notes` TEXT NOT NULL,
+            `photoPath` TEXT,
+            `createdAt` INTEGER NOT NULL
+        )""")
+        android.util.Log.i("MeetDB", "Migration $from→10: Complete")
+    }
+
+    private fun migrateToV11(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→11: Migrating dtc_definitions table to support OEM manufacturer primary key")
+        try {
+            db.execSQL("ALTER TABLE `dtc_definitions` RENAME TO `dtc_definitions_old`")
+            db.execSQL("""
+                CREATE TABLE `dtc_definitions` (
+                    `code` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `descriptionEs` TEXT NOT NULL,
+                    `descriptionEn` TEXT NOT NULL,
+                    `system` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `possibleCauses` TEXT NOT NULL,
+                    `urgency` TEXT NOT NULL,
+                    PRIMARY KEY(`code`, `manufacturer`)
+                )
+            """)
+            db.execSQL("""
+                INSERT INTO `dtc_definitions` (`code`, `manufacturer`, `descriptionEs`, `descriptionEn`, `system`, `severity`, `possibleCauses`, `urgency`)
+                SELECT `code`, 'GENERIC', `descriptionEs`, `descriptionEn`, `system`, `severity`, `possibleCauses`, `urgency`
+                FROM `dtc_definitions_old`
+            """)
+            db.execSQL("DROP TABLE `dtc_definitions_old`")
+            android.util.Log.i("MeetDB", "Migration $from→11: Complete")
+        } catch (e: Exception) {
+            android.util.Log.e("MeetDB", "Migration $from→11 failed, recreating definitions table", e)
+            db.execSQL("DROP TABLE IF EXISTS `dtc_definitions_old`")
+            db.execSQL("DROP TABLE IF EXISTS `dtc_definitions`")
+            db.execSQL("""
+                CREATE TABLE `dtc_definitions` (
+                    `code` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `descriptionEs` TEXT NOT NULL,
+                    `descriptionEn` TEXT NOT NULL,
+                    `system` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `possibleCauses` TEXT NOT NULL,
+                    `urgency` TEXT NOT NULL,
+                    PRIMARY KEY(`code`, `manufacturer`)
+                )
+            """)
+        }
+    }
+
+    private val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV10(db, 9)
+    }
+    private val MIGRATION_6_10 = object : Migration(6, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) { migrateToV8(db, 6); migrateToV9(db, 6); migrateToV10(db, 6) }
+    }
+    private val MIGRATION_7_10 = object : Migration(7, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) { migrateToV8(db, 7); migrateToV9(db, 7); migrateToV10(db, 7) }
+    }
+    private val MIGRATION_8_10 = object : Migration(8, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) { migrateToV9(db, 8); migrateToV10(db, 8) }
+    }
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV11(db, 10)
+    }
+
+    private fun migrateToV12(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→12: Adding fleet management schema elements")
+        
+        try { db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `businessId` TEXT") } catch (_: Exception) {}
+        try { db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `fleetId` TEXT") } catch (_: Exception) {}
+        try { db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `assignedDriverId` TEXT") } catch (_: Exception) {}
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `business_profiles` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `name` TEXT NOT NULL,
+                `taxId` TEXT,
+                `planType` TEXT NOT NULL,
+                `maxVehicles` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `ownerUserId` TEXT NOT NULL
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `fleets` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `businessId` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `description` TEXT,
+                `createdAt` INTEGER NOT NULL
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `fleet_members` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `businessId` TEXT NOT NULL,
+                `userId` TEXT NOT NULL,
+                `role` TEXT NOT NULL,
+                `email` TEXT NOT NULL,
+                `inviteStatus` TEXT NOT NULL,
+                `joinedAt` INTEGER
+            )
+        """)
+        
+        android.util.Log.i("MeetDB", "Migration $from→12: Complete")
+    }
+
+    private val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV12(db, 11)
+    }
+
+    private fun migrateToV13(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→13: Adding chat messaging schema elements")
+        
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `chat_messages` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `businessId` TEXT NOT NULL,
+                `senderId` TEXT NOT NULL,
+                `receiverId` TEXT NOT NULL,
+                `messageText` TEXT,
+                `messageType` TEXT NOT NULL,
+                `fileLocalPath` TEXT,
+                `fileRemoteUrl` TEXT,
+                `durationSeconds` INTEGER NOT NULL,
+                `timestamp` INTEGER NOT NULL,
+                `status` TEXT NOT NULL
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `chat_blocklist` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `businessId` TEXT NOT NULL,
+                `blockerUserId` TEXT NOT NULL,
+                `blockedUserId` TEXT NOT NULL,
+                `blockedAt` INTEGER NOT NULL
+            )
+        """)
+        
+        android.util.Log.i("MeetDB", "Migration $from→13: Complete")
+    }
+
+    private fun migrateToV14(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→14: Adding inviteCode to fleets and fleetId to fleet_members")
+        try { db.execSQL("ALTER TABLE `fleets` ADD COLUMN `inviteCode` TEXT NOT NULL DEFAULT ''") } catch (_: Exception) {}
+        try { db.execSQL("ALTER TABLE `fleet_members` ADD COLUMN `fleetId` TEXT") } catch (_: Exception) {}
+        android.util.Log.i("MeetDB", "Migration $from→14: Complete")
+    }
+
+    private val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV13(db, 12)
+    }
+
+    private val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV14(db, 13)
+    }
+
+    private fun migrateToV15(db: SupportSQLiteDatabase, from: Int) {
+        android.util.Log.i("MeetDB", "Migration $from→15: Adding dvir_reports table")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `dvir_reports` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `vehicleId` TEXT NOT NULL,
+                `driverId` TEXT NOT NULL,
+                `timestamp` INTEGER NOT NULL,
+                `brakesOk` INTEGER NOT NULL,
+                `lightsOk` INTEGER NOT NULL,
+                `tiresOk` INTEGER NOT NULL,
+                `fluidsOk` INTEGER NOT NULL,
+                `batteryOk` INTEGER NOT NULL,
+                `remarks` TEXT,
+                `signaturePath` TEXT
+            )
+        """)
+        android.util.Log.i("MeetDB", "Migration $from→15: Complete")
+    }
+
+    private val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) = migrateToV15(db, 14)
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -270,7 +502,7 @@ object AppModule {
         // ⛔ REMOVED: fallbackToDestructiveMigration()
         // This silently destroyed user data. We now use explicit migrations.
 
-        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9)
+        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10, MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
@@ -321,6 +553,18 @@ object AppModule {
     fun provideHealthSnapshotDao(db: MeetDatabase): HealthSnapshotDao = db.healthSnapshotDao()
 
     @Provides
+    fun provideMaintenanceLogDao(db: MeetDatabase): MaintenanceLogDao = db.maintenanceLogDao()
+
+    @Provides
+    fun provideRepairHistoryDao(db: MeetDatabase): RepairHistoryDao = db.repairHistoryDao()
+
+    @Provides
+    fun provideFleetDao(db: MeetDatabase): FleetDao = db.fleetDao()
+
+    @Provides
+    fun provideChatDao(db: MeetDatabase): ChatDao = db.chatDao()
+
+    @Provides
     @Singleton
     fun providePredictiveHealthEngine(
         sensorHistoryDao: SensorHistoryDao,
@@ -344,4 +588,7 @@ object AppModule {
     fun provideReportGenerator(@ApplicationContext context: Context): com.elysium369.meet.core.export.ReportGenerator {
         return com.elysium369.meet.core.export.ReportGenerator(context)
     }
+
+    @Provides
+    fun provideDvirReportDao(db: MeetDatabase): DvirReportDao = db.dvirReportDao()
 }

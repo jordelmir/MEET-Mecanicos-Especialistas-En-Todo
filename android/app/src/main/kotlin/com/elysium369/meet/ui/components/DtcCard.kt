@@ -64,8 +64,15 @@ fun DtcCard(
             
             Spacer(modifier = Modifier.height(8.dp))
             
+            val rawEs = definition?.descriptionEs
+            val descriptionText = if (rawEs.isNullOrBlank() || rawEs.contains("no disponible") || rawEs.contains("no encontrada")) {
+                DtcUtils.getDynamicDtcFallbackDescription(dtcCode, isSpanish = true)
+            } else {
+                rawEs
+            }
+            
             Text(
-                text = definition?.descriptionEs ?: "Descripción no disponible offline",
+                text = descriptionText,
                 color = Color.LightGray
             )
 

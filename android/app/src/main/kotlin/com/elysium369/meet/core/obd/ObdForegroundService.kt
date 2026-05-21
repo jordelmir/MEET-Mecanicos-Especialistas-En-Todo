@@ -99,7 +99,7 @@ class ObdForegroundService : Service() {
             }, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("MEET OBD2")
+            .setContentTitle("Elysium Vanguard")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)

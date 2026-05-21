@@ -7,6 +7,7 @@ import com.elysium369.meet.core.obd.DtcDatabaseLoader
 import com.elysium369.meet.data.local.MeetDatabase
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class MeetApplication : Application(), Configuration.Provider {
@@ -19,10 +20,21 @@ class MeetApplication : Application(), Configuration.Provider {
             .setWorkerFactory(workerFactory)
             .build()
 
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override fun onCreate() {
         super.onCreate()
         
         // Load DTC JSON if empty
         DtcDatabaseLoader(this, db).loadIfEmpty()
+
+        // Elite Cloud Dynamic Update Integration
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                com.elysium369.meet.core.sync.ElysiumCloudServices.syncDtcDefinitionsFromCloud(db.dtcDefinitionDao())
+                com.elysium369.meet.core.sync.ElysiumCloudServices.syncCommunityCustomPIDs(db.customPidDao())
+            } catch (e: Exception) {
+                android.util.Log.e("MeetApplication", "Error during automatic cloud dynamic update", e)
+            }
+        }
     }
 }

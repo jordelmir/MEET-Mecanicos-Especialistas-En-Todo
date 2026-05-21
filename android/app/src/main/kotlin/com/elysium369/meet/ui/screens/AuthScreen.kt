@@ -26,8 +26,8 @@ fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("MEET", style = MaterialTheme.typography.displayLarge, color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black)
-            Text("Mecánicos Especialistas En Todo", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 32.dp))
+            Text("ELYSIUM", style = MaterialTheme.typography.displayLarge, color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black)
+            Text("Vanguard OBD2 Scanner", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 32.dp))
 
             OutlinedTextField(
                 value = email, onValueChange = { email = it },

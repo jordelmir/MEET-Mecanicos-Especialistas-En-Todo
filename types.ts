@@ -56,6 +56,7 @@ export interface Client {
   vehicles: VehicleInfo[];
   serviceHistory: ServiceHistoryItem[];
   scans?: OBD2ScanResult[]; // Vía APK
+  oscilloscopeMeasurements?: OscilloscopeMeasurement[];
   lastVisit?: Date;
   joinDate: Date;
   loyaltyPoints: number;
@@ -70,6 +71,37 @@ export interface OBD2ScanResult {
   dtcCodes: string[];
   severity: 'high' | 'medium' | 'low' | 'none';
   notes?: string;
+}
+
+export interface OscilloscopeMeasurement {
+  id: string;
+  timestamp: Date;
+  signalType: string;
+  signalName: string;
+  pidCode: string;
+  durationMs: number;
+  sampleCount: number;
+  metrics: {
+    frequency: number;
+    amplitude: number;
+    vpp: number;
+    rms: number;
+    thd: number;
+    dutyCycle: number;
+    mean: number;
+    min: number;
+    max: number;
+    stability: number;
+    noiseLevel: number;
+  };
+  diagnosis: string;
+  recommendation: string;
+  severity: 'normal' | 'warning' | 'critical';
+  confidenceScore: number;
+  vehiclePlate?: string;
+  workOrderId?: string;
+  // Compressed waveform data for mini-canvas replay (max 200 points)
+  waveformSnapshot?: number[];
 }
 
 export interface CatalogItem {
@@ -133,6 +165,9 @@ export interface WorkOrder {
   // Parts tracking
   partsNeeded?: string[];
   partsReady?: boolean;
+  
+  // Oscilloscope measurements linked to this work order
+  oscilloscopeMeasurements?: OscilloscopeMeasurement[];
 }
 
 export interface TimeSlice {

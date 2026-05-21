@@ -26,6 +26,7 @@ import com.elysium369.meet.ui.screens.scanner.*
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.neonGlow
+import androidx.compose.ui.graphics.graphicsLayer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +91,8 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         )
     }
 
+    val language by viewModel.language.collectAsState()
+    var isSpanish by remember(language) { mutableStateOf(language == "es") }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var selectedTab by remember { mutableIntStateOf(0) }
     var hudMode by remember { mutableStateOf(false) }
@@ -99,33 +102,69 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         if (anomalousPids.isNotEmpty()) {
             val sensorNames = anomalousPids.map { it.pid }.joinToString(", ")
             snackbarHostState.showSnackbar(
-                message = "🚨 IA detectó anomalía en sensores: $sensorNames",
-                actionLabel = "VER",
+                message = if (isSpanish) "🚨 IA detectó anomalía en sensores: $sensorNames" else "🚨 AI detected anomaly in sensors: $sensorNames",
+                actionLabel = if (isSpanish) "VER" else "VIEW",
                 duration = SnackbarDuration.Long
             )
         }
     }
 
-    // HUD Mode Overlay
+// HUD Mode Overlay
     if (hudMode) {
+        var isMirrorMode by remember { mutableStateOf(false) }
+
         Surface(color = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp), 
-                horizontalAlignment = Alignment.CenterHorizontally, 
-                verticalArrangement = Arrangement.Center
-            ) {
-                val speed = liveData["010D"] ?: 0f
-                val rpm = liveData["010C"] ?: 0f
-                Text("${speed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
-                Text("km/h", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), fontSize = 24.sp)
-                Spacer(modifier = Modifier.height(32.dp))
-                Text("${rpm.toInt()} RPM", color = com.elysium369.meet.ui.theme.MeetColors.electricBlue, fontSize = 48.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.weight(1f))
-                com.elysium369.meet.ui.components.EliteTextButton(
-                    onClick = { hudMode = false }, 
-                    text = "SALIR HUD",
-                    color = MeetColors.textSecondary
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(32.dp).graphicsLayer {
+                        scaleX = if (isMirrorMode) -1f else 1f
+                    }, 
+                    horizontalAlignment = Alignment.CenterHorizontally, 
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    val speed = liveData["010D"] ?: 0f
+                    val rpm = liveData["010C"] ?: 0f
+
+                    // Shift Light LED Bar
+                    val maxRpm = 8000f
+                    val rpmRatio = (rpm / maxRpm).coerceIn(0f, 1f)
+                    val ledColor = when {
+                        rpmRatio > 0.85f -> MeetColors.error
+                        rpmRatio > 0.6f -> MeetColors.warning
+                        else -> MeetColors.neonGreen
+                    }
+                    
+                    Row(modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 32.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        for (i in 0 until 20) {
+                            val threshold = i / 20f
+                            val isOn = rpmRatio > threshold
+                            val color = if (isOn) ledColor else Color.DarkGray
+                            Box(modifier = Modifier.weight(1f).fillMaxHeight().background(color).neonGlow(if(isOn) color else Color.Transparent, minElevation = 0f, maxElevation = if(isOn) 8f else 0f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(64.dp))
+
+                    Text("${speed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
+                    Text("km/h", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), fontSize = 24.sp)
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text("${rpm.toInt()} RPM", color = ledColor, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        com.elysium369.meet.ui.components.EliteTextButton(
+                            onClick = { isMirrorMode = !isMirrorMode }, 
+                            text = if (isMirrorMode) (if (isSpanish) "MODO NORMAL" else "NORMAL MODE") else (if (isSpanish) "MODO ESPEJO" else "MIRROR MODE"),
+                            color = MeetColors.electricBlue
+                        )
+                        com.elysium369.meet.ui.components.EliteTextButton(
+                            onClick = { hudMode = false }, 
+                            text = if (isSpanish) "SALIR HUD" else "EXIT HUD",
+                            color = MeetColors.textSecondary
+                        )
+                    }
+                }
             }
         }
         return
@@ -136,8 +175,28 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         topBar = {
             Column {
                 EliteTopAppBar(
-                    title = "Scanner en Vivo",
+                    title = if (isSpanish) "Escáner en Vivo" else "Live Scanner",
                     actions = {
+                        // Language Selector
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                            Text("EN", color = if(isSpanish) MeetColors.textSecondary else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Switch(
+                                checked = isSpanish,
+                                onCheckedChange = { 
+                                    isSpanish = it
+                                    viewModel.setLanguage(if(it) "es" else "en")
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                                    checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                                    uncheckedThumbColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
+                                    uncheckedTrackColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.padding(horizontal = 4.dp).height(24.dp)
+                            )
+                            Text("ES", color = if(isSpanish) Color.White else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+
                         // High Speed Mode Indicator
                         if (highSpeedMode) {
                             com.elysium369.meet.ui.components.EliteCard(
@@ -176,7 +235,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         if (state == ObdState.DISCONNECTED) {
                             com.elysium369.meet.ui.components.EliteTextButton(
                                 onClick = { navController.navigate("connect") },
-                                text = "CONECTAR",
+                                text = if (isSpanish) "CONECTAR" else "CONNECT",
                                 color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
                             )
                         }
@@ -220,11 +279,12 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                     }
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("DIAGNÓSTICO", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("SENSORES", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("HERRAM.", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text("MONITORES", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text("ESTADÍSTICAS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if (isSpanish) "RENDIMIENTO" else "PERFORMANCE", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if (isSpanish) "DIAGNÓSTICO" else "DIAGNOSTICS", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if (isSpanish) "SENSORES" else "SENSORS", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text(if (isSpanish) "HERRAM." else "TOOLS", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text(if (isSpanish) "MONITORES" else "MONITORS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 6, onClick = { selectedTab = 6 }, text = { Text(if (isSpanish) "ESTADÍSTICAS" else "STATS", color = if (selectedTab == 6) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
                 }
             }
         },
@@ -248,11 +308,12 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTab) {
                 0 -> ScannerDashboardTab(viewModel, isLandscape, defaultGauges)
-                1 -> ScannerDiagnosticTab(viewModel, snackbarHostState)
-                2 -> ScannerSensorsTab(viewModel, defaultGauges)
-                3 -> ScannerToolsTab(viewModel, navController, onHudModeToggle = { hudMode = it })
-                4 -> ScannerMonitorsTab(viewModel)
-                5 -> ScannerStatisticsTab(viewModel, isLandscape)
+                1 -> ScannerPerformanceTab(viewModel, isLandscape)
+                2 -> ScannerDiagnosticTab(viewModel, snackbarHostState)
+                3 -> ScannerSensorsTab(viewModel, defaultGauges)
+                4 -> ScannerToolsTab(viewModel, navController, isSpanish, onHudModeToggle = { hudMode = it })
+                5 -> ScannerMonitorsTab(viewModel, isSpanish)
+                6 -> ScannerStatisticsTab(viewModel, isLandscape, isSpanish)
             }
         }
     }

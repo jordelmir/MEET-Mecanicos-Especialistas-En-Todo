@@ -19,12 +19,18 @@ android {
     namespace = "com.elysium369.meet"
     compileSdk = 35
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "3.3.0"
+        versionCode = 13
+        versionName = "3.3.3"
 
         // Supabase credentials from local.properties (never committed to git)
         buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("MEET_SUPABASE_URL", "")}\"")
@@ -140,6 +146,15 @@ dependencies {
     
     // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // Google Sign-In and Drive Backup API
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20211107-1.32.1") {
+        exclude(group = "org.apache.httpcomponents", module = "httpclient")
+    }
+    implementation("com.google.api-client:google-api-client-android:1.32.1") {
+        exclude(group = "org.apache.httpcomponents", module = "httpclient")
+    }
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

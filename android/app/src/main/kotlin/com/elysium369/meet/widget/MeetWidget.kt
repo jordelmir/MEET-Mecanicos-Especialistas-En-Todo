@@ -22,7 +22,7 @@ internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManage
     val views = RemoteViews(context.packageName, android.R.layout.simple_list_item_2) // Fallback layout
     
     // Set text to placeholder
-    views.setTextViewText(android.R.id.text1, "MEET OBD2")
+    views.setTextViewText(android.R.id.text1, "Elysium Vanguard")
     views.setTextViewText(android.R.id.text2, "Esperando conexión...")
     
     val intent = Intent(context, MainActivity::class.java)

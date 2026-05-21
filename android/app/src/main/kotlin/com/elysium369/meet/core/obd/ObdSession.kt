@@ -157,35 +157,30 @@ class ObdSession(
     
     // Standard PIDs for dashboard polling — comprehensive list matching Car Scanner Pro
     private val dashboardPids = listOf(
-        // ─── CORE ENGINE ───
+        // ─── CORE ENGINE (High-frequency) ───
         "010C", // RPM
         "010D", // Vehicle Speed
         "0104", // Calculated Engine Load
+        "0111", // Throttle Position
         "010B", // Intake Manifold Absolute Pressure (MAP)
         "010E", // Timing Advance
-        "0111", // Throttle Position
-        "011F", // Run Time Since Engine Start
         // ─── TEMPERATURE ───
         "0105", // Engine Coolant Temperature
         "010F", // Intake Air Temperature
-        "0146", // Ambient Air Temperature
         // ─── FUEL SYSTEM ───
         "0110", // MAF Air Flow Rate
         "012F", // Fuel Tank Level
         "0106", // Short Term Fuel Trim - Bank 1
         "0107", // Long Term Fuel Trim - Bank 1
-        "0103", // Fuel System Status
-        "010A", // Fuel Pressure
         // ─── O2 SENSORS ───
         "0114", // O2 Sensor 1 Bank 1 — Voltage + Short Term Fuel Trim
         "0115", // O2 Sensor 2 Bank 1 — Voltage + Short Term Fuel Trim
-        // ─── ELECTRICAL ───
-        // "0142" is skipped here because many ECUs report inaccurate voltage (e.g. 17V). 
-        // We use ATRV periodically via the live polling loop instead.
-        // ─── EMISSIONS/DIAGNOSTICS ───
-        "0133", // Barometric Pressure
+        // ─── DIAGNOSTICS (Low-frequency — polled every 3 cycles) ───
         "0101", // Monitor Status (MIL, DTC count, readiness)
-        "011C"  // OBD Standards Compliance
+        "011F"  // Run Time Since Engine Start
+        // NOTE: 0133 (Barometric), 011C (OBD Standards), 010A (Fuel Pressure),
+        //       0103 (Fuel System Status), 0146 (Ambient Temp) removed from
+        //       high-frequency loop — they rarely change and waste bus time.
     )
 
     private var targetAddress: String? = null
@@ -415,13 +410,15 @@ class ObdSession(
                         pollCustomBatch()
                     }
 
-                    // 5. Poll ELM327 Battery Voltage directly (Every 10 cycles, overrides faulty ECU 0142)
+                    // 5. Poll ELM327 Battery Voltage directly (Every 10 cycles)
                     if (cycleCount % 10 == 0) {
                         try {
-                            val volt = readBatteryVoltage()
-                            if (volt > 0f) {
-                                // Inject into liveData as if it were PID 0142, so dashboards show correct voltage
-                                updateLiveData("0142", volt) 
+                            val (ecuVolt, elmVolt) = readBatteryVoltage()
+                            if (ecuVolt > 0f) {
+                                updateLiveData("0142", ecuVolt)
+                            }
+                            if (elmVolt > 0f) {
+                                updateLiveData("AT RV", elmVolt)
                             }
                         } catch (_: Exception) {}
                     }
@@ -432,10 +429,10 @@ class ObdSession(
                 
                 // Adaptive delay: High speed mode on pro adapter has 0 delay
                 val targetDelay = when {
-                    _highSpeedMode.value && !isCloneAdapter -> 5L // Minimal breathing time
-                    _highSpeedMode.value && isCloneAdapter -> 30L
-                    isCloneAdapter -> 80L
-                    else -> 10L
+                    _highSpeedMode.value && !isCloneAdapter -> 2L // Minimal breathing time
+                    _highSpeedMode.value && isCloneAdapter -> 15L
+                    isCloneAdapter -> 40L  // Was 80L — modern clones handle 25Hz+
+                    else -> 5L
                 }
                 if (targetDelay > 0) delay(targetDelay)
             }
@@ -525,7 +522,7 @@ class ObdSession(
             try {
                 val result = CompletableDeferred<String>()
                 commandQueue.enqueue(ObdCommand(pid, 0, { result.complete(it) }, { result.complete("") }))
-                val response = withTimeoutOrNull(1500) { result.await() } ?: continue
+                val response = withTimeoutOrNull(800) { result.await() } ?: continue
                 val parsed = parsePidResponse(pid, response)
                 if (parsed != null) updateLiveData(pid, parsed)
             } catch (_: Exception) {}
@@ -589,7 +586,7 @@ class ObdSession(
         // 2. Apply smoothing and outlier rejection
         // The PID to smooth is usually the hex code.
         val corePid = pid.removePrefix("01") 
-        val smoothedValue = if (corePid == "42") {
+        val smoothedValue = if (corePid == "42" || corePid == "AT RV" || corePid == "ATRV") {
             calibratedValue // Bypass smoothing for voltage to allow oscilloscope raw reading
         } else {
             sensorSmoother.smooth(corePid, calibratedValue)
@@ -824,7 +821,6 @@ class ObdSession(
      * Disruptive high-end feature: Topology Mapping.
      */
     suspend fun scanNetworkTopology() {
-        if (_state.value != ObdState.CONNECTED) return
         _isScanningTopology.value = true
         val discovered = mutableListOf<NetworkModule>()
         
@@ -844,29 +840,74 @@ class ObdSession(
             "7EB" to ("Gateway Module" to NetworkType.CAN_HIGH)
         )
 
+        val isOfflineSim = _state.value != ObdState.CONNECTED
+
         try {
-            for ((id, data) in targetNodes) {
-                val (name, type) = data
-                _statusMessage.value = "Escanenado Nodo: $name ($id)..."
-                
-                val startTime = System.currentTimeMillis()
-                val success = withTimeoutOrNull(600) {
+            if (isOfflineSim) {
+                // Offline simulation scan
+                for ((id, data) in targetNodes) {
+                    currentCoroutineContext().ensureActive()
+                    val (name, type) = data
+                    _statusMessage.value = "[SIMULACIÓN] Escaneando: $name ($id)..."
+                    delay(300) // simulated delay
+                    
+                    // Generate mock results: TCM and HVAC dead
+                    val success = when (id) {
+                        "7E1" -> false
+                        "7E6" -> false
+                        else -> true
+                    }
+                    val latency = (20..150).random().toLong()
+                    val dtcs = if (success && id == "7E0") {
+                        listOf("U0101", "P0101") // ECM reports lost communication with TCM (U0101)
+                    } else if (success && id == "7EA") {
+                        listOf("U0115")
+                    } else {
+                        emptyList()
+                    }
+                    
+                    discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
+                }
+                _networkTopology.value = discovered
+                _statusMessage.value = "Simulación Completa: ${discovered.count { it.isAlive }} activos, ${discovered.count { !it.isAlive }} caídos."
+            } else {
+                // Physical/Real scan
+                for ((id, data) in targetNodes) {
+                    currentCoroutineContext().ensureActive()
+                    val (name, type) = data
+                    _statusMessage.value = "Escaneando Nodo: $name ($id)..."
+                    
+                    val startTime = System.currentTimeMillis()
+                    var success = false
+                    var dtcs = emptyList<String>()
+                    
                     try {
-                        sendRawCommand("AT SH $id")
-                        val resp = sendRawCommand("0100")
-                        !resp.contains("NO DATA") && !resp.contains("ERROR") && !resp.contains("?")
-                    } catch (e: Exception) { false }
-                } ?: false
-                val latency = System.currentTimeMillis() - startTime
+                        withTimeoutOrNull(600) {
+                            sendRawCommand("AT SH $id")
+                            val resp = sendRawCommand("0100")
+                            success = resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100"))
+                            if (success) {
+                                // Query DTCs immediately if alive
+                                val dtcResp = sendRawCommand("03")
+                                dtcs = DtcDecoder.decode(dtcResp, "03")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        success = false
+                    }
+                    
+                    val latency = System.currentTimeMillis() - startTime
+                    discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
+                }
                 
-                // Always add the module, but flag if it's dead
-                discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency))
+                // Reset header to default functional broadcast
+                sendRawCommand("AT SH 7DF")
+                _networkTopology.value = discovered
+                _statusMessage.value = "Mapeo de Topología Completo: ${discovered.count { it.isAlive }} nodos activos."
             }
-            
-            // Reset header to default functional broadcast
-            sendRawCommand("AT SH 7DF")
-            _networkTopology.value = discovered
-            _statusMessage.value = "Mapeo de Topología Completo: ${discovered.count { it.isAlive }} nodos activos."
+        } catch (e: CancellationException) {
+            _statusMessage.value = "Escaneo cancelado por el usuario."
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Topology scan failed", e)
         } finally {
@@ -1358,8 +1399,20 @@ class ObdSession(
         _statusMessage.value = "Escaneando topología de red CAN..."
         
         try {
-            // Standard 11-bit CAN Addressing (7E0-7EF)
-            val can11Targets = mapOf(
+            // Detect manufacturer based on VIN
+            val vinVal = vin.value ?: ""
+            val mfr = when {
+                vinVal.startsWith("1FM") || vinVal.startsWith("1FT") || vinVal.startsWith("1FA") || vinVal.startsWith("3FA") -> "FORD"
+                vinVal.startsWith("JTD") || vinVal.startsWith("JT1") || vinVal.startsWith("JTN") || vinVal.startsWith("JTH") -> "TOYOTA"
+                vinVal.startsWith("1GC") || vinVal.startsWith("1G1") || vinVal.startsWith("1G6") || vinVal.startsWith("3G1") -> "GM"
+                vinVal.startsWith("WVW") || vinVal.startsWith("WV2") || vinVal.startsWith("WAU") || vinVal.startsWith("TRU") -> "VOLKSWAGEN"
+                else -> "GENERIC"
+            }
+            
+            android.util.Log.i("ObdSession", "scanModules detected manufacturer: $mfr")
+
+            // Standard 11-bit CAN Addressing (7E0-7EF) + OEM Modules
+            val can11Targets = mutableMapOf(
                 "7E0" to "ECM (Motor)", 
                 "7E1" to "TCM (Transmisión)", 
                 "7E2" to "ABS/ESP/TCS",
@@ -1369,22 +1422,81 @@ class ObdSession(
                 "7E6" to "HVAC (Climatización)",
                 "7E7" to "PSM (Asientos/Confort)"
             )
+
+            // Add brand-specific advanced modules
+            when (mfr) {
+                "TOYOTA" -> {
+                    can11Targets["7B0"] = "Toyota ABS/VSC"
+                    can11Targets["7B4"] = "Toyota SRS Airbag"
+                    can11Targets["7C0"] = "Toyota HVAC"
+                    can11Targets["7C4"] = "Toyota BCM"
+                }
+                "GM" -> {
+                    can11Targets["7A0"] = "GM Chassis/ABS"
+                    can11Targets["7A4"] = "GM Body/BCM"
+                }
+                "VOLKSWAGEN" -> {
+                    can11Targets["721"] = "VAG Transmission"
+                    can11Targets["722"] = "VAG ABS/ESP"
+                    can11Targets["723"] = "VAG Airbag/SRS"
+                }
+                "FORD" -> {
+                    can11Targets["760"] = "Ford ABS Module"
+                    can11Targets["764"] = "Ford RCM (Airbag)"
+                }
+            }
             
             try { sendRawCommand("ATH1") } catch (_: Exception) {}
             
             for ((addr, label) in can11Targets) {
                 try {
                     sendRawCommand("ATSH$addr")
-                    // Use a shorter timeout for probing commands if possible, but sendRawCommand is generic.
-                    // 0100 is the most basic command to check if a module is alive.
-                    val resp = sendRawCommand("0100")
-                    if (resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100"))) {
-                        // Alive! Query specific DTCs for this module
-                        var dtcs = emptyList<String>()
+                    
+                    // Initialize diagnostic session for non-generic manufacturer CAN queries
+                    if (mfr != "GENERIC") {
+                        try { sendRawCommand("1003") } catch (_: Exception) {
+                            try { sendRawCommand("1001") } catch (_: Exception) {}
+                        }
+                    }
+
+                    // Probe if module is alive (0100 standard query)
+                    var isAlive = false
+                    var resp = ""
+                    try {
+                        resp = sendRawCommand("0100")
+                        if (resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100") || resp.contains("7F") || resp.contains("50"))) {
+                            isAlive = true
+                        }
+                    } catch (_: Exception) {}
+
+                    // Alternate probe for OEM modules that reject standard Mode 01
+                    if (!isAlive && mfr != "GENERIC") {
                         try {
-                            val dtcResp = sendRawCommand("03")
-                            dtcs = DtcDecoder.decode(dtcResp, "03")
+                            val testerResp = sendRawCommand("3E00")
+                            if (testerResp.isNotBlank() && !testerResp.contains("UNABLE") && !testerResp.contains("ERROR")) {
+                                isAlive = true
+                            }
                         } catch (_: Exception) {}
+                    }
+
+                    if (isAlive) {
+                        var dtcs = emptyList<String>()
+                        
+                        // Query DTCs using UDS Service 19 first
+                        try {
+                            val udsResp = sendRawCommand("19020D")
+                            if (udsResp.isNotBlank() && udsResp.contains("5902")) {
+                                dtcs = DtcDecoder.decodeUdsService19(udsResp)
+                            }
+                        } catch (_: Exception) {}
+
+                        // Fallback to Mode 03 if UDS fails or is empty
+                        if (dtcs.isEmpty()) {
+                            try {
+                                val dtcResp = sendRawCommand("03")
+                                dtcs = DtcDecoder.decode(dtcResp, "03")
+                            } catch (_: Exception) {}
+                        }
                         
                         modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
                     }
@@ -1402,13 +1514,27 @@ class ObdSession(
                 for ((addr, label) in can29Targets) {
                     try {
                         sendRawCommand("ATSH$addr")
+                        
+                        if (mfr != "GENERIC") {
+                            try { sendRawCommand("1003") } catch (_: Exception) {}
+                        }
+                        
                         val resp = sendRawCommand("0100")
-                        if (resp.isNotBlank() && resp.contains("4100")) {
+                        if (resp.isNotBlank() && (resp.contains("4100") || resp.contains("7F") || resp.contains("50"))) {
                             var dtcs = emptyList<String>()
                             try {
-                                val dtcResp = sendRawCommand("03")
-                                dtcs = DtcDecoder.decode(dtcResp, "03")
+                                val udsResp = sendRawCommand("19020D")
+                                if (udsResp.isNotBlank() && udsResp.contains("5902")) {
+                                    dtcs = DtcDecoder.decodeUdsService19(udsResp)
+                                }
                             } catch (_: Exception) {}
+                            
+                            if (dtcs.isEmpty()) {
+                                try {
+                                    val dtcResp = sendRawCommand("03")
+                                    dtcs = DtcDecoder.decode(dtcResp, "03")
+                                } catch (_: Exception) {}
+                            }
                             
                             modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
                         }
@@ -1533,7 +1659,8 @@ class ObdSession(
         
         // Final Voltage Check
         try {
-            val voltage = readBatteryVoltage()
+            val (ecuVolt, elmVolt) = readBatteryVoltage()
+            val voltage = if (elmVolt > 0f) elmVolt else ecuVolt
             Log.d(TAG, "Battery voltage: ${voltage}V")
             if (voltage in 0.1f..9.0f) _statusMessage.value = "⚠ Batería baja: ${"%.1f".format(voltage)}V"
         } catch (_: Exception) {}
@@ -1560,7 +1687,7 @@ class ObdSession(
         }
     }
 
-    private suspend fun readResponse(timeoutMs: Long = 3000L): String = 
+    private suspend fun readResponse(timeoutMs: Long = 1500L): String = 
         withContext(Dispatchers.IO) {
         val t = transport ?: return@withContext ""
         val buffer = StringBuilder()
@@ -1598,7 +1725,7 @@ class ObdSession(
         return@withContext buffer.toString().replace("\r", " ").replace("\n", " ").trim()
     }
 
-    suspend fun readBatteryVoltage(): Float {
+    suspend fun readBatteryVoltage(): Pair<Float, Float> {
         // PRIORIDAD 1: Modo 01 PID 42 (Control Module Voltage desde la ECU)
         val obdResponse = if (isRunning) sendRawCommand("0142") else sendCommandDirectly("0142", 3000L)
         val clean = CanMultiFrameParser.parse(obdResponse).replace(" ", "")
@@ -1620,9 +1747,7 @@ class ObdSession(
         val elmResponse = if (isRunning) sendRawCommand("ATRV") else sendCommandDirectly("ATRV", 2000L)
         val elmVoltage = elmResponse.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 0f
         
-        // Retornamos el valor real sin suavizar ni auto-calibrar matemáticamente. 
-        // Esto permite diagnosticar el rizado del alternador.
-        return if (ecuVoltage > 0f) ecuVoltage else elmVoltage
+        return Pair(ecuVoltage, elmVoltage)
     }
 
     fun enableOemPids(manufacturer: String) {
@@ -1638,7 +1763,8 @@ class ObdSession(
      * are only performed on high-quality adapters and under safe conditions.
      */
     suspend fun verifySafetyForProAction(conditions: List<SafetyCondition> = emptyList()): Boolean {
-        val voltage = readBatteryVoltage()
+        val (ecuVolt, elmVolt) = readBatteryVoltage()
+        val voltage = if (elmVolt > 0f) elmVolt else ecuVolt
         if (voltage < 11.5f) {
             _statusMessage.value = "ERROR: Voltaje insuficiente (${voltage}V). Conecta un cargador."
             return false
@@ -1700,12 +1826,17 @@ class ObdSession(
      * This commands an actuator (pump, fan, valve) and monitors feedback.
      */
     fun runActiveTest(test: ActiveTest) {
-        if (_state.value != ObdState.CONNECTED) return
+        val isOfflineSim = _state.value != ObdState.CONNECTED
         
         activeTestJob?.cancel()
         activeTestJob = scope.launch(Dispatchers.IO) {
             try {
-                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "Iniciando: ${test.name}...", progress = 0.1f)
+                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "Iniciando: ${test.name}...", progress = 0.1f, testId = test.id)
+                
+                if (isOfflineSim) {
+                    runOfflineActiveTestSim(test)
+                    return@launch
+                }
                 
                 if (!verifySafetyForProAction(test.safetyConditions)) {
                     _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "ERROR: Condiciones de seguridad no cumplidas.")
@@ -1720,11 +1851,12 @@ class ObdSession(
                     return@launch
                 }
 
-                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA: ${test.name}", progress = 0.5f)
+                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA: ${test.name}", progress = 0.5f, testId = test.id)
 
                 // Monitor loop
                 val startTime = System.currentTimeMillis()
                 var lastTesterPresentTime = startTime
+                var finalData = emptyMap<String, Float>()
                 while (System.currentTimeMillis() - startTime < test.durationMs) {
                     if (!isActive) break
                     
@@ -1770,6 +1902,7 @@ class ObdSession(
                     val elapsed = System.currentTimeMillis() - startTime
                     val safeDuration = test.durationMs.coerceAtLeast(1L)
                     val progress = 0.5f + (elapsed.toFloat() / safeDuration.toFloat() * 0.4f)
+                    finalData = monitoredData
                     _activeTestStatus.value = _activeTestStatus.value.copy(progress = progress, currentValues = monitoredData)
                     
                     delay(500) // 2Hz feedback
@@ -1779,20 +1912,158 @@ class ObdSession(
                 _statusMessage.value = "Deteniendo prueba: ${test.stopCommand}"
                 sendRawCommand(test.stopCommand)
                 
-                _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Prueba completada con éxito.", progress = 1.0f)
+                _activeTestStatus.value = ActiveTestStatus(
+                    isActive = false, 
+                    message = "Prueba completada con éxito.", 
+                    progress = 1.0f,
+                    testId = test.id,
+                    currentValues = finalData
+                )
                 
             } catch (e: Exception) {
-                _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Excepción en prueba: ${e.message}")
+                _activeTestStatus.value = ActiveTestStatus(
+                    isActive = false, 
+                    message = "Excepción en prueba: ${e.message}",
+                    testId = test.id
+                )
             }
         }
     }
 
+    private suspend fun runOfflineActiveTestSim(test: ActiveTest) {
+        delay(1000) // Simulated startup handshake
+        _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA (SIMULADOR): ${test.name}", progress = 0.3f, testId = test.id)
+        
+        val startTime = System.currentTimeMillis()
+        var finalData = emptyMap<String, Float>()
+        while (System.currentTimeMillis() - startTime < test.durationMs) {
+            currentCoroutineContext().ensureActive()
+            
+            val elapsed = System.currentTimeMillis() - startTime
+            val safeDuration = test.durationMs.coerceAtLeast(1L)
+            val progress = 0.3f + (elapsed.toFloat() / safeDuration.toFloat() * 0.6f)
+            
+            val monitoredData = mutableMapOf<String, Float>()
+            when (test.id) {
+                "FUEL_PUMP" -> {
+                    val noise = (-5..5).random().toFloat()
+                    monitoredData["Presión Comb."] = 320f + noise
+                }
+                "INJECTOR_BALANCE" -> {
+                    val dropIndex = (elapsed / 3000).toInt() % 4
+                    val basePress = 320f - (dropIndex * 40f)
+                    val noise = (-3..3).random().toFloat()
+                    monitoredData["Presión Comb."] = basePress + noise
+                    monitoredData["Trim Comb CT B1"] = -12f + (dropIndex * 3f)
+                }
+                "EVAP_PURGE" -> {
+                    val timeFactor = Math.sin(elapsed.toDouble() / 1000.0).toFloat()
+                    monitoredData["RPM"] = 750f - (30f * timeFactor)
+                    monitoredData["Trim Comb CT B1"] = -5f + (8f * timeFactor)
+                }
+                "EGR_VALVE" -> {
+                    val ratio = elapsed.toFloat() / safeDuration.toFloat()
+                    monitoredData["RPM"] = 750f - (120f * ratio)
+                    monitoredData["Carga Motor"] = 15f + (10f * ratio)
+                    monitoredData["Ciclo EGR"] = 80f * ratio
+                }
+                "SECONDARY_AIR" -> {
+                    monitoredData["O2 B1S1 (V)"] = 0.85f + ((-10..10).random() / 200f)
+                    monitoredData["Trim Comb CT B1"] = -15f
+                }
+                "COOLING_FAN_LOW", "COOLING_FAN_HIGH" -> {
+                    val coolingRate = if (test.id == "COOLING_FAN_HIGH") 0.3f else 0.15f
+                    val seconds = elapsed / 1000f
+                    monitoredData["Temp Motor"] = (98f - seconds * coolingRate).coerceAtLeast(85f)
+                }
+                "IDLE_SPEED_UP" -> {
+                    val ratio = (elapsed.toFloat() / safeDuration.toFloat()).coerceAtMost(1f)
+                    val targetRpm = 750f + (300f * ratio)
+                    monitoredData["RPM"] = targetRpm + (-5..5).random()
+                    monitoredData["Pos. Mariposa"] = 12f + (8f * ratio)
+                }
+                "THROTTLE_BODY" -> {
+                    val halfDuration = safeDuration / 2
+                    val angle = if (elapsed < halfDuration) {
+                        (elapsed.toFloat() / halfDuration.toFloat()) * 25f
+                    } else {
+                        25f - ((elapsed - halfDuration).toFloat() / halfDuration.toFloat()) * 25f
+                    }
+                    monitoredData["Pos. Mariposa"] = angle.coerceIn(0f, 25f)
+                    monitoredData["RPM"] = 0f
+                }
+                "TCC_SOLENOID" -> {
+                    monitoredData["Velocidad"] = 60f
+                    monitoredData["RPM"] = 2200f - (elapsed / 20)
+                }
+                "AC_COMPRESSOR" -> {
+                    monitoredData["Carga Motor"] = 22f + ((-2..2).random())
+                    monitoredData["RPM"] = 720f + ((-10..10).random())
+                }
+                "GLOW_PLUGS" -> {
+                    val ratio = (elapsed.toFloat() / safeDuration.toFloat())
+                    monitoredData["Voltaje ECU"] = 14.1f - (1.3f * ratio)
+                }
+                "TURBO_WASTEGATE" -> {
+                    monitoredData["Presión MAP"] = 101f + (elapsed / 100)
+                }
+                "HORN_TEST" -> {
+                    val isActivePulse = (elapsed / 1000) % 2 == 0L
+                    monitoredData["Consumo Amps"] = if (isActivePulse) 8.5f else 0f
+                    monitoredData["Voltaje Bat"] = if (isActivePulse) 12.2f else 12.5f
+                }
+                "HEADLIGHT_TEST" -> {
+                    monitoredData["Consumo Faros"] = 11.8f
+                    monitoredData["Voltaje Bat"] = 12.3f
+                }
+                "WIPER_TEST" -> {
+                    monitoredData["Consumo Limpia"] = 4.5f + ((-5..5).random() * 0.1f)
+                    monitoredData["Voltaje Bat"] = 12.4f
+                }
+                "RADIATOR_FAN_TEST" -> {
+                    monitoredData["Velocidad Fan RPM"] = 2850f + (-20..20).random()
+                    monitoredData["Temp Refrigerante"] = (96f - (elapsed / 1000f) * 0.5f).coerceAtLeast(88f)
+                }
+                else -> {
+                    test.monitoredPids.forEach { pid ->
+                        val def = PidRegistry.getPid(pid.substring(0, 2), pid.substring(2))
+                        if (def != null) {
+                            monitoredData[def.name] = (def.minValue + def.maxValue) / 2f
+                        }
+                    }
+                }
+            }
+            
+            finalData = monitoredData
+            _activeTestStatus.value = _activeTestStatus.value.copy(progress = progress, currentValues = monitoredData)
+            delay(500)
+        }
+        
+        _activeTestStatus.value = ActiveTestStatus(
+            isActive = false, 
+            message = "Prueba completada con éxito (Simulación).", 
+            progress = 1.0f,
+            testId = test.id,
+            currentValues = finalData
+        )
+    }
+
     fun stopActiveTest() {
+        val currentTestId = _activeTestStatus.value.testId
+        val currentValues = _activeTestStatus.value.currentValues
         activeTestJob?.cancel()
         scope.launch(Dispatchers.IO) {
-            // Try to send stop command just in case
-            _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Prueba detenida manualmente.")
+            _activeTestStatus.value = ActiveTestStatus(
+                isActive = false, 
+                message = "Prueba detenida manualmente.",
+                testId = currentTestId,
+                currentValues = currentValues
+            )
         }
+    }
+
+    fun clearActiveTestStatus() {
+        _activeTestStatus.value = ActiveTestStatus()
     }
 
 
@@ -1841,7 +2112,7 @@ class ObdSession(
                         try {
                             communicationMutex.withLock {
                                 t.write("${command.query}\r".toByteArray())
-                                val response = readResponse(timeoutMs = 5000L)
+                                val response = readResponse(timeoutMs = 2000L)
                                 if (response.isNotBlank() && !response.contains("?")) {
                                     success = true
                                     consecutiveErrors = 0
@@ -1870,11 +2141,11 @@ class ObdSession(
                         
                         command.onError(Exception("Timeout"))
                     } else {
-                        // Success - apply adaptive delay before next command
-                        delay(baseDelayMs)
+                        // Success - apply adaptive delay before next command (halved for speed)
+                        delay(baseDelayMs / 2)
                     }
                 } else {
-                    delay(50)
+                    delay(15)
                 }
             }
         }
@@ -1982,7 +2253,8 @@ class ObdSession(
             results["Hardware ID"] = version.replace("\r", " ").trim()
             
             // 4. Voltage Precision
-            val volt = readBatteryVoltage()
+            val (ecuVolt, elmVolt) = readBatteryVoltage()
+            val volt = if (elmVolt > 0f) elmVolt else ecuVolt
             results["Voltaje Sistema"] = "%.2fV".format(volt)
             
             // 5. Link Stability

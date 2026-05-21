@@ -59,7 +59,8 @@ data class ActiveTestStatus(
     val isActive: Boolean = false,
     val progress: Float = 0f,
     val message: String = "",
-    val currentValues: Map<String, Float> = emptyMap()
+    val currentValues: Map<String, Float> = emptyMap(),
+    val testId: String? = null
 )
 
 /**

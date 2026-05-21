@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -105,6 +106,7 @@ fun GarageScreen(
                             vehicle = vehicle,
                             isActive = vehicle.id == activeVehicle?.id,
                             onSelect = { viewModel.startDiagnosticSession(vehicle) },
+                            onDetails = { navController.navigate("vehicle_detail/${vehicle.id}") },
                             onDelete = { vehicleToDelete = vehicle }
                         )
                     }
@@ -168,6 +170,7 @@ private fun AnimatedVehicleCard(
     vehicle: Vehicle,
     isActive: Boolean,
     onSelect: () -> Unit,
+    onDetails: () -> Unit,
     onDelete: () -> Unit
 ) {
     // Entry animation
@@ -296,6 +299,19 @@ private fun AnimatedVehicleCard(
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onDetails,
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("HISTORIAL DE SERVICIO", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
             }
         }
     }

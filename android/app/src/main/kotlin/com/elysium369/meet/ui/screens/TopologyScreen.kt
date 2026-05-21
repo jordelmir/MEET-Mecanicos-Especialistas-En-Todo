@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +54,11 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
     
     val coroutineScope = rememberCoroutineScope()
     
+    var activeTab by remember { mutableStateOf(0) }
+    var selectedNetworkType by remember { mutableStateOf<NetworkType?>(null) }
+    var aiDiagnosticResult by remember { mutableStateOf<com.elysium369.meet.core.ai.DiagnosticResult?>(null) }
+    var isAnalyzingNetwork by remember { mutableStateOf(false) }
+
     // Animation for the "Scanning" radar effect
     val infiniteTransition = rememberInfiniteTransition(label = "Radar")
     val radarRotation by infiniteTransition.animateFloat(
@@ -80,6 +86,17 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+            // View Selector Tabs
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TabButton(text = "RADAR DE RED", isActive = activeTab == 0, onClick = { activeTab = 0 })
+                TabButton(text = "CONECTOR OBD-II", isActive = activeTab == 1, onClick = { activeTab = 1 })
+            }
+
             // Tactical Visualization Header
             EliteCard(
                 backgroundColor = MeetColors.backgroundDark,
@@ -89,67 +106,77 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                     .height(300.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Background Grid Pattern
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val step = 40.dp.toPx()
-                        for (x in 0..(size.width / step).toInt()) {
-                            drawLine(Color.White.copy(alpha = 0.05f), Offset(x * step, 0f), Offset(x * step, size.height))
+                    if (activeTab == 0) {
+                        // Background Grid Pattern
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val step = 40.dp.toPx()
+                            for (x in 0..(size.width / step).toInt()) {
+                                drawLine(Color.White.copy(alpha = 0.05f), Offset(x * step, 0f), Offset(x * step, size.height))
+                            }
+                            for (y in 0..(size.height / step).toInt()) {
+                                drawLine(Color.White.copy(alpha = 0.05f), Offset(0f, y * step), Offset(size.width, y * step))
+                            }
                         }
-                        for (y in 0..(size.height / step).toInt()) {
-                            drawLine(Color.White.copy(alpha = 0.05f), Offset(0f, y * step), Offset(size.width, y * step))
-                        }
-                    }
 
-                    if (modules.isEmpty() && !isScanning) {
-                        Column(
-                            modifier = Modifier.align(Alignment.Center),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.Default.Radar,
-                                contentDescription = null,
-                                tint = MeetColors.textMuted,
-                                modifier = Modifier.size(64.dp)
+                        if (modules.isEmpty() && !isScanning) {
+                            Column(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.Radar,
+                                    contentDescription = null,
+                                    tint = MeetColors.textMuted,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "RED NO ESCANEADA",
+                                    color = MeetColors.textSecondary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            // Tactical Node Map
+                            TacticalNodeMap(
+                                modules = modules,
+                                isScanning = isScanning,
+                                radarRotation = radarRotation,
+                                onNodeClick = { 
+                                    selectedNetworkType = it
+                                    activeTab = 1 // Switch to pinout to inspect physically
+                                }
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "RED NO ESCANEADA",
-                                color = MeetColors.textSecondary,
-                                fontWeight = FontWeight.Bold
-                            )
+                        }
+
+                        // Scan Overlay Info
+                        if (isScanning) {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.6f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    "ESCANEO ACTIVO: PINGING CAN IDs 0x7E0-0x7EB...",
+                                    color = MeetColors.electricBlue,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(8.dp),
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
                         }
                     } else {
-                        // Tactical Node Map
-                        TacticalNodeMap(
-                            modules = modules,
-                            isScanning = isScanning,
-                            radarRotation = radarRotation
+                        ObdPinoutConnector(
+                            selectedNetworkType = selectedNetworkType
                         )
-                    }
-
-                    // Scan Overlay Info
-                    if (isScanning) {
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.6f),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                "ESCANEO ACTIVO: PINGING CAN IDs 0x7E0-0x7EB...",
-                                color = MeetColors.electricBlue,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(8.dp),
-                                fontWeight = FontWeight.Black
-                            )
-                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Action Bar
             Row(
@@ -158,21 +185,149 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "MÓDULOS DETECTADOS: ${modules.size}",
+                    if (connectionState == ObdState.CONNECTED) "MÓDULOS DETECTADOS: ${modules.size}" else "[DEMO] MÓDULOS: ${modules.size}",
                     color = MeetColors.textSecondary,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
                 
-                EliteButton(
-                    text = if (isScanning) "ESCANEANDO..." else "INICIAR ESCANEO",
-                    onClick = { viewModel.scanNetworkTopology() },
-                    isEnabled = !isScanning && connectionState == ObdState.CONNECTED,
-                    color = if (connectionState == ObdState.CONNECTED) MeetColors.neonGreen else Color.Gray
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (modules.isNotEmpty() && !isScanning) {
+                        EliteButton(
+                            text = if (isAnalyzingNetwork) "ANALIZANDO..." else "🧠 ANALIZAR RED",
+                            onClick = {
+                                isAnalyzingNetwork = true
+                                coroutineScope.launch {
+                                    try {
+                                        val result = viewModel.analyzeNetworkTopology(
+                                            vehicleInfo = viewModel.ecuName.value ?: "Vehículo Genérico OBD-II",
+                                            modules = modules
+                                        )
+                                        aiDiagnosticResult = result
+                                    } catch (e: Exception) {
+                                        aiDiagnosticResult = com.elysium369.meet.core.ai.DiagnosticResult("Error al contactar con la IA de Elysium: ${e.message}")
+                                    } finally {
+                                        isAnalyzingNetwork = false
+                                    }
+                                }
+                            },
+                            isEnabled = !isAnalyzingNetwork,
+                            color = MeetColors.electricBlue
+                        )
+                    }
+
+                    if (isScanning) {
+                        EliteButton(
+                            text = "🛑 DETENER",
+                            onClick = { viewModel.cancelNetworkTopologyScan() },
+                            color = MeetColors.error
+                        )
+                    } else {
+                        val scanButtonText = if (connectionState == ObdState.CONNECTED) "INICIAR ESCANEO" else "SIMULAR ESCANEO"
+                        val scanButtonColor = if (connectionState == ObdState.CONNECTED) MeetColors.neonGreen else MeetColors.warning
+                        
+                        EliteButton(
+                            text = scanButtonText,
+                            onClick = { viewModel.scanNetworkTopology() },
+                            color = scanButtonColor
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // AI Diagnostic Report Display
+            AnimatedVisibility(
+                visible = aiDiagnosticResult != null,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                aiDiagnosticResult?.let { result ->
+                    EliteCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        glowColor = MeetColors.electricBlue,
+                        backgroundColor = MeetColors.backgroundDark
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "ANÁLISIS DE RED ELYSIUM AI",
+                                    color = MeetColors.electricBlue,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 12.sp
+                                )
+                                IconButton(
+                                    onClick = { aiDiagnosticResult = null },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = MeetColors.textMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Format paragraphs beautifully
+                            val paragraphs = result.analysisText.split("\n\n")
+                            paragraphs.forEach { paragraph ->
+                                val lines = paragraph.trim().split("\n")
+                                if (lines.isNotEmpty()) {
+                                    val firstLine = lines.first().trim()
+                                    val isHeader = firstLine.startsWith("#") || (firstLine.startsWith("*") && firstLine.endsWith(":")) || (firstLine.contains(":") && firstLine.length < 40)
+                                    
+                                    if (isHeader) {
+                                        val headerText = firstLine.replace(Regex("[#*:]"), "").trim()
+                                        Text(
+                                            text = headerText.uppercase(),
+                                            color = MeetColors.neonGreen,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Black,
+                                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                            letterSpacing = 1.sp
+                                        )
+                                        
+                                        if (lines.size > 1) {
+                                            val rest = lines.drop(1).joinToString("\n")
+                                            Text(
+                                                text = rest.replace("- ", "• ").replace("* ", "• "),
+                                                color = Color.White.copy(alpha = 0.85f),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(bottom = 6.dp),
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    } else {
+                                        Text(
+                                            text = paragraph.replace("- ", "• ").replace("* ", "• "),
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(bottom = 6.dp),
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Module List
             val listState = rememberLazyListState()
@@ -182,7 +337,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                     modifier = Modifier.fillMaxSize().eliteScrollbar(listState)
                 ) {
                     items(modules) { module ->
-                        ModuleItem(module)
+                        ModuleItem(module = module, onSelect = { selectedNetworkType = it })
                     }
                 }
             }
@@ -194,7 +349,8 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
 fun TacticalNodeMap(
     modules: List<NetworkModule>,
     isScanning: Boolean,
-    radarRotation: Float
+    radarRotation: Float,
+    onNodeClick: (NetworkType) -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val centerX = maxWidth / 2
@@ -288,6 +444,7 @@ fun TacticalNodeMap(
                     .offset(x = labelX - 15.dp, y = labelY + 10.dp)
                     .border(0.5.dp, if (!module.isAlive) MeetColors.error else Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
                     .interferenceGlitch(enabled = !module.isAlive)
+                    .clickable { onNodeClick(module.networkType) }
             ) {
                 Text(
                     module.id,
@@ -323,7 +480,7 @@ fun TacticalNodeMap(
 }
 
 @Composable
-fun ModuleItem(module: NetworkModule) {
+fun ModuleItem(module: NetworkModule, onSelect: (NetworkType) -> Unit) {
     var isExpanded by remember { mutableStateOf(false) }
     val statusColor = if (!module.isAlive) MeetColors.error 
                       else if (module.dtcs.isNotEmpty()) MeetColors.warning 
@@ -344,7 +501,10 @@ fun ModuleItem(module: NetworkModule) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { if (module.dtcs.isNotEmpty()) isExpanded = !isExpanded },
+            .clickable { 
+                onSelect(module.networkType)
+                if (module.dtcs.isNotEmpty()) isExpanded = !isExpanded 
+            },
         glowColor = statusColor.copy(alpha = if (module.isAlive) pulseAlpha else 1f),
         backgroundColor = MeetColors.backgroundDark
     ) {
@@ -428,5 +588,188 @@ fun ModuleItem(module: NetworkModule) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun TabButton(text: String, isActive: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isActive) MeetColors.electricBlue.copy(alpha = 0.2f) else Color.Transparent)
+            .border(1.dp, if (isActive) MeetColors.electricBlue else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (isActive) Color.White else MeetColors.textSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+    }
+}
+
+@Composable
+fun ObdPinoutConnector(
+    selectedNetworkType: NetworkType?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "DISTRIBUCIÓN DE PINES FISICOS OBD-II",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                
+                // Outer trapezoid dimensions
+                val topW = w * 0.85f
+                val botW = w * 0.70f
+                val trapHeight = h * 0.75f
+                val startXTop = (w - topW) / 2
+                val startXBot = (w - botW) / 2
+                val startY = (h - trapHeight) / 2
+                
+                // Draw OBD trapezoid shell path
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(startXTop, startY)
+                    lineTo(startXTop + topW, startY)
+                    lineTo(startXBot + botW, startY + trapHeight)
+                    lineTo(startXBot, startY + trapHeight)
+                    close()
+                }
+                
+                // Fill & Stroke of trapezoid shell
+                drawPath(
+                    path = path,
+                    color = Color(0xFF1E222A),
+                    style = androidx.compose.ui.graphics.drawscope.Fill
+                )
+                drawPath(
+                    path = path,
+                    color = Color.White.copy(alpha = 0.2f),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+                
+                // Highlighted pins mapping
+                // Pin positions relative to trapezoid:
+                // Row 0 (pins 1 to 8)
+                // Row 1 (pins 9 to 16)
+                val pinRadius = 6.dp.toPx()
+                
+                for (row in 0..1) {
+                    val y = startY + (if (row == 0) trapHeight * 0.3f else trapHeight * 0.7f)
+                    val rowW = if (row == 0) topW else botW
+                    val rowStartX = if (row == 0) startXTop else startXBot
+                    
+                    for (col in 0..7) {
+                        val pinNum = if (row == 0) col + 1 else col + 9
+                        val x = rowStartX + rowW * (col + 0.5f) / 8f
+                        
+                        // Determine glow color for pins
+                        val glowColor = getPinGlowColor(pinNum, selectedNetworkType)
+                        
+                        // Draw socket background
+                        drawCircle(
+                            color = if (glowColor != null) glowColor.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.6f),
+                            radius = pinRadius + 4f,
+                            center = Offset(x, y)
+                        )
+                        
+                        // Draw socket contact
+                        drawCircle(
+                            color = glowColor ?: Color.Gray.copy(alpha = 0.5f),
+                            radius = if (glowColor != null) pinRadius * 0.7f else pinRadius * 0.4f,
+                            center = Offset(x, y),
+                            style = if (glowColor != null) androidx.compose.ui.graphics.drawscope.Fill else Stroke(width = 1.dp.toPx())
+                        )
+                        
+                        // Draw pin outer ring when glowing
+                        if (glowColor != null) {
+                            drawCircle(
+                                color = glowColor,
+                                radius = pinRadius + 4f,
+                                center = Offset(x, y),
+                                style = Stroke(width = 1.5.dp.toPx())
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Interactive Pin Description Legend
+        val activeDesc = when (selectedNetworkType) {
+            NetworkType.CAN_HIGH, NetworkType.CAN_LOW -> {
+                "Red CAN Bus activa: Pines 6 (CAN H) y 14 (CAN L) bajo análisis. Masa en pines 4/5."
+            }
+            NetworkType.LIN -> {
+                "Bus LIN activo: Pin 7 utilizado para transmisión LIN / Confort. Alimentación 12V en pin 16."
+            }
+            NetworkType.K_LINE -> {
+                "Línea K activa: Pin 7 (ISO 9141-2 / K-Line) para diagnóstico directo."
+            }
+            else -> {
+                "Toque un módulo o bus para ver la asignación de pines físicos en el puerto OBD-II."
+            }
+        }
+        
+        Text(
+            text = activeDesc,
+            color = if (selectedNetworkType != null) MeetColors.electricBlue else MeetColors.textMuted,
+            fontSize = 10.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+fun getPinGlowColor(pinNum: Int, selectedNetworkType: NetworkType?): Color? {
+    // Standard power / ground pins (always slightly lit for reference if a network is selected)
+    if (selectedNetworkType != null && (pinNum == 4 || pinNum == 5)) {
+        return Color.White.copy(alpha = 0.6f) // Masa
+    }
+    if (selectedNetworkType != null && pinNum == 16) {
+        return MeetColors.error.copy(alpha = 0.6f) // +12V
+    }
+    
+    return when (selectedNetworkType) {
+        NetworkType.CAN_HIGH -> {
+            if (pinNum == 6) MeetColors.electricBlue
+            else if (pinNum == 14) MeetColors.neonGreen.copy(alpha = 0.5f) // highlight CAN L slightly
+            else null
+        }
+        NetworkType.CAN_LOW -> {
+            if (pinNum == 14) MeetColors.neonGreen
+            else if (pinNum == 6) MeetColors.electricBlue.copy(alpha = 0.5f) // highlight CAN H slightly
+            else null
+        }
+        NetworkType.LIN, NetworkType.K_LINE -> {
+            if (pinNum == 7) MeetColors.warning
+            else null
+        }
+        else -> null
     }
 }

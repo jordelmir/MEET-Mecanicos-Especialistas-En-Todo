@@ -74,7 +74,7 @@ class LiveLinkServer {
                 // Health check endpoint
                 get("/") {
                     call.respondText(
-                        """{"status":"online","app":"MEET LiveLink","version":"1.0"}""",
+                        """{"status":"online","app":"Elysium LiveLink","version":"1.0"}""",
                         ContentType.Application.Json
                     )
                 }

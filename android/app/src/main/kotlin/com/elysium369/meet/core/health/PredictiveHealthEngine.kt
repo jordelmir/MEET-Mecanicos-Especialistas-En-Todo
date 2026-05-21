@@ -126,6 +126,9 @@ class PredictiveHealthEngine @Inject constructor(
         val electricalScore = computeSubsystemScore(ELECTRICAL_PIDS, trends, currentLiveData)
         val emissionsScore = computeSubsystemScore(EMISSIONS_PIDS, trends, currentLiveData)
 
+        // Electrical Diagnosis: Alternator vs Battery based on RPM and Voltage
+        val electricalDiagnosis = computeElectricalDiagnosis(currentLiveData, trends)
+
         // Weighted overall score
         var overall = (
             engineScore * W_ENGINE +
@@ -148,6 +151,7 @@ class PredictiveHealthEngine @Inject constructor(
             coolingScore = coolingScore.toInt(),
             electricalScore = electricalScore.toInt(),
             emissionsScore = emissionsScore.toInt(),
+            electricalDiagnosis = electricalDiagnosis,
             trends = trends,
             alerts = alerts,
             dataPointCount = sensorHistoryDao.getRecordCount(vehicleId),
@@ -313,6 +317,57 @@ class PredictiveHealthEngine @Inject constructor(
         return score.coerceIn(0f, 100f)
     }
 
+    private fun computeElectricalDiagnosis(
+        currentData: Map<String, Float>,
+        trends: List<SensorTrend>
+    ): ElectricalDiagnosis? {
+        val rpm = currentData["010C"] ?: trends.find { it.pid == "010C" }?.currentValue
+        val voltage = currentData["0142"] ?: trends.find { it.pid == "0142" }?.currentValue
+
+        if (rpm == null || voltage == null) return null
+
+        var alternatorState = "Desconocido"
+        var batteryState = "Desconocido"
+        var recommendation = "Sin recomendaciones específicas."
+
+        if (rpm > 400) {
+            // Motor encendido -> Evaluamos Alternador
+            alternatorState = when {
+                voltage < 13.0f -> "Deficiente (Posible fallo de carga)"
+                voltage in 13.0f..14.8f -> "Óptimo"
+                else -> "Sobrecarga (Regulador defectuoso)"
+            }
+            batteryState = "Cargando"
+            
+            recommendation = when {
+                voltage < 13.0f -> "Revise las conexiones del alternador y la banda. El sistema no está generando suficiente carga."
+                voltage > 14.8f -> "Peligro de sobrecarga. El regulador de voltaje del alternador podría estar dañado. Revise inmediatamente para evitar daños a módulos electrónicos."
+                else -> "El sistema de carga funciona correctamente."
+            }
+        } else {
+            // Motor apagado -> Evaluamos Batería
+            batteryState = when {
+                voltage < 11.5f -> "Crítica (Reemplazo sugerido)"
+                voltage in 11.5f..12.3f -> "Descargada (Requiere carga)"
+                voltage in 12.4f..12.9f -> "Óptima"
+                else -> "Voltaje Inusual"
+            }
+            alternatorState = "Inactivo (Motor apagado)"
+            
+            recommendation = when {
+                voltage < 11.5f -> "La batería no retiene carga suficiente. Considere reemplazarla."
+                voltage in 11.5f..12.3f -> "Batería con nivel bajo. Se recomienda encender el vehículo o usar un cargador externo."
+                else -> "La batería se encuentra en buenas condiciones."
+            }
+        }
+
+        return ElectricalDiagnosis(
+            alternatorState = alternatorState,
+            batteryState = batteryState,
+            recommendation = recommendation
+        )
+    }
+
     private fun linearRegression(x: List<Double>, y: List<Double>): Pair<Double, Double> {
         val n = x.size
         if (n < 2) return Pair(0.0, y.firstOrNull() ?: 0.0)
@@ -410,10 +465,17 @@ data class PredictiveHealthReport(
     val coolingScore: Int,
     val electricalScore: Int,
     val emissionsScore: Int,
+    val electricalDiagnosis: ElectricalDiagnosis? = null,
     val trends: List<SensorTrend>,
     val alerts: List<PredictiveAlert>,
     val dataPointCount: Int,
     val recordedPidCount: Int
+)
+
+data class ElectricalDiagnosis(
+    val alternatorState: String,
+    val batteryState: String,
+    val recommendation: String
 )
 
 data class SensorTrend(

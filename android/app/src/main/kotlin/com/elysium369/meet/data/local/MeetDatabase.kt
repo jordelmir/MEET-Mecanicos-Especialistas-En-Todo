@@ -20,9 +20,17 @@ import com.elysium369.meet.data.local.entities.*
         DashboardEntity::class,
         DashboardWidgetEntity::class,
         SensorHistoryEntity::class,
-        HealthSnapshotEntity::class
+        HealthSnapshotEntity::class,
+        MaintenanceLogEntity::class,
+        RepairHistoryEntity::class,
+        BusinessProfileEntity::class,
+        FleetEntity::class,
+        FleetMemberEntity::class,
+        ChatMessageEntity::class,
+        ChatBlocklistEntity::class,
+        DvirReportEntity::class
     ],
-    version = 9,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -39,4 +47,9 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun dashboardDao(): DashboardDao
     abstract fun sensorHistoryDao(): SensorHistoryDao
     abstract fun healthSnapshotDao(): HealthSnapshotDao
+    abstract fun maintenanceLogDao(): MaintenanceLogDao
+    abstract fun repairHistoryDao(): RepairHistoryDao
+    abstract fun fleetDao(): FleetDao
+    abstract fun chatDao(): ChatDao
+    abstract fun dvirReportDao(): DvirReportDao
 }

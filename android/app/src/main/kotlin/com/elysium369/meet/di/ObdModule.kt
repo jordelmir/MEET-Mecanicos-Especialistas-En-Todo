@@ -60,4 +60,52 @@ object ObdModule {
     fun provideAdvancedDiagnosticManager(obdSession: ObdSession): com.elysium369.meet.core.obd.AdvancedDiagnosticManager {
         return com.elysium369.meet.core.obd.AdvancedDiagnosticManager(obdSession)
     }
+
+    @Provides
+    @Singleton
+    fun providePerformanceCalculator(): com.elysium369.meet.core.obd.PerformanceCalculator {
+        return com.elysium369.meet.core.obd.PerformanceCalculator()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDataLogger(): com.elysium369.meet.core.obd.DataLogger {
+        return com.elysium369.meet.core.obd.DataLogger()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAlertThresholdEngine(): com.elysium369.meet.core.obd.AlertThresholdEngine {
+        return com.elysium369.meet.core.obd.AlertThresholdEngine()
+    }
+
+    @Provides
+    @Singleton
+    fun providePrePurchaseInspection(): com.elysium369.meet.core.obd.PrePurchaseInspection {
+        return com.elysium369.meet.core.obd.PrePurchaseInspection()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFuelEconomyTracker(): com.elysium369.meet.core.obd.FuelEconomyTracker {
+        return com.elysium369.meet.core.obd.FuelEconomyTracker()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBatteryHealthAnalyzer(): com.elysium369.meet.core.obd.BatteryHealthAnalyzer {
+        return com.elysium369.meet.core.obd.BatteryHealthAnalyzer()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTurboBoostGauge(): com.elysium369.meet.core.obd.TurboBoostGauge {
+        return com.elysium369.meet.core.obd.TurboBoostGauge()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDemoModeSimulator(): com.elysium369.meet.core.obd.DemoModeSimulator {
+        return com.elysium369.meet.core.obd.DemoModeSimulator()
+    }
 }

@@ -20,7 +20,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.FleetChatViewModel
 import com.elysium369.meet.ui.screens.*
+import com.elysium369.meet.ui.screens.chat.*
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
@@ -123,10 +125,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
     val startDestination = if (onboardingDone) "home" else "onboarding"
     
     val trips by obdViewModel.trips.collectAsState()
-    val alerts by obdViewModel.maintenanceAlerts.collectAsState()
     val customPids by obdViewModel.customPids.collectAsState()
     val isPremium by obdViewModel.isPremium.collectAsState()
-    val selectedVehicle by obdViewModel.selectedVehicle.collectAsState()
 
     Scaffold(
         containerColor = Color(0xFF060612),
@@ -200,6 +200,22 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("vehicle_detail/{vehicleId}") { backStack ->
+                val vehicleId = backStack.arguments?.getString("vehicleId") ?: return@composable
+                val vehicles by obdViewModel.vehicles.collectAsState()
+                val vehicle = vehicles.find { it.id == vehicleId }
+                
+                if (vehicle != null) {
+                    VehicleDetailScreen(
+                        vehicleId = vehicle.id,
+                        vin = vehicle.vin,
+                        make = vehicle.make,
+                        model = vehicle.model,
+                        year = vehicle.year,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
             composable("vehicle_form") {
                 VehicleFormScreen(
                     navController = navController,
@@ -210,7 +226,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 TripScreen(
                     trips = trips,
                     isPremium = isPremium,
-                    onExportPdf = { obdViewModel.exportTripToPdf(it) }
+                    onExportPdf = { obdViewModel.exportTripToPdf(it) },
+                    onGenerateMockTrip = { obdViewModel.generateMockTrip() }
                 )
             }
             composable("ai/{dtcCode}") { backStack ->
@@ -269,6 +286,30 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("backup_settings") {
+                BackupSettingsScreen(navController = navController)
+            }
+            composable("fleet_chat_list/{businessId}") { backStack ->
+                val businessId = backStack.arguments?.getString("businessId") ?: ""
+                val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                FleetChatListScreen(
+                    navController = navController,
+                    viewModel = chatViewModel,
+                    businessId = businessId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("fleet_chat_detail") { backStack ->
+                val parentEntry = remember(backStack) {
+                    navController.getBackStackEntry("fleet_chat_list/{businessId}")
+                }
+                val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel(parentEntry)
+                FleetChatDetailScreen(
+                    viewModel = chatViewModel,
+                    onBack = { navController.popBackStack() },
+                    navController = navController
+                )
+            }
             composable("premium") {
                 PremiumScreen(
                     onClose = { navController.popBackStack() }
@@ -304,11 +345,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable("maintenance") {
-                val currentOdo by obdViewModel.currentOdometer.collectAsState()
                 MaintenanceScreen(
-                    alerts = alerts,
-                    currentOdometer = currentOdo.toLong(),
-                    onMarkAsDone = { obdViewModel.markMaintenanceDone(it) },
+                    viewModel = obdViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -316,7 +354,26 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 CustomPidEditorScreen(
                     customPids = customPids,
                     onAddCustomPid = { obdViewModel.addCustomPid(it) },
+                    onSyncPids = { obdViewModel.syncCustomPidsFromCloud() },
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable("pre_purchase") {
+                PrePurchaseScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("hud") {
+                HudScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("dvir") {
+                DvirScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
                 )
             }
         }

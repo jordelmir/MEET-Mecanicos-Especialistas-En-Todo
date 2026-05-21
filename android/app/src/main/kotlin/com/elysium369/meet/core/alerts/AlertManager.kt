@@ -92,6 +92,19 @@ class AlertManager @Inject constructor(@ApplicationContext private val context: 
                         alertCooldown["RPM_ENGINE"] = now
                     }
                 }
+
+                // Battery Voltage Alert Check
+                val volt = data["AT RV"] ?: data["0142"]
+                volt?.let { v ->
+                    val rpm = data["010C"] ?: 0f
+                    val isEngineRunning = rpm > 400f
+                    val minVolt = if (isEngineRunning) minVoltEncendidoThreshold else minVoltApagadoThreshold
+                    val lastVoltAlert = alertCooldown["VOLT_ALERT"] ?: 0L
+                    if (v < minVolt && (now - lastVoltAlert > 60000)) {
+                        triggerAlert("Voltaje Bajo", "Batería: ${"%.1f".format(v)}V", AlertSeverity.WARNING)
+                        alertCooldown["VOLT_ALERT"] = now
+                    }
+                }
             }
         }
     }

@@ -1,14 +1,18 @@
 package com.elysium369.meet.ui.screens
 
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -17,7 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,9 +37,11 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlin.math.PI
+import kotlin.math.sin
 
 // ═══════════════════════════════════════════════════════════════
-// LIVE LINK SCREEN — Optional Real-Time Telemetry Sharing
+// LIVE LINK SCREEN — Optional Real-Time Telemetry Sharing (Elysium V2)
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
@@ -38,62 +49,157 @@ fun LiveLinkScreen(
     navController: NavController,
     liveLinkServer: LiveLinkServer
 ) {
+    val context = LocalContext.current
     val isRunning by liveLinkServer.isRunning.collectAsState()
     val connectedClients by liveLinkServer.connectedClients.collectAsState()
     val serverUrl by liveLinkServer.serverUrl.collectAsState()
 
-    // Pulse animation when broadcasting
-    val pulseAnim = rememberInfiniteTransition(label = "broadcast")
-    val pulseAlpha by pulseAnim.animateFloat(
-        initialValue = 0.3f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = EaseInOut), RepeatMode.Reverse),
-        label = "pa"
+    // Phase shift animation for telemetry oscilloscope wave
+    val infiniteTransition = rememberInfiniteTransition(label = "telemetryWave")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
     )
+
+    // Pulse alpha animation for status indicator
+    val statusPulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "statusPulse"
+    )
+
+    // Scroll state for the screen
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDeep)
-            .padding(bottom = 24.dp)
+            .verticalScroll(scrollState)
+            .padding(bottom = 32.dp)
     ) {
         // ── Top Bar ──
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MeetColors.cardBackground)
+                    .border(1.dp, MeetColors.borderSubtle, CircleShape)
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Live Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Text("Compartir telemetría en tiempo real", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Live Link",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        fontFamily = FontFamily.SansSerif
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    // Live Glow Badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (isRunning) MeetColors.neonGreen.copy(alpha = 0.15f)
+                                else MeetColors.textMuted.copy(alpha = 0.2f)
+                            )
+                            .border(
+                                1.dp,
+                                if (isRunning) MeetColors.neonGreen.copy(alpha = 0.5f)
+                                else MeetColors.textMuted,
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "LIVE",
+                            color = if (isRunning) MeetColors.neonGreen else MeetColors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                Text(
+                    "Compartir telemetría en tiempo real",
+                    color = MeetColors.textSecondary,
+                    fontSize = 12.sp
+                )
             }
-            Icon(Icons.Default.Share, "Share", tint = MeetColors.electricBlue, modifier = Modifier.size(24.dp))
+            IconButton(
+                onClick = {
+                    if (isRunning && serverUrl != null) {
+                        val shareIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Conéctate al Live Link de mi escáner MEET en: $serverUrl")
+                            type = "text/plain"
+                        }
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Compartir Live Link"))
+                    } else {
+                        Toast.makeText(context, "Inicia la transmisión primero", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MeetColors.cardBackground)
+                    .border(1.dp, MeetColors.borderSubtle, CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    "Share",
+                    tint = if (isRunning) MeetColors.cyberCyan else MeetColors.textSecondary
+                )
+            }
         }
 
-        // ── Privacy Notice ──
+        // ── Info Alert ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MeetColors.electricBlue.copy(alpha = 0.08f))
-                .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                .padding(12.dp),
+                .clip(RoundedCornerShape(12.dp))
+                .background(MeetColors.cardBackground)
+                .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                .padding(14.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Icon(Icons.Default.Warning, "Info", tint = MeetColors.electricBlue, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Default.Info,
+                "Info",
+                tint = MeetColors.electricBlue,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(10.dp))
             Text(
-                "Esta función es completamente OPCIONAL. Solo se comparte datos cuando usted lo activa. " +
-                "La transmisión se realiza por su red WiFi local y puede detenerla en cualquier momento.",
-                color = MeetColors.electricBlue, fontSize = 11.sp, lineHeight = 16.sp
+                "Función opcional. La transmisión se realiza únicamente a través de su red WiFi local y puede ser apagada inmediatamente.",
+                color = MeetColors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 18.sp
             )
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Status Card ──
+        // ── Dynamic Oscilloscope Wave & Telemetry Control ──
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -102,96 +208,188 @@ fun LiveLinkScreen(
                 .background(MeetColors.cardBackground)
                 .border(
                     1.dp,
-                    if (isRunning) MeetColors.neonGreen.copy(alpha = 0.4f) else MeetColors.borderSubtle,
+                    if (isRunning) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.borderSubtle,
                     RoundedCornerShape(16.dp)
                 )
                 .then(
-                    if (isRunning) Modifier.neonGlow(MeetColors.neonGreen, RoundedCornerShape(16.dp), 2f, 10f)
+                    if (isRunning) Modifier.neonGlow(MeetColors.neonGreen, RoundedCornerShape(16.dp), 2f, 12f)
                     else Modifier
                 )
-                .padding(24.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                // Status indicator
-                Box(contentAlignment = Alignment.Center) {
-                    // Outer pulse
-                    if (isRunning) {
-                        Canvas(modifier = Modifier.size(80.dp)) {
-                            drawCircle(
-                                color = MeetColors.neonGreen.copy(alpha = pulseAlpha * 0.2f),
-                                radius = size.minDimension / 2
-                            )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Real-time Oscilloscope Grid & Line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                ) {
+                    // Grid pattern background
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val gridSpacing = 20.dp.toPx()
+                        val gridColor = MeetColors.borderSubtle.copy(alpha = 0.4f)
+                        
+                        // Vertical lines
+                        var x = 0f
+                        while (x < size.width) {
+                            drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 0.8f)
+                            x += gridSpacing
+                        }
+                        // Horizontal lines
+                        var y = 0f
+                        while (y < size.height) {
+                            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 0.8f)
+                            y += gridSpacing
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(
-                                if (isRunning) MeetColors.neonGreen.copy(alpha = 0.2f)
-                                else MeetColors.textMuted.copy(alpha = 0.15f),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .background(
-                                    if (isRunning) MeetColors.neonGreen else MeetColors.textMuted,
-                                    CircleShape
+
+                    // Oscilloscope telemetry sine wave
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val points = 120
+                        val path = Path()
+                        val amplitude = if (isRunning) 28f else 4f
+                        val frequency = if (isRunning) 4.5f else 1.2f
+                        
+                        for (i in 0..points) {
+                            val x = i * size.width / points
+                            val fraction = i.toFloat() / points
+                            val angle = fraction * 2f * PI.toFloat() * frequency + phase
+                            // Apply fading at boundaries
+                            val fadeFactor = sin(fraction * PI.toFloat()).toFloat()
+                            val y = size.height / 2f + sin(angle) * amplitude * fadeFactor
+                            
+                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        
+                        drawPath(
+                            path = path,
+                            brush = if (isRunning) {
+                                Brush.horizontalGradient(
+                                    colors = listOf(MeetColors.neonGreen, MeetColors.cyberCyan, MeetColors.electricBlue)
                                 )
+                            } else {
+                                Brush.horizontalGradient(
+                                    colors = listOf(MeetColors.textMuted, MeetColors.textSecondary)
+                                )
+                            },
+                            style = Stroke(width = 2.5.dp.toPx())
                         )
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    if (isRunning) "TRANSMITIENDO" else "INACTIVO",
-                    color = if (isRunning) MeetColors.neonGreen else MeetColors.textMuted,
-                    fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 2.sp
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                if (isRunning && serverUrl != null) {
-                    Text("Dirección del servidor:", color = MeetColors.textSecondary, fontSize = 12.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        serverUrl ?: "",
-                        color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MeetColors.electricBlue.copy(alpha = 0.1f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Connected clients
+                // Status Badge & Client Counter
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Glowing status label
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            modifier = Modifier.size(8.dp)
-                                .background(if (connectedClients > 0) MeetColors.neonGreen else MeetColors.warning, CircleShape)
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (isRunning) MeetColors.neonGreen.copy(alpha = statusPulseAlpha)
+                                    else MeetColors.textMuted,
+                                    CircleShape
+                                )
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            "$connectedClients ${if (connectedClients == 1) "navegador conectado" else "navegadores conectados"}",
-                            color = MeetColors.textSecondary, fontSize = 13.sp
+                            if (isRunning) "TRANSMITIENDO EN VIVO" else "MODO ESPERA (STANDBY)",
+                            color = if (isRunning) MeetColors.neonGreen else MeetColors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
-                } else {
-                    Text(
-                        "Active la transmisión para compartir datos de diagnóstico con su navegador web",
-                        color = MeetColors.textMuted, fontSize = 13.sp, textAlign = TextAlign.Center
-                    )
+
+                    if (isRunning) {
+                        // Connected clients badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MeetColors.electricBlue.copy(alpha = 0.15f))
+                                .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                "CLI: ${String.format("%02d", connectedClients)}",
+                                color = MeetColors.electricBlue,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // ── Main Toggle Button ──
+                // Server Address Panel (Copyable)
+                AnimatedVisibility(
+                    visible = isRunning && serverUrl != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            "DIRECCIÓN DE ENLACE:",
+                            color = MeetColors.textSecondary,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MeetColors.backgroundDeep)
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    serverUrl?.let { url ->
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("MEET Live Link", url)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Enlace copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                serverUrl ?: "",
+                                color = MeetColors.cyberCyan,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                "Copy",
+                                tint = MeetColors.cyberCyan,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Main Action Button
                 EliteButton(
-                    text = if (isRunning) "⏹ Detener Transmisión" else "▶ Iniciar Transmisión",
+                    text = if (isRunning) "Detener Transmisión" else "Iniciar Transmisión",
                     onClick = {
                         if (isRunning) liveLinkServer.stop()
                         else liveLinkServer.start()
@@ -202,85 +400,159 @@ fun LiveLinkScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // ── Instructions ──
+        // ── Step-by-Step Interactive Guide ──
+        Text(
+            "GUÍA DE CONEXIÓN",
+            color = MeetColors.textSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        )
+        
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(MeetColors.cardBackground)
-                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(12.dp))
+                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(14.dp))
                 .padding(16.dp)
         ) {
-            Text("Cómo usar Live Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(Modifier.height(10.dp))
-
-            val steps = listOf(
-                "1" to "Conecte su teléfono y computadora a la misma red WiFi",
-                "2" to "Presione \"Iniciar Transmisión\" arriba",
-                "3" to "En su navegador web, abra el panel MEET y vaya a \"Live Link\"",
-                "4" to "Ingrese la dirección IP mostrada arriba",
-                "5" to "Los datos de diagnóstico aparecerán en tiempo real"
+            val instructions = listOf(
+                "Conecte el móvil y su ordenador a la misma red Wi-Fi." to "Punto de Acceso Local",
+                "Pulse el botón \"Iniciar Transmisión\" superior." to "Lanzamiento del Servidor",
+                "Abra el panel MEET web en su ordenador." to "Navegador Compatible",
+                "Acceda a la sección \"Live Link\" en la web." to "Panel Remoto",
+                "Escriba la IP copiada en el buscador web." to "Sincronización Completa"
             )
 
-            steps.forEach { (num, text) ->
+            instructions.forEachIndexed { index, (desc, title) ->
                 Row(
-                    modifier = Modifier.padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
-                            .background(MeetColors.electricBlue.copy(alpha = 0.2f), CircleShape),
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isRunning && index < 2) MeetColors.neonGreenSubtle
+                                else MeetColors.backgroundDeep
+                            )
+                            .border(
+                                1.dp,
+                                if (isRunning && index < 2) MeetColors.neonGreen
+                                else MeetColors.borderSubtle,
+                                CircleShape
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(num, color = MeetColors.electricBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${index + 1}",
+                            color = if (isRunning && index < 2) MeetColors.neonGreen else MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Text(text, color = MeetColors.textSecondary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            title,
+                            color = if (isRunning && index < 2) MeetColors.textPrimary else MeetColors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            desc,
+                            color = if (isRunning && index < 2) MeetColors.textSecondary else MeetColors.textMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+                if (index < instructions.size - 1) {
+                    HorizontalDivider(
+                        color = MeetColors.borderSubtle.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(start = 36.dp, top = 2.dp, bottom = 2.dp)
+                    )
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // ── Data Being Shared ──
+        // ── Broadcasted Telemetry Channels ──
+        Text(
+            "CANALES DE DATOS COMPARTIDOS",
+            color = MeetColors.textSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(MeetColors.cardBackground)
-                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(12.dp))
+                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(14.dp))
                 .padding(16.dp)
         ) {
-            Text("Datos compartidos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(Modifier.height(8.dp))
-
-            val dataPoints = listOf(
-                "RPM del motor", "Velocidad", "Temperatura refrigerante",
-                "Posición acelerador", "Carga del motor", "Voltaje batería",
-                "Trim de combustible", "Health Score", "Códigos DTC activos"
+            val telemetryPoints = listOf(
+                "RPM Motor" to "Frecuencia rotacional en tiempo real",
+                "Velocidad" to "Lectura del velocímetro del ECU",
+                "Temp Refrigerante" to "Temperatura interna de operación",
+                "Acelerador %" to "Posición del pedal de aceleración",
+                "Carga Motor" to "Demanda del tren de potencia",
+                "Voltaje Batería" to "Potencial eléctrico del sistema ELM",
+                "Fuel Trims" to "Correcciones de inyección a corto/largo plazo",
+                "Códigos DTC" to "Monitoreo continuo de fallas activas"
             )
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.weight(1f)) {
-                    dataPoints.take(5).forEach { point ->
-                        Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(4.dp).background(MeetColors.neonGreen, CircleShape))
-                            Spacer(Modifier.width(6.dp))
-                            Text(point, color = MeetColors.textSecondary, fontSize = 12.sp)
+            telemetryPoints.chunked(2).forEach { rowPoints ->
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    rowPoints.forEachIndexed { colIndex, (point, desc) ->
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MeetColors.backgroundDeep)
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(
+                                        if (isRunning) MeetColors.neonGreen else MeetColors.textMuted,
+                                        CircleShape
+                                    )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    point,
+                                    color = if (isRunning) MeetColors.textPrimary else MeetColors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    desc,
+                                    color = MeetColors.textMuted,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp
+                                )
+                            }
                         }
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    dataPoints.drop(5).forEach { point ->
-                        Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(4.dp).background(MeetColors.neonGreen, CircleShape))
-                            Spacer(Modifier.width(6.dp))
-                            Text(point, color = MeetColors.textSecondary, fontSize = 12.sp)
+                        if (rowPoints.size == 2 && colIndex == 0) {
+                            Spacer(Modifier.width(8.dp))
                         }
                     }
                 }

@@ -27,7 +27,7 @@ fun PremiumScreen(onClose: () -> Unit) {
             Spacer(modifier = Modifier.height(48.dp))
             
             Text(
-                text = "MEET Pro",
+                text = "Elysium Pro",
                 color = MeetColors.warning,
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black

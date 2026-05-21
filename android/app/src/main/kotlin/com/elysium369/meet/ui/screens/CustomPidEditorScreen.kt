@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import com.elysium369.meet.data.local.entities.CustomPidEntity
 fun CustomPidEditorScreen(
     customPids: List<CustomPidEntity>,
     onAddCustomPid: (CustomPidEntity) -> Unit,
+    onSyncPids: () -> Unit,
     onBack: () -> Unit
 ) {
     var showForm by remember { mutableStateOf(false) }
@@ -33,6 +35,15 @@ fun CustomPidEditorScreen(
                 title = { Text("DASHBOARD BUILDER (PRO)", color = Color.White, fontWeight = FontWeight.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Text("←", color = Color.White) }
+                },
+                actions = {
+                    IconButton(onClick = onSyncPids) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Sincronizar de la Nube",
+                            tint = MeetColors.neonGreen
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             )

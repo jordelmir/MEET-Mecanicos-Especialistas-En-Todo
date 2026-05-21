@@ -1,0 +1,107 @@
+package com.elysium369.meet.core.obd
+
+import android.content.Context
+import android.os.Environment
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.*
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * DataLogger — Graba telemetría OBD en CSV de alta velocidad.
+ * Formato compatible con Excel, Google Sheets, y herramientas de análisis.
+ */
+@Singleton
+class DataLogger @Inject constructor() {
+
+    data class LogSession(
+        val startTime: Long,
+        val fileName: String,
+        val sampleCount: Int,
+        val durationMs: Long,
+        val pidsRecorded: Set<String>,
+        val filePath: String
+    )
+
+    private var isRecording = false
+    private var writer: FileWriter? = null
+    private var currentFile: File? = null
+    private var startTimeMs: Long = 0L
+    private var sampleCount: Int = 0
+    private var headers: List<String> = emptyList()
+    private var headersWritten = false
+    private var recordedPids: MutableSet<String> = mutableSetOf()
+
+    val recording: Boolean get() = isRecording
+
+    fun startRecording(context: Context, vin: String? = null): Boolean {
+        if (isRecording) return false
+        try {
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MEET_Logs")
+            dir.mkdirs()
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val vinLabel = vin?.take(8) ?: "UNKNOWN"
+            val file = File(dir, "MEET_${vinLabel}_$timestamp.csv")
+            writer = FileWriter(file)
+            currentFile = file
+            startTimeMs = System.currentTimeMillis()
+            sampleCount = 0
+            headersWritten = false
+            recordedPids.clear()
+            isRecording = true
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
+    fun recordSample(liveData: Map<String, Float>) {
+        if (!isRecording || writer == null) return
+        try {
+            val sortedKeys = liveData.keys.sorted()
+            // Write headers on first sample
+            if (!headersWritten) {
+                headers = sortedKeys
+                writer?.write("Timestamp_ms,Elapsed_s,${headers.joinToString(",")}\n")
+                headersWritten = true
+            }
+            recordedPids.addAll(sortedKeys)
+            val now = System.currentTimeMillis()
+            val elapsed = String.format("%.3f", (now - startTimeMs) / 1000.0)
+            val values = headers.map { key ->
+                liveData[key]?.let { String.format("%.4f", it) } ?: ""
+            }
+            writer?.write("$now,$elapsed,${values.joinToString(",")}\n")
+            sampleCount++
+            // Flush every 50 samples for safety
+            if (sampleCount % 50 == 0) writer?.flush()
+        } catch (_: Exception) { }
+    }
+
+    fun stopRecording(): LogSession? {
+        if (!isRecording) return null
+        isRecording = false
+        val endTime = System.currentTimeMillis()
+        try {
+            writer?.flush()
+            writer?.close()
+        } catch (_: Exception) { }
+        writer = null
+        val file = currentFile ?: return null
+        return LogSession(
+            startTime = startTimeMs,
+            fileName = file.name,
+            sampleCount = sampleCount,
+            durationMs = endTime - startTimeMs,
+            pidsRecorded = recordedPids.toSet(),
+            filePath = file.absolutePath
+        )
+    }
+
+    fun getLogFiles(context: Context): List<File> {
+        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MEET_Logs")
+        return dir.listFiles()?.filter { it.extension == "csv" }?.sortedByDescending { it.lastModified() } ?: emptyList()
+    }
+}

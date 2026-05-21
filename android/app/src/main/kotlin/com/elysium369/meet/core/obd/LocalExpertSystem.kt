@@ -42,6 +42,13 @@ class LocalExpertSystem @Inject constructor() {
         checkFuelSystemStatus(liveData, procedures)
         checkTransmissionHealth(liveData, procedures)
         checkSpeedVsRpmSlippage(liveData, procedures)
+        // ── Advanced Heuristics v2 ──
+        checkEgrSystem(liveData, procedures)
+        checkBoostPressure(liveData, procedures)
+        checkVvtSystem(liveData, procedures)
+        checkIdleStability(liveData, procedures)
+        checkCatalystTemperature(liveData, procedures)
+        checkEngineEfficiencyScore(liveData, procedures)
 
         if (procedures.isEmpty()) {
             procedures.add(
@@ -1180,6 +1187,361 @@ class LocalExpertSystem @Inject constructor() {
                         "1. DETENGA EL VEHÍCULO. Continuar conduciendo puede destruir la transmisión completamente.",
                         "2. Verifique nivel de fluido INMEDIATAMENTE.",
                         "3. Si el nivel está correcto y el fluido huele a quemado, la transmisión requiere reconstrucción."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EGR — Recirculación de Gases de Escape
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkEgrSystem(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val egrCommanded = liveData["012C"] ?: return // PID 2C = Commanded EGR (%)
+        val rpm = liveData["010C"] ?: 0f
+        val load = liveData["0104"] ?: 0f
+
+        // EGR abierta en ralentí = problema (debe estar cerrada en idle)
+        if (egrCommanded > 15f && rpm < 900f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "♻️ EGR Abierta en Ralentí — Causa Inestabilidad",
+                    description = "La EGR está comandada al ${"%,.0f".format(egrCommanded)}% en ralentí (${"%.0f".format(rpm)} RPM). " +
+                        "La EGR NO debe abrir en ralentí; hacerlo diluye la mezcla con gases inertes causando ralentí rough, " +
+                        "vibraciones y posible apagado del motor.",
+                    severity = DiagnosticSeverity.HIGH,
+                    probableCauses = listOf(
+                        "Válvula EGR atascada parcialmente abierta por acumulación de carbón.",
+                        "Solenoide de control EGR con cortocircuito o fallo eléctrico.",
+                        "PCM con software de calibración incorrecto (raro, post-reprogramación).",
+                        "Sensor de posición EGR defectuoso reportando posición incorrecta."
+                    ),
+                    testSteps = listOf(
+                        "1. PRUEBA RÁPIDA: Golpee suavemente la válvula EGR mientras observa las RPM. Si las RPM suben = estaba atascada abierta.",
+                        "2. Desconecte el solenoide de vacío/eléctrico de la EGR. Si el ralentí se normaliza, confirma EGR como causa.",
+                        "3. Remueva la EGR e inspeccione el pintle y los pasajes — limpie con spray de carburador y cepillo de latón.",
+                        "4. En motores GDI/turbo: los pasajes EGR se taponan con carbón extremadamente rápido (cada 60-80k km)."
+                    )
+                )
+            )
+        }
+
+        // EGR cerrada bajo carga media-alta (debe abrir para reducir NOx y temp de combustión)
+        if (egrCommanded < 5f && rpm > 1500f && load > 40f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "♻️ EGR No Abre Bajo Carga — Emisiones NOx Elevadas",
+                    description = "La EGR permanece cerrada (${"%,.0f".format(egrCommanded)}%) a ${"%,.0f".format(rpm)} RPM con " +
+                        "${"%,.0f".format(load)}% de carga. Debería estar al 15-40% para reducir temperatura de combustión y emisiones NOx.",
+                    severity = DiagnosticSeverity.MODERATE,
+                    probableCauses = listOf(
+                        "Válvula EGR atascada cerrada por depósitos de carbón solidificados.",
+                        "Falta de señal de vacío al actuador (manguera rota o solenoide quemado).",
+                        "Sensor de contrapresión (DPFE/BPFE) defectuoso — PCM no comanda apertura.",
+                        "Pasajes de EGR completamente bloqueados con hollín."
+                    ),
+                    testSteps = listOf(
+                        "1. Use la prueba activa 'Válvula EGR' para forzar apertura — si RPM no bajan, está bloqueada.",
+                        "2. Verifique vacío en la manguera del actuador con vacuómetro — debe tener vacío bajo carga.",
+                        "3. En motores con sensor DPFE: verifique que su voltaje cambie al abrir/cerrar la EGR manualmente.",
+                        "4. Consecuencia: sin EGR, la temperatura de combustión sube, degradando bujías y generando detonación."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BOOST / TURBO — Análisis de presión de sobrealimentación
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkBoostPressure(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val map = liveData["010B"] ?: return // MAP en kPa
+        val rpm = liveData["010C"] ?: 0f
+        val load = liveData["0104"] ?: 0f
+        val barometric = liveData["0133"] ?: 101f // Barométrica o ~1 atm
+
+        // Solo para turbo: MAP > barométrica = boost positivo
+        if (map > barometric + 10f && rpm > 2000f) {
+            val boostPsi = (map - barometric) * 0.145f
+            // Sobre-boost peligroso (>25 PSI en la mayoría de turbo de calle)
+            if (boostPsi > 25f) {
+                procedures.add(
+                    ExpertDiagnosticProcedure(
+                        title = "🌀 SOBRE-BOOST Detectado (${"%.1f".format(boostPsi)} PSI)",
+                        description = "La presión de sobrealimentación excede los límites seguros para la mayoría de motores turbo de calle. " +
+                            "El sobre-boost puede destruir pistones, bielas o la junta de culata en segundos.",
+                        severity = DiagnosticSeverity.CRITICAL,
+                        probableCauses = listOf(
+                            "Wastegate atascada cerrada o actuador desconectado — el turbo no tiene alivio.",
+                            "Válvula de blow-off/bypass atascada cerrada.",
+                            "Solenoide de control de boost (N75) defectuoso.",
+                            "Manguera de señal de vacío del wastegate desconectada o rota."
+                        ),
+                        testSteps = listOf(
+                            "1. ¡URGENTE! Reduzca aceleración inmediatamente. NO haga WOT hasta diagnosticar.",
+                            "2. Inspeccione el actuador de la wastegate — el vástago debe moverse con ~7 PSI de presión neumática.",
+                            "3. Verifique la válvula N75/solenoide de boost con prueba activa.",
+                            "4. Revise DTCs relacionados: P0234 (Overboost), P0299 (Underboost)."
+                        )
+                    )
+                )
+            }
+        }
+
+        // Turbo con bajo boost bajo carga alta (underboost)
+        if (map < barometric + 5f && load > 70f && rpm > 2500f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "🌀 Falta de Boost — Turbo Sin Presión Bajo Carga",
+                    description = "A ${"%,.0f".format(rpm)} RPM con ${"%,.0f".format(load)}% de carga, MAP es solo ${"%,.0f".format(map)} kPa. " +
+                        "Si el vehículo es turbo/supercargado, debería mostrar presión positiva significativa.",
+                    severity = DiagnosticSeverity.HIGH,
+                    probableCauses = listOf(
+                        "Fuga en el intercooler o en las mangueras de boost (causa muy común).",
+                        "Wastegate atascada abierta — todo el escape bypasea la turbina.",
+                        "Turbo con juego excesivo en el eje (rodamientos desgastados).",
+                        "Catalizador obstruido creando contrapresión que frena la turbina."
+                    ),
+                    testSteps = listOf(
+                        "1. PRUEBA DE FUGAS: Presurice el sistema de admisión post-turbo con 15 PSI de aire y escuche fugas.",
+                        "2. Inspeccione el juego axial/radial del eje del turbo con motor apagado.",
+                        "3. Verifique el actuador del wastegate — aplique vacío/presión y confirme movimiento del vástago.",
+                        "4. Revise mangueras del intercooler — las abrazaderas sueltas son la causa #1 de pérdida de boost."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // VVT — Variable Valve Timing (Distribución Variable)
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkVvtSystem(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val timing = liveData["010E"] ?: return // Advance timing
+        val rpm = liveData["010C"] ?: 0f
+        val coolant = liveData["0105"] ?: 0f
+
+        // Timing demasiado avanzado a altas RPM (riesgo de detonación)
+        if (timing > 40f && rpm > 3000f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "⏱️ Avance de Encendido Excesivo (${"%,.1f".format(timing)}° a ${"%,.0f".format(rpm)} RPM)",
+                    description = "El avance de encendido está muy adelantado para estas RPM. Esto puede causar " +
+                        "detonación (knock) destructiva, especialmente con gasolina de bajo octanaje o bajo carga.",
+                    severity = DiagnosticSeverity.HIGH,
+                    probableCauses = listOf(
+                        "Sensor de detonación (Knock Sensor) defectuoso — PCM no detecta el knock y no retarda.",
+                        "Sistema VVT (Variable Valve Timing) desfasado — solenoide OCV atascado.",
+                        "Aceite degradado afectando actuadores VVT hidráulicos (i-VTEC, VVT-i, CVVT).",
+                        "Cadena de distribución estirada alterando la sincronización mecánica."
+                    ),
+                    testSteps = listOf(
+                        "1. Verifique el sensor de knock con osciloscopio — debe generar señal al golpear el bloque.",
+                        "2. Cambie el aceite si tiene >8000 km — aceite sucio traba los actuadores VVT.",
+                        "3. Verifique tensión de la cadena: con motor caliente en ralentí, escuche 'cascabeleo' metálico en la tapa.",
+                        "4. En motores con VVT-i/CVVT: inspeccione el solenoide OCV (filtro de malla suele taparse con lodo)."
+                    )
+                )
+            )
+        }
+
+        // Motor caliente pero timing en 0° o negativo en ralentí (debería ser 8-15° BTDC)
+        if (timing < 2f && rpm in 600f..1000f && coolant > 80f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "⏱️ Avance de Encendido Nulo en Ralentí",
+                    description = "Avance en ${"%,.1f".format(timing)}° con motor caliente en ralentí. Normal es 8-15° BTDC. " +
+                        "La PCM está retardando agresivamente, probablemente por detonación detectada.",
+                    severity = DiagnosticSeverity.MODERATE,
+                    probableCauses = listOf(
+                        "Depósitos de carbón en la cámara de combustión causando puntos calientes (pre-ignición).",
+                        "Gasolina de bajo octanaje para la relación de compresión del motor.",
+                        "Sensor de knock hipersensible o mal ubicado (suelto).",
+                        "Sistema EGR inyectando gas en ralentí cuando no debería."
+                    ),
+                    testSteps = listOf(
+                        "1. Pruebe con combustible premium por 2 tanques completos. Si el timing se normaliza, era combustible.",
+                        "2. Realice una descarbonización con spray especializado por la admisión a 2000 RPM.",
+                        "3. Verifique que el sensor de knock esté apretado al torque especificado (típicamente 20 Nm).",
+                        "4. Monitoree el PID de Knock Retard si está disponible."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ESTABILIDAD DE RALENTÍ — Análisis multivariable
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkIdleStability(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val rpm = liveData["010C"] ?: return
+        val load = liveData["0104"] ?: 0f
+        val stft = liveData["0106"] ?: 0f
+        val ltft = liveData["0107"] ?: 0f
+        val coolant = liveData["0105"] ?: 0f
+        val tps = liveData["0111"] ?: 0f
+
+        // Solo analizar en ralentí con motor caliente y sin acelerar
+        if (rpm !in 400f..1200f || coolant < 75f || tps > 5f) return
+
+        // Ralentí inusualmente alto con motor caliente
+        if (rpm > 1000f && coolant > 85f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "🔄 Ralentí Alto Persistente (${"%,.0f".format(rpm)} RPM)",
+                    description = "Las RPM de ralentí están por encima de lo normal con motor caliente (típico: 600-800 RPM). " +
+                        "Esto indica una entrada de aire no medida o un problema en el control de ralentí.",
+                    severity = DiagnosticSeverity.MODERATE,
+                    probableCauses = listOf(
+                        "Fuga de vacío post-MAF (aire que entra sin ser medido).",
+                        "Motor de control de ralentí (IAC) atascado parcialmente abierto.",
+                        "Cable del acelerador tenso o sensor TPS desajustado.",
+                        "Sensor de temperatura (ECT) reportando motor frío — PCM sube ralentí para 'calentar'.",
+                        "Embrague del A/C activándose intermitentemente — PCM compensa."
+                    ),
+                    testSteps = listOf(
+                        "1. Compare lectura ECT vs termómetro infrarrojo en la manguera del termostato.",
+                        "2. Desconecte el motor IAC con motor en ralentí — si RPM no cambian, el IAC no controla.",
+                        "3. Use spray de carburador alrededor de la admisión buscando fugas de vacío (RPM cambiarán).",
+                        "4. Verifique que el cable del acelerador tenga holgura correcta (~1mm de juego libre)."
+                    )
+                )
+            )
+        }
+
+        // Ralentí bajo combinado con carga alta y mezcla inestable
+        if (rpm < 550f && load > 35f && kotlin.math.abs(stft) > 10f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "⚠️ Ralentí Inestable — Motor a Punto de Apagarse",
+                    description = "RPM en ${"%,.0f".format(rpm)} con carga ${"%,.0f".format(load)}% y STFT de ${"%+,.0f".format(stft)}%. " +
+                        "Esta combinación indica que el motor lucha por mantenerse encendido.",
+                    severity = DiagnosticSeverity.HIGH,
+                    probableCauses = listOf(
+                        "Inyector(es) obstruido(s) o con falla eléctrica — cilindro(s) no contribuyen.",
+                        "Bujía(s) desgastada(s) con gap excesivo — misfire intermitente.",
+                        "Válvula de admisión con depósitos de carbón (especialmente en GDI).",
+                        "Sensor MAP o MAF con lectura errática."
+                    ),
+                    testSteps = listOf(
+                        "1. PRUEBA DEFINITIVA: Lea contadores de misfire en Mode 06 para identificar cilindros afectados.",
+                        "2. Realice prueba de balance de inyectores desconectando uno a la vez.",
+                        "3. Mida compresión cilindro por cilindro — variación >15% entre cilindros = problema mecánico.",
+                        "4. Limpie el cuerpo de aceleración y la válvula IAC con limpiador especializado."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEMPERATURA DE CATALIZADOR — Protección térmica
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkCatalystTemperature(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val catTempB1 = liveData["013C"] ?: return // PID 3C = Cat temp B1S1 (°C)
+        val rpm = liveData["010C"] ?: 0f
+
+        // Catalizador sobrecalentado (normal: 400-700°C, peligro: >900°C)
+        if (catTempB1 > 850f) {
+            val severity = if (catTempB1 > 1000f) DiagnosticSeverity.CRITICAL else DiagnosticSeverity.HIGH
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "🔥 Catalizador Sobrecalentado (${"%,.0f".format(catTempB1)}°C)",
+                    description = "La temperatura del catalizador excede los ${"%,.0f".format(catTempB1)}°C. " +
+                        "El sustrato cerámico se derrite a ~1200°C. A esta temperatura, el catalizador se está destruyendo " +
+                        "y puede causar incendio del vehículo.",
+                    severity = severity,
+                    probableCauses = listOf(
+                        "Misfire severo — combustible no quemado explota dentro del catalizador.",
+                        "Mezcla excesivamente rica enviando combustible líquido al escape.",
+                        "Sensor O2 defectuoso causando corrección de mezcla errónea.",
+                        "Inyector goteando con motor apagado (inunda el catalizador al arrancar)."
+                    ),
+                    testSteps = listOf(
+                        "1. ¡DETENGA EL MOTOR! Un catalizador a >1000°C puede incendiar el piso del vehículo o la hierba debajo.",
+                        "2. Busque misfire activo (códigos P0300-P0308) — esta es la causa #1 de catalizadores fundidos.",
+                        "3. Inspeccione bujías — si alguna está húmeda de combustible, ese cilindro tiene misfire.",
+                        "4. Después de enfriar, golpee el catalizador. Si suena a cascabel = sustrato colapsado, reemplace."
+                    )
+                )
+            )
+        }
+
+        // Catalizador frío con motor en marcha (no está catalzando)
+        if (catTempB1 < 200f && rpm > 1500f) {
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "❄️ Catalizador No Alcanza Temperatura (${"%,.0f".format(catTempB1)}°C)",
+                    description = "El catalizador debería estar >400°C a estas RPM. A <200°C, la conversión catalítica " +
+                        "es prácticamente nula. Las emisiones de HC, CO y NOx son máximas.",
+                    severity = DiagnosticSeverity.MODERATE,
+                    probableCauses = listOf(
+                        "Sensor de temperatura del catalizador defectuoso.",
+                        "Fuga de escape antes del catalizador — gases calientes no llegan.",
+                        "Catalizador instalado muy lejos del motor (aftermarket incorrecto).",
+                        "Motor operando extremadamente pobre — combustión fría."
+                    ),
+                    testSteps = listOf(
+                        "1. Mida con termómetro infrarrojo directamente en la carcasa del catalizador para confirmar la lectura.",
+                        "2. Inspeccione el colector de escape y tubo de bajada por fugas (óxido, conexiones flojas).",
+                        "3. Un catalizador funcional debe estar 50-100°C más caliente en la salida que en la entrada."
+                    )
+                )
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SCORE DE EFICIENCIA DEL MOTOR — Puntuación integral
+    // ═══════════════════════════════════════════════════════════════
+    private fun checkEngineEfficiencyScore(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
+        val rpm = liveData["010C"] ?: return
+        val load = liveData["0104"] ?: return
+        val coolant = liveData["0105"] ?: 0f
+        val stft1 = liveData["0106"] ?: 0f
+        val ltft1 = liveData["0107"] ?: 0f
+        val timing = liveData["010E"] ?: 10f
+
+        // Solo evaluar con motor caliente en condiciones estables
+        if (coolant < 80f || rpm < 600f) return
+
+        var score = 100
+        val issues = mutableListOf<String>()
+
+        // Penalizar por fuel trims altos
+        val totalTrim = kotlin.math.abs(stft1 + ltft1)
+        if (totalTrim > 20f) { score -= 25; issues.add("Fuel Trims combinados fuera de rango (${"%+,.0f".format(stft1 + ltft1)}%)") }
+        else if (totalTrim > 10f) { score -= 10; issues.add("Fuel Trims elevados (${"%+,.0f".format(stft1 + ltft1)}%)") }
+
+        // Penalizar por timing retardado
+        if (timing < 0f) { score -= 20; issues.add("Avance negativo — motor compensando por knock/misfire") }
+        else if (timing < 5f && rpm > 800f) { score -= 10; issues.add("Avance bajo para RPM actuales") }
+
+        // Penalizar por carga excesiva en ralentí
+        if (rpm < 900f && load > 40f) { score -= 15; issues.add("Carga alta en ralentí (${"%.0f".format(load)}%) — accesorios o problema mecánico") }
+
+        // Penalizar por temperatura alta
+        if (coolant > 105f) { score -= 15; issues.add("Motor sobrecalentado (${"%,.0f".format(coolant)}°C)") }
+
+        // Solo mostrar si la eficiencia no es perfecta
+        if (score < 85 && issues.isNotEmpty()) {
+            val severity = when {
+                score < 50 -> DiagnosticSeverity.CRITICAL
+                score < 70 -> DiagnosticSeverity.HIGH
+                else -> DiagnosticSeverity.MODERATE
+            }
+            procedures.add(
+                ExpertDiagnosticProcedure(
+                    title = "📊 Eficiencia del Motor: $score/100",
+                    description = "Evaluación integral del rendimiento del motor basada en Fuel Trims, Avance de Encendido, " +
+                        "Carga y Temperatura. Puntaje ideal: 90-100. Puntaje actual: $score.",
+                    severity = severity,
+                    probableCauses = issues,
+                    testSteps = listOf(
+                        "1. Aborde los problemas listados arriba en orden de severidad (mayor penalización primero).",
+                        "2. Después de reparar, borre los DTCs y realice un ciclo de manejo de 20 minutos.",
+                        "3. Re-evalúe el puntaje — debería subir a >85 si las reparaciones fueron exitosas.",
+                        "4. Un motor en buen estado mantiene score >90 consistentemente en todas las condiciones."
                     )
                 )
             )

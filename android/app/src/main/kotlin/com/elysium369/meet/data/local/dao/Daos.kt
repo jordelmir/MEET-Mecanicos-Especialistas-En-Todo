@@ -87,6 +87,9 @@ interface AdapterProfileDao {
 
 @Dao
 interface DtcDefinitionDao {
+    @Query("SELECT * FROM dtc_definitions WHERE code = :code AND (manufacturer = :manufacturer OR manufacturer = 'GENERIC') ORDER BY CASE WHEN manufacturer = :manufacturer THEN 0 ELSE 1 END LIMIT 1")
+    suspend fun getDefinitionForCode(code: String, manufacturer: String): DtcDefinitionEntity?
+
     @Query("SELECT * FROM dtc_definitions WHERE code = :code")
     suspend fun getDefinitions(code: String): List<DtcDefinitionEntity>
 
@@ -114,6 +117,156 @@ interface AiConsultDao {
     @Query("SELECT * FROM ai_consults WHERE sessionId = :sessionId")
     fun getConsultsForSession(sessionId: String): Flow<List<AiConsultEntity>>
 
+    @Query("SELECT * FROM ai_consults WHERE dtcCodes = :dtcCodes ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getCachedConsult(dtcCodes: String): AiConsultEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConsult(consult: AiConsultEntity)
+
+    @Query("DELETE FROM ai_consults WHERE createdAt < :timestamp")
+    suspend fun pruneOldConsults(timestamp: Long)
+}
+
+@Dao
+interface MaintenanceLogDao {
+    @Query("SELECT * FROM maintenance_logs WHERE vehicleId = :vehicleId ORDER BY datePerformed DESC")
+    fun getLogsForVehicle(vehicleId: String): Flow<List<MaintenanceLogEntity>>
+
+    @Query("SELECT * FROM maintenance_logs WHERE vehicleId = :vehicleId AND category = :category ORDER BY datePerformed DESC")
+    fun getLogsByCategory(vehicleId: String, category: String): Flow<List<MaintenanceLogEntity>>
+
+    @Query("SELECT * FROM maintenance_logs WHERE vehicleId = :vehicleId AND category = :category ORDER BY datePerformed DESC LIMIT 1")
+    suspend fun getLastService(vehicleId: String, category: String): MaintenanceLogEntity?
+
+    @Query("SELECT * FROM maintenance_logs WHERE vehicleId = :vehicleId AND nextDueKm <= :currentKm ORDER BY nextDueKm ASC")
+    fun getOverdueServices(vehicleId: String, currentKm: Long): Flow<List<MaintenanceLogEntity>>
+
+    @Query("SELECT * FROM maintenance_logs WHERE vehicleId = :vehicleId AND nextDueKm BETWEEN :currentKm AND :maxKm ORDER BY nextDueKm ASC")
+    fun getUpcomingServices(vehicleId: String, currentKm: Long, maxKm: Long): Flow<List<MaintenanceLogEntity>>
+
+    @Query("SELECT SUM(cost) FROM maintenance_logs WHERE vehicleId = :vehicleId")
+    suspend fun getTotalCost(vehicleId: String): Float?
+
+    @Query("SELECT SUM(cost) FROM maintenance_logs WHERE vehicleId = :vehicleId AND datePerformed BETWEEN :fromDate AND :toDate")
+    suspend fun getCostInPeriod(vehicleId: String, fromDate: Long, toDate: Long): Float?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLog(log: MaintenanceLogEntity)
+
+    @Delete
+    suspend fun deleteLog(log: MaintenanceLogEntity)
+}
+
+@Dao
+interface RepairHistoryDao {
+    @Query("SELECT * FROM repair_history WHERE vehicleId = :vehicleId ORDER BY datePerformed DESC")
+    fun getRepairsForVehicle(vehicleId: String): Flow<List<RepairHistoryEntity>>
+
+    @Query("SELECT * FROM repair_history WHERE vehicleId = :vehicleId AND partCategory = :category ORDER BY datePerformed DESC")
+    fun getRepairsByCategory(vehicleId: String, category: String): Flow<List<RepairHistoryEntity>>
+
+    @Query("SELECT * FROM repair_history WHERE vehicleId = :vehicleId AND isPeriodic = 1 AND nextReplacementKm IS NOT NULL AND nextReplacementKm <= :currentKm")
+    fun getOverdueReplacements(vehicleId: String, currentKm: Long): Flow<List<RepairHistoryEntity>>
+
+    @Query("SELECT SUM(totalCost) FROM repair_history WHERE vehicleId = :vehicleId")
+    suspend fun getTotalRepairCost(vehicleId: String): Float?
+
+    @Query("SELECT SUM(totalCost) FROM repair_history WHERE vehicleId = :vehicleId AND datePerformed BETWEEN :fromDate AND :toDate")
+    suspend fun getRepairCostInPeriod(vehicleId: String, fromDate: Long, toDate: Long): Float?
+
+    @Query("SELECT * FROM repair_history WHERE vehicleId = :vehicleId AND relatedDtc = :dtcCode")
+    fun getRepairsForDtc(vehicleId: String, dtcCode: String): Flow<List<RepairHistoryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRepair(repair: RepairHistoryEntity)
+
+    @Delete
+    suspend fun deleteRepair(repair: RepairHistoryEntity)
+}
+
+@Dao
+interface FleetDao {
+    @Query("SELECT * FROM business_profiles WHERE ownerUserId = :ownerUserId")
+    fun getBusinessProfilesForOwner(ownerUserId: String): kotlinx.coroutines.flow.Flow<List<BusinessProfileEntity>>
+
+    @Query("SELECT * FROM business_profiles WHERE id = :businessId")
+    suspend fun getBusinessProfile(businessId: String): BusinessProfileEntity?
+
+    @Query("SELECT * FROM fleets WHERE businessId = :businessId ORDER BY name ASC")
+    fun getFleetsForBusiness(businessId: String): kotlinx.coroutines.flow.Flow<List<FleetEntity>>
+
+    @Query("SELECT * FROM fleet_members WHERE businessId = :businessId")
+    fun getMembersForBusiness(businessId: String): kotlinx.coroutines.flow.Flow<List<FleetMemberEntity>>
+
+    @Query("SELECT * FROM vehicles WHERE businessId = :businessId")
+    fun getVehiclesForBusiness(businessId: String): kotlinx.coroutines.flow.Flow<List<VehicleEntity>>
+
+    @Query("SELECT * FROM vehicles WHERE fleetId = :fleetId")
+    fun getVehiclesForFleet(fleetId: String): kotlinx.coroutines.flow.Flow<List<VehicleEntity>>
+
+    @Query("SELECT * FROM fleets WHERE inviteCode = :inviteCode LIMIT 1")
+    suspend fun getFleetByInviteCode(inviteCode: String): FleetEntity?
+
+    @Query("SELECT * FROM fleets WHERE id IN (SELECT fleetId FROM fleet_members WHERE userId = :userId)")
+    fun getFleetsForDriver(userId: String): kotlinx.coroutines.flow.Flow<List<FleetEntity>>
+
+    @Query("SELECT * FROM vehicles WHERE assignedDriverId = :driverId")
+    fun getAssignedVehiclesForDriver(driverId: String): kotlinx.coroutines.flow.Flow<List<VehicleEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBusinessProfile(profile: BusinessProfileEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFleet(fleet: FleetEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFleetMember(member: FleetMemberEntity)
+
+    @Query("DELETE FROM fleets WHERE id = :fleetId")
+    suspend fun deleteFleet(fleetId: String)
+
+    @Query("DELETE FROM fleet_members WHERE id = :memberId")
+    suspend fun deleteFleetMember(memberId: String)
+}
+
+@Dao
+interface ChatDao {
+    @Query("SELECT * FROM chat_messages WHERE businessId = :businessId AND ((senderId = :userA AND receiverId = :userB) OR (senderId = :userB AND receiverId = :userA)) ORDER BY timestamp ASC")
+    fun getChatHistory(businessId: String, userA: String, userB: String): Flow<List<ChatMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: ChatMessageEntity)
+
+    @Query("UPDATE chat_messages SET status = :status WHERE id = :messageId")
+    suspend fun updateMessageStatus(messageId: String, status: String)
+
+    // Retrieve active chat partners with their last message
+    @Query("""
+        SELECT * FROM chat_messages 
+        WHERE businessId = :businessId AND (senderId = :userId OR receiverId = :userId)
+        GROUP BY CASE WHEN senderId = :userId THEN receiverId ELSE senderId END
+        ORDER BY timestamp DESC
+    """)
+    fun getRecentChats(businessId: String, userId: String): Flow<List<ChatMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun blockUser(blockEntry: ChatBlocklistEntity)
+
+    @Query("DELETE FROM chat_blocklist WHERE businessId = :businessId AND blockerUserId = :blockerId AND blockedUserId = :blockedId")
+    suspend fun unblockUser(businessId: String, blockerId: String, blockedId: String)
+
+    @Query("SELECT COUNT(*) FROM chat_blocklist WHERE businessId = :businessId AND blockerUserId = :blockerId AND blockedUserId = :blockedId")
+    suspend fun isUserBlockedBy(businessId: String, blockerId: String, blockedId: String): Int
+
+    @Query("SELECT COUNT(*) FROM chat_blocklist WHERE businessId = :businessId AND ((blockerUserId = :userA AND blockedUserId = :userB) OR (blockerUserId = :userB AND blockedUserId = :userA))")
+    suspend fun hasBlockBetween(businessId: String, userA: String, userB: String): Int
+}
+
+@Dao
+interface DvirReportDao {
+    @Query("SELECT * FROM dvir_reports WHERE vehicleId = :vehicleId ORDER BY timestamp DESC")
+    fun getReportsForVehicle(vehicleId: String): Flow<List<DvirReportEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReport(report: DvirReportEntity)
 }

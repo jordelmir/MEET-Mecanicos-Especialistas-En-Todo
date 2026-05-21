@@ -71,7 +71,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         val stiResponse = sendWithTimeout("STI\r", 800)
         val isSTN = stiResponse.contains("STN", true) || idResponse.contains("STN", true) || idResponse.contains("vLinker", true)
 
-        val baseDelay = if (isClone) 60L else 15L
+        val baseDelay = if (isClone) 30L else 15L
         
         Log.i(TAG, "Adapter Identified: $chipVersion | Clone=$isClone | STN=$isSTN")
         onProgress("Adaptador: $chipVersion")
@@ -168,11 +168,11 @@ class ElmNegotiator(private val transport: TransportInterface) {
         add("ATCAF1") // CAN Auto Formatting on
         
         if (isClone) {
-            add("ATAT1") // Adaptive Timing 1
-            add("ATST64") // Set Timeout
+            add("ATAT2") // Adaptive Timing 2 (Aggressive) — faster polling even on clones
+            add("ATST32") // Set Timeout 128ms (was 256ms) — CAN responds in 50-200ms
         } else {
             add("ATAT2") // Adaptive Timing 2 (Aggressive)
-            add("ATST32") 
+            add("ATST19") // Set Timeout ~100ms for pro adapters
         }
 
         if (isSTN) {

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { INITIAL_WORK_ORDERS, MECHANICS as INITIAL_MECHANICS, SERVICES as DEFAULT_SERVICES, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR, INITIAL_CLIENTS, MOCK_ADMIN_USER, SERVICE_CATALOG } from './constants';
-import { WorkOrder, Role, WorkOrderStatus, Metrics, Client, ServiceHistoryItem, Service, Mechanic, VehicleInfo } from './types';
+import { WorkOrder, Role, WorkOrderStatus, Metrics, Client, ServiceHistoryItem, Service, Mechanic, VehicleInfo, OscilloscopeMeasurement } from './types';
 import { Timeline } from './components/Timeline';
 import { MetricsPanel } from './components/MetricsPanel';
 import { MechanicDashboard } from './components/MechanicDashboard';
@@ -403,6 +403,27 @@ export default function App() {
     toast('success', 'Escaneo Recibido', 'Datos de OBD2 sincronizados desde la App MEET');
   };
 
+  const handleSaveOscilloscopeMeasurement = (measurement: OscilloscopeMeasurement) => {
+    // Save to client profile
+    const updatedClient = {
+      ...loggedInUser,
+      oscilloscopeMeasurements: [measurement, ...(loggedInUser.oscilloscopeMeasurements || [])].slice(0, 50)
+    };
+    handleUpdateClient(updatedClient);
+
+    // Also attach to active work order if one exists
+    if (measurement.workOrderId) {
+      setWorkOrders(prev => prev.map(wo => {
+        if (wo.id === measurement.workOrderId) {
+          return { ...wo, oscilloscopeMeasurements: [measurement, ...(wo.oscilloscopeMeasurements || [])] };
+        }
+        return wo;
+      }));
+    }
+
+    toast('success', 'Medición Guardada', `${measurement.signalName} — ${measurement.severity === 'normal' ? 'Nominal' : measurement.severity === 'warning' ? 'Atención' : 'Crítico'}`);
+  };
+
   // ── RENDER ──
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={authError} />;
@@ -782,7 +803,12 @@ export default function App() {
 
       {/* OBD2 Scanner Modal */}
       {isOBD2Open && (
-        <OBD2Scanner onClose={() => setIsOBD2Open(false)} />
+        <OBD2Scanner
+          onClose={() => setIsOBD2Open(false)}
+          currentUser={loggedInUser}
+          workOrders={workOrders}
+          onSaveMeasurement={handleSaveOscilloscopeMeasurement}
+        />
       )}
 
       {/* TV Dashboard Mode */}

@@ -360,6 +360,63 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
             </div>
           </div>
 
+          {/* Mediciones de Osciloscopio */}
+          {currentUser.oscilloscopeMeasurements && currentUser.oscilloscopeMeasurements.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-white/5">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+                <Activity className="text-forge-500" size={24} />
+                Mediciones de Osciloscopio
+                <span className="text-xs text-steel-400 font-mono ml-2">({currentUser.oscilloscopeMeasurements.length})</span>
+              </h2>
+              <div className="space-y-3">
+                {currentUser.oscilloscopeMeasurements.slice(0, 10).map(m => (
+                  <div key={m.id} className={`glass-inner p-4 rounded-xl border-l-4 ${
+                    m.severity === 'critical' ? 'border-red-500 bg-red-500/5' :
+                    m.severity === 'warning' ? 'border-yellow-500 bg-yellow-500/5' :
+                    'border-green-500 bg-green-500/5'
+                  }`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <span className="font-bold text-white text-sm">{m.signalName}</span>
+                        <span className="text-forge-500 text-[10px] font-mono ml-2">PID: {m.pidCode}</span>
+                        {m.vehiclePlate && <span className="text-steel-400 text-[10px] ml-2">· {m.vehiclePlate}</span>}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                        m.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                        m.severity === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-green-500/20 text-green-400'
+                      }`}>
+                        {m.severity === 'critical' ? 'Crítico' : m.severity === 'warning' ? 'Atención' : 'Nominal'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      {[
+                        { l: 'Freq', v: `${m.metrics.frequency.toFixed(1)} Hz` },
+                        { l: 'RMS', v: m.metrics.rms.toFixed(2) },
+                        { l: 'THD', v: `${(m.metrics.thd * 100).toFixed(1)}%` },
+                        { l: 'Estab.', v: `${m.metrics.stability.toFixed(0)}%` },
+                      ].map((metric, i) => (
+                        <div key={i} className="bg-black/30 rounded px-2 py-1 text-center border border-white/5">
+                          <div className="text-[7px] text-steel-500 font-mono uppercase">{metric.l}</div>
+                          <div className="text-white font-bold text-[11px] font-mono">{metric.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {m.recommendation && (
+                      <p className="text-steel-300 text-[11px] leading-relaxed">
+                        <Wrench size={10} className="inline text-forge-500 mr-1" />
+                        {m.recommendation}
+                      </p>
+                    )}
+                    <div className="text-[9px] text-steel-500 font-mono mt-1">
+                      {new Date(m.timestamp).toLocaleString()} · {m.sampleCount} muestras · {(m.durationMs / 1000).toFixed(1)}s · {m.confidenceScore.toFixed(0)}% confianza
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Recomendaciones Preventivas */}
           <div className="mt-8">
             <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">

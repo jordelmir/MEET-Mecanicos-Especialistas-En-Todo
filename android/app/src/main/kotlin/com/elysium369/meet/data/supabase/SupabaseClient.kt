@@ -95,6 +95,18 @@ data class DtcEvent(
     val created_at: String? = null
 )
 
+@Serializable
+data class RemoteDtcDefinition(
+    val code: String,
+    val manufacturer: String = "GENERIC",
+    val description_es: String,
+    val description_en: String,
+    val system: String,
+    val severity: String,
+    val possible_causes: String,
+    val urgency: String
+)
+
 object SupabaseManager {
     val client get() = com.elysium369.meet.data.remote.SupabaseModule.client
 
