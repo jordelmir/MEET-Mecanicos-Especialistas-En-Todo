@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-3.3_Elite-39FF14?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-3.4_Elite-39FF14?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Platform-Android-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Platform"/>
   <img src="https://img.shields.io/badge/Kotlin-2.1_%7C_Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"/>
   <img src="https://img.shields.io/badge/React-Vite_%7C_TypeScript-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React"/>
@@ -17,7 +17,7 @@
 
 # MEET — Mecánicos Especialistas En Todo
 
-**The most advanced open-source automotive diagnostic system ever built.** MEET ELITE v3.3 is a professional-grade OBD-II diagnostic suite engineered for mechanics, workshops, and enthusiasts who demand dealership-level intelligence without the dealership price tag.
+**The most advanced open-source automotive diagnostic system ever built.** MEET ELITE v3.4 is a professional-grade OBD-II diagnostic suite engineered for mechanics, workshops, and enthusiasts who demand dealership-level intelligence without the dealership price tag.
 
 > 🧠 **12,128 expert repair guides** cross-referenced from 10 global automotive authorities — more diagnostic depth than any commercial tool at any price.
 
@@ -25,17 +25,35 @@
 
 ## ⚡ What Makes MEET Different
 
-| Feature | MEET ELITE | Torque Pro | OBD Fusion | Dealer Tools |
-|---------|:----------:|:----------:|:----------:|:------------:|
-| Expert repair guides per DTC | ✅ 12,128 | ❌ 0 | ❌ 0 | ~500 |
-| Ranked probable causes | ✅ | ❌ | ❌ | ⚠️ |
-| Urgency + drivability assessment | ✅ | ❌ | ❌ | ⚠️ |
-| Cost estimates (USD) | ✅ | ❌ | ❌ | ❌ |
-| AI diagnostic assistant | ✅ Gemini Pro | ❌ | ❌ | ❌ |
-| Predictive health engine | ✅ Mode 06 | ❌ | ❌ | ⚠️ |
-| Multi-transport (BLE/BT/WiFi) | ✅ | ⚠️ BT only | ⚠️ WiFi only | Proprietary |
-| Open source | ✅ | ❌ | ❌ | ❌ |
-| Price | **Free** | $6.99 | $12.99 | $5,000+ |
+MEET isn't just another code reader — it's a **complete vehicle intelligence platform** that replaces a $5,000+ dealer scan tool, a $50/month fleet management subscription, and a $200/year AI diagnostic service with a single app.
+
+### 🏆 Competitive Matrix
+
+| Capability | MEET ELITE | Torque Pro | OBD Fusion | BlueDriver | Dealer Tools |
+|:-----------|:----------:|:----------:|:----------:|:----------:|:------------:|
+| **Expert repair guides per DTC** | ✅ 12,128 | ❌ 0 | ❌ 0 | ~200 | ~500 |
+| **Ranked probable causes** | ✅ High/Med/Low | ❌ | ❌ | ⚠️ Basic | ⚠️ |
+| **Urgency + drivability assessment** | ✅ | ❌ | ❌ | ❌ | ⚠️ |
+| **Cost estimates (USD + labor hrs)** | ✅ | ❌ | ❌ | ⚠️ Parts only | ❌ |
+| **AI diagnostic assistant** | ✅ Gemini Pro | ❌ | ❌ | ❌ | ❌ |
+| **Predictive health engine** | ✅ Mode 06 | ❌ | ❌ | ❌ | ⚠️ |
+| **SWOT/FODA vehicle analysis** | ✅ Real-time | ❌ | ❌ | ❌ | ❌ |
+| **Eco-driving analytics** | ✅ Score + trends | ⚠️ Basic | ❌ | ❌ | ❌ |
+| **Maintenance scheduler + alerts** | ✅ | ❌ | ❌ | ⚠️ | ✅ |
+| **Pre-purchase vehicle inspection** | ✅ 47-point | ❌ | ❌ | ⚠️ | ✅ |
+| **DVIR fleet inspection reports** | ✅ | ❌ | ❌ | ❌ | ⚠️ |
+| **HUD (Heads-Up Display) mode** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Oscilloscope / waveform analysis** | ✅ | ❌ | ❌ | ❌ | ✅ |
+| **Readiness monitor drive-cycle guides** | ✅ Per monitor | ❌ | ❌ | ❌ | ⚠️ |
+| **OBD terminal (raw commands)** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **PDF diagnostic report export** | ✅ | ❌ | ⚠️ | ✅ | ✅ |
+| **Multi-transport (BLE/BT/WiFi)** | ✅ All 3 | ⚠️ BT only | ⚠️ WiFi only | BLE only | Proprietary |
+| **Bilingual (EN/ES)** | ✅ Native | ❌ | ❌ | ❌ | ⚠️ |
+| **Cloud sync + web dashboard** | ✅ Supabase | ❌ | ❌ | ⚠️ | ✅ |
+| **Open source** | ✅ MIT | ❌ | ❌ | ❌ | ❌ |
+| **Price** | **$1/mo** | $6.99 once | $12.99 once | $6/mo | $5,000+ |
+
+> 💡 **Bottom line:** MEET delivers more diagnostic intelligence in a $1/month subscription than tools costing 5,000x more. No other app combines AI diagnostics, SWOT analysis, eco-driving telemetry, fleet inspections, and 12,128 expert repair guides in a single platform.
 
 ---
 
@@ -43,7 +61,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    MEET ELITE v3.3                   │
+│                    MEET ELITE v3.4                   │
 ├─────────────┬───────────────┬───────────────────────┤
 │  Android    │   Web App     │   Cloud               │
 │  (Kotlin/   │   (React/     │   (Supabase)           │
@@ -85,31 +103,59 @@
   - 💰 Estimated repair cost range (USD)
   - ⏱️ Estimated labor time
   - 📚 Cross-referenced from 10 authoritative sources
+- **Readiness Monitor Dashboard** — I/M emission monitor status with SAE J1979 drive-cycle guides per monitor
+- **Service Resets** — Oil life, TPMS, SAS, DPF, battery registration and more
 
 ### 🧠 AI-Powered Diagnostics
 - **Gemini Pro Integration** — Context-aware AI that understands your specific vehicle, active codes, and sensor data
 - **Natural Language Queries** — Ask diagnostic questions in plain language (EN/ES)
 - **Intelligent Synthesis** — Combines live data + knowledge base + AI for unmatched accuracy
+- **BYOK (Bring Your Own Key)** — Users provide their own Gemini API key for unlimited AI queries
 
 ### 📊 Real-Time Monitoring
-- **Live Sensor Dashboard** — RPM, speed, temperatures, fuel trims, O2 sensors
-- **Animated Gauges** — Professional-grade instrumentation UI
-- **Oscilloscope Mode** — Waveform analysis for sensor signals
+- **Live Sensor Dashboard** — RPM, speed, temperatures, fuel trims, O2 sensors with animated gauges
+- **Custom Dashboard Builder** — Drag-and-drop gauge layout editor
+- **Oscilloscope Mode** — Multi-channel waveform analysis for sensor signals
 - **Mode 06 Deep Telemetry** — Test results with pass/fail thresholds
+- **Data Logger** — Record and export sensor sessions to CSV
+- **HUD Mode** — Heads-Up Display for windshield projection at night
+
+### 🔧 Maintenance Pro
+- **Maintenance Scheduler** — Custom alerts with km-based intervals (oil, filters, brakes, etc.)
+- **FODA Vehicular Analysis** — Real-time SWOT dashboard correlating DTCs, battery voltage, coolant temp, and eco-score
+- **Odometer Tracking** — Auto-updates from live OBD data
+
+### 🚗 Eco-Trips & Driving Analytics
+- **Trip Recording** — Automatic telemetry capture (distance, duration, speed, RPM, temperature)
+- **Eco Score** — Per-trip efficiency rating with circular Canvas gauge
+- **FODA de Conducción** — SWOT analysis of driving habits (acceleration patterns, RPM discipline, thermal stress)
+- **Mock Trip Simulator** — Instant demo generation for app showcase
+- **PDF Export** — Professional trip reports (Premium)
 
 ### 🏥 Predictive Health
 - **Vehicle Health Score** — Algorithmic assessment based on sensor trends
-- **Component Degradation Tracking** — Long-term monitoring of critical systems
-- **Proactive Alerts** — Warns before failures occur
+- **Battery Health Analyzer** — Voltage monitoring, cranking analysis, alternator load
+- **Smog Check Predictor** — Pre-test probability based on readiness monitors and pending DTCs
+- **Proactive Alerts** — Custom threshold engine that warns before failures occur
+
+### 🚛 Fleet & Professional Tools
+- **Pre-Purchase Inspection** — 47-point vehicle assessment for used car buyers
+- **DVIR (Driver Vehicle Inspection Report)** — DOT-compliant fleet condition reports
+- **LiveLink** — Real-time telemetry broadcast to web dashboard viewers
+- **Fleet Chat** — In-app messaging between fleet drivers and dispatchers
+- **Active Tests** — Bi-directional commands for component actuation
+- **OBD Terminal** — Raw AT/OBD command console with response parsing
 
 ### 🔗 Connectivity
 - **Triple Transport** — Bluetooth Classic, BLE 5.0, WiFi TCP
-- **Auto-Detection** — Automatic ELM327 adapter fingerprinting
+- **Auto-Detection** — Automatic ELM327 adapter fingerprinting and clone detection
 - **Keep-Alive Manager** — Maintains stable connections during long sessions
 - **CAN Multi-Frame Parser** — Handles ISO-TP segmented responses
+- **USB Oscilloscope Support** — Hantek 6022BE driver for hardware waveform capture
 
 ### ☁️ Cloud & Sync
 - **Supabase Backend** — Real-time cloud sync for diagnostic history
+- **Google Drive Backup** — Automatic encrypted database backup to user's Drive
 - **Web Dashboard** — React/Vite companion app for desktop analysis
 - **Cross-Device** — Seamless data across devices
 
@@ -123,26 +169,41 @@ MEET/
 │   └── app/src/main/
 │       ├── kotlin/com/elysium369/meet/
 │       │   ├── core/
-│       │   │   ├── obd/            # OBD-II engine (Session, Decoder, ELM, Mode06)
+│       │   │   ├── obd/            # OBD-II engine (Session, Decoder, ELM, Mode06,
+│       │   │   │                   #   DemoSimulator, SignalAnalyzer, VinDecoder,
+│       │   │   │                   #   FuelTracker, MaintenancePredictor, SmogCheck)
 │       │   │   ├── ai/             # Gemini AI diagnostic integration
-│       │   │   ├── health/         # Predictive health engine
-│       │   │   ├── transport/      # BLE, Bluetooth Classic, WiFi transports
+│       │   │   ├── alerts/         # Custom threshold alert engine
+│       │   │   ├── audio/          # Voice recorder & playback (fleet chat)
+│       │   │   ├── backup/         # Google Drive encrypted backup worker
 │       │   │   ├── export/         # PDF report generation
-│       │   │   └── sync/           # Cloud sync workers
+│       │   │   ├── health/         # Predictive health engine
+│       │   │   ├── livelink/       # Real-time telemetry broadcast server
+│       │   │   ├── sync/           # Supabase cloud sync workers
+│       │   │   ├── transport/      # BLE, Bluetooth Classic, WiFi transports
+│       │   │   ├── trips/          # Trip manager & eco-score calculator
+│       │   │   ├── usb/            # Hantek 6022BE oscilloscope USB driver
+│       │   │   └── utils/          # File utilities & helpers
 │       │   ├── data/
-│       │   │   ├── local/          # Room DB, KnowledgeBase (12,128 guides)
-│       │   │   └── remote/         # Supabase cloud repository
+│       │   │   ├── local/          # Room DB, DAOs, Entities, KnowledgeBase
+│       │   │   ├── remote/         # Remote repository interfaces
+│       │   │   └── supabase/       # Supabase client & cloud operations
 │       │   ├── ui/
-│       │   │   ├── screens/        # All app screens (DTC, Scanner, Health, etc.)
-│       │   │   ├── components/     # Elite UI components (cards, gauges, buttons)
+│       │   │   ├── screens/        # 34 screens (DTC, Scanner, Maintenance,
+│       │   │   │                   #   Trips, HUD, DVIR, PrePurchase, etc.)
+│       │   │   ├── components/     # Elite UI (cards, gauges, animations, graphs)
 │       │   │   └── theme/          # Neon Cyan cyberpunk design system
-│       │   └── di/                 # Dependency injection (Koin)
+│       │   ├── di/                 # Dependency injection (Hilt / Dagger)
+│       │   └── widget/             # Home screen widget (MeetWidget)
 │       └── assets/
 │           ├── dtc_offline_solutions.json   # 12,128 expert guides (29MB)
 │           └── common_fixes.json            # Quick-fix lookup table
-├── src/                            # Web app (React/Vite/TypeScript)
-├── releases/                       # Pre-built APKs
-│   └── MEET-v3.3-elite.apk        # ← Latest release
+├── components/                     # Web app shared components (React/TS)
+├── services/                       # Web app services (signal analysis, etc.)
+├── src/                            # Web app entry (React/Vite/TypeScript)
+├── privacy-policy-site/            # Privacy policy static page
+├── releases/                       # Pre-built APKs & AABs
+│   └── MEET_latest_debug.apk      # ← Latest release (v3.4)
 ├── generate_elite.py               # Elite knowledge base generator
 ├── elite_templates.py              # DTC template engine
 └── generate_guides.py              # Guide synthesis pipeline
@@ -174,7 +235,7 @@ cd android
 ### Install Pre-Built APK
 ```bash
 # Direct install via ADB
-adb install releases/MEET-v3.3-elite.apk
+adb install releases/MEET_latest_debug.apk
 ```
 
 ### Web Dashboard
@@ -241,7 +302,7 @@ The elite knowledge base (`dtc_offline_solutions.json`) was generated by cross-r
 
 ## 🎨 Design System
 
-MEET uses a **"Neon Cyan" cyberpunk** design language:
+MEET uses a **"Neon Cyan" cyberpunk** design language with glassmorphism cards, animated gradients, and micro-interactions:
 
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -258,7 +319,17 @@ MEET uses a **"Neon Cyan" cyberpunk** design language:
 
 ## 📋 Changelog
 
-### v3.3 Elite (Current) — May 2026
+### v3.4 Elite (Current) — May 2026
+- ✅ **Maintenance Pro Module** — Interactive alerts dashboard with FODA vehicular analysis
+- ✅ **Eco-Trips Module** — Driving telemetry with SWOT analysis of driving habits
+- ✅ **Eco Score Gauge** — Circular Canvas-rendered efficiency gauge per trip
+- ✅ **Mock Trip Simulator** — Instant demo generation for prospective buyers
+- ✅ **Pre-Purchase 47-Point Inspection** — Complete vehicle assessment for used car buyers
+- ✅ **DVIR Fleet Inspection** — DOT-compliant vehicle condition reports
+- ✅ **HUD Mode** — Heads-Up Display for windshield projection
+- ✅ **Readiness Monitor Drive Cycle Guides** — SAE J1979 professional instructions per monitor
+
+### v3.3 Elite — May 2026
 - ✅ **12,128 expert repair guides** from 10 global sources
 - ✅ Urgency badges + drivability assessment per DTC
 - ✅ Cost estimates + labor time per repair
@@ -289,11 +360,14 @@ MEET uses a **"Neon Cyan" cyberpunk** design language:
 
 ---
 
-## 🛡️ Security
+## 🛡️ Security & Privacy
 
-- All API keys are stored in `.env` (excluded from git)
-- Vehicle data is encrypted in transit via Supabase RLS
-- No telemetry — your diagnostic data stays yours
+- **BYOK Model** — Users provide their own Gemini API key; MEET never stores or proxies API credentials
+- All secrets are stored in `.env` (excluded from git via `.gitignore`)
+- Vehicle data is encrypted in transit via Supabase RLS (Row-Level Security)
+- Google Drive backups are encrypted before upload
+- No analytics, no tracking, no telemetry — your diagnostic data stays **yours**
+- Full [Privacy Policy](privacy-policy-site/index.html) published for Play Store compliance
 
 ---
 
@@ -305,5 +379,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <p align="center">
   <strong>Built with 🔧 by <a href="https://github.com/jordelmir">Jordelmir</a></strong><br/>
-  <em>Making professional automotive diagnostics accessible to everyone.</em>
+  <em>Making professional automotive diagnostics accessible to everyone.</em><br/><br/>
+  <a href="https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/latest">
+    <img src="https://img.shields.io/badge/⬇️_Download_Latest_APK-39FF14?style=for-the-badge&labelColor=0A0E1A" alt="Download"/>
+  </a>
 </p>
