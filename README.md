@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-3.4_Elite-39FF14?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-3.5_Elite-39FF14?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Platform-Android-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Platform"/>
   <img src="https://img.shields.io/badge/Kotlin-2.1_%7C_Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"/>
   <img src="https://img.shields.io/badge/React-Vite_%7C_TypeScript-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React"/>
@@ -17,7 +17,7 @@
 
 # MEET — Mecánicos Especialistas En Todo
 
-**The most advanced open-source automotive diagnostic system ever built.** MEET ELITE v3.4 is a professional-grade OBD-II diagnostic suite engineered for mechanics, workshops, and enthusiasts who demand dealership-level intelligence without the dealership price tag.
+**The most advanced open-source automotive diagnostic system ever built.** MEET ELITE v3.5 is a professional-grade OBD-II diagnostic suite engineered for mechanics, workshops, and enthusiasts who demand dealership-level intelligence without the dealership price tag.
 
 > 🧠 **12,128 expert repair guides** cross-referenced from 10 global automotive authorities — more diagnostic depth than any commercial tool at any price.
 
@@ -46,6 +46,7 @@ MEET isn't just another code reader — it's a **complete vehicle intelligence p
 | **Oscilloscope / waveform analysis** | ✅ | ❌ | ❌ | ❌ | ✅ |
 | **Readiness monitor drive-cycle guides** | ✅ Per monitor | ❌ | ❌ | ❌ | ⚠️ |
 | **OBD terminal (raw commands)** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Android Terminal (Termux substitute)** | ✅ 100% Real | ❌ | ❌ | ❌ | ❌ |
 | **PDF diagnostic report export** | ✅ | ❌ | ⚠️ | ✅ | ✅ |
 | **Multi-transport (BLE/BT/WiFi)** | ✅ All 3 | ⚠️ BT only | ⚠️ WiFi only | BLE only | Proprietary |
 | **Bilingual (EN/ES)** | ✅ Native | ❌ | ❌ | ❌ | ⚠️ |
@@ -61,7 +62,7 @@ MEET isn't just another code reader — it's a **complete vehicle intelligence p
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    MEET ELITE v3.4                   │
+│                    MEET ELITE v3.5                   │
 ├─────────────┬───────────────┬───────────────────────┤
 │  Android    │   Web App     │   Cloud               │
 │  (Kotlin/   │   (React/     │   (Supabase)           │
@@ -127,10 +128,15 @@ MEET isn't just another code reader — it's a **complete vehicle intelligence p
 
 ### 🚗 Eco-Trips & Driving Analytics
 - **Trip Recording** — Automatic telemetry capture (distance, duration, speed, RPM, temperature)
-- **Eco Score** — Per-trip efficiency rating with circular Canvas gauge
+- **Eco Score Gauge** — Real-time efficiency rating using interactive circular Canvas-rendered gauge
+- **Carbon Footprint Tracking** — Automatic CO2 calculation based on EPA standards (Gasoline/Diesel)
+- **Wasted Idle Calculator** — Financial & volumetric tracking of wasted fuel during vehicle idling
+- **Alternator & Battery Analytics** — Continuous plotting of min/max alternator voltage trends across past 10 trips
 - **FODA de Conducción** — SWOT analysis of driving habits (acceleration patterns, RPM discipline, thermal stress)
+- **Interactive Bottom Sheet** — Comprehensive telemetry overview per historical trip
 - **Mock Trip Simulator** — Instant demo generation for app showcase
-- **PDF Export** — Professional trip reports (Premium)
+- **PDF Export** — Professional, high-fidelity trip reports (Premium)
+- **Database Auto-Pruning** — Background worker to prune logs and trip history older than 90 days
 
 ### 🏥 Predictive Health
 - **Vehicle Health Score** — Algorithmic assessment based on sensor trends
@@ -145,6 +151,7 @@ MEET isn't just another code reader — it's a **complete vehicle intelligence p
 - **Fleet Chat** — In-app messaging between fleet drivers and dispatchers
 - **Active Tests** — Bi-directional commands for component actuation
 - **OBD Terminal** — Raw AT/OBD command console with response parsing
+- **Android Terminal (Termux Substitute)** — 100% real interactive Android shell (`/system/bin/sh`) with Kotlin Coroutine streams, CRT scanlines, and diagnostic quick-action chips (`uname`, `df`, `pm`, `getprop`, `netstat`, `top`, `logcat`)
 
 ### 🔗 Connectivity
 - **Triple Transport** — Bluetooth Classic, BLE 5.0, WiFi TCP
@@ -203,7 +210,7 @@ MEET/
 ├── src/                            # Web app entry (React/Vite/TypeScript)
 ├── privacy-policy-site/            # Privacy policy static page
 ├── releases/                       # Pre-built APKs & AABs
-│   └── MEET_latest_debug.apk      # ← Latest release (v3.4)
+│   └── MEET_latest_debug.apk      # ← Latest release (v3.5)
 ├── generate_elite.py               # Elite knowledge base generator
 ├── elite_templates.py              # DTC template engine
 └── generate_guides.py              # Guide synthesis pipeline
@@ -319,7 +326,20 @@ MEET uses a **"Neon Cyan" cyberpunk** design language with glassmorphism cards, 
 
 ## 📋 Changelog
 
-### v3.4 Elite (Current) — May 2026
+### v3.5 Elite (Current) — June 2026
+- ✅ **Android Terminal (Termux Substitute)** — Fully integrated interactive `/system/bin/sh` shell running asynchronously via Kotlin Coroutines. Features quick-execution chips (`uname`, `df`, `pm`, `getprop`, `netstat`, `top`, `logcat`), CRT scanline effects, and clean log exports (copy/share).
+- ✅ **Advanced Statistics & Telemetry Dashboard** — Next-level analytics tab featuring:
+  - **EcoScore Radial Gauge** with dynamic Canvas arcs & EPA-based CO2 emissions calculator.
+  - **Wasted Idle Calculator** detailing fuel volume and financial loss from idle time.
+  - **Live Canvas Graphs** for real-time speed and RPM tracking.
+  - **Alternator Health Trends** plotting battery voltage min/max history over the last 10 trips.
+  - **DTC Efficiency Alert Banner** warning users of open-loop rich fueling due to active fault codes.
+  - **Interactive Bottom Sheet** for detailed historical trip inspection.
+  - **PDF Export Engine** to generate and share high-fidelity trip reports.
+- ✅ **Unit Toggles & Persistent Settings** — Interactive Metric/Imperial converter (km/mi, km/h/mph, L/gal, L/100km/MPG, °C/°F) and configurations for local fuel price, currency, and fuel type.
+- ✅ **Database Auto-Pruning** — Background worker to clean up diagnostic logs and trip histories older than 90 days.
+
+### v3.4 Elite — May 2026
 - ✅ **Maintenance Pro Module** — Interactive alerts dashboard with FODA vehicular analysis
 - ✅ **Eco-Trips Module** — Driving telemetry with SWOT analysis of driving habits
 - ✅ **Eco Score Gauge** — Circular Canvas-rendered efficiency gauge per trip
