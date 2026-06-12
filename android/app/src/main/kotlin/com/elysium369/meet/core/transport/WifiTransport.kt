@@ -18,18 +18,29 @@ class WifiTransport(
 
     override suspend fun connect() {
         withContext(Dispatchers.IO) {
-            socket = Socket().apply {
-                // Keepalive a nivel TCP — el sistema operativo mantiene el socket vivo
-                setPerformancePreferences(0, 1, 0) // priorizar latencia sobre bandwidth
-                soTimeout = 5000      // 5s timeout de lectura
-                tcpNoDelay = true     // enviar bytes inmediatamente, sin Nagle algorithm
-                keepAlive = true      // TCP keepalive del SO
-                receiveBufferSize = 4096
-                sendBufferSize = 256  // comandos OBD son cortos
-                connect(InetSocketAddress(ipAddress, port), 5000)
+            var tempSocket: Socket? = null
+            try {
+                tempSocket = Socket()
+                tempSocket.apply {
+                    // Keepalive a nivel TCP — el sistema operativo mantiene el socket vivo
+                    setPerformancePreferences(0, 1, 0) // priorizar latencia sobre bandwidth
+                    soTimeout = 5000      // 5s timeout de lectura
+                    tcpNoDelay = true     // enviar bytes inmediatamente, sin Nagle algorithm
+                    keepAlive = true      // TCP keepalive del SO
+                    receiveBufferSize = 4096
+                    sendBufferSize = 256  // comandos OBD son cortos
+                    connect(InetSocketAddress(ipAddress, port), 5000)
+                }
+                socket = tempSocket
+                inputStream = tempSocket.getInputStream()
+                outputStream = tempSocket.getOutputStream()
+            } catch (e: Exception) {
+                tempSocket?.close()
+                socket = null
+                inputStream = null
+                outputStream = null
+                throw e
             }
-            inputStream = socket?.getInputStream()
-            outputStream = socket?.getOutputStream()
         }
     }
 

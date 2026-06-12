@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.elysium369.meet.MainActivity
 import com.elysium369.meet.core.alerts.AlertManager
@@ -28,6 +30,8 @@ class ObdForegroundService : Service() {
     private val NOTIF_ID = 1
     private val CHANNEL_ID = "obd_channel"
     
+    private var wakeLock: PowerManager.WakeLock? = null
+    
     val liveData: StateFlow<Map<String, Float>> get() = obdSession.liveData
     val connectionState: StateFlow<ObdState> get() = obdSession.state
     
@@ -36,9 +40,18 @@ class ObdForegroundService : Service() {
         
         // Crear canal ANTES de startForeground — requerido en Android 8+
         createNotificationChannel()
+        acquireWakeLock()
         
         try {
-            startForeground(NOTIF_ID, buildNotification("Iniciando conexión..."))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIF_ID,
+                    buildNotification("Iniciando conexión..."),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIF_ID, buildNotification("Iniciando conexión..."))
+            }
         } catch (e: Exception) {
             // Ignorar en desarrollo/pruebas si faltan permisos
         }
@@ -75,6 +88,33 @@ class ObdForegroundService : Service() {
         }
         
         return START_STICKY
+    }
+
+    private fun acquireWakeLock() {
+        try {
+            val pm = getSystemService(android.content.Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MEET:ObdForegroundServiceWakeLock").apply {
+                acquire(15 * 60 * 1000L) // Limit to 15 mins for safety
+            }
+            Log.d("ObdForegroundService", "WakeLock acquired successfully")
+        } catch (e: Exception) {
+            Log.e("ObdForegroundService", "Failed to acquire WakeLock", e)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    Log.d("ObdForegroundService", "WakeLock released successfully")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ObdForegroundService", "Failed to release WakeLock", e)
+        } finally {
+            wakeLock = null
+        }
     }
     
     private fun createNotificationChannel() {
@@ -116,8 +156,11 @@ class ObdForegroundService : Service() {
             try {
                 tripManager.endTrip()
             } catch (_: Exception) {}
-            // KeepAlive se detiene con obdSession.disconnect()
+            try {
+                obdSession.disconnect()
+            } catch (_: Exception) {}
         }
+        releaseWakeLock()
         serviceScope.cancel()
         super.onDestroy()
     }

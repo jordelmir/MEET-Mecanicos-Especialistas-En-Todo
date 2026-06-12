@@ -165,4 +165,82 @@ object DtcUtils {
         sb.append("Se recomienda atender con prioridad cualquier código catalogado como `HIGH` o `CRITICAL` con urgencia de tipo `STOP_DRIVING` para evitar daños permanentes en el motor o los sistemas de seguridad activa del chasis.")
         return sb.toString()
     }
+
+    fun getDtcParagraphExplanation(code: String, shortDesc: String, isSpanish: Boolean): String {
+        val upperCode = code.trim().uppercase()
+        val letter = upperCode.firstOrNull() ?: 'P'
+        
+        // Specific paragraph explanations for cylinder misfire codes
+        if (upperCode.matches(Regex("P030[1-9]|P031[0-2]"))) {
+            val cylinder = upperCode.substring(3).toIntOrNull() ?: 1
+            return if (isSpanish) {
+                "El código $upperCode es un código de diagnóstico OBD-II que significa fallo de encendido detectado en el cilindro $cylinder. Esto indica que el combustible no se está quemando de manera eficiente en ese cilindro en específico, reduciendo el rendimiento motor. Las causas comunes incluyen bujías desgastadas en el cilindro $cylinder, bobina de encendido correspondiente defectuosa, inyector tapado o problemas de compresión mecánica en dicho cilindro."
+            } else {
+                "The $upperCode code is an OBD-II diagnostic trouble code that means misfire detected in cylinder $cylinder. This indicates that fuel is not burning properly in that specific cylinder, reducing engine performance. Common causes include worn spark plugs in cylinder $cylinder, a failed ignition coil for that cylinder, a clogged fuel injector, or mechanical compression issues in that cylinder."
+            }
+        }
+
+        // Specific paragraph explanations for common codes
+        if (isSpanish) {
+            when (upperCode) {
+                "P0300" -> return "El código P0300 es un código de diagnóstico OBD-II que significa que el módulo de control del motor (ECM) ha detectado fallas de encendido aleatorias en múltiples cilindros. Esto indica que el combustible no se está quemando de manera eficiente o regular en más de un cilindro, lo que puede provocar pérdida de potencia y tirones. Las causas comunes incluyen bujías desgastadas o defectuosas, bobinas de encendido con fallas, cables de bujías dañados, inyectores de combustible obstruidos o una fuga de vacío en la admisión."
+                "P0171" -> return "El código P0171 es un código de diagnóstico OBD-II que significa que el sistema del motor está funcionando con una mezcla demasiado pobre en el banco 1. Esto indica que hay un exceso de aire o una deficiencia de combustible en la cámara de combustión, afectando la eficiencia térmica. Las causas comunes incluyen fugas de vacío, un sensor de flujo de masa de aire (MAF) sucio o dañado, baja presión de combustible por bomba debilitada o un inyector obstruido."
+                "P0420" -> return "El código P0420 es un código de diagnóstico OBD-II que significa que la eficiencia del sistema catalítico está por debajo del umbral permitido en el banco 1. Esto indica que el convertidor catalítico no está purificando adecuadamente los gases de escape nocivos para cumplir con las normas ambientales. Las causas comunes incluyen un convertidor catalítico dañado o desgastado, fallas de encendido previas que dañaron el catalizador, fugas de escape antes del catalizador o lecturas erráticas de los sensores de oxígeno."
+                "P0101" -> return "El código P0101 es un código de diagnóstico OBD-II que significa un problema de rango o rendimiento en el circuito del sensor de flujo de masa o volumen de aire (MAF). Esto indica que la computadora recibe señales de flujo de aire inconsistentes que no coinciden con la carga del motor. Las causas comunes incluyen un sensor MAF sucio o contaminado por aceite/polvo, fugas de aire en la bota de admisión o un filtro de aire excesivamente obstruido."
+                "P0505" -> return "El código P0505 es un código de diagnóstico OBD-II que significa un mal funcionamiento en el sistema de control del aire de ralentí (IAC). Esto indica que la computadora del motor no puede estabilizar las revoluciones mínimas deseadas cuando el vehículo está detenido. Las causas comunes incluyen una válvula IAC sucia o atascada, acumulación de carbón en el cuerpo de aceleración o fugas de vacío."
+            }
+        } else {
+            when (upperCode) {
+                "P0300" -> return "The P0300 code is an OBD-II diagnostic trouble code that means random or multiple cylinder misfire detected. This indicates that fuel is not burning properly in more than one cylinder, causing engine hesitation or power loss. Common causes include worn or faulty spark plugs, failing ignition coils, damaged spark plug wires, clogged fuel injectors, or a vacuum leak in the intake."
+                "P0171" -> return "The P0171 code is an OBD-II diagnostic trouble code that means system too lean in Bank 1. This indicates that there is too much air or too little fuel in the combustion chambers, impacting thermal efficiency. Common causes include intake vacuum leaks, a dirty or failed Mass Air Flow (MAF) sensor, low fuel pressure from a weak pump, or a clogged fuel injector."
+                "P0420" -> return "The P0420 code is an OBD-II diagnostic trouble code that means catalyst system efficiency below threshold in Bank 1. This indicates that the catalytic converter is not cleaning harmful exhaust emissions properly to meet environmental standards. Common causes include a degraded or melted catalytic converter, previous cylinder misfires damaging the catalyst, or leaking oxygen sensors."
+                "P0101" -> return "The P0101 code is an OBD-II diagnostic trouble code that means Mass or Volume Air Flow (MAF) circuit range or performance problem. This indicates that the computer is receiving inconsistent airflow readings relative to engine load. Common causes include a dirty or contaminated MAF sensor, air leaks in the intake boots, or an extremely dirty engine air filter."
+                "P0505" -> return "The P0505 code is an OBD-II diagnostic trouble code that means idle air control system malfunction. This indicates that the engine computer is unable to maintain a stable or target idle speed when the vehicle is stationary. Common causes include a dirty or stuck IAC valve, carbon buildup in the throttle body, or intake vacuum leaks."
+            }
+        }
+
+        // Generic dynamic paragraph constructor
+        val cleanDesc = shortDesc.trim().trimEnd('.')
+        val indication = if (isSpanish) {
+            when (letter) {
+                'P' -> "que existe una anomalía en el funcionamiento de la propulsión, la gestión de combustión, emisión o control de transmisión"
+                'C' -> "que el chasis o sistemas de seguridad activa (como frenos ABS, dirección asistida o tracción) registran valores fuera del rango esperado"
+                'B' -> "que los componentes de la carrocería, climatización, seguridad pasiva (airbags) o módulos de confort reportan fallas operativas"
+                'U' -> "que se ha interrumpido el flujo de datos digitales o la comunicación multiplexada entre las computadoras del vehículo en el bus CAN"
+                else -> "que el sistema monitoreado ha reportado lecturas fuera de los parámetros de fábrica"
+            }
+        } else {
+            when (letter) {
+                'P' -> "that there is an anomaly in the operation of the vehicle's powertrain, combustion management, emissions, or transmission systems"
+                'C' -> "that the chassis or active safety systems (such as ABS brakes, steering, or traction control) are registering values outside the expected range"
+                'B' -> "that body components, climate control, passive safety (airbags), or comfort modules are reporting operational issues"
+                'U' -> "that digital data flow or multiplexed communication between control modules has been disrupted on the CAN bus"
+                else -> "that the monitored system is reporting readings outside standard factory parameters"
+            }
+        }
+
+        val causes = if (isSpanish) {
+            when (letter) {
+                'P' -> "sensores defectuosos (como de oxígeno o MAF), fallas de cableado eléctrico, fugas de vacío, inyectores sucios o desgaste físico de piezas internas"
+                'C' -> "sensores de velocidad de rueda averiados, bajo nivel de líquido, conectores sulfatados o actuadores mecánicos desgastados"
+                'B' -> "fusibles fundidos, interruptores defectuosos, motores de accesorios dañados, cableado expuesto o conectores de seguridad flojos"
+                'U' -> "problemas de alimentación en algún módulo, cables del bus de datos dañados o con cortocircuito, o conectores de red flojos"
+                else -> "sensores con fallas internas, cableado averiado, conexiones flojas o componentes mecánicos con holguras fuera de tolerancia"
+            }
+        } else {
+            when (letter) {
+                'P' -> "faulty sensors (such as oxygen or MAF), damaged wiring harness, vacuum leaks, clogged injectors, or physical wear of internal components"
+                'C' -> "failed wheel speed sensors, low fluid levels, corroded connector terminals, or worn mechanical actuators"
+                'B' -> "blown fuses, malfunctioning switches, damaged accessory motors, exposed wiring, or loose safety connectors"
+                'U' -> "loss of power to control modules, damaged or shorted data lines, or loose network harness connections"
+                else -> "failed sensors, broken electrical wires, loose terminal connections, or mechanical parts out of tolerance"
+            }
+        }
+
+        return if (isSpanish) {
+            "El código $upperCode es un código de diagnóstico OBD-II que significa $cleanDesc. Esto indica $indication. Las causas comunes incluyen $causes."
+        } else {
+            "The $upperCode code is an OBD-II diagnostic trouble code that means $cleanDesc. This indicates $indication. Common causes include $causes."
+        }
+    }
 }

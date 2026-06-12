@@ -30,7 +30,7 @@ import com.elysium369.meet.data.local.entities.*
         ChatBlocklistEntity::class,
         DvirReportEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

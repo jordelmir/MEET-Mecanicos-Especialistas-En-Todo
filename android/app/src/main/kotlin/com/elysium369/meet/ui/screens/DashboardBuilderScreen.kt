@@ -581,6 +581,31 @@ fun WidgetCard(
         (widget.minVal + widget.maxVal) / 2f
     }
     
+    // Check for sensor characteristics to apply customized premium spring dynamics
+    val isFastSensor = widget.pid == "010D" || widget.pid == "010C" || 
+                       widget.unit.equals("km/h", ignoreCase = true) || 
+                       widget.unit.equals("rpm", ignoreCase = true) || 
+                       widget.unit.contains("hp", ignoreCase = true) ||
+                       widget.unit.equals("bar", ignoreCase = true) ||
+                       widget.unit.equals("%", ignoreCase = true) ||
+                       widget.name.contains("velocidad", ignoreCase = true) || 
+                       widget.name.contains("speed", ignoreCase = true) ||
+                       widget.name.contains("rpm", ignoreCase = true) ||
+                       widget.name.contains("boost", ignoreCase = true) ||
+                       widget.name.contains("carga", ignoreCase = true) ||
+                       widget.name.contains("load", ignoreCase = true) ||
+                       widget.name.contains("acelerador", ignoreCase = true) ||
+                       widget.name.contains("throttle", ignoreCase = true)
+
+    val animatedValue by animateFloatAsState(
+        targetValue = liveValue,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy, // Clear readability, no overshoot
+            stiffness = if (isFastSensor) 35f else 60f // Fluid visual sweep sintonizado
+        ),
+        label = "widgetAnimation"
+    )
+    
     // Simulation logic (only active in preview mode)
     if (previewMode) {
         LaunchedEffect(widget.pid) {
@@ -758,7 +783,7 @@ fun WidgetCard(
                     "WAVE" -> {
                         WaveGraphWidget(
                             label = "",
-                            currentValue = liveValue,
+                            currentValue = animatedValue,
                             minVal = widget.minVal,
                             maxVal = widget.maxVal,
                             unit = widget.unit,
@@ -779,7 +804,7 @@ fun WidgetCard(
                             } else 1f
 
                             Text(
-                                String.format("%.1f", liveValue),
+                                String.format("%.1f", animatedValue),
                                 color = (if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error else widgetColor).copy(alpha = digitAlpha),
                                 fontSize = if (widget.gridH > 1) 72.sp else 42.sp,
                                 fontWeight = FontWeight.Black,
@@ -794,7 +819,7 @@ fun WidgetCard(
                             )
                             // Percentage readout
                             val range = (widget.maxVal - widget.minVal).let { if (it == 0f) 1f else it }
-                            val pct = ((liveValue - widget.minVal) / range * 100).coerceIn(0f, 100f)
+                            val pct = ((animatedValue - widget.minVal) / range * 100).coerceIn(0f, 100f)
                             Text(
                                 "${String.format("%.0f", pct)}% OF RANGE",
                                 color = com.elysium369.meet.ui.theme.MeetColors.textMuted,
@@ -809,7 +834,7 @@ fun WidgetCard(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             GaugeWidget(
                                 label = "",
-                                value = liveValue,
+                                value = animatedValue,
                                 minVal = widget.minVal,
                                 maxVal = widget.maxVal,
                                 unit = widget.unit,
@@ -844,7 +869,7 @@ fun WidgetCard(
             // ── Pro Telemetry Bar (Bottom) ──
             Column(modifier = Modifier.fillMaxWidth()) {
                 val progressRange = (widget.maxVal - widget.minVal).let { if (it == 0f) 1f else it }
-                val progress = ((liveValue - widget.minVal) / progressRange).coerceIn(0f, 1f)
+                val progress = ((animatedValue - widget.minVal) / progressRange).coerceIn(0f, 1f)
 
                 Box(
                     modifier = Modifier
@@ -896,7 +921,7 @@ fun WidgetCard(
                         )
                     }
                     Text(
-                        "VAL: ${String.format("%.2f", liveValue)} ${widget.unit}",
+                        "VAL: ${String.format("%.2f", animatedValue)} ${widget.unit}",
                         color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Black,

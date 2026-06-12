@@ -194,14 +194,18 @@ class PredictiveHealthEngine @Inject constructor(
     private fun computeTrend(pid: String, data: List<SensorHistoryEntity>): SensorTrend {
         val values = data.map { it.value.toDouble() }
         val timestamps = data.map { it.timestamp.toDouble() }
+        val t0 = timestamps.firstOrNull() ?: 0.0
 
-        // Linear regression: y = mx + b
-        val regression = linearRegression(timestamps, values)
-        val slope = regression.first      // units per millisecond
+        // Normalizar marcas de tiempo a segundos desde el inicio para estabilidad numérica
+        val normalizedTimestamps = timestamps.map { (it - t0) / 1000.0 }
+
+        // Regresión lineal: y = mx + b
+        val regression = linearRegression(normalizedTimestamps, values)
+        val slope = regression.first      // unidades por segundo
         val intercept = regression.second
 
-        // Convert slope to units per day for readability
-        val slopePerDay = slope * MS_PER_DAY
+        // Convertir pendiente a unidades por día (86400 segundos en un día)
+        val slopePerDay = slope * 86400.0
 
         // Standard deviation for anomaly detection
         val mean = values.average()

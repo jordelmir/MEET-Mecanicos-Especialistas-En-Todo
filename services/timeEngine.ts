@@ -1,5 +1,12 @@
 
-import { WorkOrder, WorkOrderStatus } from '../types';
+import { Mechanic, Service, WorkOrder, WorkOrderStatus } from '../types';
+
+export interface ScheduleValidationResult {
+  valid: boolean;
+  errors: string[];
+  endTime: Date;
+  realDurationMinutes: number;
+}
 
 /**
  * Calculate the estimated end time for a work order based on service duration and mechanic efficiency.
@@ -8,6 +15,98 @@ export function calculateEndTime(startTime: Date, baseMinutes: number, efficienc
   const realDuration = Math.ceil(baseMinutes / efficiencyFactor);
   const endTime = new Date(startTime.getTime() + realDuration * 60000);
   return endTime;
+}
+
+export function calculateRealDurationMinutes(baseMinutes: number, efficiencyFactor: number): number {
+  if (!Number.isFinite(baseMinutes) || baseMinutes <= 0) return 0;
+  if (!Number.isFinite(efficiencyFactor) || efficiencyFactor <= 0) return baseMinutes;
+  return Math.ceil(baseMinutes / efficiencyFactor);
+}
+
+export function minutesSinceMidnight(time: Date): number {
+  return time.getHours() * 60 + time.getMinutes();
+}
+
+export function isSameBusinessDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function validateSchedule(params: {
+  mechanic?: Mechanic | null;
+  service?: Service | null;
+  startTime: Date;
+  existingOrders: WorkOrder[];
+  openHour: number;
+  closeHour: number;
+  timeSliceMinutes: number;
+  excludeOrderId?: string;
+  allowPastStart?: boolean;
+  now?: Date;
+}): ScheduleValidationResult {
+  const {
+    mechanic,
+    service,
+    startTime,
+    existingOrders,
+    openHour,
+    closeHour,
+    timeSliceMinutes,
+    excludeOrderId,
+    allowPastStart = false,
+    now = new Date(),
+  } = params;
+  const errors: string[] = [];
+
+  const realDurationMinutes = service && mechanic
+    ? calculateRealDurationMinutes(service.estimatedMinutes, mechanic.efficiencyFactor)
+    : 0;
+  const endTime = realDurationMinutes > 0
+    ? new Date(startTime.getTime() + realDurationMinutes * 60000)
+    : new Date(startTime);
+
+  if (!mechanic) errors.push('Seleccione un mecánico válido.');
+  if (!service) errors.push('Seleccione un servicio válido.');
+  if (!(startTime instanceof Date) || Number.isNaN(startTime.getTime())) {
+    errors.push('Seleccione una fecha y hora válidas.');
+  }
+  if (service && service.estimatedMinutes <= 0) {
+    errors.push('La duración del servicio debe ser mayor a cero.');
+  }
+  if (mechanic && mechanic.efficiencyFactor <= 0) {
+    errors.push('La eficiencia del mecánico debe ser mayor a cero.');
+  }
+  if (openHour >= closeHour) {
+    errors.push('El horario de apertura debe ser anterior al cierre.');
+  }
+
+  if (errors.length === 0) {
+    if (!allowPastStart && startTime.getTime() < now.getTime()) {
+      errors.push('No se pueden crear órdenes en fechas u horas pasadas.');
+    }
+
+    const startMinutes = minutesSinceMidnight(startTime);
+    const endMinutes = minutesSinceMidnight(endTime);
+    const openMinutes = openHour * 60;
+    const closeMinutes = closeHour * 60;
+
+    if (startMinutes < openMinutes || endMinutes > closeMinutes || !isSameBusinessDay(startTime, endTime)) {
+      errors.push('La orden debe iniciar y terminar dentro del horario del taller.');
+    }
+
+    if (timeSliceMinutes > 0 && startMinutes % timeSliceMinutes !== 0) {
+      errors.push(`La hora debe alinearse a bloques de ${timeSliceMinutes} minutos.`);
+    }
+
+    if (mechanic && hasConflict(mechanic.id, startTime, endTime, existingOrders, excludeOrderId)) {
+      errors.push('El mecánico ya tiene una orden asignada en ese horario.');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, endTime, realDurationMinutes };
 }
 
 /**
@@ -20,6 +119,42 @@ export function canClientCancel(order: WorkOrder): boolean {
     WorkOrderStatus.DIAGNOSED,
     WorkOrderStatus.WAITING_PARTS,
   ].includes(order.status);
+}
+
+const STATUS_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
+  [WorkOrderStatus.RECEIVED]: [
+    WorkOrderStatus.DIAGNOSED,
+    WorkOrderStatus.IN_PROGRESS,
+    WorkOrderStatus.CANCELLED,
+  ],
+  [WorkOrderStatus.DIAGNOSED]: [
+    WorkOrderStatus.WAITING_PARTS,
+    WorkOrderStatus.IN_PROGRESS,
+    WorkOrderStatus.CANCELLED,
+  ],
+  [WorkOrderStatus.WAITING_PARTS]: [
+    WorkOrderStatus.IN_PROGRESS,
+    WorkOrderStatus.CANCELLED,
+  ],
+  [WorkOrderStatus.IN_PROGRESS]: [
+    WorkOrderStatus.QUALITY_CHECK,
+    WorkOrderStatus.COMPLETED,
+    WorkOrderStatus.CANCELLED,
+  ],
+  [WorkOrderStatus.QUALITY_CHECK]: [
+    WorkOrderStatus.IN_PROGRESS,
+    WorkOrderStatus.COMPLETED,
+  ],
+  [WorkOrderStatus.COMPLETED]: [
+    WorkOrderStatus.DELIVERED,
+  ],
+  [WorkOrderStatus.DELIVERED]: [],
+  [WorkOrderStatus.CANCELLED]: [],
+};
+
+export function canTransitionStatus(currentStatus: WorkOrderStatus, nextStatus: WorkOrderStatus): boolean {
+  if (currentStatus === nextStatus) return true;
+  return STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus) ?? false;
 }
 
 /**

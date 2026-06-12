@@ -2,1676 +2,1092 @@ package com.elysium369.meet.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.launch
-import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
-import com.elysium369.meet.data.local.KnowledgeBaseRepository
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.elysium369.meet.ui.FleetChatViewModel
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC PARTICLES DEFINITION
+// ═══════════════════════════════════════════════════════════════
+
+private data class HoloParticle(
+    val xSeed: Float,
+    val ySeed: Float,
+    val speed: Float,
+    val size: Float,
+    val colorAlpha: Float,
+    val horizontalDrift: Float
+)
+
+private val backgroundParticles = List(30) { index ->
+    HoloParticle(
+        xSeed = (index * 0.17f) % 1.0f,
+        ySeed = (index * 0.23f) % 1.0f,
+        speed = 0.02f + (index * 0.008f) % 0.04f,
+        size = 1f + (index % 3) * 1f,
+        colorAlpha = 0.08f + (index % 4) * 0.04f,
+        horizontalDrift = -0.05f + (index * 0.03f) % 0.1f
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC BACKGROUND — Animated ambient light + grid + particles
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun HolographicBackground(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "holoBg")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing)),
+        label = "bgPhase"
+    )
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "bgGlow"
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+
+        // Ambient glow orbs
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    MeetColors.neonGreen.copy(alpha = 0.05f * glowPulse),
+                    Color.Transparent
+                ),
+                center = Offset(w * (0.3f + phase * 0.1f), h * 0.25f),
+                radius = w * 0.6f
+            ),
+            radius = w * 0.6f,
+            center = Offset(w * (0.3f + phase * 0.1f), h * 0.25f)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    MeetColors.electricBlue.copy(alpha = 0.04f * glowPulse),
+                    Color.Transparent
+                ),
+                center = Offset(w * (0.7f - phase * 0.1f), h * 0.7f),
+                radius = w * 0.5f
+            ),
+            radius = w * 0.5f,
+            center = Offset(w * (0.7f - phase * 0.1f), h * 0.7f)
+        )
+
+        // Subtle grid lines
+        val gridSpacing = 45.dp.toPx()
+        val gridAlpha = 0.025f
+        val gridColor = MeetColors.neonGreen.copy(alpha = gridAlpha)
+        var y = 0f
+        while (y < h) {
+            drawLine(gridColor, Offset(0f, y), Offset(w, y), 0.5f)
+            y += gridSpacing
+        }
+        var x = 0f
+        while (x < w) {
+            drawLine(gridColor, Offset(x, 0f), Offset(x, h), 0.5f)
+            x += gridSpacing
+        }
+
+        // Drifting particles
+        backgroundParticles.forEach { p ->
+            val px = ((p.xSeed * w) + (phase * p.speed * w) + (p.horizontalDrift * w * sin(phase * 2 * PI.toFloat()))) % w
+            val py = ((p.ySeed * h) - (phase * p.speed * h)) % h
+            
+            val finalX = if (px < 0) px + w else px
+            val finalY = if (py < 0) py + h else py
+
+            drawCircle(
+                color = MeetColors.neonGreen.copy(alpha = p.colorAlpha * glowPulse * 1.5f),
+                radius = p.size.dp.toPx(),
+                center = Offset(finalX, finalY)
+            )
+        }
+
+        // Horizontal scan line
+        val scanY = h * phase
+        drawLine(
+            brush = Brush.horizontalGradient(
+                0f to Color.Transparent,
+                0.2f to MeetColors.cyberCyan.copy(alpha = 0.08f),
+                0.5f to MeetColors.cyberCyan.copy(alpha = 0.15f),
+                0.8f to MeetColors.cyberCyan.copy(alpha = 0.08f),
+                1f to Color.Transparent
+            ),
+            start = Offset(0f, scanY),
+            end = Offset(w, scanY),
+            strokeWidth = 2f
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC CARD — 3D float, glow borders, inner light, corner marks
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun HoloCard(
+    modifier: Modifier = Modifier,
+    accentColor: Color = MeetColors.neonGreen,
+    glowIntensity: Float = 0.15f,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "holoCard")
+    val borderPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
+        label = "borderPhase"
+    )
+
+    // Gentle 3D float oscillation
+    val rotX by infiniteTransition.animateFloat(
+        initialValue = -2.5f, targetValue = 2.5f,
+        animationSpec = infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "rotX"
+    )
+    val rotY by infiniteTransition.animateFloat(
+        initialValue = -3f, targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "rotY"
+    )
+    val translationYAnim by infiniteTransition.animateFloat(
+        initialValue = -4f, targetValue = 4f,
+        animationSpec = infiniteRepeatable(tween(4500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "transY"
+    )
+
+    Box(
+        modifier = modifier
+            // Apply 3D rotation and translation
+            .graphicsLayer {
+                rotationX = rotX
+                rotationY = rotY
+                translationY = translationYAnim
+                cameraDistance = 12f * density
+            }
+            // Shadow layer 1 — deep ambient glow
+            .shadow(
+                elevation = 16.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = accentColor.copy(alpha = 0.25f),
+                spotColor = accentColor.copy(alpha = 0.15f)
+            )
+            // Shadow layer 2 — tight glow
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = accentColor.copy(alpha = 0.4f),
+                spotColor = accentColor.copy(alpha = 0.3f)
+            )
+            .clip(RoundedCornerShape(16.dp))
+            // Glassmorphism background
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0D1A2E).copy(alpha = 0.90f),
+                        Color(0xFF081428).copy(alpha = 0.93f),
+                        Color(0xFF060F20).copy(alpha = 0.96f)
+                    )
+                )
+            )
+            // Animated gradient border + HUD corner marks
+            .drawBehind {
+                val cornerRadius = CornerRadius(16.dp.toPx())
+                val borderWidth = 1.5f
+
+                // Animated sweep gradient for the border
+                val sweep = borderPhase * 360f
+                val colors = listOf(
+                    accentColor.copy(alpha = 0.8f),
+                    accentColor.copy(alpha = 0.2f),
+                    Color.Transparent,
+                    Color.Transparent,
+                    accentColor.copy(alpha = 0.2f),
+                    accentColor.copy(alpha = 0.8f)
+                )
+
+                drawRoundRect(
+                    brush = Brush.sweepGradient(
+                        colors = colors,
+                        center = Offset(size.width / 2, size.height / 2)
+                    ),
+                    cornerRadius = cornerRadius,
+                    style = Stroke(width = borderWidth)
+                )
+
+                // Inner glow at top
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        0f to accentColor.copy(alpha = glowIntensity * 0.4f),
+                        0.20f to Color.Transparent
+                    ),
+                    cornerRadius = cornerRadius,
+                    size = Size(size.width, size.height * 0.3f)
+                )
+
+                // Sci-fi corner brackets
+                val markerLen = 10.dp.toPx()
+                val pad = 2.dp.toPx()
+                val w = size.width
+                val h = size.height
+
+                // Top-Left
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(pad, pad), Offset(pad + markerLen, pad), strokeWidth = 2f)
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(pad, pad), Offset(pad, pad + markerLen), strokeWidth = 2f)
+
+                // Top-Right
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(w - pad, pad), Offset(w - pad - markerLen, pad), strokeWidth = 2f)
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(w - pad, pad), Offset(w - pad, pad + markerLen), strokeWidth = 2f)
+
+                // Bottom-Left
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(pad, h - pad), Offset(pad + markerLen, h - pad), strokeWidth = 2f)
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(pad, h - pad), Offset(pad, h - pad - markerLen), strokeWidth = 2f)
+
+                // Bottom-Right
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(w - pad, h - pad), Offset(w - pad - markerLen, h - pad), strokeWidth = 2f)
+                drawLine(accentColor.copy(alpha = 0.7f), Offset(w - pad, h - pad), Offset(w - pad, h - pad - markerLen), strokeWidth = 2f)
+            }
+            .border(
+                width = 0.5.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        accentColor.copy(alpha = 0.3f),
+                        accentColor.copy(alpha = 0.08f),
+                        accentColor.copy(alpha = 0.3f)
+                    )
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+    ) {
+        Column(content = content)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN DTC SCREEN
+// ═══════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
-    val chatViewModel: FleetChatViewModel = hiltViewModel()
-    val vehicle by viewModel.selectedVehicle.collectAsState()
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val permanentDtcs by viewModel.permanentDtcs.collectAsState()
     val readiness by viewModel.readinessMonitors.collectAsState()
     val clearResult by viewModel.clearDtcResult.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
+    val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
+    val statusMessage by viewModel.statusMessage.collectAsState()
+
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showClearDialog by remember { mutableStateOf(false) }
-    val language by viewModel.language.collectAsState()
-    var isSpanish by remember(language) { mutableStateOf(language == "es") } 
-    val isScanning by viewModel.isScanning.collectAsState()
-    val isClearing by viewModel.isClearing.collectAsState()
 
     if (showClearDialog) {
         EliteDialog(
-            title = if(isSpanish) "BORRAR CÓDIGOS DTC" else "CLEAR DTC CODES",
-            message = if(isSpanish) "Esto enviará el comando OBD Mode 04. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine), y se resetearán los monitores de emisiones.\n\n¿Desea continuar con la purga del sistema?" else "This will transmit OBD Mode 04. ALL active and pending DTCs will be cleared, the MIL (Check Engine) light extinguished, and emission monitors reset.\n\nProceed with system purge?",
+            title = "⚠️ Borrar Códigos",
+            message = "Esto enviará el Comando de Diagnóstico Mode 04 al vehículo. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine) y se resetearán los monitores de emisiones.\n\n¿Deseas continuar?",
             onDismiss = { showClearDialog = false },
-            onConfirm = { showClearDialog = false; coroutineScope.launch { viewModel.clearDtcs() } },
-            confirmText = if(isSpanish) "BORRAR" else "CLEAR",
+            onConfirm = {
+                showClearDialog = false
+                coroutineScope.launch { viewModel.clearDtcs() }
+            },
+            confirmText = "BORRAR MEMORIA",
+            dismissText = "CANCELAR",
             isDestructive = true
         )
     }
 
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val isCompact = screenWidth < 400
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            Column {
-                EliteTopAppBar(
-                    title = if(isSpanish) "DIAGNÓSTICO DTC" else "DTC DIAGNOSTICS",
-                    subtitle = if(isSpanish) "ANÁLISIS DE CÓDIGOS OBD-II" else "OBD-II CODE ANALYSIS",
-                    onBackClick = { navController.popBackStack() },
-                    actions = {
-                        // Sleek Bilingual Selector
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.cardBackground)
-                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                                .padding(2.dp)
-                        ) {
-                            val enBg = if (!isSpanish) MeetColors.neonGreen else Color.Transparent
-                            val enText = if (!isSpanish) MeetColors.backgroundDeep else MeetColors.textSecondary
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(enBg)
-                                    .clickable {
-                                        if (isSpanish) {
-                                            isSpanish = false
-                                            viewModel.setLanguage("en")
-                                        }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Text("EN", color = enText, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall)
-                            }
-                            val esBg = if (isSpanish) MeetColors.neonGreen else Color.Transparent
-                            val esText = if (isSpanish) MeetColors.backgroundDeep else MeetColors.textSecondary
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(esBg)
-                                    .clickable {
-                                        if (!isSpanish) {
-                                            isSpanish = true
-                                            viewModel.setLanguage("es")
-                                        }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Text("ES", color = esText, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
+            // Custom holographic top bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF0A1628),
+                                Color(0xFF070E1C),
+                                MeetColors.backgroundDeep
+                            )
+                        )
+                    )
+                    .drawBehind {
+                        // Bottom edge glow
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                0f to Color.Transparent,
+                                0.3f to MeetColors.neonGreen.copy(alpha = 0.3f),
+                                0.7f to MeetColors.electricBlue.copy(alpha = 0.2f),
+                                1f to Color.Transparent
+                            ),
+                            start = Offset(0f, size.height),
+                            end = Offset(size.width, size.height),
+                            strokeWidth = 1.5f
+                        )
                     }
-                )
-                
-                // Professional HUD selector tab bar
+                    .statusBarsPadding()
+                    .padding(horizontal = if (isCompact) 12.dp else 16.dp, vertical = 10.dp)
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MeetColors.backgroundDark)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val tabs = listOf(
-                        if(isSpanish) "Activos" else "Active",
-                        if(isSpanish) "Pend." else "Pending",
-                        if(isSpanish) "Perm." else "Permanent",
-                        if(isSpanish) "Monitores" else "Monitors",
-                        if(isSpanish) "Manual" else "Manual"
-                    )
-                    val tabColors = listOf(
-                        MeetColors.error,
-                        MeetColors.warning,
-                        MeetColors.electricBlue,
-                        MeetColors.neonGreen,
-                        Color.White
-                    )
-                    tabs.forEachIndexed { index, title ->
-                        val selected = selectedTab == index
-                        val accentColor = tabColors[index]
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (isCompact) "DTC SCAN" else "DIAGNÓSTICO DTC",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = if (isCompact) 18.sp else 22.sp,
+                            letterSpacing = 1.sp,
+                            style = LocalTextStyle.current.copy(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = MeetColors.neonGreen.copy(alpha = 0.4f),
+                                    offset = Offset(0f, 0f),
+                                    blurRadius = 8f
+                                )
+                            )
+                        )
+                        Text(
+                            if (isCompact) "Escáner OBD-II" else "Escáner Avanzado de Códigos OBD-II",
+                            color = MeetColors.neonGreen,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            style = LocalTextStyle.current.copy(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = MeetColors.neonGreen.copy(alpha = 0.4f),
+                                    offset = Offset(0f, 0f),
+                                    blurRadius = 4f
+                                )
+                            )
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // SCAN button with glow
                         Box(
                             modifier = Modifier
-                                .weight(1.5f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (selected) accentColor.copy(alpha = 0.15f) else Color.Transparent)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (selected) accentColor.copy(alpha = 0.4f) else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            MeetColors.neonGreen.copy(alpha = if (isScanning) 0.1f else 0.15f),
+                                            MeetColors.neonGreen.copy(alpha = if (isScanning) 0.05f else 0.08f)
+                                        )
+                                    )
                                 )
-                                .clickable { selectedTab = index }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .border(
+                                    1.dp,
+                                    MeetColors.neonGreen.copy(alpha = if (isScanning) 0.2f else 0.4f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable(enabled = !isScanning) {
+                                    coroutineScope.launch { viewModel.refreshDiagnostics() }
+                                }
+                                .padding(horizontal = if (isCompact) 10.dp else 14.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = title.uppercase(),
-                                color = if (selected) accentColor else MeetColors.textSecondary,
-                                fontWeight = if (selected) FontWeight.Black else FontWeight.Bold,
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                fontSize = 9.sp
+                                if (isCompact) "SCAN" else "ESCANEAR",
+                                color = if (isScanning) MeetColors.textMuted else MeetColors.neonGreen,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (isCompact) 10.sp else 12.sp,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        // BORRAR button
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MeetColors.error.copy(alpha = 0.08f))
+                                .border(1.dp, MeetColors.error.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .clickable(enabled = !isScanning) { showClearDialog = true }
+                                .padding(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                "BORRAR",
+                                color = if (isScanning) MeetColors.textMuted else MeetColors.error,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (isCompact) 10.sp else 12.sp,
+                                letterSpacing = 1.sp
                             )
                         }
                     }
                 }
             }
         },
-        containerColor = MeetColors.backgroundDark
+        containerColor = MeetColors.backgroundDeep
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            EliteScrollContainer(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .eliteScrollbar(listState),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        // Premium Control Buttons Dock
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            EliteButton(
-                                text = if (isScanning) (if(isSpanish) "ESCANEANDO..." else "SCANNING...") else (if(isSpanish) "ESCANEAR" else "SCAN"),
-                                onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } },
-                                color = MeetColors.neonGreen,
-                                textColor = MeetColors.backgroundDeep,
-                                isEnabled = !isScanning && !isClearing,
-                                modifier = Modifier.weight(1f)
-                            )
-                            EliteOutlinedButton(
-                                text = if (isClearing) (if(isSpanish) "BORRANDO..." else "CLEARING...") else (if(isSpanish) "BORRAR DTCs" else "CLEAR DTCs"),
-                                onClick = { showClearDialog = true },
-                                color = MeetColors.error,
-                                isEnabled = !isScanning && !isClearing,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    if (activeDtcs.isNotEmpty()) {
-                        item {
-                            val context = androidx.compose.ui.platform.LocalContext.current
-                            EliteButton(
-                                text = if(isSpanish) "📢 REPORTAR CÓDIGOS A FLOTA" else "📢 REPORT DTCs TO FLEET",
-                                onClick = {
-                                    val vehicleName = "${vehicle?.make ?: ""} ${vehicle?.model ?: ""}".trim()
-                                    val displayVehicle = if (vehicleName.isBlank()) "Vehículo Activo" else vehicleName
-                                    chatViewModel.selectBusiness("b1")
-                                    val dummyPartner = com.elysium369.meet.data.local.entities.FleetMemberEntity(
-                                        id = "d1",
-                                        businessId = "b1",
-                                        userId = "Chofer_Juan",
-                                        role = "CONDUCTOR",
-                                        email = "juan@fleet.com",
-                                        inviteStatus = "ACCEPTED",
-                                        joinedAt = System.currentTimeMillis()
-                                    )
-                                    chatViewModel.selectPartner(dummyPartner)
-                                    chatViewModel.sendDtcAlertMessage(displayVehicle, activeDtcs)
-                                    android.widget.Toast.makeText(context, if(isSpanish) "Reporte enviado a la flota con éxito" else "DTC report sent to fleet", android.widget.Toast.LENGTH_LONG).show()
-                                },
-                                color = MeetColors.cyberCyan,
-                                textColor = MeetColors.backgroundDeep,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    if (clearResult != null) {
-                        item {
-                            EliteCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                borderColor = MeetColors.error
-                            ) {
-                                Text(
-                                    text = clearResult.orEmpty(),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    val allDtcs = activeDtcs + pendingDtcs + permanentDtcs
-                    when (selectedTab) {
-                        0 -> { // Active DTCs (Mode 03)
-                            if (activeDtcs.isEmpty()) {
-                                item { EmptyDtcState(if(isSpanish) "No hay códigos de falla activos detectados en la ECU." else "No active fault codes detected in the ECU.", MeetColors.neonGreen) }
-                            } else {
-                                itemsIndexed(activeDtcs) { index, dtc ->
-                                    AnimatedEntrance(index = index) {
-                                        DtcCard(dtc, if(isSpanish) "ACTIVO" else "ACTIVE", MeetColors.error, navController, viewModel, isSpanish, allDtcs)
-                                    }
-                                }
-                            }
-                        }
-                        1 -> { // Pending DTCs (Mode 07)
-                            if (pendingDtcs.isEmpty()) {
-                                item { EmptyDtcState(if(isSpanish) "No hay códigos pendientes. Estos códigos no han encendido la luz MIL aún." else "No pending codes. These codes have not triggered the MIL yet.", MeetColors.warning) }
-                            } else {
-                                itemsIndexed(pendingDtcs) { index, dtc ->
-                                    AnimatedEntrance(index = index) {
-                                        DtcCard(dtc, if(isSpanish) "PENDIENTE" else "PENDING", MeetColors.warning, navController, viewModel, isSpanish, allDtcs)
-                                    }
-                                }
-                            }
-                        }
-                        2 -> { // Permanent DTCs (Mode 0A)
-                            if (permanentDtcs.isEmpty()) {
-                                item { EmptyDtcState(if(isSpanish) "No hay códigos permanentes. Estos no se pueden borrar de forma manual." else "No permanent codes. These cannot be cleared manually.", MeetColors.cyberCyan) }
-                            } else {
-                                itemsIndexed(permanentDtcs) { index, dtc ->
-                                    AnimatedEntrance(index = index) {
-                                        DtcCard(dtc, if(isSpanish) "PERMANENTE" else "PERMANENT", MeetColors.cyberCyan, navController, viewModel, isSpanish, allDtcs)
-                                    }
-                                }
-                            }
-                        }
-                        3 -> { // Readiness Monitors
-                            item { ReadinessMonitorsCard(readiness, coroutineScope, viewModel, isSpanish) }
-                        }
-                        4 -> { // Manual Search
-                            item { ManualSearchTab(navController, viewModel, isSpanish) }
-                        }
-                    }
-                }
-            }
-
-            // --- Creative Scanning Overlay ---
-            AnimatedVisibility(
-                visible = isScanning,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                EliteScanningAnimation(isSpanish)
-            }
-
-            // --- Creative Clearing Overlay ---
-            AnimatedVisibility(
-                visible = isClearing,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                EliteClearingAnimation(isSpanish)
-            }
-        }
-    }
-}
-
-@Composable
-fun EliteScanningAnimation(isSpanish: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "radar")
-    val scanLinePos by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scanLine"
-    )
-    
-    val consoleLines = remember { mutableStateListOf<String>() }
-    val fullLogs = listOf(
-        "[INIT] OBD-II connection established.",
-        "[SCAN] Querying ECU Address 0x7E8 (Engine control)...",
-        "[SCAN] Loading PID configurations...",
-        "[SCAN] Sweeping Active DTC registers (Mode 03)...",
-        "[SCAN] Sweep successful. Reading transmission...",
-        "[SCAN] Querying Transmission ECU Address 0x7E9...",
-        "[SCAN] Sweeping Pending DTC registers (Mode 07)...",
-        "[SCAN] Checking Permanent DTC registers (Mode 0A)...",
-        "[SCAN] Accessing Readiness Monitor byte maps...",
-        "[SUCCESS] Diagnostic sweep complete. Refreshing UI."
-    )
-    
-    LaunchedEffect(Unit) {
-        consoleLines.clear()
-        for (line in fullLogs) {
-            consoleLines.add(line)
-            if (consoleLines.size > 5) {
-                consoleLines.removeAt(0)
-            }
-            kotlinx.coroutines.delay(400)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.75f)),
-        contentAlignment = Alignment.Center
-    ) {
-        // Futuristic Matrix HUD Lines
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val height = size.height
-            val width = size.width
-            val currentY = height * scanLinePos
-            
-            // Draw digital matrix grid
-            val gridColor = MeetColors.neonGreen.copy(alpha = 0.05f)
-            val gridStep = 40.dp.toPx()
-            var x = 0f
-            while (x < width) {
-                drawLine(gridColor, Offset(x, 0f), Offset(x, height), 1f)
-                x += gridStep
-            }
-            var y = 0f
-            while (y < height) {
-                drawLine(gridColor, Offset(0f, y), Offset(width, y), 1f)
-                y += gridStep
-            }
-            
-            // Scanning Beam
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        MeetColors.neonGreen.copy(alpha = 0.25f),
-                        MeetColors.neonGreen.copy(alpha = 0.05f),
-                        Color.Transparent
-                    ),
-                    startY = currentY - 150f,
-                    endY = currentY + 10f
-                ),
-                topLeft = Offset(0f, currentY - 150f),
-                size = Size(width, 160f)
-            )
-            
-            // Bright scanner line
-            drawLine(
-                color = MeetColors.neonGreen,
-                start = Offset(0f, currentY),
-                end = Offset(width, currentY),
-                strokeWidth = 2.dp.toPx()
-            )
-        }
-        
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth()
-        ) {
-            // Glowing Radar Target
-            Box(
-                modifier = Modifier
-                    .size(140.dp)
-                    .drawBehind {
-                        drawCircle(
-                            color = MeetColors.neonGreen.copy(alpha = 0.1f),
-                            radius = size.minDimension / 2f
-                        )
-                        drawCircle(
-                            color = MeetColors.neonGreen.copy(alpha = 0.3f),
-                            radius = size.minDimension / 3f,
-                            style = Stroke(width = 1.5.dp.toPx())
-                        )
-                        drawCircle(
-                            color = MeetColors.neonGreen.copy(alpha = 0.5f),
-                            radius = size.minDimension / 4f,
-                            style = Stroke(width = 1.5.dp.toPx())
-                        )
-                        // Crosshairs
-                        drawLine(
-                            color = MeetColors.neonGreen.copy(alpha = 0.4f),
-                            start = Offset(0f, size.height / 2f),
-                            end = Offset(size.width, size.height / 2f),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                        drawLine(
-                            color = MeetColors.neonGreen.copy(alpha = 0.4f),
-                            start = Offset(size.width / 2f, 0f),
-                            end = Offset(size.width / 2f, size.height),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                // Heartbeat pulse dot
-                val pulseScale = infiniteTransition.animateFloat(
-                    initialValue = 0.8f,
-                    targetValue = 1.4f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulseScale"
-                )
-                val pulseAlpha = infiniteTransition.animateFloat(
-                    initialValue = 0.3f,
-                    targetValue = 0.9f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulseAlpha"
-                )
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .graphicsLayer(scaleX = pulseScale.value, scaleY = pulseScale.value, alpha = pulseAlpha.value)
-                        .background(MeetColors.neonGreen, CircleShape)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = if(isSpanish) "ESCANEANDO ECU..." else "SCANNING ECU...",
-                color = Color.White,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.headlineSmall,
-                letterSpacing = 1.sp
-            )
-            
-            Text(
-                text = if(isSpanish) "CONEXIÓN OBD ESTABLE" else "OBD CONNECTION STABLE",
-                color = MeetColors.neonGreen,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Console display box
-            Surface(
-                color = Color(0xFF020612),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(14.dp)
-                        .fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    consoleLines.forEach { line ->
-                        Text(
-                            text = line,
-                            color = if (line.contains("[SUCCESS]")) MeetColors.neonGreen else MeetColors.textSecondary,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EliteClearingAnimation(isSpanish: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha"
-    )
-
-    val consoleLines = remember { mutableStateListOf<String>() }
-    val fullLogs = listOf(
-        "[INIT] Requesting ECU write permission...",
-        "[CLEAR] Sending Mode 04 reset command...",
-        "[CLEAR] Broadasting clear command to 0x7E8...",
-        "[CLEAR] Broadasting clear command to 0x7E9...",
-        "[CLEAR] Deactivating MIL engine lamp dashboard relay...",
-        "[CLEAR] Resetting temporary diagnostic values...",
-        "[SUCCESS] Fault code memory purge completed."
-    )
-    
-    LaunchedEffect(Unit) {
-        consoleLines.clear()
-        for (line in fullLogs) {
-            consoleLines.add(line)
-            if (consoleLines.size > 5) {
-                consoleLines.removeAt(0)
-            }
-            kotlinx.coroutines.delay(350)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.8f)),
-        contentAlignment = Alignment.Center
-    ) {
-        // Red Pulsing Ring
         Box(
             modifier = Modifier
-                .size(160.dp)
-                .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
-                .border(2.dp, MeetColors.error.copy(alpha = pulseAlpha), CircleShape)
-        )
-        
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(MeetColors.error.copy(alpha = 0.15f))
-                    .border(1.dp, MeetColors.error, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "⚠️",
-                    fontSize = 32.sp,
-                    color = MeetColors.error
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = if(isSpanish) "BORRANDO REGISTROS DTC..." else "PURGING DTC MEMORY...",
-                color = Color.White,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.headlineSmall
-            )
-            
-            Text(
-                text = if(isSpanish) "TRANSMITIENDO MODO 04" else "TRANSMITTING MODE 04",
-                color = MeetColors.error,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            // Holographic background layer
+            HolographicBackground()
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Console display box
-            Surface(
-                color = Color(0xFF0C0202),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .border(1.dp, MeetColors.error.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(14.dp)
-                        .fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    consoleLines.forEach { line ->
-                        Text(
-                            text = line,
-                            color = if (line.contains("[SUCCESS]")) MeetColors.neonGreen else MeetColors.textSecondary,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DtcCard(
-    dtc: String,
-    severity: String,
-    color: Color,
-    navController: NavController,
-    viewModel: ObdViewModel,
-    isSpanish: Boolean,
-    allDtcs: List<String> = emptyList()
-) {
-    val definitions by viewModel.dtcDefinitions.collectAsState()
-    val dtcInfo = definitions[dtc]
-    val coroutineScope = rememberCoroutineScope()
-    
-    val fallbackDesc = com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(dtc, isSpanish)
-    val desc = if (isSpanish) {
-        dtcInfo?.let {
-            val raw = it.descriptionEs
-            if (raw.isNullOrBlank() || raw.contains("no disponible localmente") || raw.contains("no disponible offline") || raw.contains("no encontrada")) {
-                fallbackDesc
-            } else {
-                translateDtcText(raw)
-            }
-        } ?: fallbackDesc
-    } else {
-        dtcInfo?.let {
-            val raw = it.descriptionEn
-            val d = if (raw.isNullOrBlank() || raw.contains("not available locally") || raw.contains("offline") || raw.contains("not found")) {
-                fallbackDesc
-            } else {
-                raw
-            }
-            d
-        } ?: fallbackDesc
-    }
-    
-    val vehicle by viewModel.selectedVehicle.collectAsState()
-    val knowledgeGuide = com.elysium369.meet.data.local.KnowledgeBaseRepository.getGuideForDtc(
-        dtc = dtc, 
-        description = if (isSpanish) dtcInfo?.descriptionEs else dtcInfo?.descriptionEn, 
-        isSpanish = isSpanish,
-        vehicleMake = vehicle?.make,
-        vehicleModel = vehicle?.model
-    )
-    
-    val gridColor = color.copy(alpha = 0.03f)
-
-    EliteCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .drawBehind {
-                // Background digital matrix grid matching severity color
-                val spacing = 20.dp.toPx()
-                var x = 0f
-                while (x < size.width) {
-                    drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), 0.5.dp.toPx())
-                    x += spacing
-                }
-                var y = 0f
-                while (y < size.height) {
-                    drawLine(gridColor, Offset(0f, y), Offset(size.width, y), 0.5.dp.toPx())
-                    y += spacing
-                }
-            },
-        borderColor = color
-    ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-            // Header Row
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ═══════════ HOLOGRAPHIC TAB ROW ═══════════
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(color.copy(alpha = 0.15f))
-                        .border(1.dp, color, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = severity,
-                        color = color,
-                        fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 1.sp
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = dtc,
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = desc,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Black
-            )
-            
-            // P0300 Misfire Sub-alert panel
-            if (dtc == "P0300") {
-                val misfireCodes = allDtcs.filter { it.matches(Regex("P030[1-9]|P031[0-2]")) }
-                if (misfireCodes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    val cylinders = misfireCodes.joinToString(", ")
-                    Surface(
-                        color = MeetColors.warning.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, MeetColors.warning.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = if(isSpanish) "⚠️ CILINDROS DETECTADOS CON FALLO:" else "⚠️ MISFIRING CYLINDERS DETECTED:",
-                                color = MeetColors.warning,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = cylinders,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Surface(
-                        color = MeetColors.warning.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, MeetColors.warning.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = if(isSpanish) "⚠️ ERROR COMPLETO DE CONTROL DE MISFIRE:" else "⚠️ FULL MISFIRE SYSTEM REPORT:",
-                                color = MeetColors.warning,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = if(isSpanish) "La computadora (ECU) reporta fallos generalizados pero sin códigos individuales aún. Realice prueba física o visualice contadores de cilindro en Mode 06 para ubicar la falla." else "ECU reports random misfires but hasn't logged individual cylinders. Check cylinder drop tests or Mode 06 counters to locate the issue.",
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ═══ URGENCY + DRIVABILITY BANNER ═══
-            val urgColor = when(knowledgeGuide.urgency) {
-                "inmediata" -> MeetColors.error
-                "pronto" -> MeetColors.warning
-                else -> MeetColors.neonGreen
-            }
-            val urgText = when(knowledgeGuide.urgency) {
-                "inmediata" -> if(isSpanish) "🚨 RIESGO INMEDIATO" else "🚨 IMMEDIATE DANGER"
-                "pronto" -> if(isSpanish) "⚠️ REPARACIÓN RECOMENDADA" else "⚠️ REPAIR RECOMMENDED"
-                else -> if(isSpanish) "✅ CHEQUEO RUTINARIO" else "✅ ROUTINE CHECK"
-            }
-            val driveText = if(knowledgeGuide.canDrive) {
-                if(isSpanish) "✅ Seguro para conducir con precaución" else "✅ Safe to drive with caution"
-            } else {
-                if(isSpanish) "🚫 NO CONDUZCA - Riesgo de fallo grave en motor" else "🚫 DO NOT DRIVE - Risk of severe powertrain damage"
-            }
-            val driveColor = if(knowledgeGuide.canDrive) MeetColors.neonGreen else MeetColors.error
-
-            Surface(
-                color = urgColor.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, urgColor.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = urgText,
-                            color = urgColor,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        if (knowledgeGuide.sourcesCount > 0) {
-                            Text(
-                                text = "📚 ${knowledgeGuide.sourcesCount} " + (if(isSpanish) "fuentes" else "sources"),
-                                color = MeetColors.textSecondary,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.sp
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = driveText,
-                        color = driveColor,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ═══ COST + TIME BAR ═══
-            if (knowledgeGuide.costEstimate != null) {
-                Surface(
-                    color = MeetColors.cardBackgroundLighter.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(10.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if(isSpanish) "💰 COSTO ESTIMADO" else "💰 ESTIMATED COST",
-                                color = MeetColors.neonGreen,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "$${knowledgeGuide.costEstimate.minCost.toInt()} — $${knowledgeGuide.costEstimate.maxCost.toInt()} USD",
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(32.dp)
-                                .background(MeetColors.borderSubtle)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = if(isSpanish) "⏱️ TIEMPO" else "⏱️ TIME",
-                                color = MeetColors.electricBlue,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${knowledgeGuide.timeHours}h",
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            // ═══ SYSTEM + STANDARD ═══
-            Surface(
-                color = MeetColors.electricBlue.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if(isSpanish) "⚙️ SISTEMA: " else "⚙️ SYSTEM: ",
-                        color = MeetColors.electricBlue,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = knowledgeGuide.systemAffected.uppercase(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = knowledgeGuide.standard,
-                        color = Color.White.copy(alpha = 0.5f),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ═══ SYMPTOMS ═══
-            if (knowledgeGuide.symptoms.isNotEmpty()) {
-                Surface(
-                    color = MeetColors.warning.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, MeetColors.warning.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = if(isSpanish) "🔍 SÍNTOMAS REGISTRADOS" else "🔍 LOGGED SYMPTOMS",
-                            color = MeetColors.warning,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        knowledgeGuide.symptoms.forEach { symptom ->
-                            Row(
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(4.dp)
-                                        .background(MeetColors.warning, CircleShape)
+                        .drawBehind {
+                            // Glow under selected tab
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    1f to when (selectedTab) {
+                                        0 -> MeetColors.error.copy(alpha = 0.05f)
+                                        1 -> MeetColors.warning.copy(alpha = 0.05f)
+                                        2 -> MeetColors.cyberCyan.copy(alpha = 0.05f)
+                                        3 -> MeetColors.neonGreen.copy(alpha = 0.05f)
+                                        else -> Color.White.copy(alpha = 0.03f)
+                                    }
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if(isSpanish) translateDtcText(symptom) else symptom,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                ) {
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = Color.Transparent,
+                        contentColor = MeetColors.neonGreen,
+                        edgePadding = if (isCompact) 6.dp else 12.dp,
+                        divider = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            0f to Color.Transparent,
+                                            0.2f to MeetColors.borderSubtle,
+                                            0.8f to MeetColors.borderSubtle,
+                                            1f to Color.Transparent
+                                        )
+                                    )
+                            )
+                        },
+                        indicator = { tabPositions ->
+                            if (selectedTab < tabPositions.size) {
+                                Box(
+                                    Modifier
+                                        .tabIndicatorOffset(tabPositions[selectedTab])
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(
+                                                    Color.Transparent,
+                                                    when (selectedTab) {
+                                                        0 -> MeetColors.error
+                                                        1 -> MeetColors.warning
+                                                        2 -> MeetColors.cyberCyan
+                                                        3 -> MeetColors.neonGreen
+                                                        else -> Color.White
+                                                    },
+                                                    Color.Transparent
+                                                )
+                                            )
+                                        )
                                 )
                             }
                         }
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            // ═══ CAUSES ═══
-            Surface(
-                color = MeetColors.cardBackgroundLighter.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(10.dp))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = if(isSpanish) "🎯 CAUSAS PROBABLES" else "🎯 PROBABLE CAUSES",
-                        color = Color(0xFFFF6B6B),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    knowledgeGuide.possibleCauses.forEach { cause ->
-                        Row(
-                            modifier = Modifier.padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(4.dp)
-                                    .background(Color(0xFFFF6B6B), CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if(isSpanish) translateDtcText(cause) else cause,
-                                color = Color.White.copy(alpha = 0.9f),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ═══ DIAGNOSTIC STEPS ═══
-            Surface(
-                color = MeetColors.neonGreen.copy(alpha = 0.03f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = if(isSpanish) "🛠️ PROCEDIMIENTO DE DIAGNÓSTICO" else "🛠️ DIAGNOSTIC PROCEDURE",
-                        color = MeetColors.neonGreen,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = if(isSpanish) "(Ordenado de menor a mayor costo)" else "(Ordered from lowest to highest cost)",
-                        color = MeetColors.textSecondary,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    val solutionText = if(isSpanish) translateDtcText(knowledgeGuide.recommendedSolution) else knowledgeGuide.recommendedSolution
-                    val lines = solutionText.split("\n").filter { it.isNotBlank() }
-                    val stepLines = lines.filter { line ->
-                        val t = line.trim()
-                        t.startsWith("1.") || t.startsWith("2.") || t.startsWith("3.") || t.startsWith("4.") || t.startsWith("5.") || t.startsWith("6.") || t.startsWith("7.")
-                    }
-                    
-                    if (stepLines.isNotEmpty()) {
-                        stepLines.forEach { step ->
-                            val stepNum = step.substringBefore(".").trim()
-                            val stepDesc = step.substringAfter(".").trim()
-                            val isAlert = step.contains("⚠️") || step.contains("SEGURIDAD") || step.contains("PRECAUCIÓN")
-                            val stepColor = if (isAlert) MeetColors.error else Color.White
-                            
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isAlert) MeetColors.error.copy(alpha = 0.15f) else MeetColors.neonGreen.copy(alpha = 0.12f))
-                                        .border(1.dp, if (isAlert) MeetColors.error else MeetColors.neonGreen, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                    ) {
+                        val tabFontSize = if (isCompact) 10.sp else 12.sp
+                        val tabData = listOf(
+                            Triple("ACTIVOS (${activeDtcs.size})", MeetColors.error, 0),
+                            Triple("PEND. (${pendingDtcs.size})", MeetColors.warning, 1),
+                            Triple("PERM. (${permanentDtcs.size})", MeetColors.cyberCyan, 2),
+                            Triple("MONITORES", MeetColors.neonGreen, 3),
+                            Triple("BÚSQUEDA", Color.White, 4)
+                        )
+                        tabData.forEach { (label, color, index) ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                text = {
                                     Text(
-                                        text = stepNum,
-                                        color = if (isAlert) MeetColors.error else MeetColors.neonGreen,
-                                        fontWeight = FontWeight.Black,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 9.sp
+                                        label,
+                                        color = if (selectedTab == index) color else MeetColors.textMuted,
+                                        fontWeight = if (selectedTab == index) FontWeight.Black else FontWeight.Medium,
+                                        fontSize = tabFontSize,
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 0.5.sp,
+                                        maxLines = 1
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = stepDesc,
-                                    color = stepColor,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
+                            )
                         }
-                    } else {
-                        Text(
-                            text = solutionText,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall
-                        )
                     }
                 }
-            }
-            
-            val freezeFrame by viewModel.freezeFrameData.collectAsState()
-            val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
-            
-            if (scopedFrame.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                // Monospace Cyber Terminal for Freeze Frame
-                Surface(
-                    color = Color(0xFF02050B),
-                    shape = RoundedCornerShape(10.dp),
+
+                // ═══════════ CONTENT AREA ═══════════
+                Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(MeetColors.cyberCyan, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if(isSpanish) "❄️ DATOS DE CUADRO CONGELADO (FF):" else "❄️ FREEZE FRAME DATA (FF):",
-                                color = MeetColors.cyberCyan,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black
-                            )
+                    val listState = rememberLazyListState()
+                    val pad = if (isCompact) 12.dp else 16.dp
+
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = pad, end = pad, top = pad, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 12.dp else 16.dp)
+                    ) {
+                        if (clearResult != null) {
+                            item { ClearResultBanner(clearResult.orEmpty()) }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        scopedFrame.forEach { (scopedKey, valStr) ->
-                            val pid = scopedKey.substringAfter(":")
-                            val pidNameEs = when(pid) {
-                                "03" -> "Estado Combustible"
-                                "04" -> "Carga Motor"
-                                "05" -> "Temp. Refrigerante"
-                                "06" -> "Ajuste Comb. Corto"
-                                "07" -> "Ajuste Comb. Largo"
-                                "0C" -> "RPM Motor"
-                                "0D" -> "Velocidad"
-                                "11" -> "Pos. Acelerador"
-                                else -> "PID $pid"
+
+                        when (selectedTab) {
+                            0 -> {
+                                if (activeDtcs.isEmpty()) {
+                                    item { HolographicEmptyState("SISTEMA OK", "No hay códigos de falla activos detectados.", MeetColors.neonGreen, isCompact) }
+                                } else {
+                                    itemsIndexed(activeDtcs) { index, dtc ->
+                                        StaggeredEntrance(index) {
+                                            HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact)
+                                        }
+                                    }
+                                }
                             }
-                            val pidNameEn = when(pid) {
-                                "03" -> "Fuel System Status"
-                                "04" -> "Engine Load"
-                                "05" -> "Coolant Temp"
-                                "06" -> "Short Term Fuel Trim"
-                                "07" -> "Long Term Fuel Trim"
-                                "0C" -> "Engine RPM"
-                                "0D" -> "Vehicle Speed"
-                                "11" -> "Throttle Position"
-                                else -> "PID $pid"
+                            1 -> {
+                                if (pendingDtcs.isEmpty()) {
+                                    item { HolographicEmptyState("SIN PENDIENTES", "No hay anomalías en proceso de confirmación.", MeetColors.warning, isCompact) }
+                                } else {
+                                    itemsIndexed(pendingDtcs) { index, dtc ->
+                                        StaggeredEntrance(index) {
+                                            HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact)
+                                        }
+                                    }
+                                }
                             }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "> ${if(isSpanish) pidNameEs else pidNameEn}",
-                                    color = MeetColors.textSecondary,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    text = valStr,
-                                    color = Color.White,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            2 -> {
+                                if (permanentDtcs.isEmpty()) {
+                                    item { HolographicEmptyState("HISTORIAL LIMPIO", "No se encontraron códigos permanentes.", MeetColors.cyberCyan, isCompact) }
+                                } else {
+                                    itemsIndexed(permanentDtcs) { index, dtc ->
+                                        StaggeredEntrance(index) {
+                                            HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact)
+                                        }
+                                    }
+                                }
                             }
+                            3 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
+                            4 -> { item { ManualSearchTab(navController, viewModel, isCompact) } }
                         }
                     }
+
+                    // Scanning overlay
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isScanning,
+                        enter = fadeIn(tween(400)),
+                        exit = fadeOut(tween(300))
+                    ) {
+                        HolographicScanOverlay(statusMessage, terminalOutput, isCompact)
+                    }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Action Buttons
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EliteButton(
-                    text = if(isSpanish) "🤖 IA" else "🤖 AI",
-                    onClick = { navController.navigate("ai/$dtc") },
-                    color = MeetColors.neonGreen,
-                    textColor = MeetColors.backgroundDeep,
-                    modifier = Modifier.weight(1f)
-                )
-                EliteOutlinedButton(
-                    text = "❄️ FF DATA",
-                    onClick = { coroutineScope.launch { viewModel.refreshFreezeFrame(dtc) } },
-                    color = MeetColors.electricBlue,
-                    modifier = Modifier.weight(1f)
-                )
             }
         }
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC EMPTY STATE — Rotating rings + floating particles
+// ═══════════════════════════════════════════════════════════════
+
 @Composable
-private fun EmptyDtcState(message: String, color: Color) {
+private fun HolographicEmptyState(title: String, subtitle: String, color: Color, isCompact: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "holoEmpty")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing)),
+        label = "emptyRot"
+    )
+    val innerRotation by infiniteTransition.animateFloat(
+        initialValue = 360f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing)),
+        label = "emptyInnerRot"
+    )
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "emptyPulse"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "emptyGlow"
+    )
+    val floatY by infiniteTransition.animateFloat(
+        initialValue = -5f, targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(2500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "emptyFloat"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
+            .padding(vertical = if (isCompact) 32.dp else 48.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .graphicsLayer { translationY = floatY }
         ) {
-            // Glowing Concentric Radar target
+            // Holographic orb with rotating rings
+            val orbSize = if (isCompact) 100.dp else 130.dp
             Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .drawBehind {
-                        drawCircle(
-                            color = color.copy(alpha = 0.08f),
-                            radius = size.minDimension / 2f
-                        )
-                        drawCircle(
-                            color = color.copy(alpha = 0.15f),
-                            radius = size.minDimension / 3f,
-                            style = Stroke(width = 1.dp.toPx())
-                        )
-                        drawCircle(
-                            color = color.copy(alpha = 0.35f),
-                            radius = size.minDimension / 4f,
-                            style = Stroke(width = 1.dp.toPx())
-                        )
-                        drawLine(
-                            color = color.copy(alpha = 0.25f),
-                            start = Offset(0f, size.height / 2f),
-                            end = Offset(size.width, size.height / 2f),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                        drawLine(
-                            color = color.copy(alpha = 0.25f),
-                            start = Offset(size.width / 2f, 0f),
-                            end = Offset(size.width / 2f, size.height),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    },
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(orbSize)
             ) {
-                // Pulser
-                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.8f,
-                    targetValue = 1.3f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1400, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "scale"
-                )
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.4f,
-                    targetValue = 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1400, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "alpha"
-                )
+                // Outer glow
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
-                        .graphicsLayer(scaleX = scale, scaleY = scale, alpha = alpha)
-                        .background(color, CircleShape)
+                        .size(orbSize)
+                        .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale; alpha = glowAlpha * 0.3f }
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(color.copy(alpha = 0.3f), Color.Transparent)
+                            ),
+                            CircleShape
+                        )
                 )
+
+                // Rotating rings with sweep trail
+                Canvas(
+                    modifier = Modifier
+                        .size(orbSize)
+                        .graphicsLayer { rotationZ = rotation }
+                ) {
+                    val c = Offset(size.width / 2, size.height / 2)
+                    val r = size.minDimension / 2 * 0.9f
+                    
+                    // Sweeping gradient trail
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = listOf(
+                                color.copy(alpha = 0.5f),
+                                color.copy(alpha = 0.1f),
+                                Color.Transparent
+                            )
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                    
+                    // Dashes on outer ring
+                    for (i in 0 until 12) {
+                        val angle = (i * 30f) * (PI / 180f).toFloat()
+                        val startR = r * 0.88f
+                        val endR = r * 1f
+                        drawLine(
+                            color.copy(alpha = 0.5f),
+                            Offset(c.x + startR * cos(angle), c.y + startR * sin(angle)),
+                            Offset(c.x + endR * cos(angle), c.y + endR * sin(angle)),
+                            strokeWidth = 2f,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+
+                // Inner counter-rotating ring
+                Canvas(
+                    modifier = Modifier
+                        .size(orbSize * 0.65f)
+                        .graphicsLayer { rotationZ = innerRotation }
+                ) {
+                    val c = Offset(size.width / 2, size.height / 2)
+                    val r = size.minDimension / 2 * 0.85f
+                    
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                color.copy(alpha = 0.1f),
+                                color.copy(alpha = 0.4f)
+                            )
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                    
+                    // Dots on inner ring
+                    for (i in 0 until 8) {
+                        val angle = (i * 45f) * (PI / 180f).toFloat()
+                        drawCircle(
+                            color.copy(alpha = 0.7f),
+                            2.5f,
+                            Offset(c.x + r * cos(angle), c.y + r * sin(angle))
+                        )
+                    }
+                }
+
+                // Center icon
+                Box(
+                    modifier = Modifier
+                        .size(if (isCompact) 44.dp else 56.dp)
+                        .shadow(8.dp, CircleShape, ambientColor = color.copy(alpha = 0.4f), spotColor = color.copy(alpha = 0.3f))
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    color.copy(alpha = 0.2f),
+                                    color.copy(alpha = 0.05f)
+                                )
+                            )
+                        )
+                        .border(1.dp, color.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✓", color = color,
+                        fontSize = if (isCompact) 22.sp else 28.sp,
+                        fontWeight = FontWeight.Black,
+                        style = LocalTextStyle.current.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = color.copy(alpha = 0.8f),
+                                offset = Offset(0f, 0f),
+                                blurRadius = 8f
+                            )
+                        )
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Title with glow effect
             Text(
-                text = "STATUS SECURE",
-                color = color,
+                text = title,
+                color = Color.White,
+                fontSize = if (isCompact) 14.sp else 17.sp,
                 fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelMedium,
-                letterSpacing = 2.sp
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center,
+                style = LocalTextStyle.current.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = color.copy(alpha = 0.8f),
+                        offset = Offset(0f, 0f),
+                        blurRadius = 10f
+                    )
+                ),
+                modifier = Modifier.drawBehind {
+                    drawRoundRect(
+                        color = color.copy(alpha = glowAlpha * 0.08f),
+                        cornerRadius = CornerRadius(8f),
+                        topLeft = Offset(-12f, -4f),
+                        size = Size(size.width + 24f, size.height + 8f)
+                    )
+                }
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = message,
+                text = subtitle,
                 color = MeetColors.textSecondary,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
+                fontSize = if (isCompact) 11.sp else 13.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = if (isCompact) 15.sp else 18.sp,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
         }
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC DTC CARD — 3D with shadows + animated glow
+// ═══════════════════════════════════════════════════════════════
+
 @Composable
-private fun ReadinessMonitorsCard(
-    readiness: com.elysium369.meet.core.obd.ReadinessResult?,
-    coroutineScope: kotlinx.coroutines.CoroutineScope,
+private fun HoloDtcCard(
+    dtc: String,
+    severity: String,
+    accentColor: Color,
+    navController: NavController,
     viewModel: ObdViewModel,
-    isSpanish: Boolean
+    isCompact: Boolean
 ) {
-    if (readiness == null) {
-        Box(
+    val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
+    val definition = dtcDefinitions[dtc]
+    val desc = definition?.descriptionEs ?: com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+    val causes = definition?.possibleCauses
+    var expanded by remember { mutableStateOf(false) }
+
+    HoloCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        accentColor = accentColor,
+        glowIntensity = if (expanded) 0.25f else 0.12f
+    ) {
+        Column(
             modifier = Modifier
+                .padding(if (isCompact) 14.dp else 18.dp)
                 .fillMaxWidth()
-                .padding(vertical = 48.dp),
-            contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .drawBehind {
-                            drawCircle(
-                                color = MeetColors.neonGreen.copy(alpha = 0.08f),
-                                radius = size.minDimension / 2f
-                            )
-                            drawCircle(
-                                color = MeetColors.neonGreen.copy(alpha = 0.15f),
-                                radius = size.minDimension / 3f,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                            drawCircle(
-                                color = MeetColors.neonGreen.copy(alpha = 0.35f),
-                                radius = size.minDimension / 4f,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("📊", fontSize = 42.sp)
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = if(isSpanish) "Monitores de emisiones no leídos aún." else "Emission monitors not read yet.",
-                    color = MeetColors.textSecondary,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                EliteButton(
-                    text = if(isSpanish) "LEER MONITORES" else "READ MONITORS",
-                    onClick = { coroutineScope.launch { viewModel.refreshDiagnostics() } },
-                    color = MeetColors.neonGreen,
-                    textColor = MeetColors.backgroundDeep,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    } else {
-        // MIL Status Panel
-        val milColor = if (readiness.milOn) MeetColors.error else MeetColors.neonGreen
-        EliteCard(
-            modifier = Modifier.fillMaxWidth(),
-            borderColor = milColor
-        ) {
+            // Header
             Row(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = if(isSpanish) "LUZ MIL (CHECK ENGINE)" else "MIL (CHECK ENGINE LAMP)",
-                        color = MeetColors.textSecondary,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val statusText = if (readiness.milOn) {
-                        if(isSpanish) "🚨 ENCENDIDA / SECURE ERROR" else "🚨 ACTIVATED"
-                    } else {
-                        if(isSpanish) "🟢 APAGADA / SECURE" else "🟢 DEACTIVATED"
-                    }
-                    Text(
-                        text = statusText,
-                        color = milColor,
-                        fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MeetColors.cardBackgroundLighter)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "${readiness.dtcCount} DTCs",
-                        color = Color.White,
-                        fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        // Circular Readiness Progress ring
-        val passedCount = readiness.monitors.count { it.complete }
-        val totalCount = readiness.monitors.size
-        val ratio = if (totalCount > 0) passedCount.toFloat() / totalCount else 0f
-        val progressColor = if (passedCount == totalCount) MeetColors.neonGreen else MeetColors.warning
-        
-        Surface(
-            color = MeetColors.cardBackground.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(12.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(90.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawArc(
-                            color = progressColor.copy(alpha = 0.1f),
-                            startAngle = -90f,
-                            sweepAngle = 360f,
-                            useCenter = false,
-                            style = Stroke(width = 6.dp.toPx())
-                        )
-                        drawArc(
-                            color = progressColor,
-                            startAngle = -90f,
-                            sweepAngle = ratio * 360f,
-                            useCenter = false,
-                            style = Stroke(width = 6.dp.toPx())
-                        )
-                        
-                        // Draw radial high-tech marker ticks
-                        val tickCount = 28
-                        val radius = size.minDimension / 2f
-                        for (i in 0 until tickCount) {
-                            val angleDegrees = -90f + (i * 360f / tickCount)
-                            val angleRad = Math.toRadians(angleDegrees.toDouble()).toFloat()
-                            val innerR = radius - 12.dp.toPx()
-                            val outerR = radius - 6.dp.toPx()
-                            val startPoint = Offset(
-                                center.x + innerR * kotlin.math.cos(angleRad),
-                                center.y + innerR * kotlin.math.sin(angleRad)
+                    // Severity badge with glow
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(6.dp), ambientColor = accentColor.copy(alpha = 0.3f), spotColor = accentColor.copy(alpha = 0.2f))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(accentColor.copy(alpha = 0.2f), accentColor.copy(alpha = 0.08f))
+                                )
                             )
-                            val endPoint = Offset(
-                                center.x + outerR * kotlin.math.cos(angleRad),
-                                center.y + outerR * kotlin.math.sin(angleRad)
-                            )
-                            
-                            val isPassed = (i * 360f / tickCount) <= (ratio * 360f)
-                            val tickColor = if (isPassed) progressColor else MeetColors.borderSubtle.copy(alpha = 0.3f)
-                            
-                            drawLine(
-                                color = tickColor,
-                                start = startPoint,
-                                end = endPoint,
-                                strokeWidth = 1.5.dp.toPx()
-                            )
-                        }
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            .border(1.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = "${(ratio * 100).toInt()}%",
-                            color = Color.White,
+                            severity,
+                            color = accentColor,
                             fontWeight = FontWeight.Black,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = if(isSpanish) "LISTO" else "READY",
-                            color = progressColor,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
                             letterSpacing = 1.sp
                         )
                     }
-                }
-                Spacer(modifier = Modifier.width(20.dp))
-                Column {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    // DTC Code with real glow shadow
                     Text(
-                        text = if(isSpanish) "MONITORES DE EMISIÓN" else "EMISSION MONITORS",
+                        text = dtc,
                         color = Color.White,
                         fontWeight = FontWeight.Black,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$passedCount / $totalCount " + (if(isSpanish) "completados" else "completed"),
-                        color = progressColor,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        readiness.monitors.forEachIndexed { index, monitor ->
-            var expanded by remember { mutableStateOf(false) }
-            val guide = if (!monitor.complete) getDriveCycleGuide(monitor.name) else null
-            val hasGuide = guide != null
-            val itemBorder = if (monitor.complete) MeetColors.neonGreen else MeetColors.warning
-            
-            val localizedName = if (isSpanish) {
-                val n = monitor.name.uppercase()
-                when {
-                    "CATALYST" in n || "CATALIZADOR" in n -> "Monitor de Catalizador"
-                    "EVAP" in n -> "Monitor EVAP (Emisiones)"
-                    "O2 SENSOR HEATER" in n -> "Calentador del Sensor O2"
-                    "O2 SENSOR" in n -> "Sensor de Oxígeno"
-                    "EGR" in n -> "Sistema EGR / VVT"
-                    "MISFIRE" in n -> "Fallas de Encendido"
-                    "FUEL SYSTEM" in n -> "Sistema de Combustible"
-                    "COMPREHENSIVE COMPONENT" in n -> "Componentes Globales (CCM)"
-                    "A/C SYSTEM" in n -> "Aire Acondicionado"
-                    "SECONDARY AIR SYSTEM" in n -> "Aire Secundario"
-                    "HEATED CATALYST" in n -> "Catalizador Calentado"
-                    else -> monitor.name
-                }
-            } else {
-                monitor.name
-            }
-
-            AnimatedEntrance(index = index) {
-                EliteCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    borderColor = itemBorder,
-                    onClick = if (hasGuide) { { expanded = !expanded } } else null
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = getMonitorIcon(monitor.name),
-                                    fontSize = 18.sp,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                Text(
-                                    text = localizedName,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            val badgeText = if (monitor.complete) {
-                                if(isSpanish) "✅ LISTO" else "✅ READY"
-                            } else {
-                                if(isSpanish) "⏳ INC." else "⏳ INC."
-                            }
-                            Text(
-                                text = badgeText,
-                                color = if (monitor.complete) MeetColors.neonGreen else MeetColors.warning,
-                                fontWeight = FontWeight.Black,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.sp
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = if (isCompact) 20.sp else 24.sp,
+                        style = LocalTextStyle.current.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = accentColor.copy(alpha = 0.8f),
+                                offset = Offset(0f, 0f),
+                                blurRadius = 12f
+                            )
+                        ),
+                        modifier = Modifier.drawBehind {
+                            drawRoundRect(
+                                color = accentColor.copy(alpha = 0.06f),
+                                cornerRadius = CornerRadius(4f),
+                                topLeft = Offset(-6f, -2f),
+                                size = Size(size.width + 12f, size.height + 4f)
                             )
                         }
-                        
-                        if (expanded) {
-                            guide?.let { activeGuide ->
-                                Spacer(modifier = Modifier.height(10.dp))
-                                HorizontalDivider(color = MeetColors.borderSubtle)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                
-                                Text(
-                                    text = if(isSpanish) "📋 ¿QUÉ ES ESTE MONITOR?" else "📋 ABOUT THIS MONITOR",
-                                    color = MeetColors.warning,
-                                    fontWeight = FontWeight.Black,
-                                    style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                // Expand indicator
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.cardBackgroundLighter.copy(alpha = 0.5f))
+                        .border(0.5.dp, MeetColors.borderSubtle, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.Warning else Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MeetColors.textSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = desc,
+                color = MeetColors.textPrimary,
+                fontSize = if (isCompact) 13.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = if (isCompact) 18.sp else 20.sp,
+                softWrap = true
+            )
+
+            // Expanded content
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(300)) + expandVertically(tween(350)),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(250))
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    // Gradient divider
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    0f to Color.Transparent,
+                                    0.3f to accentColor.copy(alpha = 0.3f),
+                                    0.7f to accentColor.copy(alpha = 0.3f),
+                                    1f to Color.Transparent
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = activeGuide.first,
-                                    color = MeetColors.textSecondary,
-                                    style = MaterialTheme.typography.bodySmall
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (!causes.isNullOrBlank()) {
+                        Text(
+                            "▸ POSIBLES CAUSAS",
+                            color = MeetColors.neonGreen,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(4.dp, RoundedCornerShape(10.dp), ambientColor = Color.Black.copy(alpha = 0.4f))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF060D1A))
+                                .border(
+                                    0.5.dp,
+                                    Brush.linearGradient(
+                                        listOf(MeetColors.borderSubtle.copy(alpha = 0.5f), MeetColors.borderSubtle.copy(alpha = 0.2f))
+                                    ),
+                                    RoundedCornerShape(10.dp)
                                 )
-                                
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = if(isSpanish) "🚗 CICLO DE MANEJO REQUERIDO:" else "🚗 REQUIRED DRIVE CYCLE:",
-                                    color = MeetColors.neonGreen,
-                                    fontWeight = FontWeight.Black,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    activeGuide.second.forEachIndexed { stepIdx, step ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.Top
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(18.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MeetColors.neonGreen.copy(alpha = 0.12f))
-                                                    .border(1.dp, MeetColors.neonGreen, CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "${stepIdx + 1}",
-                                                    color = MeetColors.neonGreen,
-                                                    fontWeight = FontWeight.Black,
-                                                    fontSize = 8.sp
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                text = step,
-                                                color = Color.White.copy(alpha = 0.9f),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
+                                .padding(12.dp)
+                        ) {
+                            Text(causes, color = MeetColors.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, softWrap = true)
+                        }
+                    }
+
+                    // Freeze Frame
+                    val freezeFrame by viewModel.freezeFrameData.collectAsState()
+                    val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
+                    if (scopedFrame.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            "▸ CUADRO CONGELADO",
+                            color = MeetColors.cyberCyan,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(4.dp, RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF040A14))
+                                .border(0.5.dp, MeetColors.borderSubtle.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                scopedFrame.forEach { (k, v) ->
+                                    val pid = k.substringAfter(":")
+                                    val name = when (pid) {
+                                        "04" -> "Carga Motor"; "05" -> "Temp. Refrig."; "0C" -> "RPM"
+                                        "0D" -> "Velocidad"; "11" -> "Acelerador"; else -> "PID $pid"
+                                    }
+                                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                        Text(name, color = MeetColors.textSecondary, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                                        Text(v, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
-                        
-                        if (!monitor.complete && hasGuide && !expanded) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if(isSpanish) "▼ TOCA PARA VER CICLO DE MANEJO" else "▼ TAP TO VIEW DRIVE CYCLE GUIDE",
-                                color = MeetColors.warning.copy(alpha = 0.6f),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 8.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Buttons
+                    if (isCompact) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EliteButton("🛠️ CÓMO REPARAR (PASO A PASO)", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.fillMaxWidth())
+                            EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.fillMaxWidth())
+                            val cs = rememberCoroutineScope()
+                            EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            EliteButton("🛠️ CÓMO REPARAR", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
+                            EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
+                            val cs = rememberCoroutineScope()
+                            EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -1680,218 +1096,378 @@ private fun ReadinessMonitorsCard(
     }
 }
 
-private fun getMonitorIcon(name: String): String {
-    val n = name.uppercase()
-    return when {
-        "CATALYST" in n || "CATALIZADOR" in n || "CAT" in n -> "🧪"
-        "EVAP" in n -> "💨"
-        "O2" in n || "OXYGEN" in n || "OXÍGENO" in n -> "⚡"
-        "EGR" in n -> "⚙️"
-        "MISFIRE" in n || "ENCENDIDO" in n || "FALLO" in n -> "🔥"
-        "FUEL" in n || "COMBUSTIBLE" in n -> "⛽"
-        "HEATED" in n || "CALENTADOR" in n || "HTR" in n -> "🔌"
-        "A/C" in n || "REFRIG" in n || "AC" in n -> "❄️"
-        "SECONDARY" in n || "AIR" in n || "SECUNDARIO" in n -> "🌀"
-        else -> "📊"
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC SCAN OVERLAY
+// ═══════════════════════════════════════════════════════════════
+
+// Radar Blip definition
+private data class RadarBlip(
+    val xOffset: Float,
+    val yOffset: Float,
+    val color: Color,
+    val size: Float,
+    val label: String
+)
+
+private val radarBlips = listOf(
+    RadarBlip(-0.35f, -0.4f, MeetColors.neonGreen, 4f, "ECU"),
+    RadarBlip(0.4f, -0.3f, MeetColors.neonGreen, 4f, "TCU"),
+    RadarBlip(-0.5f, 0.35f, MeetColors.neonGreen, 4f, "ABS"),
+    RadarBlip(0.35f, 0.45f, MeetColors.error, 5f, "MIL"),
+    RadarBlip(-0.1f, 0.5f, MeetColors.warning, 4f, "SRS")
+)
+
+@Composable
+private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<TerminalLine>, isCompact: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "scanOvr")
+    val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(2500, easing = LinearEasing)), label = "sr")
+    val pulseAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sp")
+    val scanY by infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "sy")
+    val glowPulse by infiniteTransition.animateFloat(0.7f, 1.3f, infiniteRepeatable(tween(1200, easing = FastOutLinearInEasing), RepeatMode.Reverse), label = "sg")
+    val phase by infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "phase")
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF020610).copy(alpha = 0.97f),
+                        Color(0xFF040C18).copy(alpha = 0.98f),
+                        Color(0xFF020610).copy(alpha = 0.97f)
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        // Background grid with scanning crosshairs
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val gridSpacing = 40.dp.toPx()
+            val gridColor = MeetColors.neonGreen.copy(alpha = 0.02f)
+            var gy = 0f; while (gy < size.height) { drawLine(gridColor, Offset(0f, gy), Offset(size.width, gy), 0.5f); gy += gridSpacing }
+            var gx = 0f; while (gx < size.width) { drawLine(gridColor, Offset(gx, 0f), Offset(gx, size.height), 0.5f); gx += gridSpacing }
+            
+            // Scan line
+            val lineYPos = size.height * scanY
+            drawLine(
+                brush = Brush.horizontalGradient(0f to Color.Transparent, 0.3f to MeetColors.neonGreen.copy(alpha = 0.15f), 0.7f to MeetColors.neonGreen.copy(alpha = 0.15f), 1f to Color.Transparent),
+                start = Offset(0f, lineYPos), end = Offset(size.width, lineYPos), strokeWidth = 2f
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = if (isCompact) 16.dp else 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Radar
+            val radarSize = if (isCompact) 110.dp else 150.dp
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(radarSize)) {
+                // Outer glow orb
+                Box(
+                    modifier = Modifier
+                        .size(radarSize)
+                        .graphicsLayer { scaleX = glowPulse; scaleY = glowPulse; alpha = 0.15f }
+                        .background(Brush.radialGradient(listOf(MeetColors.neonGreen.copy(alpha = 0.2f), Color.Transparent)), CircleShape)
+                )
+                
+                Canvas(modifier = Modifier.size(radarSize)) {
+                    val c = Offset(size.width / 2, size.height / 2)
+                    val r = size.minDimension / 2 * 0.8f
+                    
+                    // Radar concentric rings
+                    for (i in 1..4) {
+                        drawCircle(MeetColors.neonGreen.copy(alpha = 0.03f + i * 0.015f), r * (i / 4f), c, style = Stroke(0.8f))
+                    }
+                    drawCircle(MeetColors.neonGreen.copy(alpha = 0.15f * pulseAlpha), r * glowPulse, c, style = Stroke(1.5f))
+                    
+                    // Sweeping radar arc (analog phosphor sweep)
+                    val sweepStartAngle = rotation - 90f
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = listOf(
+                                MeetColors.neonGreen.copy(alpha = 0.4f),
+                                MeetColors.neonGreen.copy(alpha = 0.05f),
+                                Color.Transparent
+                            ),
+                            center = c
+                        ),
+                        startAngle = sweepStartAngle,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                    
+                    // Sweeping ray line
+                    val angle = rotation * (PI / 180f).toFloat()
+                    drawLine(MeetColors.neonGreen.copy(alpha = 0.8f), c, Offset(c.x + r * cos(angle), c.y + r * sin(angle)), 2f, cap = StrokeCap.Round)
+                    
+                    // Digital corner crosshair markings
+                    val markSize = 12f
+                    listOf(
+                        Pair(Offset(c.x - r, c.y - r), Pair(1f, 1f)),
+                        Pair(Offset(c.x + r, c.y - r), Pair(-1f, 1f)),
+                        Pair(Offset(c.x - r, c.y + r), Pair(1f, -1f)),
+                        Pair(Offset(c.x + r, c.y + r), Pair(-1f, -1f))
+                    ).forEach { (pos, dir) ->
+                        drawLine(MeetColors.neonGreen.copy(alpha = 0.5f), pos, Offset(pos.x + markSize * dir.first, pos.y), 1.5f)
+                        drawLine(MeetColors.neonGreen.copy(alpha = 0.5f), pos, Offset(pos.x, pos.y + markSize * dir.second), 1.5f)
+                    }
+
+                    // Render decaying radar blips
+                    radarBlips.forEach { blip ->
+                        val bx = c.x + r * blip.xOffset
+                        val by = c.y + r * blip.yOffset
+                        
+                        // Angle of blip relative to center (in degrees, 0 to 360)
+                        val dx = blip.xOffset
+                        val dy = blip.yOffset
+                        var blipAngleRad = kotlin.math.atan2(dy, dx)
+                        if (blipAngleRad < 0) blipAngleRad += (2 * PI).toFloat()
+                        val blipAngleDeg = blipAngleRad * (180f / PI.toFloat())
+                        
+                        // Calculate sweep angle difference to establish decay
+                        val currentSweepDeg = rotation % 360f
+                        var angleDiff = currentSweepDeg - blipAngleDeg
+                        if (angleDiff < 0) angleDiff += 360f
+                        
+                        // Decaying brightness based on sweep pass
+                        val decay = if (angleDiff < 90f) {
+                            1f - (angleDiff / 90f) // brightest right after sweep, fading over 90 degrees
+                        } else {
+                            0.15f // base ambient glow
+                        }
+                        
+                        // Draw glowing halo around blip
+                        drawCircle(
+                            color = blip.color.copy(alpha = 0.45f * decay),
+                            radius = (blip.size * 2.2f).dp.toPx() * (0.8f + 0.2f * sin(phase * 10f)),
+                            center = Offset(bx, by)
+                        )
+                        // Draw core point
+                        drawCircle(
+                            color = blip.color.copy(alpha = 0.9f * decay + 0.1f),
+                            radius = blip.size.dp.toPx(),
+                            center = Offset(bx, by)
+                        )
+                    }
+                }
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("SCAN", color = MeetColors.neonGreen.copy(alpha = pulseAlpha), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black, fontSize = if (isCompact) 14.sp else 18.sp, letterSpacing = 6.sp, style = LocalTextStyle.current.copy(shadow = androidx.compose.ui.graphics.Shadow(color = MeetColors.neonGreen.copy(alpha = 0.8f), offset = Offset(0f,0f), blurRadius = 8f)))
+                    Text("ECU", color = Color.White.copy(alpha = 0.3f), fontFamily = FontFamily.Monospace, fontSize = 8.sp, letterSpacing = 4.sp)
+                }
+            }
+
+            Spacer(Modifier.height(if (isCompact) 14.dp else 20.dp))
+            val displayMessage = if (statusMessage.isNotBlank()) statusMessage.uppercase() else "ESCANEO EN PROGRESO"
+            Text(
+                text = displayMessage,
+                color = MeetColors.neonGreen.copy(alpha = pulseAlpha),
+                fontSize = if (isCompact) 11.sp else 14.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(10.dp))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(if (isCompact) 0.8f else 0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)), color = MeetColors.neonGreen, trackColor = MeetColors.borderSubtle)
+            Spacer(Modifier.height(if (isCompact) 14.dp else 20.dp))
+
+            // Terminal
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isCompact) 150.dp else 190.dp)
+                    .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = MeetColors.neonGreen.copy(alpha = 0.1f))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF020810).copy(alpha = 0.9f))
+                    .border(1.dp, Brush.linearGradient(listOf(MeetColors.neonGreen.copy(alpha = 0.15f), MeetColors.borderSubtle.copy(alpha = 0.3f))), RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                val termState = rememberLazyListState()
+                val lastLogs = terminalOutput.takeLast(12)
+                LaunchedEffect(lastLogs.size) { if (lastLogs.isNotEmpty()) termState.animateScrollToItem(lastLogs.size - 1) }
+                LazyColumn(state = termState, modifier = Modifier.fillMaxSize()) {
+                    itemsIndexed(lastLogs) { _, log ->
+                        val c = when (log.type) { TerminalLineType.ERROR -> MeetColors.error; TerminalLineType.WARNING -> MeetColors.warning; TerminalLineType.COMMAND -> MeetColors.electricBlue; else -> MeetColors.neonGreen.copy(alpha = 0.8f) }
+                        Text("> ${log.text}", color = c, fontFamily = FontFamily.Monospace, fontSize = if (isCompact) 9.sp else 11.sp, lineHeight = if (isCompact) 13.sp else 16.sp, modifier = Modifier.padding(vertical = 1.dp), softWrap = true)
+                    }
+                }
+            }
+        }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// STAGGERED ENTRANCE ANIMATION
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun StaggeredEntrance(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 100); visible = true }
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(500, easing = FastOutSlowInEasing), label = "sa")
+    val offsetY by animateFloatAsState(if (visible) 0f else 50f, tween(500, easing = FastOutSlowInEasing), label = "so")
+    val scale by animateFloatAsState(if (visible) 1f else 0.9f, tween(500, easing = FastOutSlowInEasing), label = "ss")
+    Box(Modifier.alpha(alpha).graphicsLayer { translationY = offsetY; scaleX = scale; scaleY = scale }) { content() }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLEAR RESULT BANNER
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun ClearResultBanner(result: String) {
+    val isSuccess = result.contains("✅")
+    val borderColor = if (isSuccess) MeetColors.neonGreen else MeetColors.error
+    HoloCard(accentColor = borderColor, modifier = Modifier.fillMaxWidth()) {
+        Text(result, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, softWrap = true, modifier = Modifier.padding(14.dp).fillMaxWidth())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// READINESS MONITORS
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun ReadinessMonitorsView(readiness: com.elysium369.meet.core.obd.ReadinessResult?, coroutineScope: kotlinx.coroutines.CoroutineScope, viewModel: ObdViewModel, screenWidth: Int, isCompact: Boolean) {
+    if (readiness == null) {
+        HolographicEmptyState("SIN DATOS", "Toca ESCANEAR para leer los monitores.", MeetColors.neonGreen, isCompact)
+    } else {
+        Column(Modifier.fillMaxWidth()) {
+            // MIL card
+            HoloCard(
+                modifier = Modifier.fillMaxWidth(),
+                accentColor = if (readiness.milOn) MeetColors.error else MeetColors.neonGreen,
+                glowIntensity = 0.2f
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ESTADO LUZ MIL", color = MeetColors.textSecondary, fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (readiness.milOn) "🔴 ENCENDIDA" else "🟢 APAGADA",
+                            color = if (readiness.milOn) MeetColors.error else MeetColors.neonGreen,
+                            fontWeight = FontWeight.Black, fontSize = if (isCompact) 15.sp else 18.sp, fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF040A14))
+                            .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("${readiness.dtcCount} DTCs", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            PhantomSectionHeader(label = "MONITORES DE EMISIÓN")
+            Spacer(Modifier.height(6.dp))
+
+            val passed = readiness.monitors.count { it.complete }
+            Text("$passed de ${readiness.monitors.size} completados", color = if (passed == readiness.monitors.size) MeetColors.neonGreen else MeetColors.warning, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+
+            val cols = when { screenWidth >= 700 -> 3; screenWidth >= 420 -> 2; else -> 1 }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                readiness.monitors.chunked(cols).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { mon ->
+                            val c = if (mon.complete) MeetColors.neonGreen else MeetColors.warning
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .shadow(4.dp, RoundedCornerShape(10.dp), ambientColor = c.copy(alpha = 0.1f))
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Brush.verticalGradient(listOf(Color(0xFF0D1A2E), Color(0xFF081428))))
+                                    .border(0.5.dp, c.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                    .padding(if (isCompact) 10.dp else 12.dp)
+                            ) {
+                                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                                    Text(mon.name, color = Color.White, fontSize = if (isCompact) 11.sp else 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), softWrap = true)
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .shadow(2.dp, RoundedCornerShape(4.dp), ambientColor = c.copy(alpha = 0.3f))
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(c.copy(alpha = 0.12f))
+                                            .border(1.dp, c, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(if (mon.complete) "OK" else "INC", color = c, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, fontSize = 8.sp)
+                                    }
+                                }
+                            }
+                        }
+                        if (row.size < cols) repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MANUAL SEARCH TAB
+// ═══════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ManualSearchTab(navController: NavController, viewModel: ObdViewModel, isSpanish: Boolean) {
+private fun ManualSearchTab(navController: NavController, viewModel: ObdViewModel, isCompact: Boolean) {
     var searchQuery by remember { mutableStateOf("") }
-    val searchResults by viewModel.manualSearchResults.collectAsState()
-
-    // Debounce Live Search
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) {
-            kotlinx.coroutines.delay(300)
-            viewModel.searchDtcManual(searchQuery)
-        } else if (searchQuery.isEmpty()) {
-            viewModel.searchDtcManual("")
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val manualResults by viewModel.manualSearchResults.collectAsState()
+    Column(Modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it.uppercase().trim() },
-            label = { Text(if(isSpanish) "Ingresar Código (Ej. P0300)" else "Enter Code (e.g. P0300)", color = MeetColors.textSecondary) },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Text("✕", color = Color.White)
-                    }
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MeetColors.neonGreen,
-                unfocusedBorderColor = MeetColors.borderSubtle,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = MeetColors.neonGreen,
-                focusedLabelColor = MeetColors.neonGreen,
-                unfocusedLabelColor = MeetColors.textSecondary,
-                focusedContainerColor = MeetColors.cardBackground.copy(alpha = 0.5f),
-                unfocusedContainerColor = MeetColors.cardBackground.copy(alpha = 0.5f)
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            value = searchQuery, onValueChange = { searchQuery = it.uppercase() },
+            label = { Text(if (isCompact) "Código DTC" else "Ingresar Código DTC (Ej. P0300)", color = MeetColors.textSecondary) },
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = MeetColors.neonGreen, unfocusedBorderColor = MeetColors.borderSubtle, cursorColor = MeetColors.neonGreen, focusedContainerColor = Color(0xFF0A1220), unfocusedContainerColor = Color(0xFF0A1220)),
+            modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(12.dp)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // OBD Quick Access Keypad
-        Text(
-            text = if(isSpanish) "TECLADO DE ACCESO RÁPIDO OBD" else "OBD QUICK ACCESS KEYPAD",
-            color = MeetColors.textSecondary,
-            fontWeight = FontWeight.Black,
-            style = MaterialTheme.typography.labelSmall,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        
-        val obdKeys = listOf("P", "B", "C", "U")
-        val numKeys = listOf("0", "1", "2")
-        
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            obdKeys.forEach { key ->
-                val keyColor = when(key) {
-                    "P" -> MeetColors.error
-                    "B" -> MeetColors.electricBlue
-                    "C" -> MeetColors.cyberCyan
-                    "U" -> MeetColors.warning
-                    else -> MeetColors.neonGreen
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, keyColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        .clickable {
-                            if (searchQuery.length < 5) {
-                                searchQuery = if (searchQuery.isEmpty()) key else key + searchQuery.drop(1)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = key, color = keyColor, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            numKeys.forEach { key ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        .clickable {
-                            if (searchQuery.length < 5) {
-                                if (searchQuery.isNotEmpty()) {
-                                    searchQuery = if (searchQuery.length == 1) searchQuery + key else searchQuery.take(1) + key + searchQuery.drop(2)
-                                } else {
-                                    searchQuery = "P" + key
+        Spacer(Modifier.height(12.dp))
+        EliteButton(if (isCompact) "BUSCAR" else "BUSCAR EN BASE DE DATOS", { val q = searchQuery.trim(); if (q.isNotEmpty()) viewModel.searchDtcManual(q) }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(20.dp))
+        if (manualResults.isNotEmpty()) {
+            Text("RESULTADOS (${manualResults.size})", color = MeetColors.neonGreen, fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                manualResults.forEachIndexed { index, dtc ->
+                    StaggeredEntrance(index) {
+                        val c = when (dtc.severity.uppercase()) { "HIGH", "CRITICAL" -> MeetColors.error; "MODERATE" -> MeetColors.warning; else -> MeetColors.neonGreen }
+                        HoloCard(modifier = Modifier.fillMaxWidth(), accentColor = c) {
+                            Column(Modifier.padding(if (isCompact) 14.dp else 18.dp).fillMaxWidth()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.shadow(2.dp, RoundedCornerShape(6.dp), ambientColor = c.copy(alpha = 0.3f)).clip(RoundedCornerShape(6.dp)).background(c.copy(alpha = 0.15f)).border(1.dp, c, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                        Text(dtc.severity.uppercase(), color = c, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(dtc.code, color = Color.White, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, fontSize = if (isCompact) 16.sp else 20.sp)
                                 }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = key, color = MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-                }
-            }
-            
-            // Backspace key
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeetColors.cardBackground)
-                    .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                    .clickable {
-                        if (searchQuery.isNotEmpty()) {
-                            searchQuery = searchQuery.dropLast(1)
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "⌫", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        // Popular Codes Chips (Only show if search query is empty)
-        if (searchQuery.isEmpty()) {
-            Text(
-                text = if(isSpanish) "CÓDIGOS DTC COMUNES" else "POPULAR DTC CODES",
-                color = MeetColors.textSecondary,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            val popularCodes = listOf(
-                Pair("P0300", if(isSpanish) "Fallo Encendido" else "Misfire"),
-                Pair("P0420", if(isSpanish) "Catalizador" else "Catalyst"),
-                Pair("P0171", if(isSpanish) "Mezcla Pobre" else "System Lean"),
-                Pair("P0442", if(isSpanish) "Fuga EVAP" else "EVAP Leak"),
-                Pair("P0113", if(isSpanish) "Sensor IAT" else "IAT Sensor"),
-                Pair("P0505", if(isSpanish) "Control Ralentí" else "Idle Control")
-            )
-            
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (row in 0 until 2) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        for (col in 0 until 3) {
-                            val index = row * 3 + col
-                            if (index < popularCodes.size) {
-                                val item = popularCodes[index]
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MeetColors.cardBackground)
-                                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            searchQuery = item.first
-                                        }
-                                        .padding(8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            text = item.first,
-                                            color = MeetColors.cyberCyan,
-                                            fontWeight = FontWeight.Black,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        Text(
-                                            text = item.second,
-                                            color = MeetColors.textSecondary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 9.sp,
-                                            maxLines = 1
-                                        )
+                                Spacer(Modifier.height(10.dp))
+                                Text(dtc.descriptionEs, color = Color.White, fontSize = if (isCompact) 12.sp else 13.sp, fontWeight = FontWeight.Bold, softWrap = true, lineHeight = 18.sp)
+                                if (dtc.descriptionEn.isNotBlank() && dtc.descriptionEn != dtc.descriptionEs) { Spacer(Modifier.height(2.dp)); Text(dtc.descriptionEn, color = MeetColors.textSecondary, fontSize = 11.sp, softWrap = true) }
+                                Spacer(Modifier.height(10.dp))
+                                Text("▸ POSIBLES CAUSAS", color = MeetColors.cyberCyan, fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                Spacer(Modifier.height(4.dp))
+                                Box(Modifier.fillMaxWidth().shadow(2.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp)).background(Color(0xFF060D1A)).border(0.5.dp, MeetColors.borderSubtle.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp)) {
+                                    Text(dtc.possibleCauses, color = MeetColors.textSecondary, fontSize = if (isCompact) 10.sp else 11.sp, lineHeight = 15.sp, softWrap = true)
+                                }
+                                Spacer(Modifier.height(14.dp))
+                                if (isCompact) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        EliteButton("🛠️ CÓMO REPARAR (PASO A PASO)", { navController.navigate("repair/${dtc.code}") }, color = MeetColors.neonGreen, modifier = Modifier.fillMaxWidth())
+                                        EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/${dtc.code}") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.fillMaxWidth())
+                                    }
+                                } else {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        EliteButton("🛠️ CÓMO REPARAR", { navController.navigate("repair/${dtc.code}") }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
+                                        EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/${dtc.code}") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
@@ -1899,355 +1475,8 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                     }
                 }
             }
+        } else if (searchQuery.isNotBlank()) {
+            HolographicEmptyState("SIN COINCIDENCIAS", "No se encontraron códigos en la base de datos local.", MeetColors.textSecondary, isCompact)
         }
-        
-        if (searchQuery.isNotEmpty() && searchResults.isEmpty() && searchQuery.length < 3) {
-            Spacer(modifier = Modifier.height(16.dp))
-            EliteButton(
-                text = if(isSpanish) "BUSCAR" else "SEARCH",
-                onClick = { viewModel.searchDtcManual(searchQuery) },
-                modifier = Modifier.fillMaxWidth(),
-                color = MeetColors.neonGreen,
-                textColor = MeetColors.backgroundDeep
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (searchResults.isNotEmpty() || searchQuery.isNotEmpty()) {
-            if (searchResults.isEmpty() && searchQuery.length >= 3) {
-                EmptyDtcState(if(isSpanish) "Código no encontrado en la base de datos local." else "Code not found in local database.", MeetColors.textSecondary)
-            } else if (searchResults.isNotEmpty()) {
-                Text(
-                    text = (if(isSpanish) "RESULTADOS DE BÚSQUEDA (${searchResults.size})" else "SEARCH RESULTS (${searchResults.size})"),
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                searchResults.forEachIndexed { index, dtc ->
-                    val color = when (dtc.severity.uppercase()) {
-                        "HIGH" -> MeetColors.error
-                        "MODERATE" -> MeetColors.warning
-                        else -> MeetColors.neonGreen
-                    }
-                    
-                    AnimatedEntrance(index = index) {
-                        DtcCard(
-                            dtc = dtc.code,
-                            severity = dtc.severity.uppercase(),
-                            color = color,
-                            navController = navController,
-                            viewModel = viewModel,
-                            isSpanish = isSpanish
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-        }
-    }
-}
-
-private fun translateDtcText(englishText: String): String {
-    var es = englishText
-    val dict = mapOf(
-        "Catalytic Converter" to "Convertidor catalítico",
-        "Oxygen Sensor" to "Sensor de oxígeno",
-        "Camshaft Position" to "Posición del árbol de levas",
-        "Crankshaft Position" to "Posición del cigüeñal",
-        "Mass Air Flow" to "Flujo de masa de aire (MAF)",
-        "Manifold Absolute Pressure" to "Presión absoluta del colector (MAP)",
-        "Engine Coolant Temperature" to "Temperatura del refrigerante del motor (ECT)",
-        "Intake Air Temperature" to "Temperatura del aire de admisión (IAT)",
-        "Throttle Position" to "Posición del acelerador (TPS)",
-        "Idle Air Control" to "Control de aire de ralentí (IAC)",
-        "Exhaust Gas Recirculation" to "Recirculación de gases de escape (EGR)",
-        "Evaporative Emission" to "Emisión evaporativa (EVAP)",
-        "Fuel Trim" to "Ajuste de combustible",
-        "Misfire Detected" to "Fallo de encendido detectado",
-        "System Rich" to "Mezcla rica",
-        "System Lean" to "Mezcla pobre",
-        "Circuit Malfunction" to "Mal funcionamiento del circuito",
-        "Circuit Range" to "Rango del circuito",
-        "Circuit Low" to "Circuito bajo",
-        "Circuit High" to "Circuito alto",
-        "Circuit Open" to "Circuito abierto",
-        "Circuit Intermittent" to "Circuito intermitente",
-        "Purge Valve" to "Válvula de purga",
-        "Solenoid Valve" to "Válvula solenoide",
-        "Fuel Pump" to "Bomba de combustible",
-        
-        "Cylinder" to "Cilindro", "Misfire" to "Fallo de encendido", "Detected" to "Detectado",
-        "Random" to "Aleatorio", "Multiple" to "Múltiple", "Sensor" to "Sensor",
-        "Circuit" to "Circuito", "Low" to "Bajo", "High" to "Alto", "Input" to "Entrada",
-        "Output" to "Salida", "Bank" to "Banco", "Voltage" to "Voltaje",
-        "Malfunction" to "Mal funcionamiento", "Performance" to "Rendimiento", "Range" to "Rango",
-        "Heater" to "Calentador", "Control" to "Control", "Module" to "Módulo",
-        "System" to "Sistema", "Emission" to "Emisión", "Evaporative" to "Evaporativo",
-        "Leak" to "Fuga", "Pressure" to "Presión", "Temperature" to "Temperatura",
-        "Engine" to "Motor", "Coolant" to "Refrigerante", "Speed" to "Velocidad",
-        "Position" to "Posición", "Camshaft" to "Árbol de levas", "Crankshaft" to "Cigüeñal",
-        "Exhaust" to "Escape", "Gas" to "Gas", "Recirculation" to "Recirculación",
-        "Oxygen" to "Oxígeno", "O2" to "O2", "Catalyst" to "Catalizador",
-        "Efficiency" to "Eficiencia", "Below" to "Por debajo", "Threshold" to "Umbral",
-        "Fuel" to "Combustible", "Trim" to "Ajuste", "Lean" to "Pobre", "Rich" to "Rico",
-        "Mass" to "Masa", "Air" to "Aire", "Flow" to "Flujo", "Volume" to "Volumen",
-        "Throttle" to "Acelerador", "Pedal" to "Pedal", "Switch" to "Interruptor",
-        "Relay" to "Relé", "Valve" to "Válvula", "Pump" to "Bomba", "Motor" to "Motor",
-        "Signal" to "Señal", "Intermittent" to "Intermitente", "Erratic" to "Errático",
-        "Open" to "Abierto", "Short" to "Corto", "Ground" to "Tierra", "Battery" to "Batería",
-        "Ignition" to "Ignición", "Coil" to "Bobina", "Primary" to "Primario",
-        "Secondary" to "Secundario", "Transmission" to "Transmisión", "Gear" to "Marcha",
-        "Ratio" to "Relación", "Shift" to "Cambio", "Solenoid" to "Solenoide",
-        "Fluid" to "Líquido", "Clutch" to "Embrague", "Torque" to "Torque",
-        "Converter" to "Convertidor", "Brake" to "Freno", "ABS" to "ABS",
-        "Steering" to "Dirección", "Wheel" to "Rueda", "Tire" to "Llanta",
-        "Monitor" to "Monitor", "Internal" to "Interno", "Error" to "Error",
-        "Memory" to "Memoria", "Keep" to "Mantener", "Alive" to "Vivo",
-        "KAM" to "KAM", "ROM" to "ROM", "RAM" to "RAM", "EEPROM" to "EEPROM",
-        "Programming" to "Programación", "Communication" to "Comunicación",
-        "Lost" to "Perdida", "Bus" to "Bus", "Data" to "Datos", "Link" to "Enlace",
-        "Network" to "Red", "Node" to "Nodo", "Invalid" to "Inválido",
-        "Missing" to "Faltante", "Message" to "Mensaje", "Received" to "Recibido",
-        "Expected" to "Esperado", "Actual" to "Real", "Limit" to "Límite",
-        "Exceeded" to "Excedido", "Maximum" to "Máximo", "Minimum" to "Mínimo",
-        "Value" to "Valor", "Out of" to "Fuera de", "Bounds" to "Límites",
-        "Tolerance" to "Tolerancia", "Calibration" to "Calibración", "Not" to "No",
-        "Learned" to "Aprendido", "Configured" to "Configurado", "Programmed" to "Programado",
-        "Supported" to "Soportado", "Available" to "Disponible", "Ready" to "Listo",
-        "Active" to "Activo", "Pending" to "Pendiente", "Permanent" to "Permanente",
-        "History" to "Historia", "Stored" to "Almacenado", "Current" to "Actual",
-        "Worn out" to "Desgastado", "spark plugs" to "bujías", "ignition wires" to "cables de ignición",
-        "distributor cap" to "tapa de distribuidor", "rotor" to "rotor",
-        "when applicable" to "cuando aplique", "Incorrect" to "Incorrecto",
-        "timing" to "sincronización", "Vacuum" to "Vacío", "leak(s)" to "fuga(s)",
-        "weak" to "débil", "Improperly functioning" to "Funcionamiento inadecuado",
-        "Defective" to "Defectuoso", "Mechanical" to "Mecánico", "problems" to "problemas",
-        "compression" to "compresión", "leaking" to "fuga", "head gasket(s)" to "junta(s) de culata",
-        "or" to "o", "and" to "y"
-    )
-
-    // Order dict by length descending so longer phrases get replaced first
-    dict.entries.sortedByDescending { it.key.length }.forEach { (en, esWord) ->
-        es = es.replace(Regex("\\b$en\\b", RegexOption.IGNORE_CASE), esWord)
-    }
-    
-    return es
-}
-
-private fun generateExpertSynthesis(dtc: DtcDefinitionEntity, isSpanish: Boolean): String {
-    val rawCauses = if (dtc.descriptionEn.isNotBlank() && dtc.descriptionEn.contains(",")) dtc.descriptionEn else dtc.possibleCauses
-    val causesList = rawCauses
-        .split(Regex("[.,;\\n]"))
-        .filter { it.isNotBlank() && it.length > 3 }
-        .map { it.trim().replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } }
-        
-    val prefix = dtc.code.firstOrNull()?.toString()?.uppercase() ?: ""
-    
-    val systemsInfo = if (isSpanish) {
-        when(prefix) {
-            "P" -> "Tren Motriz (Motor/Transmisión)"
-            "B" -> "Carrocería (Habitáculo/Módulos)"
-            "C" -> "Chasis (Frenos/Suspensión/Dirección)"
-            "U" -> "Red de Comunicación (CAN Bus/Módulos)"
-            else -> "Sistema General (${dtc.system})"
-        }
-    } else {
-        when(prefix) {
-            "P" -> "Powertrain (Engine/Transmission)"
-            "B" -> "Body (Interior/Modules)"
-            "C" -> "Chassis (Brakes/Suspension/Steering)"
-            "U" -> "Network (CAN Bus/Modules)"
-            else -> "General System (${dtc.system})"
-        }
-    }
-    
-    val severityText = if (isSpanish) {
-        when(dtc.severity.uppercase()) {
-            "HIGH" -> "ALTA - Acción Inmediata Requerida."
-            "MODERATE" -> "MEDIA - Requiere atención a corto plazo."
-            "LOW" -> "BAJA - Fallo informativo o intermitente."
-            else -> "EVALUAR - Depende de los síntomas físicos."
-        }
-    } else {
-        when(dtc.severity.uppercase()) {
-            "HIGH" -> "HIGH - Immediate Action Required."
-            "MODERATE" -> "MODERATE - Requires short-term attention."
-            "LOW" -> "LOW - Informational or intermittent fault."
-            else -> "EVALUATE - Depends on physical symptoms."
-        }
-    }
-    
-    val desc = if (isSpanish) translateDtcText(dtc.descriptionEs) else dtc.descriptionEn
-
-    val causesText = if (causesList.isNotEmpty()) {
-        causesList.take(4).mapIndexed { index, cause -> 
-            val formattedCause = if (isSpanish) translateDtcText(cause) else cause
-            "   ${index + 1}. $formattedCause" 
-        }.joinToString("\n")
-    } else {
-        if (isSpanish) {
-            "   1. Inspección visual de circuitos y conectores.\n   2. Revisar boletines técnicos (TSBs)."
-        } else {
-            "   1. Visual inspection of circuits and connectors.\n   2. Check manufacturer TSBs."
-        }
-    }
-
-    if (isSpanish) {
-        return """
-            🇪🇸 ANÁLISIS TÉCNICO
-            • Sistema: $systemsInfo
-            • Riesgo: $severityText
-            ⚙️ FALLO: "$desc"
-            
-            🛠️ RUTA DE DIAGNÓSTICO (CAUSAS):
-$causesText
-            
-            💡 NOTA EXPERTA:
-            Revisar "Cuadro Congelado" (FF Data) antes de reemplazar componentes.
-        """.trimIndent()
-    } else {
-        return """
-            🇺🇸 TECHNICAL ANALYSIS
-            • System: $systemsInfo
-            • Risk: $severityText
-            ⚙️ FAULT: "$desc"
-            
-            🛠️ DIAGNOSTIC PATH (CAUSES):
-$causesText
-            
-            💡 EXPERT NOTE:
-            Check "Freeze Frame" data before replacing any components.
-        """.trimIndent()
-    }
-}
-
-/**
- * Returns a Pair<Description, List<DriveSteps>> for each readiness monitor.
- * Professional-grade explanations based on SAE J1979 standard and OEM calibration knowledge.
- */
-private fun getDriveCycleGuide(monitorName: String): Pair<String, List<String>>? {
-    val name = monitorName.uppercase()
-    return when {
-        "CATALYST" in name || "CATALIZADOR" in name || "CAT" in name -> Pair(
-            "El monitor de Catalizador verifica que el convertidor catalítico convierta eficientemente HC, CO y NOx " +
-                "en gases inertes (H₂O, CO₂, N₂). La PCM compara la actividad del sensor O2 pre-cat (B1S1) con " +
-                "el post-cat (B1S2). Si ambos oscilan igual, el catalizador NO está funcionando.",
-            listOf(
-                "Arranque en frío (motor debe estar <50°C / 8hrs sin usar).",
-                "Deje en ralentí 2 minutos para estabilizar sensores O2.",
-                "Conduzca a velocidad constante entre 40-65 km/h por 4-5 minutos (NO acelere bruscamente).",
-                "Suelte el acelerador y deje desacelerar en motor (engine brake) hasta 30 km/h — NO pise el freno.",
-                "Repita el ciclo de aceleración-desaceleración 2-3 veces.",
-                "TOTAL: ~15-20 minutos. Si no completa, el catalizador puede estar degradado."
-            )
-        )
-        "EVAP" in name || "EVAPORAT" in name -> Pair(
-            "El monitor EVAP verifica la integridad del sistema de control de emisiones evaporativas — " +
-                "el tanque de gasolina, líneas de vapor, cánister de carbón y válvulas de purga/ventilación. " +
-                "Busca fugas tan pequeñas como 0.020\" (0.5mm). Es el monitor MÁS difícil de completar.",
-            listOf(
-                "El tanque debe estar entre 15-85% de capacidad (NO lleno ni casi vacío).",
-                "Arranque en frío (motor <50°C, idealmente primera hora de la mañana).",
-                "Conduzca a velocidad constante entre 45-65 km/h por 10 minutos.",
-                "Estacione y deje en ralentí por 5 minutos (la PCM presuriza el sistema y busca caída de presión).",
-                "Apague el motor y NO abra la tapa de gasolina por al menos 8 horas.",
-                "⚠️ IMPORTANTE: Si la tapa de gasolina no sella bien, este monitor NUNCA completará."
-            )
-        )
-        "O2" in name || "OXYGEN" in name || "OXÍGENO" in name -> Pair(
-            "El monitor de Sensores de Oxígeno verifica que los sensores O2 (lambda) respondan correctamente " +
-                "a cambios en la mezcla aire/combustible. La PCM evalúa el tiempo de respuesta, la amplitud de " +
-                "la señal (debe oscilar 0.1-0.9V) y la frecuencia de oscilación (cross-counts).",
-            listOf(
-                "Arranque el motor y deje en ralentí hasta alcanzar temperatura operativa (>75°C).",
-                "Acelere de 0 a 90 km/h de forma gradual (aceleración moderada) en 30 segundos.",
-                "Mantenga velocidad constante entre 55-100 km/h por 3 minutos.",
-                "Suelte el acelerador y deje desacelerar en motor hasta 30 km/h (NO pise freno).",
-                "Repita 3 veces. La PCM necesita ver múltiples transiciones rico→pobre→rico.",
-                "TOTAL: ~10-15 minutos. Falla si un sensor O2 tarda >1s en cambiar de rico a pobre."
-            )
-        )
-        "EGR" in name -> Pair(
-            "El monitor EGR verifica que la válvula de Recirculación de Gases de Escape abra y cierre correctamente. " +
-                "La PCM comanda la EGR abierta y observa cambios en MAF, MAP o sensores DPFE para confirmar " +
-                "que realmente fluyen gases de escape hacia la admisión.",
-            listOf(
-                "Motor a temperatura operativa (>75°C).",
-                "Conduzca a velocidad constante entre 45-65 km/h durante 1 minuto.",
-                "Acelere de 50 a 90 km/h gradualmente — la EGR debe abrir a carga media.",
-                "Suelte el acelerador para desacelerar en motor — la EGR debe cerrar.",
-                "Mantenga velocidad entre 65-90 km/h por 5 minutes adicionales.",
-                "TOTAL: ~8 minutos. Si no completa, los pasajes de EGR pueden estar tapados con carbón."
-            )
-        )
-        "MISFIRE" in name || "ENCENDIDO" in name || "FALLO" in name -> Pair(
-            "El monitor de Misfire evalúa continuamente la variación de velocidad del cigüeñal (CKP) " +
-                "para detectar cilindros que no contribuyen. Puede identificar el cilindro exacto " +
-                "y distinguir entre misfire Tipo A (daña catalizador) y Tipo B (excede umbral de emisiones).",
-            listOf(
-                "Este monitor es CONTINUO — se ejecuta siempre que el motor está en marcha.",
-                "Para resetear: conduzca normalmente por 10 minutos variando entre ralentí, ciudad y carretera.",
-                "Incluya aceleraciones desde parado hasta 70 km/h al menos 3 veces.",
-                "Si no completa, hay misfire activo — revise bujías, bobinas e inyectores.",
-                "Verifique contadores en Mode 06 para identificar el cilindro afectado."
-            )
-        )
-        "FUEL" in name || "COMBUSTIBLE" in name -> Pair(
-            "El monitor del Sistema de Combustible verifica que la PCM pueda mantener la mezcla aire/combustible " +
-                "en el rango ideal (lambda = 1.0 / 14.7:1 AFR) usando los Fuel Trims como indicador. " +
-                "Si los Fuel Trims combinados exceden ±25%, la PCM enciende el MIL.",
-            listOf(
-                "Motor a temperatura operativa (>75°C).",
-                "Conduzca en ciudad con paradas y arranques por 5 minutos.",
-                "Luego conduzca a velocidad constante 55-80 km/h por 5 minutos.",
-                "La PCM necesita ver condiciones de ralentí, parte de carga y desaceleración.",
-                "TOTAL: ~10 minutos. Si no completa, hay un problema significativo de mezcla."
-            )
-        )
-        "HEATED" in name || "CALENTADOR" in name || "HTR" in name -> Pair(
-            "El monitor del Calentador del Catalizador (si existe) verifica que el calentador eléctrico " +
-                "integrado acelere el calentamiento del catalizador. Esto es común en vehículos con " +
-                "catalizadores muy alejados del motor (underfloor cats).",
-            listOf(
-                "Arranque en frío (motor <50°C).",
-                "Deje en ralentí 3 minutos.",
-                "Conduzca normalmente 10 minutos.",
-                "La PCM verifica que la temperatura del catalizador suba más rápido que sin calentador."
-            )
-        )
-        "A/C" in name || "REFRIG" in name || "AC" in name -> Pair(
-            "El monitor del A/C verifica que el sistema de aire acondicionado no afecte negativamente " +
-                "las emisiones cuando se activa (la PCM debe compensar la carga extra del compresor).",
-            listOf(
-                "Motor a temperatura operativa.",
-                "Encienda el A/C al máximo por 2 minutos en ralentí.",
-                "Conduzca con A/C encendido a 50-80 km/h por 5 minutos.",
-                "La PCM verifica que Fuel Trims se mantengan estables con la carga del compresor."
-            )
-        )
-        "SECONDARY" in name || "AIR" in name || "SECUNDARIO" in name -> Pair(
-            "El monitor de Aire Secundario verifica que la bomba de aire inyecte aire fresco en el " +
-                "colector de escape durante arranques en frío para calentar el catalizador más rápido " +
-                "y reducir emisiones HC en los primeros 60 segundos de operación.",
-            listOf(
-                "Arranque en frío obligatorio (motor <40°C).",
-                "Al arrancar, la bomba debe activarse automáticamente por 30-120 segundos.",
-                "NO toque el acelerador durante los primeros 2 minutos.",
-                "La PCM verifica que los sensores O2 lean 'pobre' cuando la bomba inyecta aire.",
-                "Si la bomba no se escucha al arrancar en frío, verifique relé y motor de la bomba."
-            )
-        )
-        else -> Pair(
-            "Este monitor verifica un subsistema de emisiones del vehículo. " +
-                "Requiere condiciones específicas de manejo para que la PCM pueda ejecutar su prueba interna.",
-            listOf(
-                "Arranque en frío si es posible (motor <50°C).",
-                "Conduzca normalmente por 15-20 minutos incluyendo ralentí, ciudad y carretera.",
-                "Incluya al menos 3 ciclos de aceleración y desaceleración en motor (sin freno).",
-                "Si persiste incompleto después de 3 ciclos de manejo, puede haber una falla asociada."
-            )
-        )
     }
 }

@@ -407,7 +407,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                             modifier = Modifier
                                 .size(90.dp)
                                 .clip(RoundedCornerShape(45.dp))
-                                .border(2.dp, MeetColors.neonGreen.copy(alpha = pulseScale), RoundedCornerShape(45.dp)),
+                                .border(2.dp, MeetColors.neonGreen.copy(alpha = pulseScale.coerceIn(0f, 1f)), RoundedCornerShape(45.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(

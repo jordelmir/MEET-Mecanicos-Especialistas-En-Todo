@@ -156,11 +156,12 @@ fun DtcItemCard(
                 )
             }
 
-            val displayDesc = if (description.isBlank() || description.contains("no disponible") || description.contains("no encontrada")) {
+            val shortDesc = if (description.isBlank() || description.contains("no disponible") || description.contains("no encontrada")) {
                 com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(code, isSpanish = true)
             } else {
                 description
             }
+            val displayDesc = com.elysium369.meet.ui.components.DtcUtils.getDtcParagraphExplanation(code, shortDesc, isSpanish = true)
 
             Spacer(modifier = Modifier.height(6.dp))
             Text(

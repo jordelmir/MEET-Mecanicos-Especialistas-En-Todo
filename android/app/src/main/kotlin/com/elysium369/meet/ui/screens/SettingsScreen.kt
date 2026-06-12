@@ -43,6 +43,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
 
     // --- Live state from ViewModel ---
     val forceCloneMode by viewModel.forceCloneMode.collectAsState()
+    val fusedSpeedEnabled by viewModel.fusedSpeedEnabled.collectAsState()
     val aiConfig by viewModel.aiConfig.collectAsState()
 
     // --- Local AI config editing state ---
@@ -61,6 +62,9 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     var workshopPhone by remember { mutableStateOf(prefs.getString("workshop_phone", "") ?: "") }
     var workshopEmail by remember { mutableStateOf(prefs.getString("workshop_email", "") ?: "") }
     var showWorkshopSaved by remember { mutableStateOf(false) }
+    var voiceFeedbackEnabled by remember {
+        mutableStateOf(prefs.getBoolean("voice_feedback_enabled", true))
+    }
 
     // Auto-dismiss banners
     LaunchedEffect(showSavedBanner) {
@@ -149,6 +153,65 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             SettingsRow("Tipo de Conexión", "WiFi (192.168.0.10:35000)")
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Velocidad Ultra-Fluida (Waze)", color = Color.White, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        if (fusedSpeedEnabled) "Activo — Fusión de Sensores (GPS + Acelerómetro)"
+                                        else "Desactivado — lectura directa",
+                                        color = if (fusedSpeedEnabled) MeetColors.neonGreen else MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Switch(
+                                    checked = fusedSpeedEnabled,
+                                    onCheckedChange = { viewModel.setFusedSpeedEnabled(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MeetColors.neonGreen,
+                                        checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = MeetColors.textSecondary,
+                                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
+                                    )
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Asistente de Voz Interactivo", color = Color.White, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        if (voiceFeedbackEnabled) "Activo — Guías de voz en tiempo real"
+                                        else "Desactivado — silencioso",
+                                        color = if (voiceFeedbackEnabled) MeetColors.neonGreen else MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Switch(
+                                    checked = voiceFeedbackEnabled,
+                                    onCheckedChange = {
+                                        voiceFeedbackEnabled = it
+                                        prefs.edit().putBoolean("voice_feedback_enabled", it).apply()
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MeetColors.neonGreen,
+                                        checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = MeetColors.textSecondary,
+                                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
+                                    )
+                                )
+                            }
 
                             Row(
                                 modifier = Modifier

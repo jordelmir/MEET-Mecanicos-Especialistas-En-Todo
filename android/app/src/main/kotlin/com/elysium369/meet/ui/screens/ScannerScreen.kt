@@ -25,6 +25,7 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.screens.scanner.*
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteButton
+import androidx.compose.animation.core.*
 import com.elysium369.meet.ui.components.neonGlow
 import androidx.compose.ui.graphics.graphicsLayer
 
@@ -125,9 +126,25 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                     val speed = liveData["010D"] ?: 0f
                     val rpm = liveData["010C"] ?: 0f
 
+                    // Animated speed & RPM — spring ensures every integer is shown (Waze-like sweep)
+                    val animatedSpeed by animateFloatAsState(
+                        targetValue = speed,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 35f
+                        ), label = "hudSpeed"
+                    )
+                    val animatedRpm by animateFloatAsState(
+                        targetValue = rpm,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 35f
+                        ), label = "hudRpm"
+                    )
+
                     // Shift Light LED Bar
                     val maxRpm = 8000f
-                    val rpmRatio = (rpm / maxRpm).coerceIn(0f, 1f)
+                    val rpmRatio = (animatedRpm / maxRpm).coerceIn(0f, 1f)
                     val ledColor = when {
                         rpmRatio > 0.85f -> MeetColors.error
                         rpmRatio > 0.6f -> MeetColors.warning
@@ -145,10 +162,10 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
 
                     Spacer(modifier = Modifier.height(64.dp))
 
-                    Text("${speed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
+                    Text("${animatedSpeed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
                     Text("km/h", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), fontSize = 24.sp)
                     Spacer(modifier = Modifier.height(32.dp))
-                    Text("${rpm.toInt()} RPM", color = ledColor, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                    Text("${animatedRpm.toInt()} RPM", color = ledColor, fontSize = 48.sp, fontWeight = FontWeight.Bold)
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
@@ -265,7 +282,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab, 
-                    containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
+                    containerColor = Color.Transparent, 
                     contentColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
                     edgePadding = 8.dp,
                     indicator = { tabPositions -> 
@@ -303,13 +320,13 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
         },
-        containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
+        containerColor = Color.Transparent
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTab) {
                 0 -> ScannerDashboardTab(viewModel, isLandscape, defaultGauges)
                 1 -> ScannerPerformanceTab(viewModel, isLandscape)
-                2 -> ScannerDiagnosticTab(viewModel, snackbarHostState)
+                2 -> ScannerDiagnosticTab(viewModel, snackbarHostState, navController)
                 3 -> ScannerSensorsTab(viewModel, defaultGauges)
                 4 -> ScannerToolsTab(viewModel, navController, isSpanish, onHudModeToggle = { hudMode = it })
                 5 -> ScannerMonitorsTab(viewModel, isSpanish)

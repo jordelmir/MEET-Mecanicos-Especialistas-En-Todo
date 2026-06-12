@@ -485,6 +485,15 @@ object AppModule {
         override fun migrate(db: SupportSQLiteDatabase) = migrateToV15(db, 14)
     }
 
+    private val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 15→16: Adding standalone indices on timestamp column")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_sensor_history_timestamp` ON `sensor_history` (`timestamp`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_snapshots_timestamp` ON `health_snapshots` (`timestamp`)")
+            android.util.Log.i("MeetDB", "Migration 15→16: Complete")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -502,7 +511,7 @@ object AppModule {
         // ⛔ REMOVED: fallbackToDestructiveMigration()
         // This silently destroyed user data. We now use explicit migrations.
 
-        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10, MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10, MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)

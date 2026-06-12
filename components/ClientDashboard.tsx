@@ -49,6 +49,50 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
     }
   };
 
+  const handleSimulateScan = () => {
+    if (!onSimulateAPKScan) return;
+    const vehiclePlate = currentUser.vehicles[0]?.plate || 'ABC-123';
+    
+    const mockScanScenarios = [
+      {
+        dtcCodes: ['P0300', 'P0171'],
+        severity: 'high' as const,
+        notes: 'Múltiples fallos de encendido (Misfires) y mezcla de combustible pobre detectados. Revisar inyectores, bujías y posibles fugas de vacío.'
+      },
+      {
+        dtcCodes: ['P0420'],
+        severity: 'medium' as const,
+        notes: 'Eficiencia del sistema catalítico por debajo del umbral mínimo en Banco 1. Verificar fugas de escape y estado del sensor de O2 trasero.'
+      },
+      {
+        dtcCodes: ['P0115', 'P0505'],
+        severity: 'medium' as const,
+        notes: 'Fallo en el circuito del sensor de temperatura del refrigerante y mal funcionamiento en el control de aire de ralentí (IAC).'
+      },
+      {
+        dtcCodes: ['P0700', 'P0720'],
+        severity: 'high' as const,
+        notes: 'Fallo general en el sistema de control de transmisión y sensor de velocidad de salida. Se recomienda diagnóstico mecánico presencial.'
+      },
+      {
+        dtcCodes: ['P0102'],
+        severity: 'medium' as const,
+        notes: 'Señal baja en el circuito del sensor MAF (Flujo de Masa de Aire). Limpiar sensor o comprobar cableado.'
+      }
+    ];
+
+    const scenario = mockScanScenarios[Math.floor(Math.random() * mockScanScenarios.length)];
+    const newScan = {
+      id: `scan_${Date.now()}`,
+      date: new Date(),
+      vehiclePlate,
+      dtcCodes: scenario.dtcCodes,
+      severity: scenario.severity,
+      notes: scenario.notes
+    };
+    onSimulateAPKScan(newScan);
+  };
+
   const userOrders = workOrders.filter(wo => wo.clientId === currentUser.id);
   const [viewingHistoryOrder, setViewingHistoryOrder] = useState<WorkOrder | null>(null);
 
@@ -304,7 +348,7 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
               </h2>
               {onSimulateAPKScan && (
                 <button 
-                  onClick={onSimulateAPKScan}
+                  onClick={handleSimulateScan}
                   className="text-xs font-bold bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 px-3 py-1.5 rounded flex items-center gap-2 transition-colors border border-forge-500/30"
                 >
                   <Activity size={14} /> Simular Escaneo

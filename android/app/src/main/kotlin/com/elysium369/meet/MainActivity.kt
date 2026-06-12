@@ -5,6 +5,7 @@ import android.os.Build
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import com.elysium369.meet.ui.screens.chat.*
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
+import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.viewModels
 import androidx.compose.material.icons.Icons
@@ -148,11 +150,18 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
         }
     ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            val currentRoute = navController.currentBackStackEntryAsState().value
+                ?.destination?.route
+            val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium")
+            if (currentRoute !in hideBgRoutes && currentRoute != null) {
+                HolographicBackgroundShared()
+            }
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            ) {
             composable("onboarding") {
                 OnboardingScreen(
                     onFinish = { 
@@ -189,6 +198,13 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 DtcScreen(
                     navController = navController,
                     viewModel = obdViewModel
+                )
+            }
+            composable("repair/{dtcCode}") { backStack ->
+                val dtcCode = backStack.arguments?.getString("dtcCode") ?: ""
+                DtcRepairGuideScreen(
+                    navController = navController,
+                    dtcCode = dtcCode
                 )
             }
             composable("terminal") {
@@ -277,7 +293,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             composable("expert_diagnostic") {
                 com.elysium369.meet.ui.screens.ExpertDiagnosticScreen(
                     viewModel = obdViewModel,
+                    navController = navController,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("vehicle_manuals") {
+                com.elysium369.meet.ui.screens.VehicleManualsScreen(
+                    viewModel = obdViewModel,
+                    navController = navController
                 )
             }
             composable("settings") {
@@ -376,8 +399,15 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("holo_local_read") {
+                com.elysium369.meet.ui.screens.HoloLocalReadScreen(
+                    viewModel = obdViewModel,
+                    navController = navController
+                )
+            }
         }
     }
+}
 }
 
 @Composable

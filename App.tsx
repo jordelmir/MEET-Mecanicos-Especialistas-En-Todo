@@ -18,14 +18,21 @@ import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { WorkOrderReceipt } from './components/WorkOrderReceipt';
 import { useToast } from './components/ToastSystem';
-import { calculateEndTime, getStatusLabel } from './services/timeEngine';
+import { canTransitionStatus, getStatusLabel, validateSchedule } from './services/timeEngine';
 import { saveState, loadState } from './services/storage';
+import { createId } from './services/ids';
 import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TVDashboard } from './components/TVDashboard';
-import { OBD2Scanner } from './components/OBD2Scanner';
-import { LiveLinkDashboard } from './components/LiveLinkDashboard';
 import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle, Radio } from 'lucide-react';
+
+const OBD2Scanner = React.lazy(() =>
+  import('./components/OBD2Scanner').then(module => ({ default: module.OBD2Scanner }))
+);
+
+const LiveLinkDashboard = React.lazy(() =>
+  import('./components/LiveLinkDashboard').then(module => ({ default: module.LiveLinkDashboard }))
+);
 
 export default function App() {
   // ── AUTH STATE ──
@@ -34,7 +41,14 @@ export default function App() {
   const [role, setRole] = useState<Role>(Role.ADMIN);
   const [loggedInUser, setLoggedInUser] = useState<Client>(MOCK_ADMIN_USER);
 
-  const { toast } = useToast();
+	  const { toast } = useToast();
+  const lazyModalFallback = (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[70] flex items-center justify-center p-4">
+      <div className="glass rounded-xl px-6 py-4 font-mono text-xs font-bold text-forge-500">
+        Cargando modulo...
+      </div>
+    </div>
+  );
 
   // ── DATA STATE (with localStorage persistence) ──
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() => loadState('workOrders', INITIAL_WORK_ORDERS));
@@ -192,8 +206,10 @@ export default function App() {
     todaysOrders.forEach(wo => {
       const duration = (wo.estimatedEndTime.getTime() - wo.startTime.getTime()) / 60000;
       bookedMinutes += duration;
-      revenue += wo.price;
-      if (wo.status === WorkOrderStatus.COMPLETED || wo.status === WorkOrderStatus.DELIVERED) completedCount++;
+      if (wo.status === WorkOrderStatus.COMPLETED || wo.status === WorkOrderStatus.DELIVERED) {
+        revenue += wo.price;
+        completedCount++;
+      }
     });
 
     const idleTime = Math.max(0, totalMinutes - bookedMinutes);
@@ -209,6 +225,13 @@ export default function App() {
 
   // ── STATUS CHANGE ──
   const handleStatusChange = (id: string, newStatus: WorkOrderStatus) => {
+    const currentOrder = workOrders.find(w => w.id === id);
+    if (!currentOrder) return;
+    if (!canTransitionStatus(currentOrder.status, newStatus)) {
+      toast('warning', 'Cambio de estado bloqueado', `${getStatusLabel(currentOrder.status)} no puede pasar directamente a ${getStatusLabel(newStatus)}`);
+      return;
+    }
+
     setWorkOrders(prev => prev.map(wo => {
       if (wo.id !== id) return wo;
 
@@ -233,8 +256,8 @@ export default function App() {
         const service = services.find(s => s.id === wo.serviceId);
         const mech = mechanics.find(m => m.id === wo.mechanicId);
         if (service && mech) {
-          const historyItem: ServiceHistoryItem = {
-            id: `hist-${Math.random().toString(36).substr(2, 9)}`,
+	          const historyItem: ServiceHistoryItem = {
+	            id: createId('hist'),
             date: wo.startTime,
             serviceName: service.name,
             mechanicName: mech.name,
@@ -256,9 +279,33 @@ export default function App() {
     }
   };
 
-  // ── UPDATE WORK ORDER ──
-  const handleUpdateWorkOrder = (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date; vehicleMileage?: number }) => {
-    setWorkOrders(prev => prev.map(wo => {
+	  // ── UPDATE WORK ORDER ──
+	  const handleUpdateWorkOrder = (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date; vehicleMileage?: number }) => {
+    const currentOrder = workOrders.find(wo => wo.id === id);
+    if (!currentOrder) return;
+    const mechanic = mechanics.find(m => m.id === currentOrder.mechanicId);
+    const baseService = services.find(s => s.id === currentOrder.serviceId);
+    const serviceForValidation = baseService
+      ? { ...baseService, estimatedMinutes: updates.estimatedMinutes }
+      : undefined;
+    const validation = validateSchedule({
+      mechanic,
+      service: serviceForValidation,
+      startTime: updates.startTime || currentOrder.startTime,
+      existingOrders: workOrders,
+      openHour,
+      closeHour,
+      timeSliceMinutes,
+      excludeOrderId: id,
+      allowPastStart: true,
+    });
+
+    if (!validation.valid) {
+      toast('error', 'No se pudo actualizar la orden', validation.errors[0]);
+      return;
+    }
+
+	    setWorkOrders(prev => prev.map(wo => {
       if (wo.id !== id) return wo;
       const startToUse = updates.startTime || wo.startTime;
       const newEnd = new Date(startToUse.getTime() + updates.estimatedMinutes * 60000);
@@ -289,9 +336,16 @@ export default function App() {
     toast('success', 'Orden Actualizada', 'Los detalles se guardaron correctamente');
   };
 
-  // ── CANCEL ──
-  const handleCancelWorkOrder = (orderId: string, reason?: string) => {
-    setWorkOrders(prev => prev.map(wo =>
+	  // ── CANCEL ──
+	  const handleCancelWorkOrder = (orderId: string, reason?: string) => {
+    const currentOrder = workOrders.find(wo => wo.id === orderId);
+    if (!currentOrder) return;
+    if (!canTransitionStatus(currentOrder.status, WorkOrderStatus.CANCELLED)) {
+      toast('warning', 'Cancelación bloqueada', `Una orden ${getStatusLabel(currentOrder.status)} no puede cancelarse desde este flujo.`);
+      return;
+    }
+
+	    setWorkOrders(prev => prev.map(wo =>
       wo.id === orderId
         ? { ...wo, status: WorkOrderStatus.CANCELLED, cancellationReason: reason || 'Cancelada', cancellationDate: new Date() }
         : wo
@@ -300,9 +354,9 @@ export default function App() {
   };
 
   // ── CRUD HANDLERS ──
-  const handleCreateClient = (clientData: any): Client => {
-    const newClient: Client = {
-      id: `c${Date.now()}`, ...clientData,
+	  const handleCreateClient = (clientData: any): Client => {
+	    const newClient: Client = {
+	      id: createId('c'), ...clientData,
       vehicles: clientData.vehicles || [],
       serviceHistory: [], loyaltyPoints: 0, joinDate: new Date(),
     };
@@ -318,13 +372,17 @@ export default function App() {
   };
 
   const handleDeleteClient = (clientId: string) => {
+    const hasOrders = workOrders.some(wo => wo.clientId === clientId);
+    if (hasOrders) {
+      toast('warning', 'Cliente con historial', 'No se puede eliminar un cliente que ya tiene órdenes asociadas.');
+      return;
+    }
     setClients(prev => prev.filter(c => c.id !== clientId));
-    setWorkOrders(prev => prev.filter(wo => wo.clientId !== clientId));
     toast('info', 'Cliente Eliminado');
   };
 
-  const handleAddService = (serviceData: Omit<Service, 'id'>) => {
-    setServices(prev => [...prev, { id: `s-${Date.now()}`, ...serviceData }]);
+	  const handleAddService = (serviceData: Omit<Service, 'id'>) => {
+	    setServices(prev => [...prev, { id: createId('s'), ...serviceData }]);
     toast('success', 'Servicio Agregado');
   };
   const handleUpdateService = (svc: Service) => {
@@ -332,12 +390,16 @@ export default function App() {
     toast('success', 'Servicio Actualizado');
   };
   const handleDeleteService = (id: string) => {
+    if (workOrders.some(wo => wo.serviceId === id)) {
+      toast('warning', 'Servicio en uso', 'No se puede eliminar un servicio con órdenes asociadas.');
+      return;
+    }
     setServices(prev => prev.filter(s => s.id !== id));
     toast('info', 'Servicio Eliminado');
   };
 
-  const handleAddMechanic = (data: Omit<Mechanic, 'id'>) => {
-    setMechanics(prev => [...prev, { id: `m-${Date.now()}`, ...data }]);
+	  const handleAddMechanic = (data: Omit<Mechanic, 'id'>) => {
+	    setMechanics(prev => [...prev, { id: createId('m'), ...data }]);
     toast('success', 'Mecánico Registrado');
   };
   const handleUpdateMechanic = (mech: Mechanic) => {
@@ -346,6 +408,10 @@ export default function App() {
     toast('success', 'Mecánico Actualizado');
   };
   const handleDeleteMechanic = (id: string) => {
+    if (workOrders.some(wo => wo.mechanicId === id)) {
+      toast('warning', 'Mecánico con historial', 'No se puede eliminar un mecánico que ya tiene órdenes asociadas.');
+      return;
+    }
     setMechanics(prev => prev.filter(m => m.id !== id));
     toast('info', 'Mecánico Eliminado');
   };
@@ -371,21 +437,33 @@ export default function App() {
   };
 
   // ── BOOKING ──
-  const handleBook = (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo) => {
-    const mech = mechanics.find(m => m.id === mechanicId)!;
-    const service = services.find(s => s.id === serviceId)!;
+  const handleBook = (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo, notes?: string) => {
+    const mech = mechanics.find(m => m.id === mechanicId);
+    const service = services.find(s => s.id === serviceId);
+    const validation = validateSchedule({
+      mechanic: mech,
+      service,
+      startTime: time,
+      existingOrders: workOrders,
+      openHour,
+      closeHour,
+      timeSliceMinutes,
+    });
 
-    const realDuration = Math.ceil(service.estimatedMinutes / mech.efficiencyFactor);
-    const endTime = calculateEndTime(time, service.estimatedMinutes, mech.efficiencyFactor);
+    if (!validation.valid || !mech || !service) {
+      toast('error', 'No se pudo crear la orden', validation.errors[0] || 'Datos de reserva inválidos');
+      return;
+    }
 
-    const newOrder: WorkOrder = {
-      id: `wo-${Date.now()}`,
+	    const newOrder: WorkOrder = {
+	      id: createId('wo'),
       clientId, clientName, mechanicId, serviceId,
       vehicleInfo: vehicle,
-      startTime: time, estimatedEndTime: endTime,
+      startTime: time, estimatedEndTime: validation.endTime,
       status: WorkOrderStatus.RECEIVED,
       price: service.basePrice,
-      estimatedMinutes: realDuration,
+      estimatedMinutes: validation.realDurationMinutes,
+      notes,
     };
 
     setWorkOrders(prev => [...prev, newOrder]);
@@ -395,9 +473,36 @@ export default function App() {
   };
 
   const handleSimulateAPKScan = (scanResult: any) => {
+    let finalScan = scanResult;
+    // Defensive check: if scanResult is a React Event or missing dtcCodes, generate a valid payload
+    if (!scanResult || !scanResult.dtcCodes || typeof scanResult.preventDefault === 'function') {
+      const vehiclePlate = loggedInUser.vehicles?.[0]?.plate || 'ABC-123';
+      const codes = ['P0300', 'P0171', 'P0420', 'P0115', 'P0302'];
+      const randomCodes = [codes[Math.floor(Math.random() * codes.length)]];
+      if (Math.random() > 0.5) {
+        randomCodes.push(codes[Math.floor(Math.random() * codes.length)]);
+      }
+      const uniqueCodes = Array.from(new Set(randomCodes));
+	      finalScan = {
+	        id: createId('scan'),
+        date: new Date(),
+        vehiclePlate,
+        dtcCodes: uniqueCodes,
+        severity: uniqueCodes.includes('P0300') || uniqueCodes.includes('P0302') ? 'high' : 'medium',
+        notes: `Simulación de escaneo OBD2. Códigos detectados: ${uniqueCodes.join(', ')}.`
+      };
+    }
+
+    // Ensure date is a Date object (important if parsing stored JSON)
+    if (finalScan && typeof finalScan.date === 'string') {
+      finalScan.date = new Date(finalScan.date);
+    } else if (finalScan && !(finalScan.date instanceof Date)) {
+      finalScan.date = new Date();
+    }
+
     const updatedClient = {
       ...loggedInUser,
-      scans: [scanResult, ...(loggedInUser.scans || [])]
+      scans: [finalScan, ...(loggedInUser.scans || [])]
     };
     handleUpdateClient(updatedClient);
     toast('success', 'Escaneo Recibido', 'Datos de OBD2 sincronizados desde la App MEET');
@@ -422,6 +527,11 @@ export default function App() {
     }
 
     toast('success', 'Medición Guardada', `${measurement.signalName} — ${measurement.severity === 'normal' ? 'Nominal' : measurement.severity === 'warning' ? 'Atención' : 'Crítico'}`);
+  };
+
+  const handleUpdateWorkOrderDetails = (id: string, updates: Partial<WorkOrder>) => {
+    setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, ...updates } : wo));
+    toast('success', 'Orden Actualizada', 'Código DTC vinculado correctamente');
   };
 
   // ── RENDER ──
@@ -796,20 +906,25 @@ export default function App() {
         />
       )}
 
-      {/* Live Link Dashboard */}
-      {isLiveLinkOpen && (
-        <LiveLinkDashboard onClose={() => setIsLiveLinkOpen(false)} />
-      )}
+	      {/* Live Link Dashboard */}
+	      {isLiveLinkOpen && (
+	        <React.Suspense fallback={lazyModalFallback}>
+	          <LiveLinkDashboard onClose={() => setIsLiveLinkOpen(false)} />
+	        </React.Suspense>
+	      )}
 
-      {/* OBD2 Scanner Modal */}
-      {isOBD2Open && (
-        <OBD2Scanner
-          onClose={() => setIsOBD2Open(false)}
-          currentUser={loggedInUser}
-          workOrders={workOrders}
-          onSaveMeasurement={handleSaveOscilloscopeMeasurement}
-        />
-      )}
+	      {/* OBD2 Scanner Modal */}
+	      {isOBD2Open && (
+	        <React.Suspense fallback={lazyModalFallback}>
+	          <OBD2Scanner
+	            onClose={() => setIsOBD2Open(false)}
+	            currentUser={loggedInUser}
+	            workOrders={workOrders}
+	            onSaveMeasurement={handleSaveOscilloscopeMeasurement}
+	            onUpdateWorkOrder={handleUpdateWorkOrderDetails}
+	          />
+	        </React.Suspense>
+	      )}
 
       {/* TV Dashboard Mode */}
       {isTVModeOpen && (

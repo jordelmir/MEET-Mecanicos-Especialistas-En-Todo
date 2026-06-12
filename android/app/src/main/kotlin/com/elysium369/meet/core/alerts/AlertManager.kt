@@ -20,7 +20,10 @@ data class ObdAlert(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class AlertManager @Inject constructor(@ApplicationContext private val context: Context) {
+class AlertManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager
+) {
     
     private val _alerts = MutableSharedFlow<ObdAlert>(extraBufferCapacity = 10)
     val alerts = _alerts.asSharedFlow()
@@ -68,6 +71,9 @@ class AlertManager @Inject constructor(@ApplicationContext private val context: 
                 @Suppress("DEPRECATION")
                 vibrator?.vibrate(longArrayOf(0, 200, 100, 200), -1)
             }
+            voiceFeedbackManager.speak("Atención. Alerta crítica de $title. $msg", "Warning. Critical alert: $title. $msg")
+        } else if (severity == AlertSeverity.WARNING) {
+            voiceFeedbackManager.speak("Advertencia. $title. $msg", "Caution. $title. $msg")
         }
         _alerts.tryEmit(ObdAlert(title = title, message = msg, severity = severity))
     }
@@ -94,7 +100,7 @@ class AlertManager @Inject constructor(@ApplicationContext private val context: 
                 }
 
                 // Battery Voltage Alert Check
-                val volt = data["AT RV"] ?: data["0142"]
+                val volt = data["0142"] ?: data["AT RV"]
                 volt?.let { v ->
                     val rpm = data["010C"] ?: 0f
                     val isEngineRunning = rpm > 400f

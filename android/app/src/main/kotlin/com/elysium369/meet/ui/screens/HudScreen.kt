@@ -51,14 +51,21 @@ fun HudScreen(
     val engineLoad = liveData["0104"]?.toInt() ?: 0
     val voltage = liveData["0142"] ?: liveData["42"] ?: 12.4f
 
-    // Animated Speed and RPM transitions for professional smoothness
+    // Animated Speed and RPM transitions — spring animation ensures the number
+    // sweeps through every single integer value like a Waze/premium car speedometer
     val animatedSpeed by animateFloatAsState(
         targetValue = speed.toFloat(),
-        animationSpec = tween(150, easing = LinearEasing), label = "speed"
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 35f // Low stiffness = slow, smooth sweep through every number
+        ), label = "speed"
     )
     val animatedRpm by animateFloatAsState(
         targetValue = rpm.toFloat(),
-        animationSpec = tween(150, easing = LinearEasing), label = "rpm"
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 35f
+        ), label = "rpm"
     )
 
     // Pulsing warning if DTCs are present

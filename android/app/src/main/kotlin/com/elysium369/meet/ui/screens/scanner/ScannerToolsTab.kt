@@ -3,6 +3,7 @@ package com.elysium369.meet.ui.screens.scanner
 import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,9 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +36,8 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteOutlinedButton
 import com.elysium369.meet.ui.components.EliteIconButton
 import com.elysium369.meet.ui.components.neonGlow
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 @Composable
 fun ScannerToolsTab(
@@ -386,6 +393,29 @@ fun ScannerToolsTab(
             val speed = liveData["010D"] ?: 0f
             val lPer100km = if (speed > 0 && maf > 0) (maf * 3600f) / (speed * 14.7f * 710f) * 100f else 0f
             
+            // Smooth animated fuel consumption
+            val animatedFuel by animateFloatAsState(
+                targetValue = lPer100km,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 50f
+                ), label = "fuelAnim"
+            )
+            val animatedMaf by animateFloatAsState(
+                targetValue = maf,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 35f
+                ), label = "mafAnim"
+            )
+            val animatedFuelSpeed by animateFloatAsState(
+                targetValue = speed,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 35f
+                ), label = "fuelSpeedAnim"
+            )
+            
             EliteCard(
                 backgroundColor = MeetColors.backgroundDeep, 
                 shape = RoundedCornerShape(14.dp), 
@@ -408,7 +438,7 @@ fun ScannerToolsTab(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "${String.format("%.1f", lPer100km)}",
+                            text = "${String.format("%.1f", animatedFuel)}",
                             color = Color.White,
                             fontSize = 38.sp,
                             fontWeight = FontWeight.Black,
@@ -432,7 +462,7 @@ fun ScannerToolsTab(
                             .height(6.dp)
                             .background(MeetColors.backgroundDark, RoundedCornerShape(3.dp))
                     ) {
-                        val fraction = (lPer100km / 25f).coerceIn(0f, 1f)
+                        val fraction = (animatedFuel / 25f).coerceIn(0f, 1f)
                         val barColor = when {
                             fraction > 0.75f -> MeetColors.error
                             fraction > 0.4f -> MeetColors.warning
@@ -448,7 +478,7 @@ fun ScannerToolsTab(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "MAF: ${String.format("%.1f", maf)} g/s  •  Speed: ${speed.toInt()} km/h", 
+                        "MAF: ${String.format("%.1f", animatedMaf)} g/s  •  Speed: ${animatedFuelSpeed.toInt()} km/h", 
                         color = MeetColors.textMuted, 
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -459,6 +489,13 @@ fun ScannerToolsTab(
         // 7. Drag christmas tree 0-100 Performance test
         item {
             val speed = liveData["010D"] ?: 0f
+            val animatedSpeed by animateFloatAsState(
+                targetValue = speed,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 35f // Waze-like smooth number sweep
+                ), label = "dragSpeed"
+            )
             
             var testState by remember { mutableStateOf("IDLE") } // "IDLE", "WAITING_FOR_STOP", "COUNTDOWN", "RUNNING", "COMPLETED", "JUMP_START"
             var countdownProgress by remember { mutableIntStateOf(0) } // 0: Idle/Off, 1: Red 1, 2: Red 2, 3: Red 3, 4: Green (Go!), 5: Red Light (Jump Start / Falsa Salida)
@@ -738,7 +775,7 @@ fun ScannerToolsTab(
                         
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            if (isSpanish) "Velocidad: ${speed.toInt()} km/h" else "Speed: ${speed.toInt()} km/h", 
+                            if (isSpanish) "Velocidad: ${animatedSpeed.toInt()} km/h" else "Speed: ${animatedSpeed.toInt()} km/h", 
                             color = MeetColors.textSecondary, 
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyMedium
@@ -750,8 +787,17 @@ fun ScannerToolsTab(
         
         // 8. Battery Diagnostics (Visual gauge style)
         item {
-            val rawVoltage = liveData["AT RV"] ?: liveData["0142"] ?: 0f
+            val rawVoltage = liveData["0142"] ?: liveData["AT RV"] ?: 0f
             val voltage = if (rawVoltage > 18f || rawVoltage < 0f) 0f else rawVoltage
+            
+            // Smooth animated voltage
+            val animatedVoltage by animateFloatAsState(
+                targetValue = voltage,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 60f
+                ), label = "voltageAnim"
+            )
             
             val batteryState = when {
                 voltage < 0.1f -> {
@@ -802,7 +848,7 @@ fun ScannerToolsTab(
                     ) {
                         Column {
                             Text(
-                                text = "${String.format("%.1f", voltage)} V",
+                                text = "${String.format("%.1f", animatedVoltage)} V",
                                 color = Color.White,
                                 fontSize = 38.sp,
                                 fontWeight = FontWeight.Black,
@@ -824,7 +870,7 @@ fun ScannerToolsTab(
                                 .border(2.dp, MeetColors.textSecondary, RoundedCornerShape(4.dp))
                                 .padding(2.dp)
                         ) {
-                            val fraction = (voltage / 15f).coerceIn(0f, 1f)
+                            val fraction = (animatedVoltage / 15f).coerceIn(0f, 1f)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(fraction)
@@ -851,6 +897,402 @@ fun ScannerToolsTab(
                         } else {
                             "Reference Guide:\n• 12.0V to 12.6V: Normal stationary charge\n• 13.5V to 14.5V: Normal charging range (engine running)"
                         },
+                        color = MeetColors.textMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // 9. G-FORCE & INCLINOMETER TACTICAL MODULE (Phone Sensors)
+        // ═══════════════════════════════════════════════════════════════════════
+        item {
+            val lateralG by viewModel.lateralG.collectAsState()
+            val longitudinalG by viewModel.longitudinalG.collectAsState()
+            val pitch by viewModel.phonePitch.collectAsState()
+            val roll by viewModel.phoneRoll.collectAsState()
+            
+            // Smooth animated values for ultra-fluid visual sweeps
+            val animLatG by animateFloatAsState(
+                targetValue = lateralG,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 35f),
+                label = "latGAnim"
+            )
+            val animLongG by animateFloatAsState(
+                targetValue = longitudinalG,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 35f),
+                label = "longGAnim"
+            )
+            val animPitch by animateFloatAsState(
+                targetValue = pitch,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 40f),
+                label = "pitchAnim"
+            )
+            val animRoll by animateFloatAsState(
+                targetValue = roll,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 40f),
+                label = "rollAnim"
+            )
+            
+            val totalG = sqrt(animLatG * animLatG + animLongG * animLongG)
+            val animTotalG by animateFloatAsState(
+                targetValue = totalG,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 35f),
+                label = "totalGAnim"
+            )
+            
+            // Determine G-force severity color
+            val gColor = when {
+                animTotalG > 1.0f -> MeetColors.error
+                animTotalG > 0.5f -> MeetColors.warning
+                animTotalG > 0.2f -> MeetColors.cyberCyan
+                else -> MeetColors.neonGreen
+            }
+            
+            EliteCard(
+                backgroundColor = MeetColors.backgroundDeep,
+                borderColor = gColor.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(14.dp),
+                glowColor = gColor.copy(alpha = 0.2f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // ── Header ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                if (isSpanish) "📡 MEDIDOR TÁCTICO G-FORCE" else "📡 TACTICAL G-FORCE METER",
+                                color = gColor.copy(alpha = 0.8f),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                if (isSpanish) "Sensores internos del teléfono" else "Phone internal sensors",
+                                color = MeetColors.textMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        // Calibrate / Zero button
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Button(
+                                onClick = { viewModel.calibratePhoneSensors() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MeetColors.neonGreen.copy(alpha = 0.12f),
+                                    contentColor = MeetColors.neonGreen
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    if (isSpanish) "CALIBRAR" else "ZERO",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                            Button(
+                                onClick = { viewModel.resetPhoneSensorCalibration() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MeetColors.textMuted.copy(alpha = 0.1f),
+                                    contentColor = MeetColors.textMuted
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderSubtle),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    "RESET",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // ── G-Force Target Graph (Racing telemetry style) ──
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .background(MeetColors.backgroundDark, RoundedCornerShape(12.dp))
+                            .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val centerX = size.width / 2f
+                            val centerY = size.height / 2f
+                            val maxRadius = size.minDimension / 2f * 0.9f
+                            val maxG = 1.5f // 1.5G max ring
+                            
+                            // Draw concentric target rings (0.5G, 1.0G, 1.5G)
+                            val ringColors = listOf(
+                                Color(0xFF1B3A2A),  // 0.5G - dark green
+                                Color(0xFF3A3A1B),  // 1.0G - dark yellow
+                                Color(0xFF3A1B1B)   // 1.5G - dark red
+                            )
+                            val ringValues = listOf(0.5f, 1.0f, 1.5f)
+                            
+                            for (i in ringValues.indices.reversed()) {
+                                val ringRadius = (ringValues[i] / maxG) * maxRadius
+                                drawCircle(
+                                    color = ringColors[i],
+                                    radius = ringRadius,
+                                    center = Offset(centerX, centerY),
+                                    style = Stroke(width = 1.5f)
+                                )
+                            }
+                            
+                            // Draw crosshairs
+                            val crosshairColor = Color.White.copy(alpha = 0.08f)
+                            drawLine(crosshairColor, Offset(centerX, centerY - maxRadius), Offset(centerX, centerY + maxRadius), 1f)
+                            drawLine(crosshairColor, Offset(centerX - maxRadius, centerY), Offset(centerX + maxRadius, centerY), 1f)
+                            
+                            // Draw G-force position dot
+                            val dotX = centerX + (animLatG / maxG) * maxRadius
+                            val dotY = centerY - (animLongG / maxG) * maxRadius // Inverted Y: forward = up
+                            
+                            // Clamp to visible area
+                            val clampedDotX = dotX.coerceIn(centerX - maxRadius, centerX + maxRadius)
+                            val clampedDotY = dotY.coerceIn(centerY - maxRadius, centerY + maxRadius)
+                            
+                            // Glow trail from center to dot
+                            drawLine(
+                                color = gColor.copy(alpha = 0.3f),
+                                start = Offset(centerX, centerY),
+                                end = Offset(clampedDotX, clampedDotY),
+                                strokeWidth = 3f,
+                                cap = StrokeCap.Round
+                            )
+                            
+                            // Outer glow
+                            drawCircle(
+                                color = gColor.copy(alpha = 0.25f),
+                                radius = 18f,
+                                center = Offset(clampedDotX, clampedDotY)
+                            )
+                            // Inner bright dot
+                            drawCircle(
+                                color = gColor,
+                                radius = 8f,
+                                center = Offset(clampedDotX, clampedDotY)
+                            )
+                            // Core white dot
+                            drawCircle(
+                                color = Color.White,
+                                radius = 3f,
+                                center = Offset(clampedDotX, clampedDotY)
+                            )
+                        }
+                        
+                        // Ring labels overlay
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Bottom,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "0.5G  |  1.0G  |  1.5G",
+                                color = MeetColors.textMuted.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // ── G-Force Digital Readouts ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // Total G
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "${String.format("%.2f", animTotalG)}G",
+                                color = gColor,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Black,
+                                lineHeight = 28.sp
+                            )
+                            Text(
+                                "TOTAL",
+                                color = MeetColors.textMuted,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        // Lateral G
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "${String.format("%+.2f", animLatG)}G",
+                                color = MeetColors.cyberCyan,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (isSpanish) "LATERAL" else "LATERAL",
+                                color = MeetColors.textMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        // Longitudinal G
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "${String.format("%+.2f", animLongG)}G",
+                                color = MeetColors.electricBlue,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (isSpanish) "LONGITUDINAL" else "LONGITUDINAL",
+                                color = MeetColors.textMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // ── Inclinometer Section (Pitch & Roll) ──
+                    Text(
+                        if (isSpanish) "INCLINÓMETRO" else "INCLINOMETER",
+                        color = MeetColors.electricBlue.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Pitch bar
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                if (isSpanish) "Cabeceo (Pitch)" else "Pitch",
+                                color = MeetColors.textSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${String.format("%+.1f", animPitch)}°",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(12.dp)
+                                .background(MeetColors.backgroundDark, RoundedCornerShape(6.dp))
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(6.dp))
+                        ) {
+                            // Center marker
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(2.dp)
+                                    .align(Alignment.Center)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                            )
+                            // Pitch indicator (centered at 50%, moves left/right based on pitch)
+                            val pitchFraction = (animPitch / 90f).coerceIn(-1f, 1f)
+                            val pitchOffset = (0.5f + pitchFraction * 0.45f)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(8.dp)
+                                    .align(Alignment.CenterStart)
+                                    .offset(x = with(LocalDensity.current) { (pitchOffset * 300f).dp })
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(MeetColors.electricBlue, MeetColors.electricBlue.copy(alpha = 0.5f))
+                                        ),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .neonGlow(MeetColors.electricBlue, RoundedCornerShape(4.dp))
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Roll bar
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                if (isSpanish) "Alabeo (Roll)" else "Roll",
+                                color = MeetColors.textSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${String.format("%+.1f", animRoll)}°",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(12.dp)
+                                .background(MeetColors.backgroundDark, RoundedCornerShape(6.dp))
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(6.dp))
+                        ) {
+                            // Center marker
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(2.dp)
+                                    .align(Alignment.Center)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                            )
+                            // Roll indicator
+                            val rollFraction = (animRoll / 90f).coerceIn(-1f, 1f)
+                            val rollOffsetVal = (0.5f + rollFraction * 0.45f)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(8.dp)
+                                    .align(Alignment.CenterStart)
+                                    .offset(x = with(LocalDensity.current) { (rollOffsetVal * 300f).dp })
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(MeetColors.hotMagenta, MeetColors.hotMagenta.copy(alpha = 0.5f))
+                                        ),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .neonGlow(MeetColors.hotMagenta, RoundedCornerShape(4.dp))
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        if (isSpanish) "Inclina tu teléfono para ver las mediciones en vivo. Pulsa CALIBRAR para poner a cero la posición actual."
+                        else "Tilt your phone to see live readings. Press ZERO to calibrate from the current position.",
                         color = MeetColors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 16.sp

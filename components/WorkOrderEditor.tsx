@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { WorkOrder, WorkOrderStatus } from '../types';
-import { formatDuration, getStatusLabel, getStatusColor } from '../services/timeEngine';
-import { X, Car, DollarSign, Clock, Calendar, Save } from 'lucide-react';
+import { formatDuration, getStatusLabel, getStatusColor, hasConflict } from '../services/timeEngine';
+import { X, Car, DollarSign, Clock, Calendar, Save, AlertCircle } from 'lucide-react';
 
 interface WorkOrderEditorProps {
   workOrder: WorkOrder;
@@ -12,10 +12,11 @@ interface WorkOrderEditorProps {
   onSave: (id: string, updates: { price: number; estimatedMinutes: number; startTime?: Date; vehicleMileage?: number }) => void;
 }
 
-export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: WorkOrderEditorProps) {
+export function WorkOrderEditor({ workOrder, allWorkOrders, serviceName, onClose, onSave }: WorkOrderEditorProps) {
   const [price, setPrice] = useState(workOrder.price);
   const [duration, setDuration] = useState(workOrder.estimatedMinutes);
   const [mileage, setMileage] = useState(workOrder.vehicleInfo.mileage);
+  const [error, setError] = useState<string | null>(null);
   const [time, setTime] = useState(
     `${String(workOrder.startTime.getHours()).padStart(2, '0')}:${String(workOrder.startTime.getMinutes()).padStart(2, '0')}`
   );
@@ -25,6 +26,24 @@ export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: Wor
     const newStartTime = new Date(date + 'T00:00:00');
     const [h, m] = time.split(':').map(Number);
     newStartTime.setHours(h, m, 0, 0);
+    if (!Number.isFinite(price) || price < 0) {
+      setError('El precio no puede ser negativo.');
+      return;
+    }
+    if (!Number.isFinite(duration) || duration <= 0) {
+      setError('La duración debe ser mayor a cero.');
+      return;
+    }
+    if (!Number.isFinite(mileage) || mileage < 0) {
+      setError('El kilometraje no puede ser negativo.');
+      return;
+    }
+    const newEndTime = new Date(newStartTime.getTime() + duration * 60000);
+    if (hasConflict(workOrder.mechanicId, newStartTime, newEndTime, allWorkOrders, workOrder.id)) {
+      setError('El mecánico ya tiene otra orden en ese horario.');
+      return;
+    }
+    setError(null);
     onSave(workOrder.id, { price, estimatedMinutes: duration, startTime: newStartTime, vehicleMileage: mileage });
   };
 
@@ -129,6 +148,13 @@ export function WorkOrderEditor({ workOrder, serviceName, onClose, onSave }: Wor
             <div className="glass-inner rounded-lg p-3">
               <p className="font-mono text-[10px] text-forge-500 uppercase tracking-wider mb-1">Notas de Diagnóstico</p>
               <p className="text-xs text-steel-200">{workOrder.diagnosticNotes}</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-300">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 

@@ -55,28 +55,7 @@ fun HomeScreen(
 
     val scrollState = rememberScrollState()
 
-    Box(modifier = Modifier.fillMaxSize().background(MeetColors.backgroundDeep)) {
-        // Background ambient glow
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(MeetColors.electricBlue.copy(alpha = 0.04f), Color.Transparent),
-                    center = Offset(size.width * 0.8f, size.height * 0.1f),
-                    radius = size.width * 0.6f
-                ),
-                center = Offset(size.width * 0.8f, size.height * 0.1f),
-                radius = size.width * 0.6f
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(MeetColors.neonGreen.copy(alpha = 0.03f), Color.Transparent),
-                    center = Offset(size.width * 0.2f, size.height * 0.9f),
-                    radius = size.width * 0.5f
-                ),
-                center = Offset(size.width * 0.2f, size.height * 0.9f),
-                radius = size.width * 0.5f
-            )
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
 
         Column(
             modifier = Modifier

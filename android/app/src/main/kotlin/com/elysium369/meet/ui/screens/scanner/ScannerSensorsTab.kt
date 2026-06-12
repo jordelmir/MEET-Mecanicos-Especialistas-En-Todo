@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import com.elysium369.meet.core.obd.PidRegistry
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
@@ -179,6 +182,28 @@ fun ScannerSensorsTab(
                 val isExpanded = expandedPid == gauge.pid
                 val isAnomalous = anomalousPids.any { it.pid == gauge.pid }
                 
+                // Determine dynamic spring stiffness based on PID type
+                // Fast-changing PIDs (RPM, Speed, Boost) get smooth low stiffness
+                // Slow PIDs (Temp, Voltage, Fuel Level) get higher stiffness for quick settle
+                val pidLower = gauge.pid.lowercase()
+                val labelLower = gauge.label.lowercase()
+                val isFastPid = pidLower.contains("010d") || pidLower.contains("010c") ||
+                    labelLower.contains("rpm") || labelLower.contains("velocidad") || 
+                    labelLower.contains("speed") || labelLower.contains("boost") ||
+                    labelLower.contains("maf") || labelLower.contains("presión") ||
+                    labelLower.contains("pressure")
+                val springStiffness = if (isFastPid) 35f else 60f
+                
+                // Ultra-smooth animated value — sweeps through every integer
+                val animatedValue by animateFloatAsState(
+                    targetValue = currentValue,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = springStiffness
+                    ),
+                    label = "sensorAnim_${gauge.pid}"
+                )
+                
                 // Check if this sensor has a descriptive text value
                 val descriptiveText = getDescriptiveValue(gauge.pid, currentValue)
                 
@@ -224,7 +249,7 @@ fun ScannerSensorsTab(
                                 )
                             } else {
                                 Text(
-                                    "${String.format("%.${if (currentValue % 1 == 0f) "0" else "2"}f", currentValue)} ${gauge.unit}", 
+                                    "${String.format("%.${if (animatedValue % 1 == 0f) "0" else "2"}f", animatedValue)} ${gauge.unit}", 
                                     color = if (isExpanded) Color.White else com.elysium369.meet.ui.theme.MeetColors.neonGreen, 
                                     style = MaterialTheme.typography.titleMedium, 
                                     fontWeight = FontWeight.Bold

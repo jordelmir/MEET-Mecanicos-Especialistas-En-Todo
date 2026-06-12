@@ -7,6 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +27,8 @@ class TripManager @Inject constructor(
     private val scope: CoroutineScope
 ) {
     private var _currentTrip: TripEntity? = null
+    private val _currentTripState = MutableStateFlow<TripEntity?>(null)
+    val currentTripState: StateFlow<TripEntity?> = _currentTripState.asStateFlow()
     val currentTrip: TripEntity? get() = _currentTrip
     
     private var monitoringJob: Job? = null
@@ -45,6 +50,10 @@ class TripManager @Inject constructor(
     private val speedHistory = mutableListOf<Float>()
     private val rpmHistory = mutableListOf<Float>()
     private val throttleHistory = mutableListOf<Float>()
+
+    fun getSpeedHistory(): List<Float> = synchronized(speedHistory) { speedHistory.toList() }
+    fun getRpmHistory(): List<Float> = synchronized(rpmHistory) { rpmHistory.toList() }
+    fun getThrottleHistory(): List<Float> = synchronized(throttleHistory) { throttleHistory.toList() }
 
     fun startMonitoring(vehicleId: String, sessionId: String) {
         monitoringJob?.cancel()
@@ -68,6 +77,7 @@ class TripManager @Inject constructor(
             gpsTrackJson = null,
             synced = false
         )
+        _currentTripState.value = _currentTrip
 
         monitoringJob = scope.launch(Dispatchers.IO) {
             obdSession.liveData.collectLatest { data ->
@@ -130,8 +140,13 @@ class TripManager @Inject constructor(
         rpmCount++
 
         speedHistory.add(currentSpeed)
+        if (speedHistory.size > 1000) speedHistory.removeAt(0)
         rpmHistory.add(currentRpm)
-        data["0111"]?.let { throttleHistory.add(it) }
+        if (rpmHistory.size > 1000) rpmHistory.removeAt(0)
+        data["0111"]?.let { 
+            throttleHistory.add(it)
+            if (throttleHistory.size > 1000) throttleHistory.removeAt(0)
+        }
 
         // 4. Update Current Trip Object (Live)
         _currentTrip = trip.copy(
@@ -144,6 +159,7 @@ class TripManager @Inject constructor(
             maxTempC = maxTemp,
             ecoScore = calculateEcoScore()
         )
+        _currentTripState.value = _currentTrip
     }
 
     private fun calculateEcoScore(): Int {
@@ -225,6 +241,7 @@ class TripManager @Inject constructor(
         
         monitoringJob?.cancel()
         _currentTrip = null
+        _currentTripState.value = null
         resetAccumulators()
         
         return tripEntity

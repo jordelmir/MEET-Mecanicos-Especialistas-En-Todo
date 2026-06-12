@@ -150,7 +150,7 @@ fun LiveLinkScreen(
                     if (isRunning && serverUrl != null) {
                         val shareIntent = android.content.Intent().apply {
                             action = android.content.Intent.ACTION_SEND
-                            putExtra(android.content.Intent.EXTRA_TEXT, "Conéctate al Live Link de mi escáner MEET en: $serverUrl")
+	                            putExtra(android.content.Intent.EXTRA_TEXT, "Conéctate al Live Link de mi escáner MEET con este enlace seguro: $serverUrl")
                             type = "text/plain"
                         }
                         context.startActivity(android.content.Intent.createChooser(shareIntent, "Compartir Live Link"))
@@ -424,10 +424,10 @@ fun LiveLinkScreen(
             val instructions = listOf(
                 "Conecte el móvil y su ordenador a la misma red Wi-Fi." to "Punto de Acceso Local",
                 "Pulse el botón \"Iniciar Transmisión\" superior." to "Lanzamiento del Servidor",
-                "Abra el panel MEET web en su ordenador." to "Navegador Compatible",
-                "Acceda a la sección \"Live Link\" en la web." to "Panel Remoto",
-                "Escriba la IP copiada en el buscador web." to "Sincronización Completa"
-            )
+	                "Abra el panel MEET web en su ordenador." to "Navegador Compatible",
+	                "Acceda a la sección \"Live Link\" en la web." to "Panel Remoto",
+	                "Pegue el enlace completo con token en el panel web." to "Sincronización Segura"
+	            )
 
             instructions.forEachIndexed { index, (desc, title) ->
                 Row(

@@ -41,6 +41,9 @@ interface DtcDao {
 
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
     fun getUnresolvedDtcsForVehicle(vehicleId: String): Flow<List<DtcEventEntity>>
+
+    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
+    suspend fun getUnresolvedDtcsList(vehicleId: String): List<DtcEventEntity>
     
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND code = :code AND status = :status AND resolvedAt IS NULL LIMIT 1")
     suspend fun getUnresolvedDtc(vehicleId: String, code: String, status: String): DtcEventEntity?
@@ -74,6 +77,9 @@ interface TripDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrip(trip: TripEntity)
+
+    @Query("DELETE FROM trips WHERE startedAt < :timestamp")
+    suspend fun deleteTripsOlderThan(timestamp: Long)
 }
 
 @Dao

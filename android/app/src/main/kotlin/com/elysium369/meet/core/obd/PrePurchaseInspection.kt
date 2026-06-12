@@ -92,8 +92,8 @@ class PrePurchaseInspection @Inject constructor() {
             if (monScore >= 10) DiagnosticSeverity.INFO else DiagnosticSeverity.MODERATE))
 
         // ── 4. Fuel Trims (15 pts) ──
-        val stft = liveData["STFT_B1"] ?: liveData["stft_b1"]
-        val ltft = liveData["LTFT_B1"] ?: liveData["ltft_b1"]
+        val stft = liveData["STFT_B1"] ?: liveData["stft_b1"] ?: liveData["0106"]
+        val ltft = liveData["LTFT_B1"] ?: liveData["ltft_b1"] ?: liveData["0107"]
         val ftScore = when {
             stft == null && ltft == null -> 10
             ltft != null && abs(ltft) > 20 -> 0
@@ -112,7 +112,7 @@ class PrePurchaseInspection @Inject constructor() {
             if (ftScore >= 10) DiagnosticSeverity.INFO else DiagnosticSeverity.HIGH))
 
         // ── 5. Sistema Térmico (10 pts) ──
-        val coolant = liveData["COOLANT"] ?: liveData["coolant"]
+        val coolant = liveData["COOLANT"] ?: liveData["coolant"] ?: liveData["0105"]
         val thermalScore = when {
             coolant == null -> 7
             coolant > 110 -> 0
@@ -131,7 +131,7 @@ class PrePurchaseInspection @Inject constructor() {
             if (thermalScore >= 7) DiagnosticSeverity.INFO else DiagnosticSeverity.CRITICAL))
 
         // ── 6. Sistema Eléctrico (10 pts) ──
-        val voltage = liveData["VOLTAGE"] ?: liveData["voltage"] ?: liveData["CTRL_VOLTAGE"]
+        val voltage = liveData["VOLTAGE"] ?: liveData["voltage"] ?: liveData["CTRL_VOLTAGE"] ?: liveData["CALC_VOLTAGE"] ?: liveData["ELM_VOLTAGE"] ?: liveData["0142"]
         val elecScore = when {
             voltage == null -> 7
             voltage < 11.5f -> 2

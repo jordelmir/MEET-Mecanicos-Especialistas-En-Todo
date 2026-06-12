@@ -1,6 +1,7 @@
 package com.elysium369.meet.ui.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,10 +14,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -24,13 +32,132 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
 
 // ═══════════════════════════════════════════════════════════════
 // ELITE UI V2 — Phantom Carbon Components
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// HOLOGRAPHIC BACKGROUND FOR ALL SCREENS
+// ═══════════════════════════════════════════════════════════════
+
+private data class HoloParticleShared(
+    val xSeed: Float,
+    val ySeed: Float,
+    val speed: Float,
+    val size: Float,
+    val colorAlpha: Float,
+    val horizontalDrift: Float
+)
+
+private val sharedBackgroundParticles = List(30) { index ->
+    HoloParticleShared(
+        xSeed = (index * 0.17f) % 1.0f,
+        ySeed = (index * 0.23f) % 1.0f,
+        speed = 0.012f + (index * 0.005f) % 0.025f,
+        size = 1f + (index % 3) * 0.8f,
+        colorAlpha = 0.06f + (index % 4) * 0.03f,
+        horizontalDrift = -0.05f + (index * 0.03f) % 0.1f
+    )
+}
+
+@Composable
+fun HolographicBackgroundShared(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "holoBgShared")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(14000, easing = LinearEasing)),
+        label = "bgPhase"
+    )
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "bgGlow"
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+
+        // Ambient glow orbs
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    MeetColors.neonGreen.copy(alpha = 0.04f * glowPulse),
+                    Color.Transparent
+                ),
+                center = Offset(w * (0.3f + phase * 0.1f), h * 0.25f),
+                radius = w * 0.6f
+            ),
+            radius = w * 0.6f,
+            center = Offset(w * (0.3f + phase * 0.1f), h * 0.25f)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    MeetColors.electricBlue.copy(alpha = 0.03f * glowPulse),
+                    Color.Transparent
+                ),
+                center = Offset(w * (0.7f - phase * 0.1f), h * 0.7f),
+                radius = w * 0.5f
+            ),
+            radius = w * 0.5f,
+            center = Offset(w * (0.7f - phase * 0.1f), h * 0.7f)
+        )
+
+        // Subtle grid lines
+        val gridSpacing = 45.dp.toPx()
+        val gridAlpha = 0.015f
+        val gridColor = MeetColors.neonGreen.copy(alpha = gridAlpha)
+        var y = 0f
+        while (y < h) {
+            drawLine(gridColor, Offset(0f, y), Offset(w, y), 0.5f)
+            y += gridSpacing
+        }
+        var x = 0f
+        while (x < w) {
+            drawLine(gridColor, Offset(x, 0f), Offset(x, h), 0.5f)
+            x += gridSpacing
+        }
+
+        // Drifting particles
+        sharedBackgroundParticles.forEach { p ->
+            val px = ((p.xSeed * w) + (phase * p.speed * w) + (p.horizontalDrift * w * sin(phase * 2 * PI.toFloat()))) % w
+            val py = ((p.ySeed * h) - (phase * p.speed * h)) % h
+            
+            val finalX = if (px < 0) px + w else px
+            val finalY = if (py < 0) py + h else py
+
+            drawCircle(
+                color = MeetColors.neonGreen.copy(alpha = p.colorAlpha * glowPulse * 1.5f),
+                radius = p.size.dp.toPx(),
+                center = Offset(finalX, finalY)
+            )
+        }
+
+        // Horizontal scan line
+        val scanY = h * phase
+        drawLine(
+            brush = Brush.horizontalGradient(
+                0f to Color.Transparent,
+                0.2f to MeetColors.cyberCyan.copy(alpha = 0.04f),
+                0.5f to MeetColors.cyberCyan.copy(alpha = 0.10f),
+                0.8f to MeetColors.cyberCyan.copy(alpha = 0.04f),
+                1f to Color.Transparent
+            ),
+            start = Offset(0f, scanY),
+            end = Offset(w, scanY),
+            strokeWidth = 1.5f
+        )
+    }
+}
+
 /**
- * Elite Card — Premium glassmorphism card with animated accent border.
+ * Elite Card — Premium glassmorphism card with dynamic 3D tilt, sweep borders, and corner brackets.
  */
 @Composable
 fun EliteCard(
@@ -39,34 +166,137 @@ fun EliteCard(
     backgroundColor: Color = MeetColors.cardBackground,
     borderColor: Color = MeetColors.borderSubtle,
     glowColor: Color? = null,
+    enableHolo3D: Boolean = true,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    // ═══ CRITICAL: neonGlow MUST come BEFORE clip so light renders OUTSIDE the container ═══
-    val baseModifier = modifier
+    val accentColor = glowColor ?: MeetColors.neonGreen.copy(alpha = 0.5f)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "eliteCardHolo")
+    val borderPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
+        label = "borderPhase"
+    )
+
+    // Gentle 3D float oscillation (subtle to remain highly usable)
+    val rotX by infiniteTransition.animateFloat(
+        initialValue = -1.5f, targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "rotX"
+    )
+    val rotY by infiniteTransition.animateFloat(
+        initialValue = -2.0f, targetValue = 2.0f,
+        animationSpec = infiniteRepeatable(tween(5200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "rotY"
+    )
+    val translationYAnim by infiniteTransition.animateFloat(
+        initialValue = -3f, targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(4700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "transY"
+    )
+
+    val cardModifier = modifier
         .then(
-            if (glowColor != null) Modifier.neonGlow(
-                glowColor, shape,
-                minElevation = 2f, maxElevation = 10f,
-                minAlpha = 0.1f, maxAlpha = 0.35f
-            ) else Modifier
+            if (enableHolo3D) Modifier.graphicsLayer {
+                rotationX = rotX
+                rotationY = rotY
+                translationY = translationYAnim
+                cameraDistance = 12f * density
+            } else Modifier
+        )
+        // Ambient shadows for 3D depth
+        .shadow(
+            elevation = 12.dp,
+            shape = shape,
+            ambientColor = accentColor.copy(alpha = 0.2f),
+            spotColor = accentColor.copy(alpha = 0.1f)
+        )
+        .shadow(
+            elevation = 4.dp,
+            shape = shape,
+            ambientColor = accentColor.copy(alpha = 0.3f),
+            spotColor = accentColor.copy(alpha = 0.2f)
         )
         .clip(shape)
         .background(
             Brush.verticalGradient(
                 colors = listOf(
-                    backgroundColor.copy(alpha = 0.85f),
+                    backgroundColor.copy(alpha = 0.88f),
+                    backgroundColor.copy(alpha = 0.75f),
                     backgroundColor.copy(alpha = 0.65f)
                 )
             )
         )
+        .drawBehind {
+            // Draw custom corner markings and animated border sweep
+            val resolvedCornerRadius = when (shape) {
+                is RoundedCornerShape -> {
+                    val resolved = shape.topStart.toPx(size, this)
+                    CornerRadius(resolved, resolved)
+                }
+                else -> CornerRadius(16.dp.toPx(), 16.dp.toPx())
+            }
+            
+            // Sweep border gradient
+            val sweepColors = listOf(
+                accentColor.copy(alpha = 0.6f),
+                accentColor.copy(alpha = 0.15f),
+                Color.Transparent,
+                Color.Transparent,
+                accentColor.copy(alpha = 0.15f),
+                accentColor.copy(alpha = 0.6f)
+            )
+            drawRoundRect(
+                brush = Brush.sweepGradient(
+                    colors = sweepColors,
+                    center = Offset(size.width / 2, size.height / 2)
+                ),
+                cornerRadius = resolvedCornerRadius,
+                style = Stroke(width = 1.2f)
+            )
+
+            // Inner gradient top-glow
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    0f to accentColor.copy(alpha = 0.15f),
+                    0.25f to Color.Transparent
+                ),
+                cornerRadius = resolvedCornerRadius,
+                size = Size(size.width, size.height * 0.3f)
+            )
+
+            // Cyber corner markings (only if 3D hologram style is active)
+            if (enableHolo3D) {
+                val markerLen = 8.dp.toPx()
+                val pad = 2.dp.toPx()
+                val w = size.width
+                val h = size.height
+
+                // Top-Left
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(pad, pad), Offset(pad + markerLen, pad), strokeWidth = 1.5f)
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(pad, pad), Offset(pad, pad + markerLen), strokeWidth = 1.5f)
+
+                // Top-Right
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(w - pad, pad), Offset(w - pad - markerLen, pad), strokeWidth = 1.5f)
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(w - pad, pad), Offset(w - pad, pad + markerLen), strokeWidth = 1.5f)
+
+                // Bottom-Left
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(pad, h - pad), Offset(pad + markerLen, h - pad), strokeWidth = 1.5f)
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(pad, h - pad), Offset(pad, h - pad - markerLen), strokeWidth = 1.5f)
+
+                // Bottom-Right
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(w - pad, h - pad), Offset(w - pad - markerLen, h - pad), strokeWidth = 1.5f)
+                drawLine(accentColor.copy(alpha = 0.6f), Offset(w - pad, h - pad), Offset(w - pad, h - pad - markerLen), strokeWidth = 1.5f)
+            }
+        }
         .border(
-            width = 1.dp,
+            width = 0.5.dp,
             brush = Brush.linearGradient(
                 colors = listOf(
-                    borderColor.copy(alpha = 0.4f),
-                    borderColor.copy(alpha = 0.1f),
-                    borderColor.copy(alpha = 0.4f)
+                    accentColor.copy(alpha = 0.2f),
+                    accentColor.copy(alpha = 0.05f),
+                    accentColor.copy(alpha = 0.2f)
                 )
             ),
             shape = shape
@@ -74,12 +304,13 @@ fun EliteCard(
         .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
 
     Box(
-        modifier = baseModifier,
+        modifier = cardModifier,
         contentAlignment = Alignment.Center
     ) {
         content()
     }
 }
+
 
 /**
  * Elite Button — Solid premium button with glow and gradient.

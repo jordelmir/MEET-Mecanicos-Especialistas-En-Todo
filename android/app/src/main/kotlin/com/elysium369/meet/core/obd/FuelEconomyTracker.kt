@@ -63,7 +63,7 @@ class FuelEconomyTracker {
         sampleCount = 0
     }
 
-    fun calculate(data: Map<String, Float>): FuelSnapshot {
+    fun calculate(data: Map<String, Float>, displacementCc: Int = 2000): FuelSnapshot {
         val now = System.currentTimeMillis()
         val deltaSeconds = if (lastTimestamp > 0) (now - lastTimestamp) / 1000.0 else 0.0
         lastTimestamp = now
@@ -90,8 +90,8 @@ class FuelEconomyTracker {
             val ve = (load / 100f).coerceIn(0.1f, 1.0f) * 0.85f
             val intakeTempK = iat + 273.15f
             // Estimate MAF from MAP: MAF = (MAP * RPM * VE * Vd) / (R * T * 120)
-            // Assuming 2.0L engine displacement as baseline
-            val estimatedMAF = (map * rpm * ve * 2.0f) / (8.314f * intakeTempK * 120f) * 28.97f
+            val displacementLiters = if (displacementCc > 0) displacementCc / 1000.0f else 2.0f
+            val estimatedMAF = (map * rpm * ve * displacementLiters) / (8.314f * intakeTempK * 120f) * 28.97f
             gph = estimatedMAF / (GASOLINE_DENSITY * STOICH_RATIO)
             method = "MAP"
         }

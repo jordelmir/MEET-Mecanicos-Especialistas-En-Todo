@@ -433,8 +433,8 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
                     TripStatBox("Vel. Máx", "${trip.maxSpeedKmh.toInt()} km/h")
                     TripStatBox("Temp. Máx", "${trip.maxTempC.toInt()} °C")
                 } else {
-                    TripStatBox("Vel. Máx", "PRO 🔒")
-                    TripStatBox("Temp. Máx", "PRO 🔒")
+                    TripStatBox("Vel. Máx", "PRO")
+                    TripStatBox("Temp. Máx", "PRO")
                 }
             }
             

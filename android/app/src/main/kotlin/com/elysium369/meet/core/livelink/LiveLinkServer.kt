@@ -7,6 +7,7 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -19,6 +20,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.security.SecureRandom
 import java.time.Duration
 import java.util.Collections
 
@@ -35,6 +37,8 @@ class LiveLinkServer {
 
     companion object {
         const val DEFAULT_PORT = 8765
+        private const val TOKEN_LENGTH = 18
+        private const val TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
     }
 
     private var server: ApplicationEngine? = null
@@ -48,6 +52,8 @@ class LiveLinkServer {
     val serverUrl = _serverUrl.asStateFlow()
 
     private val sessions = Collections.synchronizedSet(mutableSetOf<WebSocketServerSession>())
+    private val secureRandom = SecureRandom()
+    private var pairingToken: String? = null
 
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
@@ -56,6 +62,8 @@ class LiveLinkServer {
         if (_isRunning.value) return
 
         val localIp = getLocalIpAddress() ?: "0.0.0.0"
+        val token = generatePairingToken()
+        pairingToken = token
 
         server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(WebSockets) {
@@ -65,7 +73,8 @@ class LiveLinkServer {
             }
             install(ContentNegotiation) { json(json) }
             install(CORS) {
-                anyHost()
+                allowHost("localhost:5173", schemes = listOf("http", "https"))
+                allowHost("127.0.0.1:5173", schemes = listOf("http", "https"))
                 allowHeader(HttpHeaders.ContentType)
                 allowMethod(HttpMethod.Get)
             }
@@ -81,6 +90,12 @@ class LiveLinkServer {
 
                 // WebSocket telemetry stream
                 webSocket("/live") {
+                    val suppliedToken = call.request.queryParameters["token"]
+                    if (suppliedToken == null || suppliedToken != pairingToken) {
+                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "LiveLink pairing token required"))
+                        return@webSocket
+                    }
+
                     sessions.add(this)
                     _connectedClients.value = sessions.size
 
@@ -94,8 +109,8 @@ class LiveLinkServer {
                         for (frame in incoming) {
                             // We mostly broadcast, but can receive commands
                             if (frame is Frame.Text) {
-                                val text = frame.readText()
                                 // Future: handle remote commands
+                                frame.readText()
                             }
                         }
                     } catch (_: Exception) {
@@ -109,7 +124,7 @@ class LiveLinkServer {
 
         server?.start(wait = false)
         _isRunning.value = true
-        _serverUrl.value = "http://$localIp:$port"
+        _serverUrl.value = "http://$localIp:$port/live?token=$token"
     }
 
     /** Stops the server. User can stop sharing at any time. */
@@ -117,6 +132,7 @@ class LiveLinkServer {
         server?.stop(1000, 2000)
         server = null
         sessions.clear()
+        pairingToken = null
         _isRunning.value = false
         _connectedClients.value = 0
         _serverUrl.value = null
@@ -124,26 +140,35 @@ class LiveLinkServer {
 
     /** Broadcasts a telemetry snapshot to all connected browsers. */
     suspend fun broadcastTelemetry(data: TelemetrySnapshot) {
-        if (!_isRunning.value || sessions.isEmpty()) return
+        if (!_isRunning.value) return
+        val sessionsCopy = synchronized(sessions) {
+            if (sessions.isEmpty()) return
+            sessions.toList()
+        }
         val message = json.encodeToString(LiveLinkMessage(
             type = "telemetry",
             payload = json.encodeToString(data)
         ))
         val frame = Frame.Text(message)
-        sessions.forEach { session ->
+        sessionsCopy.forEach { session ->
             try { session.send(frame.copy()) } catch (_: Exception) {}
         }
     }
 
     /** Broadcasts a DTC alert. */
     suspend fun broadcastDtcAlert(dtcs: List<String>) {
-        if (!_isRunning.value || sessions.isEmpty()) return
+        if (!_isRunning.value) return
+        val sessionsCopy = synchronized(sessions) {
+            if (sessions.isEmpty()) return
+            sessions.toList()
+        }
         val message = json.encodeToString(LiveLinkMessage(
             type = "dtc_alert",
             payload = json.encodeToString(dtcs)
         ))
-        sessions.forEach { session ->
-            try { session.send(Frame.Text(message)) } catch (_: Exception) {}
+        val frame = Frame.Text(message)
+        sessionsCopy.forEach { session ->
+            try { session.send(frame.copy()) } catch (_: Exception) {}
         }
     }
 
@@ -154,6 +179,14 @@ class LiveLinkServer {
                 ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
                 ?.hostAddress
         } catch (_: Exception) { null }
+    }
+
+    private fun generatePairingToken(): String {
+        return buildString(TOKEN_LENGTH) {
+            repeat(TOKEN_LENGTH) {
+                append(TOKEN_ALPHABET[secureRandom.nextInt(TOKEN_ALPHABET.length)])
+            }
+        }
     }
 }
 

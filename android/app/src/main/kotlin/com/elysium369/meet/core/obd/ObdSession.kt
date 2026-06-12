@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import io.github.jan.supabase.postgrest.postgrest
+import java.util.concurrent.CopyOnWriteArraySet
 
 enum class ObdState {
     DISCONNECTED,
@@ -22,7 +23,7 @@ enum class ObdState {
 
 /**
  * ObdSession — Professional Grade OBD2 Communication Engine.
- * Handles high-frequency polling, multi-frame ISO-TP responses, 
+ * Handles high-frequency polling, multi-frame ISO-TP responses,
  * and robust ELM327/STN initialization.
  */
 enum class NetworkType {
@@ -42,11 +43,23 @@ data class NetworkModule(
     val dtcs: List<String> = emptyList()
 )
 
+/** Callback for real-time OBD traffic monitoring */
+interface ObdTrafficListener {
+    fun onCommandSent(command: String)
+    fun onResponseReceived(command: String, response: String)
+    fun onError(command: String, error: String)
+}
+
 class ObdSession(
     private val scope: CoroutineScope,
     private val bluetoothAdapter: android.bluetooth.BluetoothAdapter?,
     private val context: Context
 ) {
+    private var trafficListener: ObdTrafficListener? = null
+
+    fun setTrafficListener(listener: ObdTrafficListener?) {
+        trafficListener = listener
+    }
     private val _state = MutableStateFlow(ObdState.DISCONNECTED)
     val state: StateFlow<ObdState> = _state.asStateFlow()
 
@@ -56,7 +69,7 @@ class ObdSession(
     private val commandQueue = ObdCommandQueue()
     private val communicationMutex = Mutex()
     private val keepAliveManager = KeepAliveManager(this)
-    
+
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
@@ -65,12 +78,32 @@ class ObdSession(
 
     private val _vin = MutableStateFlow<String?>(null)
     val vin: StateFlow<String?> = _vin.asStateFlow()
-    
+
     private var transport: TransportInterface? = null
     private var isRunning = false
+    @Volatile
+    private var isPollingPaused = false
+
+    val isLivePollingPaused: Boolean
+        get() = isPollingPaused
+
+    fun pauseLivePolling() {
+        isPollingPaused = true
+        Log.d(TAG, "Live polling paused")
+    }
+
+    fun resumeLivePolling() {
+        isPollingPaused = false
+        Log.d(TAG, "Live polling resumed")
+    }
+
+    fun clearCommandQueue() {
+        commandQueue.clear()
+        Log.d(TAG, "Command queue cleared")
+    }
     private var currentJob: Job? = null
     private var pollingJob: Job? = null
-    
+
     private val _isAdapterPro = MutableStateFlow(false)
     val isAdapterPro: StateFlow<Boolean> = _isAdapterPro.asStateFlow()
 
@@ -107,24 +140,27 @@ class ObdSession(
 
     private var baseDelayMs: Long = 50L
     private var maxLineLength: Int = 128
-    
+
     // Performance Tracking
     private var lastCmdTime = 0L
     private var cmdCount = 0
-    private val oemPidsToPoll = mutableSetOf<PidDefinition>()
-    
+    private val oemPidsToPoll = CopyOnWriteArraySet<PidDefinition>()
+
     private val _activeTestStatus = MutableStateFlow(ActiveTestStatus())
     val activeTestStatus: StateFlow<ActiveTestStatus> = _activeTestStatus.asStateFlow()
     private var activeTestJob: Job? = null
-    
+
     private var consecutiveErrors = 0
     private var isSelfHealing = false
-    
+
     private val _isUdsSessionActive = MutableStateFlow(false)
     val isUdsSessionActive: StateFlow<Boolean> = _isUdsSessionActive.asStateFlow()
 
     private val _allDetectedDtcs = MutableStateFlow<Set<String>>(emptySet())
     val allDetectedDtcs: StateFlow<Set<String>> = _allDetectedDtcs.asStateFlow()
+
+    private val _lastDtcScanReport = MutableStateFlow<DtcScanReport?>(null)
+    val lastDtcScanReport: StateFlow<DtcScanReport?> = _lastDtcScanReport.asStateFlow()
 
     private val _networkTopology = MutableStateFlow<List<NetworkModule>>(emptyList())
     val networkTopology: StateFlow<List<NetworkModule>> = _networkTopology.asStateFlow()
@@ -140,11 +176,11 @@ class ObdSession(
     fun setUdsSessionActive(active: Boolean) {
         _isUdsSessionActive.value = active
     }
-    
+
     // Smooth sensors & Calibration
     private val sensorSmoother = SensorSmootherManager()
     private val calibrationOffsets = MutableStateFlow<Map<String, Float>>(emptyMap())
-    
+
     fun setCalibrationOffset(pid: String, offset: Float) {
         val current = calibrationOffsets.value.toMutableMap()
         current[pid] = offset
@@ -154,7 +190,7 @@ class ObdSession(
     fun getCalibrationOffset(pid: String): Float {
         return calibrationOffsets.value[pid] ?: 0f
     }
-    
+
     // Standard PIDs for dashboard polling — comprehensive list matching Car Scanner Pro
     private val dashboardPids = listOf(
         // ─── CORE ENGINE (High-frequency) ───
@@ -190,7 +226,7 @@ class ObdSession(
         transport?.let { old ->
             scope.launch { runCatching { old.disconnect() } }
         }
-        
+
         if (address.contains(".") || address.contains(":35000") || address.contains(":35001")) {
             val parts = address.split(":")
             val ip = parts.getOrNull(0) ?: "192.168.0.10"
@@ -205,20 +241,20 @@ class ObdSession(
 
     suspend fun connect() {
         if (_state.value == ObdState.CONNECTED || _state.value == ObdState.CONNECTING) return
-        
+
         val activeTransport = transport
         if (activeTransport == null) {
             _state.value = ObdState.ERROR
             _statusMessage.value = "Selecciona un dispositivo para conectar."
             return
         }
-        
+
         _state.value = ObdState.CONNECTING
         Log.i(TAG, "═══ OBD CONNECT START (max $MAX_CONNECT_ATTEMPTS attempts) ═══")
         val t0 = System.currentTimeMillis()
-        
+
         var lastException: Exception? = null
-        
+
         for (attempt in 1..MAX_CONNECT_ATTEMPTS) {
             Log.i(TAG, "── ATTEMPT $attempt/$MAX_CONNECT_ATTEMPTS ──")
             _state.value = ObdState.CONNECTING
@@ -227,19 +263,19 @@ class ObdSession(
             } else {
                 "Reintentando conexión ($attempt/$MAX_CONNECT_ATTEMPTS)..."
             }
-            
+
             try {
                 // 1. Physical Bluetooth Connection
                 activeTransport.connect()
                 Log.i(TAG, "✓ Physical link UP in ${System.currentTimeMillis()-t0}ms (attempt $attempt)")
                 _statusMessage.value = "Conexión OK. Negociando ELM327..."
                 _state.value = ObdState.NEGOTIATING
-                
+
                 // 2. ELM327/STN Protocol Negotiation
                 withTimeout(90000) {
                     initializeAdapter()
                 }
-                
+
                 // Reset smoother on new successful connection
                 sensorSmoother.resetAll()
 
@@ -249,7 +285,7 @@ class ObdSession(
                 isRunning = true
                 consecutiveErrors = 0
                 Log.i(TAG, "═══ OBD CONNECT SUCCESS ═══ Attempt=$attempt | Total: ${System.currentTimeMillis()-t0}ms | Adapter=$adapterVersion | Protocol=$detectedProtocol")
-                
+
                 // ── TELEMETRÍA SILENCIOSA (SUPABASE) SUCCESS ──
                 scope.launch {
                     com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
@@ -260,7 +296,7 @@ class ObdSession(
                         isSuccess = true
                     )
                 }
-                
+
                 startQueueProcessor()
                 startHeartbeatMonitor()
                 keepAliveManager.start(scope)
@@ -283,17 +319,16 @@ class ObdSession(
                     }
                 }
 
-                startLivePolling()
                 return // ← EXIT: Connection successful
-                
+
             } catch (e: Exception) {
                 lastException = e
                 val msg = e.message ?: "Error desconocido"
                 Log.w(TAG, "── ATTEMPT $attempt FAILED: ${e.javaClass.simpleName}: $msg", e)
-                
+
                 // Disconnect cleanly before retrying
                 try { activeTransport.disconnect() } catch (_: Exception) {}
-                
+
                 if (attempt < MAX_CONNECT_ATTEMPTS) {
                     // Show retry UI with countdown
                     val retryDelaySec = attempt + 1 // Progressive: 2s, 3s
@@ -305,7 +340,7 @@ class ObdSession(
                 }
             }
         }
-        
+
         // ALL ATTEMPTS EXHAUSTED — Report final failure
         _state.value = ObdState.ERROR
         val msg = lastException?.message ?: "Error desconocido"
@@ -317,7 +352,7 @@ class ObdSession(
             msg.contains("enlazar") -> "No se pudo enlazar al ELM327 tras $MAX_CONNECT_ATTEMPTS intentos. Desvincula el dispositivo en Bluetooth y vuelve a emparejarlo."
             else -> "Error tras $MAX_CONNECT_ATTEMPTS intentos: $msg"
         }
-        
+
         // ── TELEMETRÍA SILENCIOSA (SUPABASE) FAILURE ──
         scope.launch {
             com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
@@ -328,11 +363,11 @@ class ObdSession(
                 isSuccess = false
             )
         }
-        
+
         isRunning = false
     }
 
-    private val customPidsToPoll = mutableSetOf<com.elysium369.meet.data.local.entities.CustomPidEntity>()
+    private val customPidsToPoll = CopyOnWriteArraySet<com.elysium369.meet.data.local.entities.CustomPidEntity>()
 
     fun setCustomPids(pids: List<com.elysium369.meet.data.local.entities.CustomPidEntity>) {
         customPidsToPoll.clear()
@@ -360,46 +395,73 @@ class ObdSession(
         _pinnedPids.value = current
     }
 
-    private fun startLivePolling() {
+    fun startLivePolling() {
+        if (!isRunning || _state.value != ObdState.CONNECTED) return
         pollingJob?.cancel()
         pollingJob = scope.launch {
             val supportedPids = detectSupportedPids()
-            
+
             // Priority 1: High-frequency PIDs (RPM, Speed, Throttle)
             val baseHighPriority = listOf("0C", "0D", "11") // PID codes without '01'
-            
+
             var cycleCount = 0
-            
+
             while (isRunning && isActive) {
+                if (isPollingPaused) {
+                    delay(100)
+                    continue
+                }
                 val cycleStartTime = System.currentTimeMillis()
-                
+
                 if (_highSpeedMode.value && _pinnedPids.value.isNotEmpty()) {
-                    // HIGH SPEED MODE: Only poll pinned PIDs at max rate
-                    pollBatch(_pinnedPids.value.toList())
-                } else {
-                    // NORMAL MODE: Balanced Polling
-                    val highPriorityPids = (baseHighPriority + _pinnedPids.value.map { it.removePrefix("01") }).distinct()
-                    
-                    val normalPriorityPids = dashboardPids.map { it.removePrefix("01") }.filter { pid ->
-                        !highPriorityPids.contains(pid)
+                    // HIGH SPEED MODE: Only poll pinned PIDs at max rate (Use Multi-PID on CAN for up to 6x faster refresh)
+                    val pinnedList = _pinnedPids.value.toList()
+                    if (detectedProtocol.contains("CAN") && pinnedList.size > 1) {
+                        val cleanPinned = pinnedList.map { it.removePrefix("01") }
+                        cleanPinned.chunked(6).forEach { chunk ->
+                            pollMultiPidBatch(chunk)
+                        }
+                    } else {
+                        pollBatch(pinnedList)
                     }
+                } else {
+                    // NORMAL MODE: Balanced Polling (filtered by supported PIDs to optimize bus bandwidth)
+                    val highPriorityPids = (baseHighPriority + _pinnedPids.value.map { it.removePrefix("01") })
+                        .distinct()
+                        .filter { pid ->
+                            val pidInt = pid.toIntOrNull(16) ?: return@filter true
+                            supportedPids.isEmpty() || supportedPids.contains(pidInt)
+                        }
+
+                    val normalPriorityPids = dashboardPids.map { it.removePrefix("01") }
+                        .filter { pid ->
+                            val pidInt = pid.toIntOrNull(16) ?: return@filter true
+                            supportedPids.isEmpty() || supportedPids.contains(pidInt)
+                        }
+                        .filter { pid ->
+                            !highPriorityPids.contains(pid)
+                        }
 
                     // 1. Poll High Priority (Every Cycle) - Use Multi-PID request if on CAN
                     if (detectedProtocol.contains("CAN") && highPriorityPids.size > 1) {
-                        pollMultiPidBatch(highPriorityPids.take(6)) // Max 6 PIDs per line in CAN
+                        highPriorityPids.chunked(6).forEach { chunk ->
+                            pollMultiPidBatch(chunk)
+                        }
                     } else {
                         pollBatch(highPriorityPids.map { "01$it" })
                     }
-                    
-                    // 2. Poll Normal Priority (Every 3 cycles)
+
+                    // 2. Poll Normal Priority (Every 3 cycles) - Chunked to prevent truncation
                     if (cycleCount % 3 == 0) {
                         if (detectedProtocol.contains("CAN") && normalPriorityPids.size > 1) {
-                            pollMultiPidBatch(normalPriorityPids.take(6))
+                            normalPriorityPids.chunked(6).forEach { chunk ->
+                                pollMultiPidBatch(chunk)
+                            }
                         } else {
                             pollBatch(normalPriorityPids.map { "01$it" })
                         }
                     }
-                    
+
                     // 3. Poll OEM PIDs (Every 4 cycles)
                     if (cycleCount % 4 == 0 && oemPidsToPoll.isNotEmpty()) {
                         pollOemBatch()
@@ -423,10 +485,10 @@ class ObdSession(
                         } catch (_: Exception) {}
                     }
                 }
-                
+
                 updateQos(System.currentTimeMillis() - cycleStartTime)
                 cycleCount++
-                
+
                 // Adaptive delay: High speed mode on pro adapter has 0 delay
                 val targetDelay = when {
                     _highSpeedMode.value && !isCloneAdapter -> 2L // Minimal breathing time
@@ -439,33 +501,102 @@ class ObdSession(
         }
     }
 
+    private fun getPidDataSize(pid: String): Int {
+        val pidHex = pid.uppercase().removePrefix("01")
+        return when (pidHex) {
+            "00", "20", "40", "60", "80", "A0", "C0" -> 4
+            "01", "41" -> 4
+            "02", "03" -> 2
+            "0C", "10", "1F", "21", "22", "23", "31", "32", "3C", "3D", "3E", "3F", "42", "43", "44", "5E", "63" -> 2
+            "24", "25", "26", "27", "28", "29", "2A", "2B", "34", "35", "36", "37", "38", "39", "3A", "3B" -> 4
+            else -> 1
+        }
+    }
+
+    private fun parseMultiPidResponse(pids: List<String>, response: String) {
+        val clean = CanMultiFrameParser.parse(response).uppercase().replace(" ", "")
+        Log.d(TAG, "Parsing multi-PID response: clean=$clean for pids=$pids")
+
+        if (clean.isBlank() || clean.contains("NODATA") || clean.contains("ERROR")) return
+
+        var parsedCount = 0
+
+        // Strategy 1: Look for repeated "41 XX DATA" patterns (most common ECU behavior)
+        // Each PID in the multi-request gets its own "41" service-response prefix
+        for (pid in pids) {
+            val pidHex = pid.uppercase()
+            val marker = "41$pidHex"
+            var idx = clean.indexOf(marker)
+            while (idx >= 0 && idx % 2 != 0) {
+                idx = clean.indexOf(marker, idx + 1)
+            }
+            if (idx >= 0) {
+                val dataStart = idx + marker.length
+                val size = getPidDataSize(pidHex)
+                val dataEnd = dataStart + (size * 2)
+                if (dataEnd <= clean.length) {
+                    val dataHex = clean.substring(dataStart, dataEnd)
+                    try {
+                        val def = PidRegistry.getPid("01", pidHex)
+                        if (def != null) {
+                            val a = if (dataHex.length >= 2) dataHex.substring(0, 2).toInt(16) else 0
+                            val b = if (dataHex.length >= 4) dataHex.substring(2, 4).toInt(16) else 0
+                            val c = if (dataHex.length >= 6) dataHex.substring(4, 6).toInt(16) else 0
+                            val d = if (dataHex.length >= 8) dataHex.substring(6, 8).toInt(16) else 0
+                            val value = def.formula(a, b, c, d)
+                            updateLiveData("01$pidHex", value)
+                            parsedCount++
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Multi-PID parse error for $pidHex: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        if (parsedCount > 0) {
+            Log.d(TAG, "Multi-PID parsed $parsedCount/${pids.size} PIDs successfully")
+        } else {
+            // Strategy 2: Fallback — use existing single-PID parser per PID
+            Log.w(TAG, "Multi-PID structured parse failed, falling back to per-PID parsePidResponse")
+            for (pid in pids) {
+                val parsed = parsePidResponse("01${pid.uppercase()}", response)
+                if (parsed != null) {
+                    updateLiveData("01${pid.uppercase()}", parsed)
+                    parsedCount++
+                }
+            }
+            Log.d(TAG, "Fallback parsed $parsedCount/${pids.size} PIDs")
+        }
+    }
+
     /**
-     * Polls multiple PIDs in a single request. 
+     * Polls multiple PIDs in a single request.
      * Supported by most CAN-bus ECUs. Reduces bus overhead significantly.
+     * Falls back to individual polling if multi-PID parsing fails entirely.
      */
     private suspend fun pollMultiPidBatch(pids: List<String>) {
         if (pids.isEmpty()) return
         try {
             val command = "01" + pids.joinToString("")
             val response = sendRawCommand(command)
-            
-            // Parse multi-response: 41 0C XX XX 0D YY ...
-            pids.forEach { pid ->
-                val parsed = parsePidResponse("01$pid", response)
-                if (parsed != null) updateLiveData("01$pid", parsed)
-            }
-        } catch (_: Exception) {}
+            parseMultiPidResponse(pids, response)
+        } catch (e: Exception) {
+            // Multi-PID request failed entirely — fall back to individual polling
+            Log.w(TAG, "Multi-PID batch failed, falling back to individual: ${e.message}")
+            pollBatch(pids.map { "01$it" })
+        }
     }
 
     private fun updateQos(latencyMs: Long, success: Boolean = true) {
         val now = System.currentTimeMillis()
         cmdCount++
-        
+
         val current = _qosMetrics.value
         val total = current.totalRequests + 1
         val successful = if (success) current.successfulRequests + 1 else current.successfulRequests
         val reliability = (successful.toFloat() / total.toFloat()) * 100f
-        
+
         if (now - lastCmdTime >= 1000) {
             _qosMetrics.value = current.copy(
                 cmdsPerSecond = cmdCount.toFloat(),
@@ -506,7 +637,7 @@ class ObdSession(
         val idx = clean.uppercase().indexOf(expectedPrefix)
         if (idx < 0) return null
         val dataHex = clean.substring(idx + expectedPrefix.length)
-        
+
         return try {
             val a = if (dataHex.length >= 2) dataHex.substring(0, 2).toInt(16) else 0
             val b = if (dataHex.length >= 4) dataHex.substring(2, 4).toInt(16) else 0
@@ -537,7 +668,7 @@ class ObdSession(
                 val command = cp.mode + cp.pid
                 commandQueue.enqueue(ObdCommand(command, 0, { result.complete(it) }, { result.complete("") }))
                 val response = withTimeoutOrNull(2000) { result.await() } ?: continue
-                
+
                 val clean = CanMultiFrameParser.parse(response)
                 // Extract bytes after mode + pid
                 // OBD response prefix = request mode + 0x40 (hex), e.g. mode 22 → response 62
@@ -550,7 +681,7 @@ class ObdSession(
                     for (i in 0 until dataHex.length - 1 step 2) {
                         bytes.add(dataHex.substring(i, i + 2).toInt(16))
                     }
-                    
+
                     if (cp.formula.isNotBlank()) {
                         val value = FormulaEvaluator.evaluate(cp.formula, bytes)
                         updateLiveData(cp.id.toString(), value)
@@ -585,7 +716,7 @@ class ObdSession(
 
         // 2. Apply smoothing and outlier rejection
         // The PID to smooth is usually the hex code.
-        val corePid = pid.removePrefix("01") 
+        val corePid = pid.removePrefix("01")
         val smoothedValue = if (corePid == "42" || corePid == "AT RV" || corePid == "ATRV") {
             calibratedValue // Bypass smoothing for voltage to allow oscilloscope raw reading
         } else {
@@ -594,13 +725,13 @@ class ObdSession(
 
         val current = _liveData.value.toMutableMap()
         current[pid] = smoothedValue
-        
+
         // ── Compute derived/calculated sensors ──
         computeCalculatedSensors(current)
-        
+
         _liveData.value = current
     }
-    
+
     private fun computeCalculatedSensors(data: MutableMap<String, Float>) {
         val mafGps = data["0110"]     // MAF flow (g/s)
         val speedKph = data["010D"]   // Vehicle speed (km/h)
@@ -608,8 +739,15 @@ class ObdSession(
         val mapKpa = data["010B"]     // MAP pressure (kPa)
         val baroKpa = data["0133"]    // Barometric pressure (kPa)
         val loadPct = data["0104"]    // Engine load (%)
-        
+
         val now = System.currentTimeMillis()
+        val previousSpeedTimestampMs = lastSpeedTimestampMs
+        val previousSpeedKph = lastSpeedKph
+        val sampleDeltaTimeSec = if (previousSpeedTimestampMs > 0L) {
+            (now - previousSpeedTimestampMs).coerceIn(0L, 5000L) / 1000.0
+        } else {
+            0.0
+        }
         if (tripStartTimeMs == 0L) tripStartTimeMs = now
 
         // ── 1. Instant Fuel Rate (L/h) ──
@@ -634,14 +772,12 @@ class ObdSession(
 
         // ── 3. Vehicle Acceleration (g) ──
         if (speedKph != null) {
-            val deltaT = (now - lastSpeedTimestampMs) / 1000f
-            if (lastSpeedTimestampMs > 0 && deltaT > 0.05f && deltaT < 5f) {
-                val deltaSpeed = (speedKph - lastSpeedKph) / 3.6f
+            val deltaT = (now - previousSpeedTimestampMs) / 1000f
+            if (previousSpeedTimestampMs > 0 && deltaT > 0.05f && deltaT < 5f) {
+                val deltaSpeed = (speedKph - previousSpeedKph) / 3.6f
                 val accelG = deltaSpeed / (deltaT * 9.81f)
                 data["CALC_ACCELERATION"] = accelG.coerceIn(-3f, 3f)
             }
-            lastSpeedKph = speedKph
-            lastSpeedTimestampMs = now
         }
 
         // ── 4. Calculated Boost (bar) ──
@@ -663,28 +799,26 @@ class ObdSession(
         }
 
         // ── 7. Trip + Total Accumulators ──
-        if (speedKph != null && lastSpeedTimestampMs > 0) {
-            val deltaTimeSec = (now - lastSpeedTimestampMs).coerceIn(0, 5000) / 1000.0
-            val distIncrementKm = speedKph / 3600.0 * deltaTimeSec
+        if (speedKph != null && previousSpeedTimestampMs > 0 && sampleDeltaTimeSec > 0.0) {
+            val distIncrementKm = speedKph / 3600.0 * sampleDeltaTimeSec
             tripDistanceKm += distIncrementKm
             totalDistanceKm += distIncrementKm
             data["CALC_TRIP_DISTANCE"] = tripDistanceKm.toFloat()
             data["CALC_TOTAL_DISTANCE"] = totalDistanceKm.toFloat()
-            
+
             speedAccumulator += speedKph
             speedSampleCount++
             data["CALC_AVG_SPEED"] = (speedAccumulator / speedSampleCount).toFloat()
         }
-        
+
         // Fuel used (trip + total)
-        if (fuelRateLh != null && lastSpeedTimestampMs > 0) {
-            val deltaTimeSec = (now - lastSpeedTimestampMs).coerceIn(0, 5000) / 1000.0
-            val fuelIncrement = fuelRateLh / 3600.0 * deltaTimeSec
+        if (fuelRateLh != null && previousSpeedTimestampMs > 0 && sampleDeltaTimeSec > 0.0) {
+            val fuelIncrement = fuelRateLh / 3600.0 * sampleDeltaTimeSec
             tripFuelUsedL += fuelIncrement
             totalFuelUsedL += fuelIncrement
             data["CALC_FUEL_USED"] = tripFuelUsedL.toFloat()
             data["CALC_FUEL_USED_TOTAL"] = totalFuelUsedL.toFloat()
-            
+
             // Trip average consumption
             if (tripDistanceKm > 0.01) {
                 data["CALC_AVG_CONSUMPTION"] = (tripFuelUsedL / tripDistanceKm * 100.0).toFloat()
@@ -693,12 +827,12 @@ class ObdSession(
             if (totalDistanceKm > 0.01) {
                 data["CALC_AVG_CONSUMPTION_TOTAL"] = (totalFuelUsedL / totalDistanceKm * 100.0).toFloat()
             }
-            
+
             // ── Fuel Price ──
             data["CALC_FUEL_PRICE"] = (tripFuelUsedL * fuelPricePerLiter).toFloat()
             data["CALC_FUEL_PRICE_TOTAL"] = (totalFuelUsedL * fuelPricePerLiter).toFloat()
         }
-        
+
         // ── 8. Rolling 10-second Average Fuel Consumption ──
         if (fuelRateLh != null) {
             fuelRateHistory.addLast(Pair(now, fuelRateLh))
@@ -752,6 +886,11 @@ class ObdSession(
 
         // ── 14. Driving/Standing Time Tracking ──
         updateDrivingTime(speedKph)
+
+        if (speedKph != null) {
+            lastSpeedKph = speedKph
+            lastSpeedTimestampMs = now
+        }
     }
 
     /**
@@ -771,23 +910,36 @@ class ObdSession(
 
     private suspend fun detectSupportedPids(): Set<Int> {
         val supported = mutableSetOf<Int>()
-        val queries = listOf("0100", "0120", "0140")
-        for (query in queries) {
+        var nextQueryPid = 0x00
+        
+        while (nextQueryPid <= 0xE0) {
+            val queryStr = "01" + String.format("%02X", nextQueryPid)
+            var pageSupported = false
             try {
-                val resp = sendRawCommand(query)
+                val resp = sendRawCommand(queryStr)
                 val clean = CanMultiFrameParser.parse(resp)
-                val modeResp = "41${query.substring(2)}"
+                val modeResp = "41" + String.format("%02X", nextQueryPid)
                 val idx = clean.uppercase().indexOf(modeResp.uppercase())
-                if (idx < 0) continue
-                val hex = clean.substring(idx + modeResp.length).take(8)
-                val bitmap = hex.toLongOrNull(16) ?: continue
-                val baseId = query.substring(2).toInt(16)
-                for (bit in 31 downTo 0) {
-                    if ((bitmap shr bit) and 1L == 1L) {
-                        supported.add(baseId + (32 - bit))
+                if (idx >= 0) {
+                    val hex = clean.substring(idx + modeResp.length).take(8)
+                    val bitmap = hex.toLongOrNull(16)
+                    if (bitmap != null) {
+                        for (bit in 31 downTo 0) {
+                            if ((bitmap shr bit) and 1L == 1L) {
+                                supported.add(nextQueryPid + (32 - bit))
+                            }
+                        }
+                        pageSupported = true
                     }
                 }
             } catch (_: Exception) {}
+            
+            val nextIndicatorPid = nextQueryPid + 32
+            if (pageSupported && supported.contains(nextIndicatorPid)) {
+                nextQueryPid = nextIndicatorPid
+            } else {
+                break
+            }
         }
         return supported
     }
@@ -796,10 +948,13 @@ class ObdSession(
         val clean = CanMultiFrameParser.parse(raw)
         val pidHex = pid.substring(2).uppercase()
         val expectedPrefix = "41$pidHex"
-        val idx = clean.indexOf(expectedPrefix)
+        var idx = clean.indexOf(expectedPrefix)
+        while (idx >= 0 && idx % 2 != 0) {
+            idx = clean.indexOf(expectedPrefix, idx + 1)
+        }
         if (idx < 0) return null
         val dataHex = clean.substring(idx + expectedPrefix.length)
-        
+
         return try {
             val def = PidRegistry.getPid("01", pidHex)
             if (def != null) {
@@ -821,9 +976,13 @@ class ObdSession(
      * Disruptive high-end feature: Topology Mapping.
      */
     suspend fun scanNetworkTopology() {
+        if (_state.value != ObdState.CONNECTED) {
+            _statusMessage.value = "Error: El escaneo de topología requiere conexión activa."
+            return
+        }
         _isScanningTopology.value = true
         val discovered = mutableListOf<NetworkModule>()
-        
+
         // Standard CAN IDs (11-bit) for physical addressing
         val targetNodes = mapOf(
             "7E0" to ("Engine Control Module (ECM)" to NetworkType.CAN_HIGH),
@@ -840,77 +999,54 @@ class ObdSession(
             "7EB" to ("Gateway Module" to NetworkType.CAN_HIGH)
         )
 
-        val isOfflineSim = _state.value != ObdState.CONNECTED
-
         try {
-            if (isOfflineSim) {
-                // Offline simulation scan
-                for ((id, data) in targetNodes) {
-                    currentCoroutineContext().ensureActive()
-                    val (name, type) = data
-                    _statusMessage.value = "[SIMULACIÓN] Escaneando: $name ($id)..."
-                    delay(300) // simulated delay
-                    
-                    // Generate mock results: TCM and HVAC dead
-                    val success = when (id) {
-                        "7E1" -> false
-                        "7E6" -> false
-                        else -> true
-                    }
-                    val latency = (20..150).random().toLong()
-                    val dtcs = if (success && id == "7E0") {
-                        listOf("U0101", "P0101") // ECM reports lost communication with TCM (U0101)
-                    } else if (success && id == "7EA") {
-                        listOf("U0115")
-                    } else {
-                        emptyList()
-                    }
-                    
-                    discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
-                }
-                _networkTopology.value = discovered
-                _statusMessage.value = "Simulación Completa: ${discovered.count { it.isAlive }} activos, ${discovered.count { !it.isAlive }} caídos."
-            } else {
-                // Physical/Real scan
-                for ((id, data) in targetNodes) {
-                    currentCoroutineContext().ensureActive()
-                    val (name, type) = data
-                    _statusMessage.value = "Escaneando Nodo: $name ($id)..."
-                    
-                    val startTime = System.currentTimeMillis()
-                    var success = false
-                    var dtcs = emptyList<String>()
-                    
-                    try {
-                        withTimeoutOrNull(600) {
-                            sendRawCommand("AT SH $id")
-                            val resp = sendRawCommand("0100")
-                            success = resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100"))
-                            if (success) {
-                                // Query DTCs immediately if alive
-                                val dtcResp = sendRawCommand("03")
-                                dtcs = DtcDecoder.decode(dtcResp, "03")
-                            }
+            // Physical/Real scan
+            for ((id, data) in targetNodes) {
+                currentCoroutineContext().ensureActive()
+                val (name, type) = data
+                _statusMessage.value = "Escaneando Nodo: $name ($id)..."
+
+                val startTime = System.currentTimeMillis()
+                var success = false
+                var dtcs = emptyList<String>()
+
+                try {
+                    withTimeoutOrNull(2000L) { // Safe 2000ms timeout for slow/genuine adapters
+                        sendRawCommand("AT SH $id")
+                        id.toIntOrNull(16)?.let { requestHex ->
+                            val responseId = String.format("%03X", requestHex + 8)
+                            sendRawCommand("AT CRA $responseId")
                         }
-                    } catch (e: Exception) {
-                        success = false
+                        val resp = sendRawCommand("0100")
+                        success = resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100"))
+                        if (success) {
+                            // Query DTCs immediately if alive
+                            val dtcResp = sendRawCommand("03")
+                            dtcs = DtcDecoder.decode(dtcResp, "03")
+                        }
                     }
-                    
-                    val latency = System.currentTimeMillis() - startTime
-                    discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    success = false
+                } finally {
+                    runCatching { sendRawCommand("AT CRA") }
                 }
-                
-                // Reset header to default functional broadcast
-                sendRawCommand("AT SH 7DF")
-                _networkTopology.value = discovered
-                _statusMessage.value = "Mapeo de Topología Completo: ${discovered.count { it.isAlive }} nodos activos."
+
+                val latency = System.currentTimeMillis() - startTime
+                discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
             }
+
+            _networkTopology.value = discovered
+            _statusMessage.value = "Mapeo de Topología Completo: ${discovered.count { it.isAlive }} nodos activos."
         } catch (e: CancellationException) {
             _statusMessage.value = "Escaneo cancelado por el usuario."
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Topology scan failed", e)
         } finally {
+            runCatching { sendRawCommand("AT SH 7DF") }
+            runCatching { sendRawCommand("AT CRA") }
             _isScanningTopology.value = false
         }
     }
@@ -924,7 +1060,7 @@ class ObdSession(
         oscilloscopeJob = scope.launch(Dispatchers.IO) {
             try {
                 _statusMessage.value = "Iniciando ráfaga de alta velocidad (Osciloscopio)..."
-                
+
                 // Check if adapter is STN (Professional)
                 if (!_isAdapterPro.value) {
                     // Fallback to high-frequency standard polling if not STN
@@ -943,11 +1079,11 @@ class ObdSession(
                 // PROFESSIONAL STN PATH: STP (Real Time Protocol)
                 // STP provides timestamped data at up to 1000 samples/sec
                 // Sequence: 1. Set Protocol 2. Start STP 3. Monitor data stream
-                
-                // Note: STP implementation varies by chip version. 
+
+                // Note: STP implementation varies by chip version.
                 // Using a simplified ráfaga pattern for implementation.
-                sendRawCommand("STP $pidCode") 
-                
+                sendRawCommand("STP $pidCode")
+
                 while (isActive && isRunning) {
                     // Read raw stream directly from transport (bypassing queue)
                     val rawBytes = transport?.read(256, 50L)
@@ -965,7 +1101,7 @@ class ObdSession(
                             }
                         }
                     }
-                    delay(1) 
+                    delay(1)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Oscilloscope mode error", e)
@@ -990,36 +1126,9 @@ class ObdSession(
         if (_state.value != ObdState.CONNECTED) return emptyList()
         return try {
             val response = sendRawCommand("03", priority = 999)
-            val active = DtcDecoder.decode(response, "03").toMutableSet()
-            
-            // ── ELITE FEATURE: Umbrella Code Resolution ──
-            // Cross-reference with Pending and Permanent memory if P0300 (Random/Multiple Misfire) is present.
-            if (active.contains("P0300")) {
-                try {
-                    val pendingResp = sendRawCommand("07", priority = 999)
-                    val pending = DtcDecoder.decode(pendingResp, "07")
-                    
-                    val permResp = sendRawCommand("0A", priority = 999)
-                    val perm = DtcDecoder.decode(permResp, "0A")
-                    
-                    // Look for specific cylinder misfire codes (P0301 - P0312)
-                    val specificMisfires = (pending + perm).filter { it.matches(Regex("P030[1-9]|P031[0-2]")) }.toMutableList()
-                    
-                    // Always trigger Deep Scan (Mode 06) for per-cylinder accuracy
-                    val mode06Misfires = deepScanMisfires()
-                    specificMisfires.addAll(mode06Misfires)
-                    
-                    // Add all specific misfires to the active list and ensure uniqueness
-                    active.addAll(specificMisfires.distinct())
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to resolve umbrella code details: ${e.message}")
-                }
-            }
-            
-            // Persistent Accumulation: DTCs remain until cleared explicitly.
+            val active = DtcDecoder.decode(response, "03")
             _allDetectedDtcs.value = _allDetectedDtcs.value + active
-            
-            active.toList()
+            active
         } catch (_: Exception) { emptyList() }
     }
 
@@ -1036,7 +1145,7 @@ class ObdSession(
                 val response = sendRawCommand("06$hexMid", priority = 999)
                 // Usa CanMultiFrameParser para limpiar headers PCI si es necesario.
                 val clean = CanMultiFrameParser.parse(response).replace(Regex("[^0-9A-F]"), "")
-                
+
                 // Formato CAN/KWP típico: 46 A2 0B [VAL] [VAL] [MIN] [MIN] [MAX] [MAX]
                 // Buscamos si hay datos y extraemos el valor (simplificado)
                 if (clean.contains("46$hexMid")) {
@@ -1072,14 +1181,14 @@ class ObdSession(
      */
     suspend fun readFreezeFrame(dtc: String): Map<String, String> {
         val results = mutableMapOf<String, String>()
-        
+
         // Mode 02 PID 02: DTC that caused freeze frame
         val dtcResp = sendRawCommand("020200") // Frame 0
         if (dtcResp.contains("NODATA") || dtcResp.contains("?")) return emptyMap()
-        
+
         // NOTE: "DTC" key removed — ViewModel now uses scoped keys (dtc:param).
         // The DTC identity is managed by the caller, not embedded in the frame map.
-        
+
         // Common PIDs for engine snapshot
         val pids = listOf(
             "020300", // Fuel system status
@@ -1091,7 +1200,7 @@ class ObdSession(
             "020D00", // Vehicle speed
             "021100"  // Throttle position
         )
-        
+
         for (cmd in pids) {
             val pid = cmd.substring(2, 4)
             val res = sendRawCommand(cmd)
@@ -1099,7 +1208,7 @@ class ObdSession(
                 results[pid] = parseMode02Response(pid, res)
             }
         }
-        
+
         _freezeFrame.value = results
         return results
     }
@@ -1109,7 +1218,7 @@ class ObdSession(
         val prefix = "42$pid"
         val idx = clean.uppercase().indexOf(prefix)
         if (idx < 0) return "N/A"
-        
+
         val data = clean.substring(idx + prefix.length)
         if (data.length < 2) return "N/A"
 
@@ -1141,16 +1250,172 @@ class ObdSession(
         } catch (_: Exception) { emptyList() }
     }
 
+    suspend fun readProfessionalDtcScan(): DtcScanReport {
+        val startedAt = System.currentTimeMillis()
+        if (_state.value != ObdState.CONNECTED) {
+            return DtcScanReport(startedAt, System.currentTimeMillis(), detectedProtocol, emptyList(), emptyList(), emptyList())
+        }
+
+        val records = mutableListOf<DtcRecord>()
+        val rawExchanges = mutableListOf<DtcRawExchange>()
+        val aliveModules = linkedMapOf<String, String>()
+
+        fun normalizeRecord(record: DtcRecord, fallbackName: String?): DtcRecord {
+            val responseName = moduleNameForResponse(record.responseAddress)
+            return record.copy(moduleName = record.moduleName ?: fallbackName ?: responseName)
+        }
+
+        suspend fun queryStandard(command: String, mode: String, target: String?, moduleName: String?) {
+            val raw = runCatching { sendRawCommand(command, priority = 999) }.getOrDefault("")
+            val parsed = DtcScanEngine.parseStandardByEcu(raw, mode, target, moduleName)
+                .map { normalizeRecord(it, moduleName) }
+            rawExchanges += DtcRawExchange(command, target, raw, parsed.size)
+            records += parsed
+        }
+
+        suspend fun queryUds(command: String, target: String?, moduleName: String?): List<DtcRecord> {
+            val raw = runCatching { sendRawCommand(command, priority = 999) }.getOrDefault("")
+            val parsed = DtcScanEngine.parseUdsService19ByEcu(raw, target, moduleName)
+                .map { normalizeRecord(it, moduleName) }
+            rawExchanges += DtcRawExchange(command, target, raw, parsed.size)
+            records += parsed
+            return parsed
+        }
+
+        fun isAliveResponse(raw: String): Boolean {
+            val u = raw.uppercase()
+            if (u.isBlank() || u.contains("NO DATA") || u.contains("UNABLE") || u.contains("ERROR") || u.trim() == "?") {
+                return false
+            }
+            return u.contains("41 00") ||
+                u.contains("4100") ||
+                u.contains("50 03") ||
+                u.contains("5003") ||
+                u.contains("50 01") ||
+                u.contains("5001") ||
+                u.contains("7F") ||
+                u.contains("59")
+        }
+
+        val isCan = detectedProtocol.uppercase().contains("CAN") || detectedProtocol.uppercase().contains("ISO15765")
+        try {
+            if (isCan) {
+                _statusMessage.value = "Escaneo DTC profesional: configurando bus CAN..."
+                runCatching { sendRawCommand("ATH1", priority = 999) }
+                runCatching { sendRawCommand("ATAL", priority = 999) }
+                runCatching { sendRawCommand("ATCAF1", priority = 999) }
+
+                // Phase 1: functional broadcast with headers.
+                runCatching { sendRawCommand("ATSH7DF", priority = 999) }
+                queryStandard("03", "03", "7DF", "Functional Broadcast")
+                queryStandard("07", "07", "7DF", "Functional Broadcast")
+                queryStandard("0A", "0A", "7DF", "Functional Broadcast")
+
+                // Phase 2: physical module sweep
+                for ((target, moduleName) in professionalDtcTargets()) {
+                    _statusMessage.value = "Escaneando $moduleName ($target)..."
+                    runCatching { sendRawCommand("ATSH$target", priority = 999) }
+                    target.toIntOrNull(16)?.let { requestHex ->
+                        val responseId = String.format("%03X", requestHex + 8)
+                        runCatching { sendRawCommand("ATCRA$responseId", priority = 999) }
+                    }
+
+                    try {
+                        val probeRaw = runCatching { sendRawCommand("0100", priority = 999) }.getOrDefault("")
+                        var alive = isAliveResponse(probeRaw)
+                        rawExchanges += DtcRawExchange("0100", target, probeRaw, 0)
+
+                        if (!alive) {
+                            val testerRaw = runCatching { sendRawCommand("3E00", priority = 999) }.getOrDefault("")
+                            alive = isAliveResponse(testerRaw)
+                            rawExchanges += DtcRawExchange("3E00", target, testerRaw, 0)
+                        }
+
+                        if (!alive) continue
+                        aliveModules[target] = moduleName
+
+                        runCatching { sendRawCommand("1003", priority = 999) }
+                        val udsAll = queryUds("1902FF", target, moduleName)
+                        if (udsAll.isEmpty()) {
+                            queryUds("19020D", target, moduleName)
+                        }
+                        queryStandard("03", "03", target, moduleName)
+                        queryStandard("07", "07", target, moduleName)
+                        queryStandard("0A", "0A", target, moduleName)
+                    } finally {
+                        runCatching { sendRawCommand("ATCRA", priority = 999) }
+                    }
+                }
+            } else {
+                _statusMessage.value = "Escaneo DTC estándar: consultando protocolo legado..."
+                runCatching { sendRawCommand("ATH0", priority = 999) }
+                // Consult standard Modes globally without CAN addressing
+                queryStandard("03", "03", null, "Standard OBD-II")
+                queryStandard("07", "07", null, "Standard OBD-II")
+                queryStandard("0A", "0A", null, "Standard OBD-II")
+            }
+        } finally {
+            if (isCan) {
+                runCatching { sendRawCommand("ATSH7DF", priority = 999) }
+                runCatching { sendRawCommand("ATCRA", priority = 999) }
+                runCatching { sendRawCommand("ATH0", priority = 999) }
+            }
+        }
+
+        val distinctRecords = records.distinctBy {
+            "${it.code}|${it.bucket}|${it.responseAddress}|${it.targetAddress}|${it.udsStatusByte}|${it.udsFailureType}"
+        }
+        val moduleKeys = (aliveModules.keys + distinctRecords.mapNotNull { it.responseAddress ?: it.targetAddress }).distinct()
+        val modules = moduleKeys.map { key ->
+            val moduleRecords = distinctRecords.filter { it.responseAddress == key || (it.responseAddress == null && it.targetAddress == key) }
+            DtcModuleReport(
+                targetAddress = aliveModules.keys.firstOrNull { it == key },
+                responseAddress = if (key in aliveModules.keys) null else key,
+                moduleName = aliveModules[key] ?: moduleNameForResponse(key) ?: "ECU $key",
+                isAlive = true,
+                dtcs = moduleRecords,
+                rawExchanges = rawExchanges.filter { it.targetAddress == key || it.targetAddress == "7DF" }
+            )
+        }
+
+        val report = DtcScanReport(
+            startedAtMs = startedAt,
+            endedAtMs = System.currentTimeMillis(),
+            protocol = detectedProtocol,
+            records = distinctRecords,
+            modules = modules,
+            rawExchanges = rawExchanges
+        )
+        _lastDtcScanReport.value = report
+        _allDetectedDtcs.value = _allDetectedDtcs.value + distinctRecords.map { it.code }
+        _statusMessage.value = "Escaneo DTC profesional completado: ${distinctRecords.size} hallazgos."
+        return report
+    }
+
     suspend fun clearDtcs(): Boolean {
         if (_state.value != ObdState.CONNECTED) return false
         return try {
+            _statusMessage.value = "Enviando comando de borrado (Mode 04)..."
             val response = sendRawCommand("04", priority = 1)
             val success = response.contains("OK") || response.contains("44")
             if (success) {
-                _allDetectedDtcs.value = emptySet()
+                _statusMessage.value = "Verificando eliminación física (Mode 03)..."
+                val checkResponse = sendRawCommand("03", priority = 1)
+                val remainingCodes = DtcDecoder.decode(checkResponse, "03")
+                if (remainingCodes.isNotEmpty()) {
+                    _statusMessage.value = "Advertencia: ${remainingCodes.size} códigos no pudieron ser borrados."
+                } else {
+                    _statusMessage.value = "Borrado verificado exitosamente."
+                    _allDetectedDtcs.value = emptySet()
+                }
+            } else {
+                _statusMessage.value = "Error al borrar códigos: respuesta inesperada."
             }
             success
-        } catch (_: Exception) { false }
+        } catch (e: Exception) {
+            _statusMessage.value = "Error en borrado: ${e.message}"
+            false
+        }
     }
 
     suspend fun fetchVin(): String {
@@ -1237,24 +1502,24 @@ class ObdSession(
             val response = sendRawCommand("0101")
             val clean = CanMultiFrameParser.parse(response).replace("4101", "")
             if (clean.length < 8) return null
-            
+
             val a = clean.substring(0, 2).toInt(16)
             val b = clean.substring(2, 4).toInt(16)
             val c = clean.substring(4, 6).toInt(16)
             val d = clean.substring(6, 8).toInt(16)
-            
+
             val milOn = (a and 0x80) != 0
             val dtcCount = a and 0x7F
-            
+
             val monitors = mutableListOf<MonitorStatus>()
             // Test de chispa vs compresión (Byte B bit 3)
             val isSpark = (b and 0x08) == 0
-            
+
             // Monitores continuos (Byte B)
             monitors.add(MonitorStatus("Misfire", (b and 0x01) != 0, (b and 0x10) == 0))
             monitors.add(MonitorStatus("Fuel System", (b and 0x02) != 0, (b and 0x20) == 0))
             monitors.add(MonitorStatus("Components", (b and 0x04) != 0, (b and 0x40) == 0))
-            
+
             // Monitores no continuos (Byte C y D)
             if (isSpark) {
                 monitors.add(MonitorStatus("Catalyst", (c and 0x01) != 0, (d and 0x01) == 0))
@@ -1273,7 +1538,7 @@ class ObdSession(
                 monitors.add(MonitorStatus("PM Filter", (c and 0x20) != 0, (d and 0x20) == 0))
                 monitors.add(MonitorStatus("EGR/VVT", (c and 0x80) != 0, (d and 0x80) == 0))
             }
-            
+
             ReadinessResult(milOn, dtcCount, monitors.filter { it.available })
         } catch (_: Exception) { null }
     }
@@ -1326,10 +1591,10 @@ class ObdSession(
      */
     suspend fun readMode06Results(): List<Mode06TestResult> {
         if (_state.value != ObdState.CONNECTED) return emptyList()
-        
+
         _statusMessage.value = "Iniciando escaneo profundo de monitores (Mode $06)..."
         val allResults = mutableListOf<Mode06TestResult>()
-        
+
         try {
             // Step 1: Discover available MIDs
             val availableMids = mutableListOf<String>()
@@ -1338,7 +1603,7 @@ class ObdSession(
                 val pidHex = String.format("%02X", basePid)
                 val response = sendRawCommand("06$pidHex")
                 val clean = CanMultiFrameParser.parse(response).replace(" ", "").uppercase()
-                
+
                 // Response should be 46 [PID] [4 bytes bitmap]
                 val marker = "46$pidHex"
                 if (clean.contains(marker)) {
@@ -1392,12 +1657,81 @@ class ObdSession(
         _standingTimeSeconds.value = 0
     }
 
+    private fun professionalDtcTargets(): Map<String, String> {
+        val vinVal = vin.value ?: ""
+        val mfr = when {
+            vinVal.startsWith("1FM") || vinVal.startsWith("1FT") || vinVal.startsWith("1FA") || vinVal.startsWith("3FA") -> "FORD"
+            vinVal.startsWith("JTD") || vinVal.startsWith("JT1") || vinVal.startsWith("JTN") || vinVal.startsWith("JTH") -> "TOYOTA"
+            vinVal.startsWith("1GC") || vinVal.startsWith("1G1") || vinVal.startsWith("1G6") || vinVal.startsWith("3G1") -> "GM"
+            vinVal.startsWith("WVW") || vinVal.startsWith("WV2") || vinVal.startsWith("WAU") || vinVal.startsWith("TRU") -> "VOLKSWAGEN"
+            else -> "GENERIC"
+        }
+
+        val targets = linkedMapOf(
+            "7E0" to "ECM (Motor)",
+            "7E1" to "TCM (Transmision)",
+            "7E2" to "ABS/ESP/TCS",
+            "7E3" to "SRS (Airbag)",
+            "7E4" to "BCM (Carroceria)",
+            "7E5" to "IPC (Instrumentos)",
+            "7E6" to "HVAC (Climatizacion)",
+            "7E7" to "PSM/Confort"
+        )
+
+        when (mfr) {
+            "TOYOTA" -> {
+                targets["7B0"] = "Toyota ABS/VSC"
+                targets["7B4"] = "Toyota SRS Airbag"
+                targets["7C0"] = "Toyota HVAC"
+                targets["7C4"] = "Toyota BCM"
+            }
+            "GM" -> {
+                targets["7A0"] = "GM Chassis/ABS"
+                targets["7A4"] = "GM Body/BCM"
+            }
+            "VOLKSWAGEN" -> {
+                targets["721"] = "VAG Transmission"
+                targets["722"] = "VAG ABS/ESP"
+                targets["723"] = "VAG Airbag/SRS"
+            }
+            "FORD" -> {
+                targets["760"] = "Ford ABS Module"
+                targets["764"] = "Ford RCM (Airbag)"
+            }
+        }
+
+        if (detectedProtocol.contains("29")) {
+            targets["18DAF110"] = "ECM (Extended 29-bit)"
+            targets["18DAF118"] = "TCM (Extended 29-bit)"
+            targets["18DAF128"] = "ABS (Extended 29-bit)"
+            targets["18DAF158"] = "SRS (Extended 29-bit)"
+        }
+
+        return targets
+    }
+
+    private fun moduleNameForResponse(responseAddress: String?): String? = when (responseAddress?.uppercase()) {
+        "7E8" -> "ECM (Motor)"
+        "7E9" -> "TCM (Transmision)"
+        "7EA" -> "ABS/ESP/TCS"
+        "7EB" -> "SRS/BCM"
+        "7EC" -> "BCM (Carroceria)"
+        "7ED" -> "IPC (Instrumentos)"
+        "7EE" -> "HVAC/Confort"
+        "7EF" -> "Modulo auxiliar"
+        "18DA10F1" -> "ECM (Extended 29-bit)"
+        "18DA18F1" -> "TCM (Extended 29-bit)"
+        "18DA28F1" -> "ABS (Extended 29-bit)"
+        "18DA58F1" -> "SRS (Extended 29-bit)"
+        else -> null
+    }
+
     suspend fun scanModules(): List<NetworkModule> {
         if (_state.value != ObdState.CONNECTED) return emptyList()
         val modules = mutableListOf<NetworkModule>()
-        
+
         _statusMessage.value = "Escaneando topología de red CAN..."
-        
+
         try {
             // Detect manufacturer based on VIN
             val vinVal = vin.value ?: ""
@@ -1408,16 +1742,16 @@ class ObdSession(
                 vinVal.startsWith("WVW") || vinVal.startsWith("WV2") || vinVal.startsWith("WAU") || vinVal.startsWith("TRU") -> "VOLKSWAGEN"
                 else -> "GENERIC"
             }
-            
+
             android.util.Log.i("ObdSession", "scanModules detected manufacturer: $mfr")
 
             // Standard 11-bit CAN Addressing (7E0-7EF) + OEM Modules
             val can11Targets = mutableMapOf(
-                "7E0" to "ECM (Motor)", 
-                "7E1" to "TCM (Transmisión)", 
+                "7E0" to "ECM (Motor)",
+                "7E1" to "TCM (Transmisión)",
                 "7E2" to "ABS/ESP/TCS",
-                "7E3" to "SRS (Airbag)", 
-                "7E4" to "BCM (Carrocería)", 
+                "7E3" to "SRS (Airbag)",
+                "7E4" to "BCM (Carrocería)",
                 "7E5" to "IPC (Instrumentos)",
                 "7E6" to "HVAC (Climatización)",
                 "7E7" to "PSM (Asientos/Confort)"
@@ -1445,13 +1779,13 @@ class ObdSession(
                     can11Targets["764"] = "Ford RCM (Airbag)"
                 }
             }
-            
+
             try { sendRawCommand("ATH1") } catch (_: Exception) {}
-            
+
             for ((addr, label) in can11Targets) {
                 try {
                     sendRawCommand("ATSH$addr")
-                    
+
                     // Initialize diagnostic session for non-generic manufacturer CAN queries
                     if (mfr != "GENERIC") {
                         try { sendRawCommand("1003") } catch (_: Exception) {
@@ -1481,12 +1815,16 @@ class ObdSession(
 
                     if (isAlive) {
                         var dtcs = emptyList<String>()
-                        
+
                         // Query DTCs using UDS Service 19 first
                         try {
                             val udsResp = sendRawCommand("19020D")
                             if (udsResp.isNotBlank() && udsResp.contains("5902")) {
-                                dtcs = DtcDecoder.decodeUdsService19(udsResp)
+                                dtcs = DtcScanEngine.parseUdsService19ByEcu(
+                                    rawResponse = udsResp,
+                                    targetAddress = addr,
+                                    moduleName = label
+                                ).map { it.code }.distinct()
                             }
                         } catch (_: Exception) {}
 
@@ -1497,7 +1835,7 @@ class ObdSession(
                                 dtcs = DtcDecoder.decode(dtcResp, "03")
                             } catch (_: Exception) {}
                         }
-                        
+
                         modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
                     }
                 } catch (_: Exception) {}
@@ -1514,28 +1852,32 @@ class ObdSession(
                 for ((addr, label) in can29Targets) {
                     try {
                         sendRawCommand("ATSH$addr")
-                        
+
                         if (mfr != "GENERIC") {
                             try { sendRawCommand("1003") } catch (_: Exception) {}
                         }
-                        
+
                         val resp = sendRawCommand("0100")
                         if (resp.isNotBlank() && (resp.contains("4100") || resp.contains("7F") || resp.contains("50"))) {
                             var dtcs = emptyList<String>()
                             try {
                                 val udsResp = sendRawCommand("19020D")
                                 if (udsResp.isNotBlank() && udsResp.contains("5902")) {
-                                    dtcs = DtcDecoder.decodeUdsService19(udsResp)
+                                    dtcs = DtcScanEngine.parseUdsService19ByEcu(
+                                        rawResponse = udsResp,
+                                        targetAddress = addr,
+                                        moduleName = label
+                                    ).map { it.code }.distinct()
                                 }
                             } catch (_: Exception) {}
-                            
+
                             if (dtcs.isEmpty()) {
                                 try {
                                     val dtcResp = sendRawCommand("03")
                                     dtcs = DtcDecoder.decode(dtcResp, "03")
                                 } catch (_: Exception) {}
                             }
-                            
+
                             modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
                         }
                     } catch (_: Exception) {}
@@ -1549,12 +1891,12 @@ class ObdSession(
             } catch (_: Exception) {}
             _statusMessage.value = "Escaneo completado: ${modules.size} módulos hallados."
         }
-        
+
         return modules
     }
 
     /**
-     * Allows manual protocol override. Essential for professional diagnostics 
+     * Allows manual protocol override. Essential for professional diagnostics
      * where auto-detection might fail on specific hardware modifications.
      */
     suspend fun setProtocol(protocol: String): Boolean {
@@ -1574,7 +1916,7 @@ class ObdSession(
             }
             val resp = sendRawCommand(cmd)
             if (!resp.contains("OK")) return false
-            
+
             // Validate connection with protocol
             val check = sendRawCommand("0100")
             val success = check.contains("4100") || check.contains("41 00")
@@ -1601,7 +1943,7 @@ class ObdSession(
      */
     suspend fun readOdometer(): Float {
         if (_state.value != ObdState.CONNECTED) return 0f
-        
+
         // Try Mode 01 PID A6 (Odometer - Newer vehicles)
         try {
             val resp = sendRawCommand("01A6")
@@ -1636,9 +1978,9 @@ class ObdSession(
         val address = targetAddress ?: "unknown"
         val fingerprint = AdapterFingerprint(context)
         val cachedProfile = fingerprint.getProfile(address)
-        
+
         Log.i(TAG, "── INIT ADAPTER START ── (cached=${cachedProfile != null})")
-        
+
         val negotiator = ElmNegotiator(t)
         val profile = negotiator.negotiate(
             hintProtocol = cachedProfile?.detectedProtocol ?: ObdProtocol.AUTO
@@ -1656,7 +1998,7 @@ class ObdSession(
         _isAdapterPro.value = !profile.isClone
         baseDelayMs = profile.baseDelayMs
         maxLineLength = profile.maxLineLength
-        
+
         // Final Voltage Check
         try {
             val (ecuVolt, elmVolt) = readBatteryVoltage()
@@ -1678,6 +2020,7 @@ class ObdSession(
             withContext(Dispatchers.IO) {
                 val t = transport ?: throw ObdConnectionException("Transport no disponible")
                 Log.v(TAG, "TX (Direct): '$command' (timeout=${timeoutMs}ms)")
+                runCatching { t.drain() }
                 t.write("$command\r".toByteArray())
                 val resp = readResponse(timeoutMs)
                 Log.v(TAG, "RX (Direct): '$resp' (${resp.length} chars)")
@@ -1687,49 +2030,76 @@ class ObdSession(
         }
     }
 
-    private suspend fun readResponse(timeoutMs: Long = 1500L): String = 
+    private suspend fun readResponse(timeoutMs: Long = 1500L): String =
         withContext(Dispatchers.IO) {
         val t = transport ?: return@withContext ""
         val buffer = StringBuilder()
         val startTime = System.currentTimeMillis()
         var consecutiveNulls = 0
-        
+
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             val chunkSize = if (t is BtClassicTransport) 1024 else 512
-            val chunk = t.read(chunkSize)
-            
+            val remainingTime = timeoutMs - (System.currentTimeMillis() - startTime)
+            if (remainingTime <= 0) break
+
+            // Adaptive Silence Detection: Use a small read timeout once we have data,
+            // avoiding long locks while waiting for subsequent frames or command prompt
+            val readTimeout = if (buffer.isEmpty()) {
+                remainingTime.coerceAtLeast(100L)
+            } else {
+                if (isCloneAdapter) 40L else 15L
+            }
+
+            val chunk = t.read(chunkSize, readTimeout)
+
             if (chunk != null) {
                 consecutiveNulls = 0
                 val str = String(chunk, Charsets.ISO_8859_1)
                 buffer.append(str)
                 keepAliveManager.notifyBytesReceived()
-                
+
                 // Exit fast if we see the ELM327 prompt
                 if (buffer.contains('>')) break
-                
+
                 val current = buffer.toString().uppercase()
                 // Fast exit on definitive error/empty responses
                 if (current.contains("NO DATA") || current.contains("UNABLE") ||
-                    current.contains("CAN ERROR") || current.contains("STOPPED") || 
+                    current.contains("CAN ERROR") || current.contains("STOPPED") ||
                     current.contains("ERROR")) break
                 // "?" alone means invalid command — exit
                 if (current.trimEnd().endsWith("?")) break
             } else {
                 consecutiveNulls++
                 // If we already have data and no new bytes for a while, response is complete.
-                // We reduce this from 20 to 2 for faster response on clone adapters.
-                if (buffer.isNotEmpty() && consecutiveNulls >= 2) break
-                delay(10) 
+                val silenceThreshold = if (isCloneAdapter) 6 else 3
+                if (buffer.isNotEmpty() && consecutiveNulls >= silenceThreshold) break
+                delay(5)
             }
         }
-        return@withContext buffer.toString().replace("\r", " ").replace("\n", " ").trim()
+        val responseStr = buffer.toString()
+        val isComplete = responseStr.contains('>') || 
+                responseStr.contains("NO DATA", ignoreCase = true) || 
+                responseStr.contains("UNABLE", ignoreCase = true) ||
+                responseStr.contains("CAN ERROR", ignoreCase = true) || 
+                responseStr.contains("STOPPED", ignoreCase = true) ||
+                responseStr.contains("ERROR", ignoreCase = true) ||
+                responseStr.trimEnd().endsWith("?")
+
+        if (!isComplete) {
+            Log.w(TAG, "Incomplete response or timeout. Draining transport input...")
+            try {
+                t.drain()
+            } catch (_: Exception) {}
+        }
+
+        return@withContext responseStr.replace("\r", " ").replace("\n", " ").trim()
     }
 
     suspend fun readBatteryVoltage(): Pair<Float, Float> {
         // PRIORIDAD 1: Modo 01 PID 42 (Control Module Voltage desde la ECU)
         val obdResponse = if (isRunning) sendRawCommand("0142") else sendCommandDirectly("0142", 3000L)
         val clean = CanMultiFrameParser.parse(obdResponse).replace(" ", "")
-        
+
         var ecuVoltage = 0f
         if (clean.length >= 4 && clean.contains("4142")) {
             try {
@@ -1745,8 +2115,12 @@ class ObdSession(
 
         // PRIORIDAD 2: Sensor de voltaje interno del ELM327 (AT RV).
         val elmResponse = if (isRunning) sendRawCommand("ATRV") else sendCommandDirectly("ATRV", 2000L)
-        val elmVoltage = elmResponse.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 0f
+        val rawElmVoltage = elmResponse.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 0f
         
+        val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+        val offset = prefs.getFloat("voltage_calibration_offset", 0f)
+        val elmVoltage = if (rawElmVoltage > 0f) rawElmVoltage + offset else 0f
+
         return Pair(ecuVoltage, elmVoltage)
     }
 
@@ -1759,7 +2133,7 @@ class ObdSession(
     }
 
     /**
-     * Professional Safety Guard: Verifies that sensitive operations 
+     * Professional Safety Guard: Verifies that sensitive operations
      * are only performed on high-quality adapters and under safe conditions.
      */
     suspend fun verifySafetyForProAction(conditions: List<SafetyCondition> = emptyList()): Boolean {
@@ -1769,7 +2143,7 @@ class ObdSession(
             _statusMessage.value = "ERROR: Voltaje insuficiente (${voltage}V). Conecta un cargador."
             return false
         }
-        
+
         // Check specific conditions
         // NOTE: Live polling stores RPM under key "010C" (Mode 01 PID 0C)
         for (condition in conditions) {
@@ -1811,7 +2185,7 @@ class ObdSession(
         if (isCloneAdapter) {
             _statusMessage.value = "AVISO: Usando adaptador clon. Proceder con extrema cautela."
             // We allow it but with a warning in logs, or return false to lock it
-            // return false 
+            // return false
         }
         return true
     }
@@ -1827,17 +2201,17 @@ class ObdSession(
      */
     fun runActiveTest(test: ActiveTest) {
         val isOfflineSim = _state.value != ObdState.CONNECTED
-        
+
         activeTestJob?.cancel()
         activeTestJob = scope.launch(Dispatchers.IO) {
             try {
                 _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "Iniciando: ${test.name}...", progress = 0.1f, testId = test.id)
-                
+
                 if (isOfflineSim) {
                     runOfflineActiveTestSim(test)
                     return@launch
                 }
-                
+
                 if (!verifySafetyForProAction(test.safetyConditions)) {
                     _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "ERROR: Condiciones de seguridad no cumplidas.")
                     return@launch
@@ -1845,10 +2219,15 @@ class ObdSession(
 
                 // Send Start Command
                 _statusMessage.value = "Enviando comando de activación: ${test.startCommand}"
-                val startResp = sendRawCommand(test.startCommand)
+                var startResp = sendRawCommand(test.startCommand)
                 if (startResp.contains("ERROR") || startResp.contains("NO DATA") || startResp.contains("CAN ERROR")) {
-                    _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Fallo al iniciar: $startResp")
-                    return@launch
+                    _statusMessage.value = "Fallo inicial. Recuperando canal físico..."
+                    attemptSelfHealing()
+                    startResp = sendRawCommand(test.startCommand)
+                    if (startResp.contains("ERROR") || startResp.contains("NO DATA") || startResp.contains("CAN ERROR")) {
+                        _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Fallo al iniciar: $startResp")
+                        return@launch
+                    }
                 }
 
                 _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA: ${test.name}", progress = 0.5f, testId = test.id)
@@ -1859,9 +2238,9 @@ class ObdSession(
                 var finalData = emptyMap<String, Float>()
                 while (System.currentTimeMillis() - startTime < test.durationMs) {
                     if (!isActive) break
-                    
+
                     // Keep-Alive for UDS Sessions (Send Tester Present 3E00 every 2 seconds)
-                    val isUdsCommand = test.startCommand.startsWith(UdsProtocolManager.SID_INPUT_OUTPUT_CONTROL) || 
+                    val isUdsCommand = test.startCommand.startsWith(UdsProtocolManager.SID_INPUT_OUTPUT_CONTROL) ||
                                        test.startCommand.startsWith(UdsProtocolManager.SID_ROUTINE_CONTROL)
                     if (isUdsCommand && (System.currentTimeMillis() - lastTesterPresentTime > 2000)) {
                         udsProtocolManager.sendTesterPresent()
@@ -1875,10 +2254,15 @@ class ObdSession(
                         val code = pid.substring(2)
                         val def = PidRegistry.getPid(mode, code)
                         if (def != null) {
-                            val resp = sendRawCommand(pid)
+                            var resp = sendRawCommand(pid)
+                            if (resp.contains("ERROR") || resp.contains("NO DATA") || resp.contains("CAN ERROR")) {
+                                Log.w(TAG, "Active test PID poll failed: $pid. Reconnecting...")
+                                attemptSelfHealing()
+                                resp = sendRawCommand(pid)
+                            }
                             val clean = CanMultiFrameParser.parse(resp).replace(" ", "")
                             val expectedPrefix = (mode.toInt(16) + 0x40).toString(16).uppercase() + code
-                            
+
                             val idx = clean.uppercase().indexOf(expectedPrefix)
                             if (idx >= 0) {
                                 val dataPart = clean.substring(idx + expectedPrefix.length)
@@ -1904,25 +2288,30 @@ class ObdSession(
                     val progress = 0.5f + (elapsed.toFloat() / safeDuration.toFloat() * 0.4f)
                     finalData = monitoredData
                     _activeTestStatus.value = _activeTestStatus.value.copy(progress = progress, currentValues = monitoredData)
-                    
+
                     delay(500) // 2Hz feedback
                 }
 
                 // Send Stop Command
                 _statusMessage.value = "Deteniendo prueba: ${test.stopCommand}"
-                sendRawCommand(test.stopCommand)
-                
+                var stopResp = sendRawCommand(test.stopCommand)
+                if (stopResp.contains("ERROR") || stopResp.contains("NO DATA") || stopResp.contains("CAN ERROR")) {
+                    Log.w(TAG, "Failed to stop active test. Self-healing...")
+                    attemptSelfHealing()
+                    sendRawCommand(test.stopCommand)
+                }
+
                 _activeTestStatus.value = ActiveTestStatus(
-                    isActive = false, 
-                    message = "Prueba completada con éxito.", 
+                    isActive = false,
+                    message = "Prueba completada con éxito.",
                     progress = 1.0f,
                     testId = test.id,
                     currentValues = finalData
                 )
-                
+
             } catch (e: Exception) {
                 _activeTestStatus.value = ActiveTestStatus(
-                    isActive = false, 
+                    isActive = false,
                     message = "Excepción en prueba: ${e.message}",
                     testId = test.id
                 )
@@ -1933,16 +2322,16 @@ class ObdSession(
     private suspend fun runOfflineActiveTestSim(test: ActiveTest) {
         delay(1000) // Simulated startup handshake
         _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA (SIMULADOR): ${test.name}", progress = 0.3f, testId = test.id)
-        
+
         val startTime = System.currentTimeMillis()
         var finalData = emptyMap<String, Float>()
         while (System.currentTimeMillis() - startTime < test.durationMs) {
             currentCoroutineContext().ensureActive()
-            
+
             val elapsed = System.currentTimeMillis() - startTime
             val safeDuration = test.durationMs.coerceAtLeast(1L)
             val progress = 0.3f + (elapsed.toFloat() / safeDuration.toFloat() * 0.6f)
-            
+
             val monitoredData = mutableMapOf<String, Float>()
             when (test.id) {
                 "FUEL_PUMP" -> {
@@ -2033,15 +2422,15 @@ class ObdSession(
                     }
                 }
             }
-            
+
             finalData = monitoredData
             _activeTestStatus.value = _activeTestStatus.value.copy(progress = progress, currentValues = monitoredData)
             delay(500)
         }
-        
+
         _activeTestStatus.value = ActiveTestStatus(
-            isActive = false, 
-            message = "Prueba completada con éxito (Simulación).", 
+            isActive = false,
+            message = "Prueba completada con éxito (Simulación).",
             progress = 1.0f,
             testId = test.id,
             currentValues = finalData
@@ -2054,7 +2443,7 @@ class ObdSession(
         activeTestJob?.cancel()
         scope.launch(Dispatchers.IO) {
             _activeTestStatus.value = ActiveTestStatus(
-                isActive = false, 
+                isActive = false,
                 message = "Prueba detenida manualmente.",
                 testId = currentTestId,
                 currentValues = currentValues
@@ -2073,13 +2462,13 @@ class ObdSession(
         val regex = Regex("(ELM327|STN\\d+|OBDLink|vLinker)[\\s]*v?[\\d.]+", RegexOption.IGNORE_CASE)
         return regex.find(response)?.value ?: response.take(20).trim()
     }
-    
+
     private fun detectClone(response: String): Boolean {
         val upper = response.uppercase()
         if (upper.contains("STN") || upper.contains("OBDLINK") || upper.contains("VLINKER")) return false
         return upper.contains("V1.5") || upper.contains("V2.1")
     }
-    
+
     private fun parseProtocolName(response: String): String {
         // ATDPN returns protocol number prefixed with optional "A" (for auto-detected)
         // e.g. "A6" means auto-detected protocol 6, "6" means manually set protocol 6
@@ -2107,10 +2496,12 @@ class ObdSession(
                     var success = false
                     var attempts = 0
                     val startTime = System.currentTimeMillis()
-                    
+
                     while (!success && attempts < 2 && isRunning) {
                         try {
                             communicationMutex.withLock {
+                                trafficListener?.onCommandSent(command.query)
+                                runCatching { t.drain() }
                                 t.write("${command.query}\r".toByteArray())
                                 val response = readResponse(timeoutMs = 2000L)
                                 if (response.isNotBlank() && !response.contains("?")) {
@@ -2118,6 +2509,7 @@ class ObdSession(
                                     consecutiveErrors = 0
                                     lastHeartbeatTime = System.currentTimeMillis()
                                     updateQos(System.currentTimeMillis() - startTime, true)
+                                    trafficListener?.onResponseReceived(command.query, response)
                                     command.onSuccess(response)
                                 } else {
                                     attempts++
@@ -2127,6 +2519,7 @@ class ObdSession(
                             if (!success) delay(100)
                         } catch (e: Exception) {
                             attempts++
+                            trafficListener?.onError(command.query, e.message ?: "Unknown error")
                             drainInput()
                             delay(100)
                         }
@@ -2134,11 +2527,12 @@ class ObdSession(
                     if (!success) {
                         consecutiveErrors++
                         updateQos(System.currentTimeMillis() - startTime, false)
-                        
+                        trafficListener?.onError(command.query, "Timeout after $attempts attempts")
+
                         if (consecutiveErrors >= 3 && !isSelfHealing) {
                             scope.launch { attemptSelfHealing() }
                         }
-                        
+
                         command.onError(Exception("Timeout"))
                     } else {
                         // Success - apply adaptive delay before next command (halved for speed)
@@ -2158,7 +2552,7 @@ class ObdSession(
             e(ObdConnectionException("OBD session not running"))
         }
     }
-    
+
     suspend fun sendRawCommand(command: String, priority: Int = 10): String {
         return withTimeout(15000) { // Safety timeout for all raw commands
             val deferred = CompletableDeferred<String>()
@@ -2179,7 +2573,7 @@ class ObdSession(
         if (isSelfHealing || !isRunning) return
         isSelfHealing = true
         _statusMessage.value = "Enlace inestable. Intentando autorecuperación..."
-        
+
         try {
             transport?.reconnect()
             delay(500)
@@ -2222,7 +2616,7 @@ class ObdSession(
      */
     suspend fun runAdapterTests(): Map<String, String> {
         val results = mutableMapOf<String, String>()
-        
+
         if (_state.value != ObdState.CONNECTED) {
             // Offline diagnostic mode — provide meaningful feedback
             kotlinx.coroutines.delay(500) // Simulate processing
@@ -2236,34 +2630,34 @@ class ObdSession(
             results["Voltaje"] = "N/A — sin lectura"
             return results
         }
-        
+
         try {
             // 1. Latency Test
             val start = System.currentTimeMillis()
             repeat(5) { sendRawCommand("ATRV") }
             val avgLatency = (System.currentTimeMillis() - start) / 5
             results["Latencia Promedio"] = "$avgLatency ms"
-            
+
             // 2. Protocol Compatibility
             val dpn = sendRawCommand("ATDPN")
             results["Protocolo Activo"] = parseProtocolName(dpn)
-            
+
             // 3. Chipset Identification
             val version = sendRawCommand("ATI")
             results["Hardware ID"] = version.replace("\r", " ").trim()
-            
+
             // 4. Voltage Precision
             val (ecuVolt, elmVolt) = readBatteryVoltage()
             val volt = if (elmVolt > 0f) elmVolt else ecuVolt
             results["Voltaje Sistema"] = "%.2fV".format(volt)
-            
+
             // 5. Link Stability
             results["Estado de Enlace"] = if (avgLatency < 150) "Excelente (ELITE)" else "Estable"
-            
+
         } catch (e: Exception) {
             results["Test Error"] = e.message ?: "Error desconocido"
         }
-        
+
         return results
     }
 
@@ -2291,7 +2685,7 @@ class ObdSession(
         speedAccumulator = 0.0
         speedSampleCount = 0
     }
-    
+
     companion object {
         private const val TAG = "MEET_OBD"
         private const val MAX_CONNECT_ATTEMPTS = 3
@@ -2303,5 +2697,5 @@ class ObdCommandQueue {
     private val queue = mutableListOf<ObdCommand>()
     @Synchronized fun enqueue(c: ObdCommand) { queue.add(c); queue.sortByDescending { it.priority } }
     @Synchronized fun dequeue(): ObdCommand? = if (queue.isEmpty()) null else queue.removeAt(0)
+    @Synchronized fun clear() { queue.clear() }
 }
-

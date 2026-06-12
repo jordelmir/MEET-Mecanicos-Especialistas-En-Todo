@@ -147,6 +147,26 @@ interface Props {
   onClose: () => void;
 }
 
+const buildLiveLinkWebSocketUrl = (input: string): string | null => {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  try {
+    const hasScheme = raw.includes('://');
+    const url = new URL(hasScheme ? raw : `http://${raw}`);
+    if (!url.port) url.port = '8765';
+    if (!url.pathname || url.pathname === '/') url.pathname = '/live';
+
+    if (url.protocol === 'http:') url.protocol = 'ws:';
+    else if (url.protocol === 'https:') url.protocol = 'wss:';
+    else if (url.protocol !== 'ws:' && url.protocol !== 'wss:') return null;
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+};
+
 export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
   // Pestañas del sistema
   const [activeTab, setActiveTab] = useState<'cloud_alerts' | 'local_wifi'>('cloud_alerts');
@@ -223,9 +243,17 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
     setIsConnecting(true);
     setError(null);
 
-    const url = ipAddress.includes('://') 
-      ? ipAddress.replace('http', 'ws') + '/live'
-      : `ws://${ipAddress.trim()}:8765/live`;
+    const url = buildLiveLinkWebSocketUrl(ipAddress);
+    if (!url) {
+      setError('Enlace Live Link inválido. Copie el enlace completo desde la app.');
+      setIsConnecting(false);
+      return;
+    }
+    if (!new URL(url).searchParams.get('token')) {
+      setError('El enlace debe incluir el token de emparejamiento generado por la app.');
+      setIsConnecting(false);
+      return;
+    }
 
     try {
       const ws = new WebSocket(url);
@@ -559,7 +587,7 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
                   </div>
                   
                   <p className="text-sm text-gray-300 mb-6 leading-relaxed">
-                    Ingrese la dirección IP que muestra la app MEET en la pantalla <span className="font-bold text-white">Live Link</span>. Ambos dispositivos deben estar en la misma red WiFi del taller.
+                    Pegue el enlace seguro que muestra la app MEET en la pantalla <span className="font-bold text-white">Live Link</span>. Ambos dispositivos deben estar en la misma red WiFi del taller.
                   </p>
 
                   <div className="flex gap-2">
@@ -567,7 +595,7 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
                       type="text"
                       value={ipAddress}
                       onChange={e => setIpAddress(e.target.value)}
-                      placeholder="192.168.1.100"
+                      placeholder="http://192.168.1.100:8765/live?token=..."
                       className="flex-1 px-4 py-3 bg-steel-900 border border-steel-700 rounded-xl text-white text-sm font-mono placeholder-gray-500 focus:outline-none focus:border-forge-500 transition-colors"
                       onKeyDown={e => e.key === 'Enter' && connectLocal()}
                     />
@@ -661,4 +689,3 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
     </div>
   );
 };
-

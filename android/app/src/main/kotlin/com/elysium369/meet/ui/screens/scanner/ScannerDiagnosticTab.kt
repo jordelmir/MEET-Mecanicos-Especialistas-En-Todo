@@ -27,16 +27,19 @@ import androidx.compose.ui.draw.alpha
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
 import kotlinx.coroutines.launch
+import androidx.navigation.NavController
 
 @Composable
 fun ScannerDiagnosticTab(
     viewModel: ObdViewModel,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    navController: NavController? = null
 ) {
     val state by viewModel.connectionState.collectAsState()
     val activeDtcEvents by viewModel.activeDtcEvents.collectAsState()
     val pendingDtcEvents by viewModel.pendingDtcEvents.collectAsState()
     val permanentDtcEvents by viewModel.permanentDtcEvents.collectAsState()
+    val historicalDtcEvents by viewModel.historicalDtcEvents.collectAsState()
 
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
@@ -152,11 +155,12 @@ fun ScannerDiagnosticTab(
                         DtcStatCard("ACTIVOS", activeDtcEvents.size, MeetColors.error, Modifier.weight(1f))
                         DtcStatCard("PENDIENTES", pendingDtcEvents.size, MeetColors.warning, Modifier.weight(1f))
                         DtcStatCard("PERMANENTES", permanentDtcEvents.size, MeetColors.textMuted, Modifier.weight(1f))
+                        DtcStatCard("HIST.", historicalDtcEvents.size, MeetColors.cyberCyan, Modifier.weight(1f))
                     }
                 }
 
                 // DTC List
-                if (activeDtcEvents.isEmpty() && pendingDtcEvents.isEmpty() && permanentDtcEvents.isEmpty()) {
+                if (activeDtcEvents.isEmpty() && pendingDtcEvents.isEmpty() && permanentDtcEvents.isEmpty() && historicalDtcEvents.isEmpty()) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -259,6 +263,36 @@ fun ScannerDiagnosticTab(
                         )
                     }
 
+                    items(historicalDtcEvents, key = { it.id }) { event ->
+                        DtcItemCard(
+                            code = event.code,
+                            type = if (event.status == "INTERMITTENT") "Intermitente" else "Historico",
+                            color = MeetColors.cyberCyan,
+                            description = event.description,
+                            occurrenceCount = event.occurrenceCount,
+                            lastSeenAt = event.lastSeenAt,
+                            freezeFrameData = freezeFrameData,
+                            onFreezeFrameClick = {
+                                coroutineScope.launch {
+                                    refreshingFreezeFrames = refreshingFreezeFrames + (event.code to true)
+                                    viewModel.refreshFreezeFrame(event.code)
+                                    refreshingFreezeFrames = refreshingFreezeFrames + (event.code to false)
+                                }
+                            },
+                            isRefreshingFreezeFrame = refreshingFreezeFrames[event.code] == true,
+                            onAiConsultClick = {
+                                coroutineScope.launch {
+                                    consultingDtcAi = consultingDtcAi + (event.code to true)
+                                    val result = viewModel.consultAi(null, null, listOf(event.code))
+                                    dtcAiResults = dtcAiResults + (event.code to result)
+                                    consultingDtcAi = consultingDtcAi + (event.code to false)
+                                }
+                            },
+                            isConsultingAi = consultingDtcAi[event.code] == true,
+                            aiAnalysis = dtcAiResults[event.code]
+                        )
+                    }
+
                     // AI Analysis Button
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -274,7 +308,7 @@ fun ScannerDiagnosticTab(
                                     .then(if (isEnabled) Modifier.clickable {
                                         coroutineScope.launch {
                                             isAnalyzingAi = true
-                                            aiAnalysisResult = viewModel.consultAi(null, null, activeDtcs + pendingDtcs + permanentDtcs)
+                                            aiAnalysisResult = viewModel.consultAi(null, null, activeDtcs + pendingDtcs + permanentDtcs + historicalDtcEvents.map { it.code })
                                             isAnalyzingAi = false
                                         }
                                     } else Modifier)
@@ -395,6 +429,18 @@ fun ScannerDiagnosticTab(
                         color = MeetColors.error
                     )
                 }
+
+                // OBD Communication Logs Quick Access
+                if (navController != null) {
+                    item {
+                        com.elysium369.meet.ui.components.EliteOutlinedButton(
+                            text = "⚡ VER LOGS DE COMUNICACIÓN OBD",
+                            onClick = { navController.navigate("terminal") },
+                            color = MeetColors.cyberCyan,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -418,7 +464,10 @@ fun ScannerDiagnosticTab(
                     Spacer(modifier = Modifier.height(32.dp))
 
                     Text(
-                        text = if (isClearing) "BORRANDO MEMORIA ECU..." else if (isScanning) "ANALIZANDO SISTEMAS..." else "ESCANEANDO MÓDULOS...",
+                        text = if (isClearing) "BORRANDO MEMORIA ECU..." 
+                               else if (isScanning && isScanningModules) syncStatus.ifBlank { "ESCANEANDO SISTEMAS..." }
+                               else if (isScanning) "ANALIZANDO SISTEMAS..." 
+                               else "ESCANEANDO MÓDULOS...",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
@@ -426,7 +475,7 @@ fun ScannerDiagnosticTab(
                     )
 
                     Text(
-                        text = syncStatus.uppercase(),
+                        text = if (isScanningModules && syncStatus.isNotBlank()) syncStatus.uppercase() else syncStatus.uppercase(),
                         color = (if (isClearing) MeetColors.error else MeetColors.electricBlue).copy(alpha = 0.7f),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(top = 12.dp),
@@ -437,4 +486,3 @@ fun ScannerDiagnosticTab(
         }
     }
 }
-

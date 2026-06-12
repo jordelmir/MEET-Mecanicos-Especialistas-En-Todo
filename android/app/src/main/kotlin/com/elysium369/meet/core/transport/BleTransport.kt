@@ -3,6 +3,7 @@ package com.elysium369.meet.core.transport
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.content.Context
+import android.os.Build
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -78,8 +79,15 @@ class BleTransport(
                                 // Standard Client Characteristic Config descriptor setup
                                 val desc = char.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
                                 if (desc != null) {
-                                    desc.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                                    gatt.writeDescriptor(desc)
+                                    val value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        gatt.writeDescriptor(desc, value)
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        desc.value = value
+                                        @Suppress("DEPRECATION")
+                                        gatt.writeDescriptor(desc)
+                                    }
                                 }
                             }
                         }
@@ -152,6 +160,9 @@ class BleTransport(
         }
 
         if (!connected) {
+            gatt?.disconnect()
+            gatt?.close()
+            gatt = null
             throw Exception("Error de enlace BLE: El adaptador no respondió a la negociación GATT")
         }
     }
@@ -171,8 +182,15 @@ class BleTransport(
 
     override suspend fun write(data: ByteArray) {
         val char = writeChar ?: throw Exception("Error: Adaptador BLE no inicializado")
-        char.value = data
-        val success = gatt?.writeCharacteristic(char) ?: false
+        val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            res == 0
+        } else {
+            @Suppress("DEPRECATION")
+            char.value = data
+            @Suppress("DEPRECATION")
+            gatt?.writeCharacteristic(char) ?: false
+        }
         if (!success) {
             throw java.io.IOException("Fallo al escribir en el radio BLE")
         }

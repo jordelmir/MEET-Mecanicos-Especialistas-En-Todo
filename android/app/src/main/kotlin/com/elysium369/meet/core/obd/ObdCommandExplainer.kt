@@ -16,17 +16,25 @@ object ObdCommandExplainer {
         val category: String // "AT", "SENSOR", "DTC", "CONTROL", "INFO"
     )
 
+    private val explanationCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val categoryCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /**
      * Returns a human-readable explanation for the given OBD command.
      */
     fun explain(command: String, isSpanish: Boolean = true): String? {
         val cmd = command.uppercase().replace(" ", "")
+        val cacheKey = "$cmd|$isSpanish"
+        explanationCache[cacheKey]?.let { return it }
+
         val info = findCommand(cmd) ?: return null
-        return if (isSpanish) {
+        val explanation = if (isSpanish) {
             "💡 ${info.nameEs}\n${info.explanationEs}"
         } else {
             "💡 ${info.nameEn}\n${info.explanationEn}"
         }
+        explanationCache[cacheKey] = explanation
+        return explanation
     }
 
     /**
@@ -34,8 +42,10 @@ object ObdCommandExplainer {
      */
     fun categoryIcon(command: String): String {
         val cmd = command.uppercase().replace(" ", "")
+        categoryCache[cmd]?.let { return it }
+        
         val info = findCommand(cmd) ?: return "📟"
-        return when (info.category) {
+        val icon = when (info.category) {
             "AT" -> "🔧"
             "SENSOR" -> "📊"
             "DTC" -> "🔍"
@@ -43,6 +53,8 @@ object ObdCommandExplainer {
             "INFO" -> "ℹ️"
             else -> "📟"
         }
+        categoryCache[cmd] = icon
+        return icon
     }
 
     /**

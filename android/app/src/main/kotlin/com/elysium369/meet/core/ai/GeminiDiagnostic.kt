@@ -274,6 +274,9 @@ class GeminiDiagnostic(
                 if (connection.responseCode in 200..299) {
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
                     return@withContext JSONObject(response)
+                } else {
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                    Log.e("GeminiDiag", "HTTP Error in callApiRaw response code: ${connection.responseCode}, body: $errorResponse")
                 }
                 JSONObject()
             } finally {
@@ -645,6 +648,9 @@ class GeminiDiagnostic(
                     } else {
                         parseGeminiResponse(jsonResponse)
                     }
+                } else {
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                    Log.e("GeminiDiag", "HTTP Error in callGemini response code: ${connection.responseCode}, body: $errorResponse")
                 }
                 null
             } finally {
@@ -710,13 +716,13 @@ class GeminiDiagnostic(
         }
         
         // Remove the JSON block and any triple backticks from the final display text
-        val cleanText = rawText.replace(Regex("```json[\\s\\S]*?```"), "").trim()
+        val cleanText = rawText.replace(JSON_MARKDOWN_REGEX, "").trim()
         
         return DiagnosticResult(cleanText, anomalousPids, confidence)
     }
 
     private fun extractJsonFromText(text: String): String? {
-        val pattern = Pattern.compile("```json([\\s\\S]*?)```")
+        val pattern = JSON_MARKDOWN_PATTERN
         val matcher = pattern.matcher(text)
         if (matcher.find()) {
             return matcher.group(1)?.trim()
@@ -734,7 +740,7 @@ class GeminiDiagnostic(
         val sb = StringBuilder()
         sb.append("⚠️ MODO OFFLINE/FALLBACK ACTIVADO\n\n")
         dtcList.forEach { code ->
-            val desc = "DTC $code detectado en el sistema"
+            val desc = com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(code)
             sb.append("🔹 Código $code: $desc\n")
         }
         return sb.toString()
@@ -823,6 +829,11 @@ class GeminiDiagnostic(
             - **Pastillas de freno (EPB):** Si abrió la pinza electrónica para cambiar pastillas, recuerde volver a cerrarla mediante el menú antes de presionar el pedal de freno.
             - **Batería:** El registro de batería es vital para evitar la sobrecarga y extender la vida útil del nuevo acumulador en marcas como BMW y Audi/VW.
         """.trimIndent()
+    }
+
+    companion object {
+        private val JSON_MARKDOWN_REGEX = Regex("```json[\\s\\S]*?```")
+        private val JSON_MARKDOWN_PATTERN = Pattern.compile("```json([\\s\\S]*?)```")
     }
 }
 

@@ -155,8 +155,17 @@ class ElmNegotiator(private val transport: TransportInterface) {
     }
 
     private suspend fun detectActiveProtocol(): ObdProtocol {
-        val dpn = sendWithTimeout("ATDPN\r", 1000).replace("A", "").trim()
-        val protocolCode = if (dpn.length >= 1) dpn.substring(0, 1) else "0"
+        val raw = sendWithTimeout("ATDPN\r", 1000)
+        val cleanLines = raw.split(Regex("[\\r\\n]+"))
+            .map { it.trim().replace(">", "").trim() }
+            .filter { it.isNotBlank() && !it.startsWith("AT", ignoreCase = true) }
+        
+        val activeLine = cleanLines.firstOrNull { line ->
+            val cleanLine = line.removePrefix("A").removePrefix("a").trim()
+            cleanLine.length == 1 && (cleanLine[0].isDigit() || cleanLine[0].uppercaseChar() in 'A'..'C')
+        } ?: "0"
+        
+        val protocolCode = activeLine.removePrefix("A").removePrefix("a").trim()
         return ObdProtocol.values().find { it.atspCode == protocolCode } ?: ObdProtocol.AUTO
     }
 

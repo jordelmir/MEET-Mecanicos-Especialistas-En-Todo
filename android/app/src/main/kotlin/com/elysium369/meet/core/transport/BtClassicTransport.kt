@@ -42,6 +42,42 @@ class BtClassicTransport(
         runCatching { BluetoothDevice::class.java.getMethod("createInsecureRfcommSocket", Int::class.javaPrimitiveType) }.getOrNull()
     }
 
+    private fun invokeReflectiveSocketCreation(device: BluetoothDevice, channel: Int): BluetoothSocket? {
+        val method = createRfcommMethod ?: return null
+        try {
+            return method.invoke(device, channel) as? BluetoothSocket
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+            val cause = e.cause
+            if (cause is SecurityException) {
+                throw SecurityException("Permiso de conexión Bluetooth denegado en la llamada de reflexión: ${cause.message}", cause)
+            }
+            throw java.io.IOException("Error en creación de socket por reflexión: ${cause?.message}", cause)
+        } catch (e: Exception) {
+            if (e is SecurityException) {
+                throw SecurityException("Permiso de conexión Bluetooth denegado en la llamada de reflexión: ${e.message}", e)
+            }
+            throw java.io.IOException("Fallo reflexivo: ${e.message}", e)
+        }
+    }
+
+    private fun invokeReflectiveInsecureSocketCreation(device: BluetoothDevice, channel: Int): BluetoothSocket? {
+        val method = createInsecureRfcommMethod ?: return null
+        try {
+            return method.invoke(device, channel) as? BluetoothSocket
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+            val cause = e.cause
+            if (cause is SecurityException) {
+                throw SecurityException("Permiso de conexión Bluetooth denegado en la llamada de reflexión: ${cause.message}", cause)
+            }
+            throw java.io.IOException("Error en creación de socket inseguro por reflexión: ${cause?.message}", cause)
+        } catch (e: Exception) {
+            if (e is SecurityException) {
+                throw SecurityException("Permiso de conexión Bluetooth denegado en la llamada de reflexión: ${e.message}", e)
+            }
+            throw java.io.IOException("Fallo reflexivo inseguro: ${e.message}", e)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     override suspend fun connect() {
         mutex.withLock {
@@ -51,6 +87,9 @@ class BtClassicTransport(
                 
                 val device: BluetoothDevice = try {
                     bluetoothAdapter.getRemoteDevice(macAddress)
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "✗ Permiso de conexión Bluetooth denegado (Android 12+)", e)
+                    throw java.io.IOException("Falta el permiso de conexión Bluetooth (BLUETOOTH_CONNECT). Otórgalo en los ajustes del sistema.")
                 } catch (e: Exception) {
                     Log.e(TAG, "✗ MAC inválida: $macAddress", e)
                     throw java.io.IOException("Dirección MAC inválida: $macAddress")
@@ -80,12 +119,8 @@ class BtClassicTransport(
                 // Prioritize Insecure SPP for ELM327 clones which often fail auth handshake
                 connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
                 connectionMethods.add("Standard SPP" to { device.createRfcommSocketToServiceRecord(SPP_UUID) })
-                connectionMethods.add("Reflection CH1" to { 
-                    createRfcommMethod?.invoke(device, 1) as? BluetoothSocket 
-                })
-                connectionMethods.add("Reflection CH2" to { 
-                    createRfcommMethod?.invoke(device, 2) as? BluetoothSocket 
-                })
+                connectionMethods.add("Reflection CH1" to { invokeReflectiveSocketCreation(device, 1) })
+                connectionMethods.add("Reflection CH2" to { invokeReflectiveSocketCreation(device, 2) })
 
                 var lastException: Exception? = null
 
@@ -124,8 +159,13 @@ class BtClassicTransport(
                             return@withContext
                         } else {
                             Log.w(TAG, "  ✗ $methodName socket.connect() returned but isConnected=false")
+                            cleanup()
                         }
                     } catch (e: Exception) {
+                        if (e is SecurityException) {
+                            Log.e(TAG, "✗ Permiso de conexión Bluetooth denegado durante el enlace", e)
+                            throw java.io.IOException("Falta el permiso de conexión Bluetooth (BLUETOOTH_CONNECT). Otórgalo en los ajustes del sistema.")
+                        }
                         val elapsed = System.currentTimeMillis() - methodStart
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
@@ -186,30 +226,41 @@ class BtClassicTransport(
         }
     }
 
-    private val readBuffer = ByteArray(8192) // Larger buffer for heavy duty logs
-
     override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
         return withContext(Dispatchers.IO) {
             val stream = inputStream ?: return@withContext null
+            val output = java.io.ByteArrayOutputStream()
             try {
-                // ELITE ADAPTIVE READ: Longer timeout for clone adapter compatibility
-                var totalWaited = 0
-                val timeoutLimit = 600 // 600ms to accommodate slow clone responses
-                val pollInterval = 5L  // 5ms polling for good latency balance
+                val tempBuffer = ByteArray(2048)
+                var totalWaited = 0L
+                val pollInterval = 5L  // 5ms polling for latency balance
 
                 while (totalWaited < timeoutMs) {
                     val available = stream.available()
                     if (available > 0) {
-                        val toRead = minOf(available, maxBytes, readBuffer.size)
-                        val bytesRead = stream.read(readBuffer, 0, toRead)
-                        if (bytesRead > 0) return@withContext readBuffer.copyOf(bytesRead)
+                        val toRead = minOf(available, tempBuffer.size)
+                        val bytesRead = stream.read(tempBuffer, 0, toRead)
+                        if (bytesRead > 0) {
+                            output.write(tempBuffer, 0, bytesRead)
+                            val currentData = output.toByteArray()
+                            var hasPrompt = false
+                            for (i in 0 until currentData.size) {
+                                if (currentData[i] == '>'.code.toByte()) {
+                                    hasPrompt = true
+                                    break
+                                }
+                            }
+                            if (currentData.size >= maxBytes || hasPrompt) {
+                                return@withContext currentData
+                            }
+                        }
                     }
                     delay(pollInterval)
-                    totalWaited += pollInterval.toInt()
+                    totalWaited += pollInterval
                 }
-                null
+                if (output.size() > 0) output.toByteArray() else null
             } catch (e: Exception) {
-                null
+                if (output.size() > 0) output.toByteArray() else null
             }
         }
     }

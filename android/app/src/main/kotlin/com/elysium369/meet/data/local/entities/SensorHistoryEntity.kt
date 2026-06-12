@@ -19,7 +19,8 @@ import androidx.room.PrimaryKey
     tableName = "sensor_history",
     indices = [
         Index(value = ["vehicleId", "pid", "timestamp"]),
-        Index(value = ["sessionId"])
+        Index(value = ["sessionId"]),
+        Index(value = ["timestamp"])
     ]
 )
 data class SensorHistoryEntity(
@@ -41,7 +42,10 @@ data class SensorHistoryEntity(
  */
 @Entity(
     tableName = "health_snapshots",
-    indices = [Index(value = ["vehicleId", "timestamp"])]
+    indices = [
+        Index(value = ["vehicleId", "timestamp"]),
+        Index(value = ["timestamp"])
+    ]
 )
 data class HealthSnapshotEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

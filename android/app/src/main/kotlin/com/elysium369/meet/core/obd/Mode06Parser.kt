@@ -1,6 +1,7 @@
 package com.elysium369.meet.core.obd
 
 import android.util.Log
+import com.elysium369.meet.core.obd.CanMultiFrameParser
 
 /**
  * Professional Mode 06 (On-Board Monitoring) Expert Parser.
@@ -16,22 +17,33 @@ class Mode06Parser {
          * Test ID (TID) to Description Mapping (SAE J1979)
          */
         private val tidDefinitions = mapOf(
-            "\$01" to "Voltaje de umbral Rico a Pobre del sensor",
-            "\$02" to "Voltaje de umbral Pobre a Rico del sensor",
+            "\$01" to "Voltaje de umbral Rico a Pobre del sensor (Rich-to-Lean)",
+            "\$02" to "Voltaje de umbral Pobre a Rico del sensor (Lean-to-Rich)",
             "\$03" to "Voltaje bajo del sensor para tiempo de conmutación",
             "\$04" to "Voltaje alto del sensor para tiempo de conmutación",
-            "\$05" to "Tiempo de conmutación Rico a Pobre",
-            "\$06" to "Tiempo de conmutación Pobre a Rico",
+            "\$05" to "Tiempo de conmutación Rico a Pobre (Rich-to-Lean switch time)",
+            "\$06" to "Tiempo de conmutación Pobre a Rico (Lean-to-Rich switch time)",
             "\$07" to "Voltaje mínimo del sensor en el ciclo de prueba",
             "\$08" to "Voltaje máximo del sensor en el ciclo de prueba",
             "\$09" to "Tiempo entre transiciones del sensor",
-            "\$0A" to "Periodo del sensor",
-            "\$0B" to "Conteo de fallas de encendido (EWMA)",
-            "\$0C" to "Conteo de fallas de encendido (Ciclo actual)",
+            "\$0A" to "Periodo del sensor de O2",
+            "\$0B" to "Conteo de fallas de encendido promedio (EWMA)",
+            "\$0C" to "Conteo de fallas de encendido máximas (Ciclo actual)",
+            "\$11" to "Monitoreo del catalizador: coeficiente de almacenamiento de oxígeno",
+            "\$12" to "Monitoreo del catalizador: pico de respuesta del sensor de O2 trasero",
+            "\$21" to "EVAP: Caída de presión del sistema (Fuga grande)",
+            "\$22" to "EVAP: Vacío / Tasa de cambio de presión (Fuga pequeña)",
             "\$31" to "Prueba de fuga del sistema EVAP",
             "\$32" to "Prueba de flujo de purga EVAP",
             "\$41" to "Eficiencia del Catalizador",
-            "\$51" to "Flujo del sistema EGR"
+            "\$45" to "Calentador del Sensor de Oxígeno: Resistencia del elemento",
+            "\$51" to "Flujo del sistema EGR",
+            "\$52" to "EGR: Sensor de contrapresión / elevación de válvula",
+            "\$53" to "Control de sincronización del VVT / Sensor de posición de levas",
+            "\$61" to "Presión del Turbo: Desviación respecto al valor objetivo",
+            "\$71" to "Eficiencia de reducción de NOx del catalizador",
+            "\$81" to "Filtro DPF/GPF: Presión diferencial / Caída de presión",
+            "\$82" to "Filtro DPF/GPF: Regeneración o acumulación de hollín"
         )
 
         /**
@@ -46,16 +58,33 @@ class Mode06Parser {
             "\$06" to "Sensor Oxígeno Banco 2 Sensor 2",
             "\$07" to "Sensor Oxígeno Banco 2 Sensor 3",
             "\$08" to "Sensor Oxígeno Banco 2 Sensor 4",
+            "\$09" to "Sensor Oxígeno Banco 3 Sensor 1",
+            "\$0A" to "Sensor Oxígeno Banco 3 Sensor 2",
+            "\$0B" to "Sensor Oxígeno Banco 4 Sensor 1",
+            "\$0C" to "Sensor Oxígeno Banco 4 Sensor 2",
             "\$21" to "Catalizador Banco 1",
             "\$22" to "Catalizador Banco 2",
-            "\$31" to "Monitor EGR Banco 1",
-            "\$32" to "Monitor EGR Banco 2",
-            "\$35" to "Monitor EVAP (0.040\")",
-            "\$36" to "Monitor EVAP (0.020\")",
+            "\$23" to "Catalizador Banco 3",
+            "\$24" to "Catalizador Banco 4",
+            "\$31" to "Monitor EGR / VVT Banco 1",
+            "\$32" to "Monitor EGR / VVT Banco 2",
+            "\$35" to "Monitor EVAP (Fuga de 0.040\")",
+            "\$36" to "Monitor EVAP (Fuga de 0.020\")",
             "\$39" to "Monitor EVAP (Flujo Purga)",
-            "\$3A" to "Monitor EVAP (Fuga Pequeña)",
+            "\$3A" to "Monitor EVAP (Fuga muy pequeña)",
+            "\$3B" to "Monitor EVAP (Cánister / Sensor de presión)",
             "\$41" to "Sistema Aire Secundario Banco 1",
             "\$42" to "Sistema Aire Secundario Banco 2",
+            "\$51" to "Monitoreo del Sistema de Combustible Banco 1",
+            "\$52" to "Monitoreo del Sistema de Combustible Banco 2",
+            "\$61" to "Control de Presión de Sobrealimentación (Turbo) Banco 1",
+            "\$62" to "Control de Presión de Sobrealimentación (Turbo) Banco 2",
+            "\$71" to "Sensor / Adsorbedor NOx Banco 1",
+            "\$72" to "Sensor / Adsorbedor NOx Banco 2",
+            "\$81" to "Filtro de Partículas (DPF/GPF) Banco 1",
+            "\$82" to "Filtro de Partículas (DPF/GPF) Banco 2",
+            "\$91" to "Distribución Variable (VVT) Banco 1",
+            "\$92" to "Distribución Variable (VVT) Banco 2",
             "\$A1" to "Falla Encendido Cilindro 1",
             "\$A2" to "Falla Encendido Cilindro 2",
             "\$A3" to "Falla Encendido Cilindro 3",
@@ -93,76 +122,115 @@ class Mode06Parser {
 
     fun parse(rawResponse: String): List<Mode06TestResult> {
         val results = mutableListOf<Mode06TestResult>()
-        val clean = rawResponse.uppercase().replace(" ", "")
-        
-        if (!clean.startsWith("46")) return emptyList()
+
+        // 1. Strip known noise lines before hex processing
+        val filtered = rawResponse
+            .replace("\r", "\n")
+            .split("\n")
+            .map { it.trim() }
+            .filter { line ->
+                val upper = line.uppercase().replace(" ", "")
+                upper.isNotBlank() &&
+                    upper != "OK" && upper != ">" &&
+                    !upper.startsWith("AT") &&
+                    !upper.startsWith("SEARCHING") &&
+                    !upper.startsWith("NO DATA") &&
+                    !upper.startsWith("UNABLE") &&
+                    !upper.startsWith("ERROR") &&
+                    !upper.startsWith("?")
+            }
+            .joinToString(" ")
+
+        // 2. Unify multi-frame via ISO-TP parser, then clean to pure hex
+        val unified = CanMultiFrameParser.parse(filtered)
+        val clean = unified.uppercase().replace(Regex("[^0-9A-F]"), "")
+
+        if (!clean.contains("46")) return emptyList()
 
         try {
             var i = 0
-            while (i + 18 <= clean.length) {
+            while (i < clean.length) {
                 val start = clean.indexOf("46", i)
                 if (start < 0) break
-                
-                val end = (start + 20).coerceAtMost(clean.length)
-                val record = clean.substring(start, end)
-                
-                if (record.length < 18) break
-                
-                val midHex = record.substring(2, 4)
-                val tidHex = record.substring(4, 6)
-                
-                var offset = 6
-                val hasUid = record.length >= 20
-                val uidHex = if (hasUid) record.substring(6, 8) else "00"
-                if (hasUid) offset = 8
 
-                val valHex = record.substring(offset, offset + 4)
-                val minHex = record.substring(offset + 4, offset + 8)
-                val maxHex = record.substring(offset + 8, (offset + 12).coerceAtMost(record.length))
+                // Need at least 18 hex chars for a minimum record (no UID)
+                if (start + 18 > clean.length) break
 
-                val rawValue = valHex.toInt(16)
-                val rawMin = if (minHex.length == 4 && minHex != "FFFF") minHex.toInt(16) else null
-                val rawMax = if (maxHex.length == 4 && maxHex != "FFFF") maxHex.toInt(16) else null
+                try {
+                    val midHex = clean.substring(start + 2, start + 4)
+                    val tidHex = clean.substring(start + 4, start + 6)
 
-                val (scaling, unit) = getUnitInfo("\$$uidHex")
-                
-                val scaledValue = rawValue * scaling
-                val scaledMin = rawMin?.let { it * scaling }
-                val scaledMax = rawMax?.let { it * scaling }
+                    // Validate MID/TID are valid hex — skip garbage bytes
+                    midHex.toInt(16)
+                    tidHex.toInt(16)
 
-                val passed = when {
-                    scaledMin != null && scaledMax != null -> scaledValue in scaledMin..scaledMax
-                    scaledMax != null -> scaledValue <= scaledMax
-                    scaledMin != null -> scaledValue >= scaledMin
-                    else -> true
+                    var offset = start + 6
+                    val hasUid = start + 20 <= clean.length
+                    val uidHex = if (hasUid) clean.substring(start + 6, start + 8) else "00"
+                    if (hasUid) offset = start + 8
+
+                    // Guard substring bounds
+                    if (offset + 12 > clean.length) {
+                        i = start + 2
+                        continue
+                    }
+
+                    val valHex = clean.substring(offset, offset + 4)
+                    val minHex = clean.substring(offset + 4, offset + 8)
+                    val maxHex = clean.substring(offset + 8, offset + 12)
+
+                    val rawValue = valHex.toIntOrNull(16)
+                    if (rawValue == null) {
+                        i = start + 2
+                        continue
+                    }
+                    val rawMin = if (minHex != "FFFF") minHex.toIntOrNull(16) else null
+                    val rawMax = if (maxHex != "FFFF") maxHex.toIntOrNull(16) else null
+
+                    val (scaling, unit) = getUnitInfo("\$$uidHex")
+
+                    val scaledValue = rawValue * scaling
+                    val scaledMin = rawMin?.let { it * scaling }
+                    val scaledMax = rawMax?.let { it * scaling }
+
+                    val passed = when {
+                        scaledMin != null && scaledMax != null -> scaledValue in scaledMin..scaledMax
+                        scaledMax != null -> scaledValue <= scaledMax
+                        scaledMin != null -> scaledValue >= scaledMin
+                        else -> true
+                    }
+
+                    // Severity Logic: "Near Limit" detection
+                    var severity = if (passed) DiagnosticSeverity.INFO else DiagnosticSeverity.HIGH
+
+                    if (passed) {
+                        if (scaledMax != null && scaledValue > (scaledMax * 0.9f)) severity = DiagnosticSeverity.MODERATE
+                        if (scaledMin != null && scaledValue < (scaledMin * 1.1f)) severity = DiagnosticSeverity.MODERATE
+                    }
+
+                    val midName = midDefinitions["\$$midHex"] ?: "Monitor ID \$$midHex"
+                    val tidName = tidDefinitions["\$$tidHex"] ?: "Prueba ID \$$tidHex"
+
+                    results.add(Mode06TestResult(
+                        mid = "\$$midHex",
+                        tid = "\$$tidHex",
+                        value = scaledValue,
+                        minLimit = scaledMin,
+                        maxLimit = scaledMax,
+                        unit = unit,
+                        passed = passed,
+                        testName = tidName,
+                        componentName = midName,
+                        proTip = generateProTip("\$$midHex", "\$$tidHex", scaledValue, scaledMin, scaledMax, passed, severity),
+                        severity = severity
+                    ))
+
+                    i = if (hasUid) start + 20 else start + 18
+                } catch (e: Exception) {
+                    // Skip this record and try to find the next "46" marker
+                    Log.w(TAG, "Skipping corrupt Mode 06 record at offset $start: ${e.message}")
+                    i = start + 2
                 }
-
-                // Severity Logic: "Near Limit" detection
-                var severity = if (passed) DiagnosticSeverity.INFO else DiagnosticSeverity.HIGH
-                
-                if (passed) {
-                    if (scaledMax != null && scaledValue > (scaledMax * 0.9f)) severity = DiagnosticSeverity.MODERATE
-                    if (scaledMin != null && scaledValue < (scaledMin * 1.1f)) severity = DiagnosticSeverity.MODERATE
-                }
-
-                val midName = midDefinitions["\$$midHex"] ?: "Monitor ID \$$midHex"
-                val tidName = tidDefinitions["\$$tidHex"] ?: "Prueba ID \$$tidHex"
-                
-                results.add(Mode06TestResult(
-                    mid = "\$$midHex",
-                    tid = "\$$tidHex",
-                    value = scaledValue,
-                    minLimit = scaledMin,
-                    maxLimit = scaledMax,
-                    unit = unit,
-                    passed = passed,
-                    testName = tidName,
-                    componentName = midName,
-                    proTip = generateProTip("\$$midHex", "\$$tidHex", scaledValue, scaledMin, scaledMax, passed, severity),
-                    severity = severity
-                ))
-
-                i = start + 20
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing Mode 06: ${e.message}")

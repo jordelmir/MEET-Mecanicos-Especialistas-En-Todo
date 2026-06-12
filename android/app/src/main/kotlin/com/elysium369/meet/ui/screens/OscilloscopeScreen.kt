@@ -1139,6 +1139,7 @@ fun OscilloscopeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 val signals = listOf(
+                                    "IGNITION_COP" to "BOBINA IGN. COP",
                                     "INJECTOR_PWM" to "INYECTOR PWM",
                                     "ALTERNATOR_RIPPLE" to "RIZADO ALT.",
                                     "CKP_SENSOR" to "SENSOR CKP",

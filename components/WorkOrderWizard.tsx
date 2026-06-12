@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { WorkOrder, WorkOrderStatus, Mechanic, Service, Client, VehicleInfo } from '../types';
-import { calculateEndTime, hasConflict, formatDuration } from '../services/timeEngine';
+import { formatDuration, validateSchedule } from '../services/timeEngine';
 import { X, Car, Wrench, User, Clock, Calendar, ChevronRight, Plus, Search, AlertCircle } from 'lucide-react';
 import { Role } from '../types';
 
@@ -17,7 +17,7 @@ interface WorkOrderWizardProps {
   freeWashThreshold: number;
   currentUser: Client;
   currentRole: Role;
-  onBook: (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo) => void;
+  onBook: (clientId: string, clientName: string, mechanicId: string, serviceId: string, time: Date, vehicle: VehicleInfo, notes?: string) => void;
   onCancel: () => void;
   onCreateClient: (data: any) => Client;
   onUpdateClient: (client: Client) => void;
@@ -25,6 +25,13 @@ interface WorkOrderWizardProps {
 }
 
 type Step = 'client' | 'vehicle' | 'service' | 'mechanic' | 'schedule' | 'confirm';
+
+const toDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export function WorkOrderWizard({
   mechanics,
@@ -47,10 +54,12 @@ export function WorkOrderWizard({
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleInfo | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const todayInputValue = toDateInputValue(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(todayInputValue);
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [searchClient, setSearchClient] = useState('');
   const [notes, setNotes] = useState('');
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const filteredClients = useMemo(() => {
     if (!searchClient) return clients;
@@ -72,12 +81,16 @@ export function WorkOrderWizard({
       for (let m = 0; m < 60; m += timeSliceMinutes) {
         const slotTime = new Date(dateObj);
         slotTime.setHours(h, m, 0, 0);
-        const endTime = calculateEndTime(slotTime, selectedService.estimatedMinutes, selectedMechanic.efficiencyFactor);
-
-        if (endTime.getHours() * 60 + endTime.getMinutes() > closeHour * 60) continue;
-
-        const conflict = hasConflict(selectedMechanic.id, slotTime, endTime, existingOrders);
-        if (!conflict) {
+        const validation = validateSchedule({
+          mechanic: selectedMechanic,
+          service: selectedService,
+          startTime: slotTime,
+          existingOrders,
+          openHour,
+          closeHour,
+          timeSliceMinutes,
+        });
+        if (validation.valid) {
           slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
       }
@@ -90,7 +103,22 @@ export function WorkOrderWizard({
     const dateObj = new Date(selectedDate + 'T00:00:00');
     const [h, m] = selectedTime.split(':').map(Number);
     dateObj.setHours(h, m, 0, 0);
-    onBook(selectedClient.id, selectedClient.name, selectedMechanic.id, selectedService.id, dateObj, selectedVehicle);
+    const validation = validateSchedule({
+      mechanic: selectedMechanic,
+      service: selectedService,
+      startTime: dateObj,
+      existingOrders,
+      openHour,
+      closeHour,
+      timeSliceMinutes,
+    });
+    if (!validation.valid) {
+      setBookingError(validation.errors[0]);
+      setStep('schedule');
+      return;
+    }
+    setBookingError(null);
+    onBook(selectedClient.id, selectedClient.name, selectedMechanic.id, selectedService.id, dateObj, selectedVehicle, notes.trim() || undefined);
   };
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
@@ -290,12 +318,13 @@ export function WorkOrderWizard({
           <div className="space-y-4 animate-slide-up">
             <div>
               <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-2">Fecha</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => { setSelectedDate(e.target.value); setSelectedTime(''); }}
-                className="w-full bg-steel-800 border border-steel-500 rounded-lg px-4 py-2.5 font-mono text-sm text-white focus:border-forge-500 outline-none"
-              />
+	              <input
+	                type="date"
+	                value={selectedDate}
+	                min={todayInputValue}
+	                onChange={e => { setSelectedDate(e.target.value); setSelectedTime(''); setBookingError(null); }}
+	                className="w-full bg-steel-800 border border-steel-500 rounded-lg px-4 py-2.5 font-mono text-sm text-white focus:border-forge-500 outline-none"
+	              />
             </div>
             <div>
               <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-2">
@@ -322,10 +351,16 @@ export function WorkOrderWizard({
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-            <div>
-              <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-2">Notas (opcional)</label>
+	              )}
+	            </div>
+	            {bookingError && (
+	              <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-300">
+	                <AlertCircle size={15} className="mt-0.5 shrink-0" />
+	                <span>{bookingError}</span>
+	              </div>
+	            )}
+	            <div>
+	              <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-2">Notas (opcional)</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
@@ -348,21 +383,27 @@ export function WorkOrderWizard({
                 { label: 'Servicio', value: selectedService?.name },
                 { label: 'Mecánico', value: selectedMechanic?.name },
                 { label: 'Fecha', value: new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' }) },
-                { label: 'Hora', value: selectedTime },
-                { label: 'Duración Est.', value: selectedService ? formatDuration(selectedService.estimatedMinutes) : '' },
-                { label: 'Precio', value: selectedService ? `₡${selectedService.basePrice.toLocaleString('es-CR')}` : '' },
-              ].map(item => (
+	                { label: 'Hora', value: selectedTime },
+	                { label: 'Duración Est.', value: selectedService ? formatDuration(selectedService.estimatedMinutes) : '' },
+	                { label: 'Precio', value: selectedService ? `₡${selectedService.basePrice.toLocaleString('es-CR')}` : '' },
+	              ].map(item => (
                 <div key={item.label} className="flex justify-between items-center py-1 border-b border-steel-600/20 last:border-0">
                   <span className="font-mono text-[10px] text-steel-300 uppercase">{item.label}</span>
                   <span className="text-sm font-medium text-white">{item.value}</span>
                 </div>
               ))}
-              {selectedService && selectedService.basePrice > freeWashThreshold && (
-                <div className="mt-2 flex items-center justify-center p-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <span className="font-bold text-xs text-green-400 uppercase tracking-wider">🏷️ Incluye Lavado y Aspirado Gratis</span>
-                </div>
-              )}
-            </div>
+	              {selectedService && selectedService.basePrice > freeWashThreshold && (
+	                <div className="mt-2 flex items-center justify-center p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+	                  <span className="font-bold text-xs text-green-400 uppercase tracking-wider">🏷️ Incluye Lavado y Aspirado Gratis</span>
+	                </div>
+	              )}
+	              {notes.trim() && (
+	                <div className="pt-2 border-t border-steel-600/20">
+	                  <span className="font-mono text-[10px] text-steel-300 uppercase">Notas</span>
+	                  <p className="mt-1 text-xs text-steel-100 whitespace-pre-line">{notes.trim()}</p>
+	                </div>
+	              )}
+	            </div>
 
             {shopRules && (
               <div className="glass-inner rounded-lg p-3">

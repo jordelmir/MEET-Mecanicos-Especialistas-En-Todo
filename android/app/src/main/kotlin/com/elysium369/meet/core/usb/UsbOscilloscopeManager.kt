@@ -168,6 +168,31 @@ class UsbOscilloscopeManager @Inject constructor(
             for (i in 0 until RENDER_POINTS) {
                 val t = i / RENDER_POINTS.toFloat()
                 when (type) {
+                    "IGNITION_COP" -> {
+                        // Coil-on-Plug (COP) Primary Ignition Waveform:
+                        // 14V charging supply baseline
+                        // Dwell phase: dips to 0.1V (transistor charges coil)
+                        // Ignition spike: flyback kick clamped at 80V
+                        // Spark line: steady burn phase at ~20V
+                        // Ringing: coil resonance decay back to 14V
+                        val period = 0.4f
+                        val localT = (t + phase) % period
+                        ch1[i] = when {
+                            localT < 0.05f -> 14f * atten1 // Supply voltage
+                            localT < 0.15f -> 0.1f * atten1 // Dwell (transistor ON)
+                            localT < 0.16f -> 80f * atten1 // Inductive flyback spike (clamp)
+                            localT < 0.22f -> 20f * atten1 // Spark line (burn phase)
+                            localT < 0.28f -> {
+                                val ringTime = localT - 0.22f
+                                val decay = kotlin.math.exp(-ringTime * 25f).toFloat()
+                                val osc = 14f + 6f * decay + 20f * sin(ringTime * 300f) * decay
+                                osc * atten1
+                            }
+                            else -> 14f * atten1
+                        }
+                        // CH2: Crankshaft Position (CKP) reference
+                        ch2[i] = (2.5f + 2.5f * sin((t + phase) * 60f)) * atten2
+                    }
                     "INJECTOR_PWM" -> {
                         // High resolution representation of a PWM common-rail injector pulse:
                         // 12V supply baseline, dips to 0V (driving gate), then flyback inductive kick (60-80V Vpp)

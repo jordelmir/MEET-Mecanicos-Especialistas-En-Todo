@@ -87,6 +87,18 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 "👨‍🔧", MeetColors.warning, "expert_diagnostic"
             ),
             ProFeature(
+                "manuals",
+                "Manuales de Taller", "Workshop Manuals",
+                "Descarga y consulta de manuales offline", "Download & view offline vehicle manuals",
+                "📚", MeetColors.cyberCyan, "vehicle_manuals"
+            ),
+            ProFeature(
+                "holo_local_read",
+                "Lectura Holográfica", "Holographic Live Read",
+                "Dashboard 3D holográfico en tiempo real", "Real-time 3D holographic OBD2 dashboard",
+                "🔮", MeetColors.neonGreen, "holo_local_read"
+            ),
+            ProFeature(
                 "ai",
                 "IA Diagnóstico", "AI Diagnostics",
                 "Análisis inteligente de fallas y datos", "Deep AI analysis of codes & data",
@@ -250,7 +262,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                "🔒",
+                                "🛡️",
                                 fontSize = 24.sp
                             )
                             Column(modifier = Modifier.weight(1f)) {

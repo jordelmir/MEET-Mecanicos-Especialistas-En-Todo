@@ -23,7 +23,7 @@ class KeepAliveManager(
             while (isActive) {
                 delay(1800L)
                 if (System.currentTimeMillis() - lastReceivedTime >= 1800L) {
-                    if (obdSession.state.value == ObdState.CONNECTED) {
+                    if (obdSession.state.value == ObdState.CONNECTED && !obdSession.isLivePollingPaused) {
                         try {
                             // If UDS session is active (e.g. for Active Tests), send Tester Present (3E 80)
                             // otherwise send standard OBD2 0100 heartbeat.

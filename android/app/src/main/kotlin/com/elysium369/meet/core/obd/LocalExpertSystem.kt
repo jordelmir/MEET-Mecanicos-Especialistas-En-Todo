@@ -2,6 +2,8 @@ package com.elysium369.meet.core.obd
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
+import com.elysium369.meet.ui.components.DtcUtils
 
 data class ExpertDiagnosticProcedure(
     val title: String,
@@ -20,7 +22,21 @@ class LocalExpertSystem @Inject constructor() {
      * Retorna una lista de procedimientos a seguir por el mecánico.
      */
     fun analyzeLiveTelemetry(liveData: Map<String, Float>): List<ExpertDiagnosticProcedure> {
+        return analyzeLiveTelemetry(liveData, emptyList(), emptyMap())
+    }
+
+    fun analyzeLiveTelemetry(
+        liveData: Map<String, Float>,
+        activeDtcs: List<String>,
+        dtcDefinitions: Map<String, DtcDefinitionEntity>
+    ): List<ExpertDiagnosticProcedure> {
         val procedures = mutableListOf<ExpertDiagnosticProcedure>()
+
+        // 1. Procesar DTCs activos primero para que aparezcan arriba con prioridad
+        activeDtcs.forEach { code ->
+            val definition = dtcDefinitions[code]
+            procedures.add(generateProcedureForDtc(code, definition))
+        }
 
         checkVoltage(liveData, procedures)
         checkCoolant(liveData, procedures)
@@ -66,6 +82,386 @@ class LocalExpertSystem @Inject constructor() {
         }
 
         return procedures
+    }
+
+    private data class DtcRule(
+        val titleTemplate: (String) -> String,
+        val probableCauses: List<String>,
+        val testSteps: List<String>
+    )
+
+    private class TrieNode {
+        val children = mutableMapOf<Char, TrieNode>()
+        var rule: DtcRule? = null
+    }
+
+    private class DtcTrie {
+        val root = TrieNode()
+
+        fun insert(prefix: String, rule: DtcRule) {
+            var current = root
+            for (char in prefix) {
+                current = current.children.getOrPut(char) { TrieNode() }
+            }
+            current.rule = rule
+        }
+
+        fun searchPrefixMatch(code: String): DtcRule? {
+            var current = root
+            var lastMatchedRule: DtcRule? = null
+            for (char in code) {
+                current = current.children[char] ?: break
+                if (current.rule != null) {
+                    lastMatchedRule = current.rule
+                }
+            }
+            return lastMatchedRule
+        }
+    }
+
+    companion object {
+        private val dtcTrie = DtcTrie().apply {
+            // P0300 Misfire
+            insert("P0300", DtcRule(
+                titleTemplate = { "Código P0300: Fallos de Encendido Múltiples/Aleatorios Detectados" },
+                probableCauses = listOf(
+                    "Presión de combustible insuficiente (bomba débil, filtro obstruido).",
+                    "Fuga de vacío masiva (múltiple de admisión, manguera PCV agrietada).",
+                    "Válvula EGR atascada abierta permitiendo exceso de gases de escape en la admisión.",
+                    "Combustible contaminado con agua o bajo octanaje.",
+                    "Sensor MAF sucio o descalibrado."
+                ),
+                testSteps = listOf(
+                    "1. Prueba de Fuga de Vacío: Conecte una máquina de humo en la admisión para descartar ingresos de aire no medido.",
+                    "2. Verifique Presión de Combustible: Conecte un manómetro en el riel de inyectores. La presión debe cumplir los valores nominales en ralentí y bajo carga.",
+                    "3. Limpieza de Sensores: Limpie el sensor MAF con limpiador especial y verifique que la lectura a ralentí corresponda al cilindraje del motor.",
+                    "4. Inspección de Válvula EGR: Verifique que la válvula EGR se encuentre cerrada en ralentí. Desconéctela para verificar si el ralentí se estabiliza.",
+                    "5. Calidad del Combustible: Drene una muestra de gasolina en un envase de vidrio transparente para inspeccionar si hay separación de agua o sedimentos."
+                )
+            ))
+
+            // Catalysts
+            insert("P0420", DtcRule(
+                titleTemplate = { "Código P0420: Eficiencia del Catalizador por Debajo del Umbral (Banco 1)" },
+                probableCauses = listOf(
+                    "Convertidor catalítico del Banco 1 agotado o dañado internamente.",
+                    "Fuga de escape en el colector o tubería cerca de los sensores de oxígeno.",
+                    "Sensor de oxígeno post-catalizador (S2) defectuoso o contaminado.",
+                    "Envenenamiento del catalizador por paso de aceite (sellos/guías) o refrigerante."
+                ),
+                testSteps = listOf(
+                    "1. Descarte Fugas de Escape: Inspeccione minuciosamente el múltiple y el tramo antes del catalizador en busca de fisuras, hollín negro o juntas quemadas.",
+                    "2. Gráfica de Sensores de O2: Con el motor caliente, grafique los voltajes de los sensores O2 pre-cat (S1) y post-cat (S2) a 2500 RPM. Si S2 cicla al mismo ritmo que S1 en lugar de estar estable a ~0.6V, el catalizador está degradado.",
+                    "3. Medición de Temperatura: Use un termómetro infrarrojo para medir la temperatura a la entrada y a la salida del catalizador. La salida debe estar a mayor temperatura que la entrada (~30-50°C más).",
+                    "4. Prueba de Contrapresión: Conecte un manómetro en el puerto del sensor O2 delantero. La presión no debe superar 1.5 PSI en ralentí o 3.0 PSI a 2500 RPM (si es mayor, el catalizador está obstruido)."
+                )
+            ))
+
+            insert("P0430", DtcRule(
+                titleTemplate = { "Código P0430: Eficiencia del Catalizador por Debajo del Umbral (Banco 2)" },
+                probableCauses = listOf(
+                    "Convertidor catalítico del Banco 2 agotado o dañado internamente.",
+                    "Fuga de escape en el colector o tubería cerca de los sensores de oxígeno.",
+                    "Sensor de oxígeno post-catalizador (S2) defectuoso o contaminado.",
+                    "Envenenamiento del catalizador por paso de aceite (sellos/guías) o refrigerante."
+                ),
+                testSteps = listOf(
+                    "1. Descarte Fugas de Escape: Inspeccione minuciosamente el múltiple y el tramo antes del catalizador en busca de fisuras, hollín negro o juntas quemadas.",
+                    "2. Gráfica de Sensores de O2: Con el motor caliente, grafique los voltajes de los sensores O2 pre-cat (S1) y post-cat (S2) a 2500 RPM. Si S2 cicla al mismo ritmo que S1 en lugar de estar estable a ~0.6V, el catalizador está degradado.",
+                    "3. Medición de Temperatura: Use un termómetro infrarrojo para medir la temperatura a la entrada y a la salida del catalizador. La salida debe estar a mayor temperatura que la entrada (~30-50°C más).",
+                    "4. Prueba de Contrapresión: Conecte un manómetro en el puerto del sensor O2 delantero. La presión no debe superar 1.5 PSI en ralentí o 3.0 PSI a 2500 RPM (si es mayor, el catalizador está obstruido)."
+                )
+            ))
+
+            // Fuel Lean Trims
+            insert("P0171", DtcRule(
+                titleTemplate = { "Código P0171: Mezcla de Combustible Demasiado Pobre (Banco 1)" },
+                probableCauses = listOf(
+                    "Fuga de vacío en el múltiple de admisión o mangueras de aire auxiliares.",
+                    "Sensor de flujo de masa de aire (MAF) sucio o contaminado con aceite.",
+                    "Presión de combustible deficiente (bomba en mal estado, filtro tapado).",
+                    "Fuga de escape antes del sensor de oxígeno del Banco 1."
+                ),
+                testSteps = listOf(
+                    "1. Análisis de Fuel Trims: Grafique los valores de STFT y LTFT a ralentí y luego a 2500 RPM. Si los Trims se normalizan a altas RPM, tiene una fuga de vacío. Si empeoran o no cambian, sospeche de flujo de combustible o MAF.",
+                    "2. Búsqueda de Fugas: Use una máquina de humo o aplique con cuidado limpia carburador en las juntas del múltiple para localizar la fuga de vacío.",
+                    "3. Limpie el MAF: Limpie los filamentos del MAF utilizando un aerosol específico limpia-MAF. No toque el filamento físicamente.",
+                    "4. Comprobación de Presión: Conecte un manómetro al riel de inyectores y compruebe la presión en ralentí y aceleración repentina."
+                )
+            ))
+
+            insert("P0174", DtcRule(
+                titleTemplate = { "Código P0174: Mezcla de Combustible Demasiado Pobre (Banco 2)" },
+                probableCauses = listOf(
+                    "Fuga de vacío en el múltiple de admisión o mangueras de aire auxiliares.",
+                    "Sensor de flujo de masa de aire (MAF) sucio o contaminado con aceite.",
+                    "Presión de combustible deficiente (bomba en mal estado, filtro tapado).",
+                    "Fuga de escape antes del sensor de oxígeno del Banco 2."
+                ),
+                testSteps = listOf(
+                    "1. Análisis de Fuel Trims: Grafique los valores de STFT y LTFT a ralentí y luego a 2500 RPM. Si los Trims se normalizan a altas RPM, tiene una fuga de vacío. Si empeoran o no cambian, sospeche de flujo de combustible o MAF.",
+                    "2. Búsqueda de Fugas: Use una máquina de humo o aplique con cuidado limpia carburador en las juntas del múltiple para localizar la fuga de vacío.",
+                    "3. Limpie el MAF: Limpie los filamentos del MAF utilizando un aerosol específico limpia-MAF. No toque el filamento físicamente.",
+                    "4. Comprobación de Presión: Conecte un manómetro al riel de inyectores y compruebe la presión en ralentí y aceleración repentina."
+                )
+            ))
+
+            // Fuel Rich Trims
+            insert("P0172", DtcRule(
+                titleTemplate = { "Código P0172: Mezcla de Combustible Demasiado Rica (Banco 1)" },
+                probableCauses = listOf(
+                    "Inyector de combustible del Banco 1 goteando o pegado abierto.",
+                    "Presión de combustible excesiva (regulador defectuoso o línea de retorno obstruida).",
+                    "Válvula de purga de EVAP bloqueada en posición abierta (pasa gases del tanque).",
+                    "Filtro de aire del motor severamente obstruido."
+                ),
+                testSteps = listOf(
+                    "1. Prueba del Regulador de Presión: Retire la manguera de vacío del regulador (si aplica). Si hay gasolina dentro de la manguera, el diafragma está roto.",
+                    "2. Aislamiento del EVAP: Conecte una pinza u obstruya la línea de la válvula de purga de EVAP. Si los Fuel Trims mejoran rápidamente, reemplace la válvula de purga.",
+                    "3. Inspección de Bujías: Retire las bujías del Banco 1. Si una de ellas sale negra y con olor penetrante a gasolina, indica un inyector goteando en ese cilindro.",
+                    "4. Comprobación de Filtro de Aire: Verifique visualmente que el elemento filtrante de aire esté limpio y libre de obstrucciones."
+                )
+            ))
+
+            insert("P0175", DtcRule(
+                titleTemplate = { "Código P0175: Mezcla de Combustible Demasiado Rica (Banco 2)" },
+                probableCauses = listOf(
+                    "Inyector de combustible del Banco 2 goteando o pegado abierto.",
+                    "Presión de combustible excesiva (regulador defectuoso o línea de retorno obstruida).",
+                    "Válvula de purga de EVAP bloqueada en posición abierta (pasa gases del tanque).",
+                    "Filtro de aire del motor severamente obstruido."
+                ),
+                testSteps = listOf(
+                    "1. Prueba del Regulador de Presión: Retire la manguera de vacío del regulador (si aplica). Si hay gasolina dentro de la manguera, el diafragma está roto.",
+                    "2. Aislamiento del EVAP: Conecte una pinza u obstruya la línea de la válvula de purga de EVAP. Si los Fuel Trims mejoran rápidamente, reemplace la válvula de purga.",
+                    "3. Inspección de Bujías: Retire las bujías del Banco 2. Si una de ellas sale negra y con olor penetrante a gasolina, indica un inyector goteando en ese cilindro.",
+                    "4. Comprobación de Filtro de Aire: Verifique visualmente que el elemento filtrante de aire esté limpio y libre de obstrucciones."
+                )
+            ))
+
+            // IAT Sensors
+            insert("P0112", DtcRule(
+                titleTemplate = { "Código P0112: Falla en Circuito del Sensor de Temperatura de Aire (IAT) - Entrada Baja" },
+                probableCauses = listOf(
+                    "Sensor IAT defectuoso (termistor roto internamente).",
+                    "Arnés del sensor dañado (cables pelados o rotos) o conector sulfatado.",
+                    "Pérdida de la señal de referencia de 5V o de la tierra provista por la PCM."
+                ),
+                testSteps = listOf(
+                    "1. Inspección Visual: Verifique el conector del sensor IAT (a menudo parte del MAF) buscando cables rotos o sulfatación en las terminales.",
+                    "2. Medición de Voltaje: Con el switch en ON y el sensor desconectado, mida el voltaje en el arnés. Debe haber 5.0V en la línea de señal y continuidad a tierra en la otra.",
+                    "3. Prueba de Puente (para P0113): Coloque un clip uniendo ambos cables del arnés del IAT. En el escáner la temperatura debe brincar al valor máximo (~120-150°C). Si lo hace, el cableado y PCM están bien; reemplace el sensor.",
+                    "4. Medición de Resistencia: Mida la resistencia del sensor IAT con un ohmímetro. Debe cambiar suavemente conforme aplica calor con una secadora (ej: ~2k ohms a 25°C)."
+                )
+            ))
+
+            insert("P0113", DtcRule(
+                titleTemplate = { "Código P0113: Falla en Circuito del Sensor de Temperatura de Aire (IAT) - Entrada Alta" },
+                probableCauses = listOf(
+                    "Sensor IAT defectuoso (termistor roto internamente).",
+                    "Arnés del sensor dañado (cables pelados o rotos) o conector sulfatado.",
+                    "Pérdida de la señal de referencia de 5V o de la tierra provista por la PCM."
+                ),
+                testSteps = listOf(
+                    "1. Inspección Visual: Verifique el conector del sensor IAT (a menudo parte del MAF) buscando cables rotos o sulfatación en las terminales.",
+                    "2. Medición de Voltaje: Con el switch en ON y el sensor desconectado, mida el voltaje en el arnés. Debe haber 5.0V en la línea de señal y continuidad a tierra en la otra.",
+                    "3. Prueba de Puente (para P0113): Coloque un clip uniendo ambos cables del arnés del IAT. En el escáner la temperatura debe brincar al valor máximo (~120-150°C). Si lo hace, el cableado y PCM están bien; reemplace el sensor.",
+                    "4. Medición de Resistencia: Mida la resistencia del sensor IAT con un ohmímetro. Debe cambiar suavemente conforme aplica calor con una secadora (ej: ~2k ohms a 25°C)."
+                )
+            ))
+
+            // MAF Sensors
+            insert("P0102", DtcRule(
+                titleTemplate = { "Código P0102: Falla en Circuito del Sensor de Flujo de Aire (MAF) - Entrada Baja" },
+                probableCauses = listOf(
+                    "Sensor MAF dañado internamente o filamento contaminado.",
+                    "Fusible de alimentación del MAF quemado.",
+                    "Pérdida de alimentación de 12V/5V o tierra en el conector del sensor."
+                ),
+                testSteps = listOf(
+                    "1. Comprobación de Fusibles: Ubique y verifique el fusible de alimentación del sensor MAF en la caja del motor.",
+                    "2. Verificación de Energía: Con el conector del MAF desconectado y el switch en ON, mida si recibe 12V (o 5V de referencia) y tierra física sólida.",
+                    "3. Limpieza: Desmonte el sensor y limpie el filamento caliente utilizando spray especial limpia-MAF. Instale una vez seco y pruebe de nuevo.",
+                    "4. Prueba de Frecuencia/Voltaje: Con el motor encendido, mida el voltaje de señal del MAF en el cable correspondiente. Debe incrementarse suavemente al acelerar el motor."
+                )
+            ))
+
+            insert("P0103", DtcRule(
+                titleTemplate = { "Código P0103: Falla en Circuito del Sensor de Flujo de Aire (MAF) - Entrada Alta" },
+                probableCauses = listOf(
+                    "Sensor MAF dañado internamente o filamento contaminado.",
+                    "Fusible de alimentación del MAF quemado.",
+                    "Pérdida de alimentación de 12V/5V o tierra en el conector del sensor."
+                ),
+                testSteps = listOf(
+                    "1. Comprobación de Fusibles: Ubique y verifique el fusible de alimentación del sensor MAF en la caja del motor.",
+                    "2. Verificación de Energía: Con el conector del MAF desconectado y el switch en ON, mida si recibe 12V (o 5V de referencia) y tierra física sólida.",
+                    "3. Limpieza: Desmonte el sensor y limpie el filamento caliente utilizando spray especial limpia-MAF. Instale una vez seco y pruebe de nuevo.",
+                    "4. Prueba de Frecuencia/Voltaje: Con el motor encendido, mida el voltaje de señal del MAF en el cable correspondiente. Debe incrementarse suavemente al acelerar el motor."
+                )
+            ))
+
+            // Idle IAC
+            insert("P0505", DtcRule(
+                titleTemplate = { "Código P0505: Falla en el Sistema de Control de Ralentí (IAC)" },
+                probableCauses = listOf(
+                    "Válvula de control de aire de ralentí (IAC) sucia o quemada.",
+                    "Cuerpo de aceleración obstruido por depósitos de carbón.",
+                    "Fuga de vacío masiva que altera el flujo de aire controlado."
+                ),
+                testSteps = listOf(
+                    "1. Limpieza de Pasajes: Desmonte la válvula IAC y el cuerpo de aceleración. Limpie los pasajes de aire y la punta de la IAC con limpiador de carburador.",
+                    "2. Resistencia de Bobinas: Mida la resistencia entre las terminales de la válvula IAC (~10-50 ohms según modelo). Si marca circuito abierto, reemplace la IAC.",
+                    "3. Prueba de Actuador: Use las pruebas bidireccionales de MEET para forzar la apertura y cierre de la IAC y observe el cambio en las RPM.",
+                    "4. Aprendizaje de Ralentí: Si el vehículo tiene cuerpo de aceleración electrónico, realice el procedimiento de aprendizaje de ralentí (Idle Relearn) con el escáner."
+                )
+            ))
+
+            // Transmission request MIL
+            insert("P0700", DtcRule(
+                titleTemplate = { "Código P0700: Solicitud de MIL del Sistema de Control de Transmisión (TCM)" },
+                probableCauses = listOf(
+                    "Fallas en solenoides, sensores de velocidad o componentes internos de la caja de cambios.",
+                    "Fluido de transmisión bajo, sucio o degradado.",
+                    "Pérdida momentánea o permanente de comunicación en el bus CAN entre PCM y TCM."
+                ),
+                testSteps = listOf(
+                    "1. Leer Códigos de la TCM: Ingrese al módulo de la transmisión (TCM) utilizando el escáner MEET para leer los códigos específicos (ej: P0730, P0750). El código P0700 solo indica que el motor encendió la luz MIL a petición de la transmisión.",
+                    "2. Inspección del Aceite: Con el motor encendido en Parking, mida el nivel del aceite de transmisión. Inspeccione si huele a quemado o tiene color oscuro.",
+                    "3. Conectores Eléctricos: Verifique el arnés principal que entra a la transmisión buscando pines doblados, sulfatados o con filtración de fluido hidráulico."
+                )
+            ))
+
+            // Cylinder misfire pattern (prefix)
+            insert("P030", DtcRule(
+                titleTemplate = { code ->
+                    val cyl = code.lastOrNull() ?: '?'
+                    "Código $code: Fallo de Encendido en Cilindro $cyl"
+                },
+                probableCauses = listOf(
+                    "Bujía desgastada, calibrada incorrectamente o contaminada.",
+                    "Bobina de encendido defectuosa.",
+                    "Inyector de combustible obstruido o con falla eléctrica.",
+                    "Baja compresión en el cilindro afectado (válvula quemada, anillos desgastados).",
+                    "Fuga de vacío localizada cerca del puerto de admisión del cilindro afectado."
+                ),
+                testSteps = listOf(
+                    "1. Identificación y Escaneo: Confirme qué cilindro tiene fallas de encendido activas.",
+                    "2. Prueba de Intercambio de Bobina: Intercambie la bobina de encendido del cilindro afectado con la de un cilindro sano contiguo. Borre códigos y ruede el auto. Si el código cambia, reemplace la bobina.",
+                    "3. Inspección de Bujía: Extraiga la bujía del cilindro afectado. Inspeccione el electrodo buscando desgaste, depósitos de carbón o humedad por aceite/combustible.",
+                    "4. Prueba de Inyector: Mida la resistencia del inyector del cilindro afectado (~11-16 ohms). Pruebe la señal de activación usando una lámpara noide.",
+                    "5. Medición de Compresión: Realice una prueba de compresión en el cilindro afectado (debe superar 120 PSI y no variar más del 10% con los demás)."
+                )
+            ))
+
+            // Generic Categories fallback
+            insert("C", DtcRule(
+                titleTemplate = { code -> "Código $code: Chasis (Frenos, ABS, Dirección)" },
+                probableCauses = listOf(
+                    "Sensor de velocidad de rueda (ABS) o sensor de ángulo de dirección defectuoso.",
+                    "Cableado expuesto, roto o conector desconectado en la zona de suspensión/ruedas.",
+                    "Acumulación de suciedad metálica o sarro en el anillo reluctor de la rueda.",
+                    "Caída de voltaje severa alimentando el módulo del ABS/ESP."
+                ),
+                testSteps = listOf(
+                    "1. Inspección Mecánica: Levante el vehículo y revise visualmente el sensor de rueda y cableado del lado afectado.",
+                    "2. Limpieza de Sensores: Limpie el captador magnético del sensor y los dientes del anillo reluctor utilizando aire a presión y cepillo.",
+                    "3. Monitoreo de Datos: Grafique la velocidad de cada rueda rodando el vehículo a baja velocidad. Identifique cuál lectura es errática.",
+                    "4. Alimentación del Módulo: Verifique que el módulo reciba el voltaje correcto y que las tierras del chasis estén limpias."
+                )
+            ))
+
+            insert("B", DtcRule(
+                titleTemplate = { code -> "Código $code: Carrocería (Airbags, Seguridad, Confort)" },
+                probableCauses = listOf(
+                    "Fusible quemado en la caja de fusibles interna (BCM/Confort).",
+                    "Cortocircuito en el arnés de puertas, cajuela o bajo los asientos (común en sensores de ocupante).",
+                    "Módulo de control del airbag (SRS) o módulo de confort (BCM) defectuoso.",
+                    "Interruptor de posición, actuador o relevador averiado."
+                ),
+                testSteps = listOf(
+                    "1. Ubicación de Fusibles: Revise el manual de usuario y compruebe los fusibles asociados al sistema del código detectado.",
+                    "2. Prueba de Entradas Digitales: Escanee los estados de los interruptores en la BCM para verificar si responde al presionar los mandos físicos.",
+                    "3. Medición de Actuadores: Compruebe la llegada de voltaje (12V) al actuador (ej: motor de seguro, elevador) al comandar su activación.",
+                    "4. Comprobación de Puntos de Masa: Limpie las conexiones de tierra de la carrocería cercanas al módulo afectado."
+                )
+            ))
+
+            insert("U", DtcRule(
+                titleTemplate = { code -> "Código $code: Red de Comunicación (CAN Bus)" },
+                probableCauses = listOf(
+                    "Cableado de la red CAN (CAN-H o CAN-L) en cortocircuito a tierra, a voltaje o entre sí.",
+                    "Falta de energía en algún módulo (PCM, TCM, ABS, BCM) debido a un fusible fundido.",
+                    "Resistencia de terminación del CAN bus dañada (normalmente en PCM o tablero).",
+                    "Interferencia electromagnética provocada por un accesorio aftermarket mal conectado."
+                ),
+                testSteps = listOf(
+                    "1. Escaneo de Red: Realice un reporte de comunicación de módulos para identificar cuáles están respondiendo en la red y cuáles están mudos (Offline).",
+                    "2. Medición de Resistencia: Desconecte la batería y mida la resistencia entre el pin 6 y pin 14 del puerto OBD2. Debe marcar 60 Ohms. Si lee 120 Ohms, hay circuito abierto en una resistencia de terminación.",
+                    "3. Comprobación de Voltajes del Bus: Con el switch en ON, mida el voltaje en el pin 6 (CAN-H: ~2.7V) y pin 14 (CAN-L: ~2.3V) contra tierra.",
+                    "4. Desconexión Selectiva: Desconecte uno a uno los módulos que no responden mientras monitorea si se restablece la comunicación en el resto de la red."
+                )
+            ))
+
+            insert("P", DtcRule(
+                titleTemplate = { code -> "Código $code: Motor/Transmisión (Powertrain)" },
+                probableCauses = listOf(
+                    "Sensor o actuador del motor/transmisión reportando valores fuera de rango.",
+                    "Arnés eléctrico dañado por calor del motor o rozamientos con partes mecánicas.",
+                    "Corrosión o pines flojos en el conector del componente del código detectado.",
+                    "Problema interno en el componente mecánico controlado."
+                ),
+                testSteps = listOf(
+                    "1. Inspección Visual: Ubique el componente relacionado al código detectado e inspeccione su arnés y conector en busca de daños físicos.",
+                    "2. Verificación de Referencia: Desconecte el sensor y verifique si recibe la señal de 5.0V y una tierra sólida con el multímetro.",
+                    "3. Prueba de Resistencia/Señal: Mida los parámetros del sensor en reposo y compárelos con el manual de taller.",
+                    "4. Borrado de Códigos: Borre el código de falla, realice un ciclo de conducción completo y compruebe si el código pasa de 'Pendiente' a 'Activo'."
+                )
+            ))
+        }
+    }
+
+    private fun generateProcedureForDtc(
+        code: String,
+        definition: DtcDefinitionEntity?
+    ): ExpertDiagnosticProcedure {
+        val uppercaseCode = code.trim().uppercase()
+        val desc = definition?.descriptionEs ?: DtcUtils.getDynamicDtcFallbackDescription(uppercaseCode, isSpanish = true)
+        val sevStr = definition?.severity ?: DtcUtils.getDynamicSeverity(uppercaseCode)
+        val severity = when (sevStr.uppercase()) {
+            "CRITICAL" -> DiagnosticSeverity.CRITICAL
+            "HIGH" -> DiagnosticSeverity.HIGH
+            "MODERATE" -> DiagnosticSeverity.MODERATE
+            else -> DiagnosticSeverity.INFO
+        }
+
+        // Búsqueda ultrarrápida usando el Trie indexado en memoria (Fácilmente < 5ms)
+        val matchedRule = dtcTrie.searchPrefixMatch(uppercaseCode)
+            ?: dtcTrie.searchPrefixMatch(uppercaseCode.firstOrNull()?.toString() ?: "P")
+
+        val title = matchedRule?.titleTemplate?.invoke(uppercaseCode) 
+            ?: "Código $uppercaseCode: $desc"
+        
+        val categoryTitle = when (uppercaseCode.firstOrNull()) {
+            'C' -> "Chasis (Frenos, ABS, Dirección)"
+            'B' -> "Carrocería (Airbags, Seguridad, Confort)"
+            'U' -> "Red de Comunicación (CAN Bus)"
+            else -> "Motor/Transmisión (Powertrain)"
+        }
+
+        val causesList = definition?.possibleCauses?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+            ?: matchedRule?.probableCauses
+            ?: emptyList()
+
+        val steps = matchedRule?.testSteps ?: emptyList()
+
+        return ExpertDiagnosticProcedure(
+            title = title,
+            description = "Categoría: ${definition?.system ?: categoryTitle}. ${definition?.urgency?.let { "Urgencia recomendada: $it." } ?: ""}",
+            severity = severity,
+            probableCauses = causesList,
+            testSteps = steps
+        )
     }
 
     private fun checkVoltage(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {

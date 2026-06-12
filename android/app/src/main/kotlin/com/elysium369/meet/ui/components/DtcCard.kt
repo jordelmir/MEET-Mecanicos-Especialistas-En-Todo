@@ -8,14 +8,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
-import com.elysium369.meet.ui.components.EliteCard
-import com.elysium369.meet.ui.components.EliteButton
-import com.elysium369.meet.ui.components.EliteOutlinedButton
 
 @Composable
 fun DtcCard(
@@ -26,12 +22,12 @@ fun DtcCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    EliteCard(
-        backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
-            .fillMaxWidth(),
-        onClick = { expanded = !expanded }
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -44,9 +40,9 @@ fun DtcCard(
                 )
                 
                 val severityColor = when(definition?.severity) {
-                    "CRITICAL" -> com.elysium369.meet.ui.theme.MeetColors.error
-                    "MODERATE" -> com.elysium369.meet.ui.theme.MeetColors.warning
-                    else -> MeetColors.textSecondary
+                    "CRITICAL" -> Color.Red
+                    "MODERATE" -> Color.Yellow
+                    else -> Color.Gray
                 }
                 
                 Surface(
@@ -64,43 +60,33 @@ fun DtcCard(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            val rawEs = definition?.descriptionEs
-            val descriptionText = if (rawEs.isNullOrBlank() || rawEs.contains("no disponible") || rawEs.contains("no encontrada")) {
-                DtcUtils.getDynamicDtcFallbackDescription(dtcCode, isSpanish = true)
-            } else {
-                rawEs
-            }
-            
             Text(
-                text = descriptionText,
+                text = definition?.descriptionEs ?: "Descripción no disponible offline",
                 color = Color.LightGray
             )
 
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = MeetColors.borderBlue)
+                Divider(color = Color.DarkGray)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text("Posibles Causas:", color = Color.White, fontWeight = FontWeight.Bold)
-                Text(definition?.possibleCauses ?: "--", color = MeetColors.textSecondary)
+                Text(definition?.possibleCauses ?: "--", color = Color.Gray)
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    EliteButton(
-                        text = "🤖 Consultar IA",
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Button(
                         onClick = { onConsultIa(dtcCode) },
-                        color = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
-                        modifier = Modifier.weight(1f)
-                    )
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
+                    ) {
+                        Text("🤖 Consultar IA")
+                    }
                     
                     if (isPremium) {
-                        EliteOutlinedButton(
-                            text = "Freeze Frame",
-                            onClick = { /* Ver Freeze Frame */ },
-                            color = MeetColors.warning,
-                            modifier = Modifier.weight(1f)
-                        )
+                        OutlinedButton(onClick = { /* Ver Freeze Frame */ }) {
+                            Text("Ver Freeze Frame", color = Color(0xFFFF6B35))
+                        }
                     }
                 }
             }

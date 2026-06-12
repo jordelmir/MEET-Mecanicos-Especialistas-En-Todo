@@ -658,7 +658,7 @@ class ReportGenerator(private val context: Context) {
     }
 
     fun shareReport(pdfFile: File) {
-        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", pdfFile)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "Diagnóstico Elysium Vanguard — ${pdfFile.nameWithoutExtension}")

@@ -104,4 +104,50 @@ class DataLogger @Inject constructor() {
         val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MEET_Logs")
         return dir.listFiles()?.filter { it.extension == "csv" }?.sortedByDescending { it.lastModified() } ?: emptyList()
     }
+
+    fun writeDtcScanReport(context: Context, report: DtcScanReport, vin: String? = null): String? {
+        return try {
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "MEET_DTC_Logs")
+            dir.mkdirs()
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(report.startedAtMs))
+            val vinLabel = vin?.takeIf { it.isNotBlank() }?.take(8) ?: "UNKNOWN"
+            val file = File(dir, "MEET_DTC_${vinLabel}_$timestamp.txt")
+
+            FileWriter(file).use { writer ->
+                writer.write("MEET Professional DTC Scan\n")
+                writer.write("Started: ${Date(report.startedAtMs)}\n")
+                writer.write("Ended: ${Date(report.endedAtMs)}\n")
+                writer.write("Protocol: ${report.protocol}\n")
+                writer.write("Records: ${report.records.size}\n")
+                writer.write("\n== Parsed DTCs ==\n")
+                report.records.forEach { record ->
+                    writer.write(
+                        listOf(
+                            record.code,
+                            "bucket=${record.bucket}",
+                            "flags=${record.statusFlags.joinToString("|")}",
+                            "service=${record.sourceService}",
+                            "target=${record.targetAddress ?: "-"}",
+                            "response=${record.responseAddress ?: "-"}",
+                            "module=${record.moduleName ?: "-"}",
+                            "udsStatus=${record.udsStatusByte?.let { String.format("0x%02X", it) } ?: "-"}",
+                            "failureType=${record.udsFailureType ?: "-"}"
+                        ).joinToString(", ")
+                    )
+                    writer.write("\n")
+                }
+
+                writer.write("\n== Raw OBD Exchanges ==\n")
+                report.rawExchanges.forEach { exchange ->
+                    writer.write("[${Date(exchange.timestampMs)}] target=${exchange.targetAddress ?: "-"} cmd=${exchange.command} parsed=${exchange.parsedRecordCount}\n")
+                    writer.write(exchange.rawResponse.ifBlank { "<empty>" }.trim())
+                    writer.write("\n---\n")
+                }
+            }
+
+            file.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
 }

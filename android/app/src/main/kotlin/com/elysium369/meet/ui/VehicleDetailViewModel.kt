@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.data.local.dao.MaintenanceLogDao
 import com.elysium369.meet.data.local.dao.RepairHistoryDao
 import com.elysium369.meet.data.local.dao.VehicleDao
+import com.elysium369.meet.data.local.dao.DtcDao
+import com.elysium369.meet.data.local.dao.DtcDefinitionDao
 import com.elysium369.meet.data.local.entities.MaintenanceLogEntity
 import com.elysium369.meet.data.local.entities.RepairHistoryEntity
 import com.elysium369.meet.data.local.entities.VehicleEntity
@@ -33,6 +35,8 @@ class VehicleDetailViewModel @Inject constructor(
     private val maintenanceLogDao: MaintenanceLogDao,
     private val repairHistoryDao: RepairHistoryDao,
     private val vehicleDao: VehicleDao,
+    private val dtcDao: DtcDao,
+    private val dtcDefinitionDao: DtcDefinitionDao,
     private val localExpertSystem: com.elysium369.meet.core.obd.LocalExpertSystem
 ) : ViewModel() {
 
@@ -59,6 +63,12 @@ class VehicleDetailViewModel @Inject constructor(
 
     private val _expertProcedures = MutableStateFlow<List<com.elysium369.meet.core.obd.ExpertDiagnosticProcedure>>(emptyList())
     val expertProcedures: StateFlow<List<com.elysium369.meet.core.obd.ExpertDiagnosticProcedure>> = _expertProcedures.asStateFlow()
+
+    private val _activeDtcs = MutableStateFlow<List<String>>(emptyList())
+    val activeDtcs: StateFlow<List<String>> = _activeDtcs.asStateFlow()
+
+    private val _dtcDefinitions = MutableStateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>>(emptyMap())
+    val dtcDefinitions: StateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>> = _dtcDefinitions.asStateFlow()
 
     private val _selectedProfile = MutableStateFlow("NORMAL")
     val selectedProfile: StateFlow<String> = _selectedProfile.asStateFlow()
@@ -88,6 +98,41 @@ class VehicleDetailViewModel @Inject constructor(
             repairHistoryDao.getRepairsForVehicle(vehicleId).collect { repairs ->
                 _repairHistory.value = repairs
                 _totalRepairCost.value = repairs.sumOf { it.totalCost.toDouble() }
+            }
+        }
+        viewModelScope.launch {
+            val veh = vehicleDao.getVehicleById(vehicleId)
+            val make = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(veh?.make)
+            dtcDao.getUnresolvedDtcsForVehicle(vehicleId).collect { dtcEvents ->
+                val codes = dtcEvents.map { it.code }
+                _activeDtcs.value = codes
+
+                val definitionsMap = mutableMapOf<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>()
+                dtcEvents.forEach { event ->
+                    val def = dtcDefinitionDao.getDefinitionForCode(event.code, make)
+                    if (def != null) {
+                        definitionsMap[event.code] = def
+                    } else {
+                        definitionsMap[event.code] = com.elysium369.meet.data.local.entities.DtcDefinitionEntity(
+                            code = event.code,
+                            descriptionEs = event.description,
+                            descriptionEn = event.description,
+                            system = com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(event.code, isSpanish = true),
+                            severity = event.severity,
+                            possibleCauses = "Verifique arnés de cableado, conectores y funcionamiento mecánico del componente.",
+                            urgency = com.elysium369.meet.ui.components.DtcUtils.getDynamicUrgency(event.code)
+                        )
+                    }
+                }
+                _dtcDefinitions.value = definitionsMap
+
+                if (!_telemetryActive.value) {
+                    _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
+                        liveData = _simulatedPids.value,
+                        activeDtcs = codes,
+                        dtcDefinitions = definitionsMap
+                    )
+                }
             }
         }
     }
@@ -243,7 +288,11 @@ class VehicleDetailViewModel @Inject constructor(
             }
         }
         _simulatedPids.value = data
-        _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(data)
+        _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
+            liveData = data,
+            activeDtcs = _activeDtcs.value,
+            dtcDefinitions = _dtcDefinitions.value
+        )
     }
 
     override fun onCleared() {

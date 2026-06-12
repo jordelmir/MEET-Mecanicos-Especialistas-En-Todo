@@ -17,8 +17,13 @@ object FileUtils {
         return withContext(Dispatchers.IO) {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
-                // Create a unique filename for the image
-                val fileName = "receipt_${UUID.randomUUID()}.jpg"
+                
+                // Extract file extension dynamically based on the MIME type
+                val extension = context.contentResolver.getType(uri)?.let { mimeType ->
+                    android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+                } ?: "jpg"
+                
+                val fileName = "receipt_${UUID.randomUUID()}.$extension"
                 val destFile = File(context.filesDir, fileName)
                 
                 val outputStream = FileOutputStream(destFile)
@@ -29,7 +34,7 @@ object FileUtils {
                 }
                 destFile.absolutePath
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("FileUtils", "Error copying Uri to internal storage", e)
                 null
             }
         }

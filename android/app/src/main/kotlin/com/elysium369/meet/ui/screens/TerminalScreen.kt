@@ -9,6 +9,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -38,6 +39,10 @@ import com.elysium369.meet.core.obd.ObdCommandExplainer
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 
 data class TerminalLine(
     val text: String,
@@ -62,6 +67,21 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
     val commandHistory by viewModel.commandHistory.collectAsState()
     
+    var activeFilter by remember { mutableStateOf<TerminalLineType?>(null) }
+    val filteredTerminalOutput = remember(terminalOutput, activeFilter) {
+        if (activeFilter == null) {
+            terminalOutput
+        } else {
+            terminalOutput.filter { it.type == activeFilter }
+        }
+    }
+    
+    var showUdsWizard by remember { mutableStateOf(false) }
+    
+    var activeTerminalTab by remember { mutableStateOf("OBD") } // "OBD" or "ANDROID"
+    var localCommandInput by remember { mutableStateOf("") }
+    val localShellLines by viewModel.localShellLines.collectAsState()
+    
     var isSending by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.connectionState.collectAsState()
@@ -85,10 +105,19 @@ fun TerminalScreen(viewModel: ObdViewModel) {
         label = "glowAlpha"
     )
 
-    // Auto-scroll to bottom
-    LaunchedEffect(terminalOutput.size) {
-        if (terminalOutput.isNotEmpty()) {
-            listState.animateScrollToItem(terminalOutput.size - 1)
+    val localListState = rememberLazyListState()
+
+    // Auto-scroll to bottom based on filtered output size
+    LaunchedEffect(filteredTerminalOutput.size) {
+        if (filteredTerminalOutput.isNotEmpty()) {
+            listState.animateScrollToItem(filteredTerminalOutput.size - 1)
+        }
+    }
+
+    // Auto-scroll to bottom based on Android terminal logs
+    LaunchedEffect(localShellLines.size) {
+        if (localShellLines.isNotEmpty()) {
+            localListState.animateScrollToItem(localShellLines.size - 1)
         }
     }
 
@@ -105,12 +134,13 @@ fun TerminalScreen(viewModel: ObdViewModel) {
         else -> "○ IDLE"
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MeetColors.carbonGradient)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MeetColors.carbonGradient)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
         // ═══ HEADER with neon glow ═══
         Box(
             modifier = Modifier
@@ -149,9 +179,29 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (activeTerminalTab == "OBD") {
+                        TextButton(
+                            onClick = {
+                                showUdsWizard = true
+                            }
+                        ) {
+                            Text(
+                                "ASISTENTE UDS",
+                                color = Color(0xFFBD00FF),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     TextButton(
                         onClick = {
-                            copyTerminalLogsToClipboard(context, terminalOutput)
+                            if (activeTerminalTab == "OBD") {
+                                copyTerminalLogsToClipboard(context, terminalOutput)
+                            } else {
+                                copyLocalShellLogsToClipboard(context, localShellLines)
+                            }
                         }
                     ) {
                         Text(
@@ -165,7 +215,11 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     Spacer(modifier = Modifier.width(4.dp))
                     TextButton(
                         onClick = {
-                            shareTerminalLogs(context, terminalOutput)
+                            if (activeTerminalTab == "OBD") {
+                                shareTerminalLogs(context, terminalOutput)
+                            } else {
+                                shareLocalShellLogs(context, localShellLines)
+                            }
                         }
                     ) {
                         Text(
@@ -179,7 +233,11 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     Spacer(modifier = Modifier.width(4.dp))
                     TextButton(
                         onClick = {
-                            viewModel.clearTerminalLogs()
+                            if (activeTerminalTab == "OBD") {
+                                viewModel.clearTerminalLogs()
+                            } else {
+                                viewModel.localShellManager.clearTerminal()
+                            }
                         }
                     ) {
                         Text(
@@ -194,176 +252,312 @@ fun TerminalScreen(viewModel: ObdViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // ═══ TERMINAL OUTPUT AREA (CRT Scanlines Overlay) ═══
-        Box(
+        // ═══ TAB BAR SELECTOR ═══
+        Row(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .padding(vertical = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
                 .background(MeetColors.backgroundDeep)
-                .border(
-                    1.dp,
-                    MeetColors.neonGreen.copy(alpha = 0.15f),
-                    RoundedCornerShape(10.dp)
-                )
-                .drawWithContent {
-                    drawContent()
-                    // CRT Scanlines Effect
-                    val scanlineSpacing = 6.dp.toPx()
-                    val scanlineHeight = 1.5.dp.toPx()
-                    var y = 0f
-                    while (y < size.height) {
-                        drawRect(
-                            color = Color.Black.copy(alpha = 0.12f),
-                            topLeft = androidx.compose.ui.geometry.Offset(0f, y),
-                            size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
-                        )
-                        y += scanlineSpacing
-                    }
-                }
-                .padding(8.dp)
+                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp)),
+            horizontalArrangement = Arrangement.Center
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (activeTerminalTab == "OBD") MeetColors.neonGreen.copy(alpha = 0.15f) else Color.Transparent)
+                    .clickable { activeTerminalTab = "OBD" }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
-                items(terminalOutput) { line ->
-                    TerminalLineRow(line, glowAlpha)
-                }
+                Text(
+                    text = "CONSOLA OBD-II",
+                    color = if (activeTerminalTab == "OBD") MeetColors.neonGreen else MeetColors.textSecondary,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (activeTerminalTab == "ANDROID") MeetColors.cyberCyan.copy(alpha = 0.15f) else Color.Transparent)
+                    .clickable { activeTerminalTab = "ANDROID" }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "TERMINAL DE ANDROID",
+                    color = if (activeTerminalTab == "ANDROID") MeetColors.cyberCyan else MeetColors.textSecondary,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // ═══ INPUT AREA ═══
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = commandInput,
-                onValueChange = { commandInput = it.uppercase() },
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MeetColors.neonGreen,
-                    unfocusedTextColor = Color.White,
-                    focusedContainerColor = MeetColors.backgroundDeep,
-                    unfocusedContainerColor = MeetColors.backgroundDeep,
-                    cursorColor = MeetColors.neonGreen,
-                    focusedBorderColor = MeetColors.neonGreen,
-                    unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.25f)
-                ),
-                placeholder = {
-                    Text(
-                        "ATZ, 010C, AT RV...",
-                        color = MeetColors.textMuted,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp
+        if (activeTerminalTab == "OBD") {
+            // ═══ OBD LAYOUT ═══
+            // ═══ FILTER BAR (Task 22) ═══
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                item {
+                    TerminalFilterChip(
+                        selected = activeFilter == null,
+                        onClick = { activeFilter = null },
+                        label = "TODOS",
+                        activeColor = MeetColors.neonGreen
                     )
-                },
-                singleLine = true,
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp
-                ),
-                shape = RoundedCornerShape(8.dp)
-            )
+                }
+                
+                val filterTypes = listOf(
+                    TerminalLineType.COMMAND to "ENVIADOS",
+                    TerminalLineType.RESPONSE to "RESPUESTAS",
+                    TerminalLineType.EXPLANATION to "EXPLICACIONES",
+                    TerminalLineType.ERROR to "ERRORES",
+                    TerminalLineType.DECODED to "DECODIFICADOS",
+                    TerminalLineType.SYSTEM to "SISTEMA"
+                )
+                
+                items(filterTypes) { (type, label) ->
+                    val color = when (type) {
+                        TerminalLineType.COMMAND -> MeetColors.neonGreen
+                        TerminalLineType.RESPONSE -> Color.White
+                        TerminalLineType.EXPLANATION -> MeetColors.cyberCyan
+                        TerminalLineType.ERROR -> MeetColors.error
+                        TerminalLineType.DECODED -> Color(0xFFBD00FF)
+                        else -> MeetColors.cyberCyan.copy(alpha = 0.8f)
+                    }
+                    TerminalFilterChip(
+                        selected = activeFilter == type,
+                        onClick = { activeFilter = type },
+                        label = label,
+                        activeColor = color
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Button(
-                onClick = {
-                    val cmd = commandInput.trim()
-                    if (cmd.isNotEmpty()) {
-                        // 1. Show the command
-                        val newLines = mutableListOf<TerminalLine>()
-                        newLines.add(TerminalLine(cmd, TerminalLineType.COMMAND))
-
-                        // 2. Show expert explanation BEFORE sending
-                        val explanation = ObdCommandExplainer.explain(cmd)
-                        if (explanation != null) {
-                            newLines.add(TerminalLine(explanation, TerminalLineType.EXPLANATION))
-                        }
-
-                        viewModel.addTerminalLogs(newLines)
-                        viewModel.addTerminalCommand(cmd)
-                        commandInput = ""
-
-                        if (state != ObdState.CONNECTED) {
-                            viewModel.addTerminalLog(
-                                "OBD no conectado. Conecta el adaptador ELM327 al puerto OBD2 y enciende el contacto.",
-                                TerminalLineType.ERROR
+            // ═══ TERMINAL OUTPUT AREA (CRT Scanlines Overlay) ═══
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MeetColors.backgroundDeep)
+                    .border(
+                        1.dp,
+                        MeetColors.neonGreen.copy(alpha = 0.15f),
+                        RoundedCornerShape(10.dp)
+                    )
+                    .drawWithContent {
+                        drawContent()
+                        // CRT Scanlines Effect
+                        val scanlineSpacing = 6.dp.toPx()
+                        val scanlineHeight = 1.5.dp.toPx()
+                        var y = 0f
+                        while (y < size.height) {
+                            drawRect(
+                                color = Color.Black.copy(alpha = 0.12f),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, y),
+                                size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
                             )
-                            return@Button
+                            y += scanlineSpacing
                         }
+                    }
+                    .padding(8.dp)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(filteredTerminalOutput) { line ->
+                        TerminalLineRow(line, glowAlpha)
+                    }
+                }
+            }
 
-                        isSending = true
-                        coroutineScope.launch {
-                            try {
-                                val response = viewModel.sendRawCommand(cmd)
-                                val responseLines = mutableListOf<TerminalLine>()
+            Spacer(modifier = Modifier.height(8.dp))
 
-                                // 3. Show raw response
-                                val responseType = when {
-                                    response.contains("ERROR", true) ||
-                                    response.contains("NO DATA", true) ||
-                                    response.contains("UNABLE", true) -> TerminalLineType.WARNING
-                                    else -> TerminalLineType.RESPONSE
-                                }
-                                responseLines.add(TerminalLine(response, responseType))
+            // ═══ INPUT AREA ═══
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = commandInput,
+                    onValueChange = { commandInput = it.uppercase() },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MeetColors.neonGreen,
+                        unfocusedTextColor = Color.White,
+                        focusedContainerColor = MeetColors.backgroundDeep,
+                        unfocusedContainerColor = MeetColors.backgroundDeep,
+                        cursorColor = MeetColors.neonGreen,
+                        focusedBorderColor = MeetColors.neonGreen,
+                        unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.25f)
+                    ),
+                    placeholder = {
+                        Text(
+                            "ATZ, 010C, AT RV...",
+                            color = MeetColors.textMuted,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp
+                        )
+                    },
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
 
-                                // 4. Show decoded value (if applicable)
-                                val decoded = ObdCommandExplainer.decodeResponse(cmd, response)
-                                if (decoded != null) {
-                                    responseLines.add(TerminalLine(decoded, TerminalLineType.DECODED))
-                                }
+                Spacer(modifier = Modifier.width(8.dp))
 
-                                viewModel.addTerminalLogs(responseLines)
-                            } catch (e: Exception) {
+                Button(
+                    onClick = {
+                        val cmd = commandInput.trim()
+                        if (cmd.isNotEmpty()) {
+                            // 1. Show the command
+                            val newLines = mutableListOf<TerminalLine>()
+                            newLines.add(TerminalLine(cmd, TerminalLineType.COMMAND))
+
+                            // 2. Show expert explanation BEFORE sending
+                            val explanation = ObdCommandExplainer.explain(cmd)
+                            if (explanation != null) {
+                                newLines.add(TerminalLine(explanation, TerminalLineType.EXPLANATION))
+                            }
+
+                            viewModel.addTerminalLogs(newLines)
+                            viewModel.addTerminalCommand(cmd)
+                            commandInput = ""
+
+                            if (state != ObdState.CONNECTED) {
                                 viewModel.addTerminalLog(
-                                    "Exception: ${e.message}",
+                                    "OBD no conectado. Conecta el adaptador ELM327 al puerto OBD2 y enciende el contacto.",
                                     TerminalLineType.ERROR
                                 )
-                            } finally {
-                                isSending = false
+                                return@Button
+                            }
+
+                            isSending = true
+                            coroutineScope.launch {
+                                try {
+                                    val response = viewModel.sendRawCommand(cmd)
+                                    val responseLines = mutableListOf<TerminalLine>()
+
+                                    // 3. Show raw response
+                                    val responseType = when {
+                                        response.contains("ERROR", true) ||
+                                        response.contains("NO DATA", true) ||
+                                        response.contains("UNABLE", true) -> TerminalLineType.WARNING
+                                        else -> TerminalLineType.RESPONSE
+                                    }
+                                    responseLines.add(TerminalLine(response, responseType))
+
+                                    // 4. Show decoded value (if applicable)
+                                    val decoded = ObdCommandExplainer.decodeResponse(cmd, response)
+                                    if (decoded != null) {
+                                        responseLines.add(TerminalLine(decoded, TerminalLineType.DECODED))
+                                    }
+
+                                    viewModel.addTerminalLogs(responseLines)
+                                } catch (e: Exception) {
+                                    viewModel.addTerminalLog(
+                                        "Exception: ${e.message}",
+                                        TerminalLineType.ERROR
+                                    )
+                                } finally {
+                                    isSending = false
+                                }
                             }
                         }
+                    },
+                    enabled = !isSending && commandInput.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.neonGreen,
+                        contentColor = MeetColors.backgroundDeep,
+                        disabledContainerColor = MeetColors.backgroundDark
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(56.dp)
+                ) {
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MeetColors.backgroundDeep
+                        )
+                    } else {
+                        Text(
+                            "TX",
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 16.sp
+                        )
                     }
-                },
-                enabled = !isSending && commandInput.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MeetColors.neonGreen,
-                    contentColor = MeetColors.backgroundDeep,
-                    disabledContainerColor = MeetColors.backgroundDark
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(56.dp)
-            ) {
-                if (isSending) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MeetColors.backgroundDeep
-                    )
-                } else {
-                    Text(
-                        "TX",
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 16.sp
-                    )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        // ═══ COMMAND HISTORY ═══
-        if (commandHistory.isNotEmpty()) {
+            // ═══ COMMAND HISTORY ═══
+            if (commandHistory.isNotEmpty()) {
+                Text(
+                    text = "HISTORIAL DE COMANDOS",
+                    color = MeetColors.textMuted,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(commandHistory) { cmd ->
+                        val icon = ObdCommandExplainer.categoryIcon(cmd)
+                        AssistChip(
+                            onClick = { commandInput = cmd },
+                            label = {
+                                Text(
+                                    "$icon $cmd",
+                                    color = MeetColors.neonGreen,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MeetColors.backgroundDeep
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MeetColors.neonGreen.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // ═══ QUICK COMMANDS ═══
             Text(
-                text = "HISTORIAL DE COMANDOS",
+                text = "COMANDOS RÁPIDOS",
                 color = MeetColors.textMuted,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 10.sp,
@@ -374,14 +568,14 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(commandHistory) { cmd ->
+                items(quickCommands) { cmd ->
                     val icon = ObdCommandExplainer.categoryIcon(cmd)
                     AssistChip(
                         onClick = { commandInput = cmd },
                         label = {
                             Text(
                                 "$icon $cmd",
-                                color = MeetColors.neonGreen,
+                                color = MeetColors.cyberCyan,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -392,55 +586,514 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         ),
                         border = BorderStroke(
                             width = 1.dp,
-                            color = MeetColors.neonGreen.copy(alpha = 0.3f)
+                            color = MeetColors.cyberCyan.copy(alpha = 0.3f)
                         ),
                         shape = RoundedCornerShape(6.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+        } else {
+            // ═══ ANDROID LOCAL TERMINAL LAYOUT ═══
+            val androidQuickCommands = listOf(
+                "ls" to "📁 ls",
+                "pwd" to "📍 pwd",
+                "getprop" to "⚙️ props",
+                "pm list packages" to "📦 pkgs",
+                "df -h" to "💾 df",
+                "uname -a" to "🐧 kernel",
+                "id" to "👤 id",
+                "netstat -an" to "🌐 netstat",
+                "top -n 1" to "⚡ top",
+                "logcat -d -t 50" to "📝 logcat"
+            )
 
-        // ═══ QUICK COMMANDS ═══
-        Text(
-            text = "COMANDOS RÁPIDOS",
-            color = MeetColors.textMuted,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(quickCommands) { cmd ->
-                val icon = ObdCommandExplainer.categoryIcon(cmd)
-                AssistChip(
-                    onClick = { commandInput = cmd },
-                    label = {
+            // CRT terminal console area
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MeetColors.backgroundDeep)
+                    .border(
+                        1.dp,
+                        MeetColors.cyberCyan.copy(alpha = 0.15f),
+                        RoundedCornerShape(10.dp)
+                    )
+                    .drawWithContent {
+                        drawContent()
+                        // CRT Scanlines Effect
+                        val scanlineSpacing = 6.dp.toPx()
+                        val scanlineHeight = 1.5.dp.toPx()
+                        var y = 0f
+                        while (y < size.height) {
+                            drawRect(
+                                color = Color.Black.copy(alpha = 0.12f),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, y),
+                                size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
+                            )
+                            y += scanlineSpacing
+                        }
+                    }
+                    .padding(8.dp)
+            ) {
+                LazyColumn(
+                    state = localListState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(localShellLines) { line ->
+                        Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                            Text(
+                                text = line,
+                                color = when {
+                                    line.startsWith("❯") -> MeetColors.cyberCyan
+                                    line.startsWith("[Error") -> MeetColors.error
+                                    line.startsWith("[Shell") -> MeetColors.error
+                                    else -> Color.White
+                                },
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Action button bar for Restart Shell next to console input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        viewModel.localShellManager.startShell()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.cardBackgroundLighter,
+                        contentColor = MeetColors.cyberCyan
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        "REINICIAR SHELL",
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            // Command input row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = localCommandInput,
+                    onValueChange = { localCommandInput = it },
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MeetColors.cyberCyan,
+                        unfocusedTextColor = Color.White,
+                        focusedContainerColor = MeetColors.backgroundDeep,
+                        unfocusedContainerColor = MeetColors.backgroundDeep,
+                        cursorColor = MeetColors.cyberCyan,
+                        focusedBorderColor = MeetColors.cyberCyan,
+                        unfocusedBorderColor = MeetColors.cyberCyan.copy(alpha = 0.25f)
+                    ),
+                    placeholder = {
                         Text(
-                            "$icon $cmd",
-                            color = MeetColors.cyberCyan,
+                            "ls -la, pm list packages, df...",
+                            color = MeetColors.textMuted,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 13.sp
                         )
                     },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = MeetColors.backgroundDeep
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Send,
+                        keyboardType = KeyboardType.Text
                     ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = MeetColors.cyberCyan.copy(alpha = 0.3f)
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            val cmd = localCommandInput.trim()
+                            if (cmd.isNotEmpty()) {
+                                viewModel.localShellManager.executeCommand(cmd)
+                                localCommandInput = ""
+                            }
+                        }
                     ),
-                    shape = RoundedCornerShape(6.dp)
+                    textStyle = LocalTextStyle.current.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp
+                    ),
+                    shape = RoundedCornerShape(8.dp)
                 )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = {
+                        val cmd = localCommandInput.trim()
+                        if (cmd.isNotEmpty()) {
+                            viewModel.localShellManager.executeCommand(cmd)
+                            localCommandInput = ""
+                        }
+                    },
+                    enabled = localCommandInput.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.cyberCyan,
+                        contentColor = MeetColors.backgroundDeep,
+                        disabledContainerColor = MeetColors.backgroundDark
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(56.dp)
+                ) {
+                    Text(
+                        "RUN",
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Quick actions list
+            Text(
+                text = "ACCIONES RÁPIDAS (AND SYSTEM)",
+                color = MeetColors.textMuted,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(androidQuickCommands) { (cmd, label) ->
+                    AssistChip(
+                        onClick = {
+                            viewModel.localShellManager.executeCommand(cmd)
+                        },
+                        label = {
+                            Text(
+                                label,
+                                color = MeetColors.cyberCyan,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MeetColors.backgroundDeep
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = MeetColors.cyberCyan.copy(alpha = 0.3f)
+                        ),
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
     }
+
+    // UDS WIZARD OVERLAY
+    if (showUdsWizard) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .clickable(enabled = true, onClick = { showUdsWizard = false }),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.7f)
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .background(MeetColors.backgroundDeep)
+                    .border(
+                        BorderStroke(1.5.dp, Color(0xFFBD00FF)),
+                        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                    )
+                    .clickable(enabled = true, onClick = {}) // consume click
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "⚙️ ASISTENTE UDS / ISO 14229",
+                        color = Color(0xFFBD00FF),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    IconButton(onClick = { showUdsWizard = false }) {
+                        Text("✕", color = MeetColors.error, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                var selectedService by remember { mutableStateOf("22") }
+                var didInput by remember { mutableStateOf("") }
+                var payloadInput by remember { mutableStateOf("") }
+                var selectedSession by remember { mutableStateOf("03") }
+                var selectedReset by remember { mutableStateOf("01") }
+                var controlOption by remember { mutableStateOf("03") }
+                
+                Text("Servicio UDS:", color = MeetColors.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "22" to "Leer DID",
+                        "2E" to "Escribir",
+                        "2F" to "Ctrl E/S",
+                        "10" to "Sesión",
+                        "11" to "Reset"
+                    ).forEach { (srv, label) ->
+                        val isSrvSelected = selectedService == srv
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSrvSelected) Color(0xFFBD00FF).copy(alpha = 0.2f) else MeetColors.cardBackgroundLighter)
+                                .border(1.dp, if (isSrvSelected) Color(0xFFBD00FF) else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .clickable { selectedService = srv }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(label, color = if (isSrvSelected) Color(0xFFBD00FF) else MeetColors.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    when (selectedService) {
+                        "22" -> {
+                            Text("Lectura de Datos por Identificador (Read Data by Identifier)", color = MeetColors.textPrimary, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = didInput,
+                                onValueChange = { if (it.length <= 4) didInput = it.uppercase().replace(Regex("[^0-9A-F]"), "") },
+                                label = { Text("DID (4 Hex digitos, ej: F190)", color = MeetColors.textSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MeetColors.textPrimary,
+                                    unfocusedTextColor = MeetColors.textSecondary,
+                                    focusedContainerColor = MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = MeetColors.backgroundDeep
+                                )
+                            )
+                        }
+                        "2E" -> {
+                            Text("Escritura de Datos por Identificador (Write Data by Identifier)", color = MeetColors.textPrimary, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = didInput,
+                                onValueChange = { if (it.length <= 4) didInput = it.uppercase().replace(Regex("[^0-9A-F]"), "") },
+                                label = { Text("DID (4 Hex digitos, ej: F190)", color = MeetColors.textSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MeetColors.textPrimary,
+                                    unfocusedTextColor = MeetColors.textSecondary,
+                                    focusedContainerColor = MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = MeetColors.backgroundDeep
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = payloadInput,
+                                onValueChange = { payloadInput = it.uppercase().replace(Regex("[^0-9A-F]"), "") },
+                                label = { Text("Payload / Datos (Hex bytes)", color = MeetColors.textSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MeetColors.textPrimary,
+                                    unfocusedTextColor = MeetColors.textSecondary,
+                                    focusedContainerColor = MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = MeetColors.backgroundDeep
+                                )
+                            )
+                        }
+                        "2F" -> {
+                            Text("Control de Entrada / Salida (Active Test / Actuation)", color = MeetColors.textPrimary, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = didInput,
+                                onValueChange = { if (it.length <= 4) didInput = it.uppercase().replace(Regex("[^0-9A-F]"), "") },
+                                label = { Text("DID (4 Hex digitos, ej: 013C)", color = MeetColors.textSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MeetColors.textPrimary,
+                                    unfocusedTextColor = MeetColors.textSecondary,
+                                    focusedContainerColor = MeetColors.backgroundDeep,
+                                    unfocusedContainerColor = MeetColors.backgroundDeep
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("03" to "Controlar", "00" to "Retornar a ECU").forEach { (opt, lbl) ->
+                                    val isOptSelected = controlOption == opt
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isOptSelected) MeetColors.cyberCyan.copy(alpha = 0.2f) else MeetColors.cardBackgroundLighter)
+                                            .border(1.dp, if (isOptSelected) MeetColors.cyberCyan else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                            .clickable { controlOption = opt }
+                                            .padding(8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(lbl, color = if (isOptSelected) MeetColors.cyberCyan else MeetColors.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                }
+                            }
+                            if (controlOption == "03") {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = payloadInput,
+                                    onValueChange = { payloadInput = it.uppercase().replace(Regex("[^0-9A-F]"), "") },
+                                    label = { Text("Estado de Control (ej: 01 = ON, 00 = OFF)", color = MeetColors.textSecondary) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = MeetColors.textPrimary,
+                                        unfocusedTextColor = MeetColors.textSecondary,
+                                        focusedContainerColor = MeetColors.backgroundDeep,
+                                        unfocusedContainerColor = MeetColors.backgroundDeep
+                                    )
+                                )
+                            }
+                        }
+                        "10" -> {
+                            Text("Control de Sesión de Diagnóstico (Diagnostic Session Control)", color = MeetColors.textPrimary, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    "01" to "Default Session (Sesión estándar)",
+                                    "02" to "Programming Session (Programación)",
+                                    "03" to "Extended Session (Sesión Extendida)"
+                                ).forEach { (sess, lbl) ->
+                                    val isSessSelected = selectedSession == sess
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isSessSelected) MeetColors.neonGreen.copy(alpha = 0.15f) else MeetColors.cardBackgroundLighter)
+                                            .border(1.dp, if (isSessSelected) MeetColors.neonGreen else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                            .clickable { selectedSession = sess }
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(lbl, color = if (isSessSelected) MeetColors.neonGreen else MeetColors.textPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                }
+                            }
+                        }
+                        "11" -> {
+                            Text("Reinicio de ECU (ECU Reset)", color = MeetColors.textPrimary, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    "01" to "Hard Reset (Apagar físico)",
+                                    "02" to "Key Off On Reset (Simulación de llave)",
+                                    "03" to "Soft Reset (Reinicio software)"
+                                ).forEach { (rst, lbl) ->
+                                    val isRstSelected = selectedReset == rst
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isRstSelected) MeetColors.error.copy(alpha = 0.15f) else MeetColors.cardBackgroundLighter)
+                                            .border(1.dp, if (isRstSelected) MeetColors.error else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                            .clickable { selectedReset = rst }
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(lbl, color = if (isRstSelected) MeetColors.error else MeetColors.textPrimary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                val generatedCommand = remember(selectedService, didInput, payloadInput, selectedSession, selectedReset, controlOption) {
+                    when (selectedService) {
+                        "22" -> "22 $didInput".trim()
+                        "2E" -> "2E $didInput $payloadInput".trim()
+                        "2F" -> "2F $didInput $controlOption $payloadInput".trim()
+                        "10" -> "10 $selectedSession".trim()
+                        "11" -> "11 $selectedReset".trim()
+                        else -> ""
+                    }
+                }
+                
+                Text(
+                    text = "Comando generado: $generatedCommand",
+                    color = Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MeetColors.cardBackgroundLighter)
+                        .padding(8.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { showUdsWizard = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cardBackgroundLighter),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancelar", color = MeetColors.textPrimary)
+                    }
+                    
+                    Button(
+                        onClick = {
+                            commandInput = generatedCommand
+                            showUdsWizard = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBD00FF)),
+                        enabled = generatedCommand.isNotBlank(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cargar Comando", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
 }
 
 // ═══════════════════════════════════════
@@ -469,6 +1122,27 @@ private fun shareTerminalLogs(context: Context, logs: List<TerminalLine>) {
         type = "text/plain"
     }
     val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal MEET")
+    context.startActivity(shareIntent)
+}
+
+private fun copyLocalShellLogsToClipboard(context: Context, logs: List<String>) {
+    if (logs.isEmpty()) return
+    val text = logs.joinToString("\n")
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clip = ClipData.newPlainText("MEET Local Terminal Logs", text)
+    clipboard.setPrimaryClip(clip)
+    Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
+}
+
+private fun shareLocalShellLogs(context: Context, logs: List<String>) {
+    if (logs.isEmpty()) return
+    val text = logs.joinToString("\n")
+    val sendIntent = Intent().apply {
+        action = Intent.ACTION_SEND
+        putExtra(Intent.EXTRA_TEXT, text)
+        type = "text/plain"
+    }
+    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal MEET Android")
     context.startActivity(shareIntent)
 }
 
@@ -572,5 +1246,35 @@ private fun TerminalLineRow(line: TerminalLine, glowAlpha: Float) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun TerminalFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    activeColor: Color
+) {
+    val backgroundColor = if (selected) activeColor.copy(alpha = 0.15f) else MeetColors.backgroundDeep
+    val borderColor = if (selected) activeColor else MeetColors.textMuted.copy(alpha = 0.2f)
+    val textColor = if (selected) activeColor else MeetColors.textMuted
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }

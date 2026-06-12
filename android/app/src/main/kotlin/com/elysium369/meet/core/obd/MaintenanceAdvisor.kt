@@ -59,11 +59,11 @@ object MaintenanceAdvisor {
         
         val nextDate = if (avgDailyKm != null && avgDailyKm > 1f) {
             // Predict next date based on daily driving average
-            val daysUntilDue = intervalKm / avgDailyKm
-            currentDateMillis + (daysUntilDue * 24 * 60 * 60 * 1000).toLong()
+            val daysUntilDue = (intervalKm.toDouble() / avgDailyKm.toDouble()).toLong()
+            currentDateMillis + (daysUntilDue * 24L * 60L * 60L * 1000L)
         } else {
             // Fallback to static months
-            currentDateMillis + (intervalMonths * 30L * 24 * 60 * 60 * 1000)
+            currentDateMillis + (intervalMonths.toLong() * 30L * 24L * 60L * 60L * 1000L)
         }
         
         return Pair(nextKm, nextDate)
