@@ -82,6 +82,9 @@ android {
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.*"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
