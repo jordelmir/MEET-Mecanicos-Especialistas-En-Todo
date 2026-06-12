@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.UUID
@@ -24,6 +26,7 @@ import io.github.jan.supabase.gotrue.auth
 class TripManager @Inject constructor(
     private val obdSession: ObdSession,
     private val tripRepository: com.elysium369.meet.data.supabase.TripRepository,
+    private val phoneSpeedTracker: com.elysium369.meet.core.obd.PhoneSpeedTracker,
     private val scope: CoroutineScope
 ) {
     private var _currentTrip: TripEntity? = null
@@ -34,7 +37,8 @@ class TripManager @Inject constructor(
     private var monitoringJob: Job? = null
     
     // Telemetry Accumulators
-    private var lastTimestamp: Long = 0
+    private var lastDistanceTimestamp: Long = 0
+    private var lastFuelTimestamp: Long = 0
     private var speedSum = 0f
     private var speedCount = 0
     private var rpmSum = 0f
@@ -79,7 +83,36 @@ class TripManager @Inject constructor(
         )
         _currentTripState.value = _currentTrip
 
+        phoneSpeedTracker.start()
+
         monitoringJob = scope.launch(Dispatchers.IO) {
+            // Loop de 1s para integración de distancia continua usando PhoneSpeedTracker (GPS + OBD)
+            launch {
+                lastDistanceTimestamp = System.currentTimeMillis()
+                while (isActive) {
+                    delay(1000L)
+                    val now = System.currentTimeMillis()
+                    val deltaTimeMillis = now - lastDistanceTimestamp
+                    val deltaTimeHours = deltaTimeMillis / 3600000f
+                    val currentSpeed = phoneSpeedTracker.fusedSpeed.value
+                    
+                    if (deltaTimeMillis > 0) {
+                        totalDistance += currentSpeed * deltaTimeHours
+                    }
+                    
+                    _currentTrip?.let { trip ->
+                        _currentTrip = trip.copy(
+                            distanceKm = totalDistance,
+                            durationSeconds = (now - trip.startedAt) / 1000,
+                            avgSpeedKmh = if (speedCount > 0) speedSum / speedCount else currentSpeed
+                        )
+                        _currentTripState.value = _currentTrip
+                    }
+                    lastDistanceTimestamp = now
+                }
+            }
+
+            // Colección asíncrona de datos de sensores OBD
             obdSession.liveData.collectLatest { data ->
                 updateTelemetry(data)
             }
@@ -90,69 +123,66 @@ class TripManager @Inject constructor(
         val trip = _currentTrip ?: return
         val now = System.currentTimeMillis()
         
-        // 1. Precise Distance Calculation (Integration)
-        val currentSpeed = data["010D"] ?: 0f // Km/h
-        val deltaTimeMillis = if (lastTimestamp > 0) (now - lastTimestamp) else 0L
+        // Mantener PhoneSpeedTracker alimentado con la velocidad del OBD si está disponible
+        val obdSpeed = data["010D"]
+        if (obdSpeed != null) {
+            phoneSpeedTracker.setObdSpeed(obdSpeed)
+        }
+        
+        // 2. Estimación del consumo de combustible usando lastFuelTimestamp independiente
+        val deltaTimeMillis = if (lastFuelTimestamp > 0) (now - lastFuelTimestamp) else 0L
         val deltaTimeHours = deltaTimeMillis / 3600000f
         
-        if (deltaTimeMillis > 0) {
-            totalDistance += currentSpeed * deltaTimeHours
-        }
-
-        // 2. High-Fidelity Fuel Consumption Estimation (Professional Grade)
-        // Order of precedence: Direct Fuel Rate > MAF + Fuel Trims > MAF Base
         val fuelRate = data["015E"] // L/h
         if (fuelRate != null) {
             totalFuelConsumed += fuelRate * deltaTimeHours
         } else {
             val maf = data["0110"] // g/s
             if (maf != null) {
-                // Apply Fuel Trims (STFT + LTFT) for precise air-fuel ratio correction
-                val stft = data["0106"] ?: 0f // Short Term Fuel Trim Bank 1 (%)
-                val ltft = data["0107"] ?: 0f // Long Term Fuel Trim Bank 1 (%)
+                val stft = data["0106"] ?: 0f
+                val ltft = data["0107"] ?: 0f
                 val totalTrimMultiplier = 1.0f + ((stft + ltft) / 100f)
-
-                // Stoichiometric ratio 14.7:1 for gasoline
-                // Gasoline density ~ 740 g/L (0.74 kg/L)
                 val baseFuelGps = maf / 14.7f
                 val correctedFuelGps = baseFuelGps * totalTrimMultiplier
-                
                 val litersPerSecond = correctedFuelGps / 740f
                 val deltaTimeSeconds = deltaTimeMillis / 1000f
                 totalFuelConsumed += litersPerSecond * deltaTimeSeconds * fuelCalibrationFactor
             }
         }
-        
-        lastTimestamp = now
+        lastFuelTimestamp = now
 
-        // 3. Update Maximums and Accumulators
+        // 3. Actualizar máximos y acumuladores
+        val currentSpeed = obdSpeed ?: phoneSpeedTracker.fusedSpeed.value
         maxSpeed = maxOf(maxSpeed, currentSpeed)
         
         val currentRpm = data["010C"] ?: 0f
-        maxRpm = maxOf(maxRpm, currentRpm)
+        if (currentRpm > 0f) {
+            maxRpm = maxOf(maxRpm, currentRpm)
+            rpmSum += currentRpm
+            rpmCount++
+            rpmHistory.add(currentRpm)
+            if (rpmHistory.size > 1000) rpmHistory.removeAt(0)
+        }
         
         val currentTemp = data["0105"] ?: 0f
-        maxTemp = maxOf(maxTemp, currentTemp)
+        if (currentTemp > 0f) {
+            maxTemp = maxOf(maxTemp, currentTemp)
+        }
 
         speedSum += currentSpeed
-        rpmSum += currentRpm
         speedCount++
-        rpmCount++
-
         speedHistory.add(currentSpeed)
         if (speedHistory.size > 1000) speedHistory.removeAt(0)
-        rpmHistory.add(currentRpm)
-        if (rpmHistory.size > 1000) rpmHistory.removeAt(0)
+        
         data["0111"]?.let { 
             throttleHistory.add(it)
             if (throttleHistory.size > 1000) throttleHistory.removeAt(0)
         }
 
-        // 4. Update Current Trip Object (Live)
+        // 4. Actualizar estado en tiempo real (mantenido por el recolector OBD)
         _currentTrip = trip.copy(
             distanceKm = totalDistance,
-            durationSeconds = (now - trip.startedAt) / 1000,
-            avgSpeedKmh = if (speedCount > 0) speedSum / speedCount else 0f,
+            avgSpeedKmh = if (speedCount > 0) speedSum / speedCount else currentSpeed,
             avgRpm = if (rpmCount > 0) rpmSum / rpmCount else 0f,
             maxSpeedKmh = maxSpeed,
             maxRpm = maxRpm,
@@ -196,7 +226,8 @@ class TripManager @Inject constructor(
     }
 
     private fun resetAccumulators() {
-        lastTimestamp = 0
+        lastDistanceTimestamp = 0
+        lastFuelTimestamp = 0
         speedSum = 0f
         speedCount = 0
         rpmSum = 0f
@@ -240,6 +271,7 @@ class TripManager @Inject constructor(
         tripRepository.saveTrip(domainTrip)
         
         monitoringJob?.cancel()
+        phoneSpeedTracker.stop()
         _currentTrip = null
         _currentTripState.value = null
         resetAccumulators()

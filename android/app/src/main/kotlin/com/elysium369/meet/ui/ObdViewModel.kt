@@ -142,7 +142,13 @@ class ObdViewModel @Inject constructor(
     val terminalSessionLogs: StateFlow<List<TerminalLine>> = _terminalSessionLogs.asStateFlow()
 
     // Sustituto de Termux para Terminal de Android
-    val localShellManager = com.elysium369.meet.core.utils.LocalShellManager(viewModelScope)
+    val localShellManager = com.elysium369.meet.core.utils.LocalShellManager(
+        context,
+        geminiDiagnostic,
+        obdSession,
+        tripManager,
+        viewModelScope
+    )
     val localShellLines: StateFlow<List<String>> = localShellManager.terminalLines
 
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
@@ -2925,6 +2931,7 @@ class ObdViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         phoneSpeedTracker.stop()
+        localShellManager.stopShell()
     }
 }
 
