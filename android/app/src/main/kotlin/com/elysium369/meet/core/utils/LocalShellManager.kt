@@ -1,6 +1,7 @@
 package com.elysium369.meet.core.utils
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.util.Log
 import com.elysium369.meet.core.ai.GeminiDiagnostic
 import com.elysium369.meet.core.obd.ObdSession
@@ -139,6 +140,94 @@ class LocalShellManager(
             return
         }
 
+        // Intercept Special Install Linux command
+        if (cmdTrimmed.startsWith("pkg install ")) {
+            val distro = cmdTrimmed.substring(12).trim().lowercase()
+            if (distro == "alpine" || distro == "linux" || distro == "ubuntu" || distro == "debian") {
+                _terminalLines.update { it + "❯ $command" }
+                val targetDistro = if (distro == "linux") "alpine" else distro
+                val capName = when (targetDistro) {
+                    "alpine" -> "Alpine"
+                    "debian" -> "Debian"
+                    "ubuntu" -> "Ubuntu"
+                    else -> "Linux"
+                }
+                _terminalLines.update { it + "[MEET-Termux] Iniciando instalación de $capName..." }
+                
+                val downloadUrl = when (targetDistro) {
+                    "alpine" -> "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/alpine-minirootfs-3.19.1-aarch64.tar.gz"
+                    "debian" -> "https://github.com/termux/proot-distro/releases/download/v4.17.3/debian-bookworm-aarch64-pd-v4.17.3.tar.xz"
+                    "ubuntu" -> "http://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04-base-arm64.tar.gz"
+                    else -> ""
+                }
+                
+                val archiveName = when (targetDistro) {
+                    "alpine" -> "alpine.tar.gz"
+                    "debian" -> "debian.tar.xz"
+                    "ubuntu" -> "ubuntu.tar.gz"
+                    else -> "distro.tar.gz"
+                }
+                val sizeStr = when (targetDistro) {
+                    "alpine" -> "~3.2MB"
+                    "debian" -> "~40.9MB"
+                    "ubuntu" -> "~26.3MB"
+                    else -> ""
+                }
+                
+                _terminalLines.update { it + "[MEET-Termux] Descargando $capName rootfs ($sizeStr)..." }
+                
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val cacheDir = appContext.cacheDir
+                        val distroArchive = File(cacheDir, archiveName)
+                        val distroDir = File(appContext.filesDir, targetDistro)
+                        
+                        downloadBinary(downloadUrl, distroArchive)
+                        appendOutput("[MEET-Termux] Descarga completada. Extrayendo rootfs...")
+                        
+                        if (distroDir.exists()) {
+                            distroDir.deleteRecursively()
+                        }
+                        distroDir.mkdirs()
+                        
+                        val isXz = archiveName.endsWith(".xz")
+                        val tarFlags = if (isXz) "-xJf" else "-xzf"
+                        
+                        val busyboxFile = File(appContext.filesDir, "bin/busybox")
+                        if (!busyboxFile.exists()) {
+                            val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
+                            if (nativeLibBusybox.exists()) {
+                                Runtime.getRuntime().exec(arrayOf(nativeLibBusybox.absolutePath, "tar", tarFlags, distroArchive.absolutePath, "-C", distroDir.absolutePath)).waitFor()
+                            } else {
+                                throw IOException("No se encontró BusyBox para extraer el rootfs.")
+                            }
+                        } else {
+                            ProcessBuilder(busyboxFile.absolutePath, "tar", tarFlags, distroArchive.absolutePath, "-C", distroDir.absolutePath)
+                                .start()
+                                .waitFor()
+                        }
+                        
+                        // Create resolv.conf for DNS
+                        val resolvConf = File(distroDir, "etc/resolv.conf")
+                        resolvConf.parentFile?.mkdirs()
+                        val dnsText = getSystemDnsServers().joinToString("\n") { "nameserver $it" } + "\n"
+                        resolvConf.writeText(dnsText)
+                        
+                        distroArchive.delete()
+                        
+                        // Re-create CLI scripts to include boot script
+                        createCliScripts(File(appContext.filesDir, "bin"))
+                        
+                        appendOutput("[MEET-Termux] ¡$capName instalado con éxito!")
+                        appendOutput("[MEET-Termux] Escribe '$targetDistro' para iniciar el contenedor.")
+                    } catch (e: Exception) {
+                        appendOutput("[MEET-Termux] Error al instalar $capName: ${e.message}")
+                    }
+                }
+                return
+            }
+        }
+
         // Intercept Special Database Query CLI
         if (cmdTrimmed.startsWith("db ") || cmdTrimmed.startsWith("meet-db ")) {
             _terminalLines.update { it + "❯ $command" }
@@ -211,6 +300,46 @@ class LocalShellManager(
             } catch (e: Exception) {
                 appendOutput("[MEET-Termux] Error al inicializar BusyBox: ${e.message}")
                 appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
+            }
+        }
+    }
+
+    private fun downloadBinary(urlStr: String, destFile: File) {
+        var currentUrl = urlStr
+        var conn: java.net.HttpURLConnection? = null
+        var redirectCount = 0
+        val maxRedirects = 5
+        
+        while (redirectCount < maxRedirects) {
+            val url = java.net.URL(currentUrl)
+            conn = url.openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 30000
+            conn.readTimeout = 30000
+            conn.instanceFollowRedirects = true
+            
+            val status = conn.responseCode
+            if (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || 
+                status == java.net.HttpURLConnection.HTTP_MOVED_PERM || 
+                status == 307 || status == 308 || status == 303) {
+                val newUrl = conn.getHeaderField("Location")
+                if (newUrl != null) {
+                    currentUrl = newUrl
+                    redirectCount++
+                    conn.disconnect()
+                    continue
+                }
+            }
+            break
+        }
+        
+        val finalConn = conn ?: throw java.io.IOException("Failed to connect to $urlStr")
+        if (finalConn.responseCode != java.net.HttpURLConnection.HTTP_OK) {
+            throw java.io.IOException("Server returned HTTP response code: ${finalConn.responseCode} for URL: $currentUrl")
+        }
+        
+        finalConn.inputStream.use { input ->
+            destFile.outputStream().use { output ->
+                input.copyTo(output)
             }
         }
     }
@@ -309,6 +438,73 @@ class LocalShellManager(
                 echo "Una vez instalado Termux, ejecute: pkg install nodejs && npx <comando>"
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${npxHelper.absolutePath}").waitFor()
+
+            // alpine, debian & ubuntu boot scripts
+            val nativeLibProot = File(appContext.applicationInfo.nativeLibraryDir, "libproot.so")
+            val distros = listOf("alpine", "debian", "ubuntu")
+            
+            for (distro in distros) {
+                val distroDir = File(appContext.filesDir, distro)
+                val bootFile = File(binDir, distro)
+                
+                if (distroDir.exists() && nativeLibProot.exists()) {
+                    val dnsSetupLines = getSystemDnsServers().joinToString("\n") {
+                        "echo \"nameserver $it\" >> ${distroDir.absolutePath}/etc/resolv.conf"
+                    }
+                    bootFile.writeText("""
+                        #!/system/bin/sh
+                        export PROOT_TMP_DIR=${appContext.cacheDir.absolutePath}
+                        rm -f ${distroDir.absolutePath}/etc/resolv.conf
+                        $dnsSetupLines
+                        
+                        if [ $# -gt 0 ]; then
+                            exec ${nativeLibProot.absolutePath} \
+                                -r ${distroDir.absolutePath} \
+                                -b /dev \
+                                -b /sys \
+                                -b /proc \
+                                -b ${binDir.absolutePath}:/bin/meet \
+                                -0 \
+                                /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec "$@"' -- "$@"
+                        else
+                            exec ${nativeLibProot.absolutePath} \
+                                -r ${distroDir.absolutePath} \
+                                -b /dev \
+                                -b /sys \
+                                -b /proc \
+                                -b ${binDir.absolutePath}:/bin/meet \
+                                -0 \
+                                /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec /bin/sh'
+                        fi
+                    """.trimIndent().trim())
+                    Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
+                } else {
+                    val capName = if (distro == "alpine") "Alpine" else if (distro == "debian") "Debian" else "Ubuntu"
+                    bootFile.writeText("""
+                        #!/system/bin/sh
+                        echo "[MEET-Termux] $capName no está instalado."
+                        echo "Ejecute el comando: pkg install $distro"
+                    """.trimIndent().trim())
+                    Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
+                }
+            }
+            
+            // linux boot script (acts as alias to the first installed container OS)
+            val linuxBootFile = File(binDir, "linux")
+            val installedDistro = distros.firstOrNull { File(appContext.filesDir, it).exists() }
+            if (installedDistro != null) {
+                linuxBootFile.writeText("""
+                    #!/system/bin/sh
+                    exec ${File(binDir, installedDistro).absolutePath} "$@"
+                """.trimIndent().trim())
+            } else {
+                linuxBootFile.writeText("""
+                    #!/system/bin/sh
+                    echo "[MEET-Termux] Ninguna distribución de Linux está instalada."
+                    echo "Ejecute el comando: pkg install alpine (o debian, o ubuntu)"
+                """.trimIndent().trim())
+            }
+            Runtime.getRuntime().exec("chmod 755 ${linuxBootFile.absolutePath}").waitFor()
 
         } catch (e: Exception) {
             Log.e("LocalShellManager", "Error creating CLI scripts: ${e.message}")
@@ -409,6 +605,25 @@ class LocalShellManager(
         writer = null
         
         controlServer?.stop()
+    }
+
+    private fun getSystemDnsServers(): List<String> {
+        val servers = mutableListOf<String>()
+        try {
+            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            cm?.activeNetwork?.let { network ->
+                cm.getLinkProperties(network)?.dnsServers?.forEach { dns ->
+                    dns.hostAddress?.let { servers.add(it) }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LocalShellManager", "Error getting system DNS: ${e.message}")
+        }
+        if (servers.isEmpty()) {
+            servers.add("8.8.8.8")
+            servers.add("8.8.4.4")
+        }
+        return servers
     }
 }
 
