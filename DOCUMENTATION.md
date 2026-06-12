@@ -32,6 +32,17 @@ When a generic `ATSP0` (Auto Search) command fails on low-end adapters, MEET per
 ### 2.4. Anti-Timeout Protection (`KeepAliveManager.kt`)
 Many ECUs and ELM chips enter a sleep state if no commands are sent for 2-3 seconds. The `KeepAliveManager` monitors the read buffer. If 1800ms pass without traffic, it injects an `0100` ping directly into the transmission stream, bypassing the queue to keep the CAN bus awake.
 
+### 2.5. Cyber-Termux & Local API Server Integration (`LocalShellManager.kt`)
+MEET v3.6.0 introduces the **Cyber-Termux Android Terminal**, a 100% real interactive `/system/bin/sh` shell sandbox (`context.filesDir/home`) that runs completely offline:
+1. **Pre-packaged BusyBox**: Bundles static `libbusybox.so` inside native libraries (`jniLibs/arm64-v8a/`), which is automatically extracted by the OS package manager to `nativeLibraryDir` with execute permissions, bypassing Android 10+ W^X policies.
+2. **Dynamic Symlink Engine**: Rebuilds utility symlinks in the virtual `bin/` directory on application startup, avoiding stale references when package hash directories change on update.
+3. **Local Control API Server (Port 8082)**: Runs a local Ktor web server that exposes:
+   - `GET /api/telemetry`: Current OBD-II values and sensor fusion data.
+   - `POST /api/db`: Performs direct SQL queries on the local SQLite database (`meet_dtc.db`).
+   - `POST /api/ai`: Queries Gemini Pro with live telemetry context.
+   - `POST /api/obd`: Transmits raw commands directly to the OBD-II adapter.
+4. **Relocatable CLI Scripts**: Injects helper scripts (`db`, `ai`, `telemetry`, `obd-send`, and guides for `node`/`npm`/`npx`) into the virtual shell path (`context.filesDir/bin`).
+
 ---
 
 ## 3. Data Flow & Persistence

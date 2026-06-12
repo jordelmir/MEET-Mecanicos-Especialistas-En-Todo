@@ -326,7 +326,14 @@ MEET uses a **"Neon Cyan" cyberpunk** design language with glassmorphism cards, 
 
 ## 📋 Changelog
 
-### v3.5 Elite (Current) — June 2026
+### v3.6 Cyber-Termux & Local Control Server (Current) — June 2026
+- ✅ **BusyBox Integration (100% Offline)** — Bundles pre-packaged `libbusybox.so` inside native libraries (`jniLibs`), extracting automatically with execute permissions to bypass Android 10+ W^X policies.
+- ✅ **Dynamic Symlink Engine** — Dynamically builds symlinks in the virtual environment's `bin/` directory on application startup, avoiding stale references when package hash directories change on update.
+- ✅ **Local Control API Server (Port 8082)** — Runs a local Ktor web server that exposes `/api/telemetry`, `/api/db` (SQL querying), `/api/ai` (Gemini prompting with live context), and `/api/obd`.
+- ✅ **Relocatable CLI Scripts** — Injects `db`, `ai`, `telemetry`, and `obd-send` helper scripts, plus `node`/`npm`/`npx` integration guides, directly into the virtual shell path (`context.filesDir/bin`).
+- ✅ **Sensor Fusion Distance Tracking** — Integrates GPS and OBD-II sensors in `PhoneSpeedTracker` at 60 FPS for continuous, real-time mileage calculation, decoupling distance from fuel consumption loops.
+
+### v3.5 Elite — June 2026
 - ✅ **Android Terminal (Termux Substitute)** — Fully integrated interactive `/system/bin/sh` shell running asynchronously via Kotlin Coroutines. Features quick-execution chips (`uname`, `df`, `pm`, `getprop`, `netstat`, `top`, `logcat`), CRT scanline effects, and clean log exports (copy/share).
 - ✅ **Advanced Statistics & Telemetry Dashboard** — Next-level analytics tab featuring:
   - **EcoScore Radial Gauge** with dynamic Canvas arcs & EPA-based CO2 emissions calculator.

@@ -129,20 +129,13 @@ class LocalShellManager(
         // Intercept Special Install Nodejs command
         if (cmdTrimmed == "pkg install nodejs" || cmdTrimmed == "pkg install node") {
             _terminalLines.update { it + "❯ $command" }
-            _terminalLines.update { it + "[MEET-Termux] Iniciando instalación de Node.js..." }
-            _terminalLines.update { it + "[MEET-Termux] Descargando Node.js v18 precompilado para Android ARM64 (~25MB)..." }
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val binDir = File(appContext.filesDir, "bin")
-                    val nodeFile = File(binDir, "node")
-                    downloadBinary("https://github.com/sjitech/nodejs-android-prebuilt-binaries/raw/master/node-v18.16.0-android-arm64/bin/node", nodeFile)
-                    Runtime.getRuntime().exec("chmod 755 ${nodeFile.absolutePath}").waitFor()
-                    appendOutput("[MEET-Termux] ¡Node.js instalado con éxito!")
-                    appendOutput("[MEET-Termux] Escribe 'node -v' para comprobar la versión instalada.")
-                } catch (e: Exception) {
-                    appendOutput("[MEET-Termux] Error al instalar Node.js: ${e.message}")
-                }
-            }
+            _terminalLines.update { it + "[MEET-Termux] Android 10+ (targetSDK 34) restringe la ejecución de binarios ELF descargados dinámicamente." }
+            _terminalLines.update { it + "[MEET-Termux] Para ejecutar Node.js, Claude Code o Gemini CLI y conectarse a esta APK:" }
+            _terminalLines.update { it + "  1. Instale Termux en su dispositivo desde F-Droid." }
+            _terminalLines.update { it + "  2. En Termux ejecute: pkg install nodejs" }
+            _terminalLines.update { it + "  3. Instale sus herramientas globales (ej. npm install -g @google/generative-ai)." }
+            _terminalLines.update { it + "  4. Ejecute sus herramientas apuntando al servidor local de esta app en http://127.0.0.1:8082" }
+            _terminalLines.update { it + "     Ejemplo: curl -X POST -d \"SELECT * FROM trips\" http://127.0.0.1:8082/api/db" }
             return
         }
 
@@ -178,46 +171,46 @@ class LocalShellManager(
     private fun checkAndInstallBusybox() {
         scope.launch(Dispatchers.IO) {
             val binDir = File(appContext.filesDir, "bin")
-            val busyboxFile = File(binDir, "busybox")
-            if (!busyboxFile.exists()) {
-                appendOutput("[MEET-Termux] Inicializando entorno de comandos de Android...")
-                appendOutput("[MEET-Termux] Descargando BusyBox ARM64 para habilitar 300+ comandos tradicionales (ls, grep, cat, curl)...")
-                try {
-                    downloadBinary("https://busybox.net/downloads/binaries/1.35.0-Goat/busybox-armv8l", busyboxFile)
-                    Runtime.getRuntime().exec("chmod 755 ${busyboxFile.absolutePath}").waitFor()
-                    appendOutput("[MEET-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
-                    
-                    val proc = ProcessBuilder(busyboxFile.absolutePath, "--install", "-s", binDir.absolutePath)
-                        .directory(binDir)
-                        .start()
-                    proc.waitFor()
-                    
-                    createCliScripts(binDir)
-                    appendOutput("[MEET-Termux] ¡BusyBox instalado con éxito! Entorno CLI listo para ejecutar cualquier script o comando.")
-                } catch (e: Exception) {
-                    appendOutput("[MEET-Termux] Error descargando BusyBox: ${e.message}")
-                    appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
-                }
-            } else {
-                createCliScripts(binDir)
+            val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
+            
+            if (!nativeLibBusybox.exists()) {
+                appendOutput("[MEET-Termux] Error: No se encontró libbusybox.so en las librerías nativas.")
+                appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
+                return@launch
             }
-        }
-    }
+            
+            appendOutput("[MEET-Termux] Inicializando entorno de comandos de Android...")
+            try {
+                // Clear bin directory to avoid stale symlinks from previous app installations/hashes
+                if (binDir.exists()) {
+                    binDir.listFiles()?.forEach { it.delete() }
+                } else {
+                    binDir.mkdirs()
+                }
+                
+                // Create busybox symlink first so busybox command itself works
+                val busyboxSymlink = File(binDir, "busybox")
+                try {
+                    android.system.Os.symlink(nativeLibBusybox.absolutePath, busyboxSymlink.absolutePath)
+                } catch (e: Exception) {
+                    Log.e("LocalShellManager", "Failed to create symlink for busybox: ${e.message}")
+                }
 
-    private fun downloadBinary(urlStr: String, destFile: File) {
-        val url = URL(urlStr)
-        val conn = url.openConnection() as java.net.HttpURLConnection
-        conn.connectTimeout = 15000
-        conn.readTimeout = 15000
-        conn.instanceFollowRedirects = true
-        
-        if (conn.responseCode != java.net.HttpURLConnection.HTTP_OK) {
-            throw IOException("Server returned HTTP response code: ${conn.responseCode} for URL: $urlStr")
-        }
-        
-        conn.inputStream.use { input ->
-            destFile.outputStream().use { output ->
-                input.copyTo(output)
+                appendOutput("[MEET-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
+                val proc = ProcessBuilder(nativeLibBusybox.absolutePath, "--install", "-s", binDir.absolutePath)
+                    .directory(binDir)
+                    .start()
+                val exitCode = proc.waitFor()
+                
+                createCliScripts(binDir)
+                if (exitCode == 0) {
+                    appendOutput("[MEET-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
+                } else {
+                    appendOutput("[MEET-Termux] Advertencia: BusyBox retornó código de salida $exitCode.")
+                }
+            } catch (e: Exception) {
+                appendOutput("[MEET-Termux] Error al inicializar BusyBox: ${e.message}")
+                appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
             }
         }
     }
@@ -283,6 +276,40 @@ class LocalShellManager(
                 fi
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${obdFile.absolutePath}").waitFor()
+
+            // node helper script
+            val nodeHelper = File(binDir, "node")
+            nodeHelper.writeText("""
+                #!/system/bin/sh
+                echo "[MEET-Termux] Android 10+ (targetSDK 34) impide ejecutar Node directamente en el sandbox del APK."
+                echo "Para usar Node.js/Claude Code/Gemini CLI con los datos de esta app:"
+                echo "1. Instale la app Termux desde F-Droid."
+                echo "2. Ejecute en Termux: pkg install nodejs"
+                echo "3. Use las APIs locales de esta app desde su terminal Termux:"
+                echo "   - Telemetria: http://127.0.0.1:8082/api/telemetry"
+                echo "   - Base de Datos (SQL): http://127.0.0.1:8082/api/db"
+                echo "   - Comandos OBD: http://127.0.0.1:8082/api/obd"
+            """.trimIndent().trim())
+            Runtime.getRuntime().exec("chmod 755 ${nodeHelper.absolutePath}").waitFor()
+
+            // npm helper script
+            val npmHelper = File(binDir, "npm")
+            npmHelper.writeText("""
+                #!/system/bin/sh
+                echo "[MEET-Termux] Use npm desde la app Termux en su dispositivo."
+                echo "Una vez instalado Termux, ejecute: pkg install nodejs && npm install -g <paquete>"
+            """.trimIndent().trim())
+            Runtime.getRuntime().exec("chmod 755 ${npmHelper.absolutePath}").waitFor()
+
+            // npx helper script
+            val npxHelper = File(binDir, "npx")
+            npxHelper.writeText("""
+                #!/system/bin/sh
+                echo "[MEET-Termux] Use npx desde la app Termux en su dispositivo."
+                echo "Una vez instalado Termux, ejecute: pkg install nodejs && npx <comando>"
+            """.trimIndent().trim())
+            Runtime.getRuntime().exec("chmod 755 ${npxHelper.absolutePath}").waitFor()
+
         } catch (e: Exception) {
             Log.e("LocalShellManager", "Error creating CLI scripts: ${e.message}")
         }
