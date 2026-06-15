@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -24,13 +25,22 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
+import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
+import com.elysium369.meet.ui.components.gauges.GaugeStyleSet
+import com.elysium369.meet.ui.components.gauges.StyledGauge
+import com.elysium369.meet.ui.components.hud.HudData
+import com.elysium369.meet.ui.components.hud.HudFaceManager
+import com.elysium369.meet.ui.components.hud.HudFaceRenderer
+import com.elysium369.meet.ui.components.hud.HudFaceSelector
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
@@ -39,7 +49,7 @@ import kotlin.math.*
 
 // ════════════════════════════════════════════════════════════════════════════
 //  HOLO LOCAL READ SCREEN — MAXIMUM VISUAL FIDELITY
-//  Full holographic 3D dashboard with particles, glows, and real shadows
+//  Full holographic 3D dashboard with StyledGauge system + particles + glows
 // ════════════════════════════════════════════════════════════════════════════
 
 private fun getMetricFromMap(map: Map<String, Float>, key: String, containsKeyword: String? = null): Float {
@@ -55,6 +65,14 @@ fun HoloLocalReadScreen(
     viewModel: ObdViewModel,
     navController: NavController
 ) {
+    val context = LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val currentStyle by gaugeStyleManager.currentStyle.collectAsState()
+
+    // HUD Face manager
+    val hudFaceManager = remember { HudFaceManager(context) }
+    val currentFace by hudFaceManager.currentFace.collectAsState()
+
     Box(modifier = Modifier.fillMaxSize().background(MeetColors.backgroundDeep)) {
         // ── Layer 1: Holographic background particles ──
         HoloLocalBackground()
@@ -66,10 +84,32 @@ fun HoloLocalReadScreen(
         Column(modifier = Modifier.fillMaxSize()) {
 
             // ── HEADER ──
-            HoloHeader(onBack = { navController.popBackStack() })
+            HoloHeader(
+                onBack = { navController.popBackStack() },
+                currentStyle = currentStyle,
+                onCycleStyle = { gaugeStyleManager.cycleNext() },
+                onCycleStyleBack = { gaugeStyleManager.cyclePrevious() }
+            )
+
+            // ── HUD Face Selector ──
+            HudFaceSelector(
+                currentFace = currentFace,
+                onFaceSelected = { hudFaceManager.selectFace(it) }
+            )
 
             // ── MAIN CONTENT GRID ──
             val gridState = rememberLazyGridState()
+            val liveData by viewModel.liveData.collectAsState()
+            val hudData = HudData(
+                speed = getMetricFromMap(liveData, "010D"),
+                rpm = getMetricFromMap(liveData, "010C"),
+                coolantTemp = getMetricFromMap(liveData, "0105"),
+                throttle = getMetricFromMap(liveData, "0111"),
+                engineLoad = getMetricFromMap(liveData, "0104"),
+                voltage = liveData["0142"] ?: liveData.entries.firstOrNull { it.key.contains("VOLT", true) }?.value ?: 12.4f,
+                fuelLevel = getMetricFromMap(liveData, "012F"),
+                intakeTemp = getMetricFromMap(liveData, "010F")
+            )
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Fixed(2),
@@ -78,32 +118,58 @@ fun HoloLocalReadScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
+                // ── Full-width HUD Face Display ──
+                item(span = { GridItemSpan(2) }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.Black.copy(alpha = 0.8f))
+                            .border(
+                                0.5.dp,
+                                MeetColors.neonGreen.copy(alpha = 0.2f),
+                                RoundedCornerShape(20.dp)
+                            )
+                    ) {
+                        HudFaceRenderer(
+                            face = currentFace,
+                            data = hudData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
                 // ── Full-width Live Status Banner ──
                 item(span = { GridItemSpan(2) }) {
                     LiveStatusBanner(viewModel)
                 }
 
-                // ── Primary gauges (full arc dial) ──
+                // ── Primary gauges (StyledGauge with 3D wrapper) ──
                 item {
-                    HoloGaugeCard(
+                    HoloStyledGaugeCard(
                         viewModel = viewModel,
                         pidKey = "010C",
                         label = "RPM",
                         maxVal = 8000f,
                         unit = "rpm",
+                        warningThreshold = 6000f,
+                        criticalThreshold = 7000f,
                         glowColor = MeetColors.neonGreen,
-                        icon = "⚡"
+                        currentStyle = currentStyle
                     )
                 }
                 item {
-                    HoloGaugeCard(
+                    HoloStyledGaugeCard(
                         viewModel = viewModel,
                         pidKey = "010D",
                         label = "VELOCIDAD",
                         maxVal = 260f,
                         unit = "km/h",
+                        warningThreshold = 160f,
+                        criticalThreshold = 200f,
                         glowColor = MeetColors.electricBlue,
-                        icon = "🏎"
+                        currentStyle = currentStyle
                     )
                 }
 
@@ -194,100 +260,203 @@ fun HoloLocalReadScreen(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  HEADER — Holographic top bar with animated scan line
+//  HEADER — Holographic top bar with animated scan line + style selector
 // ════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun HoloHeader(onBack: () -> Unit) {
+private fun HoloHeader(
+    onBack: () -> Unit,
+    currentStyle: GaugeStyleSet,
+    onCycleStyle: () -> Unit,
+    onCycleStyleBack: () -> Unit
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "headerGlow")
     val glowPulse by infiniteTransition.animateFloat(
         initialValue = 0.4f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "glowPulse"
     )
+    val sweepPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing)),
+        label = "headerSweep"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
             .drawBehind {
-                // Bottom glow line
+                // Animated sweep border at bottom
                 drawLine(
                     brush = Brush.horizontalGradient(
                         0f to Color.Transparent,
-                        0.3f to MeetColors.neonGreen.copy(alpha = 0.5f * glowPulse),
-                        0.7f to MeetColors.cyberCyan.copy(alpha = 0.4f * glowPulse),
+                        sweepPhase.coerceIn(0f, 0.5f) * 2f to MeetColors.neonGreen.copy(alpha = 0.6f * glowPulse),
+                        0.5f to MeetColors.cyberCyan.copy(alpha = 0.5f * glowPulse),
+                        (0.5f + (1f - sweepPhase).coerceIn(0f, 0.5f)) to MeetColors.electricBlue.copy(alpha = 0.4f * glowPulse),
                         1f to Color.Transparent
                     ),
                     start = Offset(0f, size.height),
                     end = Offset(size.width, size.height),
-                    strokeWidth = 1.5f
+                    strokeWidth = 2f
+                )
+                // Top glow band
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to MeetColors.neonGreen.copy(alpha = 0.04f * glowPulse),
+                        1f to Color.Transparent
+                    )
                 )
             }
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Back button with glow
-            Box(
+        Column {
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        ambientColor = MeetColors.neonGreen.copy(alpha = 0.3f),
-                        spotColor = MeetColors.neonGreen.copy(alpha = 0.4f)
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                MeetColors.neonGreen.copy(alpha = 0.15f),
-                                Color.Transparent
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Back button with glow
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = CircleShape,
+                            ambientColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                            spotColor = MeetColors.neonGreen.copy(alpha = 0.4f)
+                        )
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    MeetColors.neonGreen.copy(alpha = 0.15f),
+                                    Color.Transparent
+                                )
                             )
                         )
+                        .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f), CircleShape)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("←", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                }
+
+                // Title block
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "LECTURA EN VIVO",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        letterSpacing = 1.sp
                     )
-                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("←", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(MeetColors.neonGreen.copy(alpha = glowPulse), CircleShape)
+                                .shadow(4.dp, CircleShape, ambientColor = MeetColors.neonGreen)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "OBD2 • MODO LOCAL • ACTIVO",
+                            color = MeetColors.neonGreen.copy(alpha = 0.7f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+                    }
+                }
+
+                // Pulsing radar icon
+                HoloRadarIcon(glowPulse = glowPulse)
             }
 
-            // Title block
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(
-                    "LECTURA EN VIVO",
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 18.sp,
-                    letterSpacing = 1.sp
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(MeetColors.neonGreen.copy(alpha = glowPulse), CircleShape)
-                            .shadow(4.dp, CircleShape, ambientColor = MeetColors.neonGreen)
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        "OBD2 • MODO LOCAL • ACTIVO",
-                        color = MeetColors.neonGreen.copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp
-                    )
+            // ── Gauge Style Selector Bar ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                // Previous arrow
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.neonGreen.copy(alpha = 0.08f))
+                        .border(0.5.dp, MeetColors.neonGreen.copy(alpha = 0.25f), CircleShape)
+                        .clickable { onCycleStyleBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("◀", color = MeetColors.neonGreen.copy(alpha = 0.7f), fontSize = 10.sp)
+                }
+
+                Spacer(Modifier.width(10.dp))
+
+                // Style name chip
+                Box(
+                    modifier = Modifier
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            ambientColor = MeetColors.neonGreen.copy(alpha = 0.15f),
+                            spotColor = MeetColors.neonGreen.copy(alpha = 0.2f)
+                        )
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color(0xFF0A1A0A).copy(alpha = 0.95f),
+                                    Color(0xFF070F1E).copy(alpha = 0.95f)
+                                )
+                            )
+                        )
+                        .border(
+                            0.5.dp,
+                            Brush.horizontalGradient(
+                                listOf(
+                                    MeetColors.neonGreen.copy(alpha = 0.4f * glowPulse),
+                                    MeetColors.cyberCyan.copy(alpha = 0.3f * glowPulse)
+                                )
+                            ),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable { onCycleStyle() }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(currentStyle.icon, fontSize = 14.sp)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            currentStyle.displayName.uppercase(),
+                            color = MeetColors.neonGreen,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.5.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(10.dp))
+
+                // Next arrow
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.neonGreen.copy(alpha = 0.08f))
+                        .border(0.5.dp, MeetColors.neonGreen.copy(alpha = 0.25f), CircleShape)
+                        .clickable { onCycleStyle() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("▶", color = MeetColors.neonGreen.copy(alpha = 0.7f), fontSize = 10.sp)
                 }
             }
-
-            Spacer(Modifier.weight(1f))
-
-            // Pulsing radar icon
-            HoloRadarIcon(glowPulse = glowPulse)
         }
     }
 }
@@ -400,6 +569,18 @@ private fun LiveStatusBanner(viewModel: ObdViewModel) {
                     ),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
                 )
+                // Corner markers
+                val m = 12.dp.toPx(); val p = 3.dp.toPx()
+                val w = size.width; val h = size.height
+                val mc = MeetColors.neonGreen.copy(alpha = 0.5f * glowAlpha)
+                drawLine(mc, Offset(p, p), Offset(p + m, p), 1.5f)
+                drawLine(mc, Offset(p, p), Offset(p, p + m), 1.5f)
+                drawLine(mc, Offset(w - p, p), Offset(w - p - m, p), 1.5f)
+                drawLine(mc, Offset(w - p, p), Offset(w - p, p + m), 1.5f)
+                drawLine(mc, Offset(p, h - p), Offset(p + m, h - p), 1.5f)
+                drawLine(mc, Offset(p, h - p), Offset(p, h - p - m), 1.5f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p - m, h - p), 1.5f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p, h - p - m), 1.5f)
             }
     ) {
         Row(
@@ -477,61 +658,42 @@ private fun LiveStatusBanner(viewModel: ObdViewModel) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  HOLO GAUGE CARD — Circular arc gauge with 3D depth and glow
+//  HOLO STYLED GAUGE CARD — Uses StyledGauge with 3D wrapper inside holo card
 // ════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun HoloGaugeCard(
+private fun HoloStyledGaugeCard(
     viewModel: ObdViewModel,
     pidKey: String,
     label: String,
     maxVal: Float,
     unit: String,
+    warningThreshold: Float,
+    criticalThreshold: Float,
     glowColor: Color,
-    icon: String
+    currentStyle: GaugeStyleSet
 ) {
     val valueFlow = remember(viewModel.liveData, pidKey) {
         viewModel.liveData.map { getMetricFromMap(it, pidKey) }.distinctUntilChanged()
     }
     val value by valueFlow.collectAsState(initial = 0f)
-    val animValue by animateFloatAsState(
-        targetValue = value.coerceIn(0f, maxVal),
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 180f),
-        label = "gaugeVal"
-    )
-    val progress = (animValue / maxVal).coerceIn(0f, 1f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "gaugeHolo")
-    val rotX by infiniteTransition.animateFloat(
-        initialValue = -2f, targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotX"
-    )
-    val rotY by infiniteTransition.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(5100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotY"
-    )
+    val infiniteTransition = rememberInfiniteTransition(label = "styledGaugeHolo")
     val glowPulse by infiniteTransition.animateFloat(
         initialValue = 0.3f, targetValue = 0.8f,
         animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "glow"
+        label = "sgGlow"
     )
     val sweepPhase by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
-        label = "sweep"
+        label = "sgSweep"
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.85f)
-            .graphicsLayer {
-                rotationX = rotX
-                rotationY = rotY
-                cameraDistance = 14f * density
-            }
             .shadow(
                 elevation = 20.dp,
                 shape = RoundedCornerShape(20.dp),
@@ -582,137 +744,45 @@ private fun HoloGaugeCard(
             }
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Icon + label header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(icon, fontSize = 14.sp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    label,
-                    color = glowColor.copy(alpha = 0.7f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+            // Label header
+            Text(
+                label,
+                color = glowColor.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+            )
 
-            // Arc Gauge Canvas
+            // StyledGauge fills the card
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val radius = (size.minDimension / 2f) * 0.82f
-                    val stroke = 10.dp.toPx()
-                    val startAngle = 135f
-                    val sweepAngle = 270f
-
-                    // Outer ambient glow ring
-                    drawArc(
-                        color = glowColor.copy(alpha = 0.07f * glowPulse),
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        style = Stroke(width = stroke * 3.5f, cap = StrokeCap.Round),
-                        topLeft = Offset(cx - radius, cy - radius),
-                        size = Size(radius * 2f, radius * 2f)
-                    )
-                    // Background track
-                    drawArc(
-                        color = Color.White.copy(alpha = 0.04f),
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round),
-                        topLeft = Offset(cx - radius, cy - radius),
-                        size = Size(radius * 2f, radius * 2f)
-                    )
-                    // Value arc glow (wide)
-                    drawArc(
-                        brush = Brush.sweepGradient(
-                            0f to Color.Transparent,
-                            progress * 0.7f to glowColor.copy(alpha = 0.3f),
-                            progress to glowColor.copy(alpha = 0.7f)
-                        ),
-                        startAngle = startAngle,
-                        sweepAngle = progress * sweepAngle,
-                        useCenter = false,
-                        style = Stroke(width = stroke * 2.5f, cap = StrokeCap.Round),
-                        topLeft = Offset(cx - radius, cy - radius),
-                        size = Size(radius * 2f, radius * 2f)
-                    )
-                    // Value arc core
-                    drawArc(
-                        color = glowColor,
-                        startAngle = startAngle,
-                        sweepAngle = progress * sweepAngle,
-                        useCenter = false,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round),
-                        topLeft = Offset(cx - radius, cy - radius),
-                        size = Size(radius * 2f, radius * 2f)
-                    )
-
-                    // Needle tip dot
-                    val needleAngleDeg = startAngle + progress * sweepAngle
-                    val needleAngleRad = Math.toRadians(needleAngleDeg.toDouble())
-                    val needleTip = Offset(
-                        (cx + radius * cos(needleAngleRad)).toFloat(),
-                        (cy + radius * sin(needleAngleRad)).toFloat()
-                    )
-                    drawCircle(
-                        color = glowColor,
-                        radius = 6.dp.toPx(),
-                        center = needleTip
-                    )
-                    drawCircle(
-                        color = glowColor.copy(alpha = 0.3f),
-                        radius = 10.dp.toPx(),
-                        center = needleTip
-                    )
-
-                    // Center hub
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(Color.White.copy(alpha = 0.15f), Color.Transparent),
-                            center = Offset(cx, cy), radius = 20.dp.toPx()
-                        ),
-                        radius = 20.dp.toPx(), center = Offset(cx, cy)
-                    )
-                    drawCircle(color = glowColor.copy(alpha = 0.8f), radius = 4.dp.toPx(), center = Offset(cx, cy))
-                    drawCircle(color = Color.Black, radius = 2.5f.dp.toPx(), center = Offset(cx, cy))
-                }
-
-                // Digital value overlay
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "${animValue.toInt()}",
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = (-1).sp
-                    )
-                    Text(
-                        unit,
-                        color = glowColor.copy(alpha = 0.7f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                StyledGauge(
+                    style = currentStyle,
+                    label = label,
+                    value = value,
+                    minVal = 0f,
+                    maxVal = maxVal,
+                    unit = unit,
+                    warningThreshold = warningThreshold,
+                    criticalThreshold = criticalThreshold,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  HOLO METRIC CARD — Compact sensor card with linear bar + glow
+//  HOLO METRIC CARD — Compact sensor card with linear bar + glow (enhanced)
 // ════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -759,11 +829,16 @@ private fun HoloMetricCard(
         ),
         label = "mGlow"
     )
+    val sweepPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4000 + (label.length * 100), easing = LinearEasing)),
+        label = "mSweep"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
+            .height(145.dp)
             .graphicsLayer {
                 rotationX = rotX
                 rotationY = rotY
@@ -786,21 +861,26 @@ private fun HoloMetricCard(
             )
             .drawBehind {
                 val cr = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
-                // Animated border
+                // Animated sweep border
                 drawRoundRect(
-                    color = activeColor.copy(alpha = 0.4f * glowPulse),
+                    brush = Brush.sweepGradient(
+                        sweepPhase to activeColor.copy(alpha = 0.6f * glowPulse),
+                        (sweepPhase + 0.3f) % 1f to activeColor.copy(alpha = 0.15f),
+                        (sweepPhase + 0.6f) % 1f to Color.Transparent,
+                        (sweepPhase + 0.85f) % 1f to activeColor.copy(alpha = 0.1f)
+                    ),
                     cornerRadius = cr,
                     style = Stroke(width = 1.2f)
                 )
                 // Top glow band
                 drawRoundRect(
                     brush = Brush.verticalGradient(
-                        0f to activeColor.copy(alpha = 0.1f * glowPulse),
+                        0f to activeColor.copy(alpha = 0.12f * glowPulse),
                         0.35f to Color.Transparent
                     ),
                     cornerRadius = cr
                 )
-                // Corner marks
+                // Corner marks (all 8)
                 val m = 10.dp.toPx(); val p = 2.dp.toPx()
                 val mc = activeColor.copy(alpha = 0.5f)
                 val w = size.width; val h = size.height
@@ -808,6 +888,10 @@ private fun HoloMetricCard(
                 drawLine(mc, Offset(p, p), Offset(p, p + m), 1.2f)
                 drawLine(mc, Offset(w - p, p), Offset(w - p - m, p), 1.2f)
                 drawLine(mc, Offset(w - p, p), Offset(w - p, p + m), 1.2f)
+                drawLine(mc, Offset(p, h - p), Offset(p + m, h - p), 1.2f)
+                drawLine(mc, Offset(p, h - p), Offset(p, h - p - m), 1.2f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p - m, h - p), 1.2f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p, h - p - m), 1.2f)
             }
     ) {
         Column(
@@ -816,31 +900,40 @@ private fun HoloMetricCard(
         ) {
             // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(icon, fontSize = 12.sp)
-                Spacer(Modifier.width(5.dp))
+                Text(icon, fontSize = 14.sp)
+                Spacer(Modifier.width(6.dp))
                 Text(
                     label,
-                    color = activeColor.copy(alpha = 0.6f),
+                    color = activeColor.copy(alpha = 0.7f),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.5.sp
                 )
+                if (isWarning) {
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(MeetColors.error.copy(alpha = glowPulse), CircleShape)
+                            .shadow(4.dp, CircleShape, ambientColor = MeetColors.error)
+                    )
+                }
             }
 
             // Value
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    "${animValue.toInt()}",
+                    if (unit == "V") String.format("%.1f", animValue) else "${animValue.toInt()}",
                     color = if (isWarning) MeetColors.error else Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace
                 )
-                Spacer(Modifier.width(3.dp))
+                Spacer(Modifier.width(4.dp))
                 Text(
                     unit,
                     color = activeColor.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
@@ -860,7 +953,7 @@ private fun HoloMetricCard(
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(3.dp))
                         .shadow(
-                            elevation = 6.dp,
+                            elevation = 8.dp,
                             shape = RoundedCornerShape(3.dp),
                             ambientColor = activeColor.copy(alpha = 0.4f),
                             spotColor = activeColor
@@ -868,7 +961,7 @@ private fun HoloMetricCard(
                         .background(
                             Brush.horizontalGradient(
                                 listOf(
-                                    activeColor.copy(alpha = 0.5f),
+                                    activeColor.copy(alpha = 0.4f),
                                     activeColor
                                 )
                             )
@@ -932,6 +1025,11 @@ private fun HoloWavePanel(
         animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing)),
         label = "scan"
     )
+    val sweepPhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4500, easing = LinearEasing)),
+        label = "waveSweep"
+    )
 
     Box(
         modifier = Modifier
@@ -946,8 +1044,14 @@ private fun HoloWavePanel(
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF060E18).copy(alpha = 0.97f))
             .drawBehind {
+                // Animated sweep border
                 drawRoundRect(
-                    color = MeetColors.cyberCyan.copy(alpha = 0.3f * glowPulse),
+                    brush = Brush.sweepGradient(
+                        sweepPhase to MeetColors.cyberCyan.copy(alpha = 0.5f * glowPulse),
+                        (sweepPhase + 0.3f) % 1f to MeetColors.neonGreen.copy(alpha = 0.2f),
+                        (sweepPhase + 0.6f) % 1f to Color.Transparent,
+                        (sweepPhase + 0.85f) % 1f to MeetColors.electricBlue.copy(alpha = 0.15f)
+                    ),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
                     style = Stroke(width = 1.2f)
                 )
@@ -958,6 +1062,18 @@ private fun HoloWavePanel(
                     ),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
                 )
+                // Corner markers
+                val m = 10.dp.toPx(); val p = 2.dp.toPx()
+                val w = size.width; val h = size.height
+                val mc = MeetColors.cyberCyan.copy(alpha = 0.4f)
+                drawLine(mc, Offset(p, p), Offset(p + m, p), 1.2f)
+                drawLine(mc, Offset(p, p), Offset(p, p + m), 1.2f)
+                drawLine(mc, Offset(w - p, p), Offset(w - p - m, p), 1.2f)
+                drawLine(mc, Offset(w - p, p), Offset(w - p, p + m), 1.2f)
+                drawLine(mc, Offset(p, h - p), Offset(p + m, h - p), 1.2f)
+                drawLine(mc, Offset(p, h - p), Offset(p, h - p - m), 1.2f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p - m, h - p), 1.2f)
+                drawLine(mc, Offset(w - p, h - p), Offset(w - p, h - p - m), 1.2f)
             }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -282,6 +282,7 @@ fun HomeScreen(
             val actions = listOf(
                 Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner",
                 Triple("⚠️", "DTCs", MeetColors.error) to "dtc",
+                Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings",
                 Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage",
                 Triple("🤖", "IA", MeetColors.electricBlue) to "ai",
                 Triple("🔧", "Terminal", MeetColors.cyberCyan) to "terminal",

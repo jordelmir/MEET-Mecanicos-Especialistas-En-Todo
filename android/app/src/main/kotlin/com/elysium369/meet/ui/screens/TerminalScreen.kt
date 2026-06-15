@@ -81,6 +81,8 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     var activeTerminalTab by remember { mutableStateOf("OBD") } // "OBD" or "ANDROID"
     var localCommandInput by remember { mutableStateOf("") }
     val localShellLines by viewModel.localShellLines.collectAsState()
+    val activeDistro by viewModel.activeDistro.collectAsState()
+    val installedDistros by viewModel.installedDistros.collectAsState()
     
     var isSending by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -291,7 +293,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "TERMINAL DE ANDROID",
+                    text = "SISTEMAS ANDROID & LINUX",
                     color = if (activeTerminalTab == "ANDROID") MeetColors.cyberCyan else MeetColors.textSecondary,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -593,214 +595,445 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 }
             }
         } else {
-            // ═══ ANDROID LOCAL TERMINAL LAYOUT ═══
-            val androidQuickCommands = listOf(
-                "ls" to "📁 ls",
-                "pwd" to "📍 pwd",
-                "getprop" to "⚙️ props",
-                "pm list packages" to "📦 pkgs",
-                "df -h" to "💾 df",
-                "uname -a" to "🐧 kernel",
-                "id" to "👤 id",
-                "netstat -an" to "🌐 netstat",
-                "top -n 1" to "⚡ top",
-                "logcat -d -t 50" to "📝 logcat"
+            // ═══ MULTI-DISTRO LINUX & ANDROID LAYOUT ═══
+            val distroTabs = listOf(
+                "android" to "🤖 Host",
+                "alpine" to "🏔️ Alpine",
+                "debian" to "🍥 Debian",
+                "ubuntu" to "🧡 Ubuntu"
             )
-
-            // CRT terminal console area
-            Box(
+            
+            Row(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MeetColors.backgroundDeep)
-                    .border(
-                        1.dp,
-                        MeetColors.cyberCyan.copy(alpha = 0.15f),
-                        RoundedCornerShape(10.dp)
-                    )
-                    .drawWithContent {
-                        drawContent()
-                        // CRT Scanlines Effect
-                        val scanlineSpacing = 6.dp.toPx()
-                        val scanlineHeight = 1.5.dp.toPx()
-                        var y = 0f
-                        while (y < size.height) {
-                            drawRect(
-                                color = Color.Black.copy(alpha = 0.12f),
-                                topLeft = androidx.compose.ui.geometry.Offset(0f, y),
-                                size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                distroTabs.forEach { (distroId, label) ->
+                    val isSelected = activeDistro == distroId
+                    val isInstalled = installedDistros.contains(distroId)
+                    val activeColor = when (distroId) {
+                        "android" -> MeetColors.cyberCyan
+                        "alpine" -> MeetColors.neonGreen
+                        "debian" -> Color(0xFFBD00FF)
+                        "ubuntu" -> Color(0xFFFF5500)
+                        else -> MeetColors.cyberCyan
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) activeColor.copy(alpha = 0.15f)
+                                else MeetColors.backgroundDeep
                             )
-                            y += scanlineSpacing
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) activeColor 
+                                        else if (isInstalled) MeetColors.textMuted.copy(alpha = 0.3f)
+                                        else MeetColors.textMuted.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                if (activeDistro != distroId) {
+                                    viewModel.switchActiveDistro(distroId)
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) activeColor else if (isInstalled) Color.White.copy(alpha = 0.8f) else MeetColors.textMuted,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(
+                                            if (isInstalled) MeetColors.neonGreen 
+                                            else MeetColors.error
+                                        )
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isInstalled) "ACTIVO" else "DISPONIBLE",
+                                    color = if (isInstalled) MeetColors.neonGreen.copy(alpha = 0.8f) else MeetColors.textMuted.copy(alpha = 0.6f),
+                                    fontSize = 7.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
-                    .padding(8.dp)
-            ) {
-                LazyColumn(
-                    state = localListState,
-                    modifier = Modifier.fillMaxSize()
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val activeIsInstalled = installedDistros.contains(activeDistro)
+            if (!activeIsInstalled) {
+                // Show installation prompt
+                val distroTitle = when (activeDistro) {
+                    "alpine" -> "Alpine Linux"
+                    "debian" -> "Debian GNU/Linux"
+                    "ubuntu" -> "Ubuntu Linux"
+                    else -> if (activeDistro.isNotEmpty()) activeDistro.substring(0, 1).uppercase() + activeDistro.substring(1) else ""
+                }
+                val distroDesc = when (activeDistro) {
+                    "alpine" -> "Distribución ultraligera (~3.2MB de descarga, se extrae en ~9MB). Ideal para scripts sencillos y contenedores rápidos."
+                    "debian" -> "Distribución Debian Bookworm estable (~40.9MB de descarga, se extrae en ~110MB). Soporte completo para desarrollo."
+                    "ubuntu" -> "Ubuntu Base 22.04 LTS (~26.3MB de descarga, se extrae en ~75MB). Recomendado para instalar pip, Python y Antigravity CLI."
+                    else -> ""
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .border(
+                            1.dp,
+                            MeetColors.textMuted.copy(alpha = 0.2f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(localShellLines) { line ->
-                        Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "📦 INSTALADOR DE SISTEMAS",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = distroTitle,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = distroDesc,
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 16.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Button(
+                            onClick = {
+                                viewModel.localShellManager.executeCommand("pkg install $activeDistro")
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = when (activeDistro) {
+                                    "alpine" -> MeetColors.neonGreen
+                                    "debian" -> Color(0xFFBD00FF)
+                                    "ubuntu" -> Color(0xFFFF5500)
+                                    else -> MeetColors.cyberCyan
+                                }
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                        ) {
                             Text(
-                                text = line,
-                                color = when {
-                                    line.startsWith("❯") -> MeetColors.cyberCyan
-                                    line.startsWith("[Error") -> MeetColors.error
-                                    line.startsWith("[Shell") -> MeetColors.error
-                                    else -> Color.White
-                                },
+                                text = "📥 DESCARGAR E INSTALAR $distroTitle",
+                                fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp,
-                                lineHeight = 16.sp
+                                color = Color.White
                             )
                         }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Action button bar for Restart Shell next to console input
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        viewModel.localShellManager.startShell()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MeetColors.cardBackgroundLighter,
-                        contentColor = MeetColors.cyberCyan
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        "REINICIAR SHELL",
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            // Command input row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = localCommandInput,
-                    onValueChange = { localCommandInput = it },
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MeetColors.cyberCyan,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = MeetColors.backgroundDeep,
-                        unfocusedContainerColor = MeetColors.backgroundDeep,
-                        cursorColor = MeetColors.cyberCyan,
-                        focusedBorderColor = MeetColors.cyberCyan,
-                        unfocusedBorderColor = MeetColors.cyberCyan.copy(alpha = 0.25f)
-                    ),
-                    placeholder = {
-                        Text(
-                            "ls -la, pm list packages, df...",
-                            color = MeetColors.textMuted,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp
+            } else {
+                // CRT terminal console area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .border(
+                            1.dp,
+                            when (activeDistro) {
+                                "android" -> MeetColors.cyberCyan
+                                "alpine" -> MeetColors.neonGreen
+                                "debian" -> Color(0xFFBD00FF)
+                                "ubuntu" -> Color(0xFFFF5500)
+                                else -> MeetColors.cyberCyan
+                            }.copy(alpha = 0.15f),
+                            RoundedCornerShape(10.dp)
                         )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Send,
-                        keyboardType = KeyboardType.Text
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
+                        .drawWithContent {
+                            drawContent()
+                            // CRT Scanlines Effect
+                            val scanlineSpacing = 6.dp.toPx()
+                            val scanlineHeight = 1.5.dp.toPx()
+                            var y = 0f
+                            while (y < size.height) {
+                                drawRect(
+                                    color = Color.Black.copy(alpha = 0.12f),
+                                    topLeft = androidx.compose.ui.geometry.Offset(0f, y),
+                                    size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
+                                )
+                                y += scanlineSpacing
+                            }
+                        }
+                        .padding(8.dp)
+                ) {
+                    LazyColumn(
+                        state = localListState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(localShellLines) { line ->
+                            Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                                Text(
+                                    text = line,
+                                    color = when {
+                                        line.startsWith("❯") -> when (activeDistro) {
+                                            "android" -> MeetColors.cyberCyan
+                                            "alpine" -> MeetColors.neonGreen
+                                            "debian" -> Color(0xFFBD00FF)
+                                            "ubuntu" -> Color(0xFFFF5500)
+                                            else -> MeetColors.cyberCyan
+                                        }
+                                        line.startsWith("[Error") -> MeetColors.error
+                                        line.startsWith("[Shell") -> MeetColors.error
+                                        else -> Color.White
+                                    },
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Action button bar for Restart Shell next to console input
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.localShellManager.restartShell()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MeetColors.cardBackgroundLighter,
+                            contentColor = when (activeDistro) {
+                                "android" -> MeetColors.cyberCyan
+                                "alpine" -> MeetColors.neonGreen
+                                "debian" -> Color(0xFFBD00FF)
+                                "ubuntu" -> Color(0xFFFF5500)
+                                else -> MeetColors.cyberCyan
+                            }
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            "REINICIAR ENTORNOS",
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                // Command input row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val activeColor = when (activeDistro) {
+                        "android" -> MeetColors.cyberCyan
+                        "alpine" -> MeetColors.neonGreen
+                        "debian" -> Color(0xFFBD00FF)
+                        "ubuntu" -> Color(0xFFFF5500)
+                        else -> MeetColors.cyberCyan
+                    }
+                    OutlinedTextField(
+                        value = localCommandInput,
+                        onValueChange = { localCommandInput = it },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = activeColor,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = MeetColors.backgroundDeep,
+                            unfocusedContainerColor = MeetColors.backgroundDeep,
+                            cursorColor = activeColor,
+                            focusedBorderColor = activeColor,
+                            unfocusedBorderColor = activeColor.copy(alpha = 0.25f)
+                        ),
+                        placeholder = {
+                            Text(
+                                when (activeDistro) {
+                                    "android" -> "ls -la, pm list packages, df..."
+                                    "alpine" -> "apk update, apk add nodejs, python3..."
+                                    "debian", "ubuntu" -> "apt update, apt install -y python3..."
+                                    else -> "Comando de consola..."
+                                },
+                                color = MeetColors.textMuted,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 13.sp
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Send,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                val cmd = localCommandInput.trim()
+                                if (cmd.isNotEmpty()) {
+                                    viewModel.localShellManager.executeCommand(cmd)
+                                    localCommandInput = ""
+                                }
+                            }
+                        ),
+                        textStyle = LocalTextStyle.current.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
                             val cmd = localCommandInput.trim()
                             if (cmd.isNotEmpty()) {
                                 viewModel.localShellManager.executeCommand(cmd)
                                 localCommandInput = ""
                             }
-                        }
-                    ),
-                    textStyle = LocalTextStyle.current.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = {
-                        val cmd = localCommandInput.trim()
-                        if (cmd.isNotEmpty()) {
-                            viewModel.localShellManager.executeCommand(cmd)
-                            localCommandInput = ""
-                        }
-                    },
-                    enabled = localCommandInput.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MeetColors.cyberCyan,
-                        contentColor = MeetColors.backgroundDeep,
-                        disabledContainerColor = MeetColors.backgroundDark
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(56.dp)
-                ) {
-                    Text(
-                        "RUN",
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 16.sp
-                    )
+                        },
+                        enabled = localCommandInput.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = activeColor,
+                            contentColor = MeetColors.backgroundDeep,
+                            disabledContainerColor = MeetColors.backgroundDark
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Text(
+                            "RUN",
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Quick actions list
-            Text(
-                text = "ACCIONES RÁPIDAS (AND SYSTEM)",
-                color = MeetColors.textMuted,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(androidQuickCommands) { (cmd, label) ->
-                    AssistChip(
-                        onClick = {
-                            viewModel.localShellManager.executeCommand(cmd)
-                        },
-                        label = {
-                            Text(
-                                label,
-                                color = MeetColors.cyberCyan,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MeetColors.backgroundDeep
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = MeetColors.cyberCyan.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(6.dp)
+                // Contextual quick commands list
+                val quickCommandsForDistro = when (activeDistro) {
+                    "android" -> listOf(
+                        "ls" to "📁 ls",
+                        "pwd" to "📍 pwd",
+                        "getprop" to "⚙️ props",
+                        "pm list packages" to "📦 pkgs",
+                        "df -h" to "💾 df",
+                        "uname -a" to "🐧 kernel",
+                        "id" to "👤 id",
+                        "netstat -an" to "🌐 netstat",
+                        "top -n 1" to "⚡ top",
+                        "logcat -d -t 50" to "📝 logcat"
                     )
+                    "alpine" -> listOf(
+                        "apk update" to "🔄 update",
+                        "apk add python3 nodejs git" to "📦 add-deps",
+                        "python3 -v" to "🐍 python3",
+                        "node -v" to "🟢 nodejs",
+                        "ls" to "📁 ls",
+                        "pwd" to "📍 pwd",
+                        "whoami" to "👤 whoami"
+                    )
+                    "debian", "ubuntu" -> listOf(
+                        "apt update" to "🔄 apt-update",
+                        "apt install -y python3 python3-pip python3-venv git" to "📦 install-python",
+                        "pip3 install google-antigravity" to "🛸 pip-antigravity",
+                        "antigravity --help" to "🛸 antigravity-help",
+                        "python3 -c \"import antigravity\"" to "🐍 run-python",
+                        "ls" to "📁 ls",
+                        "pwd" to "📍 pwd",
+                        "whoami" to "👤 whoami"
+                    )
+                    else -> emptyList()
+                }
+
+                Text(
+                    text = "ACCIONES RÁPIDAS (${activeDistro.uppercase()})",
+                    color = MeetColors.textMuted,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(quickCommandsForDistro) { (cmd, label) ->
+                        val activeColor = when (activeDistro) {
+                            "android" -> MeetColors.cyberCyan
+                            "alpine" -> MeetColors.neonGreen
+                            "debian" -> Color(0xFFBD00FF)
+                            "ubuntu" -> Color(0xFFFF5500)
+                            else -> MeetColors.cyberCyan
+                        }
+                        AssistChip(
+                            onClick = {
+                                viewModel.localShellManager.executeCommand(cmd)
+                            },
+                            label = {
+                                Text(
+                                    label,
+                                    color = activeColor,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MeetColors.backgroundDeep
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = activeColor.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                    }
                 }
             }
         }

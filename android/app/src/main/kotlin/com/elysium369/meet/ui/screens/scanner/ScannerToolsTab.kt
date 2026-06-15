@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +37,10 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteOutlinedButton
 import com.elysium369.meet.ui.components.EliteIconButton
 import com.elysium369.meet.ui.components.neonGlow
+import com.elysium369.meet.ui.components.hud.HudData
+import com.elysium369.meet.ui.components.hud.HudFaceManager
+import com.elysium369.meet.ui.components.hud.HudFaceRenderer
+import com.elysium369.meet.ui.components.hud.HudFaceSelector
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -53,6 +58,21 @@ fun ScannerToolsTab(
     val highSpeedMode by viewModel.highSpeedMode.collectAsState()
     val isAdapterPro by viewModel.isAdapterPro.collectAsState()
     val isAiMonitoring by viewModel.isAiMonitoring.collectAsState()
+
+    // HUD Face manager
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hudFaceManager = remember { HudFaceManager(context) }
+    val currentFace by hudFaceManager.currentFace.collectAsState()
+    val hudData = HudData(
+        speed = liveData["010D"] ?: 0f,
+        rpm = liveData["010C"] ?: 0f,
+        coolantTemp = liveData["0105"] ?: 0f,
+        throttle = liveData["0111"] ?: 0f,
+        engineLoad = liveData["0104"] ?: 0f,
+        voltage = liveData["0142"] ?: liveData.entries.firstOrNull { it.key.contains("VOLT", true) }?.value ?: 12.4f,
+        fuelLevel = liveData["012F"] ?: 0f,
+        intakeTemp = liveData["010F"] ?: 0f
+    )
     
     val infiniteTransition = rememberInfiniteTransition()
     val recordAlpha by infiniteTransition.animateFloat(
@@ -243,45 +263,97 @@ fun ScannerToolsTab(
             }
         }
         
-        // 4. HUD Windshield Projector
+        // 4. HUD Windshield Projector — Expanded with 10 face types
         item {
             EliteCard(
                 backgroundColor = MeetColors.backgroundDeep,
                 borderColor = MeetColors.electricBlue.copy(alpha = 0.4f),
                 shape = RoundedCornerShape(14.dp),
                 glowColor = MeetColors.electricBlue.copy(alpha = 0.15f),
-                onClick = { onHudModeToggle(true) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Column {
+                    // Header row
+                    Row(
+                        modifier = Modifier.padding(16.dp).clickable { onHudModeToggle(true) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(MeetColors.electricBlue.copy(alpha = 0.1f), CircleShape)
+                                .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🖥️", fontSize = 22.sp)
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (isSpanish) "Proyector HUD de Parabrisas" else "Windshield HUD Projector", 
+                                color = Color.White, 
+                                fontWeight = FontWeight.Bold, 
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                if (isSpanish) "Refleja velocidad y RPM sobre el cristal • 10 estilos" 
+                                else "Reflects speed & RPM on windshield • 10 styles", 
+                                color = MeetColors.textSecondary, 
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    // Face selector row
+                    HudFaceSelector(
+                        currentFace = currentFace,
+                        onFaceSelected = { hudFaceManager.selectFace(it) }
+                    )
+
+                    // Live preview of selected face
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .background(MeetColors.electricBlue.copy(alpha = 0.1f), CircleShape)
-                            .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), CircleShape),
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.Black)
+                            .border(
+                                0.5.dp,
+                                MeetColors.electricBlue.copy(alpha = 0.25f),
+                                RoundedCornerShape(14.dp)
+                            )
+                            .clickable { onHudModeToggle(true) }
+                    ) {
+                        HudFaceRenderer(
+                            face = currentFace,
+                            data = hudData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // Open fullscreen button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MeetColors.electricBlue.copy(alpha = 0.1f))
+                            .border(0.5.dp, MeetColors.electricBlue.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                            .clickable { onHudModeToggle(true) }
+                            .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🖥️", fontSize = 22.sp)
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (isSpanish) "Proyector HUD de Parabrisas" else "Windshield HUD Projector", 
-                            color = Color.White, 
-                            fontWeight = FontWeight.Bold, 
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            if (isSpanish) "Refleja la velocidad y revoluciones sobre el cristal para conducción nocturna" 
-                            else "Reflects speed and RPM on the windshield for night driving", 
-                            color = MeetColors.textSecondary, 
-                            style = MaterialTheme.typography.bodySmall
+                            if (isSpanish) "▶  ABRIR HUD COMPLETO" else "▶  OPEN FULL HUD",
+                            color = MeetColors.electricBlue,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp,
+                            letterSpacing = 2.sp
                         )
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
 
@@ -34,6 +35,36 @@ data class RepairStep(
     val minutes: Int,
     val difficulty: String
 )
+
+object DtcRepairHelper {
+    fun parseStepString(stepStr: String, stepNum: Int): RepairStep {
+        // Clean prefix like "1. ", "Paso 1: ", etc.
+        val cleanStr = stepStr.replace(Regex("^(?i)(paso\\s*\\d+[:.]*|\\d+[:.]*)\\s*"), "")
+        
+        // Split into title and description at the first ':'
+        val parts = cleanStr.split(":", limit = 2)
+        val title = if (parts.size > 1) parts[0].trim() else "Procedimiento Técnico $stepNum"
+        val description = if (parts.size > 1) parts[1].trim() else cleanStr.trim()
+        
+        // Determine an icon based on title/description keywords
+        val icon = when {
+            cleanStr.contains("volt", ignoreCase = true) || cleanStr.contains("multímetro", ignoreCase = true) || cleanStr.contains("resistencia", ignoreCase = true) -> "⚡"
+            cleanStr.contains("limpiar", ignoreCase = true) || cleanStr.contains("limpieza", ignoreCase = true) || cleanStr.contains("aerosol", ignoreCase = true) -> "🧼"
+            cleanStr.contains("combustible", ignoreCase = true) || cleanStr.contains("gasolina", ignoreCase = true) || cleanStr.contains("presión", ignoreCase = true) -> "⛽"
+            cleanStr.contains("escáner", ignoreCase = true) || cleanStr.contains("escanear", ignoreCase = true) || cleanStr.contains("meet", ignoreCase = true) -> "📱"
+            cleanStr.contains("conducir", ignoreCase = true) || cleanStr.contains("ciclo", ignoreCase = true) || cleanStr.contains("ruta", ignoreCase = true) -> "🚗"
+            else -> "🔧"
+        }
+
+        return RepairStep(
+            title = title,
+            description = description,
+            icon = icon,
+            minutes = 15 + (stepNum * 5) % 20,
+            difficulty = if (stepNum > 3) "Difícil" else if (stepNum > 1) "Medio" else "Fácil"
+        )
+    }
+}
 
 object DtcRepairDatabase {
     fun getSteps(code: String): List<RepairStep> {
@@ -72,14 +103,70 @@ object DtcRepairDatabase {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DtcRepairGuideScreen(navController: NavController, dtcCode: String) {
-    val steps = remember(dtcCode) { DtcRepairDatabase.getSteps(dtcCode) }
-    val tools = remember(dtcCode) { DtcRepairDatabase.getRequiredTools(dtcCode) }
+fun DtcRepairGuideScreen(
+    navController: NavController,
+    dtcCode: String,
+    viewModel: ObdViewModel
+) {
+    var definition by remember { mutableStateOf<com.elysium369.meet.data.local.entities.DtcDefinitionEntity?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(dtcCode) {
+        isLoading = true
+        definition = viewModel.getDtcDefinition(dtcCode)
+        isLoading = false
+    }
+
+    val steps = remember(definition) {
+        val rawSteps = definition?.diagnosticSteps
+        if (!rawSteps.isNullOrEmpty()) {
+            try {
+                if (rawSteps.trim().startsWith("[")) {
+                    val array = org.json.JSONArray(rawSteps)
+                    val list = mutableListOf<RepairStep>()
+                    for (i in 0 until array.length()) {
+                        list.add(DtcRepairHelper.parseStepString(array.getString(i), i + 1))
+                    }
+                    list
+                } else {
+                    val lines = rawSteps.split(Regex("[|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
+                    lines.mapIndexed { idx, line -> DtcRepairHelper.parseStepString(line, idx + 1) }
+                }
+            } catch (e: Exception) {
+                listOf(RepairStep("Procedimiento de Diagnóstico", rawSteps, "🔧", 20, "Medio"))
+            }
+        } else {
+            DtcRepairDatabase.getSteps(dtcCode)
+        }
+    }
+
+    val tools = remember(definition) {
+        val rawTools = definition?.specialToolsRequired
+        if (!rawTools.isNullOrEmpty()) {
+            try {
+                if (rawTools.trim().startsWith("[")) {
+                    val array = org.json.JSONArray(rawTools)
+                    val list = mutableListOf<String>()
+                    for (i in 0 until array.length()) {
+                        list.add(array.getString(i))
+                    }
+                    list
+                } else {
+                    rawTools.split(Regex("[,|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
+                }
+            } catch (e: Exception) {
+                listOf(rawTools)
+            }
+        } else {
+            DtcRepairDatabase.getRequiredTools(dtcCode)
+        }
+    }
+
     var activeStepIdx by remember { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
 
     // Checklist for tools
-    val toolChecks = remember(dtcCode) { mutableStateListOf(*Array(tools.size) { false }) }
+    val toolChecks = remember(tools) { mutableStateListOf(*Array(tools.size) { false }) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -92,269 +179,309 @@ fun DtcRepairGuideScreen(navController: NavController, dtcCode: String) {
         },
         containerColor = Color.Transparent
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // ═══════════ HEADER CARD ═══════════
-            EliteCard(
-                modifier = Modifier.fillMaxWidth(),
-                glowColor = MeetColors.cyberCyan,
-                enableHolo3D = true
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "ASISTENTE DE MECÁNICA DE PRECISIÓN",
-                        color = MeetColors.cyberCyan,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Procedimiento Técnico $dtcCode",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        "Sigue las instrucciones paso a paso desarrolladas por ingenieros de servicio técnico automotriz.",
-                        color = MeetColors.textSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 17.sp
-                    )
-                }
+                CircularProgressIndicator(color = MeetColors.cyberCyan)
             }
-
-            // ═══════════ REQUIRED TOOLS CHECKLIST ═══════════
-            PhantomSectionHeader("Herramientas Requeridas")
-            EliteCard(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = MeetColors.borderSubtle,
-                enableHolo3D = false
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    tools.forEachIndexed { idx, tool ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { toolChecks[idx] = !toolChecks[idx] }
-                                .padding(vertical = 6.dp)
-                        ) {
-                            Checkbox(
-                                checked = toolChecks[idx],
-                                onCheckedChange = { toolChecks[idx] = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = MeetColors.neonGreen,
-                                    uncheckedColor = MeetColors.textSecondary,
-                                    checkmarkColor = MeetColors.backgroundDeep
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // ═══════════ HEADER CARD ═══════════
+                EliteCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    glowColor = MeetColors.cyberCyan,
+                    enableHolo3D = true
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "ASISTENTE DE MECÁNICA DE PRECISIÓN",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Procedimiento Técnico $dtcCode",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val descEs = definition?.descriptionEs ?: ""
+                        if (descEs.isNotEmpty()) {
                             Text(
-                                text = tool,
-                                color = if (toolChecks[idx]) MeetColors.textSecondary else Color.White,
+                                descEs,
+                                color = Color.White.copy(alpha = 0.85f),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.height(6.dp))
                         }
+                        Text(
+                            "Sigue las instrucciones paso a paso desarrolladas por ingenieros de servicio técnico automotriz.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
                     }
                 }
-            }
 
-            // ═══════════ STEP PROGRESS TIMELINE ═══════════
-            PhantomSectionHeader("Progreso del Diagnóstico")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                steps.forEachIndexed { idx, _ ->
-                    val isCompleted = idx < activeStepIdx
-                    val isActive = idx == activeStepIdx
-                    val barColor = when {
-                        isCompleted -> MeetColors.neonGreen
-                        isActive -> MeetColors.cyberCyan
-                        else -> MeetColors.borderSubtle
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(barColor)
-                    )
-                }
-            }
-
-            // ═══════════ ACTIVE STEP CARD ═══════════
-            val currentStep = steps.getOrNull(activeStepIdx)
-            if (currentStep != null) {
-                AnimatedContent(
-                    targetState = currentStep,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { it } togetherWith
-                        fadeOut(animationSpec = tween(200)) + slideOutHorizontally(animationSpec = tween(200)) { -it }
-                    },
-                    label = "stepAnim"
-                ) { targetStep ->
+                // ═══════════ REQUIRED TOOLS CHECKLIST ═══════════
+                if (tools.isNotEmpty()) {
+                    PhantomSectionHeader("Herramientas Requeridas")
                     EliteCard(
                         modifier = Modifier.fillMaxWidth(),
-                        glowColor = when (targetStep.difficulty) {
-                            "Fácil" -> MeetColors.neonGreen
-                            "Medio" -> MeetColors.warning
-                            else -> MeetColors.error
-                        },
-                        enableHolo3D = true
+                        borderColor = MeetColors.borderSubtle,
+                        enableHolo3D = false
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            // Step header
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(MeetColors.neonGreen.copy(alpha = 0.12f))
-                                            .border(1.dp, MeetColors.neonGreen, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = targetStep.icon,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        "PASO ${activeStepIdx + 1} DE ${steps.size}",
-                                        color = MeetColors.neonGreen,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 1.sp
-                                    )
-                                }
-
-                                // Difficulty tag
-                                Box(
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            tools.forEachIndexed { idx, tool ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            when (targetStep.difficulty) {
-                                                "Fácil" -> MeetColors.neonGreen.copy(alpha = 0.12f)
-                                                "Medio" -> MeetColors.warning.copy(alpha = 0.12f)
-                                                else -> MeetColors.error.copy(alpha = 0.12f)
-                                            }
-                                        )
-                                        .border(
-                                            1.dp,
-                                            when (targetStep.difficulty) {
-                                                "Fácil" -> MeetColors.neonGreen
-                                                "Medio" -> MeetColors.warning
-                                                else -> MeetColors.error
-                                            },
-                                            RoundedCornerShape(6.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        .fillMaxWidth()
+                                        .clickable { if (idx < toolChecks.size) toolChecks[idx] = !toolChecks[idx] }
+                                        .padding(vertical = 6.dp)
                                 ) {
+                                    val isChecked = idx < toolChecks.size && toolChecks[idx]
+                                    Checkbox(
+                                        checked = isChecked,
+                                        onCheckedChange = { if (idx < toolChecks.size) toolChecks[idx] = it },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = MeetColors.neonGreen,
+                                            uncheckedColor = MeetColors.textSecondary,
+                                            checkmarkColor = MeetColors.backgroundDeep
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = targetStep.difficulty.uppercase(),
-                                        color = when (targetStep.difficulty) {
-                                            "Fácil" -> MeetColors.neonGreen
-                                            "Medio" -> MeetColors.warning
-                                            else -> MeetColors.error
-                                        },
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 8.sp,
-                                        fontFamily = FontFamily.Monospace
+                                        text = tool,
+                                        color = if (isChecked) MeetColors.textSecondary else Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Step Title
-                            Text(
-                                text = targetStep.title,
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Step Instruction
-                            Text(
-                                text = targetStep.description,
-                                color = MeetColors.textPrimary,
-                                fontSize = 13.sp,
-                                lineHeight = 19.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Estimation
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "⏱️ Tiempo Estimado: ",
-                                    color = MeetColors.textSecondary,
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    "${targetStep.minutes} min",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
                             }
                         }
                     }
                 }
-            }
 
-            // ═══════════ NAVIGATION BUTTONS ═══════════
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (activeStepIdx > 0) {
-                    EliteOutlinedButton(
-                        text = "ANTERIOR",
-                        onClick = { activeStepIdx-- },
-                        color = MeetColors.cyberCyan,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                val isLast = activeStepIdx == steps.size - 1
-                EliteButton(
-                    text = if (isLast) "REPARACIÓN LISTA" else "SIGUIENTE PASO",
-                    onClick = {
-                        if (isLast) {
-                            navController.popBackStack()
-                        } else {
-                            activeStepIdx++
+                // ═══════════ STEP PROGRESS TIMELINE ═══════════
+                if (steps.isNotEmpty()) {
+                    PhantomSectionHeader("Progreso del Diagnóstico")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        steps.forEachIndexed { idx, _ ->
+                            val isCompleted = idx < activeStepIdx
+                            val isActive = idx == activeStepIdx
+                            val barColor = when {
+                                isCompleted -> MeetColors.neonGreen
+                                isActive -> MeetColors.cyberCyan
+                                else -> MeetColors.borderSubtle
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(5.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(barColor)
+                            )
                         }
-                    },
-                    color = MeetColors.neonGreen,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+                    }
 
-            Spacer(modifier = Modifier.height(32.dp))
+                    // ═══════════ ACTIVE STEP CARD ═══════════
+                    val currentStep = steps.getOrNull(activeStepIdx)
+                    if (currentStep != null) {
+                        AnimatedContent(
+                            targetState = currentStep,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { it } togetherWith
+                                fadeOut(animationSpec = tween(200)) + slideOutHorizontally(animationSpec = tween(200)) { -it }
+                            },
+                            label = "stepAnim"
+                        ) { targetStep ->
+                            EliteCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                glowColor = when (targetStep.difficulty) {
+                                    "Fácil" -> MeetColors.neonGreen
+                                    "Medio" -> MeetColors.warning
+                                    else -> MeetColors.error
+                                },
+                                enableHolo3D = true
+                            ) {
+                                Column(modifier = Modifier.padding(18.dp)) {
+                                    // Step header
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MeetColors.neonGreen.copy(alpha = 0.12f))
+                                                    .border(1.dp, MeetColors.neonGreen, CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = targetStep.icon,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                "PASO ${activeStepIdx + 1} DE ${steps.size}",
+                                                color = MeetColors.neonGreen,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 1.sp
+                                            )
+                                        }
+
+                                        // Difficulty tag
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(
+                                                    when (targetStep.difficulty) {
+                                                        "Fácil" -> MeetColors.neonGreen.copy(alpha = 0.12f)
+                                                        "Medio" -> MeetColors.warning.copy(alpha = 0.12f)
+                                                        else -> MeetColors.error.copy(alpha = 0.12f)
+                                                    }
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    when (targetStep.difficulty) {
+                                                        "Fácil" -> MeetColors.neonGreen
+                                                        "Medio" -> MeetColors.warning
+                                                        else -> MeetColors.error
+                                                    },
+                                                    RoundedCornerShape(6.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = targetStep.difficulty.uppercase(),
+                                                color = when (targetStep.difficulty) {
+                                                    "Fácil" -> MeetColors.neonGreen
+                                                    "Medio" -> MeetColors.warning
+                                                    else -> MeetColors.error
+                                                },
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 8.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Step Title
+                                    Text(
+                                        text = targetStep.title,
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Step Instruction
+                                    Text(
+                                        text = targetStep.description,
+                                        color = MeetColors.textPrimary,
+                                        fontSize = 13.sp,
+                                        lineHeight = 19.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Estimation
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            "⏱️ Tiempo Estimado: ",
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                        Text(
+                                            "${targetStep.minutes} min",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ═══════════ NAVIGATION BUTTONS ═══════════
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (activeStepIdx > 0) {
+                            EliteOutlinedButton(
+                                text = "ANTERIOR",
+                                onClick = { activeStepIdx-- },
+                                color = MeetColors.cyberCyan,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        val isLast = activeStepIdx == steps.size - 1
+                        EliteButton(
+                            text = if (isLast) "REPARACIÓN LISTA" else "SIGUIENTE PASO",
+                            onClick = {
+                                if (isLast) {
+                                    navController.popBackStack()
+                                } else {
+                                    activeStepIdx++
+                                }
+                            },
+                            color = MeetColors.neonGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else {
+                    // Empty steps fallback
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No se encontraron pasos de reparación para este código.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 }

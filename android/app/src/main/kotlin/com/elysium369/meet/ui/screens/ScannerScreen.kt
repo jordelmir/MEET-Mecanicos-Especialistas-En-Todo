@@ -25,9 +25,16 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.screens.scanner.*
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteTextButton
 import androidx.compose.animation.core.*
 import com.elysium369.meet.ui.components.neonGlow
+import com.elysium369.meet.ui.components.hud.HudData
+import com.elysium369.meet.ui.components.hud.HudFaceManager
+import com.elysium369.meet.ui.components.hud.HudFaceRenderer
+import com.elysium369.meet.ui.components.hud.HudFaceSelector
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,77 +117,68 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         }
     }
 
-// HUD Mode Overlay
+// HUD Mode Overlay — Modernized with 10 face types
     if (hudMode) {
         var isMirrorMode by remember { mutableStateOf(false) }
+        val context = LocalContext.current
+        val hudFaceManager = remember { HudFaceManager(context) }
+        val currentFace by hudFaceManager.currentFace.collectAsState()
+        val hudData = HudData(
+            speed = liveData["010D"] ?: 0f,
+            rpm = liveData["010C"] ?: 0f,
+            coolantTemp = liveData["0105"] ?: 0f,
+            throttle = liveData["0111"] ?: 0f,
+            engineLoad = liveData["0104"] ?: 0f,
+            voltage = liveData["0142"] ?: liveData.entries.firstOrNull { it.key.contains("VOLT", true) }?.value ?: 12.4f,
+            fuelLevel = liveData["012F"] ?: 0f,
+            intakeTemp = liveData["010F"] ?: 0f
+        )
 
-        Surface(color = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, modifier = Modifier.fillMaxSize()) {
+        Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(32.dp).graphicsLayer {
-                        scaleX = if (isMirrorMode) -1f else 1f
-                    }, 
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    val speed = liveData["010D"] ?: 0f
-                    val rpm = liveData["010C"] ?: 0f
-
-                    // Animated speed & RPM — spring ensures every integer is shown (Waze-like sweep)
-                    val animatedSpeed by animateFloatAsState(
-                        targetValue = speed,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = 35f
-                        ), label = "hudSpeed"
+                // Face selector at top (NOT mirrored)
+                Column(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HudFaceSelector(
+                        currentFace = currentFace,
+                        onFaceSelected = { hudFaceManager.selectFace(it) }
                     )
-                    val animatedRpm by animateFloatAsState(
-                        targetValue = rpm,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = 35f
-                        ), label = "hudRpm"
-                    )
+                }
 
-                    // Shift Light LED Bar
-                    val maxRpm = 8000f
-                    val rpmRatio = (animatedRpm / maxRpm).coerceIn(0f, 1f)
-                    val ledColor = when {
-                        rpmRatio > 0.85f -> MeetColors.error
-                        rpmRatio > 0.6f -> MeetColors.warning
-                        else -> MeetColors.neonGreen
-                    }
-                    
-                    Row(modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 32.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        for (i in 0 until 20) {
-                            val threshold = i / 20f
-                            val isOn = rpmRatio > threshold
-                            val color = if (isOn) ledColor else Color.DarkGray
-                            Box(modifier = Modifier.weight(1f).fillMaxHeight().background(color).neonGlow(if(isOn) color else Color.Transparent, minElevation = 0f, maxElevation = if(isOn) 8f else 0f))
+                // HUD content (mirrored if toggled)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 52.dp, bottom = 56.dp)
+                        .graphicsLayer {
+                            scaleX = if (isMirrorMode) -1f else 1f
                         }
-                    }
+                ) {
+                    HudFaceRenderer(
+                        face = currentFace,
+                        data = hudData,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
-                    Spacer(modifier = Modifier.height(64.dp))
-
-                    Text("${animatedSpeed.toInt()}", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontSize = 120.sp, fontWeight = FontWeight.Black)
-                    Text("km/h", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), fontSize = 24.sp)
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Text("${animatedRpm.toInt()} RPM", color = ledColor, fontSize = 48.sp, fontWeight = FontWeight.Bold)
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        com.elysium369.meet.ui.components.EliteTextButton(
-                            onClick = { isMirrorMode = !isMirrorMode }, 
-                            text = if (isMirrorMode) (if (isSpanish) "MODO NORMAL" else "NORMAL MODE") else (if (isSpanish) "MODO ESPEJO" else "MIRROR MODE"),
-                            color = MeetColors.electricBlue
-                        )
-                        com.elysium369.meet.ui.components.EliteTextButton(
-                            onClick = { hudMode = false }, 
-                            text = if (isSpanish) "SALIR HUD" else "EXIT HUD",
-                            color = MeetColors.textSecondary
-                        )
-                    }
+                // Bottom controls (NOT mirrored)
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                ) {
+                    EliteTextButton(
+                        onClick = { isMirrorMode = !isMirrorMode },
+                        text = if (isMirrorMode) (if (isSpanish) "MODO NORMAL" else "NORMAL MODE") else (if (isSpanish) "MODO ESPEJO" else "MIRROR MODE"),
+                        color = MeetColors.electricBlue
+                    )
+                    EliteTextButton(
+                        onClick = { hudMode = false },
+                        text = if (isSpanish) "SALIR HUD" else "EXIT HUD",
+                        color = MeetColors.textSecondary
+                    )
                 }
             }
         }

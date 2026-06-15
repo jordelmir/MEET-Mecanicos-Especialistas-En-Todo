@@ -15,15 +15,13 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -32,7 +30,8 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.net.URL
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LocalShellManager(
     private val appContext: Context,
@@ -45,6 +44,19 @@ class LocalShellManager(
     private var writer: BufferedWriter? = null
     private var readerJob: Job? = null
     private var controlServer: LocalControlServer? = null
+
+    private val shellMutex = Mutex()
+    private val isStopping = AtomicBoolean(false)
+    @Volatile private var currentSessionId: String = ""
+    private var lastRestartTime = 0L
+    private var restartCount = 0
+    private var lastRestartAttempt = 0L
+
+    private val _activeDistro = MutableStateFlow("android")
+    val activeDistro: StateFlow<String> = _activeDistro.asStateFlow()
+
+    private val _installedDistros = MutableStateFlow<Set<String>>(setOf("android"))
+    val installedDistros: StateFlow<Set<String>> = _installedDistros.asStateFlow()
 
     private val _terminalLines = MutableStateFlow<List<String>>(
         listOf(
@@ -67,8 +79,10 @@ class LocalShellManager(
         try {
             val binDir = File(appContext.filesDir, "bin")
             val homeDir = File(appContext.filesDir, "home")
+            val tmpDir = File(appContext.filesDir, "tmp")
             if (!binDir.exists()) binDir.mkdirs()
             if (!homeDir.exists()) homeDir.mkdirs()
+            if (!tmpDir.exists()) tmpDir.mkdirs()
         } catch (e: Exception) {
             Log.e("LocalShellManager", "Error setting up directories: ${e.message}")
         }
@@ -84,12 +98,31 @@ class LocalShellManager(
     }
 
     fun startShell() {
-        stopShell()
+        scope.launch(Dispatchers.IO) {
+            shellMutex.withLock {
+                startShellInternal()
+            }
+        }
+    }
+
+    private suspend fun startShellInternal() {
+        stopShellInternal(stopControlServer = false)
         try {
             val binDir = File(appContext.filesDir, "bin")
             val homeDir = File(appContext.filesDir, "home")
             
-            val builder = ProcessBuilder("/system/bin/sh")
+            val shellCommand = if (_activeDistro.value == "android") {
+                "/system/bin/sh"
+            } else {
+                val bootScript = File(binDir, _activeDistro.value)
+                if (bootScript.exists() && isDistroInstalled(_activeDistro.value)) {
+                    bootScript.absolutePath
+                } else {
+                    "/system/bin/sh"
+                }
+            }
+            
+            val builder = ProcessBuilder(shellCommand)
                 .directory(homeDir)
                 .redirectErrorStream(true)
             
@@ -98,9 +131,16 @@ class LocalShellManager(
             val currentPath = env["PATH"] ?: "/sbin:/system/sbin:/system/bin:/system/xbin"
             env["PATH"] = "${binDir.absolutePath}:$currentPath"
             env["HOME"] = homeDir.absolutePath
-            env["TMPDIR"] = appContext.cacheDir.absolutePath
-            env["LD_LIBRARY_PATH"] = "/system/lib64:/system/lib:/vendor/lib64:/vendor/lib"
+            env["TMPDIR"] = File(appContext.filesDir, "tmp").absolutePath
+            env["PROOT_TMP_DIR"] = File(appContext.filesDir, "tmp").absolutePath
+            env["PROOT_LOADER"] = File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath
+            env["LD_LIBRARY_PATH"] = "${appContext.applicationInfo.nativeLibraryDir}:/system/lib64:/system/lib:/vendor/lib64:/vendor/lib"
             
+            val sessionId = UUID.randomUUID().toString()
+            currentSessionId = sessionId
+            isStopping.set(false)
+            
+            Log.d("LocalShellManager", "[$sessionId] Starting shell: $shellCommand")
             val proc = builder.start()
             process = proc
             writer = BufferedWriter(OutputStreamWriter(proc.outputStream))
@@ -109,18 +149,219 @@ class LocalShellManager(
                 val reader = BufferedReader(InputStreamReader(proc.inputStream))
                 try {
                     var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        appendOutput(line ?: "")
+                    while (coroutineContext.isActive) {
+                        line = try {
+                            reader.readLine()
+                        } catch (e: IOException) {
+                            if (currentSessionId == sessionId && isStopping.get()) {
+                                Log.d("LocalShellManager", "[$sessionId] Stream closed during shutdown (expected)")
+                            } else {
+                                Log.e("LocalShellManager", "[$sessionId] Error reading from shell: ${e.message}")
+                            }
+                            null
+                        }
+                        if (line == null) break
+                        if (currentSessionId == sessionId) {
+                            appendOutput(line)
+                        }
                     }
                 } catch (e: Exception) {
-                    appendOutput("[Shell Error: ${e.message}]")
+                    if (e is CancellationException) {
+                        Log.d("LocalShellManager", "[$sessionId] Reader job cancelled")
+                    } else {
+                        Log.e("LocalShellManager", "[$sessionId] Exception in reader loop: ${e.message}", e)
+                        if (currentSessionId == sessionId) {
+                            appendOutput("[Shell Error: ${e.message}]")
+                        }
+                    }
                 } finally {
-                    appendOutput("[Proceso finalizado]")
+                    try {
+                        reader.close()
+                    } catch (_: Exception) {}
+                    
+                    if (currentSessionId == sessionId) {
+                        val exitCode = try { proc.exitValue() } catch (e: IllegalThreadStateException) { null }
+                        if (exitCode != null) {
+                            appendOutput("[Proceso finalizado con código: $exitCode]")
+                            if (!isStopping.get()) {
+                                Log.w("LocalShellManager", "[$sessionId] Shell process exited unexpectedly with code $exitCode")
+                                handleUnexpectedExit(sessionId)
+                            }
+                        } else {
+                            appendOutput("[Proceso finalizado]")
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
+            Log.e("LocalShellManager", "Failed to start shell: ${e.message}", e)
             _terminalLines.update { it + "Error iniciando shell: ${e.message}" }
         }
+    }
+
+    private suspend fun stopShellInternal(stopControlServer: Boolean) {
+        isStopping.set(true)
+        val proc = process
+        val w = writer
+        val job = readerJob
+
+        try {
+            w?.close()
+        } catch (e: Exception) {
+            Log.e("LocalShellManager", "Error closing shell writer: ${e.message}")
+        }
+        writer = null
+
+        if (proc != null) {
+            val exitedGracefully = withContext(Dispatchers.IO) {
+                try {
+                    var count = 0
+                    while (count < 15) {
+                        try {
+                            proc.exitValue()
+                            return@withContext true
+                        } catch (e: IllegalThreadStateException) {
+                            delay(100)
+                            count++
+                        }
+                    }
+                    false
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            if (!exitedGracefully) {
+                Log.w("LocalShellManager", "Process did not exit gracefully; destroying...")
+                proc.destroy()
+                withContext(Dispatchers.IO) {
+                    try {
+                        var count = 0
+                        while (count < 10) {
+                            try {
+                                proc.exitValue()
+                                break
+                            } catch (e: IllegalThreadStateException) {
+                                delay(50)
+                                count++
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+        process = null
+
+        job?.cancel()
+        readerJob = null
+
+        if (stopControlServer) {
+            Log.d("LocalShellManager", "Stopping local control server")
+            controlServer?.stop()
+        }
+    }
+
+    fun stopShell(stopControlServer: Boolean = false) {
+        val active = scope.isActive
+        if (!active) {
+            runBlocking(Dispatchers.IO) {
+                shellMutex.withLock {
+                    isStopping.set(true)
+                    try {
+                        writer?.close()
+                    } catch (_: Exception) {}
+                    process?.destroy()
+                    process = null
+                    writer = null
+                    readerJob?.cancel()
+                    readerJob = null
+                    if (stopControlServer) {
+                        controlServer?.stop()
+                    }
+                    isStopping.set(false)
+                }
+            }
+        } else {
+            scope.launch(Dispatchers.IO) {
+                shellMutex.withLock {
+                    stopShellInternal(stopControlServer)
+                }
+            }
+        }
+    }
+
+    fun restartShell() {
+        val now = System.currentTimeMillis()
+        if (now - lastRestartAttempt < 2000) {
+            Log.d("LocalShellManager", "Restart shell request ignored due to debouncing")
+            return
+        }
+        lastRestartAttempt = now
+        appendOutput("[MEET-Termux] Reiniciando la terminal...")
+        startShell()
+    }
+
+    private fun handleUnexpectedExit(sessionId: String) {
+        if (currentSessionId != sessionId) return
+        val now = System.currentTimeMillis()
+        if (now - lastRestartTime < 10000) {
+            restartCount++
+        } else {
+            restartCount = 1
+        }
+        lastRestartTime = now
+        
+        if (restartCount > 3) {
+            appendOutput("[MEET-Termux] Reinicios automáticos deshabilitados para evitar bucle infinito.")
+            return
+        }
+        
+        appendOutput("[MEET-Termux] Reintentando iniciar la consola en 2 segundos...")
+        scope.launch {
+            delay(2000)
+            if (currentSessionId == sessionId) {
+                startShell()
+            }
+        }
+    }
+
+    fun isDistroInstalled(distro: String): Boolean {
+        if (distro == "android") return true
+        val distroDir = File(appContext.filesDir, distro)
+        return distroDir.exists() && (distroDir.list()?.size ?: 0) > 1
+    }
+
+    fun updateInstalledDistros() {
+        val set = mutableSetOf("android")
+        listOf("alpine", "debian", "ubuntu").forEach { distro ->
+            if (isDistroInstalled(distro)) {
+                set.add(distro)
+            }
+        }
+        _installedDistros.value = set
+    }
+
+    fun switchDistro(distro: String) {
+        val validDistros = listOf("android", "alpine", "debian", "ubuntu")
+        if (distro !in validDistros) return
+        _activeDistro.value = distro
+        
+        val capName = when (distro) {
+            "android" -> "Android Host"
+            "alpine" -> "Alpine Linux"
+            "debian" -> "Debian GNU/Linux"
+            "ubuntu" -> "Ubuntu Linux"
+            else -> distro
+        }
+        
+        _terminalLines.update {
+            listOf(
+                "⚡ Entorno cambiado a: $capName",
+                "Conectando a la terminal virtual...",
+                ""
+            )
+        }
+        
+        startShell()
     }
 
     fun executeCommand(command: String) {
@@ -189,22 +430,33 @@ class LocalShellManager(
                             distroDir.deleteRecursively()
                         }
                         distroDir.mkdirs()
-                        
                         val isXz = archiveName.endsWith(".xz")
                         val tarFlags = if (isXz) "-xJf" else "-xzf"
                         
-                        val busyboxFile = File(appContext.filesDir, "bin/busybox")
-                        if (!busyboxFile.exists()) {
-                            val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
-                            if (nativeLibBusybox.exists()) {
-                                Runtime.getRuntime().exec(arrayOf(nativeLibBusybox.absolutePath, "tar", tarFlags, distroArchive.absolutePath, "-C", distroDir.absolutePath)).waitFor()
-                            } else {
-                                throw IOException("No se encontró BusyBox para extraer el rootfs.")
-                            }
-                        } else {
-                            ProcessBuilder(busyboxFile.absolutePath, "tar", tarFlags, distroArchive.absolutePath, "-C", distroDir.absolutePath)
-                                .start()
-                                .waitFor()
+                        val nativeLibProot = File(appContext.applicationInfo.nativeLibraryDir, "libproot.so")
+                        val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
+                        
+                        if (!nativeLibProot.exists() || !nativeLibBusybox.exists()) {
+                            throw IOException("Falta libproot.so o libbusybox.so en las librerías nativas de la aplicación.")
+                        }
+                        
+                        val pb = ProcessBuilder(
+                            nativeLibProot.absolutePath,
+                            "--link2symlink",
+                            "-r", distroDir.absolutePath,
+                            "-b", "${nativeLibBusybox.absolutePath}:/tar",
+                            "-b", "${appContext.cacheDir.absolutePath}:/cache",
+                            "-0",
+                            "-w", "/",
+                            "/tar", tarFlags, "/cache/$archiveName", "-C", "/"
+                        )
+                        pb.environment()["PROOT_TMP_DIR"] = File(appContext.filesDir, "tmp").absolutePath
+                        pb.environment()["PROOT_LOADER"] = File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath
+                        val proc = pb.start()
+                        
+                        val exitCode = proc.waitFor()
+                        if (exitCode != 0) {
+                            throw IOException("La extracción falló con código de salida: $exitCode")
                         }
                         
                         // Create resolv.conf for DNS
@@ -217,6 +469,7 @@ class LocalShellManager(
                         
                         // Re-create CLI scripts to include boot script
                         createCliScripts(File(appContext.filesDir, "bin"))
+                        updateInstalledDistros()
                         
                         appendOutput("[MEET-Termux] ¡$capName instalado con éxito!")
                         appendOutput("[MEET-Termux] Escribe '$targetDistro' para iniciar el contenedor.")
@@ -245,14 +498,21 @@ class LocalShellManager(
         }
 
         // Normal shell command execution
-        val w = writer ?: return
         scope.launch(Dispatchers.IO) {
-            try {
-                _terminalLines.update { it + "❯ $command" }
-                w.write(command + "\n")
-                w.flush()
-            } catch (e: Exception) {
-                _terminalLines.update { it + "[Error ejecutando: ${e.message}]" }
+            shellMutex.withLock {
+                val w = writer
+                if (w == null || process?.isAlive != true) {
+                    _terminalLines.update { it + "❯ $command" }
+                    _terminalLines.update { it + "[Error: La consola no está activa. Pulsa REINICIAR ENTORNOS para reactivarla.]" }
+                    return@withLock
+                }
+                try {
+                    _terminalLines.update { it + "❯ $command" }
+                    w.write(command + "\n")
+                    w.flush()
+                } catch (e: Exception) {
+                    _terminalLines.update { it + "[Error ejecutando: ${e.message}]" }
+                }
             }
         }
     }
@@ -270,14 +530,12 @@ class LocalShellManager(
             
             appendOutput("[MEET-Termux] Inicializando entorno de comandos de Android...")
             try {
-                // Clear bin directory to avoid stale symlinks from previous app installations/hashes
                 if (binDir.exists()) {
                     binDir.listFiles()?.forEach { it.delete() }
                 } else {
                     binDir.mkdirs()
                 }
                 
-                // Create busybox symlink first so busybox command itself works
                 val busyboxSymlink = File(binDir, "busybox")
                 try {
                     android.system.Os.symlink(nativeLibBusybox.absolutePath, busyboxSymlink.absolutePath)
@@ -292,6 +550,7 @@ class LocalShellManager(
                 val exitCode = proc.waitFor()
                 
                 createCliScripts(binDir)
+                updateInstalledDistros()
                 if (exitCode == 0) {
                     appendOutput("[MEET-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
                 } else {
@@ -448,32 +707,40 @@ class LocalShellManager(
                 val bootFile = File(binDir, distro)
                 
                 if (distroDir.exists() && nativeLibProot.exists()) {
-                    val dnsSetupLines = getSystemDnsServers().joinToString("\n") {
+                    val dnsSetupLines = (listOf("8.8.8.8", "8.8.4.4", "1.1.1.1") + getSystemDnsServers()).distinct().joinToString("\n") {
                         "echo \"nameserver $it\" >> ${distroDir.absolutePath}/etc/resolv.conf"
                     }
                     bootFile.writeText("""
                         #!/system/bin/sh
-                        export PROOT_TMP_DIR=${appContext.cacheDir.absolutePath}
+                        export PROOT_TMP_DIR=${File(appContext.filesDir, "tmp").absolutePath}
+                        export PROOT_LOADER=${File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath}
+                        export LD_LIBRARY_PATH=${appContext.applicationInfo.nativeLibraryDir}
+                        unset ANDROID_DATA
+                        unset ANDROID_ROOT
                         rm -f ${distroDir.absolutePath}/etc/resolv.conf
                         $dnsSetupLines
                         
                         if [ $# -gt 0 ]; then
                             exec ${nativeLibProot.absolutePath} \
+                                --link2symlink \
+                                -0 \
+                                -w /root \
                                 -r ${distroDir.absolutePath} \
                                 -b /dev \
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                -0 \
                                 /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec "$@"' -- "$@"
                         else
                             exec ${nativeLibProot.absolutePath} \
+                                --link2symlink \
+                                -0 \
+                                -w /root \
                                 -r ${distroDir.absolutePath} \
                                 -b /dev \
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                -0 \
                                 /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec /bin/sh'
                         fi
                     """.trimIndent().trim())
@@ -489,7 +756,7 @@ class LocalShellManager(
                 }
             }
             
-            // linux boot script (acts as alias to the first installed container OS)
+            // linux boot script
             val linuxBootFile = File(binDir, "linux")
             val installedDistro = distros.firstOrNull { File(appContext.filesDir, it).exists() }
             if (installedDistro != null) {
@@ -593,18 +860,6 @@ class LocalShellManager(
 
     fun clearTerminal() {
         _terminalLines.value = listOf("❯ ")
-    }
-
-    fun stopShell() {
-        readerJob?.cancel()
-        try {
-            writer?.close()
-        } catch (_: Exception) {}
-        process?.destroy()
-        process = null
-        writer = null
-        
-        controlServer?.stop()
     }
 
     private fun getSystemDnsServers(): List<String> {

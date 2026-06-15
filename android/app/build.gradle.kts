@@ -29,8 +29,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "3.4.0"
+        versionCode = 15
+        versionName = "3.5.0"
 
         // Supabase credentials from local.properties (never committed to git)
         buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("MEET_SUPABASE_URL", "")}\"")
@@ -44,10 +44,21 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = project.findProperty("KEYSTORE_PATH")?.let { file(it) } ?: signingConfigs.getByName("debug").storeFile
-            storePassword = project.findProperty("KEYSTORE_PASSWORD") as String? ?: "android"
-            keyAlias = project.findProperty("KEY_ALIAS") as String? ?: "androiddebugkey"
-            keyPassword = project.findProperty("KEY_PASSWORD") as String? ?: "android"
+            val keystorePath = project.findProperty("KEYSTORE_PATH") as String?
+                ?: localProps.getProperty("KEYSTORE_PATH")
+            storeFile = keystorePath?.let { file(it) } ?: signingConfigs.getByName("debug").storeFile
+
+            storePassword = project.findProperty("KEYSTORE_PASSWORD") as String?
+                ?: localProps.getProperty("KEYSTORE_PASSWORD")
+                ?: "android"
+
+            keyAlias = project.findProperty("KEY_ALIAS") as String?
+                ?: localProps.getProperty("KEY_ALIAS")
+                ?: "androiddebugkey"
+
+            keyPassword = project.findProperty("KEY_PASSWORD") as String?
+                ?: localProps.getProperty("KEY_PASSWORD")
+                ?: "android"
         }
     }
 

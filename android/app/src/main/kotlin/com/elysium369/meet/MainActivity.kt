@@ -204,7 +204,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 val dtcCode = backStack.arguments?.getString("dtcCode") ?: ""
                 DtcRepairGuideScreen(
                     navController = navController,
-                    dtcCode = dtcCode
+                    dtcCode = dtcCode,
+                    viewModel = obdViewModel
                 )
             }
             composable("terminal") {
@@ -395,6 +396,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("dvir") {
                 DvirScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("findings") {
+                FindingsScreen(
                     navController = navController,
                     viewModel = obdViewModel
                 )

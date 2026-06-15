@@ -18,10 +18,8 @@ import com.elysium369.meet.data.local.entities.TripEntity
 import com.elysium369.meet.data.local.entities.MaintenanceAlertEntity
 import com.elysium369.meet.data.local.entities.CustomPidEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.elysium369.meet.core.alerts.AlertManager
@@ -141,15 +139,27 @@ class ObdViewModel @Inject constructor(
     )
     val terminalSessionLogs: StateFlow<List<TerminalLine>> = _terminalSessionLogs.asStateFlow()
 
+    private val shellScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     // Sustituto de Termux para Terminal de Android
     val localShellManager = com.elysium369.meet.core.utils.LocalShellManager(
         context,
         geminiDiagnostic,
         obdSession,
         tripManager,
-        viewModelScope
+        shellScope
     )
     val localShellLines: StateFlow<List<String>> = localShellManager.terminalLines
+    val activeDistro: StateFlow<String> = localShellManager.activeDistro
+    val installedDistros: StateFlow<Set<String>> = localShellManager.installedDistros
+
+    fun switchActiveDistro(distro: String) {
+        localShellManager.switchDistro(distro)
+    }
+
+    fun isDistroInstalled(distro: String): Boolean {
+        return localShellManager.isDistroInstalled(distro)
+    }
 
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
@@ -1868,16 +1878,29 @@ class ObdViewModel @Inject constructor(
             if (query.isBlank()) {
                 _manualSearchResults.value = emptyList()
             } else {
-                val dbResults = dtcDefinitionDao.searchDefinitions(query).take(50)
+                val dbResults = dtcDefinitionDao.searchDefinitions(query)
                 if (dbResults.isEmpty() && query.matches(Regex("^[PBUCpbuc][0-9A-Fa-f]{4}$"))) {
                     // Generate dynamic fallback definition so search never fails for a valid DTC code!
                     val fallback = generateFallbackDefinition(query.uppercase())
                     _manualSearchResults.value = listOf(fallback)
                 } else {
-                    _manualSearchResults.value = dbResults
+                    // Deduplicate: group by code, prefer manufacturer-specific over GENERIC
+                    val deduped = dbResults
+                        .groupBy { it.code }
+                        .map { (_, entries) ->
+                            entries.firstOrNull { it.manufacturer != "GENERIC" } ?: entries.first()
+                        }
+                        .take(50)
+                    _manualSearchResults.value = deduped
                 }
             }
         }
+    }
+
+    suspend fun getDtcDefinition(code: String): DtcDefinitionEntity {
+        val make = _selectedVehicle.value?.make ?: "GENERIC"
+        val normalizedMake = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(make)
+        return dtcDefinitionDao.getDefinitionForCode(code.uppercase(), normalizedMake) ?: generateFallbackDefinition(code.uppercase())
     }
 
     suspend fun clearDtcs(): Boolean {
@@ -2931,7 +2954,8 @@ class ObdViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         phoneSpeedTracker.stop()
-        localShellManager.stopShell()
+        localShellManager.stopShell(stopControlServer = true)
+        shellScope.cancel()
     }
 }
 

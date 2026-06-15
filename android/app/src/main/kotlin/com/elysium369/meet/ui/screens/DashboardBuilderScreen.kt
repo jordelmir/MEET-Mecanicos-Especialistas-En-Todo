@@ -39,7 +39,8 @@ import com.elysium369.meet.core.obd.PidRegistry
 import com.elysium369.meet.data.local.entities.DashboardEntity
 import com.elysium369.meet.data.local.entities.DashboardWidgetEntity
 import com.elysium369.meet.ui.DashboardViewModel
-import com.elysium369.meet.ui.components.GaugeWidget
+import com.elysium369.meet.ui.components.gauges.StyledGauge
+import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.components.WaveGraphWidget
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
@@ -58,7 +59,6 @@ fun DashboardBuilderScreen(
     
     val clipboardManager = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
-    val context = LocalContext.current
 
     var showAddWidgetDialog by remember { mutableStateOf(false) }
     var showDashboardList by remember { mutableStateOf(false) }
@@ -507,52 +507,78 @@ fun DashboardGrid(
     onMoveDown: (DashboardWidgetEntity) -> Unit,
     onToggleMoveMode: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        val gridState = rememberLazyGridState()
-        EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize().eliteScrollbar(gridState)
-            ) {
-                items(
-                    widgets,
-                    key = { it.id },
-                    span = { widget -> GridItemSpan(widget.gridW.coerceIn(1, 2)) }
-                ) { widget ->
-                    WidgetCard(
-                        widget = widget, 
-                        liveValueExt = widgetStates[widget.pid],
-                        previewMode = previewMode,
-                        isMoveMode = isMoveMode,
-                        onDelete = { onDelete(widget) },
-                        onEdit = { onEdit(widget) },
-                        onMoveUp = { onMoveUp(widget) },
-                        onMoveDown = { onMoveDown(widget) }
-                    )
-                }
-            }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Responsive columns based on available width
+        val cols = when {
+            maxWidth < 360.dp  -> 1
+            maxWidth < 600.dp  -> 2
+            maxWidth < 840.dp  -> 3
+            else               -> 4
         }
 
-        // Move Mode Toggle FAB
-        ExtendedFloatingActionButton(
-            onClick = onToggleMoveMode,
-            containerColor = if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen,
-            contentColor = Color.Black,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(
-                if (isMoveMode) Icons.Default.Check else Icons.Default.OpenWith,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(if (isMoveMode) "FINALIZAR" else "REORDENAR", fontWeight = FontWeight.Black)
+        val gridPadding = when {
+            maxWidth < 360.dp  -> 8.dp
+            maxWidth < 600.dp  -> 12.dp
+            else               -> 16.dp
+        }
+        val itemSpacing = when {
+            maxWidth < 360.dp  -> 6.dp
+            maxWidth < 600.dp  -> 10.dp
+            else               -> 14.dp
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            val gridState = rememberLazyGridState()
+            EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(cols),
+                    contentPadding = PaddingValues(gridPadding, gridPadding, gridPadding, 80.dp),
+                    horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                    verticalArrangement = Arrangement.spacedBy(itemSpacing),
+                    modifier = Modifier.fillMaxSize().eliteScrollbar(gridState)
+                ) {
+                    items(
+                        widgets,
+                        key = { it.id },
+                        span = { widget -> GridItemSpan(widget.gridW.coerceIn(1, cols)) }
+                    ) { widget ->
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            WidgetCard(
+                                widget = widget, 
+                                liveValueExt = widgetStates[widget.pid],
+                                previewMode = previewMode,
+                                isMoveMode = isMoveMode,
+                                onDelete = { onDelete(widget) },
+                                onEdit = { onEdit(widget) },
+                                onMoveUp = { onMoveUp(widget) },
+                                onMoveDown = { onMoveDown(widget) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Move Mode Toggle FAB
+            ExtendedFloatingActionButton(
+                onClick = onToggleMoveMode,
+                containerColor = if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                contentColor = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    if (isMoveMode) Icons.Default.Check else Icons.Default.OpenWith,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isMoveMode) "FINALIZAR" else "REORDENAR", fontWeight = FontWeight.Black)
+            }
         }
     }
 }
@@ -569,6 +595,9 @@ fun WidgetCard(
     onMoveDown: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val currentStyle by gaugeStyleManager.currentStyle.collectAsState()
     val widgetColor = try { Color(android.graphics.Color.parseColor(widget.color)) } catch(e: Exception) { com.elysium369.meet.ui.theme.MeetColors.neonGreen }
     var simValue by remember { mutableFloatStateOf((widget.minVal + widget.maxVal) / 2f) }
     
@@ -832,7 +861,8 @@ fun WidgetCard(
                     }
                     else -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            GaugeWidget(
+                            StyledGauge(
+                                style = currentStyle,
                                 label = "",
                                 value = animatedValue,
                                 minVal = widget.minVal,
@@ -941,6 +971,9 @@ fun AddWidgetDialog(
     onAdd: (String, String, String, Float, Float, String, Int, Int, String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val currentStyle by gaugeStyleManager.currentStyle.collectAsState()
     var name by remember { mutableStateOf(editingWidget?.name ?: "") }
     var selectedPid by remember { mutableStateOf<String?>(editingWidget?.pid) }
     var type by remember { mutableStateOf(editingWidget?.type ?: "GAUGE") }
@@ -999,7 +1032,7 @@ fun AddWidgetDialog(
                     when (type) {
                         "WAVE" -> WaveGraphWidget(label = "", currentValue = previewValue, minVal = minVal.toFloatOrNull() ?: 0f, maxVal = maxVal.toFloatOrNull() ?: 100f, unit = unit, isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f)
                         "DIGITAL" -> Text(String.format("%.1f %s", previewValue, unit), color = Color(selectedColor.toColor()), fontSize = 32.sp, fontWeight = FontWeight.Black)
-                        else -> GaugeWidget(label = "", value = previewValue, minVal = minVal.toFloatOrNull() ?: 0f, maxVal = maxVal.toFloatOrNull() ?: 100f, unit = unit, isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f, modifier = Modifier.size(140.dp))
+                        else -> StyledGauge(style = currentStyle, label = "", value = previewValue, minVal = minVal.toFloatOrNull() ?: 0f, maxVal = maxVal.toFloatOrNull() ?: 100f, unit = unit, isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f, modifier = Modifier.size(140.dp))
                     }
                 }
 

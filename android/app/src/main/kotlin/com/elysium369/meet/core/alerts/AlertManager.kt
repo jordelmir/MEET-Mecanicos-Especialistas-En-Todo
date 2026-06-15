@@ -64,12 +64,16 @@ class AlertManager @Inject constructor(
 
     private fun triggerAlert(title: String, msg: String, severity: AlertSeverity) {
         if (severity == AlertSeverity.CRITICAL) {
-            val vibrator = context.getSystemService(Vibrator::class.java)
-            if (Build.VERSION.SDK_INT >= 26) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200), -1))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(longArrayOf(0, 200, 100, 200), -1)
+            try {
+                val vibrator = context.getSystemService(Vibrator::class.java)
+                if (Build.VERSION.SDK_INT >= 26) {
+                    vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 200, 100, 200), -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(longArrayOf(0, 200, 100, 200), -1)
+                }
+            } catch (e: SecurityException) {
+                android.util.Log.w("MEET", "Vibrate permission not granted, skipping haptic feedback", e)
             }
             voiceFeedbackManager.speak("Atención. Alerta crítica de $title. $msg", "Warning. Critical alert: $title. $msg")
         } else if (severity == AlertSeverity.WARNING) {

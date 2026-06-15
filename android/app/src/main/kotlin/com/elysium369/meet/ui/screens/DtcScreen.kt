@@ -1456,7 +1456,7 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                                 Text("▸ POSIBLES CAUSAS", color = MeetColors.cyberCyan, fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                 Spacer(Modifier.height(4.dp))
                                 Box(Modifier.fillMaxWidth().shadow(2.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp)).background(Color(0xFF060D1A)).border(0.5.dp, MeetColors.borderSubtle.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp)) {
-                                    Text(dtc.possibleCauses, color = MeetColors.textSecondary, fontSize = if (isCompact) 10.sp else 11.sp, lineHeight = 15.sp, softWrap = true)
+                                    Text(dtc.possibleCauses ?: "", color = MeetColors.textSecondary, fontSize = if (isCompact) 10.sp else 11.sp, lineHeight = 15.sp, softWrap = true)
                                 }
                                 Spacer(Modifier.height(14.dp))
                                 if (isCompact) {

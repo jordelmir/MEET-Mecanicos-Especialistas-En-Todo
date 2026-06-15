@@ -494,6 +494,59 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 16→17: Recreating dtc_definitions table to match Room schema exactly")
+            db.execSQL("DROP TABLE IF EXISTS `dtc_definitions`")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_definitions` (
+                    `code` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL,
+                    `isGeneric` TEXT NOT NULL,
+                    `descriptionEs` TEXT NOT NULL,
+                    `descriptionEn` TEXT NOT NULL,
+                    `obd2StandardNameEn` TEXT,
+                    `system` TEXT NOT NULL,
+                    `subSystem` TEXT,
+                    `severity` TEXT NOT NULL,
+                    `urgency` TEXT NOT NULL,
+                    `dtcCategory` TEXT,
+                    `faultType` TEXT,
+                    `monitorType` TEXT,
+                    `readinessMonitor` TEXT,
+                    `faultPersistence` TEXT,
+                    `possibleCauses` TEXT,
+                    `symptoms` TEXT,
+                    `affectedComponents` TEXT,
+                    `diagnosticSteps` TEXT,
+                    `relatedCodes` TEXT,
+                    `freezeFramePIDs` TEXT,
+                    `liveDataThresholds` TEXT,
+                    `repairComplexity` TEXT,
+                    `drivabilityImpact` TEXT,
+                    `repairCostUSD` TEXT,
+                    `laborHoursEstimate` TEXT,
+                    `diyFriendly` TEXT,
+                    `specialToolsRequired` TEXT,
+                    `repairVerification` TEXT,
+                    `preventiveMaintenance` TEXT,
+                    `milBehavior` TEXT,
+                    `emissionsImpact` TEXT,
+                    `warrantyNote` TEXT,
+                    `cascadeRisk` TEXT,
+                    `frequencyRank` TEXT,
+                    `safeToResetWithoutRepair` TEXT,
+                    `vehicleYearRange` TEXT,
+                    `obd2Protocol` TEXT,
+                    `countryRegulation` TEXT,
+                    `obd2DiagnosticMode` TEXT,
+                    `tsbBulletins` TEXT,
+                    PRIMARY KEY(`code`, `manufacturer`)
+                )
+            """)
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -507,11 +560,17 @@ object AppModule {
         // caused Room to wipe ALL tables (including vehicles) on any schema version mismatch,
         // then recreate from the asset file which contains zero vehicle records.
         // DTC definitions are now loaded programmatically via DtcDatabaseLoader on first launch.
-
+ 
         // ⛔ REMOVED: fallbackToDestructiveMigration()
         // This silently destroyed user data. We now use explicit migrations.
 
-        .addMigrations(MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6, MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10, MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+        .addMigrations(
+            MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6,
+            MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10,
+            MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12,
+            MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
+            MIGRATION_16_17
+        )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
@@ -600,4 +659,10 @@ object AppModule {
 
     @Provides
     fun provideDvirReportDao(db: MeetDatabase): DvirReportDao = db.dvirReportDao()
+
+    @Provides
+    @Singleton
+    fun provideGaugeStyleManager(@ApplicationContext context: Context): com.elysium369.meet.ui.components.gauges.GaugeStyleManager {
+        return com.elysium369.meet.ui.components.gauges.GaugeStyleManager(context)
+    }
 }
