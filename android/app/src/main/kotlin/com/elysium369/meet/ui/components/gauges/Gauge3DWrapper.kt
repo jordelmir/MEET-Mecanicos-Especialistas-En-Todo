@@ -15,6 +15,7 @@ import kotlin.math.*
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
 
 /**
  * 3D holographic wrapper that adds premium depth effects around any gauge:
@@ -32,6 +33,48 @@ import androidx.compose.ui.graphics.graphicsLayer
  */
 @Composable
 fun Gauge3DWrapper(
+    modifier: Modifier = Modifier,
+    glowColor: Color = Color(0xFF00E5FF),
+    style: GaugeStyleSet = GaugeStyleSet.ELITE,
+    content: @Composable () -> Unit
+) {
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        val sizeDp = minOf(maxWidth, maxHeight)
+        if (sizeDp > 160.dp) {
+            val baseSize = 120.dp
+            val scale = sizeDp / baseSize
+            Box(
+                modifier = Modifier
+                    .size(baseSize)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                UnscaledGauge3DWrapper(
+                    modifier = Modifier.fillMaxSize(),
+                    glowColor = glowColor,
+                    style = style,
+                    content = content
+                )
+            }
+        } else {
+            UnscaledGauge3DWrapper(
+                modifier = Modifier.fillMaxSize(),
+                glowColor = glowColor,
+                style = style,
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun UnscaledGauge3DWrapper(
     modifier: Modifier = Modifier,
     glowColor: Color = Color(0xFF00E5FF),
     style: GaugeStyleSet = GaugeStyleSet.ELITE,
