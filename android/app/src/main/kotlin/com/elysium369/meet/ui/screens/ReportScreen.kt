@@ -1,6 +1,10 @@
 package com.elysium369.meet.ui.screens
 
 import android.content.Context
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
+import com.elysium369.meet.core.print.BluetoothPrinterManager
+import com.elysium369.meet.core.print.PrintReportData
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -44,6 +48,11 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val generator = remember { ReportGenerator(context) }
+    val printerManager = remember { BluetoothPrinterManager(context) }
+    var printerList by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
+    var showPrinterPickerDialog by remember { mutableStateOf(false) }
+    var isPrinting by remember { mutableStateOf(false) }
+    var printingStatus by remember { mutableStateOf("") }
     
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val predictiveReport by viewModel.predictiveHealthReport.collectAsState()
@@ -530,7 +539,116 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                 color = MeetColors.neonGreen,
                                 modifier = Modifier.fillMaxWidth()
                             )
+                             
+                            Spacer(modifier = Modifier.height(12.dp))
+                             
+                            EliteButton(
+                                text = "IMPRIMIR REPORTE TÉRMICO (BT)",
+                                onClick = {
+                                    val list = printerManager.getPairedPrinters()
+                                    if (list.isEmpty()) {
+                                        android.widget.Toast.makeText(context, "No se encontraron impresoras Bluetooth vinculadas. Vincúlela en los ajustes del teléfono.", android.widget.Toast.LENGTH_LONG).show()
+                                    } else {
+                                        printerList = list
+                                        showPrinterPickerDialog = true
+                                    }
+                                },
+                                color = MeetColors.electricBlue,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
+                    }
+
+                    // Printer Picker Dialog
+                    if (showPrinterPickerDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showPrinterPickerDialog = false },
+                            title = { Text("Seleccionar Impresora Bluetooth", color = Color.White, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    printerList.forEach { device ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MeetColors.cardBackground)
+                                                .clickable {
+                                                    showPrinterPickerDialog = false
+                                                    coroutineScope.launch {
+                                                        isPrinting = true
+                                                        printingStatus = "Iniciando..."
+                                                        val vehicleInfo = viewModel.selectedVehicle.value?.let {
+                                                            "${it.year} ${it.make} ${it.model} (VIN: ${it.vin})"
+                                                        } ?: "Vehículo Sin Identificar"
+                                                        
+                                                        val summaryText = if (activeDtcs.isEmpty()) {
+                                                            "El sistema de a bordo no reporta fallas de motor activas. Análisis predictivo indica rendimiento estable."
+                                                        } else {
+                                                            "Se detectaron fallas de motor activas. Recomendación de diagnóstico exhaustivo inmediato."
+                                                        }
+                                                        
+                                                        val printData = com.elysium369.meet.core.print.PrintReportData(
+                                                            workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "MEET CLINIC",
+                                                            workshopAddress = workshopAddress,
+                                                            workshopPhone = workshopPhone,
+                                                            workshopEmail = workshopEmail,
+                                                            vehicleInfo = vehicleInfo,
+                                                            dtcs = activeDtcs,
+                                                            healthScore = healthScore,
+                                                            summary = summaryText,
+                                                            isPostScan = scanMode == "POST_SCAN"
+                                                        )
+                                                        
+                                                        val success = printerManager.printReport(device, printData) { status ->
+                                                            printingStatus = status
+                                                        }
+                                                        isPrinting = false
+                                                        if (success) {
+                                                            android.widget.Toast.makeText(context, "Reporte impreso con éxito!", android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Settings, contentDescription = null, tint = MeetColors.electricBlue)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                @SuppressLint("MissingPermission")
+                                                val devName = device.name ?: "Impresora Genérica"
+                                                Text(devName, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Text(device.address, color = MeetColors.textSecondary, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showPrinterPickerDialog = false }) {
+                                    Text("Cancelar", color = MeetColors.textSecondary)
+                                }
+                            },
+                            containerColor = MeetColors.backgroundDeep,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    }
+
+                    // Printing Progress Dialog
+                    if (isPrinting) {
+                        AlertDialog(
+                            onDismissRequest = {},
+                            title = { Text("Imprimiendo Reporte", color = Color.White, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(color = MeetColors.electricBlue, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text(printingStatus, color = Color.White)
+                                }
+                            },
+                            confirmButton = {},
+                            containerColor = MeetColors.backgroundDeep,
+                            shape = RoundedCornerShape(16.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

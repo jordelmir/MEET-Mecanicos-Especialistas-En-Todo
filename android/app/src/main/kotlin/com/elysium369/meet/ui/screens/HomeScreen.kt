@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -54,6 +57,7 @@ fun HomeScreen(
     }
 
     val scrollState = rememberScrollState()
+    var showThemeCustomizer by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
 
@@ -67,29 +71,60 @@ fun HomeScreen(
             // ── Hero Header ──
             AnimatedEntrance(0) {
                 Column {
-                    Text(
-                        greeting,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MeetColors.textSecondary
-                    )
-                    Spacer(Modifier.height(2.dp))
                     Row(
-                        verticalAlignment = Alignment.Bottom
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "ELYSIUM",
-                            style = MaterialTheme.typography.displayMedium,
-                            color = MeetColors.neonGreen,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "VANGUARD",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MeetColors.electricBlue,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                greeting,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MeetColors.textSecondary
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 28.sp)) {
+                                        append("ELYSIUM")
+                                    }
+                                    append(" ")
+                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
+                                        append("VANGUARD")
+                                    }
+                                }
+                            )
+                        }
+                        // Premium theme customizer & settings buttons in home header
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.cardBackground)
+                                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f), CircleShape)
+                                    .clickable { showThemeCustomizer = true }
+                                    .then(Modifier.pulseOnHover()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🎨", fontSize = 20.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.cardBackground)
+                                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), CircleShape)
+                                    .clickable { navController.navigate("settings") }
+                                    .then(Modifier.pulseOnHover()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("⚙️", fontSize = 20.sp)
+                            }
+                        }
                     }
                     Text(
                         "DIAGNÓSTICO PROFESIONAL",
@@ -282,6 +317,10 @@ fun HomeScreen(
             val actions = listOf(
                 Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner",
                 Triple("⚠️", "DTCs", MeetColors.error) to "dtc",
+                Triple("🛡️", "MEET Perito", MeetColors.neonGreen) to "meet_perito",
+                Triple("🧬", "MEET DNA", MeetColors.cyberCyan) to "meet_dna",
+                Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator",
+                Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
                 Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings",
                 Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage",
                 Triple("🤖", "IA", MeetColors.electricBlue) to "ai",
@@ -290,6 +329,7 @@ fun HomeScreen(
                 Triple("💬", "Chat Flota", MeetColors.electricBlue) to "fleet_chat_list/b1",
                 Triple("📄", "Reportes", MeetColors.electricBlue) to "reports",
                 Triple("🔮", "HUD Reflejo", MeetColors.neonGreen) to "hud",
+                Triple("📹", "Cámara HUD", MeetColors.electricBlue) to "dashcam",
                 Triple("📋", "DVIR Diario", MeetColors.cyberCyan) to "dvir",
                 Triple("🩺", "Salud AI", MeetColors.electricBlue) to "health_score",
                 Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance",
@@ -320,6 +360,12 @@ fun HomeScreen(
 
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (showThemeCustomizer) {
+        com.elysium369.meet.ui.components.SystemThemeCustomizerDialog(
+            onDismiss = { showThemeCustomizer = false }
+        )
     }
 }
 

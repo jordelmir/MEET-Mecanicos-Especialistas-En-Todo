@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 private data class TickInfo(
     val start: Offset,
@@ -39,8 +40,11 @@ fun GaugeWidget(
     warningThreshold: Float? = null,
     criticalThreshold: Float? = null,
     isAnomaly: Boolean = false,
+    customLabelColor: Color? = null,
+    customUnitColor: Color? = null,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val hasData = value != 0f || label.contains("Temp", true) // Temp can legitimately be 0
     
     // Check for fast-changing sensors to apply snappy spring dynamics
@@ -134,7 +138,21 @@ fun GaugeWidget(
 
                 val minMeasured = textMeasurer.measure(minText, TextStyle(color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold))
                 val maxMeasured = textMeasurer.measure(maxText, TextStyle(color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold))
-                val labelMeasured = textMeasurer.measure(label.uppercase(), TextStyle(color = MeetColors.textSecondary.copy(alpha = 0.7f), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp))
+                val labelMeasured = textMeasurer.measure(
+                    label.uppercase(),
+                    TextStyle(
+                        color = customLabelColor ?: colorScheme.labelColor.copy(alpha = 0.8f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.2.sp
+                    )
+                )
+
+                // ── PROPORTIONAL LAYOUT: radius-based positions prevent text overlap at any gauge size ──
+                val labelTop = center.y + radius * 0.35f
+                val textGap = (radius * 0.10f).coerceAtLeast(3.dp.toPx())
+                val valueTop = labelTop + labelMeasured.size.height + textGap
+                val anomalyTop = center.y - radius * 0.45f
 
                 // Pre-calculate tick positions and major tick labels (cos/sin math cached here!)
                 val tickCount = 40
@@ -180,9 +198,9 @@ fun GaugeWidget(
                 }
 
                 // Pre-calculate min/max label positions
-                val minAngleRad = Math.toRadians((startAngle + sweepAngle + 12).toDouble())
-                val maxAngleRad = Math.toRadians((startAngle - 12).toDouble())
-                val endLabelR = radius + 10.dp.toPx()
+                val minAngleRad = Math.toRadians((startAngle - 10).toDouble())
+                val maxAngleRad = Math.toRadians((startAngle + sweepAngle + 10).toDouble())
+                val endLabelR = radius + 8.dp.toPx()
                 val minLabelPos = Offset(
                     (center.x + endLabelR * cos(minAngleRad)).toFloat() - minMeasured.size.width / 2f,
                     (center.y + endLabelR * sin(minAngleRad)).toFloat() - minMeasured.size.height / 2f
@@ -192,6 +210,56 @@ fun GaugeWidget(
                     (center.y + endLabelR * sin(maxAngleRad)).toFloat() - maxMeasured.size.height / 2f
                 )
 
+                // Speedometer dual scale calculation
+                val isSpeedGauge = unit.equals("km/h", ignoreCase = true) || unit.equals("mph", ignoreCase = true)
+                val isKmH = unit.equals("km/h", ignoreCase = true)
+                val secondaryUnit = if (isKmH) "mph" else "km/h"
+                val speedConversion = if (isKmH) 0.621371f else (1f / 0.621371f)
+                val secondaryMax = maxVal * speedConversion
+
+                // Generate clean major tick values for the inner scale
+                val secondaryStep = if (secondaryMax > 200f) 40f else if (secondaryMax > 120f) 20f else 10f
+                val innerTicks = if (isSpeedGauge) {
+                    val list = mutableListOf<TickInfo>()
+                    var vSec = 0f
+                    while (vSec <= secondaryMax) {
+                        val angleFraction = vSec / secondaryMax
+                        val angle = startAngle + angleFraction * sweepAngle
+                        val angleRad = Math.toRadians(angle.toDouble())
+                        
+                        val innerR = radius - strokeWidth - 14.dp.toPx()
+                        val tickLength = 5.dp.toPx()
+                        
+                        val start = Offset(
+                            (center.x + innerR * cos(angleRad)).toFloat(),
+                            (center.y + innerR * sin(angleRad)).toFloat()
+                        )
+                        val end = Offset(
+                            (center.x + (innerR + tickLength) * cos(angleRad)).toFloat(),
+                            (center.y + (innerR + tickLength) * sin(angleRad)).toFloat()
+                        )
+                        
+                        val labelR = innerR - 8.dp.toPx()
+                        val labelOffset = Offset(
+                            (center.x + labelR * cos(angleRad)).toFloat(),
+                            (center.y + labelR * sin(angleRad)).toFloat()
+                        )
+                        
+                        val measured = textMeasurer.measure(
+                            text = String.format("%.0f", vSec),
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 7.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        
+                        list.add(TickInfo(start = start, end = end, isMajor = true, i = vSec.toInt(), labelTextResult = Pair(measured, labelOffset)))
+                        vSec += secondaryStep
+                    }
+                    list
+                } else emptyList()
+
                 onDrawBehind {
                     // ── RENDER PHASE (Executed on GPU draw ticks) ──
 
@@ -200,19 +268,23 @@ fun GaugeWidget(
                     val glowAlpha = glowAlphaState.value
                     val pulseAlpha = pulseAlphaState.value
                     val scanAngle = scanAngleState.value
-
                     // Determine active color dynamically
                     val activeColor = when {
                         !hasData -> MeetColors.textMuted
                         isAnomaly -> MeetColors.error
                         criticalThreshold != null && animValue >= criticalThreshold -> MeetColors.error
                         warningThreshold != null && animValue >= warningThreshold -> MeetColors.warning
-                        else -> MeetColors.neonGreen
+                        else -> colorScheme.internalColor
                     }
+
+                    // Use themed custom colors when not in warning/error state
+                    val themeGlowColor = if (activeColor == colorScheme.internalColor) colorScheme.specialColor else activeColor
+                    val themeNeedleColor = if (activeColor == colorScheme.internalColor) colorScheme.needleColor else activeColor
+                    val themeTextColor = if (activeColor == colorScheme.internalColor) colorScheme.textColor else activeColor
 
                     // ── 0. OUTER GLOW RING ──
                     drawArc(
-                        color = activeColor.copy(alpha = glowAlpha),
+                        color = themeGlowColor.copy(alpha = glowAlpha),
                         startAngle = startAngle,
                         sweepAngle = sweepAngle,
                         useCenter = false,
@@ -287,14 +359,47 @@ fun GaugeWidget(
                         }
                     }
 
+                    if (isSpeedGauge) {
+                        val innerR = radius - strokeWidth - 14.dp.toPx()
+                        // Draw inner arc line
+                        drawArc(
+                            color = Color.White.copy(alpha = 0.1f),
+                            startAngle = startAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            style = Stroke(width = 1.dp.toPx()),
+                            topLeft = Offset(center.x - innerR, center.y - innerR),
+                            size = Size(innerR * 2f, innerR * 2f)
+                        )
+                        
+                        // Draw inner ticks and labels
+                        innerTicks.forEach { tick ->
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.25f),
+                                start = tick.start,
+                                end = tick.end,
+                                strokeWidth = 1.dp.toPx()
+                            )
+                            tick.labelTextResult?.let { (measured, pos) ->
+                                drawText(
+                                    textLayoutResult = measured,
+                                    topLeft = Offset(
+                                        pos.x - measured.size.width / 2f,
+                                        pos.y - measured.size.height / 2f
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     if (hasData) {
                         // ── 3. VALUE ARC GLOW ──
                         val currentSweep = progress * sweepAngle
                         drawArc(
                             brush = Brush.sweepGradient(
-                                0f to activeColor.copy(alpha = 0f),
-                                0.5f to activeColor.copy(alpha = 0.3f),
-                                1f to activeColor.copy(alpha = 0.6f)
+                                0f to themeGlowColor.copy(alpha = 0f),
+                                0.5f to themeGlowColor.copy(alpha = 0.3f),
+                                1f to themeGlowColor.copy(alpha = 0.6f)
                             ),
                             startAngle = startAngle,
                             sweepAngle = currentSweep,
@@ -325,32 +430,39 @@ fun GaugeWidget(
                         )
                         
                         // Needle shadow
-                        drawLine(color = activeColor.copy(alpha = 0.15f), start = center, end = needleEnd, strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+                        drawLine(color = themeNeedleColor.copy(alpha = 0.15f), start = center, end = needleEnd, strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
                         // Needle glow
-                        drawLine(color = activeColor.copy(alpha = 0.5f), start = center, end = needleEnd, strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
+                        drawLine(color = themeNeedleColor.copy(alpha = 0.5f), start = center, end = needleEnd, strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
                         // Needle core
-                        drawLine(color = activeColor, start = center, end = needleEnd, strokeWidth = 2.5f.dp.toPx(), cap = StrokeCap.Round)
+                        drawLine(color = themeNeedleColor, start = center, end = needleEnd, strokeWidth = 2.5f.dp.toPx(), cap = StrokeCap.Round)
                         
                         // Center hub
-                        drawCircle(color = activeColor, radius = 5.dp.toPx(), center = center)
+                        drawCircle(color = themeNeedleColor, radius = 5.dp.toPx(), center = center)
                         drawCircle(color = Color.Black, radius = 3.dp.toPx(), center = center)
-                        drawCircle(color = activeColor.copy(alpha = 0.5f), radius = 8.dp.toPx(), center = center, style = Stroke(1.dp.toPx()))
+                        drawCircle(color = themeNeedleColor.copy(alpha = 0.5f), radius = 8.dp.toPx(), center = center, style = Stroke(1.dp.toPx()))
 
                         // ── 6. DYNAMIC DIGITAL READOUT ──
                         val valueText = String.format("%.0f", animValue)
                         val valueMeasured = textMeasurer.measure(
                             text = valueText,
                             style = TextStyle(
-                                color = Color.White,
+                                color = themeTextColor,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = (-1).sp
                             )
                         )
+                        val activeUnitColor = when {
+                            !hasData -> MeetColors.textMuted
+                            isAnomaly -> MeetColors.error
+                            criticalThreshold != null && animValue >= criticalThreshold -> MeetColors.error
+                            warningThreshold != null && animValue >= warningThreshold -> MeetColors.warning
+                            else -> customUnitColor ?: colorScheme.unitColor
+                        }
                         val unitMeasured = textMeasurer.measure(
                             text = unit.lowercase(),
                             style = TextStyle(
-                                color = activeColor,
+                                color = activeUnitColor,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -358,10 +470,25 @@ fun GaugeWidget(
 
                         val textWidth = valueMeasured.size.width + unitMeasured.size.width + 2.dp.toPx()
                         val textStart = center.x - textWidth / 2f
-                        val textY = center.y + 38.dp.toPx()
 
-                        drawText(valueMeasured, topLeft = Offset(textStart, textY))
-                        drawText(unitMeasured, topLeft = Offset(textStart + valueMeasured.size.width + 2.dp.toPx(), textY + 13.dp.toPx()))
+                        drawText(valueMeasured, topLeft = Offset(textStart, valueTop))
+                        drawText(unitMeasured, topLeft = Offset(textStart + valueMeasured.size.width + 2.dp.toPx(), valueTop + (valueMeasured.size.height - unitMeasured.size.height)))
+
+                        if (isSpeedGauge) {
+                            val secValueText = String.format("%.0f %s", animValue * speedConversion, secondaryUnit)
+                            val secMeasured = textMeasurer.measure(
+                                text = secValueText,
+                                style = TextStyle(
+                                    color = MeetColors.textSecondary.copy(alpha = 0.5f),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                            drawText(
+                                secMeasured,
+                                topLeft = Offset(center.x - secMeasured.size.width / 2f, valueTop + valueMeasured.size.height + 1.dp.toPx())
+                            )
+                        }
 
                     } else {
                         // ── NO DATA: Scanning arc animation ──
@@ -400,7 +527,7 @@ fun GaugeWidget(
                                 letterSpacing = 2.sp
                             )
                         )
-                        drawText(warningMeasured, topLeft = Offset(center.x - warningMeasured.size.width / 2f, center.y + 40.dp.toPx()))
+                        drawText(warningMeasured, topLeft = Offset(center.x - warningMeasured.size.width / 2f, valueTop))
                     }
                     
                     // ── 7. MIN / MAX LABELS at arc endpoints ──
@@ -408,7 +535,7 @@ fun GaugeWidget(
                     drawText(maxMeasured, topLeft = maxLabelPos)
 
                     // ── 8. GAUGE CENTRAL LABEL ──
-                    drawText(labelMeasured, topLeft = Offset(center.x - labelMeasured.size.width / 2f, center.y + 26.dp.toPx()))
+                    drawText(labelMeasured, topLeft = Offset(center.x - labelMeasured.size.width / 2f, labelTop))
 
                     // Anomaly label on Canvas
                     if (isAnomaly && hasData) {
@@ -422,7 +549,7 @@ fun GaugeWidget(
                                 letterSpacing = 1.sp
                             )
                         )
-                        drawText(anomalyMeasured, topLeft = Offset(center.x - anomalyMeasured.size.width / 2f, center.y + 66.dp.toPx()))
+                        drawText(anomalyMeasured, topLeft = Offset(center.x - anomalyMeasured.size.width / 2f, anomalyTop))
                     }
                 }
             }

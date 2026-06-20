@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Tokyo Drift Style: Japanese street racing aesthetic.
@@ -30,6 +31,7 @@ fun GaugeTokyoWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.7f, stiffness = 160f), label = "tokyo")
     val inf = rememberInfiniteTransition(label = "tp")
@@ -39,17 +41,17 @@ fun GaugeTokyoWidget(
         infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "tg")
     val tm = rememberTextMeasurer()
 
-    val midnightBlue = Color(0xFF000844)
-    val sakuraPink = Color(0xFFFF69B4)
-    val iceWhite = Color(0xFFE0E8FF)
-    val neonBlue = Color(0xFF4466FF)
+    val midnightBlue = colorScheme.bezelColor
+    val sakuraPink = colorScheme.needleColor
+    val iceWhite = colorScheme.textColor
+    val neonBlue = colorScheme.internalColor
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r = size.width / 2f - 16.dp.toPx()
         val sweep = 240f; val start = 150f
 
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = sakuraPink.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace))
 
         // Tick marks pre-calc
         val ticks = List(31) { i ->
@@ -138,7 +140,7 @@ fun GaugeTokyoWidget(
             // Value
             val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = iceWhite, fontSize = 26.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy + 22.dp.toPx()))
-            val ut = tm.measure(unit.lowercase(), TextStyle(color = sakuraPink, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+            val ut = tm.measure(unit.lowercase(), TextStyle(color = colorScheme.unitColor, fontSize = 10.sp, fontWeight = FontWeight.Bold))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 22.dp.toPx() + vt.size.height))
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 22.dp.toPx() + vt.size.height + ut.size.height + 2.dp.toPx()))
         }

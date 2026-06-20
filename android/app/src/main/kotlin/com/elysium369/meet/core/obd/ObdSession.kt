@@ -213,13 +213,15 @@ class ObdSession(
         "0115", // O2 Sensor 2 Bank 1 — Voltage + Short Term Fuel Trim
         // ─── DIAGNOSTICS (Low-frequency — polled every 3 cycles) ───
         "0101", // Monitor Status (MIL, DTC count, readiness)
-        "011F"  // Run Time Since Engine Start
-        // NOTE: 0133 (Barometric), 011C (OBD Standards), 010A (Fuel Pressure),
+        "011F", // Run Time Since Engine Start
+        "0133"  // Presión Barométrica (Barometric Pressure)
+        // NOTE: 011C (OBD Standards), 010A (Fuel Pressure),
         //       0103 (Fuel System Status), 0146 (Ambient Temp) removed from
         //       high-frequency loop — they rarely change and waste bus time.
     )
 
     private var targetAddress: String? = null
+    private var isDoIpMode = false
 
     fun setTargetAddress(address: String) {
         this.targetAddress = address
@@ -227,10 +229,12 @@ class ObdSession(
             scope.launch { runCatching { old.disconnect() } }
         }
 
-        if (address.contains(".") || address.contains(":35000") || address.contains(":35001")) {
+        isDoIpMode = address.contains(":13400")
+
+        if (address.contains(".") || address.contains(":") || address.startsWith("192.168.")) {
             val parts = address.split(":")
             val ip = parts.getOrNull(0) ?: "192.168.0.10"
-            val port = parts.getOrNull(1)?.toIntOrNull() ?: 35000
+            val port = parts.getOrNull(1)?.toIntOrNull() ?: if (isDoIpMode) 13400 else 35000
             transport = WifiTransport(ip, port)
         } else {
             if (bluetoothAdapter != null) {
@@ -265,15 +269,22 @@ class ObdSession(
             }
 
             try {
-                // 1. Physical Bluetooth Connection
+                // 1. Physical Bluetooth/WiFi Connection
                 activeTransport.connect()
                 Log.i(TAG, "✓ Physical link UP in ${System.currentTimeMillis()-t0}ms (attempt $attempt)")
-                _statusMessage.value = "Conexión OK. Negociando ELM327..."
-                _state.value = ObdState.NEGOTIATING
-
-                // 2. ELM327/STN Protocol Negotiation
-                withTimeout(90000) {
-                    initializeAdapter()
+                
+                if (isDoIpMode) {
+                    _statusMessage.value = "Conexión DoIP OK. Activando enrutamiento..."
+                    _state.value = ObdState.NEGOTIATING
+                    withTimeout(20000) {
+                        initializeDoIpConnection()
+                    }
+                } else {
+                    _statusMessage.value = "Conexión OK. Negociando ELM327..."
+                    _state.value = ObdState.NEGOTIATING
+                    withTimeout(90000) {
+                        initializeAdapter()
+                    }
                 }
 
                 // Reset smoother on new successful connection
@@ -1944,27 +1955,97 @@ class ObdSession(
     suspend fun readOdometer(): Float {
         if (_state.value != ObdState.CONNECTED) return 0f
 
-        // Try Mode 01 PID A6 (Odometer - Newer vehicles)
-        try {
-            val resp = sendRawCommand("01A6")
-            if (resp.contains("41A6") && !resp.contains("NO DATA")) {
-                val clean = CanMultiFrameParser.parse(resp).replace("41A6", "")
-                if (clean.length >= 8) {
-                    return clean.substring(0, 8).toLong(16) / 10f // Unit is 0.1km
-                }
-            }
-        } catch (_: Exception) {}
+        val vinVal = vin.value ?: ""
+        val manufacturer = when {
+            vinVal.startsWith("1FM") || vinVal.startsWith("1FT") || vinVal.startsWith("1FA") || vinVal.startsWith("3FA") -> "FORD"
+            vinVal.startsWith("JTD") || vinVal.startsWith("JT1") || vinVal.startsWith("JTN") || vinVal.startsWith("JTH") -> "TOYOTA"
+            vinVal.startsWith("1GC") || vinVal.startsWith("1G1") || vinVal.startsWith("1G6") || vinVal.startsWith("3G1") -> "GM"
+            vinVal.startsWith("WVW") || vinVal.startsWith("WV2") || vinVal.startsWith("WAU") || vinVal.startsWith("TRU") -> "VOLKSWAGEN"
+            else -> "GENERIC"
+        }
 
-        // Fallback: Mode 01 PID 31 (Distance traveled since codes cleared)
-        try {
-            val resp = sendRawCommand("0131")
-            if (resp.contains("4131") && !resp.contains("NO DATA")) {
-                val clean = CanMultiFrameParser.parse(resp).replace("4131", "")
-                if (clean.length >= 4) {
-                    return clean.substring(0, 4).toInt(16).toFloat()
-                }
+        val commandsToTry = mutableListOf<Pair<String, String>>()
+
+        // Priority 1: Standard OBD2 Odometer PIDs
+        commandsToTry.add("01A6" to "41A6")
+        commandsToTry.add("090D" to "490D")
+
+        // Priority 2: Manufacturer specific PIDs/DIDs
+        when (manufacturer) {
+            "TOYOTA" -> {
+                commandsToTry.add("21C4" to "61C4")
+                commandsToTry.add("2101" to "6101")
             }
-        } catch (_: Exception) {}
+            "FORD" -> {
+                commandsToTry.add("22DD01" to "62DD01")
+                commandsToTry.add("220200" to "620200")
+                commandsToTry.add("220201" to "620201")
+            }
+            "GM" -> {
+                commandsToTry.add("221A6C" to "621A6C")
+                commandsToTry.add("2211A6" to "6211A6")
+            }
+            "VOLKSWAGEN" -> {
+                commandsToTry.add("222203" to "622203")
+                commandsToTry.add("22F40D" to "62F40D")
+            }
+        }
+
+        // Priority 3: Fallback distance indicators
+        commandsToTry.add("0131" to "4131")
+        commandsToTry.add("0121" to "4121")
+
+        for ((cmd, prefix) in commandsToTry) {
+            try {
+                val resp = sendRawCommand(cmd)
+                if (resp.contains(prefix) && !resp.contains("NO DATA") && !resp.contains("ERROR")) {
+                    val clean = CanMultiFrameParser.parse(resp)
+                        .replace(prefix, "")
+                        .replace(" ", "")
+                        .replace("\r", "")
+                        .replace("\n", "")
+                    
+                    val value = when {
+                        cmd == "01A6" || cmd == "090D" || cmd == "22DD01" -> {
+                            if (clean.length >= 8) {
+                                val odoVal = clean.substring(0, 8).toLong(16) / 10f
+                                if (cmd == "22DD01" && odoVal > 2000000f) {
+                                    odoVal / 10f
+                                } else odoVal
+                            } else null
+                        }
+                        cmd == "21C4" || cmd == "221A6C" -> {
+                            if (clean.length >= 6) {
+                                clean.substring(0, 6).toInt(16).toFloat()
+                            } else null
+                        }
+                        cmd == "222203" || cmd == "22F40D" -> {
+                            if (clean.length >= 8) {
+                                clean.substring(0, 8).toLong(16) / 1000f // meters to km
+                            } else null
+                        }
+                        cmd == "2101" -> {
+                            if (clean.length >= 22) {
+                                clean.substring(16, 22).toInt(16).toFloat()
+                            } else null
+                        }
+                        cmd == "0131" || cmd == "0121" -> {
+                            if (clean.length >= 4) {
+                                clean.substring(0, 4).toInt(16).toFloat()
+                            } else null
+                        }
+                        else -> null
+                    }
+
+                    if (value != null && value in 10.0f..2500000.0f) {
+                        Log.i(TAG, "Odómetro leído con éxito ($cmd): $value km")
+                        return value
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Fallo comando odómetro $cmd: ${e.message}")
+            }
+        }
 
         return 0f
     }
@@ -2008,6 +2089,88 @@ class ObdSession(
         } catch (_: Exception) {}
     }
 
+    private suspend fun initializeDoIpConnection() {
+        val t = transport ?: throw ObdConnectionException("Transport no disponible para DoIP")
+        Log.i(TAG, "── INIT DoIP ROUTING ACTIVATION ──")
+        
+        val requestPacket = byteArrayOf(
+            0x02.toByte(), 0xFD.toByte(), // Header
+            0x00.toByte(), 0x05.toByte(), // Payload Type: Routing Activation
+            0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x07.toByte(), // Payload Length
+            0x0E.toByte(), 0x00.toByte(), // Source Address: 0x0E00
+            0x00.toByte(), // Activation Type: 0x00 (Default)
+            0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte() // Reserved
+        )
+        
+        t.write(requestPacket)
+        
+        val respBytes = t.read(1024, 5000L)
+        if (respBytes == null || respBytes.size < 13) {
+            throw ObdConnectionException("Sin respuesta de activación DoIP. Verifica el gateway DoIP.")
+        }
+        
+        val payloadType = ((respBytes[2].toInt() and 0xFF) shl 8) or (respBytes[3].toInt() and 0xFF)
+        val status = respBytes[12].toInt() and 0xFF
+        
+        if (payloadType == 0x0006 && (status == 0x10 || status == 0x00)) {
+            Log.i(TAG, "DoIP Routing Activation SUCCESS. Status: $status")
+            adapterVersion = "DoIP Gateway (ISO 13400)"
+            isCloneAdapter = false
+            detectedProtocol = ObdProtocol.DOIP_ISO13400.displayName
+            _isAdapterPro.value = true
+            baseDelayMs = 5L
+            maxLineLength = 4096
+        } else {
+            throw ObdConnectionException("Fallo en activación DoIP: Tipo=${"%04X".format(payloadType)}, Estado=${"%02X".format(status)}")
+        }
+    }
+
+    private fun wrapDoIpDiagnostics(udsHex: String): ByteArray {
+        val cleanHex = udsHex.replace(" ", "").replace("\r", "").replace("\n", "")
+        val udsBytes = cleanHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val payloadSize = 4 + udsBytes.size
+        
+        val packet = ByteArray(8 + payloadSize)
+        packet[0] = 0x02.toByte()
+        packet[1] = 0xFD.toByte()
+        packet[2] = 0x80.toByte()
+        packet[3] = 0x01.toByte()
+        
+        packet[4] = ((payloadSize shl 24) and 0xFF).toByte()
+        packet[5] = ((payloadSize shl 16) and 0xFF).toByte()
+        packet[6] = ((payloadSize shl 8) and 0xFF).toByte()
+        packet[7] = (payloadSize and 0xFF).toByte()
+        
+        packet[8] = 0x0E.toByte()
+        packet[9] = 0x00.toByte()
+        packet[10] = 0x10.toByte()
+        packet[11] = 0x00.toByte()
+        
+        System.arraycopy(udsBytes, 0, packet, 12, udsBytes.size)
+        return packet
+    }
+
+    private fun unwrapDoIpDiagnostics(doipBytes: ByteArray?): String {
+        if (doipBytes == null || doipBytes.size < 12) return ""
+        val payloadType = ((doipBytes[2].toInt() and 0xFF) shl 8) or (doipBytes[3].toInt() and 0xFF)
+        if (payloadType != 0x8001) return ""
+        
+        val udsLength = doipBytes.size - 12
+        if (udsLength <= 0) return ""
+        
+        val sb = StringBuilder()
+        for (i in 12 until doipBytes.size) {
+            sb.append("%02X".format(doipBytes[i]))
+        }
+        return sb.toString()
+    }
+
+    private suspend fun readResponseBytes(timeoutMs: Long = 1500L): ByteArray? =
+        withContext(Dispatchers.IO) {
+            val t = transport ?: return@withContext null
+            t.read(1024, timeoutMs)
+        }
+
 
     private suspend fun drainInput() {
         withContext(Dispatchers.IO) {
@@ -2016,6 +2179,33 @@ class ObdSession(
     }
 
     private suspend fun sendCommandDirectly(command: String, timeoutMs: Long = 3000L): String {
+        if (isDoIpMode) {
+            val cmd = command.trim().uppercase()
+            if (cmd.startsWith("AT")) {
+                return when {
+                    cmd == "ATRV" -> "12.6V"
+                    cmd == "ATZ" || cmd == "ATI" -> "DoIP Gateway v1.0"
+                    cmd == "ATDPN" -> "F"
+                    cmd == "ATDP" -> "DOIP"
+                    else -> "OK"
+                }
+            }
+            return communicationMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    val t = transport ?: throw ObdConnectionException("Transport no disponible")
+                    Log.v(TAG, "TX (DoIP Direct): '$command'")
+                    val packet = wrapDoIpDiagnostics(command)
+                    runCatching { t.drain() }
+                    t.write(packet)
+                    val respBytes = readResponseBytes(timeoutMs)
+                    val resp = unwrapDoIpDiagnostics(respBytes)
+                    Log.v(TAG, "RX (DoIP Direct): '$resp'")
+                    delay(baseDelayMs)
+                    resp
+                }
+            }
+        }
+
         return communicationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val t = transport ?: throw ObdConnectionException("Transport no disponible")
@@ -2501,9 +2691,28 @@ class ObdSession(
                         try {
                             communicationMutex.withLock {
                                 trafficListener?.onCommandSent(command.query)
-                                runCatching { t.drain() }
-                                t.write("${command.query}\r".toByteArray())
-                                val response = readResponse(timeoutMs = 2000L)
+                                val response = if (isDoIpMode) {
+                                    val cmd = command.query.trim().uppercase()
+                                    if (cmd.startsWith("AT")) {
+                                        when {
+                                            cmd == "ATRV" -> "12.6V"
+                                            cmd == "ATZ" || cmd == "ATI" -> "DoIP Gateway v1.0"
+                                            cmd == "ATDPN" -> "F"
+                                            cmd == "ATDP" -> "DOIP"
+                                            else -> "OK"
+                                        }
+                                    } else {
+                                        val packet = wrapDoIpDiagnostics(command.query)
+                                        runCatching { t.drain() }
+                                        t.write(packet)
+                                        val respBytes = readResponseBytes(timeoutMs = 2000L)
+                                        unwrapDoIpDiagnostics(respBytes)
+                                    }
+                                } else {
+                                    runCatching { t.drain() }
+                                    t.write("${command.query}\r".toByteArray())
+                                    readResponse(timeoutMs = 2000L)
+                                }
                                 if (response.isNotBlank() && !response.contains("?")) {
                                     success = true
                                     consecutiveErrors = 0

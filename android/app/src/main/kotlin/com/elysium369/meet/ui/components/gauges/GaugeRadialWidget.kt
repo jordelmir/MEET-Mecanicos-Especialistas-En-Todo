@@ -16,6 +16,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Radial Smartwatch Style: Thick donut ring with gradient, like Apple Watch Activity Rings.
@@ -33,6 +34,7 @@ fun GaugeRadialWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 100f),
@@ -63,7 +65,7 @@ fun GaugeRadialWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = MeetColors.textSecondary.copy(alpha = 0.7f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.8f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                 )
 
                 onDrawBehind {
@@ -72,15 +74,16 @@ fun GaugeRadialWidget(
                         isAnomaly -> MeetColors.error
                         criticalThreshold != null && animatedValue >= criticalThreshold -> MeetColors.error
                         warningThreshold != null && animatedValue >= warningThreshold -> MeetColors.warning
-                        else -> Color(0xFF6C5CE7) // Purple-blue (smartwatch feel)
+                        else -> colorScheme.internalColor
                     }
                     val secondaryColor = when {
                         !hasData -> MeetColors.textMuted
                         isAnomaly -> Color(0xFFFF6B6B)
                         criticalThreshold != null && animatedValue >= criticalThreshold -> Color(0xFFFF6B6B)
                         warningThreshold != null && animatedValue >= warningThreshold -> Color(0xFFFFBE76)
-                        else -> Color(0xFFA29BFE) // Light purple
+                        else -> colorScheme.specialColor
                     }
+                    val themeTextColor = if (activeColor == colorScheme.internalColor) colorScheme.textColor else activeColor
                     val progress = if (maxVal == minVal) 0f else ((animatedValue - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
                     val arcRect = Size(radius * 2f, radius * 2f)
                     val arcOffset = Offset(center.x - radius, center.y - radius)
@@ -140,14 +143,21 @@ fun GaugeRadialWidget(
                     val valueText = if (hasData) String.format("%.0f", animatedValue) else "---"
                     val valueMeasured = textMeasurer.measure(
                         valueText,
-                        TextStyle(color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
+                        TextStyle(color = themeTextColor, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
                     )
                     drawText(valueMeasured, topLeft = Offset(center.x - valueMeasured.size.width / 2f, center.y - valueMeasured.size.height / 2f - 10.dp.toPx()))
 
                     // Unit below value
+                    val activeUnitColor = when {
+                        !hasData -> MeetColors.textMuted
+                        isAnomaly -> MeetColors.error
+                        criticalThreshold != null && animatedValue >= criticalThreshold -> MeetColors.error
+                        warningThreshold != null && animatedValue >= warningThreshold -> MeetColors.warning
+                        else -> colorScheme.unitColor
+                    }
                     val unitMeasured = textMeasurer.measure(
                         unit.lowercase(),
-                        TextStyle(color = if (hasData) activeColor else MeetColors.textMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        TextStyle(color = activeUnitColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     )
                     drawText(unitMeasured, topLeft = Offset(center.x - unitMeasured.size.width / 2f, center.y + 8.dp.toPx()))
 

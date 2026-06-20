@@ -22,12 +22,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.core.obd.PerformanceCalculator
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.components.*
 import kotlinx.coroutines.delay
@@ -194,6 +197,112 @@ fun ScannerPerformanceTab(
                                     maxVal = 20f,
                                     unit = "AFR",
                                     activeColor = MeetColors.warning
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── VIRTUAL DYNO GRAPH & CONFIGURATION ───
+            item(span = { GridItemSpan(cols) }) {
+                val isDynoRunning by viewModel.isDynoRunning.collectAsState()
+                val dynoPoints by viewModel.dynoPoints.collectAsState()
+                val vehicleMass by viewModel.vehicleMass.collectAsState()
+                val drivetrainLoss by viewModel.drivetrainLoss.collectAsState()
+
+                EliteCard(
+                    backgroundColor = MeetColors.backgroundDark,
+                    borderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    glowColor = MeetColors.neonGreen.copy(alpha = 0.15f)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        PhantomSectionHeader(label = "DINAMÓMETRO DE CHASIS VIRTUAL", accentColor = MeetColors.neonGreen)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Sliders for Config
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Masa del Vehículo: ${vehicleMass.toInt()} kg",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Slider(
+                                    value = vehicleMass,
+                                    onValueChange = { viewModel.updateDynoSettings(it, drivetrainLoss) },
+                                    valueRange = 800f..3500f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = MeetColors.neonGreen,
+                                        activeTrackColor = MeetColors.neonGreen,
+                                        inactiveTrackColor = MeetColors.borderSubtle
+                                    )
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Pérdida por Transmisión: ${drivetrainLoss.toInt()}%",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Slider(
+                                    value = drivetrainLoss,
+                                    onValueChange = { viewModel.updateDynoSettings(vehicleMass, it) },
+                                    valueRange = 5f..30f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = MeetColors.electricBlue,
+                                        activeTrackColor = MeetColors.electricBlue,
+                                        inactiveTrackColor = MeetColors.borderSubtle
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dynamic Dyno Chart
+                        DynoCurveChart(
+                            points = dynoPoints,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MeetColors.borderSubtle.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Control Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            EliteButton(
+                                text = if (isDynoRunning) "DETENER PRUEBA" else "INICIAR PRUEBA DE DINO",
+                                onClick = {
+                                    if (isDynoRunning) {
+                                        viewModel.stopDynoTest()
+                                    } else {
+                                        viewModel.startDynoTest()
+                                    }
+                                },
+                                color = if (isDynoRunning) MeetColors.error else MeetColors.neonGreen,
+                                modifier = Modifier.weight(1.5f)
+                            )
+                            if (dynoPoints.isNotEmpty() && !isDynoRunning) {
+                                EliteOutlinedButton(
+                                    text = "REINICIAR",
+                                    onClick = { viewModel.resetDynoTest() },
+                                    color = MeetColors.textSecondary,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
@@ -640,5 +749,217 @@ fun DragResultItem(
                 }
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════
+// DYNO CURVE CHART COMPONENT (HP & TORQUE VS RPM)
+// ═══════════════════════════════════════
+
+@Composable
+fun DynoCurveChart(
+    points: List<PerformanceCalculator.DynoPoint>,
+    modifier: Modifier = Modifier
+) {
+    var touchX by remember { mutableStateOf<Float?>(null) }
+    
+    // Remember pointer input modifier to handle touch tracking
+    val pointerModifier = Modifier.pointerInput(Unit) {
+        detectDragGestures(
+            onDragStart = { offset -> touchX = offset.x },
+            onDrag = { change, _ -> 
+                change.consume()
+                touchX = change.position.x 
+            },
+            onDragEnd = { touchX = null },
+            onDragCancel = { touchX = null }
+        )
+    }
+
+    Box(modifier = modifier.then(pointerModifier)) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 24.dp)) {
+            val width = size.width
+            val height = size.height
+
+            val minRpm = 1000f
+            val maxRpm = 7000f
+            val maxHp = 400f
+            val maxTorque = 500f
+
+            // 1. Draw Grid Lines
+            val rpmSteps = listOf(2000f, 3000f, 4000f, 5000f, 6000f)
+            rpmSteps.forEach { rpm ->
+                val x = ((rpm - minRpm) / (maxRpm - minRpm)) * width
+                drawLine(
+                    color = MeetColors.borderSubtle.copy(alpha = 0.15f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val ySteps = listOf(0.2f, 0.4f, 0.6f, 0.8f)
+            ySteps.forEach { ratio ->
+                val y = height * (1f - ratio)
+                drawLine(
+                    color = MeetColors.borderSubtle.copy(alpha = 0.1f),
+                    start = Offset(0f, y),
+                    end = Offset(width, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            // 2. Draw HP Path (Green) & Torque Path (Blue)
+            if (points.isNotEmpty()) {
+                val hpPath = Path()
+                val torquePath = Path()
+                
+                points.forEachIndexed { index, pt ->
+                    val x = ((pt.rpm - minRpm) / (maxRpm - minRpm)) * width
+                    val yHp = height - ((pt.hp / maxHp) * height)
+                    val yTorque = height - ((pt.torqueNm / maxTorque) * height)
+
+                    if (index == 0) {
+                        hpPath.moveTo(x, yHp)
+                        torquePath.moveTo(x, yTorque)
+                    } else {
+                        hpPath.lineTo(x, yHp)
+                        torquePath.lineTo(x, yTorque)
+                    }
+                }
+
+                // Draw curves
+                drawPath(
+                    path = hpPath,
+                    color = MeetColors.neonGreen,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
+                drawPath(
+                    path = torquePath,
+                    color = MeetColors.electricBlue,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // 3. Touch Indicator Line and Legend
+                touchX?.let { tx ->
+                    val clampedTx = tx.coerceIn(0f, width)
+                    val touchRpm = minRpm + (clampedTx / width) * (maxRpm - minRpm)
+                    
+                    // Find closest point
+                    val closest = points.minByOrNull { kotlin.math.abs(it.rpm - touchRpm) }
+                    closest?.let { pt ->
+                        val xIndicator = ((pt.rpm - minRpm) / (maxRpm - minRpm)) * width
+                        
+                        // Vertical guideline
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.4f),
+                            start = Offset(xIndicator, 0f),
+                            end = Offset(xIndicator, height),
+                            strokeWidth = 1.5.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+
+                        // Highlight dots
+                        val dotYHp = height - ((pt.hp / maxHp) * height)
+                        val dotYTorque = height - ((pt.torqueNm / maxTorque) * height)
+                        
+                        drawCircle(color = MeetColors.neonGreen, radius = 5.dp.toPx(), center = Offset(xIndicator, dotYHp))
+                        drawCircle(color = Color.White, radius = 2.dp.toPx(), center = Offset(xIndicator, dotYHp))
+
+                        drawCircle(color = MeetColors.electricBlue, radius = 5.dp.toPx(), center = Offset(xIndicator, dotYTorque))
+                        drawCircle(color = Color.White, radius = 2.dp.toPx(), center = Offset(xIndicator, dotYTorque))
+                    }
+                }
+            }
+        }
+        
+        // 4. Overlaid text legends/labels
+        if (points.isNotEmpty()) {
+            val maxRpm = 7000f
+            val minRpm = 1000f
+            
+            touchX?.let { tx ->
+                // Map the touch x coordinates into RPM
+                // We must measure coordinates relative to the Canvas bounds
+                // Canvas width is roughly container width minus padding (48.dp = ~132px)
+                val clampedTx = tx.coerceIn(0f, 1000f)
+                val touchRpm = minRpm + (clampedTx / 1000f) * (maxRpm - minRpm)
+                val closest = points.minByOrNull { kotlin.math.abs(it.rpm - touchRpm) }
+                closest?.let { pt ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(6.dp))
+                            .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${pt.rpm} RPM  |  ${String.format("%.1f", pt.hp)} HP  |  ${String.format("%.1f", pt.torqueNm)} Nm",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            } ?: run {
+                // Show peaks as default legend
+                val peakPointHp = points.maxByOrNull { it.hp }
+                val peakPointTorque = points.maxByOrNull { it.torqueNm }
+                if (peakPointHp != null && peakPointTorque != null) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "PICO HP: ${String.format("%.0f", peakPointHp.hp)} @ ${peakPointHp.rpm} RPM",
+                            color = MeetColors.neonGreen,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = "PICO TORQUE: ${String.format("%.0f", peakPointTorque.torqueNm)} Nm @ ${peakPointTorque.rpm} RPM",
+                            color = MeetColors.electricBlue,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+        } else {
+            // Empty state guide text
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "SIN DATOS DE CORRIDA\nPresione Iniciar y acelere en 3ª o 4ª marcha",
+                    color = MeetColors.textMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
+        // Axis Y labels
+        Text(
+            text = "HP",
+            color = MeetColors.neonGreen.copy(alpha = 0.5f),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = 6.dp, start = 6.dp)
+        )
+        Text(
+            text = "Nm",
+            color = MeetColors.electricBlue.copy(alpha = 0.5f),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 6.dp, end = 6.dp)
+        )
     }
 }

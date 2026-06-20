@@ -7,16 +7,13 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -345,6 +342,7 @@ fun SearchTabContent(
     onDownload: (ManualMetadata) -> Unit
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -425,9 +423,165 @@ fun SearchTabContent(
             }
         }
 
-        // Results Section
+        // 1. Dynamic Official Portals Card or List
+        val cleanMake = make.trim().lowercase()
+        val directBrandUrl = if (cleanMake.isNotEmpty()) {
+            OFFICIAL_BRAND_PORTALS[cleanMake] ?: OFFICIAL_BRAND_PORTALS.entries.find { cleanMake.contains(it.key) || it.key.contains(cleanMake) }?.value
+        } else null
+
+        if (directBrandUrl != null) {
+            EliteCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = MeetColors.neonGreen.copy(alpha = 0.5f),
+                glowColor = MeetColors.neonGreen.copy(alpha = 0.2f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "PORTAL OFICIAL DE MANUALES",
+                            color = MeetColors.neonGreen,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Manuales y guías del propietario oficiales para ${make.capitalize()}.",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = { openWebUrl(context, directBrandUrl) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen)
+                    ) {
+                        Text("🌐 IR AL PORTAL", color = MeetColors.backgroundDeep, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+            }
+        } else {
+            // Horizontal list of all official portals
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "PORTALES OFICIALES POR MARCA",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OFFICIAL_BRAND_PORTALS.keys.map { it.capitalize() }.distinct().sorted().forEach { brandName ->
+                        val url = OFFICIAL_BRAND_PORTALS[brandName.lowercase()] ?: ""
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MeetColors.cardBackground)
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                .clickable { openWebUrl(context, url) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = brandName,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Complete Online libraries
         PhantomSectionHeader(
-            label = "Manuales Disponibles",
+            label = "Bibliotecas de Taller Online",
+            accentColor = MeetColors.electricBlue
+        )
+
+        ONLINE_LIBRARIES.forEach { library ->
+            EliteCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = MeetColors.borderSubtle,
+                glowColor = MeetColors.electricBlue.copy(alpha = 0.03f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = library.name,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MeetColors.electricBlue.copy(alpha = 0.1f))
+                                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = library.badge,
+                                    color = MeetColors.electricBlue,
+                                    fontSize = 7.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = library.description,
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = library.url.substringAfter("https://").substringBefore("/"),
+                            color = MeetColors.electricBlue,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MeetColors.electricBlue.copy(alpha = 0.15f))
+                            .border(1.dp, MeetColors.electricBlue, RoundedCornerShape(8.dp))
+                            .clickable { openWebUrl(context, library.url) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "ABRIR ↗",
+                            color = MeetColors.electricBlue,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. Local Fichas (Offline Quick Sheets)
+        PhantomSectionHeader(
+            label = "Fichas de Servicio Offline (PDF)",
             accentColor = MeetColors.neonGreen
         )
 
@@ -438,14 +592,14 @@ fun SearchTabContent(
                     .clip(RoundedCornerShape(8.dp))
                     .background(MeetColors.cardBackground)
                     .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                    .padding(32.dp),
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Escribe la marca y el modelo arriba para buscar manuales.",
+                        text = "Escribe la marca y el modelo arriba para generar fichas PDF offline.",
                         color = MeetColors.textSecondary,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -457,14 +611,14 @@ fun SearchTabContent(
                     .clip(RoundedCornerShape(8.dp))
                     .background(MeetColors.cardBackground)
                     .border(1.dp, MeetColors.error.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                    .padding(32.dp),
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "No se encontraron manuales.",
+                        text = "No se encontraron resultados de fichas offline.",
                         color = MeetColors.textSecondary,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -559,7 +713,7 @@ fun SearchTabContent(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = "Descargando manual localmente...",
+                                            text = "Generando ficha local...",
                                             color = MeetColors.cyberCyan,
                                             fontSize = 11.sp
                                         )
@@ -604,7 +758,7 @@ fun SearchTabContent(
                             }
                             else -> {
                                 EliteButton(
-                                    text = "📥 DESCARGAR MANUAL LOCAL",
+                                    text = "📥 DESCARGAR FICHA RÁPIDA DE SERVICIO",
                                     onClick = { onDownload(manual) },
                                     color = MeetColors.cyberCyan,
                                     modifier = Modifier.fillMaxWidth()
@@ -847,3 +1001,62 @@ fun generateManualPdf(context: Context, make: String, model: String, year: Strin
     }
     return file
 }
+
+// ═══════════════════════════════════════════════════════
+// WEB REDIRECTION DATA MODELS, DATA LISTS AND HELPERS
+// ═══════════════════════════════════════════════════════
+
+fun openWebUrl(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "No se pudo abrir la página web", Toast.LENGTH_SHORT).show()
+    }
+}
+
+data class OnlineLibrary(
+    val name: String,
+    val description: String,
+    val url: String,
+    val badge: String
+)
+
+val ONLINE_LIBRARIES = listOf(
+    OnlineLibrary("Charm.li", "Diagramas eléctricos y manuales de taller completos gratis.", "https://charm.li/", "MÁS RECOMENDADO"),
+    OnlineLibrary("ManualMecanica.com", "Manuales de mecánica y guías de reparación en español.", "https://manualmecanica.com/", "ESPAÑOL"),
+    OnlineLibrary("ManualesDeTodo.net", "Catálogo extenso de manuales PDF de propietario y taller.", "https://manualesdetodo.net/", "RECOMENDADO"),
+    OnlineLibrary("TodoMecanica.com", "Comunidad con manuales de taller, esquemas y guías.", "https://www.todomecanica.com/manuales.html", "COMUNIDAD"),
+    OnlineLibrary("CarDiagn.com", "Manuales de reparación y diagramas de cableado online.", "https://cardiagn.com/", "COMPLETO"),
+    OnlineLibrary("AutoManuals.online", "Biblioteca interactiva de manuales técnicos.", "https://automanuals.online/", "ONLINE"),
+    OnlineLibrary("Automotive-Manuals.net", "Colección internacional de diagramas y manuales de servicio.", "https://www.automotive-manuals.net/", "DIAGRAMAS"),
+    OnlineLibrary("DataCar Repair", "Manuales de reparación y datos técnicos de servicio.", "https://www.datacar-manualrepair.com/", "DATOS"),
+    OnlineLibrary("Dezos Manuals", "Manuales de propietario y especificaciones técnicas.", "https://www.dezosmanuals.com/", "ESPECIFICACIONES"),
+    OnlineLibrary("AutoPaper", "Manuales físicos y literatura automotriz de colección.", "https://www.autopaper.com/", "LITERATURA")
+)
+
+val OFFICIAL_BRAND_PORTALS = mapOf(
+    "toyota" to "https://www.toyota.com/owners/resources/warranty-owners-manuals",
+    "nissan" to "https://www.nissanusa.com/owners/ownership/manuals-guides.html",
+    "ford" to "https://www.ford.com/support/owner-manuals/",
+    "honda" to "https://owners.honda.com/vehicle-information/manuals",
+    "hyundai" to "https://www.hyundai.com/worldwide/en/service/manuals",
+    "kia" to "https://www.kia.com/worldwide/service/manuals",
+    "mazda" to "https://www.mazdausa.com/owners/how-to-use-my-mazda",
+    "subaru" to "https://www.subaru.com/owners/vehicle-resources.html",
+    "chevrolet" to "https://www.chevrolet.com/support/vehicle/manuals-guides",
+    "gmc" to "https://www.gmc.com/support/vehicle/manuals-guides",
+    "bmw" to "https://www.bmwusa.com/owners-manuals.html",
+    "mercedes" to "https://www.mbusa.com/en/owners/manuals",
+    "mbusa" to "https://www.mbusa.com/en/owners/manuals",
+    "volvo" to "https://www.volvocars.com/en/support/manuals",
+    "volkswagen" to "https://www.vwserviceandparts.com/digital-resources/online-owners-manual/",
+    "vw" to "https://www.vwserviceandparts.com/digital-resources/online-owners-manual/",
+    "audi" to "https://www.audiusa.com/us/web/en/support/owners-manuals.html",
+    "lexus" to "https://www.lexus.com/My-Lexus/resources#manuals",
+    "mitsubishi" to "https://www.mitsubishicars.com/owners/manuals",
+    "suzuki" to "https://www.suzuki.co.uk/owners/manuals"
+)
+

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Neon Retrowave Style: 80s synthwave aesthetic with hot pink, cyan, and purple.
@@ -36,6 +37,7 @@ fun GaugeNeonRetroWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 140f),
@@ -58,10 +60,10 @@ fun GaugeNeonRetroWidget(
     val hasData = value != 0f || label.contains("Temp", true)
 
     // Synthwave color palette
-    val neonPink = Color(0xFFFF006E)
-    val neonCyan = Color(0xFF00F5FF)
-    val neonPurple = Color(0xFFBB00FF)
-    val neonYellow = Color(0xFFFFE600)
+    val neonPink = colorScheme.needleColor
+    val neonCyan = colorScheme.internalColor
+    val neonPurple = colorScheme.specialColor
+    val neonYellow = colorScheme.specialColor
 
     Spacer(
         modifier = modifier
@@ -93,7 +95,7 @@ fun GaugeNeonRetroWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = neonCyan.copy(alpha = 0.6f), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.6f), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace)
                 )
 
                 onDrawBehind {
@@ -189,14 +191,14 @@ fun GaugeNeonRetroWidget(
                     // Core layer
                     val valueMeasured = textMeasurer.measure(
                         valueText,
-                        TextStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = colorScheme.textColor, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, fontFamily = FontFamily.Monospace)
                     )
                     drawText(valueMeasured, topLeft = Offset(center.x - valueMeasured.size.width / 2f, center.y - valueMeasured.size.height / 2f - 4.dp.toPx()))
 
                     // Unit with neon color
                     val unitMeasured = textMeasurer.measure(
                         unit.lowercase(),
-                        TextStyle(color = neonPink, fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = colorScheme.unitColor, fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     )
                     drawText(unitMeasured, topLeft = Offset(center.x - unitMeasured.size.width / 2f, center.y + valueMeasured.size.height / 2f))
 

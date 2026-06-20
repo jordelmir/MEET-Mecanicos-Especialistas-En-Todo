@@ -1,5 +1,7 @@
 package com.elysium369.meet
 
+import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.theme.MeetTheme
 import android.os.Bundle
 import android.os.Build
 import android.content.Context
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -22,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.FleetChatViewModel
+import com.elysium369.meet.ui.RepairNetworkViewModel
 import com.elysium369.meet.ui.screens.*
 import com.elysium369.meet.ui.screens.chat.*
 import com.elysium369.meet.core.livelink.LiveLinkServer
@@ -80,9 +84,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkPermissions()
+        MeetColors.initialize(this)
 
         setContent {
-            MaterialTheme(colorScheme = CyberpunkColorScheme) {
+            MeetTheme {
                 MeetApp(viewModel)
             }
         }
@@ -100,6 +105,9 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
         }
+        
+        // Microphone permission for Voice Copilot
+        permissions.add(android.Manifest.permission.RECORD_AUDIO)
 
         permissionLauncher.launch(permissions.toTypedArray())
     }
@@ -109,6 +117,22 @@ class MainActivity : ComponentActivity() {
 fun MeetApp(obdViewModel: ObdViewModel) {
     val navController = rememberNavController()
     val liveLinkServer = remember { LiveLinkServer() }
+
+    // Navigation collector for voice commands
+    LaunchedEffect(Unit) {
+        obdViewModel.navigationEvent.collect { route ->
+            android.util.Log.d("MainActivity", "Voice navigation: navigating to $route")
+            try {
+                navController.navigate(route) {
+                    popUpTo("home") { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Failed to navigate to $route", e)
+            }
+        }
+    }
 
     // Stop server when leaving composition
     DisposableEffect(Unit) {
@@ -146,7 +170,9 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 ?.destination?.route
             val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium")
             if (currentRoute !in hideBarRoutes && currentRoute != null) {
-                ConnectionStatusBar(viewModel = obdViewModel)
+                Box(modifier = Modifier.statusBarsPadding()) {
+                    ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
+                }
             }
         }
     ) { paddingValues ->
@@ -346,13 +372,17 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable("component_locator") {
-                ComponentLocatorScreen(navController = navController)
+                ComponentLocatorScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("adaptation") {
                 AdaptationScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("live_link") {
-                LiveLinkScreen(navController = navController, liveLinkServer = liveLinkServer)
+                LiveLinkScreen(
+                    navController = navController,
+                    liveLinkServer = liveLinkServer,
+                    viewModel = obdViewModel
+                )
             }
             composable("connect") {
                 AdapterSearchSheet(
@@ -412,6 +442,52 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     navController = navController
                 )
             }
+            composable("dashcam") {
+                DashcamScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("meet_perito") {
+                MeetPeritoScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("meet_dna") {
+                MeetDnaScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("repair_network") {
+                val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                RepairNetworkScreen(navController = navController, viewModel = repairViewModel)
+            }
+            composable("repair_case_detail/{caseId}") { backStack ->
+                val caseId = backStack.arguments?.getString("caseId") ?: ""
+                val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                LaunchedEffect(caseId) {
+                    repairViewModel.selectCase(caseId)
+                }
+                RepairCaseDetailScreen(navController = navController, caseId = caseId, viewModel = repairViewModel)
+            }
+            composable("contribute_case") {
+                val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                ContributeCaseScreen(navController = navController, viewModel = repairViewModel)
+            }
+            composable("marketplace") {
+                MarketplaceScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
+            composable("workshop_dashboard") {
+                WorkshopDashboardScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
         }
     }
 }
@@ -424,7 +500,7 @@ fun MeetBottomNavigation(navController: NavController) {
     
     NavigationBar(
         containerColor = Color(0xFF070B14),
-        contentColor = Color(0xFF00FFD4)
+        contentColor = MeetColors.neonGreen
     ) {
         NavigationBarItem(
             icon = { Icon(Icons.Default.Home, "Home") },
@@ -432,11 +508,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "home",
             onClick = { navController.navigate("home") { launchSingleTop = true; restoreState = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF00FFD4),
-                selectedTextColor = Color(0xFF00FFD4),
-                unselectedIconColor = Color(0xFF3D4E63),
-                unselectedTextColor = Color(0xFF3D4E63),
-                indicatorColor = Color(0xFF00FFD4).copy(alpha = 0.08f)
+                selectedIconColor = MeetColors.neonGreen,
+                selectedTextColor = MeetColors.neonGreen,
+                unselectedIconColor = MeetColors.textMuted,
+                unselectedTextColor = MeetColors.textMuted,
+                indicatorColor = MeetColors.neonGreen.copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
@@ -445,11 +521,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "scanner",
             onClick = { navController.navigate("scanner") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF00E5FF),
-                selectedTextColor = Color(0xFF00E5FF),
-                unselectedIconColor = Color(0xFF3D4E63),
-                unselectedTextColor = Color(0xFF3D4E63),
-                indicatorColor = Color(0xFF00E5FF).copy(alpha = 0.08f)
+                selectedIconColor = MeetColors.cyberCyan,
+                selectedTextColor = MeetColors.cyberCyan,
+                unselectedIconColor = MeetColors.textMuted,
+                unselectedTextColor = MeetColors.textMuted,
+                indicatorColor = MeetColors.cyberCyan.copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
@@ -458,11 +534,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "dtc",
             onClick = { navController.navigate("dtc") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFFF1744),
-                selectedTextColor = Color(0xFFFF1744),
-                unselectedIconColor = Color(0xFF3D4E63),
-                unselectedTextColor = Color(0xFF3D4E63),
-                indicatorColor = Color(0xFFFF1744).copy(alpha = 0.08f)
+                selectedIconColor = MeetColors.error,
+                selectedTextColor = MeetColors.error,
+                unselectedIconColor = MeetColors.textMuted,
+                unselectedTextColor = MeetColors.textMuted,
+                indicatorColor = MeetColors.error.copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
@@ -471,11 +547,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "garage",
             onClick = { navController.navigate("garage") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFBB00FF),
-                selectedTextColor = Color(0xFFBB00FF),
-                unselectedIconColor = Color(0xFF3D4E63),
-                unselectedTextColor = Color(0xFF3D4E63),
-                indicatorColor = Color(0xFFBB00FF).copy(alpha = 0.08f)
+                selectedIconColor = MeetColors.electricBlue,
+                selectedTextColor = MeetColors.electricBlue,
+                unselectedIconColor = MeetColors.textMuted,
+                unselectedTextColor = MeetColors.textMuted,
+                indicatorColor = MeetColors.electricBlue.copy(alpha = 0.08f)
             )
         )
         NavigationBarItem(
@@ -484,11 +560,11 @@ fun MeetBottomNavigation(navController: NavController) {
             selected = currentRoute == "pro_hub",
             onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFFFF00AA),
-                selectedTextColor = Color(0xFFFF00AA),
-                unselectedIconColor = Color(0xFF3D4E63),
-                unselectedTextColor = Color(0xFF3D4E63),
-                indicatorColor = Color(0xFFFF00AA).copy(alpha = 0.08f)
+                selectedIconColor = MeetColors.hotMagenta,
+                selectedTextColor = MeetColors.hotMagenta,
+                unselectedIconColor = MeetColors.textMuted,
+                unselectedTextColor = MeetColors.textMuted,
+                indicatorColor = MeetColors.hotMagenta.copy(alpha = 0.08f)
             )
         )
     }

@@ -33,8 +33,13 @@ class MeetApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
+        // Initialize custom theme colors
+        com.elysium369.meet.ui.theme.MeetColors.initialize(this)
+        
         // Load DTC JSON if empty
-        DtcDatabaseLoader(this, db).loadIfEmpty()
+        val dtcLoader = DtcDatabaseLoader(this, db)
+        dtcLoader.loadIfEmpty()
+        dtcLoader.loadKnowledgeGraphIfEmpty()
 
         // ── Schedule automatic database maintenance (daily) ──
         scheduleDatabaseMaintenance()

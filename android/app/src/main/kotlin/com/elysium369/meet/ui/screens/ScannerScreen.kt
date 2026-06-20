@@ -5,8 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.widget.Toast
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -16,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +58,25 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     val qosMetrics by viewModel.qosMetrics.collectAsState()
     val anomalousPids by viewModel.anomalousPids.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    
+    val language by viewModel.language.collectAsState()
+    var isSpanish by remember(language) { mutableStateOf(language == "es") }
+    
+    val voiceCopilotEnabled by viewModel.voiceCopilotEnabled.collectAsState()
+    val isVoiceCopilotListening by viewModel.isVoiceCopilotListening.collectAsState()
+    val context = LocalContext.current
+    
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.toggleVoiceCopilot(true)
+            Toast.makeText(context, if (isSpanish) "Copiloto por voz activado" else "Voice Copilot activated", Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.toggleVoiceCopilot(false)
+            Toast.makeText(context, if (isSpanish) "Permiso de micrófono denegado" else "Microphone permission denied", Toast.LENGTH_LONG).show()
+        }
+    }
 
     val defaultGauges = remember {
         listOf(
@@ -99,8 +128,6 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         )
     }
 
-    val language by viewModel.language.collectAsState()
-    var isSpanish by remember(language) { mutableStateOf(language == "es") }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var selectedTab by remember { mutableIntStateOf(0) }
     var hudMode by remember { mutableStateOf(false) }
@@ -190,8 +217,59 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         topBar = {
             Column {
                 EliteTopAppBar(
-                    title = if (isSpanish) "Escáner en Vivo" else "Live Scanner",
+                    title = buildAnnotatedString {
+                        if (isSpanish) {
+                            withStyle(SpanStyle(color = MeetColors.neonGreen)) {
+                                append("ESCÁNER ")
+                            }
+                            withStyle(SpanStyle(color = MeetColors.electricBlue)) {
+                                append("EN VIVO")
+                            }
+                        } else {
+                            withStyle(SpanStyle(color = MeetColors.neonGreen)) {
+                                append("LIVE ")
+                            }
+                            withStyle(SpanStyle(color = MeetColors.electricBlue)) {
+                                append("SCANNER")
+                            }
+                        }
+                    },
                     actions = {
+                        // Voice Copilot Active / Deactive Toggle Button
+                        IconButton(
+                            onClick = {
+                                val isChecked = !voiceCopilotEnabled
+                                if (isChecked) {
+                                    val hasMicPermission = ContextCompat.checkSelfPermission(
+                                        context,
+                                        android.Manifest.permission.RECORD_AUDIO
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    
+                                    if (hasMicPermission) {
+                                        viewModel.toggleVoiceCopilot(true)
+                                    } else {
+                                        micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    }
+                                } else {
+                                    viewModel.toggleVoiceCopilot(false)
+                                }
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (voiceCopilotEnabled) Icons.Default.Mic else Icons.Default.MicOff,
+                                contentDescription = "Voice Copilot Toggle",
+                                tint = if (voiceCopilotEnabled) {
+                                    if (isVoiceCopilotListening) MeetColors.neonGreen else MeetColors.electricBlue
+                                } else {
+                                    MeetColors.textSecondary
+                                },
+                                modifier = if (voiceCopilotEnabled && isVoiceCopilotListening) {
+                                    Modifier.neonGlow(MeetColors.neonGreen, CircleShape)
+                                } else Modifier
+                            )
+                        }
+
                         // Language Selector
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
                             Text("EN", color = if(isSpanish) MeetColors.textSecondary else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
@@ -327,7 +405,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 2 -> ScannerDiagnosticTab(viewModel, snackbarHostState, navController)
                 3 -> ScannerSensorsTab(viewModel, defaultGauges)
                 4 -> ScannerToolsTab(viewModel, navController, isSpanish, onHudModeToggle = { hudMode = it })
-                5 -> ScannerMonitorsTab(viewModel, isSpanish)
+                5 -> ScannerMonitorsTab(viewModel, isSpanish, snackbarHostState, navController)
                 6 -> ScannerStatisticsTab(viewModel, isLandscape, isSpanish)
             }
         }

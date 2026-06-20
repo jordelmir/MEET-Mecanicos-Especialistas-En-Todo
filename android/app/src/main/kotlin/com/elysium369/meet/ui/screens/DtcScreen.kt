@@ -40,6 +40,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -393,8 +396,23 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (isCompact) "DTC SCAN" else "DIAGNÓSTICO DTC",
-                            color = Color.White,
+                            text = buildAnnotatedString {
+                                if (isCompact) {
+                                    withStyle(SpanStyle(color = MeetColors.neonGreen)) {
+                                        append("DTC ")
+                                    }
+                                    withStyle(SpanStyle(color = MeetColors.electricBlue)) {
+                                        append("SCAN")
+                                    }
+                                } else {
+                                    withStyle(SpanStyle(color = MeetColors.neonGreen)) {
+                                        append("DIAGNÓSTICO ")
+                                    }
+                                    withStyle(SpanStyle(color = MeetColors.electricBlue)) {
+                                        append("DTC")
+                                    }
+                                }
+                            },
                             fontWeight = FontWeight.Black,
                             fontSize = if (isCompact) 18.sp else 22.sp,
                             letterSpacing = 1.sp,

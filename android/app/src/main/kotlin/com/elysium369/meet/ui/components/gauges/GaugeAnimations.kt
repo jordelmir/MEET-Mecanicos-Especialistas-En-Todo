@@ -1042,3 +1042,329 @@ fun DrawScope.drawCockpitHorizon(cx: Float, cy: Float, r: Float, a: GaugeAnimPar
         drawPath(path, amber.copy(alpha = 0.035f * a.pulse), style = Stroke(0.8f.dp.toPx()))
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 30 NEW PREMIUM WEATHER/ENVIRONMENT ANIMATIONS
+// ═══════════════════════════════════════════════════════════════
+
+fun DrawScope.drawLightningAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    if (a.pulse > 0.82f) {
+        val path = Path().apply {
+            moveTo(cx - r * 0.2f, cy - r * 0.8f)
+            lineTo(cx + r * 0.1f, cy - r * 0.2f)
+            lineTo(cx - r * 0.15f, cy + r * 0.1f)
+            lineTo(cx + r * 0.2f, cy + r * 0.7f)
+        }
+        drawPath(path, col.copy(alpha = 0.15f), style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+    }
+}
+
+fun DrawScope.drawRainAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 12) {
+        val x = cx - r * 0.7f + ((i * 27 + a.drift * r * 2f) % (r * 1.4f))
+        val y = cy - r * 0.7f + ((i * 47 + a.drift * r * 1.5f) % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawLine(col.copy(alpha = 0.08f), Offset(x, y), Offset(x - 2.dp.toPx(), y + 8.dp.toPx()), 1.5f.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawSnowAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 12) {
+        val x = cx - r * 0.7f + ((i * 37 + sin(a.wave * 0.05f + i) * 10f) % (r * 1.4f))
+        val y = cy - r * 0.7f + ((i * 53 + a.drift * 0.5f * r * 2f) % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawCircle(col.copy(alpha = 0.12f), 2.dp.toPx(), Offset(x, y))
+        }
+    }
+}
+
+fun DrawScope.drawTornadoAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    rotate(a.fastRot, Offset(cx, cy)) {
+        for (i in 0 until 5) {
+            val scale = 0.1f + i * 0.15f
+            drawCircle(col.copy(alpha = 0.05f), r * scale, Offset(cx, cy), style = Stroke(1.dp.toPx()))
+        }
+    }
+}
+
+fun DrawScope.drawSandstormAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 8) {
+        val y = cy - r * 0.6f + i * r * 0.18f
+        val xShift = a.fastRot * 1.5f
+        val linePath = Path().apply {
+            moveTo(cx - r, y)
+            cubicTo(
+                cx - r * 0.3f, y + sin(xShift * 0.05f + i) * 15f,
+                cx + r * 0.3f, y - sin(xShift * 0.05f + i) * 15f,
+                cx + r, y
+            )
+        }
+        drawPath(linePath, col.copy(alpha = 0.08f), style = Stroke(1.5f.dp.toPx()))
+    }
+}
+
+fun DrawScope.drawVolcanoAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 10) {
+        val progress = (a.drift * 0.8f + i * 0.1f) % 1f
+        val y = cy + r - progress * r * 1.5f
+        val x = cx - r * 0.4f + (i * 31 % (r * 0.8f))
+        val alpha = (1f - progress) * 0.12f
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawCircle(col.copy(alpha = alpha), 3.dp.toPx(), Offset(x, y))
+        }
+    }
+}
+
+fun DrawScope.drawTsunamiAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val path = Path().apply {
+        moveTo(cx - r, cy + r)
+        for (x in 0..(2 * r).toInt()) {
+            val px = cx - r + x
+            val py = cy + r * 0.3f + sin(x * 0.05f + a.wave * 0.1f) * 10f
+            lineTo(px, py)
+        }
+        lineTo(cx + r, cy + r)
+        close()
+    }
+    drawPath(path, col.copy(alpha = 0.06f))
+}
+
+fun DrawScope.drawBlizzardAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 10) {
+        val x = cx - r + ((i * 31 + a.fastRot * 4f) % (r * 2f))
+        val y = cy - r * 0.7f + (i * 19 % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawLine(col.copy(alpha = 0.1f), Offset(x, y), Offset(x - 15.dp.toPx(), y - 3.dp.toPx()), 2.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawAuroraAutoAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (j in 0 until 2) {
+        val path = Path().apply {
+            moveTo(cx - r, cy - r * 0.2f)
+            for (x in 0..(2 * r).toInt()) {
+                val px = cx - r + x
+                val py = cy - r * 0.4f + j * 15.dp.toPx() + sin(x * 0.04f + a.slowRot * 0.05f + j) * 20f
+                lineTo(px, py)
+            }
+            lineTo(cx + r, cy + r)
+            lineTo(cx - r, cy + r)
+            close()
+        }
+        drawPath(path, Brush.verticalGradient(listOf(col.copy(alpha = 0.08f), Color.Transparent)))
+    }
+}
+
+fun DrawScope.drawSolarFlareAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 8) {
+        val angle = Math.toRadians((a.medRot + i * 45f).toDouble())
+        val fStart = r * 0.3f
+        val fEnd = r * 0.7f + sin(a.wave * 0.1f + i).absoluteValue * r * 0.15f
+        drawLine(
+            col.copy(alpha = 0.08f),
+            Offset((cx + fStart * cos(angle)).toFloat(), (cy + fStart * sin(angle)).toFloat()),
+            Offset((cx + fEnd * cos(angle)).toFloat(), (cy + fEnd * sin(angle)).toFloat()),
+            3.dp.toPx()
+        )
+    }
+}
+
+fun DrawScope.drawCosmicDustAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    rotate(a.slowRot) {
+        for (i in 0 until 15) {
+            val angle = i * 24f
+            val rad = Math.toRadians(angle.toDouble())
+            val d = r * (0.2f + (i * 17 % 60) / 100f)
+            drawCircle(col.copy(alpha = 0.1f), 2.5f.dp.toPx(), Offset((cx + d * cos(rad)).toFloat(), (cy + d * sin(rad)).toFloat()))
+        }
+    }
+}
+
+fun DrawScope.drawEarthquakeAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val crack = Path().apply {
+        moveTo(cx - r * 0.3f, cy + r * 0.2f)
+        lineTo(cx - r * 0.05f, cy + r * 0.05f)
+        lineTo(cx + r * 0.1f, cy + r * 0.3f)
+    }
+    drawPath(crack, col.copy(alpha = 0.08f), style = Stroke(2.dp.toPx()))
+}
+
+fun DrawScope.drawMeteorShowerAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 2) {
+        val progress = (a.drift + i * 0.5f) % 1f
+        val mx = cx - r * 0.7f + progress * r * 1.4f
+        val my = cy - r * 0.7f + progress * r * 1.2f
+        if (sqrt((mx - cx).pow(2) + (my - cy).pow(2)) < r) {
+            drawLine(col.copy(alpha = (1f - progress) * 0.15f), Offset(mx, my), Offset(mx - 10.dp.toPx(), my - 8.dp.toPx()), 2.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawHurricaneAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    rotate(a.fastRot * 0.8f) {
+        for (i in 0 until 3) {
+            val angle = i * 120f
+            val rad = Math.toRadians(angle.toDouble())
+            drawCircle(col.copy(alpha = 0.06f), r * 0.5f, Offset((cx + r * 0.2f * cos(rad)).toFloat(), (cy + r * 0.2f * sin(rad)).toFloat()))
+        }
+    }
+}
+
+fun DrawScope.drawFoggyMistAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val mAngle = Math.toRadians((a.slowRot * 0.5f).toDouble())
+    val mx = cx + (r * 0.15f * cos(mAngle)).toFloat()
+    val my = cy + (r * 0.08f * sin(mAngle)).toFloat()
+    drawCircle(
+        Brush.radialGradient(listOf(col.copy(alpha = 0.08f), Color.Transparent), Offset(mx, my), r * 0.7f),
+        r * 0.7f, Offset(mx, my)
+    )
+}
+
+fun DrawScope.drawWildFireAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val path = Path().apply {
+        moveTo(cx - r, cy + r)
+        for (x in 0..(2 * r).toInt()) {
+            val px = cx - r + x
+            val py = cy + r - (10.dp.toPx() + sin(x * 0.1f + a.fastRot * 0.2f) * 6.dp.toPx())
+            lineTo(px, py)
+        }
+        lineTo(cx + r, cy + r)
+        close()
+    }
+    drawPath(path, Brush.verticalGradient(listOf(col.copy(alpha = 0.1f), Color.Transparent), startY = cy + r - 20.dp.toPx(), endY = cy + r))
+}
+
+fun DrawScope.drawOceanDepthAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val rad = Math.toRadians(a.medRot.toDouble())
+    drawLine(
+        col.copy(alpha = 0.08f),
+        Offset(cx, cy),
+        Offset((cx + r * 0.85f * cos(rad)).toFloat(), (cy + r * 0.85f * sin(rad)).toFloat()),
+        1.5f.dp.toPx()
+    )
+    drawCircle(col.copy(alpha = 0.03f), r * 0.4f, Offset(cx, cy), style = Stroke(1.dp.toPx()))
+}
+
+fun DrawScope.drawEclipseAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    drawCircle(
+        Brush.radialGradient(listOf(col.copy(alpha = 0.15f), Color.Transparent), Offset(cx, cy), r * 0.65f),
+        r * 0.65f, Offset(cx, cy)
+    )
+    drawCircle(Color.Black.copy(alpha = 0.7f), r * 0.4f, Offset(cx, cy))
+}
+
+fun DrawScope.drawRainbowRainAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 10) {
+        val x = cx - r * 0.7f + ((i * 33 + a.drift * r * 2f) % (r * 1.4f))
+        val y = cy - r * 0.7f + ((i * 51 + a.drift * r * 1.5f) % (r * 1.4f))
+        val hue = (i * 36f + a.slowRot) % 360f
+        val rainbowCol = Color.hsv(hue, 0.7f, 0.9f)
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawLine(rainbowCol.copy(alpha = 0.08f), Offset(x, y), Offset(x, y + 6.dp.toPx()), 1.5f.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawSandGlowAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (j in 0 until 2) {
+        val py = cy + r * 0.4f + j * 12.dp.toPx() + sin(a.wave * 0.06f + j) * 6.dp.toPx()
+        drawLine(col.copy(alpha = 0.08f), Offset(cx - r * 0.8f, py), Offset(cx + r * 0.8f, py), 1.5f.dp.toPx())
+    }
+}
+
+fun DrawScope.drawThunderCloudAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val cloudColor = if (a.pulse > 0.85f) col.copy(alpha = 0.12f) else col.copy(alpha = 0.04f)
+    drawCircle(cloudColor, r * 0.35f, Offset(cx - r * 0.15f, cy - r * 0.25f))
+    drawCircle(cloudColor, r * 0.4f, Offset(cx + r * 0.1f, cy - r * 0.3f))
+}
+
+fun DrawScope.drawIcyFrostAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 4) {
+        val angle = Math.toRadians((i * 90f + 45f).toDouble())
+        val outerX = cx + (r * cos(angle)).toFloat()
+        val outerY = cy + (r * sin(angle)).toFloat()
+        val innerX = cx + (r * 0.8f * cos(angle)).toFloat()
+        val innerY = cy + (r * 0.8f * sin(angle)).toFloat()
+        drawLine(col.copy(alpha = 0.08f), Offset(outerX, outerY), Offset(innerX, innerY), 2.dp.toPx())
+    }
+}
+
+fun DrawScope.drawCyberStormAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 8) {
+        val x = cx - r * 0.7f + ((i * 39) % (r * 1.4f))
+        val y = cy - r * 0.7f + ((i * 43 + a.drift * r * 1.8f) % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawRect(col.copy(alpha = 0.1f), Offset(x, y), Size(1.dp.toPx(), 6.dp.toPx()))
+        }
+    }
+}
+
+fun DrawScope.drawBlackHoleAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    rotate(-a.slowRot) {
+        drawCircle(
+            Brush.sweepGradient(listOf(Color.Transparent, col.copy(alpha = 0.08f), Color.Transparent)),
+            r * 0.5f, Offset(cx, cy), style = Stroke(5.dp.toPx())
+        )
+    }
+    drawCircle(Color.Black.copy(alpha = 0.6f), r * 0.25f, Offset(cx, cy))
+}
+
+fun DrawScope.drawMonsoonAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 12) {
+        val x = cx - r * 0.7f + ((i * 41 + a.drift * r * 2.2f) % (r * 1.4f)) - (a.drift * 12.dp.toPx())
+        val y = cy - r * 0.7f + ((i * 49 + a.drift * r * 1.8f) % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawLine(col.copy(alpha = 0.08f), Offset(x, y), Offset(x - 4.dp.toPx(), y + 6.dp.toPx()), 1.5f.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawCometTailAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val angle = Math.toRadians(a.medRot.toDouble())
+    drawLine(
+        col.copy(alpha = 0.08f),
+        Offset(cx, cy),
+        Offset((cx + r * 0.7f * cos(angle)).toFloat(), (cy + r * 0.7f * sin(angle)).toFloat()),
+        2.dp.toPx()
+    )
+}
+
+fun DrawScope.drawGalaxyCoreAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    rotate(a.slowRot) {
+        drawLine(col.copy(alpha = 0.08f), Offset(cx, cy - r * 0.7f), Offset(cx, cy + r * 0.7f), 2.dp.toPx())
+        drawCircle(col.copy(alpha = 0.12f), r * 0.1f, Offset(cx, cy))
+    }
+}
+
+fun DrawScope.drawAcidRainAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 8) {
+        val x = cx - r * 0.7f + ((i * 29 + a.drift * r * 1.8f) % (r * 1.4f))
+        val y = cy - r * 0.7f + ((i * 41 + a.drift * r * 1.4f) % (r * 1.4f))
+        if (sqrt((x - cx).pow(2) + (y - cy).pow(2)) < r) {
+            drawLine(col.copy(alpha = 0.08f), Offset(x, y), Offset(x, y + 5.dp.toPx()), 1.5f.dp.toPx())
+        }
+    }
+}
+
+fun DrawScope.drawSupernovaAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    val rad = r * 0.1f + (a.drift * r * 0.7f)
+    drawCircle(col.copy(alpha = (1f - a.drift) * 0.12f), rad, Offset(cx, cy), style = Stroke(1.5f.dp.toPx()))
+}
+
+fun DrawScope.drawWindTunnelAnim(cx: Float, cy: Float, r: Float, a: GaugeAnimParams, col: Color) {
+    for (i in 0 until 3) {
+        val y = cy - r * 0.4f + i * r * 0.4f
+        val flowPath = Path().apply {
+            moveTo(cx - r * 0.8f, y)
+            cubicTo(
+                cx - r * 0.2f, y + sin(a.wave * 0.08f + i) * 6f,
+                cx + r * 0.2f, y - sin(a.wave * 0.08f + i) * 6f,
+                cx + r * 0.8f, y
+            )
+        }
+        drawPath(flowPath, col.copy(alpha = 0.06f), style = Stroke(1.dp.toPx()))
+    }
+}
+

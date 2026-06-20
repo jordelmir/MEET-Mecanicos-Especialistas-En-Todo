@@ -58,7 +58,8 @@ fun DtcItemCard(
     isRefreshingFreezeFrame: Boolean = false,
     onAiConsultClick: () -> Unit = {},
     isConsultingAi: Boolean = false,
-    aiAnalysis: String? = null
+    aiAnalysis: String? = null,
+    onRepairGuideClick: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -174,6 +175,21 @@ fun DtcItemCard(
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Primary Repair Guide Button
+                Button(
+                    onClick = { onRepairGuideClick() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.cyberCyan.copy(alpha = 0.15f),
+                        contentColor = MeetColors.cyberCyan
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    contentPadding = PaddingValues(vertical = 10.dp)
+                ) {
+                    Text("🛠️ VER GUÍA DE REPARACIÓN COMPLETA", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+                }
 
                 // Action Buttons Row
                 Row(

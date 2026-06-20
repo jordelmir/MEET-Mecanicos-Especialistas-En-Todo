@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Holographic Sci-Fi Style: Multiple concentric translucent rings with particle effects.
@@ -36,6 +37,7 @@ fun GaugeHologramWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 100f),
@@ -80,7 +82,7 @@ fun GaugeHologramWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = Color(0xFF00DDFF).copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
                 )
 
                 // Particle positions (pre-calculated angles)
@@ -93,13 +95,14 @@ fun GaugeHologramWidget(
                         isAnomaly -> Color(0xFFFF4444)
                         criticalThreshold != null && animatedValue >= criticalThreshold -> Color(0xFFFF4444)
                         warningThreshold != null && animatedValue >= warningThreshold -> Color(0xFFFFAA00)
-                        else -> Color(0xFF00DDFF) // Holographic cyan
+                        else -> colorScheme.internalColor
                     }
                     val holoSecondary = when {
                         !hasData -> Color(0xFF223344)
                         isAnomaly -> Color(0xFFFF8888)
-                        else -> Color(0xFF00FF99)
+                        else -> colorScheme.specialColor
                     }
+                    val themeTextColor = if (holoColor == colorScheme.internalColor) colorScheme.textColor else holoColor
                     val progress = if (maxVal == minVal) 0f else ((animatedValue - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
 
                     // Outer ring 1 (rotating, dashed)
@@ -189,7 +192,7 @@ fun GaugeHologramWidget(
                     val valueText = if (hasData) String.format("%.0f", animatedValue) else "---"
                     val valueMeasured = textMeasurer.measure(
                         valueText,
-                        TextStyle(color = Color.White.copy(alpha = shimmer), fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
+                        TextStyle(color = themeTextColor.copy(alpha = shimmer), fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp)
                     )
                     // Ghost duplicate for holographic effect
                     val ghostMeasured = textMeasurer.measure(
@@ -200,9 +203,16 @@ fun GaugeHologramWidget(
                     drawText(valueMeasured, topLeft = Offset(center.x - valueMeasured.size.width / 2f, center.y - valueMeasured.size.height / 2f - 8.dp.toPx()))
 
                     // Unit
+                    val activeUnitColor = when {
+                        !hasData -> Color(0xFF334455)
+                        isAnomaly -> Color(0xFFFF4444)
+                        criticalThreshold != null && animatedValue >= criticalThreshold -> Color(0xFFFF4444)
+                        warningThreshold != null && animatedValue >= warningThreshold -> Color(0xFFFFB300)
+                        else -> colorScheme.unitColor
+                    }
                     val unitMeasured = textMeasurer.measure(
                         unit.lowercase(),
-                        TextStyle(color = holoColor.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = activeUnitColor.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     )
                     drawText(unitMeasured, topLeft = Offset(center.x - unitMeasured.size.width / 2f, center.y + 12.dp.toPx()))
 

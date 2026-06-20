@@ -2,6 +2,8 @@ package com.elysium369.meet.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var showThemeCustomizer by remember { mutableStateOf(false) }
 
     // --- Live state from ViewModel ---
     val forceCloneMode by viewModel.forceCloneMode.collectAsState()
@@ -64,6 +67,19 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     var showWorkshopSaved by remember { mutableStateOf(false) }
     var voiceFeedbackEnabled by remember {
         mutableStateOf(prefs.getBoolean("voice_feedback_enabled", true))
+    }
+    val voiceCopilotEnabled by viewModel.voiceCopilotEnabled.collectAsState()
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.toggleVoiceCopilot(true)
+            Toast.makeText(context, "Copiloto por voz activado", Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.toggleVoiceCopilot(false)
+            Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_LONG).show()
+        }
     }
 
     // Auto-dismiss banners
@@ -139,11 +155,11 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // ============================================================
-            //  SECCIÓN 1: ADAPTADOR OBD2 & MODO CLON FORZADO
+            //  SECCIÓN 1: ADAPTADOR OBD2 & CONECTIVIDAD
             // ============================================================
             item {
                 Column {
-                    PhantomSectionHeader(label = "ADAPTADOR OBD2", accentColor = MeetColors.neonGreen)
+                    PhantomSectionHeader(label = "ADAPTADOR OBD2 Y CONEXIÓN", accentColor = MeetColors.neonGreen)
                     Spacer(modifier = Modifier.height(8.dp))
                     EliteCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -173,37 +189,6 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 Switch(
                                     checked = fusedSpeedEnabled,
                                     onCheckedChange = { viewModel.setFusedSpeedEnabled(it) },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MeetColors.neonGreen,
-                                        checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
-                                        uncheckedThumbColor = MeetColors.textSecondary,
-                                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
-                                    )
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Asistente de Voz Interactivo", color = Color.White, fontWeight = FontWeight.Medium)
-                                    Text(
-                                        if (voiceFeedbackEnabled) "Activo — Guías de voz en tiempo real"
-                                        else "Desactivado — silencioso",
-                                        color = if (voiceFeedbackEnabled) MeetColors.neonGreen else MeetColors.textSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                                Switch(
-                                    checked = voiceFeedbackEnabled,
-                                    onCheckedChange = {
-                                        voiceFeedbackEnabled = it
-                                        prefs.edit().putBoolean("voice_feedback_enabled", it).apply()
-                                    },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = MeetColors.neonGreen,
                                         checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
@@ -257,6 +242,98 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                         lineHeight = 16.sp
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
+            //  SECCIÓN 1B: CONFIGURACIÓN DE AUDIO Y VOZ (ASISTENTE / COPILOTO)
+            // ============================================================
+            item {
+                Column {
+                    PhantomSectionHeader(label = "ASISTENTE Y AUDIO DE VOZ", accentColor = MeetColors.cyberCyan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.cyberCyan,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Asistente de Voz Interactivo", color = Color.White, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        if (voiceFeedbackEnabled) "Activo — Guías de voz en tiempo real"
+                                        else "Desactivado — silencioso",
+                                        color = if (voiceFeedbackEnabled) MeetColors.neonGreen else MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Switch(
+                                    checked = voiceFeedbackEnabled,
+                                    onCheckedChange = {
+                                        voiceFeedbackEnabled = it
+                                        prefs.edit().putBoolean("voice_feedback_enabled", it).apply()
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MeetColors.neonGreen,
+                                        checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = MeetColors.textSecondary,
+                                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
+                                    )
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Copiloto AI por Voz (Manos Libres)", color = Color.White, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        if (voiceCopilotEnabled) "Activo — Escuchando comandos de voz offline"
+                                        else "Desactivado — comandos apagados",
+                                        color = if (voiceCopilotEnabled) MeetColors.neonGreen else MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Switch(
+                                    checked = voiceCopilotEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context,
+                                                android.Manifest.permission.RECORD_AUDIO
+                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            
+                                            if (hasMicPermission) {
+                                                viewModel.toggleVoiceCopilot(true)
+                                            } else {
+                                                micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                            }
+                                        } else {
+                                            viewModel.toggleVoiceCopilot(false)
+                                        }
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MeetColors.neonGreen,
+                                        checkedTrackColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = MeetColors.textSecondary,
+                                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
+                                    )
+                                )
                             }
                         }
                     }
@@ -720,6 +797,37 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             }
 
             // ============================================================
+            //  SECCIÓN: PERSONALIZACIÓN DEL TEMA (System Theme Customizer)
+            // ============================================================
+            item {
+                Column {
+                    PhantomSectionHeader(label = "PERSONALIZACIÓN DEL TEMA", accentColor = MeetColors.neonGreen)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.neonGreen,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "Personaliza los colores acentuados, textos, iconos y bordes de todo el sistema MEET.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            EliteButton(
+                                onClick = { showThemeCustomizer = true },
+                                text = "Personalizar Colores",
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                color = MeetColors.neonGreen
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
             //  SECCIÓN 6: CUENTA / LICENCIA
             // ============================================================
             item {
@@ -748,6 +856,12 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             // Bottom spacer
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
+    }
+
+    if (showThemeCustomizer) {
+        com.elysium369.meet.ui.components.SystemThemeCustomizerDialog(
+            onDismiss = { showThemeCustomizer = false }
+        )
     }
 }
 

@@ -2,8 +2,10 @@ package com.elysium369.meet.core.health
 
 import com.elysium369.meet.data.local.dao.HealthSnapshotDao
 import com.elysium369.meet.data.local.dao.SensorHistoryDao
+import com.elysium369.meet.data.local.dao.PredictionEventDao
 import com.elysium369.meet.data.local.entities.HealthSnapshotEntity
 import com.elysium369.meet.data.local.entities.SensorHistoryEntity
+import com.elysium369.meet.data.local.entities.PredictionEventEntity
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -14,23 +16,12 @@ import kotlin.math.sqrt
 
 /**
  * PredictiveHealthEngine — Local-first predictive analytics for vehicle health.
- *
- * This engine operates entirely on-device with ZERO cloud dependencies.
- * It uses simple but effective statistical methods:
- *   - Linear regression over sensor time-series to detect degradation slopes
- *   - Standard deviation anomaly detection for sudden spikes
- *   - Weighted subsystem scoring (Engine 30%, Fuel 25%, Cooling 20%, Electrical 15%, Emissions 10%)
- *
- * The engine produces:
- *   - An overall health score (0-100)
- *   - Per-subsystem scores
- *   - Predictive alerts ("Coolant temp trending +2°C/month → thermostat degradation")
- *   - Time-to-failure estimates when sufficient data exists
  */
 @Singleton
 class PredictiveHealthEngine @Inject constructor(
     private val sensorHistoryDao: SensorHistoryDao,
-    private val healthSnapshotDao: HealthSnapshotDao
+    private val healthSnapshotDao: HealthSnapshotDao,
+    private val predictionEventDao: PredictionEventDao
 ) {
 
     companion object {
@@ -160,6 +151,23 @@ class PredictiveHealthEngine @Inject constructor(
 
         // Persist snapshot
         saveSnapshot(vehicleId, report, activeDtcCount, pendingDtcCount, anomalyCount, currentLiveData)
+
+        // Save generated alerts as prediction events
+        if (alerts.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            val events = alerts.map { alert ->
+                PredictionEventEntity(
+                    eventId = UUID.randomUUID().toString(),
+                    vehicleId = vehicleId,
+                    severity = alert.severity.name,
+                    confidence = 0.85,
+                    message = alert.message,
+                    estimatedDays = alert.predictedDaysToFailure,
+                    createdAt = now
+                )
+            }
+            predictionEventDao.insertAll(events)
+        }
 
         return report
     }

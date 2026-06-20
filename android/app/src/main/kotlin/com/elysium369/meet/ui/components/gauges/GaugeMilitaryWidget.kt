@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Military Night Ops Style: Night vision phosphor green on pure black.
@@ -30,6 +31,7 @@ fun GaugeMilitaryWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.8f, stiffness = 150f), label = "military")
     val inf = rememberInfiniteTransition(label = "mp")
@@ -39,22 +41,28 @@ fun GaugeMilitaryWidget(
         infiniteRepeatable(tween(100, easing = LinearEasing), RepeatMode.Reverse), label = "mf")
     val tm = rememberTextMeasurer()
 
-    val nvGreen = Color(0xFF00FF44)
-    val nvDarkGreen = Color(0xFF003300)
+    val nvGreen = colorScheme.internalColor
+    val nvDarkGreen = colorScheme.bezelColor
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r = size.width / 2f - 14.dp.toPx()
         val sweep = 270f; val start = 135f
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = nvGreen.copy(alpha = 0.4f), fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor.copy(alpha = 0.4f), fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontFamily = FontFamily.Monospace))
 
         onDrawBehind {
             val prog = if (maxVal == minVal) 0f else ((animVal - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
             val col = when {
-                isAnomaly -> Color(0xFFFF0000)
-                criticalThreshold != null && animVal >= criticalThreshold -> Color(0xFFFF0000)
-                warningThreshold != null && animVal >= warningThreshold -> Color(0xFFFFFF00)
+                isAnomaly -> colorScheme.needleColor
+                criticalThreshold != null && animVal >= criticalThreshold -> colorScheme.needleColor
+                warningThreshold != null && animVal >= warningThreshold -> colorScheme.specialColor
                 else -> nvGreen
+            }
+            val textCol = when {
+                isAnomaly -> colorScheme.needleColor
+                criticalThreshold != null && animVal >= criticalThreshold -> colorScheme.needleColor
+                warningThreshold != null && animVal >= warningThreshold -> colorScheme.specialColor
+                else -> colorScheme.textColor
             }
             val alpha = flicker // Slight NV flicker
 
@@ -123,9 +131,15 @@ fun GaugeMilitaryWidget(
             drawText(st, topLeft = Offset(cx - st.size.width / 2f, 8.dp.toPx()))
 
             // Value in center
-            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = col.copy(alpha = alpha), fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
+            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = textCol.copy(alpha = alpha), fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy + 16.dp.toPx()))
-            val ut = tm.measure(unit.uppercase(), TextStyle(color = col.copy(alpha = 0.6f * alpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+            val activeUnitColor = when {
+                isAnomaly -> colorScheme.needleColor
+                criticalThreshold != null && animVal >= criticalThreshold -> colorScheme.needleColor
+                warningThreshold != null && animVal >= warningThreshold -> colorScheme.specialColor
+                else -> colorScheme.unitColor
+            }
+            val ut = tm.measure(unit.uppercase(), TextStyle(color = activeUnitColor.copy(alpha = 0.6f * alpha), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 16.dp.toPx() + vt.size.height))
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 16.dp.toPx() + vt.size.height + ut.size.height + 2.dp.toPx()))
         }

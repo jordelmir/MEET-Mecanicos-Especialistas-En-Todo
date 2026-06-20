@@ -1,11 +1,16 @@
 package com.elysium369.meet.ui.theme
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -23,22 +28,22 @@ import androidx.compose.ui.unit.sp
 object MeetColors {
 
     // ═══════════ PRIMARY: Turquoise Plasma ═══════════
-    val neonGreen = Color(0xFF00FFD4)           // Primary accent — turquoise plasma
-    val neonGreenDim = Color(0xFF00C4A3)
-    val neonGreenSubtle = Color(0xFF006B5A)
+    var neonGreen by mutableStateOf(Color(0xFF00FFD4))           // Primary accent — turquoise plasma
+    var neonGreenDim by mutableStateOf(Color(0xFF00C4A3))
+    var neonGreenSubtle by mutableStateOf(Color(0xFF006B5A))
 
     // ═══════════ SECONDARY: Neon Purple Phosphorescent ═══════════
-    val electricBlue = Color(0xFFBB00FF)         // Now neon purple
-    val electricBlueDim = Color(0xFF8800CC)
-    val electricBlueSubtle = Color(0xFF440066)
+    var electricBlue by mutableStateOf(Color(0xFFBB00FF))         // Now neon purple
+    var electricBlueDim by mutableStateOf(Color(0xFF8800CC))
+    var electricBlueSubtle by mutableStateOf(Color(0xFF440066))
 
     // ═══════════ TERTIARY: Cyan Electric ═══════════
-    val cyberCyan = Color(0xFF00E5FF)
-    val cyberCyanDim = Color(0xFF00ACC1)
+    var cyberCyan by mutableStateOf(Color(0xFF00E5FF))
+    var cyberCyanDim by mutableStateOf(Color(0xFF00ACC1))
     
     // ═══════════ QUATERNARY: Hot Magenta ═══════════
-    val hotMagenta = Color(0xFFFF00AA)
-    val hotMagentaDim = Color(0xFFCC0088)
+    var hotMagenta by mutableStateOf(Color(0xFFFF00AA))
+    var hotMagentaDim by mutableStateOf(Color(0xFFCC0088))
 
     // ═══════════ BACKGROUNDS: Deep Navy Carbon ═══════════
     val backgroundDeep = Color(0xFF050B15)        // Deepest — navy void
@@ -48,7 +53,7 @@ object MeetColors {
 
     // ═══════════ BORDERS ═══════════
     val borderBlue = Color(0xFF1E3355)
-    val borderGlow = Color(0xFF00FFD4).copy(alpha = 0.3f)
+    val borderGlow: Color get() = neonGreen.copy(alpha = 0.3f)
     val borderSubtle = Color(0xFF182A42)
 
     // ═══════════ TEXT ═══════════
@@ -59,61 +64,140 @@ object MeetColors {
     // ═══════════ STATUS ═══════════
     val error = Color(0xFFFF1744)
     val warning = Color(0xFFFFAA00)
-    val success = Color(0xFF00FFD4)
+    val success: Color get() = neonGreen
 
     // ═══════════ GRADIENTS ═══════════
-    val neonGreenGradient = Brush.linearGradient(
-        colors = listOf(Color(0xFF00FFD4), Color(0xFF00E5FF))
+    val neonGreenGradient: Brush get() = Brush.linearGradient(
+        colors = listOf(neonGreen, cyberCyan)
     )
-    val electricBlueGradient = Brush.linearGradient(
-        colors = listOf(Color(0xFFBB00FF), Color(0xFF7700FF))
+    val electricBlueGradient: Brush get() = Brush.linearGradient(
+        colors = listOf(electricBlue, Color(0xFF7700FF))
     )
-    val phantomGradient = Brush.linearGradient(
-        colors = listOf(Color(0xFF00FFD4), Color(0xFFBB00FF))
+    val phantomGradient: Brush get() = Brush.linearGradient(
+        colors = listOf(neonGreen, electricBlue)
     )
-    val carbonGradient = Brush.verticalGradient(
+    val carbonGradient: Brush get() = Brush.verticalGradient(
         colors = listOf(Color(0xFF050B15), Color(0xFF0F1B30), Color(0xFF081222))
     )
-    val cardBorderGradient = Brush.linearGradient(
+    val cardBorderGradient: Brush get() = Brush.linearGradient(
         colors = listOf(
-            Color(0xFF00FFD4).copy(alpha = 0.15f),
-            Color(0xFFBB00FF).copy(alpha = 0.3f),
-            Color(0xFF00FFD4).copy(alpha = 0.15f)
+            neonGreen.copy(alpha = 0.15f),
+            electricBlue.copy(alpha = 0.3f),
+            neonGreen.copy(alpha = 0.15f)
         )
     )
-    val heroGradient = Brush.verticalGradient(
+    val heroGradient: Brush get() = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFBB00FF).copy(alpha = 0.08f),
+            electricBlue.copy(alpha = 0.08f),
             Color.Transparent,
-            Color(0xFF00FFD4).copy(alpha = 0.04f)
+            neonGreen.copy(alpha = 0.04f)
         )
     )
-}
 
-private val DarkColorScheme = darkColorScheme(
-    primary = MeetColors.neonGreen,
-    onPrimary = MeetColors.backgroundDeep,
-    primaryContainer = MeetColors.neonGreenSubtle,
-    secondary = MeetColors.electricBlue,
-    onSecondary = MeetColors.backgroundDeep,
-    background = Color(0xFF050B15),
-    surface = Color(0xFF0F1B30),
-    surfaceVariant = Color(0xFF152640),
-    surfaceContainerHighest = Color(0xFF1A3050),
-    surfaceContainerHigh = Color(0xFF152B48),
-    surfaceContainer = Color(0xFF112240),
-    surfaceContainerLow = Color(0xFF0D1C35),
-    surfaceContainerLowest = Color(0xFF08142A),
-    error = MeetColors.error,
-    errorContainer = Color(0xFF3D0012),
-    onBackground = MeetColors.textPrimary,
-    onSurface = MeetColors.textPrimary,
-    onSurfaceVariant = MeetColors.neonGreen,
-    outline = Color(0xFF1E3355),
-    outlineVariant = Color(0xFF152640),
-    inverseSurface = MeetColors.neonGreen,
-    inverseOnSurface = MeetColors.backgroundDeep
-)
+    // ── SYSTEM THEME SETTINGS LOADER & PERSISTENCE ──
+    fun initialize(context: Context) {
+        val prefs = context.getSharedPreferences("meet_system_theme_prefs", Context.MODE_PRIVATE)
+        neonGreen = Color(prefs.getInt("neonGreen", Color(0xFF00FFD4).toArgb()))
+        neonGreenDim = Color(prefs.getInt("neonGreenDim", Color(0xFF00C4A3).toArgb()))
+        neonGreenSubtle = Color(prefs.getInt("neonGreenSubtle", Color(0xFF006B5A).toArgb()))
+
+        electricBlue = Color(prefs.getInt("electricBlue", Color(0xFFBB00FF).toArgb()))
+        electricBlueDim = Color(prefs.getInt("electricBlueDim", Color(0xFF8800CC).toArgb()))
+        electricBlueSubtle = Color(prefs.getInt("electricBlueSubtle", Color(0xFF440066).toArgb()))
+
+        cyberCyan = Color(prefs.getInt("cyberCyan", Color(0xFF00E5FF).toArgb()))
+        cyberCyanDim = Color(prefs.getInt("cyberCyanDim", Color(0xFF00ACC1).toArgb()))
+
+        hotMagenta = Color(prefs.getInt("hotMagenta", Color(0xFFFF00AA).toArgb()))
+        hotMagentaDim = Color(prefs.getInt("hotMagentaDim", Color(0xFFCC0088).toArgb()))
+    }
+
+    fun save(context: Context) {
+        val prefs = context.getSharedPreferences("meet_system_theme_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt("neonGreen", neonGreen.toArgb())
+            .putInt("neonGreenDim", neonGreenDim.toArgb())
+            .putInt("neonGreenSubtle", neonGreenSubtle.toArgb())
+            .putInt("electricBlue", electricBlue.toArgb())
+            .putInt("electricBlueDim", electricBlueDim.toArgb())
+            .putInt("electricBlueSubtle", electricBlueSubtle.toArgb())
+            .putInt("cyberCyan", cyberCyan.toArgb())
+            .putInt("cyberCyanDim", cyberCyanDim.toArgb())
+            .putInt("hotMagenta", hotMagenta.toArgb())
+            .putInt("hotMagentaDim", hotMagentaDim.toArgb())
+            .apply()
+    }
+
+    fun reset(context: Context) {
+        neonGreen = Color(0xFF00FFD4)
+        neonGreenDim = Color(0xFF00C4A3)
+        neonGreenSubtle = Color(0xFF006B5A)
+        electricBlue = Color(0xFFBB00FF)
+        electricBlueDim = Color(0xFF8800CC)
+        electricBlueSubtle = Color(0xFF440066)
+        cyberCyan = Color(0xFF00E5FF)
+        cyberCyanDim = Color(0xFF00ACC1)
+        hotMagenta = Color(0xFFFF00AA)
+        hotMagentaDim = Color(0xFFCC0088)
+        save(context)
+    }
+
+    fun updateNeonGreen(color: Color, context: Context) {
+        neonGreen = color
+        neonGreenDim = Color(
+            red = color.red * 0.77f,
+            green = color.green * 0.77f,
+            blue = color.blue * 0.77f,
+            alpha = color.alpha
+        )
+        neonGreenSubtle = Color(
+            red = color.red * 0.42f,
+            green = color.green * 0.42f,
+            blue = color.blue * 0.42f,
+            alpha = color.alpha
+        )
+        save(context)
+    }
+
+    fun updateElectricBlue(color: Color, context: Context) {
+        electricBlue = color
+        electricBlueDim = Color(
+            red = color.red * 0.73f,
+            green = color.green * 0.73f,
+            blue = color.blue * 0.73f,
+            alpha = color.alpha
+        )
+        electricBlueSubtle = Color(
+            red = color.red * 0.36f,
+            green = color.green * 0.36f,
+            blue = color.blue * 0.36f,
+            alpha = color.alpha
+        )
+        save(context)
+    }
+
+    fun updateCyberCyan(color: Color, context: Context) {
+        cyberCyan = color
+        cyberCyanDim = Color(
+            red = color.red * 0.75f,
+            green = color.green * 0.75f,
+            blue = color.blue * 0.75f,
+            alpha = color.alpha
+        )
+        save(context)
+    }
+
+    fun updateHotMagenta(color: Color, context: Context) {
+        hotMagenta = color
+        hotMagentaDim = Color(
+            red = color.red * 0.80f,
+            green = color.green * 0.80f,
+            blue = color.blue * 0.80f,
+            alpha = color.alpha
+        )
+        save(context)
+    }
+}
 
 val MeetTypography = Typography(
     displayLarge = TextStyle(
@@ -186,8 +270,32 @@ val MeetTypography = Typography(
 
 @Composable
 fun MeetTheme(content: @Composable () -> Unit) {
+    val dynamicColorScheme = darkColorScheme(
+        primary = MeetColors.neonGreen,
+        onPrimary = MeetColors.backgroundDeep,
+        primaryContainer = MeetColors.neonGreenSubtle,
+        secondary = MeetColors.electricBlue,
+        onSecondary = MeetColors.backgroundDeep,
+        background = Color(0xFF050B15),
+        surface = Color(0xFF0F1B30),
+        surfaceVariant = Color(0xFF152640),
+        surfaceContainerHighest = Color(0xFF1A3050),
+        surfaceContainerHigh = Color(0xFF152B48),
+        surfaceContainer = Color(0xFF112240),
+        surfaceContainerLow = Color(0xFF0D1C35),
+        surfaceContainerLowest = Color(0xFF08142A),
+        error = MeetColors.error,
+        errorContainer = Color(0xFF3D0012),
+        onBackground = MeetColors.textPrimary,
+        onSurface = MeetColors.textPrimary,
+        onSurfaceVariant = MeetColors.neonGreen,
+        outline = Color(0xFF1E3355),
+        outlineVariant = Color(0xFF152640),
+        inverseSurface = MeetColors.neonGreen,
+        inverseOnSurface = MeetColors.backgroundDeep
+    )
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = dynamicColorScheme,
         typography = MeetTypography,
         content = content
     )

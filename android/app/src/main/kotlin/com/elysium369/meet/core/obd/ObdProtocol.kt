@@ -11,5 +11,9 @@ enum class ObdProtocol(val atspCode: String, val displayName: String) {
     CAN_29BIT_500K("7", "ISO 15765-4 CAN 29bit 500K"),
     CAN_11BIT_250K("8", "ISO 15765-4 CAN 11bit 250K"),
     CAN_29BIT_250K("9", "ISO 15765-4 CAN 29bit 250K"),
-    CAN_ISO15765("6", "CAN ISO 15765 (detectado)")
+    CAN_ISO15765("6", "CAN ISO 15765 (detectado)"),
+    // Modern Protocols
+    CAN_FD_11BIT("D", "CAN FD 11bit 500K/2M"),
+    CAN_FD_29BIT("E", "CAN FD 29bit 500K/2M"),
+    DOIP_ISO13400("F", "DoIP ISO 13400 (Ethernet)")
 }

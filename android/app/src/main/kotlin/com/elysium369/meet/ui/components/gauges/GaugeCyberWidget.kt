@@ -21,6 +21,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Cyber HUD Style: Futuristic videogame-like display.
@@ -39,6 +40,7 @@ fun GaugeCyberWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 150f),
@@ -93,7 +95,7 @@ fun GaugeCyberWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = MeetColors.textSecondary, fontSize = labelFontSize.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.8f), fontSize = labelFontSize.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
                 )
 
                 onDrawBehind {
@@ -102,8 +104,9 @@ fun GaugeCyberWidget(
                         isAnomaly -> MeetColors.error
                         criticalThreshold != null && animatedValue >= criticalThreshold -> MeetColors.error
                         warningThreshold != null && animatedValue >= warningThreshold -> MeetColors.warning
-                        else -> Color(0xFF00EEFF) // Cyber cyan
+                        else -> colorScheme.internalColor
                     }
+                    val themeTextColor = if (activeColor == colorScheme.internalColor) colorScheme.textColor else activeColor
                     val progress = if (maxVal == minVal) 0f else ((animatedValue - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
 
                     // Grid background
@@ -159,7 +162,7 @@ fun GaugeCyberWidget(
                     val valueText = if (hasData) String.format("%.0f", animatedValue) else "---"
                     val valueMeasured = textMeasurer.measure(
                         valueText,
-                        TextStyle(color = Color.White, fontSize = valueFontSize.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = themeTextColor, fontSize = valueFontSize.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, fontFamily = FontFamily.Monospace)
                     )
                     val glowMeasured = textMeasurer.measure(
                         valueText,
@@ -173,9 +176,10 @@ fun GaugeCyberWidget(
                     drawText(valueMeasured, topLeft = Offset(valX, valY))
 
                     // Unit below value, centered
+                    val activeUnitColor = if (activeColor == colorScheme.internalColor) colorScheme.unitColor else activeColor
                     val unitMeasured = textMeasurer.measure(
                         unit.uppercase(),
-                        TextStyle(color = activeColor, fontSize = unitFontSize.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = activeUnitColor, fontSize = unitFontSize.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     )
                     drawText(unitMeasured, topLeft = Offset(w / 2f - unitMeasured.size.width / 2f, valY + valueMeasured.size.height + 1.dp.toPx()))
 

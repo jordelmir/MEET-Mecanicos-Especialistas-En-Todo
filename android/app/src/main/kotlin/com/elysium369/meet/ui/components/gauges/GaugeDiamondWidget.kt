@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Diamond Luxury Style: Premium chrome/silver with ice blue accents.
@@ -30,6 +31,7 @@ fun GaugeDiamondWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.85f, stiffness = 90f), label = "diamond")
     val inf = rememberInfiniteTransition(label = "dp")
@@ -37,17 +39,17 @@ fun GaugeDiamondWidget(
         infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "ds")
     val tm = rememberTextMeasurer()
 
-    val iceBlue = Color(0xFF88CCFF)
-    val chrome = Color(0xFFCCCCCC)
-    val silver = Color(0xFF999999)
-    val gold = Color(0xFFD4AF37)
+    val iceBlue = colorScheme.internalColor
+    val chrome = colorScheme.bezelColor
+    val silver = colorScheme.bezelColor
+    val gold = colorScheme.specialColor
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r = size.width / 2f - 14.dp.toPx()
         val sweep = 250f; val start = 145f
 
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = silver.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
 
         // Number labels at major ticks
         val numLabels = List(6) { i ->
@@ -56,7 +58,7 @@ fun GaugeDiamondWidget(
             val a = Math.toRadians((start + (i.toFloat() / 5f) * sweep).toDouble())
             val labelR = r - 22.dp.toPx()
             Pair(
-                tm.measure(text, TextStyle(color = chrome.copy(alpha = 0.6f), fontSize = 7.sp, fontWeight = FontWeight.Bold)),
+                tm.measure(text, TextStyle(color = colorScheme.textColor.copy(alpha = 0.6f), fontSize = 7.sp, fontWeight = FontWeight.Bold)),
                 Offset((cx + labelR * cos(a)).toFloat(), (cy + labelR * sin(a)).toFloat())
             )
         }
@@ -128,9 +130,15 @@ fun GaugeDiamondWidget(
             drawCircle(gold.copy(alpha = shimmer * 0.3f), 8.dp.toPx(), Offset(cx, cy))
 
             // Value below
-            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold))
+            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = colorScheme.textColor, fontSize = 22.sp, fontWeight = FontWeight.Bold))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy + 22.dp.toPx()))
-            val ut = tm.measure(unit.lowercase(), TextStyle(color = col, fontSize = 9.sp, fontWeight = FontWeight.Bold))
+            val activeUnitColor = when {
+                isAnomaly -> Color(0xFFFF4444)
+                criticalThreshold != null && animVal >= criticalThreshold -> Color(0xFFFF4444)
+                warningThreshold != null && animVal >= warningThreshold -> gold
+                else -> colorScheme.unitColor
+            }
+            val ut = tm.measure(unit.lowercase(), TextStyle(color = activeUnitColor, fontSize = 9.sp, fontWeight = FontWeight.Bold))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 22.dp.toPx() + vt.size.height))
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 22.dp.toPx() + vt.size.height + ut.size.height + 2.dp.toPx()))
 

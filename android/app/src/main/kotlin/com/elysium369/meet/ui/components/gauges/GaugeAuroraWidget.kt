@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Midnight Aurora Style: Deep purple/violet aurora borealis effect.
@@ -30,6 +31,7 @@ fun GaugeAuroraWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.8f, stiffness = 100f), label = "aurora")
     val inf = rememberInfiniteTransition(label = "ap")
@@ -39,17 +41,17 @@ fun GaugeAuroraWidget(
         infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "ab")
     val tm = rememberTextMeasurer()
 
-    val auroraPurple = Color(0xFF6600CC)
-    val auroraMagenta = Color(0xFFFF00AA)
-    val auroraTeal = Color(0xFF00FFD4)
-    val auroraDeep = Color(0xFF1A0033)
+    val auroraPurple = colorScheme.specialColor
+    val auroraMagenta = colorScheme.needleColor
+    val auroraTeal = colorScheme.internalColor
+    val auroraDeep = colorScheme.bezelColor
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r = size.width / 2f - 16.dp.toPx()
         val sweep = 240f; val start = 150f
         val ringW = 16.dp.toPx()
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = auroraTeal.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
 
         onDrawBehind {
             val prog = if (maxVal == minVal) 0f else ((animVal - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
@@ -116,9 +118,9 @@ fun GaugeAuroraWidget(
             }
 
             // Value
-            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp))
+            val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = colorScheme.textColor, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy - vt.size.height / 2f - 4.dp.toPx()))
-            val ut = tm.measure(unit.lowercase(), TextStyle(color = auroraTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold))
+            val ut = tm.measure(unit.lowercase(), TextStyle(color = colorScheme.unitColor, fontSize = 11.sp, fontWeight = FontWeight.Bold))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 14.dp.toPx()))
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 30.dp.toPx()))
         }

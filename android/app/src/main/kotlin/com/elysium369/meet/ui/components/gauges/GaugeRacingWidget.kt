@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Racing F1 Style: Segmented LED tachometer like an F1 dashboard.
@@ -37,6 +38,7 @@ fun GaugeRacingWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 200f),
@@ -75,7 +77,7 @@ fun GaugeRacingWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = MeetColors.textSecondary, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.5f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
                 )
 
                 onDrawBehind {
@@ -95,8 +97,8 @@ fun GaugeRacingWidget(
                             isAnomaly -> MeetColors.error
                             segFrac >= critFrac -> if (isRedline) MeetColors.error.copy(alpha = shiftFlash) else MeetColors.error
                             segFrac >= warnFrac -> MeetColors.warning
-                            segFrac >= 0.5f -> Color(0xFFCCFF00) // Lime
-                            else -> Color(0xFF00FF66) // Racing green
+                            segFrac >= 0.5f -> colorScheme.specialColor
+                            else -> colorScheme.internalColor
                         }
 
                         // LED segment as thick arc
@@ -159,7 +161,7 @@ fun GaugeRacingWidget(
                     val valueMeasured = textMeasurer.measure(
                         valueText,
                         TextStyle(
-                            color = if (isRedline) MeetColors.error.copy(alpha = shiftFlash) else Color.White,
+                            color = if (isRedline) MeetColors.error.copy(alpha = shiftFlash) else colorScheme.textColor,
                             fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, fontFamily = FontFamily.Monospace
                         )
                     )
@@ -168,7 +170,7 @@ fun GaugeRacingWidget(
                     // Unit
                     val unitMeasured = textMeasurer.measure(
                         unit.uppercase(),
-                        TextStyle(color = MeetColors.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        TextStyle(color = colorScheme.unitColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     )
                     drawText(unitMeasured, topLeft = Offset(center.x - unitMeasured.size.width / 2f, center.y + valueMeasured.size.height / 2f))
 

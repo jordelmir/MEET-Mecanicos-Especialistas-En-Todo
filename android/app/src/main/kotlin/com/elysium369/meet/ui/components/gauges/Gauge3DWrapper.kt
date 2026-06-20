@@ -43,26 +43,17 @@ fun Gauge3DWrapper(
         contentAlignment = Alignment.Center
     ) {
         val sizeDp = minOf(maxWidth, maxHeight)
-        if (sizeDp > 160.dp) {
-            val baseSize = 120.dp
-            val scale = sizeDp / baseSize
-            Box(
-                modifier = Modifier
-                    .size(baseSize)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                UnscaledGauge3DWrapper(
-                    modifier = Modifier.fillMaxSize(),
-                    glowColor = glowColor,
-                    style = style,
-                    content = content
-                )
-            }
-        } else {
+        val baseSize = 220.dp
+        val scale = if (sizeDp > 0.dp) sizeDp / baseSize else 1f
+        Box(
+            modifier = Modifier
+                .requiredSize(baseSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+            contentAlignment = Alignment.Center
+        ) {
             UnscaledGauge3DWrapper(
                 modifier = Modifier.fillMaxSize(),
                 glowColor = glowColor,
@@ -80,6 +71,11 @@ private fun UnscaledGauge3DWrapper(
     style: GaugeStyleSet = GaugeStyleSet.ELITE,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val diyTrigger = GaugeStyleManager.diyUpdateTrigger
+    val diyAnimIndex = remember(diyTrigger) { gaugeStyleManager.getDiyAnimation() }
     val inf = rememberInfiniteTransition(label = "g3d")
 
     // Glow pulse — breathing effect
@@ -236,14 +232,14 @@ private fun UnscaledGauge3DWrapper(
             // ── METALLIC BEZEL RING ──
             drawCircle(
                 Brush.sweepGradient(
-                    0f to Color(0xFF1E1E1E),
-                    0.15f to Color(0xFF4A4A4A),
-                    0.3f to Color(0xFF2A2A2A),
-                    0.45f to Color(0xFF5C5C5C),
-                    0.6f to Color(0xFF1A1A1A),
-                    0.75f to Color(0xFF3E3E3E),
-                    0.9f to Color(0xFF2A2A2A),
-                    1f to Color(0xFF1E1E1E),
+                    0f to colorScheme.bezelColor.copy(alpha = 0.8f),
+                    0.15f to Color.White.copy(alpha = 0.25f),
+                    0.3f to colorScheme.bezelColor.copy(alpha = 0.9f),
+                    0.45f to Color.White.copy(alpha = 0.35f),
+                    0.6f to colorScheme.bezelColor.copy(alpha = 0.7f),
+                    0.75f to Color.White.copy(alpha = 0.15f),
+                    0.9f to colorScheme.bezelColor.copy(alpha = 0.9f),
+                    1f to colorScheme.bezelColor.copy(alpha = 0.8f),
                     center = Offset(cx, cy)
                 ),
                 outerR + bezelW / 2f,
@@ -324,7 +320,68 @@ private fun UnscaledGauge3DWrapper(
                     GaugeStyleSet.MILITARY -> drawMilitaryRadar(cx, cy, r, animParams, glowColor)
                     GaugeStyleSet.DIAMOND  -> drawDiamondPrism(cx, cy, r, animParams, glowColor)
                     GaugeStyleSet.COCKPIT  -> drawCockpitHorizon(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.LIGHTNING -> drawLightningAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.RAIN     -> drawRainAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.SNOW     -> drawSnowAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.TORNADO  -> drawTornadoAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.SANDSTORM -> drawSandstormAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.VOLCANO  -> drawVolcanoAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.TSUNAMI  -> drawTsunamiAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.BLIZZARD -> drawBlizzardAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.AURORA_AUTO -> drawAuroraAutoAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.SOLAR_FLARE -> drawSolarFlareAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.COSMIC_DUST -> drawCosmicDustAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.EARTHQUAKE -> drawEarthquakeAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.METEOR_SHOWER -> drawMeteorShowerAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.HURRICANE -> drawHurricaneAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.FOGGY_MIST -> drawFoggyMistAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.WILD_FIRE -> drawWildFireAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.OCEAN_DEPTH -> drawOceanDepthAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.ECLIPSE  -> drawEclipseAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.RAINBOW_RAIN -> drawRainbowRainAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.SAND_GLOW -> drawSandGlowAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.THUNDER_CLOUD -> drawThunderCloudAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.ICY_FROST -> drawIcyFrostAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.CYBER_STORM -> drawCyberStormAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.BLACK_HOLE -> drawBlackHoleAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.MONSOON  -> drawMonsoonAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.COMET_TAIL -> drawCometTailAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.GALAXY_CORE -> drawGalaxyCoreAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.ACID_RAIN -> drawAcidRainAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.SUPERNOVA -> drawSupernovaAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.WIND_TUNNEL -> drawWindTunnelAnim(cx, cy, r, animParams, glowColor)
+                    GaugeStyleSet.CUSTOM_DIY -> {
+                        when (diyAnimIndex) {
+                            1 -> drawWildFireAnim(cx, cy, r, animParams, glowColor)
+                            2 -> drawLightningAnim(cx, cy, r, animParams, glowColor)
+                            3 -> drawSnowAnim(cx, cy, r, animParams, glowColor)
+                            4 -> drawRainAnim(cx, cy, r, animParams, glowColor)
+                            5 -> drawClassicGears(cx, cy, r, animParams, glowColor)
+                            6 -> drawEliteGalaxy(cx, cy, r, animParams, glowColor)
+                            7 -> drawMilitaryRadar(cx, cy, r, animParams, glowColor)
+                            8 -> drawCyberGrid(cx, cy, r, animParams, glowColor)
+                            9 -> drawAuroraCurtains(cx, cy, r, animParams, glowColor)
+                            else -> { /* Ninguna */ }
+                        }
+                    }
                 }
+
+                // ── CENTRAL BREATHING NEON BACK-LIGHT GLOW ──
+                // Breathes behind the central text/number area
+                val numGlowAlpha = (sin(animParams.wave * 0.05f) * 0.12f + 0.28f).toFloat() // breathing range
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = numGlowAlpha * 0.95f),
+                            glowColor.copy(alpha = numGlowAlpha * 0.35f),
+                            Color.Transparent
+                        ),
+                        center = Offset(cx, cy + r * 0.12f),
+                        radius = r * 0.65f
+                    ),
+                    radius = r * 0.65f,
+                    center = Offset(cx, cy + r * 0.12f)
+                )
             }
         }
 

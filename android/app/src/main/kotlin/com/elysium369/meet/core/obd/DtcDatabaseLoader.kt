@@ -308,6 +308,323 @@ class DtcDatabaseLoader(
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    // KNOWLEDGE GRAPH LOADER — Populates child tables from JSON arrays
+    // ══════════════════════════════════════════════════════════════════
+
+    fun loadKnowledgeGraphIfEmpty() {
+        loaderScope.launch {
+            try {
+                val kgDao = db.dtcKnowledgeGraphDao()
+                if (kgDao.getSymptomsCount() > 0) {
+                    // Clean up any accumulated duplicates from prior loads
+                    // (autoGenerate PKs + REPLACE never conflict → duplicates pile up)
+                    kgDao.deleteAllProcedures()
+                    kgDao.deleteAllSymptoms()
+                    kgDao.deleteAllCauses()
+                    kgDao.deleteAllRelatedPids()
+                    kgDao.deleteAllCoOccurrences()
+                    kgDao.deleteAllRepairCosts()
+                    Log.i("DtcDatabaseLoader", "Cleared stale knowledge graph data for clean reload")
+                }
+
+                Log.i("DtcDatabaseLoader", "Building DTC Knowledge Graph from JSON asset...")
+                val stream = context.assets.open("dtc_database_es.json")
+                val reader = JsonReader(InputStreamReader(stream, "UTF-8"))
+
+                val symptoms = mutableListOf<com.elysium369.meet.data.local.entities.DtcSymptomEntity>()
+                val causes = mutableListOf<com.elysium369.meet.data.local.entities.DtcCauseEntity>()
+                val procedures = mutableListOf<com.elysium369.meet.data.local.entities.DtcProcedureEntity>()
+                val relatedPids = mutableListOf<com.elysium369.meet.data.local.entities.DtcRelatedPidEntity>()
+                val coOccurrences = mutableListOf<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity>()
+                val repairCosts = mutableListOf<com.elysium369.meet.data.local.entities.DtcRepairCostEntity>()
+
+                var totalRecords = 0
+
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    val rootKey = reader.nextName()
+                    if (rootKey == "records") {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            reader.beginObject()
+                            var code = ""
+                            var manufacturer = "GENERIC"
+                            var symptomsRaw: String? = null
+                            var causesRaw: String? = null
+                            var stepsRaw: String? = null
+                            var relatedCodesRaw: String? = null
+                            var freezeFrameRaw: String? = null
+                            var costRaw: String? = null
+                            var laborRaw: String? = null
+
+                            while (reader.hasNext()) {
+                                val key = reader.nextName()
+                                if (reader.peek() == JsonToken.NULL) {
+                                    reader.skipValue()
+                                    continue
+                                }
+                                when (key) {
+                                    "code" -> code = readStringOrRaw(reader)
+                                    "manufacturer" -> manufacturer = readStringOrRaw(reader)
+                                    "symptoms" -> symptomsRaw = readStringOrNull(reader)
+                                    "possibleCauses" -> causesRaw = readStringOrNull(reader)
+                                    "diagnosticSteps" -> stepsRaw = readStringOrNull(reader)
+                                    "relatedCodes" -> relatedCodesRaw = readStringOrNull(reader)
+                                    "freezeFramePIDs" -> freezeFrameRaw = readStringOrNull(reader)
+                                    "repairCostUSD" -> costRaw = readStringOrNull(reader)
+                                    "laborHoursEstimate" -> laborRaw = readStringOrNull(reader)
+                                    else -> reader.skipValue()
+                                }
+                            }
+                            reader.endObject()
+
+                            if (code.isEmpty()) continue
+                            totalRecords++
+
+                            // Parse Symptoms
+                            parseSymptoms(code, manufacturer, symptomsRaw)?.let { symptoms.addAll(it) }
+
+                            // Parse Causes
+                            parseCauses(code, manufacturer, causesRaw)?.let { causes.addAll(it) }
+
+                            // Parse Procedures
+                            parseProcedures(code, manufacturer, stepsRaw)?.let { procedures.addAll(it) }
+
+                            // Parse Co-Occurrences from relatedCodes
+                            parseCoOccurrences(code, relatedCodesRaw)?.let { coOccurrences.addAll(it) }
+
+                            // Parse Related PIDs from freezeFramePIDs
+                            parseRelatedPids(code, manufacturer, freezeFrameRaw)?.let { relatedPids.addAll(it) }
+
+                            // Parse Repair Costs
+                            parseRepairCost(code, manufacturer, costRaw, laborRaw)?.let { repairCosts.add(it) }
+
+                            // Batch insert every 500 records
+                            if (totalRecords % 500 == 0) {
+                                flushKnowledgeGraph(kgDao, symptoms, causes, procedures, relatedPids, coOccurrences, repairCosts)
+                                Log.d("DtcDatabaseLoader", "KG batch flushed at record $totalRecords")
+                            }
+                        }
+                        reader.endArray()
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                reader.endObject()
+                reader.close()
+                stream.close()
+
+                // Final flush
+                flushKnowledgeGraph(kgDao, symptoms, causes, procedures, relatedPids, coOccurrences, repairCosts)
+
+                // Rebuild the Full-Text Search (FTS) index
+                Log.i("DtcDatabaseLoader", "Rebuilding Full-Text Search index...")
+                kgDao.clearSearchIndex()
+                kgDao.rebuildSearchIndex()
+                Log.i("DtcDatabaseLoader", "✅ FTS Search Index rebuilt successfully")
+
+                val totalKg = kgDao.getSymptomsCount() + kgDao.getCausesCount() + kgDao.getProceduresCount()
+                Log.i("DtcDatabaseLoader", "✅ Knowledge Graph built: $totalKg child records from $totalRecords DTCs")
+            } catch (e: Exception) {
+                Log.e("DtcDatabaseLoader", "Error building knowledge graph", e)
+            }
+        }
+    }
+
+    private suspend fun flushKnowledgeGraph(
+        kgDao: com.elysium369.meet.data.local.dao.DtcKnowledgeGraphDao,
+        symptoms: MutableList<com.elysium369.meet.data.local.entities.DtcSymptomEntity>,
+        causes: MutableList<com.elysium369.meet.data.local.entities.DtcCauseEntity>,
+        procedures: MutableList<com.elysium369.meet.data.local.entities.DtcProcedureEntity>,
+        relatedPids: MutableList<com.elysium369.meet.data.local.entities.DtcRelatedPidEntity>,
+        coOccurrences: MutableList<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity>,
+        repairCosts: MutableList<com.elysium369.meet.data.local.entities.DtcRepairCostEntity>
+    ) {
+        if (symptoms.isNotEmpty()) { kgDao.insertSymptoms(symptoms.toList()); symptoms.clear() }
+        if (causes.isNotEmpty()) { kgDao.insertCauses(causes.toList()); causes.clear() }
+        if (procedures.isNotEmpty()) { kgDao.insertProcedures(procedures.toList()); procedures.clear() }
+        if (relatedPids.isNotEmpty()) { kgDao.insertRelatedPids(relatedPids.toList()); relatedPids.clear() }
+        if (coOccurrences.isNotEmpty()) { kgDao.insertCoOccurrences(coOccurrences.toList()); coOccurrences.clear() }
+        if (repairCosts.isNotEmpty()) { kgDao.insertRepairCosts(repairCosts.toList()); repairCosts.clear() }
+    }
+
+    private fun parseSymptoms(code: String, manufacturer: String, raw: String?): List<com.elysium369.meet.data.local.entities.DtcSymptomEntity>? {
+        if (raw.isNullOrBlank()) return null
+        val items = parseStringListFromRaw(raw)
+        if (items.isEmpty()) return null
+        return items.map { symptom ->
+            com.elysium369.meet.data.local.entities.DtcSymptomEntity(
+                dtcCode = code,
+                manufacturer = manufacturer,
+                symptomEs = symptom.trim(),
+                probability = "media",
+                isDriverNoticeable = true
+            )
+        }
+    }
+
+    private fun parseCauses(code: String, manufacturer: String, raw: String?): List<com.elysium369.meet.data.local.entities.DtcCauseEntity>? {
+        if (raw.isNullOrBlank()) return null
+        val items = raw.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+        if (items.isEmpty()) return null
+        return items.mapIndexed { idx, cause ->
+            val prob = when {
+                idx == 0 -> "alta"
+                idx == 1 -> "media"
+                else -> "baja"
+            }
+            val lc = cause.lowercase()
+            val isElec = lc.contains("circuito") || lc.contains("sensor") || lc.contains("voltaje") ||
+                         lc.contains("eléctric") || lc.contains("electr") || lc.contains("conector") ||
+                         lc.contains("arnés") || lc.contains("señal") || lc.contains("módulo")
+            val isMech = lc.contains("desgast") || lc.contains("roto") || lc.contains("mecánic") ||
+                         lc.contains("válvula") || lc.contains("junta") || lc.contains("fuga") ||
+                         lc.contains("obstrui") || lc.contains("filtro") || lc.contains("bomba")
+            com.elysium369.meet.data.local.entities.DtcCauseEntity(
+                dtcCode = code,
+                manufacturer = manufacturer,
+                causeEs = cause,
+                probability = prob,
+                isElectronic = isElec,
+                isMechanical = isMech
+            )
+        }
+    }
+
+    private fun parseProcedures(code: String, manufacturer: String, raw: String?): List<com.elysium369.meet.data.local.entities.DtcProcedureEntity>? {
+        if (raw.isNullOrBlank()) return null
+        val items = parseStringListFromRaw(raw)
+        if (items.isEmpty()) return null
+
+        // Deduplicate steps: normalize text for comparison, remove entries
+        // where the description is a substring of the previous/next step
+        val seen = mutableSetOf<String>()
+        val uniqueItems = items.filter { step ->
+            val normalized = step.replace(Regex("^(?i)(paso\\s*\\d+[:.]*|\\d+[:.]*)\\s*"), "")
+                .trim().lowercase()
+            if (normalized.isBlank() || normalized.length < 5) return@filter false
+            seen.add(normalized)  // returns false if already present
+        }
+
+        if (uniqueItems.isEmpty()) return null
+
+        return uniqueItems.mapIndexed { idx, step ->
+            val cleanStr = step.replace(Regex("^(?i)(paso\\s*\\d+[:.]*|\\d+[:.]*)\\s*"), "")
+            val parts = cleanStr.split(":", limit = 2)
+            val title = if (parts.size > 1) parts[0].trim() else "Paso ${idx + 1}"
+            val desc = if (parts.size > 1) parts[1].trim() else cleanStr.trim()
+            val lc = cleanStr.lowercase()
+            val icon = when {
+                lc.contains("volt") || lc.contains("multímetro") || lc.contains("resistencia") -> "⚡"
+                lc.contains("limpiar") || lc.contains("limpieza") || lc.contains("aerosol") -> "🧼"
+                lc.contains("combustible") || lc.contains("gasolina") || lc.contains("presión") -> "⛽"
+                lc.contains("escáner") || lc.contains("escanear") || lc.contains("meet") -> "📱"
+                lc.contains("conducir") || lc.contains("ciclo") || lc.contains("ruta") -> "🚗"
+                else -> "🔧"
+            }
+            val difficulty = when {
+                idx < 2 -> "facil"
+                idx < 4 -> "medio"
+                else -> "dificil"
+            }
+            com.elysium369.meet.data.local.entities.DtcProcedureEntity(
+                dtcCode = code,
+                manufacturer = manufacturer,
+                stepNumber = idx + 1,
+                titleEs = title,
+                descriptionEs = desc,
+                estimatedMinutes = 10 + (idx * 5),
+                difficulty = difficulty,
+                icon = icon
+            )
+        }
+    }
+
+    private fun parseCoOccurrences(code: String, raw: String?): List<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity>? {
+        if (raw.isNullOrBlank()) return null
+        val items = parseStringListFromRaw(raw)
+        if (items.isEmpty()) return null
+        return items.filter { it.matches(Regex("[PCBU]\\d{4,5}")) }.map { relatedCode ->
+            com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity(
+                dtcCode = code,
+                relatedDtcCode = relatedCode,
+                correlationStrength = 0.5f
+            )
+        }
+    }
+
+    private fun parseRelatedPids(code: String, manufacturer: String, raw: String?): List<com.elysium369.meet.data.local.entities.DtcRelatedPidEntity>? {
+        if (raw.isNullOrBlank()) return null
+        val items = parseStringListFromRaw(raw)
+        if (items.isEmpty()) return null
+        return items.mapIndexed { idx, pidStr ->
+            val parts = pidStr.split(Regex(" — | - "), limit = 2)
+            val cmd = parts[0].trim()
+            val name = if (parts.size > 1) parts[1].trim() else cmd
+            com.elysium369.meet.data.local.entities.DtcRelatedPidEntity(
+                dtcCode = code,
+                manufacturer = manufacturer,
+                pidCommand = cmd,
+                pidNameEs = name,
+                priority = idx
+            )
+        }
+    }
+
+    private fun parseRepairCost(code: String, manufacturer: String, costRaw: String?, laborRaw: String?): com.elysium369.meet.data.local.entities.DtcRepairCostEntity? {
+        if (costRaw.isNullOrBlank()) return null
+        try {
+            val cleaned = costRaw.replace("$", "").replace(",", "").trim()
+            val costParts = cleaned.split("-", "–").map { it.trim().toFloatOrNull() ?: 0f }
+            val minCost = costParts.getOrNull(0) ?: return null
+            val maxCost = costParts.getOrNull(1) ?: minCost
+            if (minCost <= 0f && maxCost <= 0f) return null
+
+            var laborHours: Float? = null
+            if (!laborRaw.isNullOrBlank()) {
+                val laborParts = laborRaw.replace("h", "").trim().split("-", "–").mapNotNull { it.trim().toFloatOrNull() }
+                laborHours = laborParts.firstOrNull()
+            }
+
+            return com.elysium369.meet.data.local.entities.DtcRepairCostEntity(
+                dtcCode = code,
+                manufacturer = manufacturer,
+                region = "US",
+                minCostUsd = minCost,
+                maxCostUsd = maxCost,
+                laborHours = laborHours,
+                updatedAt = System.currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    /**
+     * Parses a raw JSON value that can be either:
+     * - A JSON array string: ["item1", "item2"]
+     * - A pipe-separated string: "item1 | item2"
+     * - A newline-separated string
+     */
+    private fun parseStringListFromRaw(raw: String): List<String> {
+        val trimmed = raw.trim()
+        return try {
+            if (trimmed.startsWith("[")) {
+                val arr = org.json.JSONArray(trimmed)
+                (0 until arr.length()).map { arr.getString(it) }.filter { it.isNotBlank() }
+            } else if (trimmed.contains("|")) {
+                trimmed.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+            } else if (trimmed.contains("\n")) {
+                trimmed.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+            } else {
+                listOf(trimmed).filter { it.isNotEmpty() }
+            }
+        } catch (e: Exception) {
+            if (trimmed.isNotEmpty()) listOf(trimmed) else emptyList()
+        }
+    }
+
     fun cancel() {
         loaderScope.cancel()
     }

@@ -25,6 +25,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +54,14 @@ fun GarageScreen(
     Scaffold(
         topBar = {
             com.elysium369.meet.ui.components.EliteTopAppBar(
-                title = "Mi Garage\n${vehicles.size} vehículo${if (vehicles.size != 1) "s" else ""}",
+                title = buildAnnotatedString {
+                    withStyle(SpanStyle(color = com.elysium369.meet.ui.theme.MeetColors.neonGreen)) {
+                        append("MI GARAGE\n")
+                    }
+                    withStyle(SpanStyle(color = com.elysium369.meet.ui.theme.MeetColors.electricBlue)) {
+                        append("${vehicles.size} VEHÍCULO${if (vehicles.size != 1) "S" else ""}")
+                    }
+                },
                 onBackClick = { navController.popBackStack() },
                 backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )

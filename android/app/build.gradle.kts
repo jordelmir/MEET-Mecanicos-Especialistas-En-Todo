@@ -170,6 +170,20 @@ dependencies {
         exclude(group = "org.apache.httpcomponents", module = "httpclient")
     }
 
+    // CameraX
+    val cameraVersion = "1.3.1"
+    implementation("androidx.camera:camera-core:$cameraVersion")
+    implementation("androidx.camera:camera-camera2:$cameraVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
+    implementation("androidx.camera:camera-video:$cameraVersion")
+    implementation("androidx.camera:camera-view:$cameraVersion")
+
+    // Media3 Transformer for video telemetry overlay baking
+    val media3Version = "1.3.1"
+    implementation("androidx.media3:media3-transformer:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,6 +78,10 @@ fun AdaptationScreen(
     var statusMessage by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<AdaptationCategory?>(null) }
     val scope = rememberCoroutineScope()
+    
+    val connectionState by viewModel.connectionState.collectAsState()
+    val isConnected = connectionState == com.elysium369.meet.core.obd.ObdState.CONNECTED
+    val logLines = remember { mutableStateListOf<String>() }
 
     val filtered = remember(selectedCategory) {
         if (selectedCategory == null) procedures
@@ -258,6 +263,57 @@ fun AdaptationScreen(
                                 else -> {}
                             }
 
+                            // Console Terminal Log (UDS/OBD)
+                            if (logLines.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(130.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.Black.copy(alpha = 0.9f))
+                                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        "UDS ADAPTATION TERMINAL LOG",
+                                        color = MeetColors.textSecondary.copy(alpha = 0.6f),
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    
+                                    val consoleState = rememberLazyListState()
+                                    LaunchedEffect(logLines.size) {
+                                        if (logLines.size > 0) {
+                                            consoleState.scrollToItem(logLines.size - 1)
+                                        }
+                                    }
+                                    
+                                    LazyColumn(
+                                        state = consoleState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        items(logLines) { line ->
+                                            val color = when {
+                                                line.contains("TX:") -> MeetColors.electricBlue
+                                                line.contains("RX:") -> MeetColors.cyberCyan
+                                                line.contains("ERR:") || line.contains("ERROR:") -> MeetColors.error
+                                                line.contains("ÉXITO") || line.contains("COMPLETADO") -> MeetColors.neonGreen
+                                                else -> MeetColors.textSecondary
+                                            }
+                                            Text(
+                                                text = line,
+                                                color = color,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             if (procedureState != ProcedureState.RUNNING) {
                                 Spacer(Modifier.height(8.dp))
                                 EliteButton(
@@ -265,15 +321,73 @@ fun AdaptationScreen(
                                     onClick = {
                                         scope.launch {
                                             procedureState = ProcedureState.RUNNING
-                                            statusMessage = "Iniciando sesión diagnóstica..."
-                                            delay(800)
-                                            statusMessage = "Enviando comandos al ECU..."
-                                            delay(1200)
-                                            statusMessage = "Esperando confirmación del módulo..."
-                                            delay(1000)
-                                            // Simulate result
-                                            procedureState = ProcedureState.SUCCESS
-                                            statusMessage = "Adaptación completada exitosamente"
+                                            logLines.clear()
+                                            
+                                            if (isConnected) {
+                                                logLines.add("--- INICIANDO ADAPTACIÓN OBD-II/UDS ---")
+                                                var isStepFailed = false
+                                                for (cmd in proc.commandSequence) {
+                                                    if (cmd.startsWith("delay:")) {
+                                                        val ms = cmd.substringAfter("delay:").toLongOrNull() ?: 1000L
+                                                        logLines.add("[RETARDO] Esperando ${ms}ms...")
+                                                        statusMessage = "Esperando ${ms}ms..."
+                                                        delay(ms)
+                                                    } else {
+                                                        logLines.add("TX: $cmd")
+                                                        statusMessage = "Enviando comando $cmd..."
+                                                        try {
+                                                            val resp = viewModel.sendRawCommand(cmd)
+                                                            logLines.add("RX: $resp")
+                                                            if (resp.contains("ERROR") || resp.contains("?") || resp.isBlank()) {
+                                                                logLines.add("ERROR: Respuesta inválida/rechazada por ECU")
+                                                                isStepFailed = true
+                                                                break
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            logLines.add("ERROR: ${e.message ?: "Fallo de comunicación"}")
+                                                            isStepFailed = true
+                                                            break
+                                                        }
+                                                    }
+                                                    delay(200)
+                                                }
+                                                if (isStepFailed) {
+                                                    procedureState = ProcedureState.ERROR
+                                                    statusMessage = "Error al ejecutar la rutina de adaptación"
+                                                    logLines.add(">>> ADAPTACIÓN FALLIDA <<<")
+                                                } else {
+                                                    procedureState = ProcedureState.SUCCESS
+                                                    statusMessage = "Adaptación completada exitosamente!"
+                                                    logLines.add(">>> ADAPTACIÓN COMPLETADA CON ÉXITO <<<")
+                                                }
+                                            } else {
+                                                // Simulated demo mode
+                                                logLines.add("--- MODO DEMOSTRACIÓN (SIN CONEXIÓN OBD) ---")
+                                                statusMessage = "Iniciando sesión diagnóstica..."
+                                                logLines.add("TX: 10 03 (Diagnostic Session)")
+                                                delay(800)
+                                                logLines.add("RX: 50 03 (Session Active)")
+                                                
+                                                statusMessage = "Enviando comandos al ECU..."
+                                                for (cmd in proc.commandSequence) {
+                                                    if (cmd.startsWith("delay:")) {
+                                                        val ms = cmd.substringAfter("delay:").toLongOrNull() ?: 1000L
+                                                        logLines.add("[RETARDO SIMULADO] Esperando ${ms}ms...")
+                                                        delay(ms)
+                                                    } else {
+                                                        logLines.add("TX: $cmd [SIMULADO]")
+                                                        delay(400)
+                                                        val mockResp = if (cmd.startsWith("2E")) "6E" else "71"
+                                                        logLines.add("RX: $mockResp OK")
+                                                    }
+                                                }
+                                                
+                                                statusMessage = "Esperando confirmación del módulo..."
+                                                delay(1000)
+                                                procedureState = ProcedureState.SUCCESS
+                                                statusMessage = "Adaptación completada exitosamente [DEMO]"
+                                                logLines.add(">>> DEMO COMPLETADA CON ÉXITO <<<")
+                                            }
                                         }
                                     },
                                     color = proc.category.color,

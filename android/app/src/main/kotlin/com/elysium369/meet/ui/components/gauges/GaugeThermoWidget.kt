@@ -20,6 +20,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Industrial Thermometer Style: Vertical bar gauge with color zones.
@@ -37,6 +38,7 @@ fun GaugeThermoWidget(
     isAnomaly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(minVal, maxVal),
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 80f),
@@ -87,7 +89,7 @@ fun GaugeThermoWidget(
 
                 val labelMeasured = textMeasurer.measure(
                     label.uppercase(),
-                    TextStyle(color = MeetColors.textSecondary, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
+                    TextStyle(color = colorScheme.labelColor.copy(alpha = 0.8f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
                 )
 
                 onDrawBehind {
@@ -97,7 +99,7 @@ fun GaugeThermoWidget(
                         isAnomaly -> MeetColors.error
                         progress >= critFrac -> MeetColors.error
                         progress >= warnFrac -> MeetColors.warning
-                        else -> Color(0xFF00E676) // Industrial green
+                        else -> colorScheme.internalColor
                     }
                     val fillHeight = progress * barHeight
 
@@ -112,7 +114,7 @@ fun GaugeThermoWidget(
                     val warnY = barBottom - warnFrac * barHeight
                     val critY = barBottom - critFrac * barHeight
                     // Green zone
-                    drawRect(Color(0xFF00E676).copy(alpha = 0.04f), Offset(barLeft, warnY), Size(barWidth, barBottom - warnY))
+                    drawRect(colorScheme.internalColor.copy(alpha = 0.04f), Offset(barLeft, warnY), Size(barWidth, barBottom - warnY))
                     // Yellow zone
                     drawRect(MeetColors.warning.copy(alpha = 0.04f), Offset(barLeft, critY), Size(barWidth, warnY - critY))
                     // Red zone
@@ -148,13 +150,14 @@ fun GaugeThermoWidget(
 
                         // Value readout next to indicator
                         val valueText = String.format("%.0f", animatedValue)
+                        val themeTextColor = if (activeColor == colorScheme.internalColor) colorScheme.textColor else activeColor
                         val valueMeasured = textMeasurer.measure(
                             valueText,
-                            TextStyle(color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                            TextStyle(color = themeTextColor, fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                         )
                         val unitMeasured = textMeasurer.measure(
                             unit.lowercase(),
-                            TextStyle(color = activeColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            TextStyle(color = colorScheme.unitColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         )
                         val readoutX = barLeft + barWidth + 14.dp.toPx()
                         val readoutY = fillTop - valueMeasured.size.height / 2f

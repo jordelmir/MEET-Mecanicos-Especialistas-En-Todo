@@ -237,3 +237,193 @@ CREATE POLICY "Clients manage their own data" ON clients FOR ALL USING (true);
 CREATE POLICY "Mechanics manage their own data" ON mechanics FOR ALL USING (true);
 CREATE POLICY "Work orders are visible to everyone in the shop" ON work_orders FOR ALL USING (true);
 CREATE POLICY "Service history is visible" ON service_history FOR ALL USING (true);
+
+-- ═══════════════════════════════════════════════════════════════
+// NEW EXTENSION TABLES (MEET PRO & ELITE)
+-- ═══════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS live_sessions (
+  id TEXT PRIMARY KEY,
+  vehicle_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  mechanic_id TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  started_at BIGINT NOT NULL,
+  ended_at BIGINT,
+  permissions TEXT NOT NULL DEFAULT 'READ_ONLY',
+  session_code TEXT NOT NULL UNIQUE,
+  share_url TEXT NOT NULL,
+  duration_minutes INT NOT NULL DEFAULT 30,
+  video_call_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS live_snapshots (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES live_sessions(id) ON DELETE CASCADE,
+  timestamp BIGINT NOT NULL,
+  pid_values JSONB NOT NULL DEFAULT '{}',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mechanic_notes (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES live_sessions(id) ON DELETE CASCADE,
+  author_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repair_photos (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  photo_path TEXT NOT NULL,
+  caption TEXT,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repair_parts (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  part_number TEXT NOT NULL,
+  part_name TEXT NOT NULL,
+  price FLOAT NOT NULL DEFAULT 0,
+  brand TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repair_votes (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  vote_type TEXT NOT NULL, -- 'UP' or 'DOWN'
+  UNIQUE(case_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS repair_comments (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT NOT NULL,
+  user_reputation TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repair_verifications (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL,
+  verifier_id TEXT NOT NULL,
+  verifier_name TEXT NOT NULL,
+  verifier_credential TEXT NOT NULL,
+  verified_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_requests (
+  id TEXT PRIMARY KEY,
+  vehicle_id TEXT NOT NULL,
+  problem TEXT NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'MEDIUM',
+  description TEXT NOT NULL,
+  location TEXT NOT NULL,
+  radius_km FLOAT NOT NULL DEFAULT 10.0,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  auto_dtc_code TEXT,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_bids (
+  id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
+  shop_id TEXT NOT NULL,
+  shop_name TEXT NOT NULL,
+  shop_rating FLOAT NOT NULL DEFAULT 5.0,
+  price FLOAT NOT NULL DEFAULT 0,
+  estimated_hours FLOAT NOT NULL DEFAULT 1.0,
+  warranty_days INT NOT NULL DEFAULT 30,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS evidence_packages (
+  id TEXT PRIMARY KEY,
+  vehicle_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  timestamp BIGINT NOT NULL,
+  gps_location TEXT NOT NULL,
+  video_path TEXT NOT NULL,
+  audio_path TEXT,
+  pid_snapshot JSONB NOT NULL DEFAULT '{}',
+  dtcs TEXT NOT NULL DEFAULT '[]',
+  hash_sha256 TEXT NOT NULL,
+  signature_version TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS vehicle_twin_profiles (
+  id TEXT PRIMARY KEY,
+  vehicle_id TEXT NOT NULL UNIQUE,
+  baseline_json JSONB NOT NULL DEFAULT '{}',
+  variance_json JSONB NOT NULL DEFAULT '{}',
+  confidence FLOAT NOT NULL DEFAULT 0.0,
+  last_training_date BIGINT NOT NULL,
+  anomaly_count INT NOT NULL DEFAULT 0,
+  health_score INT NOT NULL DEFAULT 100
+);
+
+CREATE TABLE IF NOT EXISTS twin_anomalies (
+  id TEXT PRIMARY KEY,
+  vehicle_id TEXT NOT NULL,
+  parameter TEXT NOT NULL,
+  expected_value FLOAT NOT NULL,
+  actual_value FLOAT NOT NULL,
+  deviation FLOAT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'LOW',
+  confidence FLOAT NOT NULL DEFAULT 0.0,
+  timestamp BIGINT NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE live_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mechanic_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_parts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_verifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_bids ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evidence_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vehicle_twin_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE twin_anomalies ENABLE ROW LEVEL SECURITY;
+
+-- Select/All policies
+CREATE POLICY "Public Select live_sessions" ON live_sessions FOR ALL USING (true);
+CREATE POLICY "Public Select live_snapshots" ON live_snapshots FOR ALL USING (true);
+CREATE POLICY "Public Select mechanic_notes" ON mechanic_notes FOR ALL USING (true);
+CREATE POLICY "Public Select repair_photos" ON repair_photos FOR ALL USING (true);
+CREATE POLICY "Public Select repair_parts" ON repair_parts FOR ALL USING (true);
+CREATE POLICY "Public Select repair_votes" ON repair_votes FOR ALL USING (true);
+CREATE POLICY "Public Select repair_comments" ON repair_comments FOR ALL USING (true);
+CREATE POLICY "Public Select repair_verifications" ON repair_verifications FOR ALL USING (true);
+CREATE POLICY "Public Select service_requests" ON service_requests FOR ALL USING (true);
+CREATE POLICY "Public Select service_bids" ON service_bids FOR ALL USING (true);
+CREATE POLICY "Public Select evidence_packages" ON evidence_packages FOR ALL USING (true);
+CREATE POLICY "Public Select vehicle_twin_profiles" ON vehicle_twin_profiles FOR ALL USING (true);
+CREATE POLICY "Public Select twin_anomalies" ON twin_anomalies FOR ALL USING (true);
+
+-- HIGH SPEED INDICES FOR MILLIONS OF RECORDS (Repair Network & Twin)
+CREATE INDEX IF NOT EXISTS idx_repair_cases_vehicleMake_vehicleModel ON repair_cases (vehicleMake, vehicleModel);
+CREATE INDEX IF NOT EXISTS idx_repair_cases_dtcCode ON repair_cases (dtcCode);
+CREATE INDEX IF NOT EXISTS idx_repair_cases_country ON repair_cases (country);
+
+-- GIN index for PostgreSQL full-text search
+CREATE INDEX IF NOT EXISTS idx_repair_cases_full_text ON repair_cases USING gin (to_tsvector('spanish', coalesce(vehicleMake, '') || ' ' || coalesce(vehicleModel, '') || ' ' || coalesce(dtcCode, '') || ' ' || coalesce(symptoms, '') || ' ' || coalesce(solution, '')));
+
+-- Indexes for active telemetry/marketplace
+CREATE INDEX IF NOT EXISTS idx_live_snapshots_session ON live_snapshots (session_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_service_bids_request ON service_bids (request_id);
+CREATE INDEX IF NOT EXISTS idx_twin_anomalies_vehicle ON twin_anomalies (vehicle_id, timestamp DESC);
+

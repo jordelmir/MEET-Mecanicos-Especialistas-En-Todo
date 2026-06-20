@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlinx.coroutines.launch
 
 data class RepairStep(
     val title: String,
@@ -38,15 +40,10 @@ data class RepairStep(
 
 object DtcRepairHelper {
     fun parseStepString(stepStr: String, stepNum: Int): RepairStep {
-        // Clean prefix like "1. ", "Paso 1: ", etc.
         val cleanStr = stepStr.replace(Regex("^(?i)(paso\\s*\\d+[:.]*|\\d+[:.]*)\\s*"), "")
-        
-        // Split into title and description at the first ':'
         val parts = cleanStr.split(":", limit = 2)
         val title = if (parts.size > 1) parts[0].trim() else "Procedimiento Técnico $stepNum"
         val description = if (parts.size > 1) parts[1].trim() else cleanStr.trim()
-        
-        // Determine an icon based on title/description keywords
         val icon = when {
             cleanStr.contains("volt", ignoreCase = true) || cleanStr.contains("multímetro", ignoreCase = true) || cleanStr.contains("resistencia", ignoreCase = true) -> "⚡"
             cleanStr.contains("limpiar", ignoreCase = true) || cleanStr.contains("limpieza", ignoreCase = true) || cleanStr.contains("aerosol", ignoreCase = true) -> "🧼"
@@ -109,63 +106,105 @@ fun DtcRepairGuideScreen(
     viewModel: ObdViewModel
 ) {
     var definition by remember { mutableStateOf<com.elysium369.meet.data.local.entities.DtcDefinitionEntity?>(null) }
+    var symptoms by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcSymptomEntity>>(emptyList()) }
+    var causes by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcCauseEntity>>(emptyList()) }
+    var dbProcedures by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcProcedureEntity>>(emptyList()) }
+    var relatedPids by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcRelatedPidEntity>>(emptyList()) }
+    var coOccurrences by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity>>(emptyList()) }
+    var repairCosts by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcRepairCostEntity>>(emptyList()) }
+    var verifiedFixes by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcVerifiedFixEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var activeStepIdx by remember { mutableIntStateOf(0) }
+    
+    val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+    // Upvoted fixes cache to disable upvote button after click
+    val upvotedFixIds = remember { mutableStateListOf<Long>() }
 
     LaunchedEffect(dtcCode) {
         isLoading = true
-        definition = viewModel.getDtcDefinition(dtcCode)
-        isLoading = false
-    }
-
-    val steps = remember(definition) {
-        val rawSteps = definition?.diagnosticSteps
-        if (!rawSteps.isNullOrEmpty()) {
-            try {
-                if (rawSteps.trim().startsWith("[")) {
-                    val array = org.json.JSONArray(rawSteps)
-                    val list = mutableListOf<RepairStep>()
-                    for (i in 0 until array.length()) {
-                        list.add(DtcRepairHelper.parseStepString(array.getString(i), i + 1))
-                    }
-                    list
-                } else {
-                    val lines = rawSteps.split(Regex("[|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
-                    lines.mapIndexed { idx, line -> DtcRepairHelper.parseStepString(line, idx + 1) }
-                }
-            } catch (e: Exception) {
-                listOf(RepairStep("Procedimiento de Diagnóstico", rawSteps, "🔧", 20, "Medio"))
-            }
-        } else {
-            DtcRepairDatabase.getSteps(dtcCode)
+        coroutineScope.launch {
+            definition = viewModel.getDtcDefinition(dtcCode)
+            symptoms = viewModel.getDtcSymptoms(dtcCode)
+            causes = viewModel.getDtcCauses(dtcCode)
+            dbProcedures = viewModel.getDtcProcedures(dtcCode)
+            relatedPids = viewModel.getDtcRelatedPids(dtcCode)
+            coOccurrences = viewModel.getDtcCoOccurrences(dtcCode)
+            repairCosts = viewModel.getDtcRepairCosts(dtcCode)
+            verifiedFixes = viewModel.getDtcVerifiedFixes(dtcCode)
+            isLoading = false
         }
     }
 
-    val tools = remember(definition) {
-        val rawTools = definition?.specialToolsRequired
-        if (!rawTools.isNullOrEmpty()) {
-            try {
-                if (rawTools.trim().startsWith("[")) {
-                    val array = org.json.JSONArray(rawTools)
-                    val list = mutableListOf<String>()
-                    for (i in 0 until array.length()) {
-                        list.add(array.getString(i))
+    val steps = remember(definition, dbProcedures) {
+        val rawStepsList = if (dbProcedures.isNotEmpty()) {
+            dbProcedures.map { proc ->
+                RepairStep(
+                    title = proc.titleEs,
+                    description = proc.descriptionEs,
+                    icon = proc.icon,
+                    minutes = proc.estimatedMinutes,
+                    difficulty = when (proc.difficulty.lowercase()) {
+                        "facil" -> "Fácil"
+                        "medio" -> "Medio"
+                        else -> "Difícil"
                     }
-                    list
-                } else {
-                    rawTools.split(Regex("[,|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
-                }
-            } catch (e: Exception) {
-                listOf(rawTools)
+                )
             }
         } else {
-            DtcRepairDatabase.getRequiredTools(dtcCode)
+            val rawSteps = definition?.diagnosticSteps
+            if (!rawSteps.isNullOrEmpty()) {
+                try {
+                    if (rawSteps.trim().startsWith("[")) {
+                        val array = org.json.JSONArray(rawSteps)
+                        val list = mutableListOf<RepairStep>()
+                        for (i in 0 until array.length()) {
+                            list.add(DtcRepairHelper.parseStepString(array.getString(i), i + 1))
+                        }
+                        list
+                    } else {
+                        val lines = rawSteps.split(Regex("[|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
+                        lines.mapIndexed { idx, line -> DtcRepairHelper.parseStepString(line, idx + 1) }
+                    }
+                } catch (e: Exception) {
+                    listOf(RepairStep("Procedimiento de Diagnóstico", rawSteps, "🔧", 20, "Medio"))
+                }
+            } else {
+                DtcRepairDatabase.getSteps(dtcCode)
+            }
+        }
+        rawStepsList.distinctBy { it.description.trim().lowercase() }
+    }
+
+    val tools = remember(definition, dbProcedures) {
+        val toolsFromProcedures = dbProcedures.mapNotNull { it.toolRequired }.filter { it.isNotBlank() }
+        if (toolsFromProcedures.isNotEmpty()) {
+            toolsFromProcedures
+        } else {
+            val rawTools = definition?.specialToolsRequired
+            if (!rawTools.isNullOrEmpty()) {
+                try {
+                    if (rawTools.trim().startsWith("[")) {
+                        val array = org.json.JSONArray(rawTools)
+                        val list = mutableListOf<String>()
+                        for (i in 0 until array.length()) {
+                            list.add(array.getString(i))
+                        }
+                        list
+                    } else {
+                        rawTools.split(Regex("[,|\n]")).map { it.trim() }.filter { it.isNotEmpty() }
+                    }
+                } catch (e: Exception) {
+                    listOf(rawTools)
+                }
+            } else {
+                DtcRepairDatabase.getRequiredTools(dtcCode)
+            }
         }
     }
 
-    var activeStepIdx by remember { mutableIntStateOf(0) }
-    val scrollState = rememberScrollState()
-
-    // Checklist for tools
     val toolChecks = remember(tools) { mutableStateListOf(*Array(tools.size) { false }) }
 
     Scaffold(
@@ -194,293 +233,819 @@ fun DtcRepairGuideScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // ═══════════ HEADER CARD ═══════════
-                EliteCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    glowColor = MeetColors.cyberCyan,
-                    enableHolo3D = true
+                // Tab Navigation
+                val tabs = listOf("Diagnóstico", "Procedimiento", "Parámetros Live", "Soluciones")
+                TabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor = Color.Transparent,
+                    contentColor = MeetColors.cyberCyan,
+                    divider = { HorizontalDivider(color = Color.White.copy(alpha = 0.08f)) },
+                    indicator = { tabPositions ->
+                        if (selectedTabIndex < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                color = MeetColors.cyberCyan,
+                                height = 3.dp
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "ASISTENTE DE MECÁNICA DE PRECISIÓN",
-                            color = MeetColors.cyberCyan,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Procedimiento Técnico $dtcCode",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        val descEs = definition?.descriptionEs ?: ""
-                        if (descEs.isNotEmpty()) {
-                            Text(
-                                descEs,
-                                color = Color.White.copy(alpha = 0.85f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-                        Text(
-                            "Sigue las instrucciones paso a paso desarrolladas por ingenieros de servicio técnico automotriz.",
-                            color = MeetColors.textSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = {
+                                Text(
+                                    text = title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selectedTabIndex == index) FontWeight.Black else FontWeight.Bold,
+                                    color = if (selectedTabIndex == index) MeetColors.cyberCyan else MeetColors.textSecondary,
+                                    fontFamily = FontFamily.SansSerif
+                                )
+                            }
                         )
                     }
                 }
 
-                // ═══════════ REQUIRED TOOLS CHECKLIST ═══════════
-                if (tools.isNotEmpty()) {
-                    PhantomSectionHeader("Herramientas Requeridas")
-                    EliteCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        borderColor = MeetColors.borderSubtle,
-                        enableHolo3D = false
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            tools.forEachIndexed { idx, tool ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { if (idx < toolChecks.size) toolChecks[idx] = !toolChecks[idx] }
-                                        .padding(vertical = 6.dp)
-                                ) {
-                                    val isChecked = idx < toolChecks.size && toolChecks[idx]
-                                    Checkbox(
-                                        checked = isChecked,
-                                        onCheckedChange = { if (idx < toolChecks.size) toolChecks[idx] = it },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = MeetColors.neonGreen,
-                                            uncheckedColor = MeetColors.textSecondary,
-                                            checkmarkColor = MeetColors.backgroundDeep
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = tool,
-                                        color = if (isChecked) MeetColors.textSecondary else Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                // Tab Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                // ═══════════ STEP PROGRESS TIMELINE ═══════════
-                if (steps.isNotEmpty()) {
-                    PhantomSectionHeader("Progreso del Diagnóstico")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        steps.forEachIndexed { idx, _ ->
-                            val isCompleted = idx < activeStepIdx
-                            val isActive = idx == activeStepIdx
-                            val barColor = when {
-                                isCompleted -> MeetColors.neonGreen
-                                isActive -> MeetColors.cyberCyan
-                                else -> MeetColors.borderSubtle
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(5.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(barColor)
-                            )
-                        }
-                    }
-
-                    // ═══════════ ACTIVE STEP CARD ═══════════
-                    val currentStep = steps.getOrNull(activeStepIdx)
-                    if (currentStep != null) {
-                        AnimatedContent(
-                            targetState = currentStep,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { it } togetherWith
-                                fadeOut(animationSpec = tween(200)) + slideOutHorizontally(animationSpec = tween(200)) { -it }
-                            },
-                            label = "stepAnim"
-                        ) { targetStep ->
+                    when (selectedTabIndex) {
+                        0 -> {
+                            // ═══════════ TAB 0: DIAGNÓSTICO ═══════════
+                            // Header Card
                             EliteCard(
                                 modifier = Modifier.fillMaxWidth(),
-                                glowColor = when (targetStep.difficulty) {
-                                    "Fácil" -> MeetColors.neonGreen
-                                    "Medio" -> MeetColors.warning
-                                    else -> MeetColors.error
-                                },
+                                glowColor = MeetColors.cyberCyan,
                                 enableHolo3D = true
                             ) {
-                                Column(modifier = Modifier.padding(18.dp)) {
-                                    // Step header
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MeetColors.neonGreen.copy(alpha = 0.12f))
-                                                    .border(1.dp, MeetColors.neonGreen, CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = targetStep.icon,
-                                                    fontSize = 14.sp
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                "PASO ${activeStepIdx + 1} DE ${steps.size}",
-                                                color = MeetColors.neonGreen,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Black,
-                                                letterSpacing = 1.sp
-                                            )
-                                        }
-
-                                        // Difficulty tag
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "GRAFO DE CONOCIMIENTO OBD2",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.5.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Análisis Técnico $dtcCode",
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    val system = definition?.system ?: "General"
+                                    val severity = definition?.severity ?: "Media"
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(MeetColors.cyberCyan.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(system.uppercase(), color = MeetColors.cyberCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Box(
+                                            modifier = Modifier
                                                 .background(
-                                                    when (targetStep.difficulty) {
-                                                        "Fácil" -> MeetColors.neonGreen.copy(alpha = 0.12f)
-                                                        "Medio" -> MeetColors.warning.copy(alpha = 0.12f)
-                                                        else -> MeetColors.error.copy(alpha = 0.12f)
-                                                    }
-                                                )
-                                                .border(
-                                                    1.dp,
-                                                    when (targetStep.difficulty) {
-                                                        "Fácil" -> MeetColors.neonGreen
-                                                        "Medio" -> MeetColors.warning
-                                                        else -> MeetColors.error
+                                                    when (severity.lowercase()) {
+                                                        "high", "alta", "crítico" -> MeetColors.error.copy(alpha = 0.12f)
+                                                        "low", "baja" -> MeetColors.neonGreen.copy(alpha = 0.12f)
+                                                        else -> MeetColors.warning.copy(alpha = 0.12f)
                                                     },
-                                                    RoundedCornerShape(6.dp)
+                                                    RoundedCornerShape(4.dp)
                                                 )
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
                                             Text(
-                                                text = targetStep.difficulty.uppercase(),
-                                                color = when (targetStep.difficulty) {
-                                                    "Fácil" -> MeetColors.neonGreen
-                                                    "Medio" -> MeetColors.warning
-                                                    else -> MeetColors.error
+                                                "SEVERIDAD: ${severity.uppercase()}",
+                                                color = when (severity.lowercase()) {
+                                                    "high", "alta", "crítico" -> MeetColors.error
+                                                    "low", "baja" -> MeetColors.neonGreen
+                                                    else -> MeetColors.warning
                                                 },
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 8.sp,
-                                                fontFamily = FontFamily.Monospace
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Step Title
-                                    Text(
-                                        text = targetStep.title,
-                                        color = Color.White,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Black
-                                    )
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    // Step Instruction
-                                    Text(
-                                        text = targetStep.description,
-                                        color = MeetColors.textPrimary,
-                                        fontSize = 13.sp,
-                                        lineHeight = 19.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Estimation
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val descEs = definition?.descriptionEs ?: ""
+                                    if (descEs.isNotEmpty()) {
                                         Text(
-                                            "⏱️ Tiempo Estimado: ",
-                                            color = MeetColors.textSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                        Text(
-                                            "${targetStep.minutes} min",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
+                                            descEs,
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
+                                            lineHeight = 18.sp
                                         )
+                                    }
+                                }
+                            }
+
+                            // Symptoms
+                            PhantomSectionHeader("Síntomas Comunes")
+                            EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (symptoms.isNotEmpty()) {
+                                        symptoms.forEach { symptom ->
+                                            Row(verticalAlignment = Alignment.Top) {
+                                                Text("•", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(symptom.symptomEs, color = Color.White, fontSize = 13.sp)
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier.padding(top = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            "Probabilidad: ${symptom.probability.uppercase()}",
+                                                            color = MeetColors.textSecondary,
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                        if (symptom.isDriverNoticeable) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .background(MeetColors.warning.copy(alpha = 0.1f), RoundedCornerShape(2.dp))
+                                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            ) {
+                                                                Text("PERCEPTIBLE POR CONDUCTOR", color = MeetColors.warning, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        val fallbackSymptoms = definition?.symptoms
+                                        if (!fallbackSymptoms.isNullOrBlank()) {
+                                            Text(fallbackSymptoms, color = Color.White, fontSize = 13.sp)
+                                        } else {
+                                            Text("No se encontraron síntomas específicos registrados para este código.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Causes
+                            PhantomSectionHeader("Causas Probables")
+                            EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    if (causes.isNotEmpty()) {
+                                        causes.forEach { cause ->
+                                            Column {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        cause.causeEs,
+                                                        color = Color.White,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        if (cause.isElectronic) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .background(MeetColors.electricBlue.copy(alpha = 0.1f), RoundedCornerShape(3.dp))
+                                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text("⚡ ELEC", color = MeetColors.electricBlue, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                        if (cause.isMechanical) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .background(MeetColors.warning.copy(alpha = 0.1f), RoundedCornerShape(3.dp))
+                                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text("⚙️ MEC", color = MeetColors.warning, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Probability bar
+                                                val probValue = when (cause.probability.lowercase()) {
+                                                    "alta" -> 0.9f
+                                                    "media" -> 0.6f
+                                                    else -> 0.3f
+                                                }
+                                                val probColor = when (cause.probability.lowercase()) {
+                                                    "alta" -> MeetColors.neonGreen
+                                                    "media" -> MeetColors.warning
+                                                    else -> MeetColors.textSecondary
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    LinearProgressIndicator(
+                                                        progress = { probValue },
+                                                        color = probColor,
+                                                        trackColor = Color.White.copy(alpha = 0.05f),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(4.dp)
+                                                            .clip(RoundedCornerShape(2.dp))
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = cause.probability.uppercase(),
+                                                        color = probColor,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        val fallbackCauses = definition?.possibleCauses
+                                        if (!fallbackCauses.isNullOrBlank()) {
+                                            Text(fallbackCauses.replace("|", "\n"), color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+                                        } else {
+                                            Text("No se encontraron causas comunes registradas.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Co-occurrences
+                            if (coOccurrences.isNotEmpty()) {
+                                PhantomSectionHeader("Códigos Asociados (Co-ocurrencia)")
+                                EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            "Los siguientes códigos suelen aparecer de manera simultánea en el diagnóstico debido a fallas mecánicas en cascada:",
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        coOccurrences.forEach { co ->
+                                            val related = if (co.dtcCode == dtcCode) co.relatedDtcCode else co.dtcCode
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
+                                                    .padding(8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        related,
+                                                        color = MeetColors.cyberCyan,
+                                                        fontWeight = FontWeight.Black,
+                                                        fontSize = 13.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        "Fuerza: ${(co.correlationStrength * 100).toInt()}%",
+                                                        color = MeetColors.textSecondary,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                                val combo = co.combinedDiagnosisEs
+                                                if (!combo.isNullOrBlank()) {
+                                                    Text(
+                                                        combo,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        textAlign = TextAlign.End,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Repair Costs
+                            if (repairCosts.isNotEmpty()) {
+                                PhantomSectionHeader("Costos Estimados de Reparación")
+                                EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        repairCosts.forEach { cost ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        "Rango Estimado (${cost.region})",
+                                                        color = Color.White,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    val labor = cost.laborHours
+                                                    if (labor != null && labor > 0) {
+                                                        Text(
+                                                            "Tiempo estimado de labor: $labor h",
+                                                            color = MeetColors.textSecondary,
+                                                            fontSize = 11.sp
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    "$${cost.minCostUsd.toInt()} - $${cost.maxCostUsd.toInt()} ${cost.currency}",
+                                                    color = MeetColors.neonGreen,
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 16.sp,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
+                                            val desc = cost.partsDescription
+                                            if (!desc.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    "Repuestos sugeridos: $desc",
+                                                    color = MeetColors.textSecondary,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                val fallbackCost = definition?.repairCostUSD
+                                if (!fallbackCost.isNullOrBlank()) {
+                                    PhantomSectionHeader("Costos Estimados de Reparación")
+                                    EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Rango Promedio", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                Text(fallbackCost, color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                                            }
+                                            val estHours = definition?.laborHoursEstimate
+                                            if (!estHours.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("Tiempo estimado de labor: $estHours", color = MeetColors.textSecondary, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        1 -> {
+                            // ═══════════ TAB 1: PROCEDIMIENTO ═══════════
+                            // Required tools
+                            if (tools.isNotEmpty()) {
+                                PhantomSectionHeader("Herramientas Requeridas")
+                                EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        tools.forEachIndexed { idx, tool ->
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { if (idx < toolChecks.size) toolChecks[idx] = !toolChecks[idx] }
+                                                    .padding(vertical = 4.dp)
+                                            ) {
+                                                val isChecked = idx < toolChecks.size && toolChecks[idx]
+                                                Checkbox(
+                                                    checked = isChecked,
+                                                    onCheckedChange = { if (idx < toolChecks.size) toolChecks[idx] = it },
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = MeetColors.neonGreen,
+                                                        uncheckedColor = MeetColors.textSecondary,
+                                                        checkmarkColor = MeetColors.backgroundDeep
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = tool,
+                                                    color = if (isChecked) MeetColors.textSecondary else Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Stepper
+                            if (steps.isNotEmpty()) {
+                                PhantomSectionHeader("Progreso del Diagnóstico")
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    steps.forEachIndexed { idx, _ ->
+                                        val isCompleted = idx < activeStepIdx
+                                        val isActive = idx == activeStepIdx
+                                        val barColor = when {
+                                            isCompleted -> MeetColors.neonGreen
+                                            isActive -> MeetColors.cyberCyan
+                                            else -> MeetColors.borderSubtle
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(5.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(barColor)
+                                        )
+                                    }
+                                }
+
+                                val currentStep = steps.getOrNull(activeStepIdx)
+                                if (currentStep != null) {
+                                    AnimatedContent(
+                                        targetState = currentStep,
+                                        transitionSpec = {
+                                            fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { it } togetherWith
+                                            fadeOut(animationSpec = tween(200)) + slideOutHorizontally(animationSpec = tween(200)) { -it }
+                                        },
+                                        label = "stepAnim"
+                                    ) { targetStep ->
+                                        EliteCard(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            glowColor = when (targetStep.difficulty) {
+                                                "Fácil" -> MeetColors.neonGreen
+                                                "Medio" -> MeetColors.warning
+                                                else -> MeetColors.error
+                                            },
+                                            enableHolo3D = true
+                                        ) {
+                                            Column(modifier = Modifier.padding(18.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(28.dp)
+                                                                .clip(CircleShape)
+                                                                .background(MeetColors.neonGreen.copy(alpha = 0.12f))
+                                                                .border(1.dp, MeetColors.neonGreen, CircleShape),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(text = targetStep.icon, fontSize = 14.sp)
+                                                        }
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            "PASO ${activeStepIdx + 1} DE ${steps.size}",
+                                                            color = MeetColors.neonGreen,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            letterSpacing = 1.sp
+                                                        )
+                                                    }
+
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(
+                                                                when (targetStep.difficulty) {
+                                                                    "Fácil" -> MeetColors.neonGreen.copy(alpha = 0.12f)
+                                                                    "Medio" -> MeetColors.warning.copy(alpha = 0.12f)
+                                                                    else -> MeetColors.error.copy(alpha = 0.12f)
+                                                                }
+                                                            )
+                                                            .border(
+                                                                1.dp,
+                                                                when (targetStep.difficulty) {
+                                                                    "Fácil" -> MeetColors.neonGreen
+                                                                    "Medio" -> MeetColors.warning
+                                                                    else -> MeetColors.error
+                                                                },
+                                                                RoundedCornerShape(6.dp)
+                                                            )
+                                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = targetStep.difficulty.uppercase(),
+                                                            color = when (targetStep.difficulty) {
+                                                                "Fácil" -> MeetColors.neonGreen
+                                                                "Medio" -> MeetColors.warning
+                                                                else -> MeetColors.error
+                                                            },
+                                                            fontWeight = FontWeight.Black,
+                                                            fontSize = 8.sp,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Text(
+                                                    text = targetStep.title,
+                                                    color = Color.White,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Black
+                                                )
+                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Text(
+                                                    text = targetStep.description,
+                                                    color = MeetColors.textPrimary,
+                                                    fontSize = 13.sp,
+                                                    lineHeight = 19.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text("⏱️ Tiempo Estimado: ", color = MeetColors.textSecondary, fontSize = 11.sp)
+                                                    Text(
+                                                        "${targetStep.minutes} min",
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (activeStepIdx > 0) {
+                                        EliteOutlinedButton(
+                                            text = "ANTERIOR",
+                                            onClick = { activeStepIdx-- },
+                                            color = MeetColors.cyberCyan,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    val isLast = activeStepIdx == steps.size - 1
+                                    EliteButton(
+                                        text = if (isLast) "REPARACIÓN LISTA" else "SIGUIENTE PASO",
+                                        onClick = {
+                                            if (isLast) {
+                                                navController.popBackStack()
+                                            } else {
+                                                activeStepIdx++
+                                            }
+                                        },
+                                        color = MeetColors.neonGreen,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No se encontraron pasos de reparación para este código.", color = MeetColors.textSecondary, fontSize = 14.sp)
+                                }
+                            }
+                        }
+
+                        2 -> {
+                            // ═══════════ TAB 2: PARÁMETROS LIVE ═══════════
+                            PhantomSectionHeader("Sensores a Monitorear en Tiempo Real")
+                            EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    if (relatedPids.isNotEmpty()) {
+                                        Text(
+                                            "Para validar la falla o confirmar la solución, monitorea los siguientes parámetros en vivo en la pantalla de datos en tiempo real:",
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 11.sp,
+                                            lineHeight = 16.sp
+                                        )
+                                        relatedPids.forEach { pid ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Pulsing live indicator
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MeetColors.cyberCyan)
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        pid.pidNameEs,
+                                                        color = Color.White,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        "Comando OBD: ${pid.pidCommand}",
+                                                        color = MeetColors.textSecondary,
+                                                        fontSize = 10.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                                val normalRange = pid.normalRange
+                                                if (!normalRange.isNullOrBlank()) {
+                                                    Column(horizontalAlignment = Alignment.End) {
+                                                        Text("RANGO NORMAL", color = MeetColors.cyberCyan, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                                        Text(
+                                                            "$normalRange ${pid.unit ?: ""}".trim(),
+                                                            color = Color.White,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        val fallbackPids = definition?.freezeFramePIDs
+                                        if (!fallbackPids.isNullOrBlank()) {
+                                            Text(
+                                                "Monitorea los siguientes PIDs relacionados:",
+                                                color = MeetColors.textSecondary,
+                                                fontSize = 12.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(fallbackPids, color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                                        } else {
+                                            Text("No hay parámetros de sensores específicos vinculados a este código en la base de datos local.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        3 -> {
+                            // ═══════════ TAB 3: SOLUCIONES VERIFICADAS ═══════════
+                            PhantomSectionHeader("Soluciones Confirmadas (TSB / Comunidad)")
+                            if (verifiedFixes.isNotEmpty()) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    verifiedFixes.forEach { fix ->
+                                        EliteCard(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            glowColor = MeetColors.neonGreen.copy(alpha = 0.2f)
+                                        ) {
+                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    // Source Badge
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(
+                                                                when (fix.source?.lowercase()) {
+                                                                    "tsb" -> MeetColors.electricBlue.copy(alpha = 0.12f)
+                                                                    "oem" -> MeetColors.cyberCyan.copy(alpha = 0.12f)
+                                                                    else -> MeetColors.neonGreen.copy(alpha = 0.12f)
+                                                                },
+                                                                RoundedCornerShape(4.dp)
+                                                            )
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = (fix.source ?: "COMUNIDAD").uppercase(),
+                                                            color = when (fix.source?.lowercase()) {
+                                                                "tsb" -> MeetColors.electricBlue
+                                                                "oem" -> MeetColors.cyberCyan
+                                                                else -> MeetColors.neonGreen
+                                                            },
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+
+                                                    // Success Rate tag
+                                                    Text(
+                                                        text = "Éxito: ${(fix.successRate * 100).toInt()}%",
+                                                        color = MeetColors.neonGreen,
+                                                        fontWeight = FontWeight.Black,
+                                                        fontSize = 12.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Text(
+                                                    text = fix.fixDescriptionEs,
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    lineHeight = 18.sp
+                                                )
+
+                                                val part = fix.partRequired
+                                                if (!part.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "🔩 Repuesto: $part",
+                                                        color = MeetColors.textSecondary,
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    val cost = fix.estimatedCostUsd
+                                                    if (cost != null && cost > 0) {
+                                                        Text(
+                                                            text = "Costo repuesto: ~$${cost.toInt()} USD",
+                                                            color = MeetColors.textSecondary,
+                                                            fontSize = 11.sp
+                                                        )
+                                                    } else {
+                                                        Spacer(modifier = Modifier.width(1.dp))
+                                                    }
+
+                                                    // Upvote Button
+                                                    val isUpvoted = upvotedFixIds.contains(fix.id)
+                                                    Button(
+                                                        onClick = {
+                                                            if (!isUpvoted) {
+                                                                coroutineScope.launch {
+                                                                    viewModel.upvoteDtcFix(fix.id)
+                                                                    upvotedFixIds.add(fix.id)
+                                                                    // Refresh list
+                                                                    verifiedFixes = viewModel.getDtcVerifiedFixes(dtcCode)
+                                                                }
+                                                            }
+                                                        },
+                                                        enabled = !isUpvoted,
+                                                        colors = ButtonDefaults.buttonColors(
+                                                            containerColor = if (isUpvoted) Color.Transparent else MeetColors.neonGreen.copy(alpha = 0.1f),
+                                                            contentColor = MeetColors.neonGreen,
+                                                            disabledContainerColor = Color.Transparent,
+                                                            disabledContentColor = MeetColors.textSecondary
+                                                        ),
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        border = if (isUpvoted) null else androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f)),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(30.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (isUpvoted) "✓ VALIDADO" else "👍 ÚTIL (${fix.voteCount})",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                EliteCard(modifier = Modifier.fillMaxWidth()) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("🔧", fontSize = 32.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                "No hay soluciones verificadas cargadas aún para este DTC.",
+                                                color = MeetColors.textSecondary,
+                                                fontSize = 12.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // ═══════════ NAVIGATION BUTTONS ═══════════
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        if (activeStepIdx > 0) {
-                            EliteOutlinedButton(
-                                text = "ANTERIOR",
-                                onClick = { activeStepIdx-- },
-                                color = MeetColors.cyberCyan,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        val isLast = activeStepIdx == steps.size - 1
-                        EliteButton(
-                            text = if (isLast) "REPARACIÓN LISTA" else "SIGUIENTE PASO",
-                            onClick = {
-                                if (isLast) {
-                                    navController.popBackStack()
-                                } else {
-                                    activeStepIdx++
-                                }
-                            },
-                            color = MeetColors.neonGreen,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                } else {
-                    // Empty steps fallback
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "No se encontraron pasos de reparación para este código.",
-                            color = MeetColors.textSecondary,
-                            fontSize = 14.sp
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

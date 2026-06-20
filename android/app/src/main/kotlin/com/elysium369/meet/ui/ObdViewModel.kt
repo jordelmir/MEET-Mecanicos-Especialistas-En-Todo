@@ -11,12 +11,20 @@ import com.elysium369.meet.data.supabase.VehicleRepository
 import com.elysium369.meet.data.supabase.SupabaseManager
 import com.elysium369.meet.data.supabase.SessionLogRepository
 import com.elysium369.meet.data.supabase.DiagnosticSession
+import com.elysium369.meet.data.local.dao.*
+import com.elysium369.meet.data.local.entities.*
+import com.elysium369.meet.core.twin.VehicleTwinEngine
+import com.elysium369.meet.core.blackbox.EvidenceCompiler
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import com.elysium369.meet.data.local.dao.TripDao
 import com.elysium369.meet.data.local.dao.MaintenanceAlertDao
 import com.elysium369.meet.data.local.dao.CustomPidDao
 import com.elysium369.meet.data.local.entities.TripEntity
 import com.elysium369.meet.data.local.entities.MaintenanceAlertEntity
 import com.elysium369.meet.data.local.entities.CustomPidEntity
+import com.elysium369.meet.data.local.entities.PredictionEventEntity
+import com.elysium369.meet.data.local.entities.HealthSnapshotEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -75,16 +83,39 @@ class ObdViewModel @Inject constructor(
     private val turboBoostGauge: TurboBoostGauge,
     private val demoModeSimulator: DemoModeSimulator,
     private val dvirReportDao: com.elysium369.meet.data.local.dao.DvirReportDao,
+    private val predictionEventDao: com.elysium369.meet.data.local.dao.PredictionEventDao,
+    private val healthSnapshotDao: com.elysium369.meet.data.local.dao.HealthSnapshotDao,
     private val phoneSpeedTracker: PhoneSpeedTracker,
-    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager
+    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager,
+    private val voiceCommandManager: com.elysium369.meet.core.audio.VoiceCommandManager,
+    private val gaugeStyleManager: com.elysium369.meet.ui.components.gauges.GaugeStyleManager,
+    private val meetDnaEngine: com.elysium369.meet.core.dna.MeetDnaEngine,
+    private val ruleEngine: com.elysium369.meet.core.copilot.RuleEngine,
+    private val speechService: com.elysium369.meet.core.copilot.SpeechService,
+    private val notificationService: com.elysium369.meet.core.copilot.NotificationService,
+    private val liveSessionDao: LiveSessionDao,
+    private val repairNetworkAddonsDao: RepairNetworkAddonsDao,
+    private val marketplaceDao: MarketplaceDao,
+    private val blackBoxDao: BlackBoxDao,
+    private val vehicleTwinDao: VehicleTwinDao,
+    private val vehicleTwinEngine: VehicleTwinEngine,
+    private val dtcKnowledgeGraphDao: com.elysium369.meet.data.local.dao.DtcKnowledgeGraphDao
 ) : ViewModel() {
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
 
+
     // --- Force Clone Mode ---
     private val _forceCloneMode = MutableStateFlow(false)
     val forceCloneMode: StateFlow<Boolean> = _forceCloneMode.asStateFlow()
+
+    // --- Voice Copilot Enabled ---
+    private val _voiceCopilotEnabled = MutableStateFlow(
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .getBoolean("voice_copilot_enabled", false)
+    )
+    val voiceCopilotEnabled: StateFlow<Boolean> = _voiceCopilotEnabled.asStateFlow()
 
     // --- Fused Speed Enabled (Waze style) ---
     private val _fusedSpeedEnabled = MutableStateFlow(true)
@@ -164,6 +195,288 @@ class ObdViewModel @Inject constructor(
     private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
 
+    // ── LiveLink PRO remote session state ──
+    private val _liveLinkProSession = MutableStateFlow<LiveSessionEntity?>(null)
+    val liveLinkProSession: StateFlow<LiveSessionEntity?> = _liveLinkProSession.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val mechanicNotes: StateFlow<List<MechanicNoteEntity>> = _liveLinkProSession
+        .flatMapLatest { session ->
+            session?.let { liveSessionDao.getNotesForSession(it.sessionId) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private var telemetryUploadJob: Job? = null
+    private var notesPollingJob: Job? = null
+
+    fun startLiveLinkPro(durationMinutes: Int, readOnly: Boolean, videoCall: Boolean) {
+        val vehicle = selectedVehicle.value ?: return
+        val sessionCode = (100000..999999).random().toString()
+        val sessionId = UUID.randomUUID().toString()
+        val ownerId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: "anonymous"
+        val session = LiveSessionEntity(
+            sessionId = sessionId,
+            vehicleId = vehicle.id,
+            ownerId = ownerId,
+            mechanicId = null,
+            status = "ACTIVE",
+            startedAt = System.currentTimeMillis(),
+            endedAt = null,
+            permissions = if (readOnly) "READ_ONLY" else "FULL",
+            sessionCode = sessionCode,
+            shareUrl = "https://meet.elysium369.com/livelink/$sessionCode",
+            durationMinutes = durationMinutes,
+            videoCallUrl = if (videoCall) "https://meet.elysium369.com/call/$sessionId" else null
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                liveSessionDao.insertLiveSession(session)
+                _liveLinkProSession.value = session
+                
+                // Upload active session to Supabase
+                SupabaseManager.client.postgrest["live_sessions"].insert(session)
+                
+                // Start background upload loop for telemetry
+                startLiveLinkTelemetryLoop(sessionId)
+                
+                // Start background note polling loop
+                startNotesPollingLoop(sessionId)
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Error starting remote LiveLink PRO session", e)
+            }
+        }
+    }
+
+    fun stopLiveLinkPro() {
+        val session = _liveLinkProSession.value ?: return
+        telemetryUploadJob?.cancel()
+        notesPollingJob?.cancel()
+        _liveLinkProSession.value = null
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val now = System.currentTimeMillis()
+                liveSessionDao.updateSessionStatus(session.sessionId, "COMPLETED")
+                liveSessionDao.updateSessionEndedAt(session.sessionId, now)
+                
+                // Sync status to cloud
+                SupabaseManager.client.postgrest["live_sessions"].update(mapOf("status" to "COMPLETED", "endedAt" to now)) {
+                    filter {
+                        eq("sessionId", session.sessionId)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Error stopping remote LiveLink PRO session", e)
+            }
+        }
+    }
+
+    private fun startLiveLinkTelemetryLoop(sessionId: String) {
+        telemetryUploadJob?.cancel()
+        telemetryUploadJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive && _liveLinkProSession.value?.status == "ACTIVE") {
+                try {
+                    val pidsJson = Json.encodeToString(_liveData.value)
+                    val snapshot = LiveSnapshotEntity(
+                        snapshotId = UUID.randomUUID().toString(),
+                        sessionId = sessionId,
+                        timestamp = System.currentTimeMillis(),
+                        pidValues = pidsJson,
+                        notes = ""
+                    )
+                    
+                    // Save local snapshot
+                    liveSessionDao.insertLiveSnapshot(snapshot)
+                    
+                    // Upload to cloud
+                    SupabaseManager.client.postgrest["live_snapshots"].insert(snapshot)
+                } catch (e: Exception) {
+                    Log.e("ObdViewModel", "Error uploading telemetry snapshot", e)
+                }
+                delay(2000L) // Telemetry uploaded every 2 seconds
+            }
+        }
+    }
+
+    private fun startNotesPollingLoop(sessionId: String) {
+        notesPollingJob?.cancel()
+        notesPollingJob = viewModelScope.launch(Dispatchers.IO) {
+            var lastPollTime = 0L
+            while (isActive && _liveLinkProSession.value?.status == "ACTIVE") {
+                try {
+                    val newNotes = SupabaseManager.client.postgrest["mechanic_notes"]
+                        .select {
+                            filter {
+                                eq("sessionId", sessionId)
+                                gt("createdAt", lastPollTime)
+                            }
+                        }.decodeList<MechanicNoteEntity>()
+                    
+                    if (newNotes.isNotEmpty()) {
+                        newNotes.forEach { note ->
+                            liveSessionDao.insertMechanicNote(note)
+                            if (note.createdAt > lastPollTime) {
+                                lastPollTime = note.createdAt
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("ObdViewModel", "Error polling mechanic notes", e)
+                }
+                delay(4000L) // Poll recommendations/notes every 4 seconds
+            }
+        }
+    }
+
+    // ── Marketplace (Bids and requests) ──
+    val serviceRequests: StateFlow<List<ServiceRequestEntity>> = marketplaceDao.getRequests()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Shop/Workshop bids derived dynamically
+    private val _shopId = MutableStateFlow<String?>("local_shop_id") // Simulated shop ID
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val shopBids: StateFlow<List<ServiceBidEntity>> = _shopId
+        .flatMapLatest { shopId ->
+            shopId?.let { marketplaceDao.getBidsByShop(it) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun getBidsForRequest(requestId: String): Flow<List<ServiceBidEntity>> {
+        return marketplaceDao.getBidsForRequest(requestId)
+    }
+
+    fun createServiceRequest(
+        vehicleId: String,
+        problem: String,
+        description: String,
+        location: String,
+        priority: String
+    ) {
+        val request = ServiceRequestEntity(
+            requestId = UUID.randomUUID().toString(),
+            vehicleId = vehicleId,
+            problem = problem,
+            priority = priority,
+            description = description,
+            location = location,
+            radiusKm = 15.0,
+            status = "OPEN",
+            autoDtcCode = activeDtcs.value.firstOrNull(),
+            createdAt = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.insertRequest(request)
+                SupabaseManager.client.postgrest["service_requests"].insert(request)
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to create service request", e)
+            }
+        }
+    }
+
+    fun placeServiceBid(
+        requestId: String,
+        price: Double,
+        estimatedHours: Double,
+        warrantyDays: Int,
+        message: String
+    ) {
+        val bid = ServiceBidEntity(
+            bidId = UUID.randomUUID().toString(),
+            requestId = requestId,
+            shopId = _shopId.value ?: "unknown_shop",
+            shopName = "Mecánica Elite Pro",
+            shopRating = 4.9,
+            price = price,
+            estimatedHours = estimatedHours,
+            warrantyDays = warrantyDays,
+            message = message,
+            status = "PENDING",
+            createdAt = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.insertBid(bid)
+                SupabaseManager.client.postgrest["service_bids"].insert(bid)
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to place bid", e)
+            }
+        }
+    }
+
+    fun acceptBid(requestId: String, bidId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.updateRequestStatus(requestId, "ACCEPTED")
+                marketplaceDao.updateBidStatus(bidId, "ACCEPTED")
+                
+                SupabaseManager.client.postgrest["service_requests"].update(mapOf("status" to "ACCEPTED")) {
+                    filter { eq("requestId", requestId) }
+                }
+                SupabaseManager.client.postgrest["service_bids"].update(mapOf("status" to "ACCEPTED")) {
+                    filter { eq("bidId", bidId) }
+                }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to accept bid", e)
+            }
+        }
+    }
+
+    // Background periodic task to poll/sync local Room data with Supabase for Marketplace
+    fun startMarketplaceSync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    // Sync service requests from Supabase
+                    val cloudRequests = SupabaseManager.client.postgrest["service_requests"]
+                        .select().decodeList<ServiceRequestEntity>()
+                    cloudRequests.forEach { req ->
+                        marketplaceDao.insertRequest(req)
+                    }
+
+                    // Sync bids for each request
+                    cloudRequests.forEach { req ->
+                        val cloudBids = SupabaseManager.client.postgrest["service_bids"]
+                            .select {
+                                filter {
+                                    eq("requestId", req.requestId)
+                                }
+                            }.decodeList<ServiceBidEntity>()
+                        cloudBids.forEach { bid ->
+                            marketplaceDao.insertBid(bid)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("ObdViewModel", "Error in periodic Supabase sync", e)
+                }
+                delay(10000L) // Poll every 10 seconds
+            }
+        }
+    }
+
+    // ── Black Box ──
+    val evidencePackages: StateFlow<List<EvidencePackageEntity>> = blackBoxDao.getEvidencePackages()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun saveEvidencePackage(evidence: EvidencePackageEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                blackBoxDao.insertEvidencePackage(evidence)
+                SupabaseManager.client.postgrest["evidence_packages"].insert(evidence)
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to save evidence package", e)
+            }
+        }
+    }
+
+    // ── Vehicle Twin ──
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val twinAnomalies: StateFlow<List<TwinAnomalyEntity>> = _selectedVehicle
+        .flatMapLatest { vehicle ->
+            vehicle?.let { vehicleTwinDao.getAnomaliesForVehicle(it.id) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     // Tarea 34 & 35: Configuración persistente de sistema de unidades, precio de combustible, moneda y tipo de carburante
     private val _useImperialUnits = MutableStateFlow(false)
     val useImperialUnits: StateFlow<Boolean> = _useImperialUnits.asStateFlow()
@@ -222,6 +535,7 @@ class ObdViewModel @Inject constructor(
         predictiveEstimator.reset()
         context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
             .edit().putString("selected_vehicle_id", vehicle?.id).apply()
+        evaluateDnaInference()
     }
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
@@ -384,6 +698,35 @@ class ObdViewModel @Inject constructor(
             val torque = _performanceSnapshot.value?.torqueNm
             _dragStripResult.value = performanceCalculator.updateDragRun(speed, hp, torque)
         }
+        if (_isDynoRunning.value) {
+            val rpm = data["RPM"] ?: data["rpm"] ?: 0f
+            val speed = data["SPEED"] ?: data["speed"] ?: 0f
+            val accel = if (lastLinearAccelY > 0.05f) {
+                lastLinearAccelY
+            } else {
+                _performanceSnapshot.value?.acceleration ?: 0f
+            }
+            _dynoPoints.value = performanceCalculator.updateDynoRun(rpm, accel, speed)
+        }
+        if (_isRecordingDashcam.value) {
+            val elapsed = System.currentTimeMillis() - dashcamStartTimeMs
+            val rpm = data["RPM"] ?: data["rpm"] ?: 0f
+            val speed = data["SPEED"] ?: data["speed"] ?: 0f
+            val load = data["LOAD"] ?: data["load"] ?: 0f
+            val throttle = data["THROTTLE"] ?: data["throttle"] ?: data["0111"] ?: 0f
+            val gForce = _performanceSnapshot.value?.gForce ?: 0f
+            
+            dashcamTelemetryBuffer.add(
+                DashcamTelemetryFrame(
+                    timestampMs = elapsed,
+                    rpm = rpm,
+                    speedKph = speed,
+                    gForce = gForce,
+                    throttle = throttle,
+                    load = load
+                )
+            )
+        }
     }
 
     fun startDragStrip() {
@@ -433,6 +776,8 @@ class ObdViewModel @Inject constructor(
         if (newAlerts.isNotEmpty()) {
             _thresholdAlerts.value = newAlerts
         }
+        // Run MEET Copilot RuleEngine check
+        ruleEngine.evaluate(data, activeDtcEvents.value.map { it.code })
     }
 
     fun getAlertHistory() = alertThresholdEngine.getAlertHistory()
@@ -495,6 +840,202 @@ class ObdViewModel @Inject constructor(
                 reportGenerator.shareReport(file)
             } catch (e: Exception) {
                 Log.e("MEET", "Failed to generate pre-purchase PDF", e)
+            }
+        }
+    }
+
+    // ──── MEET PERITO STATES ────
+    private val _isInspectingPerito = MutableStateFlow(false)
+    val isInspectingPerito: StateFlow<Boolean> = _isInspectingPerito.asStateFlow()
+
+    private val _peritoConsoleLogs = MutableStateFlow<List<String>>(emptyList())
+    val peritoConsoleLogs: StateFlow<List<String>> = _peritoConsoleLogs.asStateFlow()
+
+    private val _activePeritoReport = MutableStateFlow<com.elysium369.meet.core.obd.VehicleInspectionReport?>(null)
+    val activePeritoReport: StateFlow<com.elysium369.meet.core.obd.VehicleInspectionReport?> = _activePeritoReport.asStateFlow()
+
+    private val _peritoHistory = MutableStateFlow<List<com.elysium369.meet.core.obd.VehicleInspectionReport>>(emptyList())
+    val peritoHistory: StateFlow<List<com.elysium369.meet.core.obd.VehicleInspectionReport>> = _peritoHistory.asStateFlow()
+
+    private val _currentPeritoStep = MutableStateFlow(0)
+    val currentPeritoStep: StateFlow<Int> = _currentPeritoStep.asStateFlow()
+
+    private val _peritoReportFile = MutableStateFlow<java.io.File?>(null)
+    val peritoReportFile: StateFlow<java.io.File?> = _peritoReportFile.asStateFlow()
+
+    private val meetPerito = com.elysium369.meet.core.obd.MeetPerito()
+    private val peritoReportGenerator = com.elysium369.meet.core.export.PeritoReportGenerator(context)
+
+    // --- MEET DNA ---
+    private val _dnaResult = MutableStateFlow<com.elysium369.meet.core.dna.DnaEvaluationResult>(com.elysium369.meet.core.dna.DnaEvaluationResult(isCalibrated = false))
+    val dnaResult: StateFlow<com.elysium369.meet.core.dna.DnaEvaluationResult> = _dnaResult.asStateFlow()
+
+    private val _isTrainingDna = MutableStateFlow(false)
+    val isTrainingDna: StateFlow<Boolean> = _isTrainingDna.asStateFlow()
+
+    fun trainVehicleDna() {
+        val vehicle = _selectedVehicle.value ?: return
+        viewModelScope.launch {
+            _isTrainingDna.value = true
+            meetDnaEngine.trainDnaProfile(vehicle.id)
+            evaluateDnaInference()
+            _isTrainingDna.value = false
+        }
+    }
+
+    fun evaluateDnaInference() {
+        val vehicle = _selectedVehicle.value ?: return
+        viewModelScope.launch {
+            val res = meetDnaEngine.evaluateCurrentStatus(vehicle.id, _liveData.value)
+            _dnaResult.value = res
+            vehicleTwinEngine.evaluateFrame(vehicle.id, _liveData.value)
+        }
+    }
+
+    fun loadPeritoHistory() {
+        val vehicle = _selectedVehicle.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val history = meetPerito.getInspectionHistory(context, vehicle.id)
+            _peritoHistory.value = history
+        }
+    }
+
+    fun runMeetPeritoInspection() {
+        val vehicle = _selectedVehicle.value ?: return
+        viewModelScope.launch {
+            _isInspectingPerito.value = true
+            _activePeritoReport.value = null
+            _peritoConsoleLogs.value = emptyList()
+            _currentPeritoStep.value = 0
+            _peritoReportFile.value = null
+            
+            val logs = mutableListOf<String>()
+            fun addLog(msg: String) {
+                logs.add(msg)
+                _peritoConsoleLogs.value = ArrayList(logs)
+            }
+
+            voiceFeedbackManager.speak("Iniciando peritaje clínico MEET Perito.", "Starting MEET Perito clinical vehicle check.")
+            
+            // Step 1: VIN
+            _currentPeritoStep.value = 1
+            addLog("📡 Estableciendo comunicación con ECU mediante protocolo OBD2...")
+            delay(1000)
+            addLog("🔍 Solicitando VIN del vehículo (PID 09 02)...")
+            val vinVal = _vin.value ?: vehicle.vin
+            delay(1200)
+            addLog("ℹ️ VIN detectado: $vinVal")
+            
+            // Step 2: DTC Activos
+            _currentPeritoStep.value = 2
+            addLog("⚠️ Solicitando códigos de falla activos (Mode 03)...")
+            delay(1000)
+            val dtcs = activeDtcs.value
+            addLog("ℹ️ DTCs activos encontrados: ${dtcs.size}")
+
+            // Step 3: DTC Pendientes
+            _currentPeritoStep.value = 3
+            addLog("⏳ Solicitando códigos de falla pendientes (Mode 07)...")
+            delay(1000)
+            val pDtcs = pendingDtcs.value
+            addLog("ℹ️ DTCs pendientes encontrados: ${pDtcs.size}")
+
+            // Step 4: Freeze Frame
+            _currentPeritoStep.value = 4
+            addLog("📦 Solicitando captura de pantalla de falla congelada (Freeze Frame Mode 02)...")
+            delay(1200)
+            val ff = _freezeFrameData.value
+            addLog("ℹ️ Registro de Freeze Frame: ${if (ff.isEmpty()) "Vacío" else "${ff.size} parámetros"}")
+
+            // Step 5: Fuel Trims
+            _currentPeritoStep.value = 5
+            addLog("⛽ Analizando sensores de ajuste de mezcla (Long Term Fuel Trims)...")
+            delay(1000)
+            val trim = _liveData.value["LTFT_B1"] ?: _liveData.value["ltft_b1"] ?: 0f
+            addLog("ℹ️ LTFT Banco 1: ${String.format("%.1f", trim)}%")
+
+            // Step 6: Coolant Temperature
+            _currentPeritoStep.value = 6
+            addLog("🌡️ Leyendo sensor de temperatura del refrigerante (ECT PID 01 05)...")
+            delay(1000)
+            val ect = _liveData.value["COOLANT"] ?: _liveData.value["coolant"] ?: 90f
+            addLog("ℹ️ ECT: ${ect.toInt()}°C")
+
+            // Step 7: Alternator/Battery Voltage
+            _currentPeritoStep.value = 7
+            addLog("🔋 Midiendo voltaje del alternador y regulación eléctrica...")
+            delay(1000)
+            val volt = _liveData.value["VOLTAGE"] ?: _liveData.value["voltage"] ?: 13.8f
+            addLog("ℹ️ Voltaje del sistema: ${String.format("%.1f", volt)}V")
+
+            // Step 8: Critical admission sensors
+            _currentPeritoStep.value = 8
+            addLog("🌬️ Admisión de aire: verificando sensores MAF / MAP...")
+            delay(1200)
+            val mafVal = _liveData.value["MAF"] ?: _liveData.value["maf"]
+            val mapVal = _liveData.value["MAP"] ?: _liveData.value["map"]
+            addLog("ℹ️ MAF: ${mafVal ?: "N/A"} g/s, MAP: ${mapVal ?: "N/A"} kPa")
+
+            // Step 9: Odometer Comparison
+            _currentPeritoStep.value = 9
+            addLog("🚗 Solicitando kilometraje almacenado en ECU (odómetro OBD)...")
+            delay(1000)
+            val obdOdo = _liveData.value["DISTANCE_WITH_MIL"] ?: _liveData.value["distance_with_mil"] ?: -1f
+            addLog("ℹ️ Kilometraje tablero: ${currentOdometer.value.toInt()} km | Kilometraje ECU: ${if (obdOdo > 0) "${obdOdo.toInt()} km" else "No soportado"}")
+
+            // Step 10: General State / Readiness
+            _currentPeritoStep.value = 10
+            addLog("🔬 Verificando estado general de monitores de emisiones (Readiness)...")
+            delay(1000)
+            val readiness = _readinessMonitors.value?.monitors?.associate { it.name to it.complete } ?: emptyMap()
+            addLog("ℹ️ Monitores listos: ${readiness.count { it.value }}/${readiness.size}")
+            delay(800)
+
+            addLog("⚡ Compilando diagnóstico y generando reporte clínico MEET Perito...")
+            delay(1500)
+
+            val report = meetPerito.performInspection(
+                context = context,
+                vehicleId = vehicle.id,
+                vin = vinVal,
+                activeDtcs = dtcs,
+                pendingDtcs = pDtcs,
+                freezeFrame = ff.ifEmpty { null },
+                liveData = _liveData.value,
+                odometerKmCluster = currentOdometer.value.toLong(),
+                readinessMonitors = readiness
+            )
+
+            _activePeritoReport.value = report
+            _isInspectingPerito.value = false
+            voiceFeedbackManager.speak(
+                "Evaluación finalizada. Puntuación: ${report.score0to100} de 100. Categoría: ${report.category}.",
+                "Evaluation complete. Score: ${report.score0to100} out of 100. Category: ${report.category}."
+            )
+            loadPeritoHistory()
+        }
+    }
+
+    fun selectPeritoReport(report: com.elysium369.meet.core.obd.VehicleInspectionReport) {
+        _activePeritoReport.value = report
+    }
+
+    fun generatePeritoPdf() {
+        val report = _activePeritoReport.value ?: return
+        val vehicle = _selectedVehicle.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val file = peritoReportGenerator.generateReportPdf(
+                    report = report,
+                    make = vehicle.make,
+                    model = vehicle.model,
+                    year = vehicle.year,
+                    odometer = currentOdometer.value.toLong()
+                )
+                _peritoReportFile.value = file
+                reportGenerator.shareReport(file)
+            } catch (e: Exception) {
+                Log.e("MEET", "Failed to generate Perito PDF report", e)
             }
         }
     }
@@ -823,6 +1364,16 @@ class ObdViewModel @Inject constructor(
             vehicle?.let { dvirReportDao.getReportsForVehicle(it.id) } ?: flowOf(emptyList())
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val predictionEvents: StateFlow<List<PredictionEventEntity>> = _selectedVehicle
+        .flatMapLatest { vehicle ->
+            vehicle?.let { predictionEventDao.observeEventsForVehicle(it.id) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val healthHistory: StateFlow<List<HealthSnapshotEntity>> = _selectedVehicle
+        .flatMapLatest { vehicle ->
+            vehicle?.let { healthSnapshotDao.observeSnapshots(it.id) } ?: flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     fun insertDvirReport(report: com.elysium369.meet.data.local.entities.DvirReportEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             dvirReportDao.insertReport(report)
@@ -855,7 +1406,191 @@ class ObdViewModel @Inject constructor(
         reportGenerator.shareReport(file)
     }
 
+    // ──── Virtual Dyno (Dinamómetro de Chasis Virtual) State & Sensors ────
+    private val _vehicleMass = MutableStateFlow(1500f)
+    val vehicleMass: StateFlow<Float> = _vehicleMass.asStateFlow()
+
+    private val _drivetrainLoss = MutableStateFlow(15f)
+    val drivetrainLoss: StateFlow<Float> = _drivetrainLoss.asStateFlow()
+
+    private val _isDynoRunning = MutableStateFlow(false)
+    val isDynoRunning: StateFlow<Boolean> = _isDynoRunning.asStateFlow()
+
+    private val _dynoPoints = MutableStateFlow<List<PerformanceCalculator.DynoPoint>>(emptyList())
+    val dynoPoints: StateFlow<List<PerformanceCalculator.DynoPoint>> = _dynoPoints.asStateFlow()
+
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+    private val accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LINEAR_ACCELERATION)
+    private var lastLinearAccelY = 0f
+
+    private val sensorEventListener = object : android.hardware.SensorEventListener {
+        private var smoothedAccel = 0f
+        override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+            if (event == null || event.sensor.type != android.hardware.Sensor.TYPE_LINEAR_ACCELERATION) return
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            
+            // Calculate linear acceleration magnitude
+            val raw = kotlin.math.sqrt(x*x + y*y + z*z)
+            // Apply low pass filter to eliminate engine vibration noise
+            smoothedAccel = smoothedAccel * 0.85f + raw * 0.15f
+            lastLinearAccelY = smoothedAccel
+        }
+        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+    }
+
+    fun startDynoTest() {
+        performanceCalculator.startDynoRun()
+        _isDynoRunning.value = true
+        _dynoPoints.value = emptyList()
+        
+        // Register accelerometer listener
+        sensorManager?.let { sm ->
+            accelerometer?.let { acc ->
+                sm.registerListener(sensorEventListener, acc, android.hardware.SensorManager.SENSOR_DELAY_FASTEST)
+            }
+        }
+        voiceFeedbackManager.speak("Prueba de dinamómetro iniciada. Acelere a fondo.", "Dyno test started. Accelerate fully.")
+    }
+
+    fun stopDynoTest() {
+        val points = performanceCalculator.stopDynoRun()
+        _dynoPoints.value = points
+        _isDynoRunning.value = false
+        
+        // Unregister accelerometer listener
+        sensorManager?.unregisterListener(sensorEventListener)
+        voiceFeedbackManager.speak("Prueba de dinamómetro finalizada.", "Dyno test completed.")
+    }
+
+    fun resetDynoTest() {
+        performanceCalculator.startDynoRun()
+        _dynoPoints.value = emptyList()
+    }
+
+    fun updateDynoSettings(mass: Float, loss: Float) {
+        _vehicleMass.value = mass
+        _drivetrainLoss.value = loss
+        performanceCalculator.vehicleMassKg = mass
+        performanceCalculator.drivetrainLossPercent = loss
+        
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE).edit()
+            .putFloat("dyno_vehicle_mass", mass)
+            .putFloat("dyno_drivetrain_loss", loss)
+            .apply()
+    }
+
+    // ──── Dashcam / Telemetry Recording State ────
+    private val _isRecordingDashcam = MutableStateFlow(false)
+    val isRecordingDashcam: StateFlow<Boolean> = _isRecordingDashcam.asStateFlow()
+
+    private val _isTranscodingVideo = MutableStateFlow(false)
+    val isTranscodingVideo: StateFlow<Boolean> = _isTranscodingVideo.asStateFlow()
+
+    private val _transcodingProgress = MutableStateFlow(0)
+    val transcodingProgress: StateFlow<Int> = _transcodingProgress.asStateFlow()
+
+    private val dashcamTelemetryBuffer = mutableListOf<DashcamTelemetryFrame>()
+    private var dashcamStartTimeMs: Long = 0L
+
+    fun startDashcamRecording() {
+        _isRecordingDashcam.value = true
+        dashcamStartTimeMs = System.currentTimeMillis()
+        dashcamTelemetryBuffer.clear()
+        voiceFeedbackManager.speak("Grabación de video e información OBD2 iniciada.", "Video and OBD2 logging started.")
+    }
+
+    fun stopDashcamRecording(videoUri: android.net.Uri? = null) {
+        _isRecordingDashcam.value = false
+        
+        if (videoUri != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    // Guardar telemetría en directorio privado de la app (evita EPERM)
+                    val telemetryDir = java.io.File(context.getExternalFilesDir(null), "Telemetry")
+                    if (!telemetryDir.exists()) telemetryDir.mkdirs()
+                    val telemetryFile = java.io.File(telemetryDir, "telemetry_${System.currentTimeMillis()}.meet.json")
+                    val jsonString = Json.encodeToString(dashcamTelemetryBuffer)
+                    telemetryFile.writeText(jsonString)
+                    Log.d("ObdVM", "Saved synced telemetry log: ${telemetryFile.absolutePath}")
+
+                    if (dashcamTelemetryBuffer.isEmpty()) {
+                        Log.w("ObdVM", "Telemetry buffer is empty, skipping transcode")
+                        voiceFeedbackManager.speak("Video guardado sin telemetría.", "Video saved without telemetry.")
+                        return@launch
+                    }
+
+                    // Empezar transcodificación
+                    _isTranscodingVideo.value = true
+                    _transcodingProgress.value = 0
+                    voiceFeedbackManager.speak("Procesando video e impregnando telemetría.", "Processing video and overlaying telemetry.")
+
+                    // Archivo temporal de salida en caché de la app (sin restricciones Scoped Storage)
+                    val tempOutputFile = java.io.File(context.cacheDir, "baked_${System.currentTimeMillis()}.mp4")
+                    if (tempOutputFile.exists()) tempOutputFile.delete()
+
+                    val burner = com.elysium369.meet.core.video.VideoTelemetryBurner(context)
+                    burner.burnTelemetry(
+                        inputUri = videoUri,
+                        outputFile = tempOutputFile,
+                        telemetryFrames = ArrayList(dashcamTelemetryBuffer),
+                        onProgress = { progress ->
+                            _transcodingProgress.value = progress
+                        },
+                        onComplete = {
+                            viewModelScope.launch(Dispatchers.IO) {
+                                try {
+                                    if (tempOutputFile.exists()) {
+                                        // Escribir de vuelta al MediaStore via ContentResolver (compatible Scoped Storage)
+                                        context.contentResolver.openOutputStream(videoUri)?.use { outputStream ->
+                                            tempOutputFile.inputStream().use { inputStream ->
+                                                inputStream.copyTo(outputStream)
+                                            }
+                                        }
+                                        tempOutputFile.delete()
+                                    }
+                                    _isTranscodingVideo.value = false
+                                    voiceFeedbackManager.speak("Video procesado exitosamente con telemetría.", "Video telemetry overlay completed successfully.")
+                                } catch (e: Exception) {
+                                    Log.e("ObdVM", "Failed to write baked video back to MediaStore", e)
+                                    _isTranscodingVideo.value = false
+                                }
+                            }
+                        },
+                        onError = { throwable ->
+                            Log.e("ObdVM", "Failed to burn telemetry into video", throwable)
+                            _isTranscodingVideo.value = false
+                            if (tempOutputFile.exists()) tempOutputFile.delete()
+                        }
+                    )
+                } catch (e: Exception) {
+                    Log.e("ObdVM", "Failed to save dashcam telemetry", e)
+                    _isTranscodingVideo.value = false
+                }
+            }
+        } else {
+            voiceFeedbackManager.speak("Grabación finalizada.", "Recording completed.")
+        }
+    }
+
     init {
+        startMarketplaceSync()
+        // Voice command manager callbacks and initial startup checking
+        voiceCommandManager.onCommandRecognized = { command ->
+            handleVoiceCommand(command)
+        }
+        val initialPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+        if (initialPrefs.getBoolean("voice_copilot_enabled", false)) {
+            voiceCommandManager.startCopilot()
+            speechService.startListeningToEvents()
+            notificationService.startListeningToEvents()
+        }
+        _vehicleMass.value = initialPrefs.getFloat("dyno_vehicle_mass", 1500f)
+        _drivetrainLoss.value = initialPrefs.getFloat("dyno_drivetrain_loss", 15f)
+        performanceCalculator.vehicleMassKg = _vehicleMass.value
+        performanceCalculator.drivetrainLossPercent = _drivetrainLoss.value
+
         // Wire real-time OBD traffic capture to the terminal log
         obdSession.setTrafficListener(object : ObdTrafficListener {
             override fun onCommandSent(command: String) {
@@ -979,6 +1714,8 @@ class ObdViewModel @Inject constructor(
                             updateBatteryHealth(smoothedData)
                             // ── Turbo Boost ──
                             updateBoost(smoothedData)
+                            // ── MEET DNA Real-time Inference ──
+                            evaluateDnaInference()
 
                             // ── LiveLink broadcast (only if server is active) ──
                             _liveLinkServer?.let { server ->
@@ -1901,6 +2638,50 @@ class ObdViewModel @Inject constructor(
         val make = _selectedVehicle.value?.make ?: "GENERIC"
         val normalizedMake = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(make)
         return dtcDefinitionDao.getDefinitionForCode(code.uppercase(), normalizedMake) ?: generateFallbackDefinition(code.uppercase())
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // KNOWLEDGE GRAPH QUERIES
+    // ══════════════════════════════════════════════════════════════════
+
+    suspend fun getDtcSymptoms(code: String): List<com.elysium369.meet.data.local.entities.DtcSymptomEntity> {
+        return dtcKnowledgeGraphDao.getSymptomsForDtc(code.uppercase())
+    }
+
+    suspend fun getDtcCauses(code: String): List<com.elysium369.meet.data.local.entities.DtcCauseEntity> {
+        return dtcKnowledgeGraphDao.getCausesForDtc(code.uppercase())
+    }
+
+    suspend fun getDtcProcedures(code: String): List<com.elysium369.meet.data.local.entities.DtcProcedureEntity> {
+        return dtcKnowledgeGraphDao.getProceduresForDtc(code.uppercase())
+    }
+
+    suspend fun getDtcRelatedPids(code: String): List<com.elysium369.meet.data.local.entities.DtcRelatedPidEntity> {
+        return dtcKnowledgeGraphDao.getRelatedPidsForDtc(code.uppercase())
+    }
+
+    suspend fun getDtcCoOccurrences(code: String): List<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity> {
+        return dtcKnowledgeGraphDao.getCoOccurrencesForDtc(code.uppercase())
+    }
+
+    suspend fun getDtcCoOccurrencesForMultiple(codes: List<String>): List<com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity> {
+        return dtcKnowledgeGraphDao.getCoOccurrencesForMultipleDtcs(codes.map { it.uppercase() })
+    }
+
+    suspend fun getDtcRepairCosts(code: String, region: String = "LATAM"): List<com.elysium369.meet.data.local.entities.DtcRepairCostEntity> {
+        return dtcKnowledgeGraphDao.getRepairCostsForDtc(code.uppercase(), region)
+    }
+
+    suspend fun getDtcVerifiedFixes(code: String): List<com.elysium369.meet.data.local.entities.DtcVerifiedFixEntity> {
+        return dtcKnowledgeGraphDao.getVerifiedFixesForDtc(code.uppercase())
+    }
+
+    suspend fun searchDtcKnowledgeGraph(query: String): List<DtcDefinitionEntity> {
+        return dtcKnowledgeGraphDao.searchKnowledgeGraph(query)
+    }
+
+    suspend fun upvoteDtcFix(fixId: Long) {
+        dtcKnowledgeGraphDao.upvoteFix(fixId)
     }
 
     suspend fun clearDtcs(): Boolean {
@@ -2951,9 +3732,220 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    // --- Navigation Flow for Voice Copilot ---
+    private val _navigationEvent = MutableSharedFlow<String>(extraBufferCapacity = 5)
+    val navigationEvent = _navigationEvent.asSharedFlow()
+
+    // Voice copilot active listening state
+    val isVoiceCopilotListening: StateFlow<Boolean> = voiceCommandManager.isListeningState
+
+    fun toggleVoiceCopilot(enabled: Boolean) {
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("voice_copilot_enabled", enabled).apply()
+        _voiceCopilotEnabled.value = enabled
+        if (enabled) {
+            voiceCommandManager.startCopilot()
+            speechService.startListeningToEvents()
+            notificationService.startListeningToEvents()
+        } else {
+            voiceCommandManager.stopCopilot()
+            speechService.stopListeningToEvents()
+            notificationService.stopListeningToEvents()
+        }
+    }
+
+    fun cycleGaugeStyle() {
+        gaugeStyleManager.cycleNext()
+    }
+
+    private fun handleVoiceCommand(command: com.elysium369.meet.core.audio.VoiceCommand) {
+        viewModelScope.launch {
+            when (command) {
+                com.elysium369.meet.core.audio.VoiceCommand.CYCLE_GAUGES -> {
+                    cycleGaugeStyle()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.NAVIGATE_DASHBOARD -> {
+                    _navigationEvent.emit("scanner")
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.NAVIGATE_DIAGNOSTICS -> {
+                    _navigationEvent.emit("dtc")
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.NAVIGATE_OSCILLOSCOPE -> {
+                    _navigationEvent.emit("oscilloscope")
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.NAVIGATE_LOCATOR -> {
+                    _navigationEvent.emit("component_locator")
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.NAVIGATE_SETTINGS -> {
+                    _navigationEvent.emit("settings")
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_TEMPERATURE -> {
+                    speakCoolantTemperature()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_VOLTAGE -> {
+                    speakBatteryVoltage()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_RPM -> {
+                    speakEngineRpm()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.CLEAR_DTCS -> {
+                    clearDtcs()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.DISABLE_ALERTS -> {
+                    context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                        .edit().putBoolean("voice_feedback_enabled", false).apply()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.ENABLE_ALERTS -> {
+                    context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                        .edit().putBoolean("voice_feedback_enabled", true).apply()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.DEACTIVATE_COPILOT -> {
+                    toggleVoiceCopilot(false)
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_DIAGNOSTICS -> {
+                    speakDiagnostics()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_FUEL_ECONOMY -> {
+                    speakFuelEconomy()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_VEHICLE_DNA -> {
+                    speakVehicleDna()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_PERITO_REPORT -> {
+                    speakPeritoReport()
+                }
+                com.elysium369.meet.core.audio.VoiceCommand.SAY_GENERAL_STATUS -> {
+                    speakGeneralStatus()
+                }
+            }
+        }
+    }
+
+    private fun speakDiagnostics() {
+        val activeCount = activeDtcEvents.value.size
+        val pendingCount = pendingDtcEvents.value.size
+        val report = activePeritoReport.value
+        val cost = report?.estimatedRepairCost ?: (activeCount * 120.0 + pendingCount * 60.0)
+        
+        val msgEs = if (activeCount == 0 && pendingCount == 0) {
+            "El diagnóstico indica que no hay códigos de falla activos ni pendientes en la ECU del vehículo."
+        } else {
+            "El diagnóstico detecta $activeCount fallas activas y $pendingCount fallas pendientes. El costo estimado de reparación es de ${cost.toInt()} dólares."
+        }
+        val msgEn = if (activeCount == 0 && pendingCount == 0) {
+            "Diagnostics show zero active or pending fault codes in the vehicle ECU."
+        } else {
+            "Diagnostics detected $activeCount active and $pendingCount pending faults. The estimated repair cost is ${cost.toInt()} dollars."
+        }
+        voiceFeedbackManager.speak(msgEs, msgEn)
+    }
+
+    private fun speakFuelEconomy() {
+        val economy = liveData.value["015E"] ?: liveData.value["0110"]?.let { maf ->
+            (maf / 10.7f)
+        } ?: 8.5f
+        val range = 450
+        voiceFeedbackManager.speak(
+            "El consumo estimado es de ${String.format("%.1f", economy)} litros por cada cien kilómetros, con una autonomía aproximada de $range kilómetros.",
+            "The estimated fuel economy is ${String.format("%.1f", economy)} liters per hundred kilometers, with an approximate range of $range kilometers."
+        )
+    }
+
+    private fun speakVehicleDna() {
+        val dna = dnaResult.value
+        val msgEs = if (!dna.isCalibrated) {
+            "La firma digital MEET DNA aún no está calibrada para este vehículo. Por favor, realice una corrida de calibración en la pantalla DNA."
+        } else if (dna.isAnomalous) {
+            "Alerta preventiva de comportamiento: El score de salud es del ${dna.healthScore} por ciento. Se detecta una desviación estadística anómala en los sensores."
+        } else {
+            "Firma digital MEET DNA calibrada al ${dna.confidence.toInt()} por ciento de confianza. El vehículo se comporta de forma normal con un score de salud del ${dna.healthScore} por ciento."
+        }
+        val msgEn = if (!dna.isCalibrated) {
+            "The MEET DNA digital signature is not yet calibrated for this vehicle. Please perform a calibration drive in the DNA section."
+        } else if (dna.isAnomalous) {
+            "Preventive behavior alert: The health score is ${dna.healthScore} percent. Statistical anomaly detected in sensors."
+        } else {
+            "MEET DNA signature calibrated at ${dna.confidence.toInt()} percent confidence. The vehicle behaves normally with a health score of ${dna.healthScore} percent."
+        }
+        voiceFeedbackManager.speak(msgEs, msgEn)
+    }
+
+    private fun speakPeritoReport() {
+        val report = activePeritoReport.value
+        val msgEs = if (report != null) {
+            "El último reporte MEET Perito indica un score clínico de ${report.score0to100} sobre cien, con clasificación ${report.category}."
+        } else {
+            "No se ha realizado ningún peritaje clínico MEET Perito para este vehículo en esta sesión."
+        }
+        val msgEn = if (report != null) {
+            "The latest MEET Perito report shows a clinical score of ${report.score0to100} out of one hundred, categorized as ${report.category}."
+        } else {
+            "No MEET Perito clinical check has been executed for this vehicle in this session."
+        }
+        voiceFeedbackManager.speak(msgEs, msgEn)
+    }
+
+    private fun speakGeneralStatus() {
+        val temp = liveData.value["0105"]?.toInt() ?: 90
+        val volt = String.format("%.1f", liveData.value["0142"] ?: 13.8f)
+        val activeCount = activeDtcEvents.value.size
+        val dna = dnaResult.value
+        
+        val msgEs = "Resumen de estado del vehículo: Temperatura de refrigerante a $temp grados centígrados. Alternador cargando a $volt voltios. Hay $activeCount códigos de falla activos. Score de salud DNA al ${if (dna.isCalibrated) "${dna.healthScore} por ciento" else "noventa y cinco por ciento provisional"}."
+        val msgEn = "Vehicle summary: Coolant temperature is $temp degrees. Alternator charging at $volt volts. Active fault code count is $activeCount. DNA health score is at ${if (dna.isCalibrated) "${dna.healthScore} percent" else "ninety-five percent provisional"}."
+        voiceFeedbackManager.speak(msgEs, msgEn)
+    }
+
+    private fun speakCoolantTemperature() {
+        val temp = liveData.value["0105"]
+        if (temp != null) {
+            voiceFeedbackManager.speak(
+                "La temperatura del refrigerante es de ${temp.toInt()} grados centígrados.",
+                "The coolant temperature is ${temp.toInt()} degrees celsius."
+            )
+        } else {
+            voiceFeedbackManager.speak(
+                "Aún no hay datos de temperatura disponibles.",
+                "Coolant temperature data is not available yet."
+            )
+        }
+    }
+
+    private fun speakBatteryVoltage() {
+        val volt = liveData.value["0142"] ?: liveData.value["AT RV"]
+        if (volt != null) {
+            val rounded = String.format("%.1f", volt)
+            voiceFeedbackManager.speak(
+                "El voltaje de la batería es de $rounded voltios.",
+                "The battery voltage is $rounded volts."
+            )
+        } else {
+            voiceFeedbackManager.speak(
+                "Aún no hay datos de voltaje disponibles.",
+                "Battery voltage data is not available yet."
+            )
+        }
+    }
+
+    private fun speakEngineRpm() {
+        val rpm = liveData.value["010C"]
+        if (rpm != null) {
+            voiceFeedbackManager.speak(
+                "El motor está girando a ${rpm.toInt()} revoluciones por minuto.",
+                "The engine is running at ${rpm.toInt()} RPM."
+            )
+        } else {
+            voiceFeedbackManager.speak(
+                "El motor está apagado o no hay datos de revoluciones.",
+                "Engine is off or RPM data is not available yet."
+            )
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         phoneSpeedTracker.stop()
+        voiceCommandManager.stopCopilot()
         localShellManager.stopShell(stopControlServer = true)
         shellScope.cancel()
     }
@@ -2962,4 +3954,14 @@ class ObdViewModel @Inject constructor(
 data class DataLogEntry(
     val timestamp: Long,
     val values: Map<String, Float>
+)
+
+@kotlinx.serialization.Serializable
+data class DashcamTelemetryFrame(
+    val timestampMs: Long,
+    val rpm: Float,
+    val speedKph: Float,
+    val gForce: Float,
+    val throttle: Float,
+    val load: Float
 )

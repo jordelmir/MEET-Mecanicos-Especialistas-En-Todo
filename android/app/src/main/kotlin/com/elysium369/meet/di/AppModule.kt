@@ -547,6 +547,383 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 17→18: Creating vehicle_dna_profiles table")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `vehicle_dna_profiles` (
+                    `vehicleId` TEXT NOT NULL,
+                    `baselineJson` TEXT NOT NULL,
+                    `varianceJson` TEXT NOT NULL,
+                    `forestJson` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `lastTrainingDate` INTEGER NOT NULL,
+                    PRIMARY KEY(`vehicleId`)
+                )
+            """)
+        }
+    }
+
+    private val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 18→19: Creating repair_cases table")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_cases` (
+                    `id` TEXT NOT NULL,
+                    `vehicleMake` TEXT NOT NULL,
+                    `vehicleModel` TEXT NOT NULL,
+                    `year` INTEGER NOT NULL,
+                    `engine` TEXT NOT NULL,
+                    `country` TEXT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `symptoms` TEXT NOT NULL,
+                    `solution` TEXT NOT NULL,
+                    `cost` REAL NOT NULL,
+                    `timeSpent` INTEGER NOT NULL,
+                    `partsUsed` TEXT NOT NULL,
+                    `verified` INTEGER NOT NULL DEFAULT 0,
+                    `votes` INTEGER NOT NULL DEFAULT 0,
+                    `successRate` REAL NOT NULL DEFAULT 100.0,
+                    `isBookmarked` INTEGER NOT NULL DEFAULT 0,
+                    `isMyContribution` INTEGER NOT NULL DEFAULT 0,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """)
+        }
+    }
+
+    private val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `prediction_events` (
+                    `eventId` TEXT NOT NULL PRIMARY KEY,
+                    `vehicleId` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `message` TEXT NOT NULL,
+                    `estimatedDays` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_prediction_events_vehicleId_createdAt` ON `prediction_events` (`vehicleId`, `createdAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_prediction_events_createdAt` ON `prediction_events` (`createdAt`)")
+        }
+    }
+
+    private val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 20→21: Creating new feature tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `live_sessions` (
+                    `sessionId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `ownerId` TEXT NOT NULL,
+                    `mechanicId` TEXT,
+                    `status` TEXT NOT NULL,
+                    `startedAt` INTEGER NOT NULL,
+                    `endedAt` INTEGER,
+                    `permissions` TEXT NOT NULL,
+                    `sessionCode` TEXT NOT NULL,
+                    `shareUrl` TEXT NOT NULL,
+                    `durationMinutes` INTEGER NOT NULL,
+                    `videoCallUrl` TEXT,
+                    PRIMARY KEY(`sessionId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `live_snapshots` (
+                    `snapshotId` TEXT NOT NULL,
+                    `sessionId` TEXT NOT NULL,
+                    `timestamp` INTEGER NOT NULL,
+                    `pidValues` TEXT NOT NULL,
+                    `notes` TEXT NOT NULL,
+                    PRIMARY KEY(`snapshotId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `mechanic_notes` (
+                    `noteId` TEXT NOT NULL,
+                    `sessionId` TEXT NOT NULL,
+                    `authorId` TEXT NOT NULL,
+                    `content` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`noteId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_photos` (
+                    `photoId` TEXT NOT NULL,
+                    `caseId` TEXT NOT NULL,
+                    `photoPath` TEXT NOT NULL,
+                    `caption` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`photoId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_parts` (
+                    `partId` TEXT NOT NULL,
+                    `caseId` TEXT NOT NULL,
+                    `partNumber` TEXT NOT NULL,
+                    `partName` TEXT NOT NULL,
+                    `price` REAL NOT NULL,
+                    `brand` TEXT NOT NULL,
+                    PRIMARY KEY(`partId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_votes` (
+                    `id` TEXT NOT NULL,
+                    `caseId` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `voteType` TEXT NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_comments` (
+                    `commentId` TEXT NOT NULL,
+                    `caseId` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `userName` TEXT NOT NULL,
+                    `userReputation` TEXT NOT NULL,
+                    `content` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`commentId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_verifications` (
+                    `verificationId` TEXT NOT NULL,
+                    `caseId` TEXT NOT NULL,
+                    `verifierId` TEXT NOT NULL,
+                    `verifierName` TEXT NOT NULL,
+                    `verifierCredential` TEXT NOT NULL,
+                    `verifiedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`verificationId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `service_requests` (
+                    `requestId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `problem` TEXT NOT NULL,
+                    `priority` TEXT NOT NULL,
+                    `description` TEXT NOT NULL,
+                    `location` TEXT NOT NULL,
+                    `radiusKm` REAL NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `autoDtcCode` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`requestId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `service_bids` (
+                    `bidId` TEXT NOT NULL,
+                    `requestId` TEXT NOT NULL,
+                    `shopId` TEXT NOT NULL,
+                    `shopName` TEXT NOT NULL,
+                    `shopRating` REAL NOT NULL,
+                    `price` REAL NOT NULL,
+                    `estimatedHours` REAL NOT NULL,
+                    `warrantyDays` INTEGER NOT NULL,
+                    `message` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`bidId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `evidence_packages` (
+                    `packageId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `eventType` TEXT NOT NULL,
+                    `timestamp` INTEGER NOT NULL,
+                    `gpsLocation` TEXT NOT NULL,
+                    `videoPath` TEXT NOT NULL,
+                    `audioPath` TEXT NOT NULL,
+                    `pidSnapshot` TEXT NOT NULL,
+                    `dtcs` TEXT NOT NULL,
+                    `hashSha256` TEXT NOT NULL,
+                    `signatureVersion` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`packageId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `vehicle_twin_profiles` (
+                    `profileId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `baselineJson` TEXT NOT NULL,
+                    `varianceJson` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `lastTrainingDate` INTEGER NOT NULL,
+                    `anomalyCount` INTEGER NOT NULL,
+                    `healthScore` INTEGER NOT NULL,
+                    PRIMARY KEY(`profileId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `twin_anomalies` (
+                    `anomalyId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `parameter` TEXT NOT NULL,
+                    `expectedValue` REAL NOT NULL,
+                    `actualValue` REAL NOT NULL,
+                    `deviation` REAL NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `confidence` REAL NOT NULL,
+                    `timestamp` INTEGER NOT NULL,
+                    PRIMARY KEY(`anomalyId`)
+                )
+            """)
+            
+            // Speed up local mechanical SO database searches
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_cases_vehicleMake_vehicleModel` ON `repair_cases` (`vehicleMake`, `vehicleModel`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_cases_dtcCode` ON `repair_cases` (`dtcCode`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_cases_createdAt` ON `repair_cases` (`createdAt`)")
+        }
+    }
+
+    private val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 21→22: Creating DTC Knowledge Graph tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_symptoms` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `symptomEs` TEXT NOT NULL,
+                    `symptomEn` TEXT,
+                    `probability` TEXT NOT NULL,
+                    `isDriverNoticeable` INTEGER NOT NULL DEFAULT 1
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_symptoms_dtcCode` ON `dtc_symptoms` (`dtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_causes` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `causeEs` TEXT NOT NULL,
+                    `causeEn` TEXT,
+                    `probability` TEXT NOT NULL,
+                    `componentAffected` TEXT,
+                    `isElectronic` INTEGER NOT NULL DEFAULT 0,
+                    `isMechanical` INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_causes_dtcCode` ON `dtc_causes` (`dtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_procedures` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `stepNumber` INTEGER NOT NULL,
+                    `titleEs` TEXT NOT NULL,
+                    `descriptionEs` TEXT NOT NULL,
+                    `toolRequired` TEXT,
+                    `expectedValue` TEXT,
+                    `estimatedMinutes` INTEGER NOT NULL DEFAULT 15,
+                    `difficulty` TEXT NOT NULL DEFAULT 'medio',
+                    `icon` TEXT NOT NULL DEFAULT '🔧'
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_procedures_dtcCode` ON `dtc_procedures` (`dtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_related_pids` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `pidCommand` TEXT NOT NULL,
+                    `pidNameEs` TEXT NOT NULL,
+                    `pidNameEn` TEXT,
+                    `normalRange` TEXT,
+                    `unit` TEXT,
+                    `priority` INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_related_pids_dtcCode` ON `dtc_related_pids` (`dtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_co_occurrences` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `relatedDtcCode` TEXT NOT NULL,
+                    `correlationStrength` REAL NOT NULL DEFAULT 0.5,
+                    `combinedDiagnosisEs` TEXT,
+                    `combinedDiagnosisEn` TEXT
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_co_occurrences_dtcCode` ON `dtc_co_occurrences` (`dtcCode`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_co_occurrences_relatedDtcCode` ON `dtc_co_occurrences` (`relatedDtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_vehicle_compat` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL,
+                    `make` TEXT NOT NULL,
+                    `model` TEXT,
+                    `yearFrom` INTEGER,
+                    `yearTo` INTEGER,
+                    `engineType` TEXT,
+                    `specialNotesEs` TEXT
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_vehicle_compat_dtcCode` ON `dtc_vehicle_compat` (`dtcCode`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_vehicle_compat_manufacturer` ON `dtc_vehicle_compat` (`manufacturer`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_verified_fixes` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `fixDescriptionEs` TEXT NOT NULL,
+                    `fixDescriptionEn` TEXT,
+                    `successRate` REAL NOT NULL DEFAULT 0.0,
+                    `voteCount` INTEGER NOT NULL DEFAULT 0,
+                    `partRequired` TEXT,
+                    `estimatedCostUsd` REAL,
+                    `difficultyLevel` TEXT NOT NULL DEFAULT 'medio',
+                    `source` TEXT,
+                    `addedAt` INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_verified_fixes_dtcCode` ON `dtc_verified_fixes` (`dtcCode`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `dtc_repair_costs` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dtcCode` TEXT NOT NULL,
+                    `manufacturer` TEXT NOT NULL DEFAULT 'GENERIC',
+                    `region` TEXT NOT NULL DEFAULT 'LATAM',
+                    `minCostUsd` REAL NOT NULL,
+                    `maxCostUsd` REAL NOT NULL,
+                    `laborHours` REAL,
+                    `partsDescription` TEXT,
+                    `currency` TEXT NOT NULL DEFAULT 'USD',
+                    `source` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_dtc_repair_costs_dtcCode` ON `dtc_repair_costs` (`dtcCode`)")
+        }
+    }
+
+    private val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 22→23: Creating FTS Search Index table")
+            db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `dtc_search_index` USING fts4(`code`, `descriptionEs`, `symptoms`, `causes`)")
+        }
+    }
+
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -555,21 +932,14 @@ object AppModule {
             MeetDatabase::class.java,
             "meet_database"
         )
-        // ⛔ REMOVED: createFromAsset("databases/meet_dtc.db")
-        // ROOT CAUSE of vehicle data loss — this combined with fallbackToDestructiveMigration
-        // caused Room to wipe ALL tables (including vehicles) on any schema version mismatch,
-        // then recreate from the asset file which contains zero vehicle records.
-        // DTC definitions are now loaded programmatically via DtcDatabaseLoader on first launch.
- 
-        // ⛔ REMOVED: fallbackToDestructiveMigration()
-        // This silently destroyed user data. We now use explicit migrations.
-
+        .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
         .addMigrations(
             MIGRATION_1_6, MIGRATION_2_6, MIGRATION_3_6, MIGRATION_4_6, MIGRATION_5_6,
             MIGRATION_6_9, MIGRATION_7_9, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_6_10,
             MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
-            MIGRATION_16_17
+            MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
+            MIGRATION_21_22, MIGRATION_22_23
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -578,7 +948,17 @@ object AppModule {
             }
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
-                android.util.Log.d("MeetDB", "Database opened successfully — user data intact")
+                try {
+                    db.execSQL("PRAGMA synchronous = NORMAL;")
+                } catch (e: Exception) {
+                    android.util.Log.w("MeetDB", "Could not set synchronous: ${e.message}")
+                }
+                try {
+                    db.execSQL("PRAGMA temp_store = MEMORY;")
+                } catch (e: Exception) {
+                    android.util.Log.w("MeetDB", "Could not set temp_store: ${e.message}")
+                }
+                android.util.Log.i("MeetDB", "Performance PRAGMAs configured (synchronous=NORMAL, temp_store=MEMORY)")
             }
         })
         .build()
@@ -636,8 +1016,9 @@ object AppModule {
     @Singleton
     fun providePredictiveHealthEngine(
         sensorHistoryDao: SensorHistoryDao,
-        healthSnapshotDao: HealthSnapshotDao
-    ): PredictiveHealthEngine = PredictiveHealthEngine(sensorHistoryDao, healthSnapshotDao)
+        healthSnapshotDao: HealthSnapshotDao,
+        predictionEventDao: PredictionEventDao
+    ): PredictiveHealthEngine = PredictiveHealthEngine(sensorHistoryDao, healthSnapshotDao, predictionEventDao)
 
     @Provides
     @Singleton
@@ -661,8 +1042,37 @@ object AppModule {
     fun provideDvirReportDao(db: MeetDatabase): DvirReportDao = db.dvirReportDao()
 
     @Provides
+    fun provideVehicleDnaDao(db: MeetDatabase): VehicleDnaDao = db.vehicleDnaDao()
+
+    @Provides
+    fun provideRepairCaseDao(db: MeetDatabase): RepairCaseDao = db.repairCaseDao()
+
+    @Provides
+    fun providePredictionEventDao(db: MeetDatabase): PredictionEventDao = db.predictionEventDao()
+
+    @Provides
     @Singleton
     fun provideGaugeStyleManager(@ApplicationContext context: Context): com.elysium369.meet.ui.components.gauges.GaugeStyleManager {
         return com.elysium369.meet.ui.components.gauges.GaugeStyleManager(context)
     }
+
+    // NEW FEATURE DAO PROVIDERS
+    @Provides
+    fun provideLiveSessionDao(db: MeetDatabase): LiveSessionDao = db.liveSessionDao()
+
+    @Provides
+    fun provideRepairNetworkAddonsDao(db: MeetDatabase): RepairNetworkAddonsDao = db.repairNetworkAddonsDao()
+
+    @Provides
+    fun provideMarketplaceDao(db: MeetDatabase): MarketplaceDao = db.marketplaceDao()
+
+    @Provides
+    fun provideBlackBoxDao(db: MeetDatabase): BlackBoxDao = db.blackBoxDao()
+
+    @Provides
+    fun provideVehicleTwinDao(db: MeetDatabase): VehicleTwinDao = db.vehicleTwinDao()
+
+    // KNOWLEDGE GRAPH DAO
+    @Provides
+    fun provideDtcKnowledgeGraphDao(db: MeetDatabase): DtcKnowledgeGraphDao = db.dtcKnowledgeGraphDao()
 }

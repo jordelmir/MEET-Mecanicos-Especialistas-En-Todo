@@ -21,19 +21,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.DiagnosticSeverity
 import com.elysium369.meet.core.obd.Mode06TestResult
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlinx.coroutines.launch
 
 @Composable
-fun ScannerMonitorsTab(viewModel: ObdViewModel, isSpanish: Boolean) {
+fun ScannerMonitorsTab(
+    viewModel: ObdViewModel,
+    isSpanish: Boolean,
+    snackbarHostState: SnackbarHostState? = null,
+    navController: NavController? = null
+) {
     val mode06Results by viewModel.mode06Results.collectAsState()
     val isReading by viewModel.isReadingMode06.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val isConnected = connectionState == ObdState.CONNECTED
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -41,7 +49,24 @@ fun ScannerMonitorsTab(viewModel: ObdViewModel, isSpanish: Boolean) {
             .background(MeetColors.backgroundDark)
     ) {
         // Header with Premium Action
-        HeaderSection(isConnected, isReading, isSpanish) { viewModel.readMode06() }
+        HeaderSection(
+            isConnected = isConnected,
+            isReading = isReading,
+            isSpanish = isSpanish,
+            onRead = { viewModel.readMode06() },
+            onNotConnectedClick = {
+                scope.launch {
+                    val result = snackbarHostState?.showSnackbar(
+                        message = if (isSpanish) "OBD Desconectado. Conéctate a tu adaptador primero." else "OBD Disconnected. Connect your adapter first.",
+                        actionLabel = if (isSpanish) "CONECTAR" else "CONNECT",
+                        duration = SnackbarDuration.Short
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        navController?.navigate("connect")
+                    }
+                }
+            }
+        )
 
         // Health Summary Index
         if (mode06Results.isNotEmpty()) {
@@ -68,7 +93,13 @@ fun ScannerMonitorsTab(viewModel: ObdViewModel, isSpanish: Boolean) {
 }
 
 @Composable
-private fun HeaderSection(isConnected: Boolean, isReading: Boolean, isSpanish: Boolean, onRead: () -> Unit) {
+private fun HeaderSection(
+    isConnected: Boolean, 
+    isReading: Boolean, 
+    isSpanish: Boolean, 
+    onRead: () -> Unit,
+    onNotConnectedClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -94,7 +125,9 @@ private fun HeaderSection(isConnected: Boolean, isReading: Boolean, isSpanish: B
         Spacer(modifier = Modifier.width(8.dp))
 
         EliteCard(
-            onClick = if (isConnected && !isReading) onRead else null,
+            onClick = if (isReading) null else {
+                if (isConnected) onRead else onNotConnectedClick
+            },
             backgroundColor = if (isConnected) MeetColors.neonGreen.copy(alpha = 0.1f) else MeetColors.borderBlue.copy(alpha = 0.15f),
             borderColor = if (isConnected) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.textSecondary.copy(alpha = 0.3f),
             shape = RoundedCornerShape(12.dp),

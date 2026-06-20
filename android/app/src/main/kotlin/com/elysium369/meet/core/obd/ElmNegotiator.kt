@@ -138,7 +138,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         }
 
         // Step 5c: Manual Sweep if Auto fails
-        val manualList = listOf("6", "7", "8", "9", "3", "5", "4", "1", "2", "A") // CAN 11/29, ISO, KWP, J1850, J1939
+        val manualList = listOf("6", "7", "8", "9", "D", "E", "3", "5", "4", "1", "2", "A") // CAN 11/29, CAN FD, ISO, KWP, J1850, J1939
         for (pCode in manualList) {
             if (pCode == hint.atspCode) continue // Already tried
             

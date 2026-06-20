@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Ferrari Rosso Style: Bold Italian red with yellow shift indicators.
@@ -30,6 +31,7 @@ fun GaugeFerrariWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.6f, stiffness = 200f), label = "ferrari")
     val inf = rememberInfiniteTransition(label = "fp")
@@ -37,8 +39,8 @@ fun GaugeFerrariWidget(
         infiniteRepeatable(tween(250, easing = LinearEasing), RepeatMode.Reverse), label = "ff")
     val tm = rememberTextMeasurer()
 
-    val rossoCorsa = Color(0xFFDC0000)
-    val gialloModena = Color(0xFFFFD700)
+    val rossoCorsa = colorScheme.needleColor
+    val gialloModena = colorScheme.specialColor
     val carbonBlack = Color(0xFF0A0A0A)
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
@@ -49,7 +51,14 @@ fun GaugeFerrariWidget(
         val segGap = 3f
         val segSweep = (sweep - (totalSegs - 1) * segGap) / totalSegs
 
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = Color(0xFF888888), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace))
+
+        // Speedometer dual scale calculation
+        val isSpeedGauge = unit.equals("km/h", ignoreCase = true) || unit.equals("mph", ignoreCase = true)
+        val isKmH = unit.equals("km/h", ignoreCase = true)
+        val secondaryUnit = if (isKmH) "mph" else "km/h"
+        val speedConversion = if (isKmH) 0.621371f else (1f / 0.621371f)
+        val secondaryMax = maxVal * speedConversion
 
         // Number labels for major ticks (every 5 segments)
         val numLabels = List(6) { i ->
@@ -84,7 +93,7 @@ fun GaugeFerrariWidget(
                     isAnomaly -> rossoCorsa
                     frac >= 0.85f -> if (isRedline) rossoCorsa.copy(alpha = shiftFlash) else rossoCorsa
                     frac >= 0.7f -> gialloModena
-                    else -> Color.White
+                    else -> colorScheme.internalColor
                 }
 
                 // Segment
@@ -101,6 +110,54 @@ fun GaugeFerrariWidget(
             // Number labels
             numLabels.forEach { (measured, pos) ->
                 drawText(measured, topLeft = Offset(pos.x - measured.size.width / 2f, pos.y - measured.size.height / 2f))
+            }
+
+            // Speedometer dual scale (inner concentric)
+            if (isSpeedGauge) {
+                val innerR = r - 16.dp.toPx()
+                // Inner concentric line
+                drawArc(
+                    color = Color.White.copy(alpha = 0.1f),
+                    startAngle = start,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    style = Stroke(width = 1.dp.toPx()),
+                    topLeft = Offset(cx - innerR, cy - innerR),
+                    size = Size(innerR * 2f, innerR * 2f)
+                )
+
+                val secondaryStep = if (secondaryMax > 200f) 40f else if (secondaryMax > 120f) 20f else 10f
+                var vSec = 0f
+                while (vSec <= secondaryMax) {
+                    val angleFraction = vSec / secondaryMax
+                    val angle = start + angleFraction * sweep
+                    val angleRad = Math.toRadians(angle.toDouble())
+
+                    val startPt = Offset(
+                        (cx + innerR * cos(angleRad)).toFloat(),
+                        (cy + innerR * sin(angleRad)).toFloat()
+                    )
+                    val endPt = Offset(
+                        (cx + (innerR - 4.dp.toPx()) * cos(angleRad)).toFloat(),
+                        (cy + (innerR - 4.dp.toPx()) * sin(angleRad)).toFloat()
+                    )
+
+                    drawLine(gialloModena.copy(alpha = 0.3f), startPt, endPt, 1.dp.toPx())
+
+                    val labelR = innerR - 10.dp.toPx()
+                    val labelMeasured = tm.measure(
+                        text = String.format("%.0f", vSec),
+                        style = TextStyle(color = gialloModena.copy(alpha = 0.4f), fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    )
+                    drawText(
+                        labelMeasured,
+                        topLeft = Offset(
+                            (cx + labelR * cos(angleRad)).toFloat() - labelMeasured.size.width / 2f,
+                            (cy + labelR * sin(angleRad)).toFloat() - labelMeasured.size.height / 2f
+                        )
+                    )
+                    vSec += secondaryStep
+                }
             }
 
             // Shift lights at top (5 circles: 2 green, 1 yellow, 2 red)
@@ -125,14 +182,24 @@ fun GaugeFerrariWidget(
             drawCircle(rossoCorsa, 5.dp.toPx(), Offset(cx, cy))
             drawCircle(carbonBlack, 3.dp.toPx(), Offset(cx, cy))
 
-            // Value below center
+            // Digital value
             val vt = tm.measure(String.format("%.0f", animVal), TextStyle(
-                color = if (isRedline) rossoCorsa.copy(alpha = shiftFlash) else Color.White,
+                color = if (isRedline) rossoCorsa.copy(alpha = shiftFlash) else colorScheme.textColor,
                 fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy + 20.dp.toPx()))
-            val ut = tm.measure(unit.uppercase(), TextStyle(color = rossoCorsa, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
+            
+            val ut = tm.measure(unit.uppercase(), TextStyle(color = colorScheme.unitColor, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 20.dp.toPx() + vt.size.height))
-            drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 20.dp.toPx() + vt.size.height + ut.size.height + 2.dp.toPx()))
+            
+            var currentOffset = cy + 20.dp.toPx() + vt.size.height + ut.size.height
+            if (isSpeedGauge) {
+                val secValText = String.format("%.0f %s", animVal * speedConversion, secondaryUnit.uppercase())
+                val secMeasured = tm.measure(secValText, TextStyle(color = colorScheme.needleColor.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+                drawText(secMeasured, topLeft = Offset(cx - secMeasured.size.width / 2f, currentOffset + 2.dp.toPx()))
+                currentOffset += secMeasured.size.height + 2.dp.toPx()
+            }
+
+            drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, currentOffset + 2.dp.toPx()))
         }
     })
 }

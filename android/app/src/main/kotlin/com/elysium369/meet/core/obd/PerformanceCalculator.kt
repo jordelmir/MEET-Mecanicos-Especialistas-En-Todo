@@ -30,6 +30,19 @@ class PerformanceCalculator @Inject constructor() {
         val isRunning: Boolean = false
     )
 
+    data class DynoPoint(
+        val rpm: Int,
+        val hp: Float,
+        val torqueNm: Float
+    )
+
+    // Configurable vehicle parameters for Dyno calculations
+    var vehicleMassKg: Float = 1500f
+    var drivetrainLossPercent: Float = 15f
+
+    private var isDynoRunning = false
+    private val dynoBins = mutableMapOf<Int, DynoPoint>()
+
     private var dragStartTimeMs: Long = 0L
     private var isDragRunning = false
     private var time60mph: Float? = null
@@ -148,4 +161,56 @@ class PerformanceCalculator @Inject constructor() {
     }
 
     val isDragActive: Boolean get() = isDragRunning
+
+    fun startDynoRun() {
+        isDynoRunning = true
+        dynoBins.clear()
+    }
+
+    fun stopDynoRun(): List<DynoPoint> {
+        isDynoRunning = false
+        return getDynoPoints()
+    }
+
+    fun getDynoPoints(): List<DynoPoint> {
+        return dynoBins.values.sortedBy { it.rpm }
+    }
+
+    fun updateDynoRun(rpm: Float, accelMs2: Float, speedKph: Float): List<DynoPoint> {
+        if (!isDynoRunning || rpm < 800 || speedKph < 5f) return getDynoPoints()
+
+        // 1. Calculate HP and Torque using weight-based physics
+        val speedMs = speedKph / 3.6f
+        
+        // Power = Force * Velocity
+        // Force = Mass * Acceleration
+        val force = vehicleMassKg * accelMs2
+        val powerWheelWatts = force * speedMs
+        
+        // Engine Power corrected for drivetrain loss
+        val lossFactor = drivetrainLossPercent / 100f
+        val powerEngineWatts = powerWheelWatts / (1f - lossFactor)
+        
+        // Convert to HP (745.7 Watts = 1 HP)
+        val hp = (powerEngineWatts / 745.7f).coerceAtLeast(0f)
+        
+        // Torque (Nm) = (HP * 9549) / (RPM * 1.341)
+        val torqueNm = if (rpm > 300) {
+            (hp * 9549f / (rpm * 1.341f)).coerceAtLeast(0f)
+        } else 0f
+
+        // 2. Map to RPM bin (bin of 200 RPM: 2000, 2200, 2400...)
+        val binSize = 200
+        val rpmBin = ((rpm + binSize / 2).toInt() / binSize) * binSize
+        
+        if (rpmBin in 1000..8500) {
+            val existing = dynoBins[rpmBin]
+            if (existing == null || hp > existing.hp) {
+                dynoBins[rpmBin] = DynoPoint(rpmBin, hp, torqueNm)
+            }
+        }
+        return getDynoPoints()
+    }
+
+    val isDynoActive: Boolean get() = isDynoRunning
 }

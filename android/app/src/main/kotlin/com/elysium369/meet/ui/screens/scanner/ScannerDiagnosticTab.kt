@@ -86,13 +86,26 @@ fun ScannerDiagnosticTab(
                             com.elysium369.meet.ui.components.EliteTextButton(
                                 text = if (isScanningModules) "ESCANEA..." else "ESCANEAR SISTEMAS",
                                 onClick = {
-                                    coroutineScope.launch {
-                                        isScanningModules = true
-                                        detectedModules = viewModel.scanModules()
-                                        isScanningModules = false
+                                    if (state != ObdState.CONNECTED) {
+                                        coroutineScope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = "OBD Desconectado. Conéctate a tu adaptador primero.",
+                                                actionLabel = "CONECTAR",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                navController?.navigate("connect")
+                                            }
+                                        }
+                                    } else {
+                                        coroutineScope.launch {
+                                            isScanningModules = true
+                                            detectedModules = viewModel.scanModules()
+                                            isScanningModules = false
+                                        }
                                     }
                                 },
-                                isEnabled = state == ObdState.CONNECTED && !isScanningModules,
+                                isEnabled = !isScanningModules,
                                 color = MeetColors.neonGreen
                             )
                         }
@@ -199,7 +212,10 @@ fun ScannerDiagnosticTab(
                                 }
                             },
                             isConsultingAi = consultingDtcAi[event.code] == true,
-                            aiAnalysis = dtcAiResults[event.code]
+                            aiAnalysis = dtcAiResults[event.code],
+                            onRepairGuideClick = {
+                                navController?.navigate("repair/${event.code}")
+                            }
                         )
                     }
 
@@ -229,7 +245,10 @@ fun ScannerDiagnosticTab(
                                 }
                             },
                             isConsultingAi = consultingDtcAi[event.code] == true,
-                            aiAnalysis = dtcAiResults[event.code]
+                            aiAnalysis = dtcAiResults[event.code],
+                            onRepairGuideClick = {
+                                navController?.navigate("repair/${event.code}")
+                            }
                         )
                     }
 
@@ -259,7 +278,10 @@ fun ScannerDiagnosticTab(
                                 }
                             },
                             isConsultingAi = consultingDtcAi[event.code] == true,
-                            aiAnalysis = dtcAiResults[event.code]
+                            aiAnalysis = dtcAiResults[event.code],
+                            onRepairGuideClick = {
+                                navController?.navigate("repair/${event.code}")
+                            }
                         )
                     }
 
@@ -289,7 +311,10 @@ fun ScannerDiagnosticTab(
                                 }
                             },
                             isConsultingAi = consultingDtcAi[event.code] == true,
-                            aiAnalysis = dtcAiResults[event.code]
+                            aiAnalysis = dtcAiResults[event.code],
+                            onRepairGuideClick = {
+                                navController?.navigate("repair/${event.code}")
+                            }
                         )
                     }
 

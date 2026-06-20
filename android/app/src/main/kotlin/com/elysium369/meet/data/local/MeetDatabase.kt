@@ -28,9 +28,38 @@ import com.elysium369.meet.data.local.entities.*
         FleetMemberEntity::class,
         ChatMessageEntity::class,
         ChatBlocklistEntity::class,
-        DvirReportEntity::class
+        DvirReportEntity::class,
+        VehicleDnaProfileEntity::class,
+        RepairCaseEntity::class,
+        PredictionEventEntity::class,
+        
+        // FEATURE ENTITIES
+        LiveSessionEntity::class,
+        LiveSnapshotEntity::class,
+        MechanicNoteEntity::class,
+        RepairPhotoEntity::class,
+        RepairPartEntity::class,
+        RepairVoteEntity::class,
+        RepairCommentEntity::class,
+        RepairVerificationEntity::class,
+        ServiceRequestEntity::class,
+        ServiceBidEntity::class,
+        EvidencePackageEntity::class,
+        VehicleTwinProfileEntity::class,
+        TwinAnomalyEntity::class,
+        
+        // KNOWLEDGE GRAPH ENTITIES
+        DtcSymptomEntity::class,
+        DtcCauseEntity::class,
+        DtcProcedureEntity::class,
+        DtcRelatedPidEntity::class,
+        DtcCoOccurrenceEntity::class,
+        DtcVehicleCompatEntity::class,
+        DtcVerifiedFixEntity::class,
+        DtcRepairCostEntity::class,
+        DtcSearchIndexEntity::class
     ],
-    version = 17,
+    version = 23,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -52,4 +81,17 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun fleetDao(): FleetDao
     abstract fun chatDao(): ChatDao
     abstract fun dvirReportDao(): DvirReportDao
+    abstract fun vehicleDnaDao(): VehicleDnaDao
+    abstract fun repairCaseDao(): RepairCaseDao
+    abstract fun predictionEventDao(): PredictionEventDao
+    
+    // NEW FEATURE DAOS
+    abstract fun liveSessionDao(): LiveSessionDao
+    abstract fun repairNetworkAddonsDao(): RepairNetworkAddonsDao
+    abstract fun marketplaceDao(): MarketplaceDao
+    abstract fun blackBoxDao(): BlackBoxDao
+    abstract fun vehicleTwinDao(): VehicleTwinDao
+    
+    // KNOWLEDGE GRAPH DAO
+    abstract fun dtcKnowledgeGraphDao(): DtcKnowledgeGraphDao
 }

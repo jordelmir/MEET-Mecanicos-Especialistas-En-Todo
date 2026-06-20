@@ -3,11 +3,8 @@ package com.elysium369.meet.ui.screens.scanner
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import android.widget.Toast
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +17,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,7 +39,10 @@ import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.components.gauges.GaugeStyleSet
+import com.elysium369.meet.ui.components.gauges.GaugeColorScheme
+import com.elysium369.meet.ui.components.gauges.GaugeCustomizerDialog
 import com.elysium369.meet.ui.components.gauges.StyledGauge
+import com.elysium369.meet.ui.components.gauges.FullscreenAnimatedBg
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -83,6 +84,7 @@ fun ScannerDashboardTab(
     // ── MULTI-GAUGE FULLSCREEN STATE (long-press to select up to 3) ──
     val multiSelected = remember { mutableStateListOf<GaugeConfig>() }
     var showMultiFullscreen by remember { mutableStateOf(false) }
+    var showDashboardCustomizer by remember { mutableStateOf(false) }
 
     val isFullscreen = selectedGauge != null || showMultiFullscreen
 
@@ -108,8 +110,8 @@ fun ScannerDashboardTab(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── RESPONSIVE LAYOUT using BoxWithConstraints (animates out when fullscreen opens) ──
-        BoxWithConstraints(
+        // ── RESPONSIVE LAYOUT (animates out when fullscreen opens) ──
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
@@ -118,79 +120,144 @@ fun ScannerDashboardTab(
                     alpha = gridAlpha
                 }
         ) {
-            // Dynamically calculate columns based on available width
-            val cols = when {
-                maxWidth < 360.dp  -> 1   // Very small phones
-                maxWidth < 600.dp  -> 2   // Normal phones portrait
-                maxWidth < 840.dp  -> 3   // Large phones landscape / small tablets
-                else               -> 4   // Tablets / large landscape
-            }
+            if (isLandscape) {
+                // ─── WIDESCREEN AUTO/CARPLAY DASHBOARD VIEW ───
+                var activePrimaryGauge by remember(sortedGauges) {
+                    mutableStateOf(sortedGauges.firstOrNull() ?: GaugeConfig("1", "RPM", "010C", 0f, 8000f, "rpm"))
+                }
+                val primaryValue by remember(viewModel, activePrimaryGauge.pid) {
+                    viewModel.liveData.map { it[activePrimaryGauge.pid] ?: 0f }.distinctUntilChanged()
+                }.collectAsState(initial = 0f)
 
-            // Responsive spacing
-            val gridPadding = when {
-                maxWidth < 360.dp  -> 8.dp
-                maxWidth < 600.dp  -> 12.dp
-                else               -> 16.dp
-            }
-            val itemSpacing = when {
-                maxWidth < 360.dp  -> 6.dp
-                maxWidth < 600.dp  -> 10.dp
-                else               -> 14.dp
-            }
-
-            EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
-                LazyVerticalGrid(
-                    state = gridState,
-                    columns = GridCells.Fixed(cols),
-                    contentPadding = PaddingValues(gridPadding),
-                    horizontalArrangement = Arrangement.spacedBy(itemSpacing),
-                    verticalArrangement = Arrangement.spacedBy(itemSpacing),
-                    modifier = Modifier.fillMaxSize().eliteScrollbar(gridState)
+                Row(
+                    modifier = Modifier.fillMaxSize().background(Color(0xFF070B14)).padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // ─── CONNECTION STATUS BAR (Full width) ───
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedEntryItem(index = 0, visibleCount = visibleCount) {
-                            ConnectionStatusBar(viewModel = viewModel, showQos = true)
+                    // LEFT COLUMN: Large Gauge Panel & Customizer Row
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .weight(0.42f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF0C101F))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Title HUD Card
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "MONITOR PRINCIPAL",
+                                color = MeetColors.textSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MeetColors.neonGreen.copy(alpha = 0.15f))
+                                    .clickable { showDashboardCustomizer = true }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text("🎨 AJUSTAR", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            }
                         }
-                    }
 
-                    // ─── VEHICLE HEALTH INDEX CARD (Full width) ───
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedEntryItem(index = 1, visibleCount = visibleCount) {
-                            HealthIndexCard(healthScore = healthScore, anomalousPids = anomalousPids)
-                        }
-                    }
-
-                    // ─── LIVE AI REASONING TERMINAL (Full width) ───
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedEntryItem(index = 2, visibleCount = visibleCount) {
-                            LiveAITerminal(anomalousPids = anomalousPids)
-                        }
-                    }
-
-                    // ─── GAUGE STYLE SWITCHER (Full width) ───
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        AnimatedEntryItem(index = 3, visibleCount = visibleCount) {
-                            GaugeStyleSwitcher(
-                                currentStyle = currentStyle,
-                                onCycleNext = { gaugeStyleManager.cycleNext() },
-                                onCyclePrevious = { gaugeStyleManager.cyclePrevious() }
+                        // Large focal Gauge
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            StyledGauge(
+                                style = currentStyle,
+                                label = activePrimaryGauge.label,
+                                value = primaryValue,
+                                minVal = activePrimaryGauge.minVal,
+                                maxVal = activePrimaryGauge.maxVal,
+                                unit = activePrimaryGauge.unit,
+                                isAnomaly = anomalousPids.any { it.pid == activePrimaryGauge.pid },
+                                modifier = Modifier.fillMaxSize(0.95f)
                             )
                         }
+
+                        // Horizontal Style Carousel
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            GaugeStyleSet.entries.forEach { styleItem ->
+                                val isSelected = styleItem == currentStyle
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) MeetColors.neonGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
+                                        .border(1.dp, if (isSelected) MeetColors.neonGreen else Color.Transparent, RoundedCornerShape(8.dp))
+                                        .clickable { gaugeStyleManager.selectStyle(styleItem) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "${styleItem.icon} ${styleItem.displayName}",
+                                        color = if (isSelected) Color.White else MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
 
-                    // ─── GAUGE / WAVE WIDGETS ───
-                    items(sortedGauges.size, key = { index -> sortedGauges[index].pid }) { index ->
-                        val gauge = sortedGauges[index]
-                        val isAnomaly = anomalousPids.any { it.pid == gauge.pid }
-                        val isPinned = pinnedPids.contains(gauge.pid)
-                        val isSelectedForFs = multiSelected.contains(gauge)
+                    // RIGHT COLUMN: Widescreen Telemetry Grid
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .weight(0.58f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Title HUD Card
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "TELEMETRÍA DE VEHÍCULO (TOCA PARA ENFOCAR / MANTÉN PARA TPMS 3D)",
+                                color = MeetColors.textSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                        }
 
-                        AnimatedEntryItem(index = index + 4, visibleCount = visibleCount) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
+                        // Scrollable grid of telemetry cards
+                        val gridStateLandscape = rememberLazyGridState()
+                        LazyVerticalGrid(
+                            state = gridStateLandscape,
+                            columns = GridCells.Fixed(2),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize().eliteScrollbar(gridStateLandscape)
+                        ) {
+                            items(sortedGauges.size, key = { index -> "land_${sortedGauges[index].pid}" }) { index ->
+                                val gauge = sortedGauges[index]
+                                val isAnomaly = anomalousPids.any { it.pid == gauge.pid }
+                                val isPinned = pinnedPids.contains(gauge.pid)
+                                val isSelectedForFs = multiSelected.contains(gauge)
+
                                 GaugeCard(
                                     viewModel = viewModel,
                                     gauge = gauge,
@@ -202,15 +269,95 @@ fun ScannerDashboardTab(
                                         if (isPinned) viewModel.unpinPid(gauge.pid)
                                         else viewModel.pinPid(gauge.pid)
                                     },
-                                    onTap = { selectedGauge = gauge },
+                                    onTap = {
+                                        activePrimaryGauge = gauge
+                                    },
                                     onLongPress = {
-                                        if (isSelectedForFs) {
-                                            multiSelected.remove(gauge)
-                                        } else if (multiSelected.size < 3) {
-                                            multiSelected.add(gauge)
-                                        }
+                                        selectedGauge = gauge
                                     }
                                 )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // ─── PORTRAIT VIEW (Standard Vertical Scroll Grid) ───
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val cols = when {
+                        maxWidth < 360.dp  -> 1
+                        maxWidth < 600.dp  -> 2
+                        maxWidth < 840.dp  -> 3
+                        else               -> 4
+                    }
+                    val gridPadding = if (maxWidth < 360.dp) 8.dp else if (maxWidth < 600.dp) 12.dp else 16.dp
+                    val itemSpacing = if (maxWidth < 360.dp) 6.dp else if (maxWidth < 600.dp) 10.dp else 14.dp
+
+                    EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Fixed(cols),
+                            contentPadding = PaddingValues(gridPadding),
+                            horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                            verticalArrangement = Arrangement.spacedBy(itemSpacing),
+                            modifier = Modifier.fillMaxSize().eliteScrollbar(gridState)
+                        ) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                AnimatedEntryItem(index = 0, visibleCount = visibleCount) {
+                                    HealthIndexCard(healthScore = healthScore, anomalousPids = anomalousPids)
+                                }
+                            }
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                AnimatedEntryItem(index = 1, visibleCount = visibleCount) {
+                                    LiveAITerminal(anomalousPids = anomalousPids)
+                                }
+                            }
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                AnimatedEntryItem(index = 2, visibleCount = visibleCount) {
+                                    GaugeStyleSwitcher(
+                                        currentStyle = currentStyle,
+                                        onCycleNext = { gaugeStyleManager.cycleNext() },
+                                        onCyclePrevious = { gaugeStyleManager.cyclePrevious() },
+                                        onCustomize = { showDashboardCustomizer = true },
+                                        onDiyCreate = {
+                                            gaugeStyleManager.selectStyle(GaugeStyleSet.CUSTOM_DIY)
+                                            showDashboardCustomizer = true
+                                        }
+                                    )
+                                }
+                            }
+                            items(sortedGauges.size, key = { index -> sortedGauges[index].pid }) { index ->
+                                val gauge = sortedGauges[index]
+                                val isAnomaly = anomalousPids.any { it.pid == gauge.pid }
+                                val isPinned = pinnedPids.contains(gauge.pid)
+                                val isSelectedForFs = multiSelected.contains(gauge)
+
+                                AnimatedEntryItem(index = index + 3, visibleCount = visibleCount) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        GaugeCard(
+                                            viewModel = viewModel,
+                                            gauge = gauge,
+                                            gaugeStyle = currentStyle,
+                                            isAnomaly = isAnomaly,
+                                            isPinned = isPinned,
+                                            isSelectedForFullscreen = isSelectedForFs,
+                                            onTogglePin = {
+                                                if (isPinned) viewModel.unpinPid(gauge.pid)
+                                                else viewModel.pinPid(gauge.pid)
+                                            },
+                                            onTap = { selectedGauge = gauge },
+                                            onLongPress = {
+                                                if (isSelectedForFs) {
+                                                    multiSelected.remove(gauge)
+                                                } else if (multiSelected.size < 3) {
+                                                    multiSelected.add(gauge)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -325,6 +472,21 @@ fun ScannerDashboardTab(
                     }
                 )
             }
+        }
+
+        // ── DASHBOARD COLOR CUSTOMIZER DIALOG ──
+        if (showDashboardCustomizer) {
+            val trigger = GaugeStyleManager.colorSchemeUpdateTrigger
+            val dashColorScheme = remember(currentStyle, trigger) {
+                gaugeStyleManager.getColorScheme(currentStyle)
+            }
+            GaugeCustomizerDialog(
+                currentStyle = currentStyle,
+                currentScheme = dashColorScheme,
+                onSchemeChange = { gaugeStyleManager.saveColorScheme(currentStyle, it) },
+                onReset = { gaugeStyleManager.resetColorScheme(currentStyle) },
+                onDismiss = { showDashboardCustomizer = false }
+            )
         }
     }
 }
@@ -571,7 +733,9 @@ private fun LiveAITerminal(anomalousPids: List<com.elysium369.meet.core.ai.Healt
 private fun GaugeStyleSwitcher(
     currentStyle: GaugeStyleSet,
     onCycleNext: () -> Unit,
-    onCyclePrevious: () -> Unit
+    onCyclePrevious: () -> Unit,
+    onCustomize: () -> Unit = {},
+    onDiyCreate: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "styleSwitcherGlow")
     val borderAlpha by infiniteTransition.animateFloat(
@@ -579,86 +743,157 @@ private fun GaugeStyleSwitcher(
         animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "switcherBorder"
     )
+    // DIY button pulsing glow
+    val diyGlow by infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "diyGlow"
+    )
+    val isDiyActive = currentStyle == GaugeStyleSet.CUSTOM_DIY
 
-    EliteCard(
-        backgroundColor = Color(0xFF080E1A),
-        borderColor = MeetColors.cyberCyan.copy(alpha = borderAlpha),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
-        glowColor = MeetColors.cyberCyan.copy(alpha = 0.08f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+    Column(modifier = Modifier.fillMaxWidth()) {
+        EliteCard(
+            backgroundColor = Color(0xFF080E1A),
+            borderColor = MeetColors.cyberCyan.copy(alpha = borderAlpha),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            glowColor = MeetColors.cyberCyan.copy(alpha = 0.08f)
         ) {
-            // Previous button
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeetColors.cyberCyan.copy(alpha = 0.08f))
-                    .border(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                    .clickable { onCyclePrevious() },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("◀", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
+                // Previous button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MeetColors.cyberCyan.copy(alpha = 0.08f))
+                        .border(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .clickable { onCyclePrevious() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("◀", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
 
-            // Style info (center)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-            ) {
-                Text(
-                    "GAUGE STYLE",
-                    color = MeetColors.textMuted,
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                Spacer(Modifier.height(2.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                // Style info (center)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                 ) {
                     Text(
-                        currentStyle.icon,
-                        fontSize = 16.sp
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        currentStyle.displayName.uppercase(),
-                        color = Color.White,
-                        fontSize = 12.sp,
+                        "GAUGE STYLE",
+                        color = MeetColors.textMuted,
+                        fontSize = 7.sp,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.5.sp
+                        letterSpacing = 2.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            currentStyle.icon,
+                            fontSize = 16.sp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            currentStyle.displayName.uppercase(),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                    Text(
+                        currentStyle.description,
+                        color = MeetColors.textSecondary,
+                        fontSize = 8.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
                     )
                 }
-                Text(
-                    currentStyle.description,
-                    color = MeetColors.textSecondary,
-                    fontSize = 8.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-            }
 
-            // Next button
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeetColors.cyberCyan.copy(alpha = 0.08f))
-                    .border(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                    .clickable { onCycleNext() },
-                contentAlignment = Alignment.Center
+                // Palette/Customize button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MeetColors.cyberCyan.copy(alpha = 0.12f))
+                        .border(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .clickable { onCustomize() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🎨", fontSize = 14.sp)
+                }
+
+                // Next button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MeetColors.cyberCyan.copy(alpha = 0.08f))
+                        .border(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .clickable { onCycleNext() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("▶", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // ── PROMINENT DIY BUTTON ──
+        val diyBorderColor = if (isDiyActive) Color(0xFF00FFCC) else Color(0xFFFF6F00).copy(alpha = diyGlow)
+        val diyBgColor = if (isDiyActive) Color(0xFF00FFCC).copy(alpha = 0.15f) else Color(0xFFFF6F00).copy(alpha = 0.08f + diyGlow * 0.07f)
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            diyBgColor,
+                            if (isDiyActive) Color(0xFF00FFCC).copy(alpha = 0.08f) else Color(0xFFFF8F00).copy(alpha = 0.05f),
+                            diyBgColor
+                        )
+                    )
+                )
+                .border(1.dp, diyBorderColor, RoundedCornerShape(10.dp))
+                .clickable { onDiyCreate() }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text("▶", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("🛠️", fontSize = 18.sp)
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(
+                        if (isDiyActive) "✦ MODO DIY ACTIVO — TOCA PARA EDITAR" else "CREAR TU RELOJ PERSONALIZADO",
+                        color = if (isDiyActive) Color(0xFF00FFCC) else Color(0xFFFFAB40),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        "Diseña agujas, bordes, marcas y fondo a tu gusto",
+                        color = if (isDiyActive) Color(0xFF00FFCC).copy(alpha = 0.6f) else Color(0xFFFFAB40).copy(alpha = 0.5f),
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
         }
     }
@@ -682,6 +917,13 @@ private fun GaugeCard(
     onTap: () -> Unit = {},
     onLongPress: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val trigger = GaugeStyleManager.colorSchemeUpdateTrigger
+    val colorScheme = remember(gaugeStyle, trigger) {
+        gaugeStyleManager.getColorScheme(gaugeStyle)
+    }
+
     val currentValue by remember(viewModel, gauge.pid) {
         viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
     }.collectAsState(initial = 0f)
@@ -691,24 +933,7 @@ private fun GaugeCard(
     }.collectAsState(initial = null)
 
     // ── Per-style accent color (identical to fullscreen) ──
-    val accentColor = when (gaugeStyle) {
-        GaugeStyleSet.ELITE      -> Color(0xFF00E5FF)
-        GaugeStyleSet.CLASSIC    -> Color(0xFF4CAF50)
-        GaugeStyleSet.CYBER      -> Color(0xFF00FFFF)
-        GaugeStyleSet.RACING     -> Color(0xFFFF1744)
-        GaugeStyleSet.RADIAL     -> Color(0xFF448AFF)
-        GaugeStyleSet.THERMO     -> Color(0xFFFF6D00)
-        GaugeStyleSet.HOLOGRAM   -> Color(0xFF00E5FF)
-        GaugeStyleSet.NEON_RETRO -> Color(0xFFFF00FF)
-        GaugeStyleSet.LAMBO      -> Color(0xFFFF9100)
-        GaugeStyleSet.PLASMA     -> Color(0xFF7C4DFF)
-        GaugeStyleSet.AURORA     -> Color(0xFF1DE9B6)
-        GaugeStyleSet.FERRARI    -> Color(0xFFD50000)
-        GaugeStyleSet.TOKYO      -> Color(0xFFFF4081)
-        GaugeStyleSet.MILITARY   -> Color(0xFF76FF03)
-        GaugeStyleSet.DIAMOND    -> Color(0xFF80D8FF)
-        GaugeStyleSet.COCKPIT    -> Color(0xFFFFAB00)
-    }
+    val accentColor = colorScheme.specialColor
 
     val effectiveAccent = if (isAnomaly) MeetColors.error else accentColor
 
@@ -792,7 +1017,9 @@ private fun GaugeCard(
                     maxVal = gauge.maxVal,
                     unit = gauge.unit,
                     isAnomaly = isAnomaly,
-                    historyData = telemetryHistory
+                    historyData = telemetryHistory,
+                    style = gaugeStyle,
+                    colorScheme = colorScheme
                 )
             } else {
                 StyledGauge(
@@ -917,6 +1144,14 @@ private fun FullScreenGaugeOverlay(
     isAnomaly: Boolean,
     onDismiss: () -> Unit
 ) {
+    // ── COLOR CUSTOMIZATION STATE ──
+    val context = LocalContext.current
+    val fsStyleManager = remember { GaugeStyleManager(context) }
+    val fsTrigger = GaugeStyleManager.colorSchemeUpdateTrigger
+    val fsColorScheme = remember(gaugeStyle, fsTrigger) {
+        fsStyleManager.getColorScheme(gaugeStyle)
+    }
+    var showCustomizer by remember { mutableStateOf(false) }
     // Live data stream
     val currentValue by remember(viewModel, gauge.pid) {
         viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
@@ -985,25 +1220,8 @@ private fun FullScreenGaugeOverlay(
         label = "bgGlowS"
     )
 
-    // Per-style accent color (consistent with StyledGauge)
-    val accentColor = when (gaugeStyle) {
-        GaugeStyleSet.ELITE      -> Color(0xFF00E5FF)
-        GaugeStyleSet.CLASSIC    -> Color(0xFF4CAF50)
-        GaugeStyleSet.CYBER      -> Color(0xFF00FFFF)
-        GaugeStyleSet.RACING     -> Color(0xFFFF1744)
-        GaugeStyleSet.RADIAL     -> Color(0xFF448AFF)
-        GaugeStyleSet.THERMO     -> Color(0xFFFF6D00)
-        GaugeStyleSet.HOLOGRAM   -> Color(0xFF00E5FF)
-        GaugeStyleSet.NEON_RETRO -> Color(0xFFFF00FF)
-        GaugeStyleSet.LAMBO      -> Color(0xFFFF9100)
-        GaugeStyleSet.PLASMA     -> Color(0xFF7C4DFF)
-        GaugeStyleSet.AURORA     -> Color(0xFF1DE9B6)
-        GaugeStyleSet.FERRARI    -> Color(0xFFD50000)
-        GaugeStyleSet.TOKYO      -> Color(0xFFFF4081)
-        GaugeStyleSet.MILITARY   -> Color(0xFF76FF03)
-        GaugeStyleSet.DIAMOND    -> Color(0xFF80D8FF)
-        GaugeStyleSet.COCKPIT    -> Color(0xFFFFAB00)
-    }
+    // Per-style accent color — now derived from dynamic color scheme
+    val accentColor = fsColorScheme.specialColor
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1035,6 +1253,9 @@ private fun FullScreenGaugeOverlay(
                 ) { /* consume taps on background */ },
             contentAlignment = Alignment.Center
         ) {
+            // ── Dynamic Fullscreen Animated Background (Matrix, Lightning, Fire, etc.) ──
+            FullscreenAnimatedBg(style = gaugeStyle, modifier = Modifier.fillMaxSize())
+
             // ── Breathing ambient glow behind gauge ──
             Box(
                 modifier = Modifier
@@ -1070,7 +1291,12 @@ private fun FullScreenGaugeOverlay(
                         .alpha(gaugeAlpha),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (gauge.type == GaugeType.WAVE) {
+                    if (gauge.pid == "0133") {
+                        CarTpmsChassisView(
+                            viewModel = viewModel,
+                            colorScheme = fsColorScheme
+                        )
+                    } else if (gauge.type == GaugeType.WAVE) {
                         WaveGraphWidget(
                             label = gauge.label,
                             currentValue = currentValue,
@@ -1078,7 +1304,9 @@ private fun FullScreenGaugeOverlay(
                             maxVal = gauge.maxVal,
                             unit = gauge.unit,
                             isAnomaly = isAnomaly,
-                            historyData = null
+                            historyData = null,
+                            style = gaugeStyle,
+                            colorScheme = fsColorScheme
                         )
                     } else {
                         StyledGauge(
@@ -1097,36 +1325,59 @@ private fun FullScreenGaugeOverlay(
                 }
             }
 
-            // ═══ CLOSE (X) BUTTON — floating at top right ═══
-            Box(
+            // ═══ TOP RIGHT CONTROLS — Palette + Close ═══
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 28.dp, end = 28.dp)
                     .scale(closeBtnScale)
-                    .graphicsLayer { rotationZ = closeBtnRotation }
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF1A1A2E),
-                                Color(0xFF0D0D1A)
+                    .graphicsLayer { rotationZ = closeBtnRotation },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 🎨 Palette Button
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF1A1A2E), Color(0xFF0D0D1A))
                             )
                         )
-                    )
-                    .border(
-                        2.dp,
-                        accentColor.copy(alpha = closeBtnGlow),
-                        CircleShape
-                    )
-                    .clickable { onDismiss() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "✕",
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
+                        .border(1.5.dp, accentColor.copy(alpha = closeBtnGlow * 0.6f), CircleShape)
+                        .clickable { showCustomizer = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🎨", fontSize = 20.sp)
+                }
+
+                // ✕ Close Button
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF1A1A2E), Color(0xFF0D0D1A))
+                            )
+                        )
+                        .border(2.dp, accentColor.copy(alpha = closeBtnGlow), CircleShape)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✕", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // ── CUSTOMIZER DIALOG ──
+            if (showCustomizer) {
+                GaugeCustomizerDialog(
+                    currentStyle = gaugeStyle,
+                    currentScheme = fsColorScheme,
+                    onSchemeChange = { fsStyleManager.saveColorScheme(gaugeStyle, it) },
+                    onReset = { fsStyleManager.resetColorScheme(gaugeStyle) },
+                    onDismiss = { showCustomizer = false }
                 )
             }
         }
@@ -1147,25 +1398,14 @@ private fun MultiGaugeFullscreenOverlay(
     onDismiss: () -> Unit,
     onClearSelection: () -> Unit
 ) {
-    // Per-style accent color
-    val accentColor = when (gaugeStyle) {
-        GaugeStyleSet.ELITE      -> Color(0xFF00E5FF)
-        GaugeStyleSet.CLASSIC    -> Color(0xFF4CAF50)
-        GaugeStyleSet.CYBER      -> Color(0xFF00FFFF)
-        GaugeStyleSet.RACING     -> Color(0xFFFF1744)
-        GaugeStyleSet.RADIAL     -> Color(0xFF448AFF)
-        GaugeStyleSet.THERMO     -> Color(0xFFFF6D00)
-        GaugeStyleSet.HOLOGRAM   -> Color(0xFF00E5FF)
-        GaugeStyleSet.NEON_RETRO -> Color(0xFFFF00FF)
-        GaugeStyleSet.LAMBO      -> Color(0xFFFF9100)
-        GaugeStyleSet.PLASMA     -> Color(0xFF7C4DFF)
-        GaugeStyleSet.AURORA     -> Color(0xFF1DE9B6)
-        GaugeStyleSet.FERRARI    -> Color(0xFFD50000)
-        GaugeStyleSet.TOKYO      -> Color(0xFFFF4081)
-        GaugeStyleSet.MILITARY   -> Color(0xFF76FF03)
-        GaugeStyleSet.DIAMOND    -> Color(0xFF80D8FF)
-        GaugeStyleSet.COCKPIT    -> Color(0xFFFFAB00)
+    // Per-style accent color — from dynamic color scheme
+    val multiContext = LocalContext.current
+    val multiStyleManager = remember { GaugeStyleManager(multiContext) }
+    val multiTrigger = GaugeStyleManager.colorSchemeUpdateTrigger
+    val multiColorScheme = remember(gaugeStyle, multiTrigger) {
+        multiStyleManager.getColorScheme(gaugeStyle)
     }
+    val accentColor = multiColorScheme.specialColor
 
     // Animations
     val inf = rememberInfiniteTransition(label = "multiFS")
@@ -1215,6 +1455,9 @@ private fun MultiGaugeFullscreenOverlay(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                 ) { /* consume background taps */ }
         ) {
+            // ── Dynamic Fullscreen Animated Background (Matrix, Lightning, Fire, etc.) ──
+            FullscreenAnimatedBg(style = gaugeStyle, modifier = Modifier.fillMaxSize())
+
             // ── TOP BAR with title and close ──
             Box(
                 modifier = Modifier
@@ -1386,6 +1629,13 @@ private fun MultiGaugeCell(
     glowPulse: Float,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val gaugeStyleManager = remember { GaugeStyleManager(context) }
+    val trigger = GaugeStyleManager.colorSchemeUpdateTrigger
+    val colorScheme = remember(gaugeStyle, trigger) {
+        gaugeStyleManager.getColorScheme(gaugeStyle)
+    }
+
     val currentValue by remember(viewModel, gauge.pid) {
         viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
     }.collectAsState(initial = 0f)
@@ -1449,7 +1699,9 @@ private fun MultiGaugeCell(
                         maxVal = gauge.maxVal,
                         unit = gauge.unit,
                         isAnomaly = isAnomaly,
-                        historyData = null
+                        historyData = null,
+                        style = gaugeStyle,
+                        colorScheme = colorScheme
                     )
                 } else {
                     StyledGauge(
@@ -1487,4 +1739,758 @@ private fun MultiGaugeCell(
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════
+// CAR TPMS SKELETON CHASSIS TELEMETRY VIEW
+// ═══════════════════════════════════════════════════════
+
+@Composable
+fun CarTpmsChassisView(
+    viewModel: ObdViewModel,
+    colorScheme: GaugeColorScheme
+) {
+    val liveData by viewModel.liveData.collectAsState()
+    val isDemoMode by viewModel.isDemoMode.collectAsState()
+
+    // Real Barometric Pressure (PID 0133) in kPa
+    val rawBaro = liveData["0133"]
+    val ecuBaro = rawBaro ?: 0.0f
+    val isBaroSupported = rawBaro != null && rawBaro > 0f
+
+    // Standard tire pressures: in demo mode, simulate based on ECU baro pressure.
+    // In real mode, since OBD2 standard doesn't report individual tire pressures, set them to 0.0f (with inactive UI color).
+    val basePressure = if (isDemoMode) {
+        if (ecuBaro > 0f) ecuBaro / 3.1f else 32.5f
+    } else {
+        0.0f
+    }
+
+    // We want the values to update in real time with slight fluctuations (only in demo mode)
+    val time = rememberInfiniteTransition(label = "tpmsTime").animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
+        label = "time"
+    )
+
+    // Animated dash phase for flowing holographic data packet lines
+    val dashPhase by rememberInfiniteTransition(label = "dashPhase").animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing)),
+        label = "dashPhase"
+    )
+    val dashEffect = remember(dashPhase) {
+        androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(15f, 15f), dashPhase)
+    }
+
+    // Leader pulse animation (animate as dp Float value, converted inside DrawScope)
+    val pulseRadiusDp by rememberInfiniteTransition(label = "pulseRadius").animateFloat(
+        initialValue = 3f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulseRadius"
+    )
+
+    val pFL = remember(basePressure, time.value) {
+        if (isDemoMode) {
+            (basePressure + Math.sin(time.value.toDouble() * 0.5).toFloat() * 0.4f + (Math.sin(time.value.toDouble() * 2.1).toFloat() * 0.1f)).coerceIn(10f, 50f)
+        } else {
+            0.0f
+        }
+    }
+    val pFR = remember(basePressure, time.value) {
+        if (isDemoMode) {
+            (basePressure + Math.cos(time.value.toDouble() * 0.4).toFloat() * 0.3f + (Math.cos(time.value.toDouble() * 1.8).toFloat() * 0.1f)).coerceIn(10f, 50f)
+        } else {
+            0.0f
+        }
+    }
+    val pRL = remember(basePressure, time.value) {
+        if (isDemoMode) {
+            (basePressure - 0.5f + Math.sin(time.value.toDouble() * 0.3).toFloat() * 0.4f + (Math.sin(time.value.toDouble() * 1.5).toFloat() * 0.1f)).coerceIn(10f, 50f)
+        } else {
+            0.0f
+        }
+    }
+    val pRR = remember(basePressure, time.value) {
+        if (isDemoMode) {
+            (basePressure - 0.5f + Math.cos(time.value.toDouble() * 0.3).toFloat() * 0.3f + (Math.cos(time.value.toDouble() * 1.4).toFloat() * 0.1f)).coerceIn(10f, 50f)
+        } else {
+            0.0f
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "SISTEMA DE MONITOREO TPMS PRO",
+            color = colorScheme.specialColor,
+            fontWeight = FontWeight.Black,
+            fontSize = 18.sp,
+            letterSpacing = 2.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            text = if (isDemoMode) "TELEMETRÍA SIMULADA — MODO PRESENTACIÓN" else if (isBaroSupported) "TELEMETRÍA REAL EN TIEMPO REAL DESDE LA ECU" else "ESPERANDO CONEXIÓN OBD2 (PID 0133)",
+            color = if (isDemoMode) MeetColors.warning.copy(alpha = 0.8f) else if (isBaroSupported) MeetColors.textSecondary else MeetColors.error.copy(alpha = 0.8f),
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+        )
+
+        // 🚀 ECU BAROMETRIC PRESSURE HUD PANEL
+        val baroBar = ecuBaro / 100f
+        val baroPsi = ecuBaro * 0.145038f
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(bottom = 16.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xBB080F25), Color(0xBB020510))
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = if (isBaroSupported) {
+                            listOf(colorScheme.specialColor, colorScheme.specialColor.copy(alpha = 0.2f))
+                        } else {
+                            listOf(Color(0x335A6E85), Color(0x115A6E85))
+                        }
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .padding(12.dp)
+        ) {
+            // Futuristic scanner corners
+            Box(modifier = Modifier.align(Alignment.TopStart).size(8.dp).border(1.dp, colorScheme.specialColor.copy(alpha = 0.4f), RoundedCornerShape(topStart = 3.dp)))
+            Box(modifier = Modifier.align(Alignment.BottomEnd).size(8.dp).border(1.dp, colorScheme.specialColor.copy(alpha = 0.4f), RoundedCornerShape(bottomEnd = 3.dp)))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "PRESIÓN BAROMÉTRICA DE LA ECU",
+                    color = if (isBaroSupported) MeetColors.textSecondary else Color(0xFF5A6E85),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (isBaroSupported) "${String.format("%.1f", ecuBaro)} kPa" else "0.0 kPa",
+                            color = if (isBaroSupported) Color.White else Color(0xFF5A6E85),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "PRESIÓN ABSOLUTA",
+                            color = if (isBaroSupported) colorScheme.specialColor.copy(alpha = 0.7f) else Color(0x445A6E85),
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(modifier = Modifier.size(1.dp, 24.dp).background(Color(0x225A6E85)))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isBaroSupported) "${String.format("%.2f", baroBar)} BAR" else "0.00 BAR",
+                            color = if (isBaroSupported) Color.White.copy(alpha = 0.8f) else Color(0xFF5A6E85),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Box(modifier = Modifier.size(3.dp).background(Color(0x335A6E85), CircleShape))
+                        Text(
+                            text = if (isBaroSupported) "${String.format("%.1f", baroPsi)} PSI" else "0.0 PSI",
+                            color = if (isBaroSupported) Color.White.copy(alpha = 0.8f) else Color(0xFF5A6E85),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            // Tilted 3D Holographic Chassis Container
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationX = 35f
+                        rotationZ = -15f
+                        cameraDistance = 12f * density
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                // Draw 3D wireframe car chassis skeleton and holographic grid
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2
+                    val cy = size.height / 2
+                    
+                    // 1. Holographic Floor Radial base glow
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colorScheme.specialColor.copy(alpha = 0.12f),
+                                colorScheme.specialColor.copy(alpha = 0.03f),
+                                Color.Transparent
+                            )
+                        ),
+                        radius = 240.dp.toPx(),
+                        center = Offset(cx, cy)
+                    )
+
+                    // 3D perspective floor grid
+                    val vpX = cx
+                    val vpY = cy - 280.dp.toPx()
+                    val gridColor = colorScheme.specialColor.copy(alpha = 0.08f)
+                    
+                    // Radial lines
+                    val numRadial = 12
+                    for (i in -numRadial..numRadial) {
+                        val angleOffset = i * 14.dp.toPx()
+                        drawLine(
+                            color = gridColor,
+                            start = Offset(vpX + angleOffset * 0.1f, vpY),
+                            end = Offset(vpX + angleOffset * 3f, cy + 250.dp.toPx()),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                    
+                    // Horizontal perspective grid lines
+                    var gridY = cy - 180.dp.toPx()
+                    var spacing = 12.dp.toPx()
+                    while (gridY < cy + 250.dp.toPx()) {
+                        drawLine(
+                            color = gridColor,
+                            start = Offset(0f, gridY),
+                            end = Offset(size.width, gridY),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        spacing *= 1.2f
+                        gridY += spacing
+                    }
+
+                    // 2. Holographic drop shadows projected on the floor grid (Offset downward)
+                    val shadowOffset = Offset(10.dp.toPx(), 20.dp.toPx())
+                    val shadowColor = Color.Black.copy(alpha = 0.5f)
+
+                    // Axle shadows
+                    drawLine(shadowColor, Offset(cx - 80.dp.toPx(), cy - 100.dp.toPx()) + shadowOffset, Offset(cx + 80.dp.toPx(), cy - 100.dp.toPx()) + shadowOffset, strokeWidth = 5.dp.toPx())
+                    drawLine(shadowColor, Offset(cx - 80.dp.toPx(), cy + 100.dp.toPx()) + shadowOffset, Offset(cx + 80.dp.toPx(), cy + 100.dp.toPx()) + shadowOffset, strokeWidth = 5.dp.toPx())
+                    // Spine shadow
+                    drawLine(shadowColor, Offset(cx, cy - 130.dp.toPx()) + shadowOffset, Offset(cx, cy + 130.dp.toPx()) + shadowOffset, strokeWidth = 8.dp.toPx())
+
+                    // Chassis cage shadow
+                    val shadowPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(cx - 45.dp.toPx() + shadowOffset.x, cy - 140.dp.toPx() + shadowOffset.y)
+                        quadraticBezierTo(cx + shadowOffset.x, cy - 150.dp.toPx() + shadowOffset.y, cx + 45.dp.toPx() + shadowOffset.x, cy - 140.dp.toPx() + shadowOffset.y)
+                        lineTo(cx + 60.dp.toPx() + shadowOffset.x, cy - 90.dp.toPx() + shadowOffset.y)
+                        lineTo(cx + 65.dp.toPx() + shadowOffset.x, cy + 90.dp.toPx() + shadowOffset.y)
+                        lineTo(cx + 50.dp.toPx() + shadowOffset.x, cy + 140.dp.toPx() + shadowOffset.y)
+                        quadraticBezierTo(cx + shadowOffset.x, cy + 145.dp.toPx() + shadowOffset.y, cx - 50.dp.toPx() + shadowOffset.x, cy + 140.dp.toPx() + shadowOffset.y)
+                        lineTo(cx - 65.dp.toPx() + shadowOffset.x, cy + 90.dp.toPx() + shadowOffset.y)
+                        lineTo(cx - 60.dp.toPx() + shadowOffset.x, cy - 90.dp.toPx() + shadowOffset.y)
+                        close()
+                    }
+                    drawPath(shadowPath, shadowColor)
+
+                    // 3. Real 3D Chassis wireframe lines (With animated marching ants dash effect)
+                    val chassisColorDark = colorScheme.specialColor.copy(alpha = 0.2f)
+                    val chassisColorLight = colorScheme.specialColor.copy(alpha = 0.65f)
+                    
+                    // Axles
+                    // Front axle
+                    drawLine(chassisColorLight, Offset(cx - 80.dp.toPx(), cy - 100.dp.toPx()), Offset(cx + 80.dp.toPx(), cy - 100.dp.toPx()), strokeWidth = 3.dp.toPx())
+                    // Rear axle
+                    drawLine(chassisColorLight, Offset(cx - 80.dp.toPx(), cy + 100.dp.toPx()), Offset(cx + 80.dp.toPx(), cy + 100.dp.toPx()), strokeWidth = 3.dp.toPx())
+                    // Central spine
+                    drawLine(chassisColorDark, Offset(cx, cy - 130.dp.toPx()), Offset(cx, cy + 130.dp.toPx()), strokeWidth = 5.dp.toPx())
+
+                    // 3D wireframe cage lower
+                    val lowerY = 15.dp.toPx()
+                    val lowerPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(cx - 45.dp.toPx(), cy - 140.dp.toPx() + lowerY)
+                        quadraticBezierTo(cx, cy - 150.dp.toPx() + lowerY, cx + 45.dp.toPx(), cy - 140.dp.toPx() + lowerY)
+                        lineTo(cx + 60.dp.toPx(), cy - 90.dp.toPx() + lowerY)
+                        lineTo(cx + 65.dp.toPx(), cy + 90.dp.toPx() + lowerY)
+                        lineTo(cx + 50.dp.toPx(), cy + 140.dp.toPx() + lowerY)
+                        quadraticBezierTo(cx, cy + 145.dp.toPx() + lowerY, cx - 50.dp.toPx(), cy + 140.dp.toPx() + lowerY)
+                        lineTo(cx - 65.dp.toPx(), cy + 90.dp.toPx() + lowerY)
+                        lineTo(cx - 60.dp.toPx(), cy - 90.dp.toPx() + lowerY)
+                        close()
+                    }
+                    drawPath(lowerPath, chassisColorDark, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+
+                    // 3D wireframe cage upper (Animating data flow)
+                    val upperY = -15.dp.toPx()
+                    val upperPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(cx - 35.dp.toPx(), cy - 120.dp.toPx() + upperY)
+                        quadraticBezierTo(cx, cy - 130.dp.toPx() + upperY, cx + 35.dp.toPx(), cy - 120.dp.toPx() + upperY)
+                        lineTo(cx + 45.dp.toPx(), cy - 80.dp.toPx() + upperY)
+                        lineTo(cx + 48.dp.toPx(), cy + 80.dp.toPx() + upperY)
+                        lineTo(cx + 38.dp.toPx(), cy + 120.dp.toPx() + upperY)
+                        quadraticBezierTo(cx, cy + 125.dp.toPx() + upperY, cx - 38.dp.toPx(), cy + 120.dp.toPx() + upperY)
+                        lineTo(cx - 48.dp.toPx(), cy + 80.dp.toPx() + upperY)
+                        lineTo(cx - 45.dp.toPx(), cy - 80.dp.toPx() + upperY)
+                        close()
+                    }
+                    drawPath(
+                        path = upperPath,
+                        color = chassisColorLight,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 2.dp.toPx(),
+                            pathEffect = dashEffect
+                        )
+                    )
+
+                    // Pillars
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx - 45.dp.toPx(), cy - 140.dp.toPx() + lowerY), Offset(cx - 35.dp.toPx(), cy - 120.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx + 45.dp.toPx(), cy - 140.dp.toPx() + lowerY), Offset(cx + 35.dp.toPx(), cy - 120.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx - 60.dp.toPx(), cy - 90.dp.toPx() + lowerY), Offset(cx - 45.dp.toPx(), cy - 80.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx + 60.dp.toPx(), cy - 90.dp.toPx() + lowerY), Offset(cx + 45.dp.toPx(), cy - 80.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx - 50.dp.toPx(), cy + 140.dp.toPx() + lowerY), Offset(cx - 38.dp.toPx(), cy + 120.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                    drawLine(chassisColorLight.copy(alpha = 0.3f), Offset(cx + 50.dp.toPx(), cy + 140.dp.toPx() + lowerY), Offset(cx + 38.dp.toPx(), cy + 120.dp.toPx() + upperY), strokeWidth = 1.5f.dp.toPx())
+                }
+
+                // 3D Tyres (Rotated inside the tilted container)
+                val tireWidth = 32.dp
+                val tireHeight = 56.dp
+
+                // FL Tyre
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(x = (-80).dp, y = (-100).dp)
+                        .size(tireWidth, tireHeight)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    getTireColor(pFL, isDemoMode).copy(alpha = 0.45f),
+                                    Color.Black,
+                                    getTireColor(pFL, isDemoMode).copy(alpha = 0.25f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 2.dp,
+                            brush = Brush.linearGradient(
+                                listOf(getTireColor(pFL, isDemoMode), getTireColor(pFL, isDemoMode).copy(alpha = 0.3f))
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp, 24.dp)
+                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                    )
+                }
+
+                // FR Tyre
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(x = 80.dp, y = (-100).dp)
+                        .size(tireWidth, tireHeight)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    getTireColor(pFR, isDemoMode).copy(alpha = 0.45f),
+                                    Color.Black,
+                                    getTireColor(pFR, isDemoMode).copy(alpha = 0.25f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 2.dp,
+                            brush = Brush.linearGradient(
+                                listOf(getTireColor(pFR, isDemoMode), getTireColor(pFR, isDemoMode).copy(alpha = 0.3f))
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp, 24.dp)
+                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                    )
+                }
+
+                // RL Tyre
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(x = (-80).dp, y = 100.dp)
+                        .size(tireWidth, tireHeight)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    getTireColor(pRL, isDemoMode).copy(alpha = 0.45f),
+                                    Color.Black,
+                                    getTireColor(pRL, isDemoMode).copy(alpha = 0.25f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 2.dp,
+                            brush = Brush.linearGradient(
+                                listOf(getTireColor(pRL, isDemoMode), getTireColor(pRL, isDemoMode).copy(alpha = 0.3f))
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp, 24.dp)
+                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                    )
+                }
+
+                // RR Tyre
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(x = 80.dp, y = 100.dp)
+                        .size(tireWidth, tireHeight)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    getTireColor(pRR, isDemoMode).copy(alpha = 0.45f),
+                                    Color.Black,
+                                    getTireColor(pRR, isDemoMode).copy(alpha = 0.25f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 2.dp,
+                            brush = Brush.linearGradient(
+                                listOf(getTireColor(pRR, isDemoMode), getTireColor(pRR, isDemoMode).copy(alpha = 0.3f))
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp, 24.dp)
+                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                    )
+                }
+            }
+
+            // 2D HUD Callout Leader Lines (Overlay)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cx = size.width / 2
+                val cy = size.height / 2
+                val lineCol = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.35f) else Color(0x335A6E85)
+                val dotCol = if (isDemoMode) colorScheme.specialColor else Color(0xFF5A6E85)
+                val strokeW = 1.5f.dp.toPx()
+                val pulseRadius = pulseRadiusDp.dp.toPx()
+
+                // FL Leader
+                val flStart = Offset(cx - 180.dp.toPx() + 67.5.dp.toPx(), cy - 100.dp.toPx())
+                val flMid = Offset(cx - 130.dp.toPx(), cy - 100.dp.toPx())
+                val flEnd = Offset(cx - 96.dp.toPx(), cy - 90.dp.toPx())
+                drawLine(color = lineCol, start = flStart, end = flMid, strokeWidth = strokeW)
+                drawLine(color = lineCol, start = flMid, end = flEnd, strokeWidth = strokeW)
+                drawCircle(color = dotCol.copy(alpha = 0.2f), radius = pulseRadius, center = flEnd)
+                drawCircle(color = dotCol, radius = 3.dp.toPx(), center = flEnd)
+
+                // FR Leader
+                val frStart = Offset(cx + 180.dp.toPx() - 67.5.dp.toPx(), cy - 100.dp.toPx())
+                val frMid = Offset(cx + 130.dp.toPx(), cy - 100.dp.toPx())
+                val frEnd = Offset(cx + 96.dp.toPx(), cy - 90.dp.toPx())
+                drawLine(color = lineCol, start = frStart, end = frMid, strokeWidth = strokeW)
+                drawLine(color = lineCol, start = frMid, end = frEnd, strokeWidth = strokeW)
+                drawCircle(color = dotCol.copy(alpha = 0.2f), radius = pulseRadius, center = frEnd)
+                drawCircle(color = dotCol, radius = 3.dp.toPx(), center = frEnd)
+
+                // RL Leader
+                val rlStart = Offset(cx - 180.dp.toPx() + 67.5.dp.toPx(), cy + 100.dp.toPx())
+                val rlMid = Offset(cx - 130.dp.toPx(), cy + 100.dp.toPx())
+                val rlEnd = Offset(cx - 96.dp.toPx(), cy + 110.dp.toPx())
+                drawLine(color = lineCol, start = rlStart, end = rlMid, strokeWidth = strokeW)
+                drawLine(color = lineCol, start = rlMid, end = rlEnd, strokeWidth = strokeW)
+                drawCircle(color = dotCol.copy(alpha = 0.2f), radius = pulseRadius, center = rlEnd)
+                drawCircle(color = dotCol, radius = 3.dp.toPx(), center = rlEnd)
+
+                // RR Leader
+                val rrStart = Offset(cx + 180.dp.toPx() - 67.5.dp.toPx(), cy + 100.dp.toPx())
+                val rrMid = Offset(cx + 130.dp.toPx(), cy + 100.dp.toPx())
+                val rrEnd = Offset(cx + 96.dp.toPx(), cy + 110.dp.toPx())
+                drawLine(color = lineCol, start = rrStart, end = rrMid, strokeWidth = strokeW)
+                drawLine(color = lineCol, start = rrMid, end = rrEnd, strokeWidth = strokeW)
+                drawCircle(color = dotCol.copy(alpha = 0.2f), radius = pulseRadius, center = rrEnd)
+                drawCircle(color = dotCol, radius = 3.dp.toPx(), center = rrEnd)
+            }
+
+            // 2D flat HUD cards (Flat glassmorphic overlay, extremely clear)
+            // FRONT LEFT CARD
+            TirePressureBox(
+                pressure = pFL,
+                label = "DELANTERO IZQ (FL)",
+                isDemo = isDemoMode,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = (-180).dp, y = (-100).dp)
+            )
+
+            // FRONT RIGHT CARD
+            TirePressureBox(
+                pressure = pFR,
+                label = "DELANTERO DER (FR)",
+                isDemo = isDemoMode,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = 180.dp, y = (-100).dp)
+            )
+
+            // REAR LEFT CARD
+            TirePressureBox(
+                pressure = pRL,
+                label = "TRASERO IZQ (RL)",
+                isDemo = isDemoMode,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = (-180).dp, y = 100.dp)
+            )
+
+            // REAR RIGHT CARD
+            TirePressureBox(
+                pressure = pRR,
+                label = "TRASERO DER (RR)",
+                isDemo = isDemoMode,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = 180.dp, y = 100.dp)
+            )
+
+            // Center Holographic Core Card (Temperature)
+            val animatedGlow = rememberInfiniteTransition(label = "coreGlow").animateFloat(
+                initialValue = 0.2f,
+                targetValue = 0.7f,
+                animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "glow"
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(135.dp, 84.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xDD101730),
+                                Color(0xDD060B18)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = if (isDemoMode) {
+                                listOf(colorScheme.specialColor.copy(alpha = animatedGlow.value), colorScheme.specialColor.copy(alpha = 0.1f))
+                            } else {
+                                listOf(Color(0x335A6E85), Color(0x115A6E85))
+                            }
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        ambientColor = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent,
+                        spotColor = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent
+                    )
+                    .padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "TEMP. LLANTAS",
+                        color = if (isDemoMode) MeetColors.textSecondary else Color(0x885A6E85),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isDemoMode) "34°C" else "--°C",
+                        color = if (isDemoMode) Color.White else Color(0xFF5A6E85),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isDemoMode) "SISTEMA: NOMINAL" else "SIN MEDICIÓN",
+                        color = if (isDemoMode) MeetColors.success else Color(0xFF5A6E85),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Bottom Color Legend Card
+        EliteCard(
+            modifier = Modifier.fillMaxWidth(0.9f),
+            borderColor = MeetColors.borderSubtle
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(MeetColors.success, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("30 - 36 PSI (Óptimo)", color = Color.White, fontSize = 9.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(MeetColors.warning, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Precaución", color = Color.White, fontSize = 9.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(MeetColors.error, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Crítico / Exceso", color = Color.White, fontSize = 9.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF5A6E85), CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("N/A (Inactivo)", color = Color.White, fontSize = 9.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TirePressureBox(
+    pressure: Float,
+    label: String,
+    isDemo: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val isMeasured = isDemo && pressure > 0f
+    val barVal = pressure * 0.0689476f
+    
+    val shadowColor = if (isMeasured) getTireColor(pressure, isDemo) else Color.Transparent
+
+    Column(
+        modifier = modifier
+            .width(135.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xDD0C101F))
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        getTireColor(pressure, isDemo).copy(alpha = 0.5f),
+                        getTireColor(pressure, isDemo).copy(alpha = 0.15f)
+                    )
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(10.dp),
+                ambientColor = shadowColor.copy(alpha = 0.15f),
+                spotColor = shadowColor.copy(alpha = 0.15f)
+            )
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            color = if (isMeasured) MeetColors.textSecondary else Color(0xFF5A6E85),
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = if (isMeasured) "${String.format("%.1f", pressure)} PSI" else "0.0 PSI",
+            color = getTireColor(pressure, isDemo),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Black
+        )
+        Text(
+            text = if (isMeasured) "${String.format("%.2f", barVal)} BAR" else "0.00 BAR",
+            color = if (isMeasured) Color.White.copy(alpha = 0.6f) else Color(0x665A6E85),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+        if (!isMeasured) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "SIN CONEXIÓN TPMS",
+                color = Color(0x995A6E85),
+                fontSize = 6.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
+
+fun getTireColor(pressure: Float, isDemo: Boolean): Color {
+    if (!isDemo || pressure <= 0f) return Color(0xFF5A6E85)
+    return when {
+        pressure < 27f || pressure > 39f -> MeetColors.error
+        pressure < 30f || pressure > 36f -> MeetColors.warning
+        else -> MeetColors.success
+    }
+}
+
 

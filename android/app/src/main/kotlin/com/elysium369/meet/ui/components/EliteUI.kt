@@ -26,6 +26,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -443,7 +447,7 @@ fun EliteIconButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EliteTopAppBar(
-    title: String,
+    title: Any,
     subtitle: String? = null,
     onBackClick: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
@@ -452,8 +456,16 @@ fun EliteTopAppBar(
     TopAppBar(
         title = {
             Column {
-                Text(title, color = Color.White, fontWeight = FontWeight.Black,
-                    style = MaterialTheme.typography.titleLarge)
+                when (title) {
+                    is AnnotatedString -> {
+                        Text(title, fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleLarge)
+                    }
+                    is String -> {
+                        Text(title, color = Color.White, fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleLarge)
+                    }
+                }
                 if (subtitle != null) {
                     Text(subtitle, color = MeetColors.neonGreen, fontSize = 11.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = 1.sp)

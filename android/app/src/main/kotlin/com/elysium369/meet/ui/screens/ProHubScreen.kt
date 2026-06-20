@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -120,7 +123,13 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 "pre_purchase",
                 "Inspección Pre-Compra", "Pre-Purchase Check",
                 "Verificación de odómetro y salud general", "Verify odometer & vehicle health",
-                "🛡️", Color(0xFF00E5FF), "pre_purchase"
+                "🛡️", Color(0xFF00E5FF), "meet_perito"
+            ),
+            ProFeature(
+                "meet_dna",
+                "Firma MEET DNA", "MEET DNA Signature",
+                "Firma matemática y anomalías de comportamiento", "Mathematical vehicle signature and anomaly tracking",
+                "🧬", MeetColors.cyberCyan, "meet_dna"
             ),
             ProFeature(
                 "performance",
@@ -157,6 +166,12 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 "Eco Viajes", "Eco Trips Log",
                 "Historial de rutas y puntajes eco", "Trip logs, fuel efficiency & eco-scoring",
                 "🍃", MeetColors.neonGreen, "trips"
+            ),
+            ProFeature(
+                "repair_network",
+                "Red de Reparación", "Repair Network",
+                "Base de conocimiento de casos reales", "Offline/online community repair database",
+                "🌐", MeetColors.neonGreen, "repair_network"
             )
         )
     }
@@ -165,7 +180,14 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
         Scaffold(
             topBar = {
                 EliteTopAppBar(
-                    title = "ELYSIUM VANGUARD PRO",
+                    title = buildAnnotatedString {
+                        withStyle(SpanStyle(color = MeetColors.neonGreen)) {
+                            append("ELYSIUM VANGUARD ")
+                        }
+                        withStyle(SpanStyle(color = MeetColors.electricBlue)) {
+                            append("PRO")
+                        }
+                    },
                     subtitle = if (isSpanish) "SISTEMAS AVANZADOS OEM" else "OEM ADVANCED SYSTEMS",
                     backgroundColor = MeetColors.backgroundDark
                 )

@@ -83,7 +83,11 @@ object PidRegistry {
         PidDefinition("01","3C","Temp Cat B1S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
         PidDefinition("01","3D","Temp Cat B2S1","°C",-40f,6513.5f,800f,950f,{a,b,_,_ -> ((a*256f)+b)/10f-40f}, PidCategory.EMISSIONS, isPremium=true),
         PidDefinition("01","5A","Pedal Relat.","%",0f,100f,80f,95f,{a,_,_,_ -> a*100f/255f}, PidCategory.ENGINE),
-        PidDefinition("01","5E","Consumo Comb.","L/h",0f,3212.75f,0f,0f,{a,b,_,_ -> ((a*256f)+b)/20f}, PidCategory.FUEL, isPremium=true)
+        PidDefinition("01","5E","Consumo Comb.","L/h",0f,3212.75f,0f,0f,{a,b,_,_ -> ((a*256f)+b)/20f}, PidCategory.FUEL, isPremium=true),
+        
+        // ODOMETER / MILEAGE
+        PidDefinition("01","A6","Odómetro Standard 01","km",0f,1000000f,0f,0f,{a,b,c,d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f}, PidCategory.ENGINE, isPremium=true),
+        PidDefinition("09","0D","Odómetro Standard 09","km",0f,1000000f,0f,0f,{a,b,c,d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f}, PidCategory.ENGINE, isPremium=true)
     )
 
     /**
@@ -93,19 +97,23 @@ object PidRegistry {
     val MANUFACTURER_PIDS = mapOf(
         "FORD" to listOf(
             PidDefinition("22", "03E0", "Carga Alt.", "%", 0f, 100f, 90f, 98f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "0200", "Presión Aceite", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true)
+            PidDefinition("22", "0200", "Presión Aceite", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "DD01", "Odómetro Ford", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f }, PidCategory.ENGINE, true)
         ),
         "TOYOTA" to listOf(
             PidDefinition("21", "01", "Temp Bat HV", "°C", -40f, 100f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("21", "02", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true)
+            PidDefinition("21", "02", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "C4", "Odómetro Toyota", "km", 0f, 1000000f, 0f, 0f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.ENGINE, true)
         ),
         "GM" to listOf(
             PidDefinition("22", "1940", "Temp Trans Fluid", "°C", -40f, 150f, 110f, 125f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("22", "1153", "Vida Aceite", "%", 0f, 100f, 10f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true)
+            PidDefinition("22", "1153", "Vida Aceite", "%", 0f, 100f, 10f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1A6C", "Odómetro GM", "km", 0f, 1000000f, 0f, 0f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.ENGINE, true)
         ),
         "VOLKSWAGEN" to listOf(
             PidDefinition("22", "11BD", "Presión Turbo Deseada", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "11BE", "Presión Turbo Real", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true)
+            PidDefinition("22", "11BE", "Presión Turbo Real", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "2203", "Odómetro VAG", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat() * 16777216f) + (b.toFloat() * 65536f) + (c.toFloat() * 256f) + d.toFloat()) / 1000f }, PidCategory.ENGINE, true)
         ),
         "HYUNDAI" to listOf(
             PidDefinition("22", "0101", "Temp Bat EV", "°C", -40f, 80f, 45f, 55f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),

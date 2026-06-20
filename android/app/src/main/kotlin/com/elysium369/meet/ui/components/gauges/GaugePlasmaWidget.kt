@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
+import com.elysium369.meet.ui.components.gauges.LocalGaugeColorScheme
 
 /**
  * Plasma Style: Electric blue/purple plasma energy field with lightning arc effects.
@@ -30,6 +31,7 @@ fun GaugePlasmaWidget(
     unit: String, warningThreshold: Float? = null, criticalThreshold: Float? = null,
     isAnomaly: Boolean = false, modifier: Modifier = Modifier
 ) {
+    val colorScheme = LocalGaugeColorScheme.current
     val animVal by animateFloatAsState(value.coerceIn(minVal, maxVal),
         spring(dampingRatio = 0.7f, stiffness = 120f), label = "plasma")
     val inf = rememberInfiniteTransition(label = "pp")
@@ -41,22 +43,22 @@ fun GaugePlasmaWidget(
         infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Restart), label = "pc")
     val tm = rememberTextMeasurer()
 
-    val plasmaBlue = Color(0xFF0066FF)
-    val plasmaViolet = Color(0xFF8800FF)
-    val plasmaWhite = Color(0xFFCCDDFF)
+    val plasmaBlue = colorScheme.internalColor
+    val plasmaViolet = colorScheme.specialColor
+    val plasmaWhite = colorScheme.textColor
 
     Spacer(modifier = modifier.fillMaxWidth().aspectRatio(1f).padding(4.dp).drawWithCache {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r = size.width / 2f - 18.dp.toPx()
         val sweep = 270f; val start = 135f
-        val lbl = tm.measure(label.uppercase(), TextStyle(color = plasmaBlue.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace))
+        val lbl = tm.measure(label.uppercase(), TextStyle(color = colorScheme.labelColor.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace))
 
         onDrawBehind {
             val prog = if (maxVal == minVal) 0f else ((animVal - minVal) / (maxVal - minVal)).coerceIn(0f, 1f)
             val col = when {
-                isAnomaly -> Color(0xFFFF0066)
-                criticalThreshold != null && animVal >= criticalThreshold -> Color(0xFFFF0066)
-                warningThreshold != null && animVal >= warningThreshold -> Color(0xFFFF6600)
+                isAnomaly -> colorScheme.needleColor
+                criticalThreshold != null && animVal >= criticalThreshold -> colorScheme.needleColor
+                warningThreshold != null && animVal >= warningThreshold -> colorScheme.specialColor
                 else -> plasmaBlue
             }
 
@@ -119,7 +121,13 @@ fun GaugePlasmaWidget(
             // Value
             val vt = tm.measure(String.format("%.0f", animVal), TextStyle(color = plasmaWhite, fontSize = 28.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace))
             drawText(vt, topLeft = Offset(cx - vt.size.width / 2f, cy - vt.size.height / 2f - 8.dp.toPx()))
-            val ut = tm.measure(unit.lowercase(), TextStyle(color = col, fontSize = 11.sp, fontWeight = FontWeight.Bold))
+            val activeUnitColor = when {
+                isAnomaly -> colorScheme.needleColor
+                criticalThreshold != null && animVal >= criticalThreshold -> colorScheme.needleColor
+                warningThreshold != null && animVal >= warningThreshold -> colorScheme.specialColor
+                else -> colorScheme.unitColor
+            }
+            val ut = tm.measure(unit.lowercase(), TextStyle(color = activeUnitColor, fontSize = 11.sp, fontWeight = FontWeight.Bold))
             drawText(ut, topLeft = Offset(cx - ut.size.width / 2f, cy + 10.dp.toPx()))
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 26.dp.toPx()))
         }

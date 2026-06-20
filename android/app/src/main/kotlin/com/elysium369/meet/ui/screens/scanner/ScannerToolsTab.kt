@@ -160,6 +160,50 @@ fun ScannerToolsTab(
             }
         }
         
+        // 1b. Motor 3D / Localizador 3D Card
+        item {
+            EliteCard(
+                backgroundColor = MeetColors.backgroundDeep,
+                borderColor = MeetColors.cyberCyan.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(14.dp),
+                glowColor = MeetColors.cyberCyan.copy(alpha = 0.15f),
+                onClick = {
+                    navController.navigate("component_locator")
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(MeetColors.cyberCyan.copy(alpha = 0.1f), CircleShape)
+                            .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("📦", fontSize = 22.sp)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (isSpanish) "Diagnóstico Visual 3D" else "3D Visual Diagnostic", 
+                            color = Color.White, 
+                            fontWeight = FontWeight.Bold, 
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            if (isSpanish) "Localizador interactivo de motor, fusibles y arnés eléctrico" else "Interactive locator for engine, fuses, and wiring harness", 
+                            color = MeetColors.textSecondary, 
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+        
         // 2. AI Health Monitoring
         item {
             EliteCard(
