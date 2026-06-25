@@ -44,6 +44,9 @@ import com.elysium369.meet.data.local.entities.*
         RepairVerificationEntity::class,
         ServiceRequestEntity::class,
         ServiceBidEntity::class,
+        PartsStoreEntity::class,
+        PartRequestEntity::class,
+        PartOfferEntity::class,
         EvidencePackageEntity::class,
         VehicleTwinProfileEntity::class,
         TwinAnomalyEntity::class,
@@ -73,7 +76,7 @@ import com.elysium369.meet.data.local.entities.*
         SavedGaugeEntity::class,
         GaugeListingCacheEntity::class
     ],
-    version = 28,
+    version = 29,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

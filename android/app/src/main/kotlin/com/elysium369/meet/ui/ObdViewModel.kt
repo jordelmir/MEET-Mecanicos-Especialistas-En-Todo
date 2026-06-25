@@ -427,6 +427,136 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    val partsStores: StateFlow<List<PartsStoreEntity>> = marketplaceDao.getPartsStores()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val partRequests: StateFlow<List<PartRequestEntity>> = marketplaceDao.getPartRequests()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun getPartOffersForRequest(requestId: String): Flow<List<PartOfferEntity>> {
+        return marketplaceDao.getPartOffersForRequest(requestId)
+    }
+
+    fun createPartRequest(
+        serviceRequestId: String?,
+        vehicleId: String,
+        dtcCode: String?,
+        partName: String,
+        partNumber: String?,
+        quantity: Int,
+        oemPreference: String,
+        deliveryLocation: String,
+        urgencyMinutes: Int,
+        customerNotes: String
+    ) {
+        val request = PartRequestEntity(
+            requestId = UUID.randomUUID().toString(),
+            serviceRequestId = serviceRequestId,
+            vehicleId = vehicleId,
+            dtcCode = dtcCode,
+            partName = partName,
+            partNumber = partNumber?.takeIf { it.isNotBlank() },
+            quantity = quantity.coerceAtLeast(1),
+            oemPreference = oemPreference,
+            deliveryLocation = deliveryLocation,
+            urgencyMinutes = urgencyMinutes.coerceAtLeast(15),
+            customerNotes = customerNotes,
+            status = "OPEN",
+            acceptedOfferId = null,
+            createdAt = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.insertPartRequest(request)
+                runCatching { SupabaseManager.client.postgrest["part_requests"].insert(request) }
+                    .onFailure { Log.w("ObdViewModel", "Part request saved locally; cloud table unavailable", it) }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to create part request", e)
+            }
+        }
+    }
+
+    fun placePartOffer(
+        partRequestId: String,
+        storeName: String,
+        brand: String,
+        partNumber: String,
+        condition: String,
+        price: Double,
+        deliveryFee: Double,
+        etaMinutes: Int,
+        warrantyDays: Int,
+        message: String
+    ) {
+        val storeId = storeName.trim().lowercase()
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
+            .ifBlank { "repuestera_local" }
+        val now = System.currentTimeMillis()
+        val store = PartsStoreEntity(
+            storeId = storeId,
+            storeName = storeName.ifBlank { "Repuestera local" },
+            rating = 4.8,
+            phone = "",
+            location = "Zona local",
+            deliveryRadiusKm = 20.0,
+            averageEtaMinutes = etaMinutes.coerceAtLeast(15),
+            verified = false,
+            createdAt = now
+        )
+        val offer = PartOfferEntity(
+            offerId = UUID.randomUUID().toString(),
+            partRequestId = partRequestId,
+            storeId = store.storeId,
+            storeName = store.storeName,
+            brand = brand.ifBlank { "Marca por confirmar" },
+            partNumber = partNumber.ifBlank { "Por confirmar" },
+            condition = condition,
+            price = price,
+            deliveryFee = deliveryFee.coerceAtLeast(0.0),
+            etaMinutes = etaMinutes.coerceAtLeast(15),
+            warrantyDays = warrantyDays.coerceAtLeast(0),
+            message = message,
+            status = "PENDING",
+            createdAt = now
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.insertPartsStore(store)
+                marketplaceDao.insertPartOffer(offer)
+                runCatching { SupabaseManager.client.postgrest["parts_stores"].upsert(store) }
+                    .onFailure { Log.w("ObdViewModel", "Parts store saved locally; cloud table unavailable", it) }
+                runCatching { SupabaseManager.client.postgrest["part_offers"].insert(offer) }
+                    .onFailure { Log.w("ObdViewModel", "Part offer saved locally; cloud table unavailable", it) }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to place part offer", e)
+            }
+        }
+    }
+
+    fun acceptPartOffer(partRequestId: String, offerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.updatePartRequestStatus(partRequestId, "ACCEPTED", offerId)
+                marketplaceDao.updatePartOfferStatus(offerId, "ACCEPTED")
+                runCatching {
+                    SupabaseManager.client.postgrest["part_requests"].update(
+                        mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
+                    ) { filter { eq("requestId", partRequestId) } }
+                }.onFailure { Log.w("ObdViewModel", "Part request accepted locally; cloud table unavailable", it) }
+                runCatching {
+                    SupabaseManager.client.postgrest["part_offers"].update(mapOf("status" to "ACCEPTED")) {
+                        filter { eq("offerId", offerId) }
+                    }
+                }.onFailure { Log.w("ObdViewModel", "Part offer accepted locally; cloud table unavailable", it) }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to accept part offer", e)
+            }
+        }
+    }
+
     // Background periodic task to poll/sync local Room data with Supabase for Marketplace
     fun startMarketplaceSync() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -553,6 +683,7 @@ class ObdViewModel @Inject constructor(
     private val initialDtcScanMutex = Mutex()
     @Volatile private var hasCompletedInitialDtcScan = false
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val activeDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
         vehicle?.let {
             dtcDao.getUnresolvedDtcsForVehicle(it.id)
@@ -560,6 +691,7 @@ class ObdViewModel @Inject constructor(
         } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val pendingDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
         vehicle?.let {
             dtcDao.getUnresolvedDtcsForVehicle(it.id)
@@ -567,6 +699,7 @@ class ObdViewModel @Inject constructor(
         } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val permanentDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
         vehicle?.let {
             dtcDao.getUnresolvedDtcsForVehicle(it.id)
@@ -574,6 +707,7 @@ class ObdViewModel @Inject constructor(
         } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val historicalDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
         vehicle?.let {
             dtcDao.getUnresolvedDtcsForVehicle(it.id)
@@ -581,14 +715,28 @@ class ObdViewModel @Inject constructor(
         } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    // Backwards compatibility for logic that only needs the strings
-    val activeDtcs: StateFlow<List<String>> = activeDtcEvents.map { list -> list.map { it.code } }
+    private val _latestScanActiveDtcs = MutableStateFlow<List<String>>(emptyList())
+    private val _latestScanPendingDtcs = MutableStateFlow<List<String>>(emptyList())
+    private val _latestScanPermanentDtcs = MutableStateFlow<List<String>>(emptyList())
+    private val _latestScanHistoricalDtcs = MutableStateFlow<List<String>>(emptyList())
+
+    // Backwards compatibility for logic that only needs the strings.
+    // The latest scan bucket keeps DTCs visible even before a vehicle record is selected or Room emits.
+    val activeDtcs: StateFlow<List<String>> = combine(activeDtcEvents, _latestScanActiveDtcs) { events, latest ->
+        (events.map { it.code } + latest).distinct()
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val pendingDtcs: StateFlow<List<String>> = pendingDtcEvents.map { list -> list.map { it.code } }
+    val pendingDtcs: StateFlow<List<String>> = combine(pendingDtcEvents, _latestScanPendingDtcs) { events, latest ->
+        (events.map { it.code } + latest).distinct()
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val permanentDtcs: StateFlow<List<String>> = permanentDtcEvents.map { list -> list.map { it.code } }
+    val permanentDtcs: StateFlow<List<String>> = combine(permanentDtcEvents, _latestScanPermanentDtcs) { events, latest ->
+        (events.map { it.code } + latest).distinct()
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val historicalDtcs: StateFlow<List<String>> = historicalDtcEvents.map { list -> list.map { it.code } }
+    val historicalDtcs: StateFlow<List<String>> = combine(historicalDtcEvents, _latestScanHistoricalDtcs) { events, latest ->
+        (events.map { it.code } + latest).distinct()
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val lastDtcScanReport: StateFlow<DtcScanReport?> = obdSession.lastDtcScanReport
@@ -2421,6 +2569,11 @@ class ObdViewModel @Inject constructor(
             val freshPermanent = professionalReport.codesForBucket(DtcBucket.PERMANENT)
             val freshHistory = professionalReport.codesForBucket(DtcBucket.HISTORY)
 
+            _latestScanActiveDtcs.value = freshActive
+            _latestScanPendingDtcs.value = freshPending
+            _latestScanPermanentDtcs.value = freshPermanent
+            _latestScanHistoricalDtcs.value = freshHistory
+
             addTerminalLog(
                 "[SCAN] Activos: ${freshActive.size} | Pendientes: ${freshPending.size} | Permanentes: ${freshPermanent.size} | Históricos: ${freshHistory.size}",
                 TerminalLineType.SYSTEM
@@ -2429,6 +2582,11 @@ class ObdViewModel @Inject constructor(
             val vehicle = _selectedVehicle.value
             if (vehicle != null) {
                 saveDetectedDtcFindings(professionalReport)
+            } else if ((freshActive + freshPending + freshPermanent + freshHistory).isNotEmpty()) {
+                addTerminalLog(
+                    "[SCAN] Códigos visibles en pantalla desde el último escaneo; selecciona un vehículo para guardar historial persistente.",
+                    TerminalLineType.WARNING
+                )
             }
 
             // Mode 01 PID 01 → I/M Readiness Monitors
@@ -2506,16 +2664,7 @@ class ObdViewModel @Inject constructor(
             } else {
                 val vehicleMake = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(vehicle.make)
                 val def = dtcDefinitionDao.getDefinitionForCode(record.code, vehicleMake)
-                val description = if (def != null && !def.descriptionEs.isNullOrBlank()) {
-                    val raw = def.descriptionEs
-                    if (raw.contains("no disponible localmente") || raw.contains("no disponible offline")) {
-                        com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(record.code, isSpanish = true)
-                    } else {
-                        raw
-                    }
-                } else {
-                    com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(record.code, isSpanish = true)
-                }
+                val description = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(def, record.code)
                 val severity = if (def != null && !def.severity.isNullOrBlank() && def.severity != "UNKNOWN") {
                     def.severity
                 } else {
@@ -2644,16 +2793,7 @@ class ObdViewModel @Inject constructor(
                 // Fetch definition for initial discovery
                 val vehicleMake = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(vehicle.make)
                 val def = dtcDefinitionDao.getDefinitionForCode(code, vehicleMake)
-                val description = if (def != null && !def.descriptionEs.isNullOrBlank()) {
-                    val raw = def.descriptionEs
-                    if (raw.contains("no disponible localmente") || raw.contains("no disponible offline")) {
-                        com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(code, isSpanish = true)
-                    } else {
-                        raw
-                    }
-                } else {
-                    com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(code, isSpanish = true)
-                }
+                val description = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(def, code)
                 val severity = if (def != null && !def.severity.isNullOrBlank() && def.severity != "UNKNOWN") {
                     def.severity
                 } else {
@@ -2709,7 +2849,7 @@ class ObdViewModel @Inject constructor(
                 if (!newDefinitions.containsKey(code)) {
                     val def = dtcDefinitionDao.getDefinitionForCode(code, vehicleMake)
                     if (def != null) {
-                        newDefinitions[code] = def
+                        newDefinitions[code] = localizeDtcDefinition(def)
                     } else {
                         newDefinitions[code] = generateFallbackDefinition(code)
                     }
@@ -2733,8 +2873,15 @@ class ObdViewModel @Inject constructor(
             descriptionEs = descEs,
             system = when (letter) { 'P' -> "ENGINE"; 'C' -> "CHASSIS"; 'B' -> "BODY"; 'U' -> "NETWORK"; else -> "GENERAL" },
             severity = severity,
-            possibleCauses = "Requiere escaneo profesional avanzado. / Requires advanced professional scan.",
+            possibleCauses = com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(code, null),
             urgency = urgency
+        )
+    }
+
+    private fun localizeDtcDefinition(definition: DtcDefinitionEntity): DtcDefinitionEntity {
+        return definition.copy(
+            descriptionEs = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(definition, definition.code),
+            possibleCauses = com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(definition.code, definition.possibleCauses)
         )
     }
 
@@ -2751,9 +2898,14 @@ class ObdViewModel @Inject constructor(
                 } else {
                     // Deduplicate: group by code, prefer manufacturer-specific over GENERIC
                     val deduped = dbResults
+                        .map { localizeDtcDefinition(it) }
                         .groupBy { it.code }
                         .map { (_, entries) ->
-                            entries.firstOrNull { it.manufacturer != "GENERIC" } ?: entries.first()
+                            entries.firstOrNull {
+                                it.manufacturer != "GENERIC" &&
+                                    !it.possibleCauses.isNullOrBlank() &&
+                                    !it.possibleCauses.contains("manufacturer manual", ignoreCase = true)
+                            } ?: entries.firstOrNull { it.manufacturer == "GENERIC" } ?: entries.first()
                         }
                         .take(50)
                     _manualSearchResults.value = deduped
@@ -2765,7 +2917,10 @@ class ObdViewModel @Inject constructor(
     suspend fun getDtcDefinition(code: String): DtcDefinitionEntity {
         val make = _selectedVehicle.value?.make ?: "GENERIC"
         val normalizedMake = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(make)
-        return dtcDefinitionDao.getDefinitionForCode(code.uppercase(), normalizedMake) ?: generateFallbackDefinition(code.uppercase())
+        val normalizedCode = code.uppercase()
+        return dtcDefinitionDao.getDefinitionForCode(normalizedCode, normalizedMake)
+            ?.let { localizeDtcDefinition(it) }
+            ?: generateFallbackDefinition(normalizedCode)
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -2834,6 +2989,10 @@ class ObdViewModel @Inject constructor(
                 _selectedVehicle.value?.let { vehicle ->
                     dtcDao.resolveAllDtcsForVehicle(vehicle.id, System.currentTimeMillis())
                 }
+                _latestScanActiveDtcs.value = emptyList()
+                _latestScanPendingDtcs.value = emptyList()
+                _latestScanPermanentDtcs.value = emptyList()
+                _latestScanHistoricalDtcs.value = emptyList()
                 _freezeFrameData.value = emptyMap()
                 updateHealthScore()
                 scheduleSync()

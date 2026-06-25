@@ -89,6 +89,39 @@ interface MarketplaceDao {
 
     @Query("SELECT * FROM service_bids WHERE shopId = :shopId ORDER BY createdAt DESC")
     fun getBidsByShop(shopId: String): Flow<List<ServiceBidEntity>>
+
+    @Query("SELECT * FROM parts_stores ORDER BY verified DESC, rating DESC, averageEtaMinutes ASC")
+    fun getPartsStores(): Flow<List<PartsStoreEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPartsStore(store: PartsStoreEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPartsStores(stores: List<PartsStoreEntity>)
+
+    @Query("SELECT * FROM part_requests ORDER BY createdAt DESC")
+    fun getPartRequests(): Flow<List<PartRequestEntity>>
+
+    @Query("SELECT * FROM part_requests WHERE status = 'OPEN' ORDER BY urgencyMinutes ASC, createdAt DESC")
+    fun getOpenPartRequests(): Flow<List<PartRequestEntity>>
+
+    @Query("SELECT * FROM part_requests WHERE requestId = :requestId LIMIT 1")
+    suspend fun getPartRequestById(requestId: String): PartRequestEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPartRequest(request: PartRequestEntity)
+
+    @Query("SELECT * FROM part_offers WHERE partRequestId = :requestId ORDER BY etaMinutes ASC, price ASC")
+    fun getPartOffersForRequest(requestId: String): Flow<List<PartOfferEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPartOffer(offer: PartOfferEntity)
+
+    @Query("UPDATE part_requests SET status = :status, acceptedOfferId = :acceptedOfferId WHERE requestId = :requestId")
+    suspend fun updatePartRequestStatus(requestId: String, status: String, acceptedOfferId: String?)
+
+    @Query("UPDATE part_offers SET status = :status WHERE offerId = :offerId")
+    suspend fun updatePartOfferStatus(offerId: String, status: String)
 }
 
 @Dao

@@ -1495,6 +1495,69 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 28→29: Creating real parts-store auction tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `parts_stores` (
+                    `storeId` TEXT NOT NULL,
+                    `storeName` TEXT NOT NULL,
+                    `rating` REAL NOT NULL,
+                    `phone` TEXT NOT NULL,
+                    `location` TEXT NOT NULL,
+                    `deliveryRadiusKm` REAL NOT NULL,
+                    `averageEtaMinutes` INTEGER NOT NULL,
+                    `verified` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`storeId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `part_requests` (
+                    `requestId` TEXT NOT NULL,
+                    `serviceRequestId` TEXT,
+                    `vehicleId` TEXT NOT NULL,
+                    `dtcCode` TEXT,
+                    `partName` TEXT NOT NULL,
+                    `partNumber` TEXT,
+                    `quantity` INTEGER NOT NULL,
+                    `oemPreference` TEXT NOT NULL,
+                    `deliveryLocation` TEXT NOT NULL,
+                    `urgencyMinutes` INTEGER NOT NULL,
+                    `customerNotes` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `acceptedOfferId` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`requestId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `part_offers` (
+                    `offerId` TEXT NOT NULL,
+                    `partRequestId` TEXT NOT NULL,
+                    `storeId` TEXT NOT NULL,
+                    `storeName` TEXT NOT NULL,
+                    `brand` TEXT NOT NULL,
+                    `partNumber` TEXT NOT NULL,
+                    `condition` TEXT NOT NULL,
+                    `price` REAL NOT NULL,
+                    `deliveryFee` REAL NOT NULL,
+                    `etaMinutes` INTEGER NOT NULL,
+                    `warrantyDays` INTEGER NOT NULL,
+                    `message` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`offerId`)
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_part_requests_status_createdAt` ON `part_requests` (`status`, `createdAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_part_requests_vehicleId` ON `part_requests` (`vehicleId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_part_requests_serviceRequestId` ON `part_requests` (`serviceRequestId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_part_offers_partRequestId` ON `part_offers` (`partRequestId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_part_offers_storeId` ON `part_offers` (`storeId`)")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -1512,7 +1575,7 @@ object AppModule {
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
             MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
             MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
-            MIGRATION_26_27, MIGRATION_27_28
+            MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

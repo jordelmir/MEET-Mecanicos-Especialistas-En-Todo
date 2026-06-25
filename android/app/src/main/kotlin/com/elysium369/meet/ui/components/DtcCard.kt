@@ -61,7 +61,7 @@ fun DtcCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = definition?.descriptionEs ?: "Descripción no disponible offline",
+                text = DtcUtils.getSpanishDescription(definition, dtcCode),
                 color = Color.LightGray
             )
 
@@ -71,7 +71,7 @@ fun DtcCard(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text("Posibles Causas:", color = Color.White, fontWeight = FontWeight.Bold)
-                Text(definition?.possibleCauses ?: "--", color = Color.Gray)
+                Text(DtcUtils.getSpanishPossibleCauses(dtcCode, definition?.possibleCauses), color = Color.Gray)
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 

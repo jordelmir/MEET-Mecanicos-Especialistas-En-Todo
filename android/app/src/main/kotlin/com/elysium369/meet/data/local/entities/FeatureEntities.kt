@@ -140,6 +140,71 @@ data class ServiceBidEntity(
     val createdAt: Long
 )
 
+@Entity(tableName = "parts_stores")
+@Serializable
+data class PartsStoreEntity(
+    @PrimaryKey val storeId: String,
+    val storeName: String,
+    val rating: Double,
+    val phone: String,
+    val location: String,
+    val deliveryRadiusKm: Double,
+    val averageEtaMinutes: Int,
+    val verified: Boolean,
+    val createdAt: Long
+)
+
+@Entity(
+    tableName = "part_requests",
+    indices = [
+        Index(value = ["status", "createdAt"]),
+        Index(value = ["vehicleId"]),
+        Index(value = ["serviceRequestId"])
+    ]
+)
+@Serializable
+data class PartRequestEntity(
+    @PrimaryKey val requestId: String,
+    val serviceRequestId: String?,
+    val vehicleId: String,
+    val dtcCode: String?,
+    val partName: String,
+    val partNumber: String?,
+    val quantity: Int,
+    val oemPreference: String,      // OEM, AFTERMARKET, ANY
+    val deliveryLocation: String,
+    val urgencyMinutes: Int,
+    val customerNotes: String,
+    val status: String,             // OPEN, ACCEPTED, DELIVERED, CANCELLED
+    val acceptedOfferId: String?,
+    val createdAt: Long
+)
+
+@Entity(
+    tableName = "part_offers",
+    indices = [
+        Index(value = ["partRequestId"]),
+        Index(value = ["storeId"])
+    ]
+)
+@Serializable
+data class PartOfferEntity(
+    @PrimaryKey val offerId: String,
+    val partRequestId: String,
+    val storeId: String,
+    val storeName: String,
+    val brand: String,
+    val partNumber: String,
+    val condition: String,          // NEW, OEM, USED_TESTED, REMAN
+    val price: Double,
+    val deliveryFee: Double,
+    val etaMinutes: Int,
+    val warrantyDays: Int,
+    val message: String,
+    val status: String,             // PENDING, ACCEPTED, REJECTED
+    val createdAt: Long
+)
+
 // ═══════════════════════════════════════════════════════════════
 // FEATURE 4 — MEET Black Box
 // ═══════════════════════════════════════════════════════════════

@@ -18,6 +18,8 @@ MEET es una plataforma Android de diagnostico automotriz offline-first orientada
 - Topologia real de ECUs: la pantalla de topologia ya no ofrece simulacion. Solo dibuja modulos que responden fisicamente al sondeo.
 - Borrado de DTCs, pruebas activas y adaptaciones: requieren enlace OBD real. Ya no se marcan como exitosas sin vehiculo conectado.
 - Escaneo DTC y registro de viajes: ya no fabrican resultados cuando no hay vehiculo enlazado.
+- La pantalla DTC muestra automaticamente los codigos del ultimo escaneo real aunque todavia no haya un vehiculo seleccionado para historial persistente.
+- DTC incluye una seccion `Hallazgos` con resumen de activos/pendientes/permanentes/historicos, modulos que respondieron y guia directa por codigo.
 - Bluetooth Classic: transporte RFCOMM/SPP real.
 - BLE: escaneo real con `BluetoothLeScanner` y conexion GATT real via `BleTransport`.
 - WiFi TCP: conexion real a adaptadores ELM por socket.
@@ -83,6 +85,9 @@ La app tambien crea y migra tablas de conocimiento mecanico para:
 - `tool_usage_guides`
 - `safety_protocols`
 - `meet_knowledge_matrix`
+- `parts_stores`
+- `part_requests`
+- `part_offers`
 
 Esto permite que el conocimiento mecanico viva dentro del dispositivo, incluso con mala conectividad en taller.
 
@@ -136,8 +141,11 @@ Se mejoraron flujos para que la informacion entre mejor desde el principio:
 - publicar un caso pide mejor contexto tecnico y valida formato DTC real
 - el marketplace del cliente ahora explica que evidencia minima conviene publicar
 - el dashboard de taller ahora guia mejor la oferta: tiempo, garantia, enfoque diagnostico
+- el marketplace agrega subasta real de repuestos: el cliente crea una solicitud de pieza ligada a una solicitud de servicio, DTC y vehiculo
+- las repuesteras pueden ofertar marca, numero de parte, condicion, precio, envio, ETA y garantia
+- el cliente puede aceptar una oferta de repuesto; Room guarda la solicitud y la oferta aceptada para operar offline y sincronizar cuando exista backend
 
-La idea es que una solicitud no sea solo "el carro falla", sino una orden de triage util para cotizar y resolver.
+La idea es que una solicitud no sea solo "el carro falla", sino una orden de triage util para cotizar, diagnosticar, conseguir la pieza correcta y resolver en una sola visita.
 
 ## DIY Gauges y marketplace
 
@@ -196,9 +204,10 @@ Nota: el `.db` completo supera 100 MB y no se empuja a GitHub como blob normal. 
 ## Estado verificado en esta iteracion
 
 - `:app:compileDebugKotlin` exitoso
-- APK debug instalable via `adb`
-- app abierta en Android via `am start`
-- `generate_db.py --include-graph` ejecutado y base regenerada
+- `:app:assembleDebug` exitoso
+- APK debug instalado via `adb install -r`
+- app abierta en Android via `adb shell am start -n com.elysium369.meet/.MainActivity`
+- `MainActivity` quedo activa despues de corregir la migracion Room `28 -> 29`
 
 ## Fuentes tecnicas
 

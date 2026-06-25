@@ -84,6 +84,165 @@ object DtcUtils {
         }
     }
 
+    fun getSpanishDescription(definition: DtcDefinitionEntity?, code: String): String {
+        val raw = definition?.descriptionEs?.trim().orEmpty()
+        val normalizedCode = code.trim().uppercase()
+        return when {
+            raw.isBlank() -> getKnownSpanishTitle(normalizedCode)
+                ?: getDynamicDtcFallbackDescription(normalizedCode, isSpanish = true)
+            raw.contains("no disponible localmente", ignoreCase = true) ||
+                raw.contains("no disponible offline", ignoreCase = true) -> getDynamicDtcFallbackDescription(normalizedCode, isSpanish = true)
+            looksEnglishDiagnosticText(raw) -> getKnownSpanishTitle(normalizedCode)
+                ?: translateKnownDiagnosticTitle(raw)
+                ?: getDynamicDtcFallbackDescription(normalizedCode, isSpanish = true)
+            else -> raw
+        }
+    }
+
+    fun getSpanishPossibleCauses(code: String, rawCauses: String?): String {
+        val normalizedCode = code.trim().uppercase()
+        val raw = rawCauses?.trim().orEmpty()
+        if (raw.isBlank() || raw.equals("Consult manufacturer manual.", ignoreCase = true) || raw.equals("--", ignoreCase = true)) {
+            return defaultSpanishCauses(normalizedCode)
+        }
+
+        if (!looksEnglishDiagnosticText(raw)) return raw
+
+        val translated = raw
+            .split('|', ',')
+            .map { translateCausePhrase(it.trim()) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" | ")
+
+        return if (translated.isBlank() || looksEnglishDiagnosticText(translated)) {
+            defaultSpanishCauses(normalizedCode)
+        } else {
+            translated
+        }
+    }
+
+    private fun looksEnglishDiagnosticText(text: String): Boolean {
+        val value = text.trim()
+        if (value.isBlank()) return false
+        val englishNeedles = listOf(
+            "detected", "circuit", "bank", "cylinder", "misfire", "threshold", "range",
+            "performance", "malfunction", "sensor", "fuel", "spark", "ignition",
+            "vacuum", "pressure", "low", "high", "open", "short", "manufacturer manual"
+        )
+        return englishNeedles.any { value.contains(it, ignoreCase = true) } &&
+            !value.contains("falla", ignoreCase = true) &&
+            !value.contains("buj", ignoreCase = true) &&
+            !value.contains("combustible", ignoreCase = true) &&
+            !value.contains("encendido", ignoreCase = true)
+    }
+
+    private fun getKnownSpanishTitle(code: String): String? {
+        if (code == "P0300") return "Fallas de encendido aleatorias o múltiples detectadas"
+        if (code.matches(Regex("P030[1-9]|P031[0-2]"))) {
+            val cylinder = code.substring(3).toIntOrNull()
+            if (cylinder != null) return "Falla de encendido detectada en cilindro $cylinder"
+        }
+        return when (code) {
+            "P0171" -> "Sistema demasiado pobre en banco 1"
+            "P0172" -> "Sistema demasiado rico en banco 1"
+            "P0174" -> "Sistema demasiado pobre en banco 2"
+            "P0175" -> "Sistema demasiado rico en banco 2"
+            "P0420" -> "Eficiencia del catalizador por debajo del umbral en banco 1"
+            "P0430" -> "Eficiencia del catalizador por debajo del umbral en banco 2"
+            "P0100" -> "Falla en circuito del sensor MAF"
+            "P0101" -> "Rango o rendimiento incorrecto del sensor MAF"
+            "P0102" -> "Entrada baja del circuito del sensor MAF"
+            "P0103" -> "Entrada alta del circuito del sensor MAF"
+            "P0113" -> "Entrada alta del circuito del sensor de temperatura de aire de admisión"
+            else -> null
+        }
+    }
+
+    private fun translateKnownDiagnosticTitle(raw: String): String? {
+        val title = raw.trim().trimEnd('.')
+        Regex("Cylinder\\s+(\\d+)\\s+Misfire\\s+Detected", RegexOption.IGNORE_CASE)
+            .find(title)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.let { return "Falla de encendido detectada en cilindro $it" }
+        return when {
+            title.equals("Random/Multiple Cylinder Misfire Detected", ignoreCase = true) ->
+                "Fallas de encendido aleatorias o múltiples detectadas"
+            title.contains("System Too Lean", ignoreCase = true) && title.contains("Bank 1", ignoreCase = true) ->
+                "Sistema demasiado pobre en banco 1"
+            title.contains("System Too Lean", ignoreCase = true) && title.contains("Bank 2", ignoreCase = true) ->
+                "Sistema demasiado pobre en banco 2"
+            title.contains("Catalyst System Efficiency Below Threshold", ignoreCase = true) && title.contains("Bank 1", ignoreCase = true) ->
+                "Eficiencia del catalizador por debajo del umbral en banco 1"
+            title.contains("Catalyst System Efficiency Below Threshold", ignoreCase = true) && title.contains("Bank 2", ignoreCase = true) ->
+                "Eficiencia del catalizador por debajo del umbral en banco 2"
+            title.contains("Mass or Volume Air Flow", ignoreCase = true) ->
+                "Rango o rendimiento incorrecto del sensor MAF"
+            else -> null
+        }
+    }
+
+    private fun translateCausePhrase(phrase: String): String {
+        if (phrase.isBlank()) return ""
+        val cleaned = phrase.trim().trimEnd('.')
+        val exact = mapOf(
+            "Worn out spark plugs" to "Bujías desgastadas o contaminadas",
+            "ignition wires" to "cables de bujía dañados",
+            "coil(s)" to "bobina(s) de encendido defectuosas",
+            "distributor cap and rotor (when applicable)" to "tapa y rotor del distribuidor dañados (si aplica)",
+            "Incorrect ignition timing" to "tiempo de encendido incorrecto",
+            "Vacuum leak(s)" to "fuga(s) de vacío en admisión",
+            "Low or weak fuel pressure" to "presión de combustible baja o inestable",
+            "Improperly functioning EGR system" to "sistema EGR funcionando incorrectamente",
+            "Defective Mass Air Flow Sensor" to "sensor MAF defectuoso o contaminado",
+            "Defective Crankshaft and or Camshaft Sensor" to "sensor CKP/CMP defectuoso",
+            "Defective Throttle Position Sensor" to "sensor TPS defectuoso",
+            "Mechanical engine problems (i.e.—low compression, leaking head gasket(s), or valve problems)" to "problemas mecánicos: baja compresión, junta de culata con fuga o válvulas dañadas",
+            "Control module software needs to be updated" to "software del módulo de control requiere actualización",
+            "Vacuum leaks (intake manifold gaskets, vacuum hoses, PCV hoses, etc.)" to "fugas de vacío en juntas de admisión, mangueras o sistema PCV",
+            "Mass air flow sensor" to "sensor MAF sucio o defectuoso",
+            "Plugged fuel filter or weak fuel pump" to "filtro de combustible obstruido o bomba débil",
+            "Plugged or dirty fuel injectors" to "inyectores obstruidos o sucios",
+            "Inefficient Catalytic Converter(s)" to "convertidor catalítico ineficiente o dañado",
+            "Defective Front or Rear Oxygen Sensor(s)" to "sensor(es) de oxígeno delantero o trasero defectuosos",
+            "Misfiring engines" to "fallas de encendido que dañan o saturan el catalizador"
+        )
+        exact.entries.firstOrNull { cleaned.equals(it.key, ignoreCase = true) }?.let { return it.value }
+
+        return cleaned
+            .replace("spark plugs", "bujías", ignoreCase = true)
+            .replace("ignition", "encendido", ignoreCase = true)
+            .replace("fuel pressure", "presión de combustible", ignoreCase = true)
+            .replace("fuel pump", "bomba de combustible", ignoreCase = true)
+            .replace("fuel injectors", "inyectores", ignoreCase = true)
+            .replace("vacuum leak", "fuga de vacío", ignoreCase = true)
+            .replace("oxygen sensor", "sensor de oxígeno", ignoreCase = true)
+            .replace("catalytic converter", "convertidor catalítico", ignoreCase = true)
+            .replace("sensor", "sensor", ignoreCase = true)
+            .replace("defective", "defectuoso", ignoreCase = true)
+            .replace("damaged", "dañado", ignoreCase = true)
+            .replace("low", "bajo", ignoreCase = true)
+            .replace("high", "alto", ignoreCase = true)
+    }
+
+    private fun defaultSpanishCauses(code: String): String {
+        return when {
+            code == "P0300" || code.matches(Regex("P030[1-9]|P031[0-2]")) ->
+                "Bujías desgastadas o contaminadas | Bobina de encendido defectuosa | Cableado o conector de bobina dañado | Inyector sucio o tapado | Presión de combustible baja | Fuga de vacío | Baja compresión mecánica en el cilindro | Sensor CKP/CMP con señal irregular"
+            code in setOf("P0171", "P0174") ->
+                "Fuga de vacío en admisión | Sensor MAF sucio o defectuoso | Baja presión de combustible | Inyectores obstruidos | Manguera PCV dañada | Sensor de oxígeno reportando mezcla incorrecta"
+            code in setOf("P0172", "P0175") ->
+                "Presión de combustible excesiva | Inyector goteando | Sensor MAF contaminado | Filtro de aire restringido | Sensor de oxígeno con lectura sesgada | Regulador de presión defectuoso"
+            code in setOf("P0420", "P0430") ->
+                "Convertidor catalítico agotado | Sensor de oxígeno delantero o trasero defectuoso | Fuga de escape antes del catalizador | Fallas de encendido previas | Consumo de aceite o combustible sin quemar dañando el catalizador"
+            code.startsWith("U") ->
+                "Pérdida de alimentación o tierra en un módulo | Cable CAN abierto o en corto | Conector sulfatado | Módulo sin comunicación | Terminación de red fuera de rango"
+            else ->
+                "Sensor o actuador defectuoso | Cableado abierto o en cortocircuito | Conector flojo o sulfatado | Alimentación o tierra fuera de especificación | Componente mecánico fuera de tolerancia"
+        }
+    }
+
     fun getDynamicSeverity(code: String): String {
         val letter = code.firstOrNull()?.uppercaseChar() ?: 'P'
         val digit1 = code.drop(1).firstOrNull() ?: '0'

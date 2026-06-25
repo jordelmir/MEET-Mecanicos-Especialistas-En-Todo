@@ -327,11 +327,13 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val permanentDtcs by viewModel.permanentDtcs.collectAsState()
+    val historicalDtcs by viewModel.historicalDtcs.collectAsState()
     val readiness by viewModel.readinessMonitors.collectAsState()
     val clearResult by viewModel.clearDtcResult.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val lastScanReport by viewModel.lastDtcScanReport.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -520,7 +522,8 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                         0 -> MeetColors.error.copy(alpha = 0.05f)
                                         1 -> MeetColors.warning.copy(alpha = 0.05f)
                                         2 -> MeetColors.cyberCyan.copy(alpha = 0.05f)
-                                        3 -> MeetColors.neonGreen.copy(alpha = 0.05f)
+                                        3 -> MeetColors.electricBlue.copy(alpha = 0.05f)
+                                        4 -> MeetColors.neonGreen.copy(alpha = 0.05f)
                                         else -> Color.White.copy(alpha = 0.03f)
                                     }
                                 )
@@ -562,7 +565,8 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                                         0 -> MeetColors.error
                                                         1 -> MeetColors.warning
                                                         2 -> MeetColors.cyberCyan
-                                                        3 -> MeetColors.neonGreen
+                                                        3 -> MeetColors.electricBlue
+                                                        4 -> MeetColors.neonGreen
                                                         else -> Color.White
                                                     },
                                                     Color.Transparent
@@ -578,8 +582,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                             Triple("ACTIVOS (${activeDtcs.size})", MeetColors.error, 0),
                             Triple("PEND. (${pendingDtcs.size})", MeetColors.warning, 1),
                             Triple("PERM. (${permanentDtcs.size})", MeetColors.cyberCyan, 2),
-                            Triple("MONITORES", MeetColors.neonGreen, 3),
-                            Triple("BÚSQUEDA", Color.White, 4)
+                            Triple("HALLAZGOS (${historicalDtcs.size + (lastScanReport?.records?.size ?: 0)})", MeetColors.electricBlue, 3),
+                            Triple("MONITORES", MeetColors.neonGreen, 4),
+                            Triple("BÚSQUEDA", Color.White, 5)
                         )
                         tabData.forEach { (label, color, index) ->
                             Tab(
@@ -654,8 +659,9 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     }
                                 }
                             }
-                            3 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
-                            4 -> { item { ManualSearchTab(navController, viewModel, isCompact) } }
+                            3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, navController, isCompact) } }
+                            4 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
+                            5 -> { item { ManualSearchTab(navController, viewModel, isCompact) } }
                         }
                     }
 
@@ -670,6 +676,158 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DtcFindingsTab(
+    report: com.elysium369.meet.core.obd.DtcScanReport?,
+    activeDtcs: List<String>,
+    pendingDtcs: List<String>,
+    permanentDtcs: List<String>,
+    historicalDtcs: List<String>,
+    navController: NavController,
+    isCompact: Boolean
+) {
+    val totalCodes = (activeDtcs + pendingDtcs + permanentDtcs + historicalDtcs).distinct().size
+    if (report == null && totalCodes == 0) {
+        HolographicEmptyState(
+            "SIN HALLAZGOS",
+            "Toca ESCANEAR para capturar DTCs, módulos que respondieron y evidencia técnica del último barrido.",
+            MeetColors.electricBlue,
+            isCompact
+        )
+        return
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        HoloCard(
+            modifier = Modifier.fillMaxWidth(),
+            accentColor = MeetColors.electricBlue,
+            glowIntensity = 0.18f
+        ) {
+            Column(Modifier.padding(if (isCompact) 14.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "RESUMEN DEL ÚLTIMO ESCANEO REAL",
+                    color = MeetColors.electricBlue,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FindingMetric("Activos", activeDtcs.size, MeetColors.error, Modifier.weight(1f))
+                    FindingMetric("Pend.", pendingDtcs.size, MeetColors.warning, Modifier.weight(1f))
+                    FindingMetric("Perm.", permanentDtcs.size, MeetColors.cyberCyan, Modifier.weight(1f))
+                    FindingMetric("Hist.", historicalDtcs.size, MeetColors.textSecondary, Modifier.weight(1f))
+                }
+                Text(
+                    "Los códigos se muestran aunque aún no hayas seleccionado un vehículo. Para historial permanente, selecciona un vehículo en Garage antes o después del escaneo.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+
+        val reportRecords = report?.records.orEmpty()
+        if (reportRecords.isNotEmpty()) {
+            HoloCard(
+                modifier = Modifier.fillMaxWidth(),
+                accentColor = MeetColors.neonGreen,
+                glowIntensity = 0.12f
+            ) {
+                Column(Modifier.padding(if (isCompact) 14.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "CÓDIGOS CAPTURADOS",
+                        color = MeetColors.neonGreen,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.sp
+                    )
+                    reportRecords
+                        .distinctBy { "${it.code}|${it.bucket}|${it.moduleName}|${it.responseAddress}" }
+                        .take(12)
+                        .forEach { record ->
+                            val bucketLabel = when (record.bucket) {
+                                com.elysium369.meet.core.obd.DtcBucket.ACTIVE -> "ACTIVO"
+                                com.elysium369.meet.core.obd.DtcBucket.PENDING -> "PENDIENTE"
+                                com.elysium369.meet.core.obd.DtcBucket.PERMANENT -> "PERMANENTE"
+                                com.elysium369.meet.core.obd.DtcBucket.HISTORY -> "HISTÓRICO"
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF050C18), RoundedCornerShape(8.dp))
+                                    .border(0.5.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(record.code, color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                                    Text(
+                                        "${record.moduleName ?: "Módulo OBD-II"} · ${record.sourceService} · $bucketLabel",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                EliteButton(
+                                    text = "GUÍA",
+                                    onClick = { navController.navigate("repair/${record.code}") },
+                                    color = MeetColors.neonGreen,
+                                    modifier = Modifier.width(76.dp).height(30.dp)
+                                )
+                            }
+                        }
+                }
+            }
+        }
+
+        val aliveModules = report?.modules.orEmpty().filter { it.isAlive }
+        if (aliveModules.isNotEmpty()) {
+            HoloCard(
+                modifier = Modifier.fillMaxWidth(),
+                accentColor = MeetColors.cyberCyan,
+                glowIntensity = 0.12f
+            ) {
+                Column(Modifier.padding(if (isCompact) 14.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "MÓDULOS QUE RESPONDIERON",
+                        color = MeetColors.cyberCyan,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.sp
+                    )
+                    aliveModules.take(10).forEach { module ->
+                        Text(
+                            "• ${module.moduleName}: ${module.dtcs.map { it.code }.distinct().joinToString().ifBlank { "sin DTC" }}",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FindingMetric(label: String, value: Int, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+            .padding(vertical = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(value.toString(), color = color, fontWeight = FontWeight.Black, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
+        Text(label, color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -896,8 +1054,12 @@ private fun HoloDtcCard(
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
     val definition = dtcDefinitions[dtc]
-    val desc = definition?.descriptionEs ?: com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
-    val causes = definition?.possibleCauses
+    val desc = if (definition != null) {
+        com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(definition, dtc)
+    } else {
+        com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+    }
+    val causes = com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(dtc, definition?.possibleCauses)
     var expanded by remember { mutableStateOf(false) }
 
     HoloCard(
@@ -1468,13 +1630,25 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                                     Text(dtc.code, color = Color.White, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, fontSize = if (isCompact) 16.sp else 20.sp)
                                 }
                                 Spacer(Modifier.height(10.dp))
-                                Text(dtc.descriptionEs, color = Color.White, fontSize = if (isCompact) 12.sp else 13.sp, fontWeight = FontWeight.Bold, softWrap = true, lineHeight = 18.sp)
-                                if (dtc.descriptionEn.isNotBlank() && dtc.descriptionEn != dtc.descriptionEs) { Spacer(Modifier.height(2.dp)); Text(dtc.descriptionEn, color = MeetColors.textSecondary, fontSize = 11.sp, softWrap = true) }
+                                Text(
+                                    com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(dtc, dtc.code),
+                                    color = Color.White,
+                                    fontSize = if (isCompact) 12.sp else 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    softWrap = true,
+                                    lineHeight = 18.sp
+                                )
                                 Spacer(Modifier.height(10.dp))
                                 Text("▸ POSIBLES CAUSAS", color = MeetColors.cyberCyan, fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                 Spacer(Modifier.height(4.dp))
                                 Box(Modifier.fillMaxWidth().shadow(2.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp)).background(Color(0xFF060D1A)).border(0.5.dp, MeetColors.borderSubtle.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp)) {
-                                    Text(dtc.possibleCauses ?: "", color = MeetColors.textSecondary, fontSize = if (isCompact) 10.sp else 11.sp, lineHeight = 15.sp, softWrap = true)
+                                    Text(
+                                        com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(dtc.code, dtc.possibleCauses),
+                                        color = MeetColors.textSecondary,
+                                        fontSize = if (isCompact) 10.sp else 11.sp,
+                                        lineHeight = 15.sp,
+                                        softWrap = true
+                                    )
                                 }
                                 Spacer(Modifier.height(14.dp))
                                 if (isCompact) {
