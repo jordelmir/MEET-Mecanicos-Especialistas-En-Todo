@@ -25,6 +25,13 @@ import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TVDashboard } from './components/TVDashboard';
 import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle, Radio } from 'lucide-react';
+import { AnalyticsDebugPanel } from './components/analytics/AnalyticsDebugPanel';
+import { analytics } from './src/analytics/analyticsClient';
+import { AnalyticsConsentManager } from './src/analytics/analyticsConsent';
+import { ANALYTICS_EVENTS } from './src/analytics/analyticsEvents';
+import { ANALYTICS_FUNNELS } from './src/analytics/analyticsFunnels';
+import { useAnalyticsLifecycle, useAnalyticsScreen } from './src/analytics/analyticsHooks';
+import type { AnalyticsConsentState } from './src/analytics/analyticsTypes';
 
 const OBD2Scanner = React.lazy(() =>
   import('./components/OBD2Scanner').then(module => ({ default: module.OBD2Scanner }))
@@ -92,6 +99,66 @@ export default function App() {
   const [isTVModeOpen, setIsTVModeOpen] = useState(false);
   const [isOBD2Open, setIsOBD2Open] = useState(false);
   const [isLiveLinkOpen, setIsLiveLinkOpen] = useState(false);
+  const [analyticsConsent, setAnalyticsConsent] = useState<AnalyticsConsentState>(() => AnalyticsConsentManager.getConsent());
+
+  useAnalyticsLifecycle(isAuthenticated ? loggedInUser.id : null);
+
+  useEffect(() => {
+    return AnalyticsConsentManager.subscribe(setAnalyticsConsent);
+  }, []);
+
+  const handleAnalyticsConsentChange = useCallback((consent: AnalyticsConsentState) => {
+    AnalyticsConsentManager.setConsent(consent);
+    setAnalyticsConsent(consent);
+  }, []);
+
+  const analyticsScreenName = useMemo(() => {
+    if (!isAuthenticated) return 'Login';
+    if (isOBD2Open) return 'OBD2 Scanner';
+    if (isLiveLinkOpen) return 'Live Link';
+    if (isBookingModalOpen) return 'Nueva Orden';
+    if (isCatalogOpen) return 'Catálogo';
+    if (isMechanicManagerOpen) return 'Mecánicos';
+    if (isClientManagerOpen) return 'Clientes';
+    if (isServiceManagerOpen) return 'Servicios';
+    if (isSettingsOpen) return 'Config';
+    if (isTVModeOpen) return 'TV';
+    if (role === Role.CLIENT) return 'Cliente';
+    return adminViewMode === 'WORKSTATION' ? 'Estación' : 'Dashboard';
+  }, [
+    adminViewMode,
+    isAuthenticated,
+    isBookingModalOpen,
+    isCatalogOpen,
+    isClientManagerOpen,
+    isLiveLinkOpen,
+    isMechanicManagerOpen,
+    isOBD2Open,
+    isServiceManagerOpen,
+    isSettingsOpen,
+    isTVModeOpen,
+    role,
+  ]);
+
+  useAnalyticsScreen(analyticsScreenName, { role, admin_view_mode: adminViewMode });
+
+  const openBooking = useCallback((source: string) => {
+    analytics.track(ANALYTICS_EVENTS.NEW_ORDER_CLICKED, { source, role });
+    analytics.funnelStep(ANALYTICS_FUNNELS.workshopOrder.name, 'new_order_clicked', { source, role });
+    setIsBookingModalOpen(true);
+  }, [role]);
+
+  const closeBooking = useCallback((reason: string = 'user_closed') => {
+    analytics.funnelAbandoned(ANALYTICS_FUNNELS.workshopOrder.name, 'new_order_clicked', {
+      reason_if_known: reason,
+      route: analyticsScreenName,
+    });
+    setIsBookingModalOpen(false);
+  }, [analyticsScreenName]);
+
+  const isAnalyticsDebugRoute = typeof window !== 'undefined' &&
+    import.meta.env.VITE_ENABLE_ANALYTICS_DEBUG === 'true' &&
+    window.location.pathname === '/analytics-debug';
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -120,6 +187,7 @@ export default function App() {
       setRole(Role.ADMIN);
       setLoggedInUser(MOCK_ADMIN_USER);
       setIsAuthenticated(true);
+      analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: 'login_success', role: Role.ADMIN });
       return;
     }
 
@@ -138,6 +206,7 @@ export default function App() {
       };
       setLoggedInUser(mechAsUser);
       setIsAuthenticated(true);
+      analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: 'login_success', role: Role.MECHANIC });
       return;
     }
 
@@ -149,6 +218,7 @@ export default function App() {
       setRole(Role.CLIENT);
       setLoggedInUser(clientFound);
       setIsAuthenticated(true);
+      analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: 'login_success', role: Role.CLIENT });
       toast('success', 'Sesión Iniciada', `Bienvenido, ${clientFound.name}`);
       return;
     }
@@ -178,10 +248,12 @@ export default function App() {
     setRole(Role.CLIENT);
     setLoggedInUser(newClient);
     setIsAuthenticated(true);
+    analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: 'registration_success', role: Role.CLIENT });
     toast('success', 'Cuenta Creada', `Bienvenido a MEET, ${newClient.name.split(' ')[0]}`);
   };
 
   const handleLogout = () => {
+    analytics.track(ANALYTICS_EVENTS.SESSION_ENDED, { reason: 'logout' });
     setIsAuthenticated(false);
     setRole(Role.ADMIN);
     setAuthError(null);
@@ -469,6 +541,18 @@ export default function App() {
     setWorkOrders(prev => [...prev, newOrder]);
     setIsBookingModalOpen(false);
     setCurrentDate(time);
+    analytics.funnelStep(ANALYTICS_FUNNELS.workshopOrder.name, 'order_created', {
+      service_id: serviceId,
+      mechanic_id: mechanicId,
+      role,
+    });
+    analytics.track(ANALYTICS_EVENTS.ORDER_CREATED, {
+      service_id: serviceId,
+      mechanic_id: mechanicId,
+      estimated_minutes: validation.realDurationMinutes,
+      price: service.basePrice,
+      role,
+    });
     toast('success', 'Orden Creada', `Para ${vehicle.plate} a las ${time.toLocaleTimeString([],{hour: '2-digit', minute:'2-digit'})}`);
   };
 
@@ -535,6 +619,10 @@ export default function App() {
   };
 
   // ── RENDER ──
+  if (isAnalyticsDebugRoute) {
+    return <AnalyticsDebugPanel />;
+  }
+
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={authError} />;
   }
@@ -566,7 +654,10 @@ export default function App() {
             {role === Role.ADMIN && (
               <div className="flex items-center gap-1 md:gap-2 glass-inner p-1 rounded-full border border-white/5">
                 <button
-                  onClick={() => setIsTVModeOpen(true)}
+                  onClick={() => {
+                    analytics.moduleOpened('TV', { role });
+                    setIsTVModeOpen(true);
+                  }}
                   className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all bg-forge-500/10 text-forge-400 hover:bg-forge-500/20 md:mr-2 whitespace-nowrap"
                   title="Abrir Pantalla de Taller (TV)"
                 >
@@ -575,7 +666,11 @@ export default function App() {
                 </button>
                 <div className="w-px h-4 bg-steel-700 md:mr-2"></div>
                 <button
-                  onClick={() => setAdminViewMode('DASHBOARD')}
+                  onClick={() => {
+                    analytics.track(ANALYTICS_EVENTS.DASHBOARD_VIEWED, { role, mode: 'management' });
+                    analytics.moduleOpened('Gerencia', { role });
+                    setAdminViewMode('DASHBOARD');
+                  }}
                   className={`flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap ${
                     adminViewMode === 'DASHBOARD' ? 'bg-steel-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
                   }`}
@@ -584,7 +679,10 @@ export default function App() {
                   <span>Gerencia</span>
                 </button>
                 <button
-                  onClick={() => setAdminViewMode('WORKSTATION')}
+                  onClick={() => {
+                    analytics.moduleOpened('Estación', { role });
+                    setAdminViewMode('WORKSTATION');
+                  }}
                   className={`flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap ${
                     adminViewMode === 'WORKSTATION' ? 'bg-forge-500 text-black shadow-sm' : 'text-gray-400 hover:text-white'
                   }`}
@@ -598,7 +696,12 @@ export default function App() {
             <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-white/10 h-8">
               {/* OBD2 Button */}
               <button
-                onClick={() => setIsOBD2Open(true)}
+                onClick={() => {
+                  analytics.track(ANALYTICS_EVENTS.OBD2_SCANNER_OPENED, { role });
+                  analytics.moduleOpened('OBD2 Scanner', { role });
+                  analytics.funnelStep(ANALYTICS_FUNNELS.scanner.name, 'obd2_scanner_opened', { role });
+                  setIsOBD2Open(true);
+                }}
                 className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-forge-500 hover:text-forge-400 hover:border-forge-500/50 transition-all text-[10px] font-mono font-bold whitespace-nowrap"
               >
                 <AlertTriangle size={12} />
@@ -606,7 +709,11 @@ export default function App() {
               </button>
               {/* Live Link Button */}
               <button
-                onClick={() => setIsLiveLinkOpen(true)}
+                onClick={() => {
+                  analytics.track(ANALYTICS_EVENTS.LIVE_LINK_OPENED, { role });
+                  analytics.moduleOpened('Live Link', { role });
+                  setIsLiveLinkOpen(true);
+                }}
                 className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-green-400 hover:text-green-300 hover:border-green-500/50 transition-all text-[10px] font-mono font-bold whitespace-nowrap"
               >
                 <Radio size={12} />
@@ -615,7 +722,10 @@ export default function App() {
               
               {/* ⌘K Search */}
               <button
-                onClick={() => setIsPaletteOpen(true)}
+                onClick={() => {
+                  analytics.track(ANALYTICS_EVENTS.SEARCH_PERFORMED, { source: 'command_palette_button', role });
+                  setIsPaletteOpen(true);
+                }}
                 className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg glass-inner text-steel-300 hover:text-white hover:border-forge-500/30 transition-all text-[10px] font-mono whitespace-nowrap"
               >
                 <Search size={12} />
@@ -632,7 +742,10 @@ export default function App() {
 
               {(role === Role.MECHANIC || role === Role.ADMIN) && (
                 <button
-                  onClick={() => setIsSettingsOpen(true)}
+                  onClick={() => {
+                    analytics.moduleOpened('Config', { role, source: 'navbar_icon' });
+                    setIsSettingsOpen(true);
+                  }}
                   className="p-1 md:p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
                   title="Configuración"
                 >
@@ -693,35 +806,54 @@ export default function App() {
                   {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
                     <>
                       <button
-                        onClick={() => setIsCatalogOpen(true)}
+                        onClick={() => {
+                          analytics.track(ANALYTICS_EVENTS.CATALOG_OPENED, { role });
+                          analytics.moduleOpened('Catálogo', { role });
+                          setIsCatalogOpen(true);
+                        }}
                         className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                       >
                         <BookOpen size={16} />
                         Catálogo
                       </button>
                       <button
-                        onClick={() => setIsSettingsOpen(true)}
+                        onClick={() => {
+                          analytics.moduleOpened('Config', { role });
+                          setIsSettingsOpen(true);
+                        }}
                         className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                       >
                         <Settings size={16} />
                         Config
                       </button>
                       <button
-                        onClick={() => setIsMechanicManagerOpen(true)}
+                        onClick={() => {
+                          analytics.track(ANALYTICS_EVENTS.MECHANICS_OPENED, { role });
+                          analytics.moduleOpened('Mecánicos', { role });
+                          setIsMechanicManagerOpen(true);
+                        }}
                         className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                       >
                         <Users size={16} />
                         Mecánicos
                       </button>
                       <button
-                        onClick={() => setIsClientManagerOpen(true)}
+                        onClick={() => {
+                          analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role });
+                          analytics.moduleOpened('Clientes', { role });
+                          setIsClientManagerOpen(true);
+                        }}
                         className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                       >
                         <Car size={16} />
                         Clientes
                       </button>
                       <button
-                        onClick={() => setIsServiceManagerOpen(true)}
+                        onClick={() => {
+                          analytics.track(ANALYTICS_EVENTS.SERVICES_OPENED, { role });
+                          analytics.moduleOpened('Servicios', { role });
+                          setIsServiceManagerOpen(true);
+                        }}
                         className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                       >
                         <ClipboardList size={16} />
@@ -733,7 +865,11 @@ export default function App() {
                     <>
                       {role === Role.MECHANIC && (
                         <button
-                          onClick={() => setIsClientManagerOpen(true)}
+                          onClick={() => {
+                            analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role, source: 'mechanic_toolbar' });
+                            analytics.moduleOpened('Clientes', { role, source: 'mechanic_toolbar' });
+                            setIsClientManagerOpen(true);
+                          }}
                           className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
                         >
                           <Car size={16} />
@@ -741,7 +877,7 @@ export default function App() {
                         </button>
                       )}
                       <button
-                        onClick={() => setIsBookingModalOpen(true)}
+                        onClick={() => openBooking('toolbar')}
                         className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
                       >
                         <Plus size={16} strokeWidth={3} />
@@ -808,7 +944,7 @@ export default function App() {
               services={services}
               mechanics={mechanics}
               freeWashThreshold={freeWashThreshold}
-              onBookNew={() => setIsBookingModalOpen(true)}
+              onBookNew={() => openBooking('client_dashboard')}
               onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
               onUpdateUser={handleUpdateClient}
               onSimulateAPKScan={handleSimulateAPKScan}
@@ -841,7 +977,7 @@ export default function App() {
               currentUser={loggedInUser}
               currentRole={role}
               onBook={handleBook}
-              onCancel={() => setIsBookingModalOpen(false)}
+              onCancel={() => closeBooking('modal_cancel')}
               onCreateClient={handleCreateClient}
               onUpdateClient={handleUpdateClient}
               onDeleteClient={handleDeleteClient}
@@ -891,6 +1027,8 @@ export default function App() {
           currentCloseHour={closeHour}
           currentTimeSlice={timeSliceMinutes}
           currentFreeWashThreshold={freeWashThreshold}
+          currentAnalyticsConsent={analyticsConsent}
+          onAnalyticsConsentChange={handleAnalyticsConsentChange}
           onSave={handleUpdateSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
@@ -909,7 +1047,10 @@ export default function App() {
 	      {/* Live Link Dashboard */}
 	      {isLiveLinkOpen && (
 	        <React.Suspense fallback={lazyModalFallback}>
-	          <LiveLinkDashboard onClose={() => setIsLiveLinkOpen(false)} />
+	          <LiveLinkDashboard onClose={() => {
+                analytics.moduleExited('Live Link', { role });
+                setIsLiveLinkOpen(false);
+              }} />
 	        </React.Suspense>
 	      )}
 
@@ -917,7 +1058,13 @@ export default function App() {
 	      {isOBD2Open && (
 	        <React.Suspense fallback={lazyModalFallback}>
 	          <OBD2Scanner
-	            onClose={() => setIsOBD2Open(false)}
+	            onClose={() => {
+                  analytics.moduleExited('OBD2 Scanner', { role });
+                  analytics.funnelAbandoned(ANALYTICS_FUNNELS.scanner.name, 'obd2_scanner_opened', {
+                    reason_if_known: 'modal_closed',
+                  });
+                  setIsOBD2Open(false);
+                }}
 	            currentUser={loggedInUser}
 	            workOrders={workOrders}
 	            onSaveMeasurement={handleSaveOscilloscopeMeasurement}
@@ -956,10 +1103,14 @@ export default function App() {
         mechanics={mechanics}
         services={services}
         onSelectWorkOrder={(wo) => setEditingWorkOrder(wo)}
-        onNavigate={(action) => {
-          if (action === '__open_palette') setIsPaletteOpen(true);
-          else if (action === 'new_order') setIsBookingModalOpen(true);
-          else if (action === 'catalog') setIsCatalogOpen(true);
+          onNavigate={(action) => {
+            if (action === '__open_palette') setIsPaletteOpen(true);
+          else if (action === 'new_order') openBooking('command_palette');
+          else if (action === 'catalog') {
+            analytics.track(ANALYTICS_EVENTS.CATALOG_OPENED, { role, source: 'command_palette' });
+            analytics.moduleOpened('Catálogo', { role, source: 'command_palette' });
+            setIsCatalogOpen(true);
+          }
         }}
       />
 

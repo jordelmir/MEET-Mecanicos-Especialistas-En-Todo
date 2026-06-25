@@ -3,29 +3,37 @@ package com.elysium369.meet.core.billing
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import com.android.billingclient.api.*
+import com.android.billingclient.api.AcknowledgePurchaseParams
+import com.android.billingclient.api.AcknowledgePurchaseResponseListener
+import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.BillingClientStateListener
+import com.android.billingclient.api.BillingFlowParams
+import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.ConsumeParams
+import com.android.billingclient.api.ConsumeResponseListener
+import com.android.billingclient.api.PendingPurchasesParams
+import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.ProductDetailsResponseListener
+import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.PurchasesUpdatedListener
+import com.android.billingclient.api.QueryProductDetailsParams
 import com.elysium369.meet.data.supabase.GaugePriceTiers
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "GaugeBilling"
+private const val TAG = "MeetBilling"
 
-/**
- * Wrapper over Google Play Billing Library v7 for gauge marketplace IAP.
- *
- * 10 consumable products: gauge_tier_1 ($0.99) → gauge_tier_10 ($9.99)
- *
- * Flow:
- * 1. Connect BillingClient
- * 2. Query product details for the specific tier
- * 3. Launch purchase flow
- * 4. On success → consume + callback to repository
- */
 @Singleton
 class GaugeBillingManager @Inject constructor(
     @ApplicationContext private val context: Context
@@ -33,7 +41,6 @@ class GaugeBillingManager @Inject constructor(
     private var billingClient: BillingClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // Purchase result callback
     var onPurchaseCompleted: ((purchaseToken: String, productId: String) -> Unit)? = null
     var onPurchaseError: ((message: String) -> Unit)? = null
 
@@ -46,24 +53,26 @@ class GaugeBillingManager @Inject constructor(
     private val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                purchases?.forEach { purchase ->
+                purchases.orEmpty().forEach { purchase ->
                     scope.launch { handlePurchase(purchase) }
                 }
             }
             BillingClient.BillingResponseCode.USER_CANCELED -> {
-                Log.i(TAG, "User canceled purchase")
                 _isProcessing.value = false
                 onPurchaseError?.invoke("Compra cancelada")
             }
-            else -> {
-                Log.e(TAG, "Purchase error: ${billingResult.debugMessage}")
+            BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
                 _isProcessing.value = false
-                onPurchaseError?.invoke("Error: ${billingResult.debugMessage}")
+                onPurchaseError?.invoke("Google Play Billing no está disponible en este dispositivo o cuenta.")
+            }
+            else -> {
+                Log.e(TAG, "Purchase error: ${billingResult.responseCode} ${billingResult.debugMessage}")
+                _isProcessing.value = false
+                onPurchaseError?.invoke("Error de compra: ${billingResult.debugMessage}")
             }
         }
     }
 
-    /** Connect to Google Play Billing */
     fun connect() {
         if (billingClient?.isReady == true) {
             _isConnected.value = true
@@ -72,139 +81,194 @@ class GaugeBillingManager @Inject constructor(
 
         billingClient = BillingClient.newBuilder(context)
             .setListener(purchasesUpdatedListener)
-            .enablePendingPurchases()
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
             .build()
 
         billingClient?.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    Log.i(TAG, "Billing client connected")
-                    _isConnected.value = true
-                } else {
+                _isConnected.value = billingResult.responseCode == BillingClient.BillingResponseCode.OK
+                if (!_isConnected.value) {
                     Log.e(TAG, "Billing setup failed: ${billingResult.debugMessage}")
-                    _isConnected.value = false
                 }
             }
 
             override fun onBillingServiceDisconnected() {
-                Log.w(TAG, "Billing service disconnected")
                 _isConnected.value = false
             }
         })
     }
 
-    /** Disconnect billing client */
     fun disconnect() {
         billingClient?.endConnection()
+        billingClient = null
         _isConnected.value = false
     }
 
-    /**
-     * Launch the purchase flow for a specific price tier.
-     * @param activity The current activity for the purchase dialog
-     * @param priceTier 1-10 corresponding to $0.99-$9.99
-     */
     suspend fun launchPurchaseFlow(activity: Activity, priceTier: Int) {
+        val productId = GaugePriceTiers.productId(priceTier)
+        launchProductPurchaseFlow(activity, productId, BillingClient.ProductType.INAPP)
+    }
+
+    suspend fun launchProductPurchaseFlow(
+        activity: Activity,
+        productId: String,
+        productType: String = PlayBillingCatalog.productType(productId)
+    ) {
         val client = billingClient
         if (client == null || !client.isReady) {
-            onPurchaseError?.invoke("Billing client not ready")
+            emitError("Google Play Billing aún no está listo")
             return
         }
 
-        _isProcessing.value = true
-        val productId = GaugePriceTiers.productId(priceTier)
+        setProcessing(true)
 
-        // Query product details
-        val productList = listOf(
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(productId)
-                .setProductType(BillingClient.ProductType.INAPP)
-                .build()
-        )
-
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(productList)
-            .build()
-
-        val (billingResult, productDetailsList) = withContext(Dispatchers.IO) {
-            client.queryProductDetails(params).let { it.billingResult to it.productDetailsList }
-        }
-
-        if (billingResult.responseCode != BillingClient.BillingResponseCode.OK || productDetailsList.isNullOrEmpty()) {
-            Log.e(TAG, "Failed to query product details for $productId: ${billingResult.debugMessage}")
-            _isProcessing.value = false
-            onPurchaseError?.invoke("Producto no disponible: $productId")
+        val productDetails = queryProductDetails(client, productId, productType)
+        if (productDetails == null) {
+            setProcessing(false)
+            emitError("Producto no disponible en Google Play: $productId")
             return
         }
 
-        val productDetails = productDetailsList[0]
+        val detailsBuilder = BillingFlowParams.ProductDetailsParams.newBuilder()
+            .setProductDetails(productDetails)
+
+        if (productType == BillingClient.ProductType.SUBS) {
+            val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
+            if (offerToken.isNullOrBlank()) {
+                setProcessing(false)
+                emitError("La suscripción no tiene una oferta activa en Play Console.")
+                return
+            }
+            detailsBuilder.setOfferToken(offerToken)
+        }
 
         val flowParams = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(
-                listOf(
-                    BillingFlowParams.ProductDetailsParams.newBuilder()
-                        .setProductDetails(productDetails)
-                        .build()
-                )
-            )
+            .setProductDetailsParamsList(listOf(detailsBuilder.build()))
             .build()
 
         withContext(Dispatchers.Main) {
             val launchResult = client.launchBillingFlow(activity, flowParams)
             if (launchResult.responseCode != BillingClient.BillingResponseCode.OK) {
-                Log.e(TAG, "Failed to launch billing flow: ${launchResult.debugMessage}")
                 _isProcessing.value = false
-                onPurchaseError?.invoke("Error al iniciar compra")
+                onPurchaseError?.invoke("No se pudo iniciar compra: ${launchResult.debugMessage}")
             }
         }
     }
 
-    /** Handle a completed purchase: acknowledge, consume, and notify */
+    private suspend fun queryProductDetails(
+        client: BillingClient,
+        productId: String,
+        productType: String
+    ): ProductDetails? {
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(
+                listOf(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId(productId)
+                        .setProductType(productType)
+                        .build()
+                )
+            )
+            .build()
+
+        return suspendCancellableCoroutine { continuation ->
+            client.queryProductDetailsAsync(
+                params,
+                ProductDetailsResponseListener { billingResult, productDetailsResult ->
+                    if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                        Log.e(TAG, "queryProductDetails failed: ${billingResult.debugMessage}")
+                        if (continuation.isActive) continuation.resume(null)
+                    } else if (continuation.isActive) {
+                        continuation.resume(productDetailsResult.productDetailsList.firstOrNull())
+                    }
+                }
+            )
+        }
+    }
+
     private suspend fun handlePurchase(purchase: Purchase) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
-            Log.w(TAG, "Purchase not in PURCHASED state: ${purchase.purchaseState}")
-            _isProcessing.value = false
+            setProcessing(false)
             return
         }
 
-        // Acknowledge if needed
-        if (!purchase.isAcknowledged) {
-            val ackParams = AcknowledgePurchaseParams.newBuilder()
-                .setPurchaseToken(purchase.purchaseToken)
-                .build()
-
-            val ackResult = withContext(Dispatchers.IO) {
-                billingClient?.acknowledgePurchase(ackParams)
-            }
-
-            if (ackResult?.responseCode != BillingClient.BillingResponseCode.OK) {
-                Log.e(TAG, "Failed to acknowledge purchase: ${ackResult?.debugMessage}")
-                _isProcessing.value = false
-                onPurchaseError?.invoke("Error al confirmar compra")
-                return
-            }
+        val productId = purchase.products.firstOrNull().orEmpty()
+        if (productId.isBlank()) {
+            setProcessing(false)
+            emitError("Google Play no devolvió productId para la compra.")
+            return
         }
 
-        // Consume the purchase (so it can be bought again by others)
-        val consumeParams = ConsumeParams.newBuilder()
-            .setPurchaseToken(purchase.purchaseToken)
-            .build()
-
-        val consumeResult = withContext(Dispatchers.IO) {
-            billingClient?.consumePurchase(consumeParams)
+        val processed = if (PlayBillingCatalog.isConsumable(productId)) {
+            consumePurchase(purchase)
+        } else {
+            acknowledgePurchase(purchase)
         }
 
-        if (consumeResult?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
-            Log.i(TAG, "Purchase consumed successfully")
-            val productId = purchase.products.firstOrNull() ?: ""
+        setProcessing(false)
+        if (processed) {
             withContext(Dispatchers.Main) {
                 onPurchaseCompleted?.invoke(purchase.purchaseToken, productId)
             }
-        } else {
-            Log.e(TAG, "Failed to consume purchase: ${consumeResult?.billingResult?.debugMessage}")
-            onPurchaseError?.invoke("Error al procesar compra")
+        }
+    }
+
+    private suspend fun acknowledgePurchase(purchase: Purchase): Boolean {
+        if (purchase.isAcknowledged) return true
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+        val result = suspendCancellableCoroutine { continuation ->
+            billingClient?.acknowledgePurchase(
+                params,
+                AcknowledgePurchaseResponseListener { billingResult ->
+                    if (continuation.isActive) continuation.resume(billingResult)
+                }
+            ) ?: continuation.resume(null)
         }
 
-        _isProcessing.value = false
+        return if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
+            true
+        } else {
+            emitError("No se pudo confirmar la compra: ${result?.debugMessage.orEmpty()}")
+            false
+        }
+    }
+
+    private suspend fun consumePurchase(purchase: Purchase): Boolean {
+        val params = ConsumeParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+        val result = suspendCancellableCoroutine { continuation ->
+            billingClient?.consumeAsync(
+                params,
+                ConsumeResponseListener { billingResult, _ ->
+                    if (continuation.isActive) continuation.resume(billingResult)
+                }
+            ) ?: continuation.resume(null)
+        }
+
+        return if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
+            true
+        } else {
+            emitError("No se pudo procesar la compra: ${result?.debugMessage.orEmpty()}")
+            false
+        }
+    }
+
+    private suspend fun setProcessing(value: Boolean) {
+        withContext(Dispatchers.Main) {
+            _isProcessing.value = value
+        }
+    }
+
+    private suspend fun emitError(message: String) {
+        withContext(Dispatchers.Main) {
+            onPurchaseError?.invoke(message)
+        }
     }
 }

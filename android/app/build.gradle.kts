@@ -161,8 +161,9 @@ dependencies {
     // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
-    // Google Play Billing Library
-    implementation("com.android.billingclient:billing-ktx:7.0.0")
+    // Google Play Billing Library. Use the Java artifact to stay compatible with the
+    // project's Kotlin 1.9 toolchain while still targeting Billing 9.1.0.
+    implementation("com.android.billingclient:billing:9.1.0")
 
     // QR Code and Barcode Processing
     implementation("com.google.zxing:core:3.5.3")

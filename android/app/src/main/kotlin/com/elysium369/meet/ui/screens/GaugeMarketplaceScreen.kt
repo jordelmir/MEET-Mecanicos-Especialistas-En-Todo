@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.elysium369.meet.core.billing.GaugeBillingManager
+import com.elysium369.meet.core.billing.GooglePlayPurchaseVerifier
+import com.elysium369.meet.core.billing.PlayBillingCatalog
 import com.elysium369.meet.data.local.entities.GaugeConfig
 import com.elysium369.meet.data.local.entities.SavedGaugeEntity
 import com.elysium369.meet.data.supabase.GaugeListing
@@ -60,6 +62,7 @@ fun GaugeMarketplaceScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val billingManager = remember(appContext) { GaugeBillingManager(appContext) }
+    val purchaseVerifier = remember(appContext) { GooglePlayPurchaseVerifier(appContext) }
     val isBillingConnected by billingManager.isConnected.collectAsState()
     val isBillingProcessing by billingManager.isProcessing.collectAsState()
     var selectedListing by remember { mutableStateOf<GaugeListing?>(null) }
@@ -76,13 +79,22 @@ fun GaugeMarketplaceScreen(
     val accentPurple = Color(0xFF7C4DFF)
 
     DisposableEffect(billingManager) {
-        billingManager.onPurchaseCompleted = { purchaseToken, _ ->
+        billingManager.onPurchaseCompleted = { purchaseToken, productId ->
             val listing = purchaseTarget
             purchaseTarget = null
             if (listing != null) {
-                viewModel.recordPurchase(listing, purchaseToken)
                 scope.launch {
-                    snackbarHostState.showSnackbar("Compra confirmada. El gauge quedó registrado en tu cuenta.")
+                    val verification = purchaseVerifier.verify(
+                        productId = productId,
+                        productType = PlayBillingCatalog.productType(productId),
+                        purchaseToken = purchaseToken
+                    )
+                    if (verification.isSuccess) {
+                        viewModel.recordPurchase(listing, purchaseToken)
+                        snackbarHostState.showSnackbar("Compra verificada por Google Play. El gauge quedó registrado en tu cuenta.")
+                    } else {
+                        snackbarHostState.showSnackbar("Google Play confirmó el pago, pero el backend no pudo verificarlo: ${verification.exceptionOrNull()?.message.orEmpty()}")
+                    }
                 }
             }
         }

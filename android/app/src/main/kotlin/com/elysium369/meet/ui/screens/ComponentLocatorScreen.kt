@@ -29,11 +29,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.ai.DiagnosticAiContextBuilder
+import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.core.engine3d.EngineType
-import kotlinx.coroutines.flow.map
+import com.elysium369.meet.data.visualdiagnostics.VisualDiagnosticRepositoryImpl
+import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
+import com.elysium369.meet.domain.visualdiagnostics.ComponentCategory as VisualComponentCategory
+import com.elysium369.meet.domain.visualdiagnostics.EngineType as VisualEngineType
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT LOCATOR 3D — Interactive Graphics Engine & Part Finder
@@ -91,13 +96,18 @@ fun ComponentLocatorScreen(
     }
 
     var selectedEngineType by remember(detectedEngineType) { mutableStateOf(detectedEngineType) }
+    val visualRepository = remember { VisualDiagnosticRepositoryImpl() }
+    val aiContextBuilder = remember { DiagnosticAiContextBuilder() }
+    val visualEngineType = remember(selectedEngineType) { selectedEngineType.toVisualEngineType() }
     
-    // Base de datos de componentes filtrada por tipo de motor
-    val components = remember(selectedEngineType) { buildComponentDatabase(selectedEngineType) }
+    // Base profesional de componentes filtrada por tipo de motor.
+    val diagnosticComponents = remember(visualEngineType) { visualRepository.componentsForEngine(visualEngineType) }
+    val components = remember(diagnosticComponents) { diagnosticComponents.map { it.toComponentInfo() } }
     
     var searchQuery by remember { mutableStateOf("") }
     var selectedComponent by remember { mutableStateOf<ComponentInfo?>(null) }
     var selectedCategory by remember { mutableStateOf<ComponentCategory?>(null) }
+    var aiContextPreview by remember { mutableStateOf<String?>(null) }
     
     var currentScene by remember { mutableStateOf(SceneType.ENGINE_BLOCK) }
     var explodedServiceView by remember { mutableStateOf(false) }
@@ -106,6 +116,16 @@ fun ComponentLocatorScreen(
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val allActiveDtcs = remember(activeDtcs, pendingDtcs) { activeDtcs + pendingDtcs }
+    val liveData by viewModel.liveData.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    val isObdConnected = connectionState == ObdState.CONNECTED
+    val vehicleLabel = remember(selectedVehicle) {
+        selectedVehicle?.let { vehicle ->
+            listOf(vehicle.year.toString(), vehicle.make, vehicle.model, vehicle.engine)
+                .filterNot { it.isBlank() }
+                .joinToString(" ")
+        }
+    }
 
     val filteredComponents = remember(searchQuery, selectedCategory, components) {
         components.filter { c ->
@@ -118,6 +138,7 @@ fun ComponentLocatorScreen(
     val onMeshSelected: (String, String) -> Unit = { meshId, meshName ->
         val mappedId = mapMeshToComponentId(meshId)
         val comp = components.find { it.id == mappedId }
+        aiContextPreview = null
         if (comp != null) {
             selectedComponent = comp
         } else {
@@ -190,6 +211,7 @@ fun ComponentLocatorScreen(
                         .clickable { 
                             selectedEngineType = type
                             selectedComponent = null
+                            aiContextPreview = null
                         }
                         .padding(vertical = 6.dp),
                     contentAlignment = Alignment.Center
@@ -224,6 +246,7 @@ fun ComponentLocatorScreen(
                 onClick = {
                     currentScene = SceneType.ENGINE_BLOCK
                     selectedComponent = null
+                    aiContextPreview = null
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -233,6 +256,7 @@ fun ComponentLocatorScreen(
                 onClick = {
                     currentScene = SceneType.RELAY_FUSE_BOX
                     selectedComponent = null
+                    aiContextPreview = null
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -242,6 +266,7 @@ fun ComponentLocatorScreen(
                 onClick = {
                     currentScene = SceneType.WIRING_HARNESS
                     selectedComponent = null
+                    aiContextPreview = null
                 },
                 modifier = Modifier.weight(1f)
             )
@@ -330,6 +355,15 @@ fun ComponentLocatorScreen(
         ) {
             selectedComponent?.let { comp ->
                 val activeDtcOnPiece = comp.relatedDtcs.firstOrNull { allActiveDtcs.contains(it) }
+                val diagnosticComponent = remember(comp.id, visualEngineType) {
+                    visualRepository.findComponent(visualEngineType, comp.id)
+                }
+                val livePidValues = remember(diagnosticComponent, liveData) {
+                    diagnosticComponent?.relatedPids.orEmpty().associate { pid ->
+                        pid.pid to liveData.readPid(pid.pid, pid.label, pid.unit)
+                    }
+                }
+                val livePidCount = livePidValues.values.count { it != "Sin lectura en vivo" }
 
                 Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     EliteCard(
@@ -360,6 +394,19 @@ fun ComponentLocatorScreen(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                StatusPill(
+                                    text = if (isObdConnected) "OBD conectado" else "Sin conexion OBD",
+                                    color = if (isObdConnected) MeetColors.neonGreen else MeetColors.textMuted
+                                )
+                                if (livePidValues.isNotEmpty()) {
+                                    StatusPill("$livePidCount/${livePidValues.size} PIDs vivos", MeetColors.electricBlue)
+                                }
+                                if (diagnosticComponent != null) {
+                                    StatusPill("Ficha OEM-ready", MeetColors.cyberCyan)
+                                }
                             }
 
                             if (activeDtcOnPiece != null) {
@@ -414,6 +461,14 @@ fun ComponentLocatorScreen(
                             }
 
                             ProfessionalInfoSection("Pruebas de taller", checks, MeetColors.cyberCyan)
+                            if (diagnosticComponent != null) {
+                                ProfessionalInfoSection(
+                                    title = "Datos OBD en vivo",
+                                    items = livePidValues.entries.map { "${it.key}: ${it.value}" }
+                                        .ifEmpty { listOf(if (isObdConnected) "No hay PIDs asociados para esta pieza." else "Conecta el escáner para poblar valores reales de este componente.") },
+                                    color = if (isObdConnected) MeetColors.electricBlue else MeetColors.textMuted
+                                )
+                            }
                             ProfessionalInfoSection("Flujo de reparación", workflow, MeetColors.neonGreen)
                             ProfessionalInfoSection("Especificaciones", specs, MeetColors.warning)
                             ProfessionalInfoSection("Herramientas", tools, comp.category.color)
@@ -424,6 +479,49 @@ fun ComponentLocatorScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                                     if (comp.relatedPids.isNotEmpty()) StatusPill("PID ${comp.relatedPids.joinToString(", ")}", MeetColors.electricBlue)
                                     if (comp.relatedDtcs.isNotEmpty()) StatusPill("DTC ${comp.relatedDtcs.take(4).joinToString(", ")}", MeetColors.error)
+                                }
+                            }
+
+                            if (diagnosticComponent != null) {
+                                Spacer(Modifier.height(8.dp))
+                                EliteTextButton(
+                                    text = "ARMAR CONTEXTO IA DE ESTA PIEZA",
+                                    onClick = {
+                                        aiContextPreview = aiContextBuilder.build(
+                                            vehicleLabel = vehicleLabel,
+                                            engineType = visualEngineType,
+                                            component = diagnosticComponent,
+                                            activeDtcs = allActiveDtcs.toSet(),
+                                            livePidValues = livePidValues
+                                        )
+                                    },
+                                    color = MeetColors.neonGreen,
+                                    isEnabled = true
+                                )
+
+                                AnimatedVisibility(visible = aiContextPreview != null) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color.Black.copy(alpha = 0.35f))
+                                            .border(0.5.dp, MeetColors.neonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(
+                                            "Contexto técnico listo para IA",
+                                            color = MeetColors.neonGreen,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            aiContextPreview.orEmpty().take(900),
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 10.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -485,6 +583,7 @@ fun ComponentLocatorScreen(
                         .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                         .clickable {
                             selectedComponent = if (isSelected) null else comp
+                            aiContextPreview = null
                             // Conmutar escena automáticamente
                             currentScene = when {
                                 comp.id.contains("fuse") || comp.id.contains("relay") || comp.id == "fuel_pump" || comp.id.contains("contactor") || comp.id == "safety_disconnect" -> SceneType.RELAY_FUSE_BOX
@@ -985,5 +1084,73 @@ private fun ComponentInfo.defaultSafetyNotes(): List<String> {
         ComponentCategory.EXHAUST -> listOf("Escape y catalizador pueden quemar incluso minutos después de apagar.", "Use soportes seguros si trabaja debajo del vehículo.")
         ComponentCategory.ELECTRICAL, ComponentCategory.SENSORS -> listOf("No perfore cables innecesariamente.", "Desconecte batería si manipula alimentación principal.", "Evite cortos con puntas de prueba.")
         else -> listOf("Asegure vehículo, motor apagado cuando aplique y use EPP.", "Siga torque y secuencia del fabricante.")
+    }
+}
+
+private fun EngineType.toVisualEngineType(): VisualEngineType {
+    return when (this) {
+        EngineType.INLINE_4 -> VisualEngineType.L4
+        EngineType.V6 -> VisualEngineType.V6
+        EngineType.V8 -> VisualEngineType.V8
+        EngineType.ELECTRIC -> VisualEngineType.EV
+    }
+}
+
+private fun DiagnosticComponent.toComponentInfo(): ComponentInfo {
+    return ComponentInfo(
+        id = id,
+        name = name,
+        category = category.toUiCategory(),
+        description = description,
+        commonFailures = commonFailures,
+        relatedPids = relatedPids.map { it.pid },
+        relatedDtcs = relatedDtcs.map { it.code },
+        location = location,
+        requiredTools = requiredTools,
+        professionalChecks = workshopTests.map { test ->
+            "${test.title}: ${test.procedure} Resultado esperado: ${test.expectedResult}. Herramienta: ${test.tool}."
+        },
+        repairWorkflow = repairFlow.sortedBy { it.order }.map { step ->
+            "${step.order}. ${step.action} Confirmación: ${step.confirmation}."
+        },
+        serviceSpecs = specs.map { spec ->
+            buildString {
+                append("${spec.label}: ${spec.expectedValue}")
+                if (spec.notes.isNotBlank()) append(". ${spec.notes}")
+            }
+        },
+        safetyNotes = safetyWarnings.map { warning ->
+            "${warning.severity}: ${warning.message}"
+        }
+    )
+}
+
+private fun VisualComponentCategory.toUiCategory(): ComponentCategory {
+    return when (this) {
+        VisualComponentCategory.IGNITION -> ComponentCategory.ENGINE
+        VisualComponentCategory.AIR_INTAKE -> ComponentCategory.INTAKE
+        VisualComponentCategory.FUEL -> ComponentCategory.FUEL
+        VisualComponentCategory.EXHAUST -> ComponentCategory.EXHAUST
+        VisualComponentCategory.ELECTRICAL -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.COOLING -> ComponentCategory.COOLING
+        VisualComponentCategory.LUBRICATION -> ComponentCategory.ENGINE
+        VisualComponentCategory.SENSOR -> ComponentCategory.SENSORS
+        VisualComponentCategory.RELAY_FUSE -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.HARNESS -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.EV_HIGH_VOLTAGE -> ComponentCategory.HIGH_VOLTAGE
+    }
+}
+
+private fun Map<String, Float>.readPid(pid: String, label: String, unit: String): String {
+    val value = this[pid]
+        ?: this[pid.uppercase()]
+        ?: this[label]
+        ?: this[label.uppercase()]
+        ?: this[label.lowercase()]
+    return if (value != null) {
+        val suffix = unit.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+        "%.2f%s".format(value, suffix)
+    } else {
+        "Sin lectura en vivo"
     }
 }

@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Platform"/>
-  <img src="https://img.shields.io/badge/Kotlin-2.1%20%7C%20Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"/>
+  <img src="https://img.shields.io/badge/Kotlin-1.9.23%20%7C%20Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"/>
   <img src="https://img.shields.io/badge/SQLite-Offline%20First-39FF14?style=flat-square" alt="SQLite"/>
   <img src="https://img.shields.io/badge/Status-Active%20Build-39FF14?style=flat-square" alt="Status"/>
 </p>
@@ -24,6 +24,9 @@ MEET es una plataforma Android de diagnostico automotriz offline-first orientada
 - BLE: escaneo real con `BluetoothLeScanner` y conexion GATT real via `BleTransport`.
 - WiFi TCP: conexion real a adaptadores ELM por socket.
 - DoIP: activacion de routing ISO 13400 real y sondeo real del gateway/servidor UDS cuando se usa `:13400`.
+- Diagnostico Visual 3D: el visor ya se alimenta de fichas tecnicas por componente con DTCs, PIDs, pruebas, flujo de reparacion, herramientas, seguridad y contexto listo para IA.
+- Monetizacion: Google Play Billing 9.1.0 queda integrado con catalogo de productos, verificacion backend y entitlements en Supabase.
+- Analytics web: eventos estructurados, consentimiento, cola offline, retencion y panel debug opcional para medir embudos reales sin depender de logs sueltos.
 
 ## Arquitectura
 
@@ -152,12 +155,51 @@ La idea es que una solicitud no sea solo "el carro falla", sino una orden de tri
 - el editor DIY ahora puede persistir configuraciones completas de gauge
 - el marketplace de gauges ya consume listados reales desde Supabase
 - las tarjetas y previews renderizan el gauge real a partir del `config_json`
-- el flujo de compra se engancha con Google Play Billing y registra la compra en Supabase cuando el build y los productos estan configurados
+- el flujo de compra se engancha con Google Play Billing 9.1.0 y verifica cada `purchaseToken` en Supabase antes de activar el entitlement
 
 Limitacion honesta:
 
 - las compras in-app requieren un build distribuido por Google Play y productos `gauge_tier_*` activos
 - en debug local el flujo mostrara errores reales de Billing si el servicio o los productos no estan disponibles
+
+## Monetizacion y entitlements
+
+La app queda preparada para un modelo gratis + PRO sin cobrar la descarga inicial:
+
+- compras unicas: `pro_lifetime`, `gauge_pack_elite`, `report_pack`, `gauge_tier_1` a `gauge_tier_10`
+- suscripciones: `pro_monthly`, `pro_yearly`, `workshop_monthly`
+- verificador Supabase Edge Function: `verify-google-play-purchase`
+- tablas con RLS: `billing_products`, `google_play_purchase_receipts`, `user_entitlements`
+- el cliente Android no activa PRO por si solo; primero envia `productId`, `productType` y `purchaseToken` al backend
+
+Esto permite manejar renovaciones, cancelaciones, reembolsos y restauracion de acceso desde servidor, no solo desde UI modificable.
+
+## Analytics profesional web
+
+El frontend web ahora incluye:
+
+- `analytics.track(...)` tipado por evento
+- `anonymous_id`, `session_id`, rol y modo admin
+- cola IndexedDB/localStorage con reintento exponencial
+- eventos de pantalla, modulo, embudo, paywall y compra
+- retencion D1/D3/D7/D14/D30
+- consentimiento: `enabled`, `essential_only`, `disabled`
+- panel `/analytics-debug` cuando `VITE_ENABLE_ANALYTICS_DEBUG=true`
+
+Documentacion completa: `docs/ANALYTICS_WEB.md`.
+
+## Diagnostico Visual 3D
+
+El modulo 3D se organizo alrededor de dominio tecnico, no solo dibujo:
+
+- `DiagnosticComponent`: pieza, categoria, ubicacion, mesh 3D, DTCs, PIDs, pruebas y specs
+- `VisualDiagnosticRepository`: fuente de componentes por motor L4/V6/V8/EV
+- `DiagnosticAiContextBuilder`: paquete de contexto con vehiculo, DTCs activos y PIDs vivos
+- la UI muestra `Sin lectura en vivo` cuando el escaner no entrega dato real
+- fusibles/reles incluyen amperaje, alimentacion esperada, continuidad, funcion y procedimiento de prueba
+- EV/HV incluye advertencias de alto voltaje y desenergizacion OEM
+
+Documentacion completa: `docs/VISUAL_DIAGNOSTICS_3D.md`.
 
 ## Estructura del proyecto
 
@@ -166,14 +208,22 @@ MEET/
 ├── android/
 │   └── app/src/main/
 │       ├── kotlin/com/elysium369/meet/
+│       │   ├── ai/                    # Contexto IA especializado
 │       │   ├── core/obd/              # Sesion OBD, UDS, DoIP, PIDs, DTCs
+│       │   ├── core/billing/          # Google Play Billing y verificacion
 │       │   ├── core/transport/        # BT classic, BLE, WiFi
+│       │   ├── data/visualdiagnostics/# Seed/repositorio diagnostico 3D
+│       │   ├── domain/visualdiagnostics/# Modelo tecnico 3D
 │       │   ├── data/local/            # Room, entidades, conocimiento mecanico
 │       │   ├── data/supabase/         # Reparacion/red/sync cloud
 │       │   └── ui/screens/            # Scanner, topologia, marketplace, repair network
 │       └── assets/
 │           ├── dtc_database_es.json
 │           └── databases/meet_dtc.db
+├── docs/                              # Billing, analytics y diagnostico visual
+├── src/analytics/                     # SDK local de analytics web
+├── supabase/functions/                # Edge Functions
+├── supabase/migrations/               # RLS, entitlements, analytics
 ├── generate_db.py                     # Generador del SQLite enriquecido
 └── README.md
 ```
@@ -203,11 +253,10 @@ Nota: el `.db` completo supera 100 MB y no se empuja a GitHub como blob normal. 
 
 ## Estado verificado en esta iteracion
 
+- `npm run build` exitoso
 - `:app:compileDebugKotlin` exitoso
-- `:app:assembleDebug` exitoso
-- APK debug instalado via `adb install -r`
-- app abierta en Android via `adb shell am start -n com.elysium369.meet/.MainActivity`
-- `MainActivity` quedo activa despues de corregir la migracion Room `28 -> 29`
+- `:app:testDebugUnitTest` exitoso
+- Google Play Billing 9.1.0 compila usando el artefacto Java `com.android.billingclient:billing` para mantener compatibilidad con Kotlin 1.9.23
 
 ## Fuentes tecnicas
 
@@ -219,6 +268,17 @@ Nota: el `.db` completo supera 100 MB y no se empuja a GitHub como blob normal. 
   [sqlite.org/lang_createindex.html](https://www.sqlite.org/lang_createindex.html)
 - Android SQLite performance best practices:
   [developer.android.com/topic/performance/sqlite-performance-best-practices](https://developer.android.com/topic/performance/sqlite-performance-best-practices)
+
+### Google Play Billing
+
+- Google Play Billing release notes:
+  [developer.android.com/google/play/billing/release-notes](https://developer.android.com/google/play/billing/release-notes)
+- Integrate Google Play Billing:
+  [developer.android.com/google/play/billing/integrate](https://developer.android.com/google/play/billing/integrate)
+- Migrate to Play Billing Library 9:
+  [developer.android.com/google/play/billing/migrate-gpblv9](https://developer.android.com/google/play/billing/migrate-gpblv9)
+- Google Play payments policy:
+  [support.google.com/googleplay/android-developer/answer/10281818](https://support.google.com/googleplay/android-developer/answer/10281818)
 
 ### Diagnostico y topologia
 

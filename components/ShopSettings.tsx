@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { X, Settings } from 'lucide-react';
+import type { AnalyticsConsentState } from '../src/analytics/analyticsTypes';
 
 interface ShopSettingsProps {
   currentRules: string;
@@ -8,16 +9,29 @@ interface ShopSettingsProps {
   currentCloseHour: number;
   currentTimeSlice: number;
   currentFreeWashThreshold: number;
+  currentAnalyticsConsent?: AnalyticsConsentState;
+  onAnalyticsConsentChange?: (consent: AnalyticsConsentState) => void;
   onSave: (settings: { rules: string; openHour: number; closeHour: number; timeSlice: number; freeWashThreshold: number }) => void;
   onClose: () => void;
 }
 
-export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, currentTimeSlice, currentFreeWashThreshold, onSave, onClose }: ShopSettingsProps) {
+export function ShopSettings({
+  currentRules,
+  currentOpenHour,
+  currentCloseHour,
+  currentTimeSlice,
+  currentFreeWashThreshold,
+  currentAnalyticsConsent = 'enabled',
+  onAnalyticsConsentChange,
+  onSave,
+  onClose,
+}: ShopSettingsProps) {
   const [rules, setRules] = useState(currentRules);
   const [openHour, setOpenHour] = useState(currentOpenHour);
   const [closeHour, setCloseHour] = useState(currentCloseHour);
   const [timeSlice, setTimeSlice] = useState(currentTimeSlice);
   const [freeWashThreshold, setFreeWashThreshold] = useState(currentFreeWashThreshold);
+  const [analyticsConsent, setAnalyticsConsent] = useState<AnalyticsConsentState>(currentAnalyticsConsent);
 
   const handleSave = () => {
     if (openHour >= closeHour) return; // Prevent invalid schedule range
@@ -81,6 +95,40 @@ export function ShopSettings({ currentRules, currentOpenHour, currentCloseHour, 
               rows={5}
               className="w-full bg-steel-800 border border-steel-500 rounded-lg px-3 py-2 font-mono text-xs text-white focus:border-forge-500 outline-none resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block font-mono text-[10px] text-steel-300 uppercase tracking-wider mb-1.5">Analytics y Privacidad</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ['enabled', 'Completo'],
+                ['essential_only', 'Esencial'],
+                ['disabled', 'Off'],
+              ].map(([value, label]) => {
+                const consent = value as AnalyticsConsentState;
+                const selected = analyticsConsent === consent;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsConsent(consent);
+                      onAnalyticsConsentChange?.(consent);
+                    }}
+                    className={`rounded-lg border px-2 py-2 font-mono text-[10px] font-bold uppercase transition-all ${
+                      selected
+                        ? 'border-forge-500 bg-forge-500/15 text-forge-400'
+                        : 'border-steel-600 bg-steel-800 text-steel-300 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-steel-300 leading-relaxed">
+              No se envían emails, teléfonos, VIN completo, cédulas, direcciones ni tokens. El modo esencial conserva solo eventos técnicos básicos y errores.
+            </p>
           </div>
 
           <div className="flex gap-2">
