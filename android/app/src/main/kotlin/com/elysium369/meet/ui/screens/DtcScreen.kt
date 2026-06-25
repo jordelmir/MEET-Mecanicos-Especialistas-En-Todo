@@ -334,6 +334,8 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val lastScanReport by viewModel.lastDtcScanReport.collectAsState()
+    val isDemoMode by viewModel.isDemoMode.collectAsState()
+    val demoDescription by viewModel.demoScenarioDescription.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -509,6 +511,27 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
             HolographicBackground()
 
             Column(modifier = Modifier.fillMaxSize()) {
+                if (isDemoMode) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MeetColors.warning.copy(alpha = 0.14f))
+                            .border(1.dp, MeetColors.warning.copy(alpha = 0.35f), RoundedCornerShape(0.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("DEMO", color = MeetColors.warning, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        Text(
+                            demoDescription.ifBlank { "Datos de entrenamiento; no provienen de un vehículo real." },
+                            color = Color.White.copy(alpha = 0.82f),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
                 // ═══════════ HOLOGRAPHIC TAB ROW ═══════════
                 Box(
                     modifier = Modifier

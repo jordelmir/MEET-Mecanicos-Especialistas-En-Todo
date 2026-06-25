@@ -230,6 +230,7 @@ class ObdViewModel @Inject constructor(
     private val fuelEconomyTracker: FuelEconomyTracker,
     private val batteryHealthAnalyzer: BatteryHealthAnalyzer,
     private val turboBoostGauge: TurboBoostGauge,
+    private val demoModeSimulator: DemoModeSimulator,
     private val dvirReportDao: com.elysium369.meet.data.local.dao.DvirReportDao,
     private val predictionEventDao: com.elysium369.meet.data.local.dao.PredictionEventDao,
     private val healthSnapshotDao: com.elysium369.meet.data.local.dao.HealthSnapshotDao,
@@ -904,6 +905,68 @@ class ObdViewModel @Inject constructor(
         evaluateDnaInference()
     }
 
+    fun startDemoMode(scenario: DemoModeSimulator.Scenario = DemoModeSimulator.Scenario.ENGINE_MISFIRE) {
+        if (connectionState.value == ObdState.CONNECTED) {
+            addTerminalLog("[DEMO] Hay un vehículo real conectado; no se activó entrenamiento.", TerminalLineType.WARNING)
+            return
+        }
+
+        demoModeJob?.cancel()
+        demoModeSimulator.currentScenario = scenario
+        _isDemoMode.value = true
+        _demoScenarioDescription.value = demoModeSimulator.getScenarioDescription()
+
+        val demoDtcs = demoDtcsForScenario(scenario)
+        _latestScanActiveDtcs.value = demoDtcs
+        _latestScanPendingDtcs.value = emptyList()
+        _latestScanPermanentDtcs.value = emptyList()
+        _latestScanHistoricalDtcs.value = emptyList()
+        if (demoDtcs.isNotEmpty()) fetchDtcDefinitions(demoDtcs)
+
+        addTerminalLog("[DEMO] Entrenamiento activado: ${_demoScenarioDescription.value}", TerminalLineType.SYSTEM)
+        demoModeJob = viewModelScope.launch(Dispatchers.Default) {
+            while (isActive) {
+                val frame = demoModeSimulator.generateFrame()
+                _liveData.value = frame
+                updateTelemetryHistory(frame)
+                updateOscilloscopeBuffer(System.currentTimeMillis(), frame)
+                updateHealthScore()
+                delay(250L)
+            }
+        }
+    }
+
+    fun cycleDemoScenario() {
+        val scenarios = DemoModeSimulator.Scenario.entries
+        val currentIndex = scenarios.indexOf(demoModeSimulator.currentScenario).coerceAtLeast(0)
+        startDemoMode(scenarios[(currentIndex + 1) % scenarios.size])
+    }
+
+    fun stopDemoMode(clearDemoData: Boolean = true) {
+        demoModeJob?.cancel()
+        demoModeJob = null
+        _isDemoMode.value = false
+        _demoScenarioDescription.value = ""
+        if (clearDemoData && connectionState.value != ObdState.CONNECTED) {
+            _liveData.value = emptyMap()
+            _latestScanActiveDtcs.value = emptyList()
+            _latestScanPendingDtcs.value = emptyList()
+            _latestScanPermanentDtcs.value = emptyList()
+            _latestScanHistoricalDtcs.value = emptyList()
+        }
+        addTerminalLog("[DEMO] Entrenamiento desactivado.", TerminalLineType.SYSTEM)
+    }
+
+    private fun demoDtcsForScenario(scenario: DemoModeSimulator.Scenario): List<String> {
+        return when (scenario) {
+            DemoModeSimulator.Scenario.ENGINE_MISFIRE -> listOf("P0302")
+            DemoModeSimulator.Scenario.OVERHEATING -> listOf("P0128")
+            DemoModeSimulator.Scenario.RICH_MIXTURE -> listOf("P0172")
+            DemoModeSimulator.Scenario.TURBO_BOOST -> listOf("P0234")
+            else -> emptyList()
+        }
+    }
+
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
@@ -1052,6 +1115,13 @@ class ObdViewModel @Inject constructor(
 
     private val _qosMetrics = MutableStateFlow(QosMetrics())
     val qosMetrics: StateFlow<QosMetrics> = _qosMetrics.asStateFlow()
+
+    private var demoModeJob: Job? = null
+    private val _isDemoMode = MutableStateFlow(false)
+    val isDemoMode: StateFlow<Boolean> = _isDemoMode.asStateFlow()
+
+    private val _demoScenarioDescription = MutableStateFlow("")
+    val demoScenarioDescription: StateFlow<String> = _demoScenarioDescription.asStateFlow()
 
     // Telemetry History for Graphs
     private val _telemetryHistory = MutableStateFlow<Map<String, List<Float>>>(emptyMap())
@@ -2276,6 +2346,8 @@ class ObdViewModel @Inject constructor(
                         .collect { state ->
                             if (state != ObdState.CONNECTED) {
                                 hasCompletedInitialDtcScan = false
+                            } else if (_isDemoMode.value) {
+                                stopDemoMode(clearDemoData = true)
                             }
                         }
                 } catch (e: Exception) {

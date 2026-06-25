@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -16,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -25,6 +27,7 @@ import com.elysium369.meet.ui.components.EliteOutlinedButton
 import com.elysium369.meet.ui.components.EliteTextButton
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
+import java.util.Locale
 
 // ═══════════════════════════════════════════════════════════════
 // ONBOARDING V2 — Cinematic Entry Experience
@@ -32,7 +35,11 @@ import com.elysium369.meet.ui.theme.MeetColors
 
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
+    val context = LocalContext.current
     var step by remember { mutableIntStateOf(1) }
+    var selectedProfile by remember { mutableStateOf("owner") }
+    var selectedAdapter by remember { mutableStateOf("bt_classic") }
+    val detectedLanguage = remember { Locale.getDefault().language.takeIf { it == "es" || it == "en" } ?: "es" }
 
     // Step transition animation
     var animateContent by remember { mutableStateOf(true) }
@@ -94,8 +101,9 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             ) {
                 when (step) {
                     1 -> OnboardingStep1()
-                    2 -> OnboardingStep2 { step = 3 }
-                    3 -> OnboardingStep3()
+                    2 -> OnboardingStep2(selectedProfile) { selectedProfile = it }
+                    3 -> OnboardingStep3(selectedAdapter) { selectedAdapter = it }
+                    4 -> OnboardingStep4(selectedProfile, selectedAdapter, detectedLanguage)
                 }
             }
 
@@ -106,7 +114,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                (1..3).forEach { s ->
+                (1..4).forEach { s ->
                     val isActive = s == step
                     val width by animateDpAsState(
                         if (isActive) 24.dp else 8.dp,
@@ -129,15 +137,36 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             Spacer(Modifier.height(28.dp))
 
             EliteButton(
-                onClick = { if (step < 3) step++ else onFinish() },
+                onClick = {
+                    if (step < 4) {
+                        step++
+                    } else {
+                        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("user_profile", selectedProfile)
+                            .putString("preferred_adapter", selectedAdapter)
+                            .putString("app_language", detectedLanguage)
+                            .putBoolean("demo_hint_seen", false)
+                            .apply()
+                        onFinish()
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
-                text = if (step < 3) "SIGUIENTE →" else "INICIAR ⚡",
-                color = if (step == 3) MeetColors.neonGreen else MeetColors.electricBlue
+                text = if (step < 4) "SIGUIENTE →" else "INICIAR ⚡",
+                color = if (step == 4) MeetColors.neonGreen else MeetColors.electricBlue
             )
 
-            if (step < 3) {
+            if (step < 4) {
                 EliteTextButton(
-                    onClick = onFinish,
+                    onClick = {
+                        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("user_profile", selectedProfile)
+                            .putString("preferred_adapter", selectedAdapter)
+                            .putString("app_language", detectedLanguage)
+                            .apply()
+                        onFinish()
+                    },
                     text = "Saltar por ahora",
                     color = MeetColors.textMuted
                 )
@@ -202,7 +231,49 @@ private fun OnboardingStep1() {
 }
 
 @Composable
-private fun OnboardingStep2(onSelect: () -> Unit) {
+private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            "¿CÓMO USARÁS MEET?",
+            style = MaterialTheme.typography.headlineMedium,
+            color = Color.White,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 1.sp
+        )
+        Text(
+            "Ajustaremos la experiencia inicial",
+            color = MeetColors.textSecondary,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(Modifier.height(28.dp))
+
+        listOf(
+            Triple("owner", "Dueño de carro", "simple y guiado"),
+            Triple("mechanic", "Mecánico", "diagnóstico técnico"),
+            Triple("workshop", "Taller", "clientes y órdenes"),
+            Triple("fleet", "Flota", "riesgo y mantenimiento")
+        ).forEachIndexed { idx, (id, title, desc) ->
+            Spacer(Modifier.height(if (idx == 0) 0.dp else 10.dp))
+            EliteOutlinedButton(
+                onClick = { onSelect(id) },
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                text = "${if (selectedProfile == id) "✓" else "•"}  $title — $desc",
+                color = if (selectedProfile == id) MeetColors.neonGreen else MeetColors.cyberCyan
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Puedes cambiarlo luego desde ajustes.",
+            color = MeetColors.textMuted,
+            textAlign = TextAlign.Center,
+            fontSize = 12.sp
+        )
+    }
+}
+
+@Composable
+private fun OnboardingStep3(selectedAdapter: String, onSelect: (String) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             "TIPO DE ADAPTADOR",
@@ -212,29 +283,30 @@ private fun OnboardingStep2(onSelect: () -> Unit) {
             letterSpacing = 1.sp
         )
         Text(
-            "Selecciona cómo te conectarás",
+            "MEET buscará por todos, pero prioriza tu opción",
             color = MeetColors.textSecondary,
+            textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(Modifier.height(28.dp))
 
         listOf(
-            Triple("📡", "Bluetooth", "Recomendado"),
-            Triple("🔵", "BLE", "Bajo consumo"),
-            Triple("📶", "WiFi", "Alta velocidad")
-        ).forEachIndexed { idx, (icon, title, desc) ->
+            Triple("bt_classic", "Bluetooth clásico", "ELM327/STN por SPP"),
+            Triple("ble", "BLE", "adaptadores modernos"),
+            Triple("wifi", "WiFi", "ELM por TCP/IP")
+        ).forEachIndexed { idx, (id, title, desc) ->
             Spacer(Modifier.height(if (idx == 0) 0.dp else 10.dp))
             EliteOutlinedButton(
-                onClick = onSelect,
+                onClick = { onSelect(id) },
                 modifier = Modifier.fillMaxWidth().height(58.dp),
-                text = "$icon  $title — $desc",
-                color = MeetColors.cyberCyan
+                text = "${if (selectedAdapter == id) "✓" else "•"}  $title — $desc",
+                color = if (selectedAdapter == id) MeetColors.neonGreen else MeetColors.cyberCyan
             )
         }
 
         Spacer(Modifier.height(16.dp))
         Text(
-            "¿No sabes cuál tienes? Elige Bluetooth.",
+            "Si no tienes adaptador todavía, usa el modo demo de entrenamiento.",
             color = MeetColors.textMuted,
             textAlign = TextAlign.Center,
             fontSize = 12.sp
@@ -243,7 +315,19 @@ private fun OnboardingStep2(onSelect: () -> Unit) {
 }
 
 @Composable
-private fun OnboardingStep3() {
+private fun OnboardingStep4(profile: String, adapter: String, language: String) {
+    val profileLabel = when (profile) {
+        "mechanic" -> "Mecánico independiente"
+        "workshop" -> "Taller"
+        "fleet" -> "Flota"
+        else -> "Dueño de carro"
+    }
+    val adapterLabel = when (adapter) {
+        "ble" -> "BLE"
+        "wifi" -> "WiFi ELM"
+        else -> "Bluetooth clásico"
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -273,7 +357,15 @@ private fun OnboardingStep3() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Ya puedes escanear vehículos\ncomo un profesional.",
+            "Perfil: $profileLabel\nAdaptador: $adapterLabel\nIdioma: ${language.uppercase()}",
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyLarge,
+            lineHeight = 24.sp
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Siguiente paso: agrega tu vehículo o activa demo si todavía no tienes adaptador.",
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,

@@ -46,7 +46,7 @@ fun ConnectionStatusBar(
     val stateColor = when (state) {
         ObdState.CONNECTED -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
         ObdState.CONNECTING, ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
-        ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+        ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
         else -> MeetColors.textMuted
     }
 
@@ -110,10 +110,10 @@ fun ConnectionStatusBar(
                 ) {
                     // ELM Connection Status
                     val elmConnected = state == ObdState.NEGOTIATING || state == ObdState.CONNECTED
-                    val elmColor = if (elmConnected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else if (state == ObdState.CONNECTING) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                    val elmColor = if (elmConnected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else if (state == ObdState.CONNECTING) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.error
                     val elmText = when {
-                        state == ObdState.CONNECTED || state == ObdState.NEGOTIATING -> "Connected"
-                        state == ObdState.CONNECTING -> "Connecting"
+                        state == ObdState.CONNECTED || state == ObdState.NEGOTIATING -> "Conectado"
+                        state == ObdState.CONNECTING -> "Conectando"
                         state == ObdState.ERROR -> "Error"
                         else -> "—"
                     }
@@ -125,14 +125,14 @@ fun ConnectionStatusBar(
                         ecuConnected -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
                         state == ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
                         state == ObdState.CONNECTING -> MeetColors.textMuted
-                        state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                        state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
                         else -> MeetColors.textMuted
                     }
                     val ecuText = when {
-                        ecuConnected -> "Connected"
-                        state == ObdState.NEGOTIATING -> "Connecting"
+                        ecuConnected -> "Conectada"
+                        state == ObdState.NEGOTIATING -> "Negociando"
                         state == ObdState.ERROR -> "Error"
-                        else -> "Waiting"
+                        else -> "Esperando"
                     }
                     DualStatusItem("ECU:", ecuText, ecuColor, if (protocol.isNotBlank() && ecuConnected) protocol else null)
                 }

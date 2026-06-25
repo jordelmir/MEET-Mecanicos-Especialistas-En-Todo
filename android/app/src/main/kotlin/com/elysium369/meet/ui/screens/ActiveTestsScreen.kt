@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ActiveTest
 import com.elysium369.meet.core.obd.ActiveTestStatus
+import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.PidRegistry
 import com.elysium369.meet.core.obd.SafetyCondition
 import com.elysium369.meet.ui.components.*
@@ -36,9 +37,19 @@ import com.elysium369.meet.ui.theme.MeetColors
 @Composable
 fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.meet.ui.ObdViewModel) {
     val status by viewModel.activeTestStatus.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    val qos by viewModel.qosMetrics.collectAsState()
+    val liveData by viewModel.liveData.collectAsState()
     val availableTests = viewModel.availableActiveTests
     
     var expandedTestId by remember { mutableStateOf<String?>(null) }
+    val voltage = liveData["0142"] ?: liveData["42"] ?: liveData["Voltaje ECU"] ?: liveData["VOLTAGE"]
+    val disabledReason = when {
+        connectionState != ObdState.CONNECTED -> "Conecta un vehículo real antes de controlar actuadores."
+        qos.latencyMs > 500 || qos.reliability < 80f -> "Enlace inestable: latencia ${qos.latencyMs} ms, fiabilidad ${"%.0f".format(qos.reliability)}%."
+        voltage != null && voltage < 12.2f -> "Voltaje bajo (${String.format("%.2f", voltage)} V). Carga batería antes de ejecutar."
+        else -> null
+    }
 
     Scaffold(
         topBar = {
@@ -79,8 +90,9 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
                 items(availableTests) { test ->
                     ActiveTestItem(
                         test = test,
-                        isEnabled = !status.isActive,
+                        isEnabled = !status.isActive && disabledReason == null,
                         isExpanded = expandedTestId == test.id,
+                        disabledReason = if (status.isActive) "Hay otra prueba activa en progreso." else disabledReason,
                         onExpandClick = {
                             expandedTestId = if (expandedTestId == test.id) null else test.id
                         },
@@ -100,6 +112,7 @@ fun ActiveTestItem(
     test: ActiveTest,
     isEnabled: Boolean,
     isExpanded: Boolean,
+    disabledReason: String?,
     onExpandClick: () -> Unit,
     onStartClick: () -> Unit
 ) {
@@ -163,6 +176,21 @@ fun ActiveTestItem(
                     }
                 }
 
+                if (disabledReason != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "BLOQUEO DE SEGURIDAD:",
+                        color = MeetColors.error,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(
+                        disabledReason,
+                        color = MeetColors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Technical Workshop Guide
@@ -197,7 +225,7 @@ fun ActiveTestItem(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Hay otra prueba activa en progreso.",
+                        disabledReason ?: "Prueba bloqueada por seguridad.",
                         color = MeetColors.error,
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,

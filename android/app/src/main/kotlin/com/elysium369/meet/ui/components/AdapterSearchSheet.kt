@@ -182,7 +182,7 @@ fun AdapterSearchSheet(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "VIRTUAL DIAGNOSTIC INTERFACE",
+                        text = "INTERFAZ DE DIAGNÓSTICO REAL",
                         color = MeetColors.textSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -330,6 +330,7 @@ fun AdapterSearchSheet(
                                             }
                                             Spacer(modifier = Modifier.width(16.dp))
                                             Column(modifier = Modifier.weight(1f)) {
+                                                val quality = estimateClassicAdapterQuality(device.first)
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
                                                         text = device.first,
@@ -362,6 +363,13 @@ fun AdapterSearchSheet(
                                                     color = MeetColors.textSecondary,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 11.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "Calidad estimada: ${quality.first} · ${quality.second}",
+                                                    color = quality.third,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.SemiBold
                                                 )
                                             }
                                             Text(
@@ -459,7 +467,7 @@ fun AdapterSearchSheet(
                                 }
 
                                 Text(
-                                    text = if (isBleScanning) "SCANNING" else "BLE READY",
+                                    text = if (isBleScanning) "ESCANEANDO" else "BLE LISTO",
                                     color = if (isBleScanning) MeetColors.electricBlue else MeetColors.neonGreen,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
@@ -540,6 +548,7 @@ fun AdapterSearchSheet(
                                                     }
                                                     Spacer(modifier = Modifier.width(14.dp))
                                                     Column(modifier = Modifier.weight(1f)) {
+                                                        val quality = estimateBleAdapterQuality(device.rssi)
                                                         Text(
                                                             text = device.name,
                                                             color = Color.White,
@@ -552,6 +561,13 @@ fun AdapterSearchSheet(
                                                             color = MeetColors.textSecondary,
                                                             fontFamily = FontFamily.Monospace,
                                                             fontSize = 11.sp
+                                                        )
+                                                        Spacer(modifier = Modifier.height(3.dp))
+                                                        Text(
+                                                            text = "Calidad: ${quality.first} · ${quality.second}",
+                                                            color = quality.third,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.SemiBold
                                                         )
                                                     }
 
@@ -951,5 +967,25 @@ fun CustomObdTextField(
                 )
             }
         }
+    }
+}
+
+private fun estimateClassicAdapterQuality(name: String): Triple<String, String, Color> {
+    val upper = name.uppercase()
+    return when {
+        upper.contains("OBDLINK") || upper.contains("STN") || upper.contains("VLINKER") ->
+            Triple("Alta", "mejor para Mode 06, UDS y baja latencia", MeetColors.neonGreen)
+        upper.contains("ELM") || upper.contains("OBD") ->
+            Triple("Media", "validar comandos soportados tras conectar", MeetColors.warning)
+        else ->
+            Triple("Desconocida", "solo conectar si sabes que es el adaptador OBD", MeetColors.textSecondary)
+    }
+}
+
+private fun estimateBleAdapterQuality(rssi: Int): Triple<String, String, Color> {
+    return when {
+        rssi > -65 -> Triple("Alta", "señal fuerte", MeetColors.neonGreen)
+        rssi > -78 -> Triple("Media", "acércate al conector OBD", MeetColors.warning)
+        else -> Triple("Baja", "riesgo de cortes y latencia alta", MeetColors.error)
     }
 }

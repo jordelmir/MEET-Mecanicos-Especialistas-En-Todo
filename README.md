@@ -27,6 +27,8 @@ MEET es una plataforma Android de diagnostico automotriz offline-first orientada
 - Diagnostico Visual 3D: el visor ya se alimenta de fichas tecnicas por componente con DTCs, PIDs, pruebas, flujo de reparacion, herramientas, seguridad y contexto listo para IA.
 - Monetizacion: Google Play Billing 9.1.0 queda integrado con catalogo de productos, verificacion backend y entitlements en Supabase.
 - Analytics web: eventos estructurados, consentimiento, cola offline, retencion y panel debug opcional para medir embudos reales sin depender de logs sueltos.
+- Onboarding y Home: perfil de uso, adaptador preferido, centro de mando con siguiente accion y demo de entrenamiento rotulada.
+- Seguridad bidireccional: pruebas activas bloqueadas si no hay conexion real, si el enlace es inestable o si el voltaje esta bajo.
 
 ## Arquitectura
 
@@ -200,6 +202,19 @@ El modulo 3D se organizo alrededor de dominio tecnico, no solo dibujo:
 - EV/HV incluye advertencias de alto voltaje y desenergizacion OEM
 
 Documentacion completa: `docs/VISUAL_DIAGNOSTICS_3D.md`.
+
+## Sistema operativo automotriz
+
+MEET esta avanzando hacia un flujo completo:
+
+```text
+Detectar problema -> diagnosticar -> validar con datos reales -> guiar reparacion
+-> cotizar -> documentar -> cobrar -> aprender del caso
+```
+
+La app ahora conserva esta regla: si no hay adaptador real, el usuario puede explorar con demo de entrenamiento, pero los datos se rotulan y no se venden como lectura fisica.
+
+Documentacion de producto: `docs/PRODUCT_OS_ROADMAP.md`.
 
 ## Estructura del proyecto
 

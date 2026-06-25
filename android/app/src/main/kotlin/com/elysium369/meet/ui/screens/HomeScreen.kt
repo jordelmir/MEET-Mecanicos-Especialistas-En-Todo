@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -42,12 +44,48 @@ fun HomeScreen(
     navController: NavController,
     viewModel: ObdViewModel
 ) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE) }
+    val userProfile = remember { prefs.getString("user_profile", "owner").orEmpty() }
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
     val obdState by viewModel.connectionState.collectAsState()
     val activeDtcs by viewModel.activeDtcs.collectAsState()
+    val pendingDtcs by viewModel.pendingDtcs.collectAsState()
+    val permanentDtcs by viewModel.permanentDtcs.collectAsState()
+    val readiness by viewModel.readinessMonitors.collectAsState()
+    val healthScore by viewModel.healthScore.collectAsState()
+    val liveData by viewModel.liveData.collectAsState()
+    val isDemoMode by viewModel.isDemoMode.collectAsState()
+    val demoDescription by viewModel.demoScenarioDescription.collectAsState()
     val protocol by viewModel.detectedProtocol.collectAsState()
     val adapterVer by viewModel.adapterVersion.collectAsState()
     val isClone by viewModel.isCloneAdapter.collectAsState()
+
+    val totalDtcs = activeDtcs.size + pendingDtcs.size + permanentDtcs.size
+    val readyCount = readiness?.monitors?.count { it.complete } ?: 0
+    val monitorCount = readiness?.monitors?.size ?: 0
+    val batteryVoltage = liveData["0142"] ?: liveData["42"] ?: liveData["Voltaje ECU"] ?: liveData["VOLTAGE"]
+    val commandState = remember(
+        activeVehicle,
+        obdState,
+        totalDtcs,
+        healthScore,
+        isDemoMode,
+        batteryVoltage,
+        readyCount,
+        monitorCount
+    ) {
+        buildHomeCommandState(
+            hasVehicle = activeVehicle != null,
+            obdState = obdState,
+            totalDtcs = totalDtcs,
+            healthScore = healthScore,
+            batteryVoltage = batteryVoltage,
+            readyCount = readyCount,
+            monitorCount = monitorCount,
+            isDemoMode = isDemoMode
+        )
+    }
 
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when (hour) {
@@ -135,9 +173,22 @@ fun HomeScreen(
                 }
             }
 
+            AnimatedEntrance(1) {
+                CommandCenterCard(
+                    profile = userProfile,
+                    state = commandState,
+                    isDemoMode = isDemoMode,
+                    demoDescription = demoDescription,
+                    onPrimaryAction = { navController.navigate(commandState.primaryRoute) },
+                    onStartDemo = { viewModel.startDemoMode() },
+                    onCycleDemo = { viewModel.cycleDemoScenario() },
+                    onStopDemo = { viewModel.stopDemoMode() }
+                )
+            }
+
             // ── DTC Alert Banner ──
             if (activeDtcs.isNotEmpty()) {
-                AnimatedEntrance(1) {
+                AnimatedEntrance(2) {
                     EliteCard(
                         glowColor = MeetColors.neonGreen,
                         borderColor = MeetColors.neonGreen.copy(alpha = 0.4f),
@@ -180,7 +231,7 @@ fun HomeScreen(
             }
 
             // ── Vehicle Card ──
-            AnimatedEntrance(2) {
+            AnimatedEntrance(3) {
                 EliteCard(
                     glowColor = MeetColors.neonGreen,
                     borderColor = MeetColors.neonGreen.copy(alpha = 0.15f),
@@ -234,7 +285,7 @@ fun HomeScreen(
             }
 
             // ── Connection Status ──
-            AnimatedEntrance(3) {
+            AnimatedEntrance(4) {
                 EliteCard(
                     glowColor = when (obdState) {
                         ObdState.CONNECTED -> MeetColors.neonGreen
@@ -307,7 +358,7 @@ fun HomeScreen(
             }
 
             // Vehicle Identification Card
-            AnimatedEntrance(4) {
+            AnimatedEntrance(5) {
                 VehicleIdentificationCard(viewModel = viewModel)
             }
 
@@ -339,7 +390,7 @@ fun HomeScreen(
             )
 
             actions.chunked(2).forEachIndexed { rowIdx, row ->
-                AnimatedEntrance(5 + rowIdx) {
+                AnimatedEntrance(6 + rowIdx) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -366,6 +417,106 @@ fun HomeScreen(
         com.elysium369.meet.ui.components.SystemThemeCustomizerDialog(
             onDismiss = { showThemeCustomizer = false }
         )
+    }
+}
+
+private data class HomeCommandState(
+    val title: String,
+    val recommendation: String,
+    val primaryAction: String,
+    val primaryRoute: String,
+    val severityColor: Color,
+    val statusLine: String
+)
+
+@Composable
+private fun CommandCenterCard(
+    profile: String,
+    state: HomeCommandState,
+    isDemoMode: Boolean,
+    demoDescription: String,
+    onPrimaryAction: () -> Unit,
+    onStartDemo: () -> Unit,
+    onCycleDemo: () -> Unit,
+    onStopDemo: () -> Unit
+) {
+    EliteCard(
+        glowColor = state.severityColor,
+        borderColor = state.severityColor.copy(alpha = 0.35f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(18.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill(profileLabel(profile), MeetColors.electricBlue)
+                StatusPill(if (isDemoMode) "DEMO" else "REAL", if (isDemoMode) MeetColors.warning else MeetColors.neonGreen)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                state.title,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                state.statusLine,
+                color = state.severityColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                state.recommendation,
+                color = MeetColors.textSecondary,
+                fontSize = 13.sp,
+                lineHeight = 18.sp
+            )
+
+            if (isDemoMode) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    demoDescription.ifBlank { "Entrenamiento activo con telemetría de muestra." },
+                    color = MeetColors.warning,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+            EliteButton(
+                text = state.primaryAction,
+                onClick = onPrimaryAction,
+                color = state.severityColor,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
+            if (isDemoMode) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    EliteOutlinedButton(
+                        text = "CAMBIAR ESCENARIO",
+                        onClick = onCycleDemo,
+                        color = MeetColors.warning,
+                        modifier = Modifier.weight(1f)
+                    )
+                    EliteOutlinedButton(
+                        text = "DETENER DEMO",
+                        onClick = onStopDemo,
+                        color = MeetColors.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                EliteOutlinedButton(
+                    text = "EXPLORAR DEMO SIN ADAPTADOR",
+                    onClick = onStartDemo,
+                    color = MeetColors.warning,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 
@@ -399,5 +550,101 @@ private fun QuickActionCard(
                 letterSpacing = 0.3.sp
             )
         }
+    }
+}
+
+@Composable
+private fun StatusPill(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.38f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun buildHomeCommandState(
+    hasVehicle: Boolean,
+    obdState: ObdState,
+    totalDtcs: Int,
+    healthScore: Int,
+    batteryVoltage: Float?,
+    readyCount: Int,
+    monitorCount: Int,
+    isDemoMode: Boolean
+): HomeCommandState {
+    return when {
+        !hasVehicle -> HomeCommandState(
+            title = "Configura tu primer vehículo",
+            recommendation = "Agrega marca, modelo, año, motor y VIN si lo tienes. Eso mejora guías, reportes, IA y mantenimiento.",
+            primaryAction = "AGREGAR VEHÍCULO",
+            primaryRoute = "vehicle_form",
+            severityColor = MeetColors.electricBlue,
+            statusLine = "Garaje pendiente"
+        )
+        isDemoMode -> HomeCommandState(
+            title = "Demo de entrenamiento activo",
+            recommendation = "Estás viendo telemetría de práctica. Úsala para conocer DTCs, gauges, Motor 3D e IA sin escribir historial real.",
+            primaryAction = "VER DTC DEMO",
+            primaryRoute = "dtc",
+            severityColor = MeetColors.warning,
+            statusLine = "Datos simulados rotulados"
+        )
+        obdState != ObdState.CONNECTED -> HomeCommandState(
+            title = "Conecta el adaptador OBD",
+            recommendation = "Enciende el switch, conecta el adaptador y deja que MEET detecte protocolo, latencia y capacidades antes del escaneo.",
+            primaryAction = "CONECTAR ADAPTADOR",
+            primaryRoute = "connect",
+            severityColor = MeetColors.cyberCyan,
+            statusLine = "Sin enlace físico"
+        )
+        totalDtcs > 0 -> HomeCommandState(
+            title = "Diagnóstico prioritario disponible",
+            recommendation = "Hay $totalDtcs código(s). Revisa severidad, freeze frame, pruebas de confirmación y piezas relacionadas antes de borrar o cambiar repuestos.",
+            primaryAction = "VER DIAGNÓSTICO PRIORITARIO",
+            primaryRoute = "dtc",
+            severityColor = MeetColors.error,
+            statusLine = "Check engine / DTC detectado"
+        )
+        batteryVoltage != null && batteryVoltage < 12.4f -> HomeCommandState(
+            title = "Voltaje bajo detectado",
+            recommendation = "Valida batería, alternador, masas y caída de voltaje. Un voltaje bajo puede contaminar lecturas y pruebas bidireccionales.",
+            primaryAction = "ABRIR MOTOR 3D",
+            primaryRoute = "component_locator",
+            severityColor = MeetColors.warning,
+            statusLine = "Batería/sistema de carga: %.2f V".format(batteryVoltage)
+        )
+        healthScore < 80 -> HomeCommandState(
+            title = "Salud del vehículo requiere revisión",
+            recommendation = "El score bajó por telemetría o anomalías. Revisa MEET DNA para ver tendencia, sistema afectado y próxima prueba recomendada.",
+            primaryAction = "VER MEET DNA",
+            primaryRoute = "meet_dna",
+            severityColor = MeetColors.warning,
+            statusLine = "Score: $healthScore/100"
+        )
+        else -> HomeCommandState(
+            title = "Vehículo listo para monitoreo",
+            recommendation = if (monitorCount > 0) {
+                "Monitores listos: $readyCount/$monitorCount. Puedes grabar sesión, generar reporte o revisar mantenimiento predictivo."
+            } else {
+                "No hay fallas críticas ahora. Graba una sesión de manejo para construir historial DNA y detectar cambios temprano."
+            },
+            primaryAction = "INICIAR SCANNER",
+            primaryRoute = "scanner",
+            severityColor = MeetColors.neonGreen,
+            statusLine = "Sistema estable"
+        )
+    }
+}
+
+private fun profileLabel(profile: String): String {
+    return when (profile) {
+        "mechanic" -> "MECÁNICO"
+        "workshop" -> "TALLER"
+        "fleet" -> "FLOTA"
+        else -> "USUARIO"
     }
 }
