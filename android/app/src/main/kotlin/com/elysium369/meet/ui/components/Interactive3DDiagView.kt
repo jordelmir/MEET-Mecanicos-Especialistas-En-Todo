@@ -209,7 +209,7 @@ fun Interactive3DDiagView(
                 var hitMeshName: String? = null
 
                 for (pf in projectedFaces.reversed()) {
-                    if (pf.mesh.id == "engine_block" || pf.mesh.id.startsWith("valve_cover") || pf.mesh.id == "fuse_box_housing" || pf.mesh.id == "fuse_box_tray") continue
+                    if (isNonSelectableSupportMesh(pf.mesh.id)) continue
                     if (isPointInPolygon(tappedPos.x, tappedPos.y, pf.points)) {
                         hitMeshId = pf.mesh.id
                         hitMeshName = pf.mesh.name
@@ -364,6 +364,11 @@ private fun projectPoint(
 private fun serviceExplodedOffset(meshId: String, progress: Float): Vector3D {
     if (progress <= 0f) return Vector3D(0f, 0f, 0f)
     val direction = when {
+        meshId == "fuse_box_lid" -> Vector3D(0f, -64f, 0f)
+        meshId == "fuse_box_pcb" || meshId.startsWith("bus_bar") -> Vector3D(0f, 22f, 0f)
+        meshId.startsWith("main_connector_") || meshId.startsWith("main_harness_branch_") -> Vector3D(0f, 34f, 0f)
+        meshId.startsWith("relay_") -> Vector3D(0f, -24f, 0f)
+        meshId.startsWith("fuse_") || meshId.startsWith("socket_fuse_") -> Vector3D(0f, -15f, 0f)
         meshId.startsWith("spark_plug_") || meshId.startsWith("ignition_coil_") || meshId.startsWith("spark_gap_") -> Vector3D(0f, -28f, 0f)
         meshId.startsWith("injector_") || meshId == "fuel_rail" -> Vector3D(0f, -12f, -18f)
         meshId == "intake_manifold" || meshId.startsWith("intake_runner_") || meshId == "throttle_body" -> Vector3D(0f, -10f, -30f)
@@ -373,6 +378,20 @@ private fun serviceExplodedOffset(meshId: String, progress: Float): Vector3D {
         else -> Vector3D(0f, 0f, 0f)
     }
     return direction * progress
+}
+
+private fun isNonSelectableSupportMesh(meshId: String): Boolean {
+    return meshId == "engine_block" ||
+        meshId.startsWith("valve_cover") ||
+        meshId == "fuse_box_housing" ||
+        meshId == "fuse_box_tray" ||
+        meshId == "fuse_box_lid" ||
+        meshId == "fuse_box_pcb" ||
+        meshId.startsWith("bus_bar") ||
+        meshId.startsWith("fuse_box_screw") ||
+        meshId.startsWith("fuse_box_latch") ||
+        meshId.startsWith("main_connector") ||
+        meshId.startsWith("main_harness_branch")
 }
 
 private fun shouldLabelMesh(mesh: Mesh3D, selectedComponentId: String?): Boolean {
@@ -387,12 +406,23 @@ private fun shouldLabelMesh(mesh: Mesh3D, selectedComponentId: String?): Boolean
         "catalytic_converter",
         "inverter_module",
         "hv_battery_pack",
-        "safety_disconnect"
+        "safety_disconnect",
+        "fuse_ecm_batt",
+        "fuse_injectors",
+        "fuse_ignition_coils",
+        "fuse_fuel_pump",
+        "fuse_battery_main",
+        "relay_fuel_pump",
+        "relay_ignition",
+        "relay_fan"
     ) || mesh.id.startsWith("spark_plug_0") || mesh.id.startsWith("ignition_coil_0")
 }
 
 private fun serviceLabel(name: String): String {
     return name
+        .replace("Grabado ", "")
+        .replace("Terminal 1 ", "")
+        .replace("Terminal 2 ", "")
         .replace("(Pre-Cat)", "pre-cat")
         .replace("(Post-Cat)", "post-cat")
         .replace("Sensor ", "")

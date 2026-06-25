@@ -591,6 +591,36 @@ private fun sceneDisplayName(sceneType: SceneType, engineType: EngineType): Stri
 }
 
 private fun mapMeshToComponentId(meshId: String): String? {
+    val normalizedMeshId = if (meshId.startsWith("socket_")) meshId.removePrefix("socket_") else meshId
+    val powerDistributionIds = listOf(
+        "fuse_ecm_batt",
+        "fuse_ecm_ign",
+        "fuse_injectors",
+        "fuse_ignition_coils",
+        "fuse_o2_heater",
+        "fuse_maf_map",
+        "fuse_fuel_pump",
+        "fuse_cooling_fan_low",
+        "fuse_cooling_fan_high",
+        "fuse_starter",
+        "fuse_abs",
+        "fuse_eps",
+        "fuse_ac_clutch",
+        "fuse_obd_dlc",
+        "fuse_headlamp",
+        "fuse_blower",
+        "fuse_battery_main",
+        "relay_fuel_pump",
+        "relay_starter",
+        "relay_ignition",
+        "relay_fan",
+        "relay_ac_clutch",
+        "relay_headlamp",
+        "relay_horn",
+        "relay_aux"
+    )
+    powerDistributionIds.firstOrNull { normalizedMeshId == it || normalizedMeshId.startsWith("${it}_") }?.let { return it }
+
     return when {
         meshId.startsWith("spark_plug_") || meshId.startsWith("spark_metal_") || meshId.startsWith("spark_gap_") -> "spark_plugs"
         meshId.startsWith("piston_") || meshId.startsWith("rod_") -> "spark_plugs"
@@ -614,9 +644,8 @@ private fun mapMeshToComponentId(meshId: String): String? {
         meshId == "exhaust_manifold" || meshId.startsWith("exhaust_runner_") || meshId == "o2_upstream" -> "o2_upstream"
         meshId == "o2_downstream" -> "o2_downstream"
         meshId == "catalytic_converter" -> "catalytic_conv"
-        meshId == "relay_fuel_pump" || meshId == "fuse_10" -> "fuel_pump"
-        meshId == "relay_starter" -> "alternator"
-        meshId == "relay_fan" || meshId == "fuse_7" -> "thermostat"
+        meshId == "fuse_10" -> "fuel_pump"
+        meshId == "fuse_7" -> "thermostat"
         meshId.startsWith("fuse_0") -> "injectors"
         meshId.startsWith("fuse_5") -> "ignition_coils"
         // EV Mappings
@@ -719,10 +748,133 @@ private fun buildComponentDatabase(engineType: EngineType): List<ComponentInfo> 
             relatedPids = listOf("010F"), relatedDtcs = listOf("P0110", "P0112")),
         ComponentInfo("oil_pan", "Cárter de Aceite", ComponentCategory.ENGINE, "Reservorio inferior de aceite del motor. Contiene el sensor de nivel/presión de aceite.",
             commonFailures = listOf("Fuga por empaque", "Tapón de drenaje dañado"))
-    )
+    ) + powerDistributionComponentDatabase()
+}
+
+private data class FuseInfoSpec(
+    val id: String,
+    val slot: String,
+    val type: String,
+    val amps: Int,
+    val colorName: String,
+    val function: String,
+    val feed: String,
+    val relatedDtcs: List<String> = emptyList(),
+    val circuit: String = ""
+)
+
+private data class RelayInfoSpec(
+    val id: String,
+    val label: String,
+    val function: String,
+    val feed: String,
+    val relatedDtcs: List<String> = emptyList()
+)
+
+private fun powerDistributionComponentDatabase(): List<ComponentInfo> {
+    val fuses = listOf(
+        FuseInfoSpec("fuse_ecm_batt", "F1", "Micro2", 10, "Rojo", "ECM memoria permanente", "B+ permanente", listOf("P0603", "P0685"), "PCM BATT"),
+        FuseInfoSpec("fuse_ecm_ign", "F2", "Micro2", 15, "Azul", "ECM ignición/ACC", "Llave ON/START", listOf("P0685"), "PCM IGN"),
+        FuseInfoSpec("fuse_injectors", "F3", "Mini", 15, "Azul", "Inyectores", "Relé principal o ASD", listOf("P0201", "P0202", "P0203", "P0204"), "INY"),
+        FuseInfoSpec("fuse_ignition_coils", "F4", "Mini", 20, "Amarillo", "Bobinas de encendido", "Relé principal/ignición", listOf("P0351", "P0352", "P0300"), "IGN COIL"),
+        FuseInfoSpec("fuse_o2_heater", "F5", "Micro2", 15, "Azul", "Calentadores sensores O2", "Llave ON con control PCM", listOf("P0135", "P0141"), "HTR O2"),
+        FuseInfoSpec("fuse_maf_map", "F6", "Micro2", 10, "Rojo", "Sensores MAF/MAP/IAT", "Referencia/ignición sensores", listOf("P0100", "P0105", "P0110"), "SNSR"),
+        FuseInfoSpec("fuse_fuel_pump", "F7", "Mini", 20, "Amarillo", "Bomba de combustible", "B+ vía relé bomba", listOf("P0230", "P0087"), "F/PMP"),
+        FuseInfoSpec("fuse_cooling_fan_low", "F8", "JCASE", 30, "Verde", "Ventilador radiador baja", "B+ relé ventilador", listOf("P0480"), "FAN LOW"),
+        FuseInfoSpec("fuse_cooling_fan_high", "F9", "JCASE", 40, "Naranja", "Ventilador radiador alta", "B+ relé ventilador", listOf("P0481"), "FAN HI"),
+        FuseInfoSpec("fuse_starter", "F10", "Maxi", 40, "Naranja", "Solenoide de arranque", "START desde relé", listOf("P0512"), "START"),
+        FuseInfoSpec("fuse_abs", "F11", "JCASE", 30, "Verde", "Módulo ABS", "B+ permanente ABS", listOf("C0035", "C0040"), "ABS"),
+        FuseInfoSpec("fuse_eps", "F12", "PAL", 60, "Azul", "Dirección asistida EPS", "B+ alto consumo", listOf("C1604"), "EPS"),
+        FuseInfoSpec("fuse_ac_clutch", "F13", "Mini", 10, "Rojo", "Embrague compresor A/C", "ACC con solicitud A/C", listOf("P0645"), "A/C CLT"),
+        FuseInfoSpec("fuse_obd_dlc", "F14", "Micro2", 10, "Rojo", "Puerto OBD-II DLC", "B+ permanente pin 16", listOf("U0100"), "DLC"),
+        FuseInfoSpec("fuse_headlamp", "F15", "Mini", 15, "Azul", "Faros principales", "B+ iluminación", circuit = "HEAD"),
+        FuseInfoSpec("fuse_blower", "F16", "JCASE", 40, "Naranja", "Soplador HVAC", "B+ motor soplador", circuit = "BLWR"),
+        FuseInfoSpec("fuse_battery_main", "F17", "PAL", 80, "Amarillo", "Alimentación principal B+", "B+ batería directo", listOf("P0562", "P0563"), "MAIN")
+    ).map { fuse ->
+        ComponentInfo(
+            id = fuse.id,
+            name = "${fuse.slot} ${fuse.type} ${fuse.amps}A - ${fuse.function}",
+            category = ComponentCategory.ELECTRICAL,
+            description = "Protección de circuito ${fuse.circuit.ifBlank { fuse.function }}. Tipo ${fuse.type}, ${fuse.amps}A, color ${fuse.colorName}. Alimentación esperada: ${fuse.feed}.",
+            commonFailures = listOf("Elemento interno abierto", "Terminal floja o sulfatada", "Fusible reemplazado por amperaje incorrecto", "Corto intermitente aguas abajo"),
+            relatedDtcs = fuse.relatedDtcs,
+            location = "Caja de fusibles del vano motor, ranura ${fuse.slot}. Confirmar tapa/diagrama físico y manual OEM por VIN.",
+            requiredTools = listOf("Multímetro", "Lámpara de prueba de baja corriente", "Pinza extractora de fusibles", "Diagrama eléctrico OEM", "Puntas back-probe"),
+            professionalChecks = listOf(
+                "Medir voltaje en ambos puntos de prueba del fusible: debe existir el mismo voltaje en entrada y salida cuando el circuito está alimentado.",
+                "Si hay voltaje en un lado y cero en el otro, el elemento está abierto; reemplace por ${fuse.amps}A, no suba amperaje.",
+                "Si vuelve a quemarse, desconecte cargas aguas abajo y busque corto a masa antes de instalar otro fusible.",
+                "Prueba de continuidad solo con fusible fuera del circuito; valor esperado cercano a 0 ohmios.",
+                "Pin ECM/PCM exacto depende del diagrama OEM; use ${fuse.circuit.ifBlank { fuse.slot }} como circuito guía."
+            ),
+            repairWorkflow = listOf(
+                "Guardar DTC/freeze frame antes de borrar.",
+                "Confirmar alimentación ${fuse.feed} en la ranura ${fuse.slot}.",
+                "Extraer fusible, inspeccionar elemento y terminales de caja.",
+                "Si el fusible está abierto, aislar carga y arnés antes de reemplazar.",
+                "Instalar fusible ${fuse.type} ${fuse.amps}A y validar funcionamiento del sistema."
+            ),
+            serviceSpecs = listOf(
+                "Tipo: ${fuse.type}",
+                "Amperaje: ${fuse.amps}A",
+                "Color: ${fuse.colorName}",
+                "Continuidad esperada fuera de circuito: aproximadamente 0 ohmios",
+                "Voltaje esperado: ${fuse.feed}"
+            ),
+            safetyNotes = listOf("No puentear con cable ni papel metálico.", "No aumentar amperaje para evitar que se queme.", "Si el fusible protege bomba/inyectores, despresurice combustible antes de intervenir cargas.")
+        )
+    }
+
+    val relays = listOf(
+        RelayInfoSpec("relay_fuel_pump", "Relé Bomba Gasolina", "Alimenta bomba de combustible durante cebado, arranque y motor en marcha.", "B+ permanente + comando PCM", listOf("P0230", "P0087")),
+        RelayInfoSpec("relay_starter", "Relé Motor Arranque", "Entrega señal al solenoide de arranque cuando se cumplen condiciones de seguridad.", "START/PNP/inmovilizador", listOf("P0512")),
+        RelayInfoSpec("relay_ignition", "Relé Principal ECM", "Alimenta ECM, bobinas, inyectores y sensores clave según arquitectura.", "Llave ON con control ECM", listOf("P0685", "P0603")),
+        RelayInfoSpec("relay_fan", "Relé Ventilador", "Controla velocidad baja/alta de ventiladores de radiador.", "B+ batería + comando ECM", listOf("P0480", "P0481")),
+        RelayInfoSpec("relay_ac_clutch", "Relé Compresor A/C", "Activa embrague o solicitud de compresor cuando presiones y temperatura son válidas.", "ACC + solicitud HVAC/PCM", listOf("P0645")),
+        RelayInfoSpec("relay_headlamp", "Relé Faros", "Alimenta faros principales sin cargar directamente el interruptor.", "B+ iluminación"),
+        RelayInfoSpec("relay_horn", "Relé Bocina", "Alimenta bocina desde mando de volante/BCM.", "B+ permanente + mando BCM"),
+        RelayInfoSpec("relay_aux", "Relé Auxiliar", "Reserva para cargas auxiliares según equipamiento.", "Según diagrama OEM")
+    ).map { relay ->
+        ComponentInfo(
+            id = relay.id,
+            name = relay.label,
+            category = ComponentCategory.ELECTRICAL,
+            description = "${relay.function} Alimentación esperada: ${relay.feed}.",
+            commonFailures = listOf("Contactos internos carbonizados", "Bobina abierta", "Terminal floja en zócalo", "Comando PCM/BCM ausente"),
+            relatedDtcs = relay.relatedDtcs,
+            location = "Caja de fusibles/relés del vano motor. Confirmar posición exacta en tapa y diagrama OEM.",
+            requiredTools = listOf("Multímetro", "Pinza amperimétrica", "Lámpara de prueba", "Cable puente con fusible", "Diagrama eléctrico OEM"),
+            professionalChecks = listOf(
+                "Identificar terminales 30, 87, 85 y 86 según diagrama; no asumir distribución sin verificar.",
+                "Terminal 30 debe tener alimentación cuando aplique; terminal 87 debe alimentar la carga al activar.",
+                "Bobina 85/86 debe recibir comando y masa/control PCM; medir caída de voltaje bajo carga.",
+                "Intercambiar solo con relé idéntico de mismo número y capacidad para prueba rápida.",
+                "Si el relé activa pero la carga no funciona, medir consumo y continuidad hacia la carga."
+            ),
+            repairWorkflow = listOf(
+                "Guardar DTC y condición de falla.",
+                "Probar alimentación/comando en zócalo con el relé retirado.",
+                "Activar relé con escáner o condición de mando y medir salida.",
+                "Reparar zócalo, arnés o carga si el relé nuevo también falla.",
+                "Validar sistema y revisar calentamiento anormal del relé."
+            ),
+            serviceSpecs = listOf(
+                "Terminal 30: alimentación principal según circuito.",
+                "Terminal 87: salida a carga.",
+                "Terminal 85/86: bobina de mando.",
+                "Resistencia de bobina típica varía por relé; confirmar OEM.",
+                "Caída de voltaje en contactos debe ser baja bajo carga."
+            ),
+            safetyNotes = listOf("Use puente con fusible, nunca cable directo sin protección.", "No fuerce relés de diferente patillaje.", "Cargas como bomba o ventilador pueden arrancar inesperadamente.")
+        )
+    }
+
+    return fuses + relays
 }
 
 private fun ComponentInfo.serviceLocation(): String {
+    if (id.startsWith("fuse_")) return "Caja de fusibles del vano motor. Use la ranura indicada y confirme contra la tapa física o diagrama OEM por VIN."
+    if (id.startsWith("relay_")) return "Caja de relés del vano motor. Confirmar posición por tapa/diagrama; algunos vehículos repiten relés de misma apariencia con patillaje distinto."
     return when (id) {
         "spark_plugs" -> "Parte superior de la culata, debajo de bobinas o cables de encendido; una bujía por cilindro."
         "ignition_coils" -> "Encima de cada bujía en sistemas COP, o agrupadas en paquete de bobinas cerca de la tapa de válvulas."

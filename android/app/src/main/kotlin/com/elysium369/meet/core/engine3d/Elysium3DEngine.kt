@@ -947,33 +947,180 @@ object ElysiumProceduralModels {
         )
     }
 
+    private data class FuseBaySpec(
+        val id: String,
+        val slot: String,
+        val type: String,
+        val amps: Int,
+        val function: String,
+        val position: Vector3D,
+        val relatedDtcs: List<String> = emptyList()
+    )
+
+    private data class RelayBaySpec(
+        val id: String,
+        val label: String,
+        val position: Vector3D,
+        val relatedDtcs: List<String> = emptyList()
+    )
+
+    private fun fuseColorForAmps(amps: Int): Color {
+        return when (amps) {
+            5 -> Color(0xFFD7CCC8)
+            7 -> Color(0xFF8D6E63)
+            10 -> Color(0xFFFF1744)
+            15 -> Color(0xFF2979FF)
+            20 -> Color(0xFFFFEA00)
+            25 -> Color(0xFFECEFF1)
+            30 -> Color(0xFF00C853)
+            40 -> Color(0xFFFF9100)
+            50 -> Color(0xFFE53935)
+            60 -> Color(0xFF1E88E5)
+            80 -> Color(0xFFFFB300)
+            100 -> Color(0xFF66BB6A)
+            else -> Color(0xFFB0BEC5)
+        }
+    }
+
     fun buildRelayFuseBoxScene(engineType: EngineType, activeDtcs: List<String>): List<Mesh3D> {
         val meshes = mutableListOf<Mesh3D>()
+
+        val isEv = engineType == EngineType.ELECTRIC
 
         meshes.add(
             createBox(
                 id = "fuse_box_housing",
-                name = "Carcasa Caja de Fusibles",
-                width = 130f,
-                height = 30f,
-                depth = 95f,
-                color = Color(0xFF121418),
+                name = "Carcasa ABS de Caja de Fusibles",
+                width = 156f,
+                height = 28f,
+                depth = 108f,
+                color = Color(0xFF10151B),
                 position = Vector3D(0f, 0f, 0f)
             )
         )
         meshes.add(
             createBox(
                 id = "fuse_box_tray",
-                name = "Bandeja de Fusibles",
-                width = 122f,
+                name = "Bandeja Recesada de Fusibles",
+                width = 146f,
                 height = 4f,
-                depth = 87f,
+                depth = 98f,
                 color = Color(0xFF2A2E35),
                 position = Vector3D(0f, -14f, 0f)
             )
         )
+        meshes.add(
+            createBox(
+                id = "fuse_box_pcb",
+                name = "PCB de Distribución",
+                width = 134f,
+                height = 2.8f,
+                depth = 88f,
+                color = Color(0xFF0B3D2E),
+                position = Vector3D(0f, -17.5f, 0f),
+                isTranslucent = true,
+                opacity = 0.82f
+            )
+        )
+        meshes.add(
+            createBox(
+                id = "fuse_box_lid",
+                name = "Tapa Translúcida con Diagrama",
+                width = 164f,
+                height = 6f,
+                depth = 116f,
+                color = Color(0xFF263238),
+                position = Vector3D(0f, -43f, 0f),
+                isTranslucent = true,
+                opacity = 0.22f
+            )
+        )
 
-        if (engineType == EngineType.ELECTRIC) {
+        listOf(-78f to -54f, 78f to -54f, -78f to 54f, 78f to 54f).forEachIndexed { index, (x, z) ->
+            meshes.add(
+                createCylinder(
+                    id = "fuse_box_screw_$index",
+                    name = "Tornillo Torx Caja ${index + 1}",
+                    radius = 3.2f,
+                    height = 3f,
+                    segments = 14,
+                    color = Color(0xFFB0BEC5),
+                    position = Vector3D(x, -24f, z)
+                )
+            )
+        }
+
+        listOf(
+            Vector3D(-84f, -17f, 0f),
+            Vector3D(84f, -17f, 0f),
+            Vector3D(0f, -17f, -58f),
+            Vector3D(0f, -17f, 58f)
+        ).forEachIndexed { index, pos ->
+            meshes.add(
+                createBox(
+                    id = "fuse_box_latch_$index",
+                    name = "Pestaña de Retención ${index + 1}",
+                    width = if (index < 2) 5f else 28f,
+                    height = 8f,
+                    depth = if (index < 2) 24f else 5f,
+                    color = Color(0xFF05070A),
+                    position = pos
+                )
+            )
+        }
+
+        listOf(
+            Triple("bus_bar_battery", "Barra B+ Permanente", Vector3D(-48f, -19.5f, 42f)),
+            Triple("bus_bar_acc", "Barra ACC/IGN", Vector3D(12f, -19.5f, 42f)),
+            Triple("bus_bar_ecm", "Barra ECM/PCM", Vector3D(52f, -19.5f, -16f))
+        ).forEach { (id, name, pos) ->
+            meshes.add(
+                createBox(
+                    id = id,
+                    name = name,
+                    width = 52f,
+                    height = 2.4f,
+                    depth = 4f,
+                    color = Color(0xFFC77827),
+                    position = pos
+                )
+            )
+        }
+
+        listOf(
+            Vector3D(-74f, -22f, 48f),
+            Vector3D(74f, -22f, 48f),
+            Vector3D(-74f, -22f, -48f),
+            Vector3D(74f, -22f, -48f)
+        ).forEachIndexed { index, pos ->
+            meshes.add(
+                createBox(
+                    id = "main_connector_$index",
+                    name = "Conector Inferior C${index + 1}",
+                    width = 20f,
+                    height = 14f,
+                    depth = 10f,
+                    color = Color(0xFF111820),
+                    position = pos
+                )
+            )
+            meshes.add(
+                createSplineCable(
+                    id = "main_harness_branch_$index",
+                    name = "Ramal de Arnés C${index + 1}",
+                    points = listOf(
+                        pos + Vector3D(0f, 8f, 0f),
+                        pos + Vector3D(if (pos.x < 0) -16f else 16f, 18f, if (pos.z < 0) -20f else 20f),
+                        pos + Vector3D(if (pos.x < 0) -42f else 42f, 28f, if (pos.z < 0) -34f else 34f)
+                    ),
+                    radius = 2.8f,
+                    segments = 8,
+                    color = Color(0xFF0A0D11)
+                )
+            )
+        }
+
+        if (isEv) {
             meshes.add(
                 createCylinder(
                     id = "contactor_positive",
@@ -1024,107 +1171,169 @@ object ElysiumProceduralModels {
         }
 
         val relayGrid = listOf(
-            Triple("relay_fuel_pump", "Relé Bomba Gasolina", Vector3D(-40f, -21f, -25f)),
-            Triple("relay_starter", "Relé del Motor de Arranque", Vector3D(-10f, -21f, -25f)),
-            Triple("relay_ignition", "Relé Principal de Ignición", Vector3D(20f, -21f, -25f)),
-            Triple("relay_fan", "Relé del Ventilador Radiador", Vector3D(50f, -21f, -25f)),
-            Triple("relay_horn", "Relé de Bocina", Vector3D(-40f, -21f, 25f)),
-            Triple("relay_lights", "Relé de Faros Principales", Vector3D(20f, -21f, 25f))
+            RelayBaySpec("relay_fuel_pump", "Relé Bomba Gasolina", Vector3D(-52f, -30f, -31f), listOf("P0230", "P0087")),
+            RelayBaySpec("relay_starter", "Relé Motor Arranque", Vector3D(-18f, -30f, -31f), listOf("P0512")),
+            RelayBaySpec("relay_ignition", "Relé Principal ECM", Vector3D(16f, -30f, -31f), listOf("P0685", "P0603")),
+            RelayBaySpec("relay_fan", "Relé Ventilador", Vector3D(50f, -30f, -31f), listOf("P0480", "P0481")),
+            RelayBaySpec("relay_ac_clutch", "Relé Compresor A/C", Vector3D(-52f, -30f, 31f), listOf("P0645")),
+            RelayBaySpec("relay_headlamp", "Relé Faros", Vector3D(-18f, -30f, 31f)),
+            RelayBaySpec("relay_horn", "Relé Bocina", Vector3D(16f, -30f, 31f)),
+            RelayBaySpec("relay_aux", "Relé Auxiliar", Vector3D(50f, -30f, 31f))
         )
 
-        relayGrid.forEach { (id, name, pos) ->
-            val isFailing = when (id) {
-                "relay_fuel_pump" -> activeDtcs.contains("P0230") || activeDtcs.contains("P0087")
-                "relay_starter" -> activeDtcs.contains("P0512")
-                "relay_fan" -> activeDtcs.contains("P0480")
-                else -> false
-            }
+        relayGrid.forEach { relay ->
+            val isFailing = relay.relatedDtcs.any { activeDtcs.contains(it) }
 
             meshes.add(
                 createBox(
-                    id = id,
-                    name = name,
-                    width = 22f,
-                    height = 15f,
-                    depth = 22f,
-                    color = Color(0xFF1E2228),
-                    position = pos,
+                    id = relay.id,
+                    name = relay.label,
+                    width = 25f,
+                    height = 24f,
+                    depth = 25f,
+                    color = Color(0xFF171B22),
+                    position = relay.position,
                     isActiveDtc = isFailing
                 )
             )
+            meshes.add(
+                createBox(
+                    id = "${relay.id}_engraving",
+                    name = "Grabado ${relay.label}",
+                    width = 17f,
+                    height = 1.2f,
+                    depth = 2f,
+                    color = Color(0xFF607D8B),
+                    position = relay.position + Vector3D(0f, -12.6f, -9f)
+                )
+            )
+            listOf(-7f, 0f, 7f).forEachIndexed { index, x ->
+                meshes.add(
+                    createBox(
+                        id = "${relay.id}_pin_$index",
+                        name = "Terminal ${index + 1} ${relay.label}",
+                        width = 2.2f,
+                        height = 8f,
+                        depth = 5f,
+                        color = Color(0xFFE6C16A),
+                        position = relay.position + Vector3D(x, 14f, 8f)
+                    )
+                )
+            }
         }
 
-        val fusePositions = listOf(
-            Pair(Vector3D(-45f, -18f, -2f), Color(0xFFFF1744)),
-            Pair(Vector3D(-32f, -18f, -2f), Color(0xFF2979FF)),
-            Pair(Vector3D(-19f, -18f, -2f), Color(0xFFFFEA00)),
-            Pair(Vector3D(-6f, -18f, -2f), Color(0xFF00E676)),
-            Pair(Vector3D(7f, -18f, -2f), Color(0xFFFF1744)),
-            Pair(Vector3D(20f, -18f, -2f), Color(0xFF2979FF)),
-            Pair(Vector3D(33f, -18f, -2f), Color(0xFFFFEA00)),
-            Pair(Vector3D(46f, -18f, -2f), Color(0xFF00E676)),
-            Pair(Vector3D(-45f, -18f, 10f), Color(0xFFFF9100)),
-            Pair(Vector3D(-32f, -18f, 10f), Color(0xFF2979FF)),
-            Pair(Vector3D(-19f, -18f, 10f), Color(0xFFFF1744)),
-            Pair(Vector3D(-6f, -18f, 10f), Color(0xFFFFEA00)),
-            Pair(Vector3D(7f, -18f, 10f), Color(0xFF00E676))
+        val fuseGrid = listOf(
+            FuseBaySpec("fuse_ecm_batt", "F1", "Micro2", 10, "ECM memoria permanente", Vector3D(-64f, -29f, -4f), listOf("P0603", "P0685")),
+            FuseBaySpec("fuse_ecm_ign", "F2", "Micro2", 15, "ECM ignición/ACC", Vector3D(-52f, -29f, -4f), listOf("P0685")),
+            FuseBaySpec("fuse_injectors", "F3", "Mini", 15, "Inyectores", Vector3D(-40f, -29f, -4f), listOf("P0201", "P0202", "P0203", "P0204")),
+            FuseBaySpec("fuse_ignition_coils", "F4", "Mini", 20, "Bobinas de encendido", Vector3D(-28f, -29f, -4f), listOf("P0351", "P0352", "P0300")),
+            FuseBaySpec("fuse_o2_heater", "F5", "Micro2", 15, "Calentadores O2", Vector3D(-16f, -29f, -4f), listOf("P0135", "P0141")),
+            FuseBaySpec("fuse_maf_map", "F6", "Micro2", 10, "Sensores MAF/MAP/IAT", Vector3D(-4f, -29f, -4f), listOf("P0100", "P0105", "P0110")),
+            FuseBaySpec("fuse_fuel_pump", "F7", "Mini", 20, "Bomba de combustible", Vector3D(8f, -29f, -4f), listOf("P0230", "P0087")),
+            FuseBaySpec("fuse_cooling_fan_low", "F8", "JCASE", 30, "Ventilador baja", Vector3D(25f, -29f, -4f), listOf("P0480")),
+            FuseBaySpec("fuse_cooling_fan_high", "F9", "JCASE", 40, "Ventilador alta", Vector3D(45f, -29f, -4f), listOf("P0481")),
+            FuseBaySpec("fuse_starter", "F10", "Maxi", 40, "Solenoide arranque", Vector3D(66f, -29f, -4f), listOf("P0512")),
+            FuseBaySpec("fuse_abs", "F11", "JCASE", 30, "Módulo ABS", Vector3D(-62f, -29f, 15f), listOf("C0035", "C0040")),
+            FuseBaySpec("fuse_eps", "F12", "PAL", 60, "Dirección EPS", Vector3D(-36f, -29f, 17f), listOf("C1604")),
+            FuseBaySpec("fuse_ac_clutch", "F13", "Mini", 10, "Compresor A/C", Vector3D(-11f, -29f, 15f), listOf("P0645")),
+            FuseBaySpec("fuse_obd_dlc", "F14", "Micro2", 10, "Puerto OBD-II DLC", Vector3D(1f, -29f, 15f), listOf("U0100")),
+            FuseBaySpec("fuse_headlamp", "F15", "Mini", 15, "Faros principales", Vector3D(13f, -29f, 15f)),
+            FuseBaySpec("fuse_blower", "F16", "JCASE", 40, "Soplador HVAC", Vector3D(31f, -29f, 15f)),
+            FuseBaySpec("fuse_battery_main", "F17", "PAL", 80, "Alimentación principal B+", Vector3D(59f, -29f, 18f), listOf("P0562", "P0563"))
         )
 
-        fusePositions.forEachIndexed { index, (pos, fuseColor) ->
-            val isBlown = when (index) {
-                0 -> activeDtcs.contains("P0201") || activeDtcs.contains("P0202")
-                4 -> activeDtcs.contains("P0115")
-                5 -> activeDtcs.contains("P0351") || activeDtcs.contains("P0352")
-                10 -> activeDtcs.contains("P0230")
-                else -> false
+        fuseGrid.forEach { fuse ->
+            val isBlown = fuse.relatedDtcs.any { activeDtcs.contains(it) }
+            val fuseColor = if (isBlown) Color(0xFFD50000) else fuseColorForAmps(fuse.amps)
+            val shell = when (fuse.type) {
+                "Micro2" -> Vector3D(7f, 10f, 5f)
+                "Mini" -> Vector3D(9f, 12f, 6f)
+                "JCASE" -> Vector3D(16f, 13f, 10f)
+                "Maxi" -> Vector3D(20f, 16f, 10f)
+                "PAL" -> Vector3D(26f, 10f, 9f)
+                else -> Vector3D(8f, 11f, 6f)
             }
 
             meshes.add(
                 createBox(
-                    id = "fuse_$index",
-                    name = "Fusible F$index",
-                    width = 8f,
-                    height = 9f,
-                    depth = 5f,
+                    id = "socket_${fuse.id}",
+                    name = "Zócalo ${fuse.slot} ${fuse.function}",
+                    width = shell.x + 4f,
+                    height = 3f,
+                    depth = shell.z + 4f,
+                    color = Color(0xFF080A0D),
+                    position = fuse.position + Vector3D(0f, 7.2f, 0f)
+                )
+            )
+            meshes.add(
+                createBox(
+                    id = fuse.id,
+                    name = "${fuse.slot} ${fuse.type} ${fuse.amps}A - ${fuse.function}",
+                    width = shell.x,
+                    height = shell.y,
+                    depth = shell.z,
                     color = fuseColor,
-                    position = pos,
+                    position = fuse.position,
                     isTranslucent = true,
-                    opacity = 0.7f,
+                    opacity = if (isBlown) 0.95f else 0.78f,
                     isActiveDtc = isBlown
                 )
             )
-
-            val metalColor = if (isBlown) Color(0xFF3E2723) else Color(0xFFCFD8DC)
             meshes.add(
-                Mesh3D(
-                    id = "fuse_element_$index",
-                    name = "Elemento Fusible F$index",
-                    vertices = if (isBlown) {
-                        listOf(
-                            pos + Vector3D(-2f, 1f, 0f),
-                            pos + Vector3D(-1f, 3f, 0f),
-                            pos + Vector3D(1f, 3f, 0f),
-                            pos + Vector3D(2f, 1f, 0f)
-                        )
-                    } else {
-                        listOf(
-                            pos + Vector3D(-2f, 1f, 0f),
-                            pos + Vector3D(0f, 3f, 0f),
-                            pos + Vector3D(2f, 1f, 0f)
-                        )
-                    },
-                    faces = if (isBlown) {
-                        listOf(
-                            Face3D(listOf(0, 1), metalColor, isTranslucent = true, isLineOnly = true),
-                            Face3D(listOf(2, 3), metalColor, isTranslucent = true, isLineOnly = true)
-                        )
-                    } else {
-                        listOf(
-                            Face3D(listOf(0, 1, 2), metalColor, isTranslucent = true, isLineOnly = true)
-                        )
-                    }
+                createBox(
+                    id = "${fuse.id}_amp_band",
+                    name = "Grabado ${fuse.slot} ${fuse.amps}A",
+                    width = shell.x * 0.72f,
+                    height = 1.1f,
+                    depth = 1.5f,
+                    color = Color.White.copy(alpha = 0.7f),
+                    position = fuse.position + Vector3D(0f, -shell.y / 2f - 0.7f, -shell.z / 2f + 1.2f),
+                    isTranslucent = true,
+                    opacity = 0.7f
                 )
             )
+            listOf(-shell.x * 0.23f, shell.x * 0.23f).forEachIndexed { bladeIndex, x ->
+                meshes.add(
+                    createBox(
+                        id = "${fuse.id}_blade_$bladeIndex",
+                        name = "Terminal ${bladeIndex + 1} ${fuse.slot}",
+                        width = 1.8f,
+                        height = 8f,
+                        depth = shell.z * 0.55f,
+                        color = Color(0xFFE6C16A),
+                        position = fuse.position + Vector3D(x, 8.5f, 0f)
+                    )
+                )
+            }
+
+            val elementColor = if (isBlown) Color(0xFF2B1510) else Color(0xFFE0E0E0)
+            meshes.add(
+                Mesh3D(
+                    id = "${fuse.id}_element",
+                    name = if (isBlown) "Elemento abierto ${fuse.slot}" else "Elemento continuo ${fuse.slot}",
+                    vertices = listOf(
+                        fuse.position + Vector3D(-shell.x * 0.28f, -1.5f, -shell.z / 2f - 0.4f),
+                        fuse.position + Vector3D(0f, if (isBlown) 1.6f else -3.2f, -shell.z / 2f - 0.4f),
+                        fuse.position + Vector3D(shell.x * 0.28f, -1.5f, -shell.z / 2f - 0.4f)
+                    ),
+                    faces = listOf(
+                        Face3D(listOf(0, 1, 2), elementColor, isTranslucent = true, opacity = 0.9f, isLineOnly = true)
+                    )
+                )
+            )
+            if (isBlown) {
+                meshes.add(
+                    createBox(
+                        id = "${fuse.id}_carbon",
+                        name = "Carbonización ${fuse.slot}",
+                        width = shell.x * 0.72f,
+                        height = 1.4f,
+                        depth = 1.8f,
+                        color = Color(0xFF1B0D09),
+                        position = fuse.position + Vector3D(0f, -shell.y / 2f - 1.2f, 0f)
+                    )
+                )
+            }
         }
 
         return meshes
