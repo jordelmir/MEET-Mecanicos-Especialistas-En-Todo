@@ -12,6 +12,9 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles WHERE id = :id")
     suspend fun getVehicleById(id: String): VehicleEntity?
 
+    @Query("SELECT * FROM vehicles WHERE UPPER(vin) = UPPER(:vin) LIMIT 1")
+    suspend fun getVehicleByVin(vin: String): VehicleEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: VehicleEntity)
 

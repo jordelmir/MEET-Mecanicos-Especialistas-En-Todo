@@ -160,6 +160,12 @@ class VehicleRepository @Inject constructor(
     suspend fun getVehicleById(id: String): Vehicle? {
         return vehicleDao.getVehicleById(id)?.toDomain()
     }
+
+    suspend fun getVehicleByVin(vin: String): Vehicle? {
+        val cleanVin = vin.trim().uppercase()
+        if (cleanVin.isBlank() || cleanVin == "N/A" || cleanVin == "NOT_READ") return null
+        return vehicleDao.getVehicleByVin(cleanVin)?.toDomain()
+    }
     
     suspend fun insertVehicle(vehicle: Vehicle) {
         // Save locally

@@ -36,7 +36,9 @@ import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.Calendar
 import java.util.UUID
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 import com.elysium369.meet.data.local.entities.DtcEventEntity
@@ -51,6 +53,153 @@ import com.elysium369.meet.ui.screens.TerminalLine
 import com.elysium369.meet.ui.screens.TerminalLineType
 import com.elysium369.meet.core.obd.ObdTrafficListener
 import com.elysium369.meet.core.obd.PredictiveTelemetryEstimator
+
+@Serializable
+private data class RemotePartsStore(
+    val storeId: String,
+    val storeName: String,
+    val rating: Double,
+    val phone: String,
+    val location: String,
+    val deliveryRadiusKm: Double,
+    val averageEtaMinutes: Int,
+    val verified: Boolean,
+    val createdAt: Long,
+    val owner_id: String
+) {
+    fun toLocal() = PartsStoreEntity(
+        storeId = storeId,
+        storeName = storeName,
+        rating = rating,
+        phone = phone,
+        location = location,
+        deliveryRadiusKm = deliveryRadiusKm,
+        averageEtaMinutes = averageEtaMinutes,
+        verified = verified,
+        createdAt = createdAt
+    )
+}
+
+@Serializable
+private data class RemotePartRequest(
+    val requestId: String,
+    val serviceRequestId: String?,
+    val vehicleId: String,
+    val dtcCode: String?,
+    val partName: String,
+    val partNumber: String?,
+    val quantity: Int,
+    val oemPreference: String,
+    val deliveryLocation: String,
+    val urgencyMinutes: Int,
+    val customerNotes: String,
+    val status: String,
+    val acceptedOfferId: String?,
+    val createdAt: Long,
+    val customer_id: String
+) {
+    fun toLocal() = PartRequestEntity(
+        requestId = requestId,
+        serviceRequestId = serviceRequestId,
+        vehicleId = vehicleId,
+        dtcCode = dtcCode,
+        partName = partName,
+        partNumber = partNumber,
+        quantity = quantity,
+        oemPreference = oemPreference,
+        deliveryLocation = deliveryLocation,
+        urgencyMinutes = urgencyMinutes,
+        customerNotes = customerNotes,
+        status = status,
+        acceptedOfferId = acceptedOfferId,
+        createdAt = createdAt
+    )
+}
+
+@Serializable
+private data class RemotePartOffer(
+    val offerId: String,
+    val partRequestId: String,
+    val storeId: String,
+    val storeName: String,
+    val brand: String,
+    val partNumber: String,
+    val condition: String,
+    val price: Double,
+    val deliveryFee: Double,
+    val etaMinutes: Int,
+    val warrantyDays: Int,
+    val message: String,
+    val status: String,
+    val createdAt: Long,
+    val store_owner_id: String
+) {
+    fun toLocal() = PartOfferEntity(
+        offerId = offerId,
+        partRequestId = partRequestId,
+        storeId = storeId,
+        storeName = storeName,
+        brand = brand,
+        partNumber = partNumber,
+        condition = condition,
+        price = price,
+        deliveryFee = deliveryFee,
+        etaMinutes = etaMinutes,
+        warrantyDays = warrantyDays,
+        message = message,
+        status = status,
+        createdAt = createdAt
+    )
+}
+
+private fun PartRequestEntity.toRemote(customerId: String) = RemotePartRequest(
+    requestId = requestId,
+    serviceRequestId = serviceRequestId,
+    vehicleId = vehicleId,
+    dtcCode = dtcCode,
+    partName = partName,
+    partNumber = partNumber,
+    quantity = quantity,
+    oemPreference = oemPreference,
+    deliveryLocation = deliveryLocation,
+    urgencyMinutes = urgencyMinutes,
+    customerNotes = customerNotes,
+    status = status,
+    acceptedOfferId = acceptedOfferId,
+    createdAt = createdAt,
+    customer_id = customerId
+)
+
+private fun PartsStoreEntity.toRemote(ownerId: String) = RemotePartsStore(
+    storeId = storeId,
+    storeName = storeName,
+    rating = rating,
+    phone = phone,
+    location = location,
+    deliveryRadiusKm = deliveryRadiusKm,
+    averageEtaMinutes = averageEtaMinutes,
+    verified = verified,
+    createdAt = createdAt,
+    owner_id = ownerId
+)
+
+private fun PartOfferEntity.toRemote(ownerId: String) = RemotePartOffer(
+    offerId = offerId,
+    partRequestId = partRequestId,
+    storeId = storeId,
+    storeName = storeName,
+    brand = brand,
+    partNumber = partNumber,
+    condition = condition,
+    price = price,
+    deliveryFee = deliveryFee,
+    etaMinutes = etaMinutes,
+    warrantyDays = warrantyDays,
+    message = message,
+    status = status,
+    createdAt = createdAt,
+    store_owner_id = ownerId
+)
 
 @HiltViewModel
 class ObdViewModel @Inject constructor(
@@ -437,6 +586,18 @@ class ObdViewModel @Inject constructor(
         return marketplaceDao.getPartOffersForRequest(requestId)
     }
 
+    private fun currentCloudUserId(): String? {
+        return SupabaseManager.client.auth.currentUserOrNull()?.id
+    }
+
+    private fun buildPartsStoreId(storeName: String, ownerId: String?): String {
+        val base = storeName.trim().lowercase()
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
+            .ifBlank { "repuestera_local" }
+        return ownerId?.take(8)?.let { "${base}_$it" } ?: base
+    }
+
     fun createPartRequest(
         serviceRequestId: String?,
         vehicleId: String,
@@ -469,8 +630,13 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 marketplaceDao.insertPartRequest(request)
-                runCatching { SupabaseManager.client.postgrest["part_requests"].insert(request) }
-                    .onFailure { Log.w("ObdViewModel", "Part request saved locally; cloud table unavailable", it) }
+                val userId = currentCloudUserId()
+                if (userId != null) {
+                    runCatching { SupabaseManager.client.postgrest["part_requests"].insert(request.toRemote(userId)) }
+                        .onFailure { Log.w("ObdViewModel", "Part request saved locally; cloud table unavailable", it) }
+                } else {
+                    Log.i("ObdViewModel", "Part request saved locally; sign in to publish it to the live auction.")
+                }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to create part request", e)
             }
@@ -489,10 +655,8 @@ class ObdViewModel @Inject constructor(
         warrantyDays: Int,
         message: String
     ) {
-        val storeId = storeName.trim().lowercase()
-            .replace(Regex("[^a-z0-9]+"), "_")
-            .trim('_')
-            .ifBlank { "repuestera_local" }
+        val ownerId = currentCloudUserId()
+        val storeId = buildPartsStoreId(storeName, ownerId)
         val now = System.currentTimeMillis()
         val store = PartsStoreEntity(
             storeId = storeId,
@@ -526,10 +690,14 @@ class ObdViewModel @Inject constructor(
             try {
                 marketplaceDao.insertPartsStore(store)
                 marketplaceDao.insertPartOffer(offer)
-                runCatching { SupabaseManager.client.postgrest["parts_stores"].upsert(store) }
-                    .onFailure { Log.w("ObdViewModel", "Parts store saved locally; cloud table unavailable", it) }
-                runCatching { SupabaseManager.client.postgrest["part_offers"].insert(offer) }
-                    .onFailure { Log.w("ObdViewModel", "Part offer saved locally; cloud table unavailable", it) }
+                if (ownerId != null) {
+                    runCatching { SupabaseManager.client.postgrest["parts_stores"].upsert(store.toRemote(ownerId)) }
+                        .onFailure { Log.w("ObdViewModel", "Parts store saved locally; cloud table unavailable", it) }
+                    runCatching { SupabaseManager.client.postgrest["part_offers"].insert(offer.toRemote(ownerId)) }
+                        .onFailure { Log.w("ObdViewModel", "Part offer saved locally; cloud table unavailable", it) }
+                } else {
+                    Log.i("ObdViewModel", "Part offer saved locally; sign in as a parts store to publish it.")
+                }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to place part offer", e)
             }
@@ -546,11 +714,6 @@ class ObdViewModel @Inject constructor(
                         mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
                     ) { filter { eq("requestId", partRequestId) } }
                 }.onFailure { Log.w("ObdViewModel", "Part request accepted locally; cloud table unavailable", it) }
-                runCatching {
-                    SupabaseManager.client.postgrest["part_offers"].update(mapOf("status" to "ACCEPTED")) {
-                        filter { eq("offerId", offerId) }
-                    }
-                }.onFailure { Log.w("ObdViewModel", "Part offer accepted locally; cloud table unavailable", it) }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to accept part offer", e)
             }
@@ -561,32 +724,101 @@ class ObdViewModel @Inject constructor(
     fun startMarketplaceSync() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                try {
-                    // Sync service requests from Supabase
-                    val cloudRequests = SupabaseManager.client.postgrest["service_requests"]
-                        .select().decodeList<ServiceRequestEntity>()
-                    cloudRequests.forEach { req ->
-                        marketplaceDao.insertRequest(req)
-                    }
-
-                    // Sync bids for each request
-                    cloudRequests.forEach { req ->
-                        val cloudBids = SupabaseManager.client.postgrest["service_bids"]
-                            .select {
-                                filter {
-                                    eq("requestId", req.requestId)
-                                }
-                            }.decodeList<ServiceBidEntity>()
-                        cloudBids.forEach { bid ->
-                            marketplaceDao.insertBid(bid)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("ObdViewModel", "Error in periodic Supabase sync", e)
-                }
+                runCatching { syncServiceMarketplaceFromCloud() }
+                    .onFailure { Log.w("ObdViewModel", "Service marketplace cloud sync unavailable", it) }
+                runCatching { syncPartsMarketplaceFromCloud() }
+                    .onFailure { Log.w("ObdViewModel", "Parts marketplace cloud sync unavailable", it) }
                 delay(10000L) // Poll every 10 seconds
             }
         }
+    }
+
+    private suspend fun syncServiceMarketplaceFromCloud() {
+        val cloudRequests = SupabaseManager.client.postgrest["service_requests"]
+            .select().decodeList<ServiceRequestEntity>()
+        cloudRequests.forEach { req ->
+            marketplaceDao.insertRequest(req)
+        }
+
+        cloudRequests.forEach { req ->
+            val cloudBids = SupabaseManager.client.postgrest["service_bids"]
+                .select {
+                    filter {
+                        eq("requestId", req.requestId)
+                    }
+                }.decodeList<ServiceBidEntity>()
+            cloudBids.forEach { bid ->
+                marketplaceDao.insertBid(bid)
+            }
+        }
+    }
+
+    private suspend fun syncPartsMarketplaceFromCloud() {
+        currentCloudUserId() ?: return
+
+        val stores = SupabaseManager.client.postgrest["parts_stores"]
+            .select(
+                columns = Columns.list(
+                    "storeId",
+                    "storeName",
+                    "rating",
+                    "phone",
+                    "location",
+                    "deliveryRadiusKm",
+                    "averageEtaMinutes",
+                    "verified",
+                    "createdAt",
+                    "owner_id"
+                )
+            )
+            .decodeList<RemotePartsStore>()
+        marketplaceDao.insertPartsStores(stores.map { it.toLocal() })
+
+        val requests = SupabaseManager.client.postgrest["part_requests"]
+            .select(
+                columns = Columns.list(
+                    "requestId",
+                    "serviceRequestId",
+                    "vehicleId",
+                    "dtcCode",
+                    "partName",
+                    "partNumber",
+                    "quantity",
+                    "oemPreference",
+                    "deliveryLocation",
+                    "urgencyMinutes",
+                    "customerNotes",
+                    "status",
+                    "acceptedOfferId",
+                    "createdAt",
+                    "customer_id"
+                )
+            )
+            .decodeList<RemotePartRequest>()
+        requests.forEach { marketplaceDao.insertPartRequest(it.toLocal()) }
+
+        val offers = SupabaseManager.client.postgrest["part_offers"]
+            .select(
+                columns = Columns.list(
+                    "offerId",
+                    "partRequestId",
+                    "storeId",
+                    "storeName",
+                    "brand",
+                    "partNumber",
+                    "condition",
+                    "price",
+                    "deliveryFee",
+                    "etaMinutes",
+                    "warrantyDays",
+                    "message",
+                    "status",
+                    "createdAt",
+                    "store_owner_id"
+                )
+            )
+            .decodeList<RemotePartOffer>()
+        offers.forEach { marketplaceDao.insertPartOffer(it.toLocal()) }
     }
 
     // ── Black Box ──
@@ -681,6 +913,8 @@ class ObdViewModel @Inject constructor(
 
     private var currentSessionId: String = UUID.randomUUID().toString()
     private val initialDtcScanMutex = Mutex()
+    private val vinVehicleRecognitionMutex = Mutex()
+    private var lastAutoRecognizedVin: String? = null
     @Volatile private var hasCompletedInitialDtcScan = false
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -1202,6 +1436,69 @@ class ObdViewModel @Inject constructor(
     fun decodeVin() {
         val vinStr = _vin.value ?: return
         _vinDecoded.value = VinDecoder.decode(vinStr)
+    }
+
+    private suspend fun autoSelectVehicleFromVin(rawVin: String): Vehicle? {
+        val cleanVin = normalizeVin(rawVin) ?: return null
+        if (_selectedVehicle.value?.vin?.equals(cleanVin, ignoreCase = true) == true) {
+            lastAutoRecognizedVin = cleanVin
+            return _selectedVehicle.value
+        }
+        if (lastAutoRecognizedVin == cleanVin) return _selectedVehicle.value
+
+        return vinVehicleRecognitionMutex.withLock {
+            if (_selectedVehicle.value?.vin?.equals(cleanVin, ignoreCase = true) == true) {
+                lastAutoRecognizedVin = cleanVin
+                return@withLock _selectedVehicle.value
+            }
+
+            vehicleRepository.getVehicleByVin(cleanVin)?.let { existing ->
+                selectVehicle(existing)
+                lastAutoRecognizedVin = cleanVin
+                voiceFeedbackManager.speak(
+                    "Vehículo reconocido por VIN. ${existing.make} ${existing.model} seleccionado.",
+                    "Vehicle recognized by VIN. ${existing.make} ${existing.model} selected."
+                )
+                addTerminalLog("[VIN] Vehículo existente seleccionado automáticamente: ${existing.make} ${existing.model} ($cleanVin)", TerminalLineType.SYSTEM)
+                return@withLock existing
+            }
+
+            val decoded = VinDecoder.decode(cleanVin) ?: return@withLock null
+            val year = decoded.modelYear.toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
+            val vehicle = Vehicle(
+                id = "vin_$cleanVin",
+                user_id = currentCloudUserId() ?: "guest",
+                year = year,
+                make = decoded.manufacturer,
+                model = "Detectado por VIN",
+                engine = "Identificado por escáner OBD-II | ${decoded.country} | Planta ${decoded.assemblyPlant}",
+                displacement_cc = 0,
+                engine_tech = "Por completar",
+                transmission_type = "Por completar",
+                transmission_subtype = "Por completar",
+                fuel_type = "Por completar",
+                vin = cleanVin,
+                plate = "VIN-${cleanVin.takeLast(6)}"
+            )
+
+            vehicleRepository.insertVehicle(vehicle)
+            selectVehicle(vehicle)
+            lastAutoRecognizedVin = cleanVin
+            _vinDecoded.value = decoded
+            voiceFeedbackManager.speak(
+                "VIN leído correctamente. Creé el vehículo automáticamente en Garage.",
+                "VIN read successfully. I created the vehicle automatically in Garage."
+            )
+            addTerminalLog("[VIN] Perfil creado automáticamente desde escáner: ${vehicle.make} ${vehicle.year} ($cleanVin)", TerminalLineType.DECODED)
+            vehicle
+        }
+    }
+
+    private fun normalizeVin(rawVin: String): String? {
+        val clean = rawVin.trim().uppercase()
+            .replace(Regex("[^A-HJ-NPR-Z0-9]"), "")
+        if (clean.length != 17) return null
+        return clean
     }
 
     // ═══════════════════════════════════════
@@ -1960,7 +2257,10 @@ class ObdViewModel @Inject constructor(
                     obdSession.vin
                         .collect { v ->
                             _vin.value = v
-                            v?.let { detectManufacturer(it) }
+                            v?.let {
+                                detectManufacturer(it)
+                                autoSelectVehicleFromVin(it)
+                            }
                             updateHealthScore()
                         }
                 } catch (e: Exception) {
@@ -2226,7 +2526,10 @@ class ObdViewModel @Inject constructor(
         if (obdSession.state.value != ObdState.CONNECTED) return
         ensureDtcScanBeforeAction(force = true)
         runCatching {
-            obdSession.fetchVin()
+            val detectedVin = obdSession.fetchVin()
+            _vin.value = detectedVin
+            detectManufacturer(detectedVin)
+            autoSelectVehicleFromVin(detectedVin)
             _currentOdometer.value = obdSession.readOdometer()
         }.onFailure { e ->
             android.util.Log.e("ObdVM", "Post-DTC startup identification error", e)
@@ -3098,7 +3401,11 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun readVin(): String? {
-        return obdSession.fetchVin()
+        val detectedVin = obdSession.fetchVin()
+        _vin.value = detectedVin
+        detectManufacturer(detectedVin)
+        autoSelectVehicleFromVin(detectedVin)
+        return detectedVin
     }
 
     suspend fun setProtocol(protocol: String): Boolean {
