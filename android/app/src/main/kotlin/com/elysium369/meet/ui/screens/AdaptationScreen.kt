@@ -317,7 +317,11 @@ fun AdaptationScreen(
                             if (procedureState != ProcedureState.RUNNING) {
                                 Spacer(Modifier.height(8.dp))
                                 EliteButton(
-                                    text = if (procedureState == ProcedureState.SUCCESS) "Completado ✓" else "Ejecutar Procedimiento",
+                                    text = when {
+                                        procedureState == ProcedureState.SUCCESS -> "Completado ✓"
+                                        !isConnected -> "Conecta OBD para ejecutar"
+                                        else -> "Ejecutar Procedimiento"
+                                    },
                                     onClick = {
                                         scope.launch {
                                             procedureState = ProcedureState.RUNNING
@@ -361,37 +365,14 @@ fun AdaptationScreen(
                                                     logLines.add(">>> ADAPTACIÓN COMPLETADA CON ÉXITO <<<")
                                                 }
                                             } else {
-                                                // Simulated demo mode
-                                                logLines.add("--- MODO DEMOSTRACIÓN (SIN CONEXIÓN OBD) ---")
-                                                statusMessage = "Iniciando sesión diagnóstica..."
-                                                logLines.add("TX: 10 03 (Diagnostic Session)")
-                                                delay(800)
-                                                logLines.add("RX: 50 03 (Session Active)")
-                                                
-                                                statusMessage = "Enviando comandos al ECU..."
-                                                for (cmd in proc.commandSequence) {
-                                                    if (cmd.startsWith("delay:")) {
-                                                        val ms = cmd.substringAfter("delay:").toLongOrNull() ?: 1000L
-                                                        logLines.add("[RETARDO SIMULADO] Esperando ${ms}ms...")
-                                                        delay(ms)
-                                                    } else {
-                                                        logLines.add("TX: $cmd [SIMULADO]")
-                                                        delay(400)
-                                                        val mockResp = if (cmd.startsWith("2E")) "6E" else "71"
-                                                        logLines.add("RX: $mockResp OK")
-                                                    }
-                                                }
-                                                
-                                                statusMessage = "Esperando confirmación del módulo..."
-                                                delay(1000)
-                                                procedureState = ProcedureState.SUCCESS
-                                                statusMessage = "Adaptación completada exitosamente [DEMO]"
-                                                logLines.add(">>> DEMO COMPLETADA CON ÉXITO <<<")
+                                                procedureState = ProcedureState.ERROR
+                                                statusMessage = "Conecta un vehículo real antes de ejecutar adaptaciones."
+                                                logLines.add("BLOQUEADO: las adaptaciones envían comandos UDS reales y requieren enlace OBD activo.")
                                             }
                                         }
                                     },
                                     color = proc.category.color,
-                                    isEnabled = procedureState != ProcedureState.SUCCESS,
+                                    isEnabled = procedureState != ProcedureState.SUCCESS && isConnected,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

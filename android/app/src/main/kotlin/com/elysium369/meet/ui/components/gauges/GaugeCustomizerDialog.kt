@@ -17,20 +17,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.navigation.NavController
 import com.elysium369.meet.ui.theme.ThemeColors
-import com.elysium369.meet.ui.theme.ColorEntry
-import com.elysium369.meet.ui.theme.ColorCategory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════════════════════
 // CUSTOMIZER TARGET TABS
@@ -46,6 +47,53 @@ private enum class ColorTarget(val label: String, val icon: String) {
     SPECIAL("Efectos", "✨"),
 }
 
+private data class DiyGuidedStep(
+    val title: String,
+    val summary: String,
+    val cue: String,
+)
+
+private data class DiyQuickPreset(
+    val label: String,
+    val description: String,
+    val color: Color,
+    val apply: () -> Unit,
+)
+
+private val diyGuidedSteps =
+    listOf(
+        DiyGuidedStep(
+            title = "Identidad",
+            summary = "Define qué mide y cómo debe leerse de un vistazo.",
+            cue = "Usa nombres cortos: RPM, BOOST PSI, TEMP ECT, VOLTAJE.",
+        ),
+        DiyGuidedStep(
+            title = "Base visual",
+            summary = "Elige fondo, imagen o preset sin sacrificar contraste.",
+            cue = "Si el fondo tiene textura, baja la opacidad o sube el glow.",
+        ),
+        DiyGuidedStep(
+            title = "Lectura",
+            summary = "Aguja, borde y escala deben contar la misma historia.",
+            cue = "Para datos rápidos usa aguja simple y marcadores limpios.",
+        ),
+        DiyGuidedStep(
+            title = "Color",
+            summary = "Primario para lectura; secundario para profundidad.",
+            cue = "Reserva rojo/naranja para advertencia o sensación racing.",
+        ),
+        DiyGuidedStep(
+            title = "Movimiento",
+            summary = "Animación y brillo agregan vida sin tapar el valor.",
+            cue = "En tableros diarios suele bastar 35-70% de glow.",
+        ),
+        DiyGuidedStep(
+            title = "Salida",
+            summary = "Guarda, comparte por QR o publica cuando esté listo.",
+            cue = "Antes de compartir confirma nombre, fondo, escala y contraste.",
+        ),
+    )
+
 // ═══════════════════════════════════════════════════════
 // MAIN CUSTOMIZER DIALOG
 // ═══════════════════════════════════════════════════════
@@ -56,12 +104,17 @@ fun GaugeCustomizerDialog(
     currentScheme: GaugeColorScheme,
     onSchemeChange: (GaugeColorScheme) -> Unit,
     onReset: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    navController: NavController? = null,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val gaugeStyleManager = remember { GaugeStyleManager(context) }
     var selectedTarget by remember { mutableStateOf(ColorTarget.BEZEL) }
-    var activeTab by remember { mutableIntStateOf(if (currentStyle == GaugeStyleSet.CUSTOM_DIY) 1 else 0) } // 0 = Colors, 1 = DIY Design
+    var activeTab by remember {
+        mutableIntStateOf(if (currentStyle == GaugeStyleSet.CUSTOM_DIY) 1 else 0)
+    } // 0 = Colors, 1 = DIY Design
+    var diyGuideStep by remember { mutableIntStateOf(0) }
     val diyTrigger = GaugeStyleManager.diyUpdateTrigger
     var primaryCategoryIndex by remember { mutableIntStateOf(0) }
     var secondaryCategoryIndex by remember { mutableIntStateOf(0) }
@@ -70,97 +123,105 @@ fun GaugeCustomizerDialog(
     var liveScheme by remember { mutableStateOf(currentScheme) }
     LaunchedEffect(currentScheme) { liveScheme = currentScheme }
 
-    val currentTargetColor = when (selectedTarget) {
-        ColorTarget.BEZEL -> liveScheme.bezelColor
-        ColorTarget.INTERNAL -> liveScheme.internalColor
-        ColorTarget.TEXT -> liveScheme.textColor
-        ColorTarget.LABEL -> liveScheme.labelColor
-        ColorTarget.UNIT -> liveScheme.unitColor
-        ColorTarget.NEEDLE -> liveScheme.needleColor
-        ColorTarget.SPECIAL -> liveScheme.specialColor
-    }
+    val currentTargetColor =
+        when (selectedTarget) {
+            ColorTarget.BEZEL -> liveScheme.bezelColor
+            ColorTarget.INTERNAL -> liveScheme.internalColor
+            ColorTarget.TEXT -> liveScheme.textColor
+            ColorTarget.LABEL -> liveScheme.labelColor
+            ColorTarget.UNIT -> liveScheme.unitColor
+            ColorTarget.NEEDLE -> liveScheme.needleColor
+            ColorTarget.SPECIAL -> liveScheme.specialColor
+        }
 
     val inf = rememberInfiniteTransition(label = "customizer")
-    val borderGlow by inf.animateFloat(
-        0.3f, 0.8f,
-        infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "borderGlow"
-    )
+    val borderGlow by
+        inf.animateFloat(
+            0.3f,
+            0.8f,
+            infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "borderGlow",
+        )
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.82f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF0D1117),
-                            Color(0xFF0A0E1A),
-                            Color(0xFF060810),
+            modifier =
+                Modifier.fillMaxWidth(0.92f)
+                    .fillMaxHeight(0.82f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color(0xFF0D1117),
+                                    Color(0xFF0A0E1A),
+                                    Color(0xFF060810),
+                                )
                         )
                     )
-                )
-                .border(
-                    1.5.dp,
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            currentTargetColor.copy(alpha = borderGlow * 0.6f),
-                            currentTargetColor.copy(alpha = borderGlow * 0.15f),
-                            currentTargetColor.copy(alpha = borderGlow * 0.4f),
-                        )
-                    ),
-                    RoundedCornerShape(24.dp)
-                )
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    currentTargetColor.copy(alpha = borderGlow * 0.6f),
+                                    currentTargetColor.copy(alpha = borderGlow * 0.15f),
+                                    currentTargetColor.copy(alpha = borderGlow * 0.4f),
+                                )
+                        ),
+                        RoundedCornerShape(24.dp),
+                    )
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // ══════════════════════════════════════
                 // HEADER
                 // ══════════════════════════════════════
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp, 16.dp, 16.dp, 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(20.dp, 16.dp, 16.dp, 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         "🎨 Personalizar",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.SansSerif
+                        fontFamily = FontFamily.SansSerif,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Reset
                         Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0x33FF6B6B))
-                                .clickable { onReset() }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                            modifier =
+                                Modifier.clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0x33FF6B6B))
+                                    .clickable { onReset() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 "🔄 Reset",
                                 color = Color(0xFFFF6B6B),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                         // Close
                         Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x33FFFFFF))
-                                .clickable { onDismiss() },
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier.size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x33FFFFFF))
+                                    .clickable { onDismiss() },
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text("✕", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "✕",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
                         }
                     }
                 }
@@ -172,7 +233,7 @@ fun GaugeCustomizerDialog(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(horizontal = 20.dp),
-                    fontFamily = FontFamily.SansSerif
+                    fontFamily = FontFamily.SansSerif,
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -181,48 +242,53 @@ fun GaugeCustomizerDialog(
                 // TARGET TABS (Borde, Internos, etc.)
                 // ══════════════════════════════════════
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     ColorTarget.entries.forEach { target ->
                         val isSelected = target == selectedTarget
-                        val targetColor = when (target) {
-                            ColorTarget.BEZEL -> liveScheme.bezelColor
-                            ColorTarget.INTERNAL -> liveScheme.internalColor
-                            ColorTarget.TEXT -> liveScheme.textColor
-                            ColorTarget.LABEL -> liveScheme.labelColor
-                            ColorTarget.UNIT -> liveScheme.unitColor
-                            ColorTarget.NEEDLE -> liveScheme.needleColor
-                            ColorTarget.SPECIAL -> liveScheme.specialColor
-                        }
+                        val targetColor =
+                            when (target) {
+                                ColorTarget.BEZEL -> liveScheme.bezelColor
+                                ColorTarget.INTERNAL -> liveScheme.internalColor
+                                ColorTarget.TEXT -> liveScheme.textColor
+                                ColorTarget.LABEL -> liveScheme.labelColor
+                                ColorTarget.UNIT -> liveScheme.unitColor
+                                ColorTarget.NEEDLE -> liveScheme.needleColor
+                                ColorTarget.SPECIAL -> liveScheme.specialColor
+                            }
                         Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    if (isSelected) targetColor.copy(alpha = 0.2f)
-                                    else Color(0x15FFFFFF)
-                                )
-                                .then(
-                                    if (isSelected) Modifier.border(
-                                        1.dp,
-                                        targetColor.copy(alpha = 0.6f),
-                                        RoundedCornerShape(14.dp)
+                            modifier =
+                                Modifier.clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (isSelected) targetColor.copy(alpha = 0.2f)
+                                        else Color(0x15FFFFFF)
                                     )
-                                    else Modifier
-                                )
-                                .clickable { selectedTarget = target }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .then(
+                                        if (isSelected)
+                                            Modifier.border(
+                                                1.dp,
+                                                targetColor.copy(alpha = 0.6f),
+                                                RoundedCornerShape(14.dp),
+                                            )
+                                        else Modifier
+                                    )
+                                    .clickable { selectedTarget = target }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(target.icon, fontSize = 16.sp)
                                 Text(
                                     target.label,
-                                    color = if (isSelected) targetColor else Color.White.copy(alpha = 0.5f),
+                                    color =
+                                        if (isSelected) targetColor
+                                        else Color.White.copy(alpha = 0.5f),
                                     fontSize = 10.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    fontWeight =
+                                        if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 )
                             }
                         }
@@ -233,8 +299,7 @@ fun GaugeCustomizerDialog(
 
                 // Thin separator
                 Box(
-                    Modifier
-                        .fillMaxWidth()
+                    Modifier.fillMaxWidth()
                         .height(1.dp)
                         .padding(horizontal = 16.dp)
                         .background(currentTargetColor.copy(alpha = 0.15f))
@@ -245,53 +310,120 @@ fun GaugeCustomizerDialog(
                 // Tab Selection for DIY style
                 if (currentStyle == GaugeStyleSet.CUSTOM_DIY) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier =
+                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        TabButton(label = "DISEÑO DIY", active = activeTab == 1, accentColor = currentTargetColor, onClick = { activeTab = 1 }, modifier = Modifier.weight(1f))
-                        TabButton(label = "COLORES NEÓN", active = activeTab == 0, accentColor = currentTargetColor, onClick = { activeTab = 0 }, modifier = Modifier.weight(1f))
+                        TabButton(
+                            label = "DISEÑO DIY",
+                            active = activeTab == 1,
+                            accentColor = currentTargetColor,
+                            onClick = { activeTab = 1 },
+                            modifier = Modifier.weight(1f),
+                        )
+                        TabButton(
+                            label = "COLORES NEÓN",
+                            active = activeTab == 0,
+                            accentColor = currentTargetColor,
+                            onClick = { activeTab = 0 },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                 }
 
                 val scrollState = rememberScrollState()
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(scrollState)
-                        .padding(horizontal = 16.dp)
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 16.dp)
                 ) {
                     if (currentStyle == GaugeStyleSet.CUSTOM_DIY && activeTab == 1) {
                         // ── DIY DESIGNER CONTROLS ──
                         val diyBgType = remember(diyTrigger) { gaugeStyleManager.getDiyBgType() }
-                        val diyBgPreset = remember(diyTrigger) { gaugeStyleManager.getDiyBgPresetIndex() }
+                        val diyBgPreset =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyBgPresetIndex() }
                         val diyBgUri = remember(diyTrigger) { gaugeStyleManager.getDiyBgImageUri() }
                         val diyBezel = remember(diyTrigger) { gaugeStyleManager.getDiyBezelStyle() }
-                        val diyNeedle = remember(diyTrigger) { gaugeStyleManager.getDiyNeedleStyle() }
+                        val diyNeedle =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyNeedleStyle() }
                         val diyTicks = remember(diyTrigger) { gaugeStyleManager.getDiyTicksStyle() }
-                        val diyAccentArgb = remember(diyTrigger) { gaugeStyleManager.getDiyAccentColor() }
-                        val diyAccent2Argb = remember(diyTrigger) { gaugeStyleManager.getDiyAccentColor2() }
-                        val diyGlowIntensity = remember(diyTrigger) { gaugeStyleManager.getDiyGlowIntensity() }
-                        val diyImageOpacity = remember(diyTrigger) { gaugeStyleManager.getDiyImageOpacity() }
-                        val diyGaugeName = remember(diyTrigger) { gaugeStyleManager.getDiyGaugeName() }
-                        val diyAnimation = remember(diyTrigger) { gaugeStyleManager.getDiyAnimation() }
+                        val diyAccentArgb =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyAccentColor() }
+                        val diyAccent2Argb =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyAccentColor2() }
+                        val diyGlowIntensity =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyGlowIntensity() }
+                        val diyImageOpacity =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyImageOpacity() }
+                        val diyGaugeName =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyGaugeName() }
+                        val diyAnimation =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyAnimation() }
+                        val diyTypography =
+                            remember(diyTrigger) { gaugeStyleManager.getDiyTypography() }
                         val accentColor = Color(diyAccentArgb)
 
+                        val applyDiyPreset =
+                            {
+                                nameStr: String,
+                                bgTypeVal: Int,
+                                bgPresetVal: Int,
+                                bezelVal: Int,
+                                needleVal: Int,
+                                ticksVal: Int,
+                                accentVal: Int,
+                                accent2Val: Int,
+                                glowVal: Float,
+                                animVal: Int,
+                                typoVal: Int ->
+                                gaugeStyleManager.saveDiyGaugeName(nameStr)
+                                gaugeStyleManager.saveDiyBgType(bgTypeVal)
+                                gaugeStyleManager.saveDiyBgPresetIndex(bgPresetVal)
+                                gaugeStyleManager.saveDiyBezelStyle(bezelVal)
+                                gaugeStyleManager.saveDiyNeedleStyle(needleVal)
+                                gaugeStyleManager.saveDiyTicksStyle(ticksVal)
+                                gaugeStyleManager.saveDiyAccentColor(accentVal)
+                                gaugeStyleManager.saveDiyAccentColor2(accent2Val)
+                                gaugeStyleManager.saveDiyGlowIntensity(glowVal)
+                                gaugeStyleManager.saveDiyAnimation(animVal)
+                                gaugeStyleManager.saveDiyTypography(typoVal)
+                            }
+
+                        DiyGuidedHeader(
+                            steps = diyGuidedSteps,
+                            currentIndex = diyGuideStep.coerceIn(0, diyGuidedSteps.lastIndex),
+                            accentColor = accentColor,
+                            onSelect = { diyGuideStep = it },
+                            onPrev = { diyGuideStep = (diyGuideStep - 1).coerceAtLeast(0) },
+                            onNext = {
+                                diyGuideStep =
+                                    (diyGuideStep + 1).coerceAtMost(diyGuidedSteps.lastIndex)
+                            },
+                        )
+
+                        Spacer(Modifier.height(10.dp))
+
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .padding(8.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF080C14))
-                                .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .height(200.dp)
+                                    .padding(8.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF080C14))
+                                    .border(
+                                        1.dp,
+                                        accentColor.copy(alpha = 0.3f),
+                                        RoundedCornerShape(16.dp),
+                                    ),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Gauge3DWrapper(
                                 glowColor = accentColor,
                                 style = GaugeStyleSet.CUSTOM_DIY,
-                                modifier = Modifier.size(180.dp)
+                                modifier = Modifier.size(180.dp),
                             ) {
                                 GaugeDiyWidget(
                                     label = diyGaugeName.ifEmpty { "PREVIEW" },
@@ -301,60 +433,236 @@ fun GaugeCustomizerDialog(
                                     unit = "%",
                                     warningThreshold = 70f,
                                     criticalThreshold = 90f,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             }
                         }
-                        
+
                         Text(
                             text = "Vista previa en tiempo real",
                             color = accentColor.copy(alpha = 0.6f),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         )
 
+                        DiyReadinessStrip(
+                            statusItems =
+                                listOf(
+                                    "Nombre" to diyGaugeName.ifBlank { "Pendiente" },
+                                    "Base" to
+                                        diyBackgroundSummary(diyBgType, diyBgPreset, diyBgUri),
+                                    "Lectura" to "Aguja ${diyNeedle + 1} · Escala ${diyTicks + 1}",
+                                    "Movimiento" to diyAnimationSummary(diyAnimation),
+                                    "Salida" to
+                                        if (diyGaugeName.isBlank()) "Nombra y guarda"
+                                        else "Listo para guardar",
+                                ),
+                            accentColor = accentColor,
+                        )
+
+                        DiySectionHeader(icon = "🚀", title = "PLANTILLAS RÁPIDAS (1-CLICK)")
+                        DiySectionHint(
+                            text =
+                                "Arranca con una receta completa y luego ajusta color, aguja, escala y fondo.",
+                            accentColor = accentColor,
+                        )
+                        val quickPresets =
+                            listOf(
+                                DiyQuickPreset(
+                                    "🏁 F1 Racing",
+                                    "RPM, velocidad y redline con lectura agresiva.",
+                                    Color(0xFFFF1744),
+                                ) {
+                                    applyDiyPreset(
+                                        "F1 Racing",
+                                        1,
+                                        1,
+                                        7,
+                                        1,
+                                        5,
+                                        0xFFFF1744.toInt(),
+                                        0xFFFFEA00.toInt(),
+                                        0.8f,
+                                        1,
+                                        5,
+                                    )
+                                },
+                                DiyQuickPreset(
+                                    "🌌 Cyber Space",
+                                    "Boost, voltaje o sensores con estética HUD.",
+                                    Color(0xFF00FFCC),
+                                ) {
+                                    applyDiyPreset(
+                                        "Cyber Space",
+                                        1,
+                                        2,
+                                        0,
+                                        2,
+                                        4,
+                                        0xFF00FFCC.toInt(),
+                                        0xFF7C4DFF.toInt(),
+                                        1.0f,
+                                        9,
+                                        4,
+                                    )
+                                },
+                                DiyQuickPreset(
+                                    "⏱️ Retro Vintage",
+                                    "Temperatura, presión o lectura clásica.",
+                                    Color(0xFFFFB74D),
+                                ) {
+                                    applyDiyPreset(
+                                        "Retro Vintage",
+                                        1,
+                                        0,
+                                        1,
+                                        4,
+                                        7,
+                                        0xFFFFB74D.toInt(),
+                                        0xFFE0E0E0.toInt(),
+                                        0.3f,
+                                        0,
+                                        7,
+                                    )
+                                },
+                                DiyQuickPreset(
+                                    "🌋 Lava Core",
+                                    "Alertas calientes, turbo y eventos críticos.",
+                                    Color(0xFFFF3D00),
+                                ) {
+                                    applyDiyPreset(
+                                        "Lava Core",
+                                        1,
+                                        4,
+                                        2,
+                                        5,
+                                        6,
+                                        0xFFFF3D00.toInt(),
+                                        0xFFFFEA00.toInt(),
+                                        0.9f,
+                                        1,
+                                        6,
+                                    )
+                                },
+                                DiyQuickPreset(
+                                    "🛡️ Stealth Pro",
+                                    "Diario sobrio, alto contraste y poco movimiento.",
+                                    Color(0xFFB0BEC5),
+                                ) {
+                                    applyDiyPreset(
+                                        "Stealth Pro",
+                                        1,
+                                        12,
+                                        3,
+                                        6,
+                                        13,
+                                        0xFFB0BEC5.toInt(),
+                                        0xFF00E5FF.toInt(),
+                                        0.45f,
+                                        0,
+                                        0,
+                                    )
+                                },
+                                DiyQuickPreset(
+                                    "🏎️ Rally Night",
+                                    "Racing nocturno para tablero de performance.",
+                                    Color(0xFFFFD54F),
+                                ) {
+                                    applyDiyPreset(
+                                        "Rally Night",
+                                        1,
+                                        51,
+                                        14,
+                                        1,
+                                        11,
+                                        0xFFFFD54F.toInt(),
+                                        0xFFFF1744.toInt(),
+                                        0.65f,
+                                        5,
+                                        5,
+                                    )
+                                },
+                            )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        ) {
+                            items(quickPresets) { preset ->
+                                DiyQuickPresetCard(
+                                    preset = preset,
+                                    onClick = preset.apply,
+                                )
+                            }
+                        }
+
                         DiySectionHeader(icon = "🏷️", title = "NOMBRE DEL GAUGE")
+                        DiySectionHint(
+                            text =
+                                "Pon una etiqueta breve y práctica; será lo primero que reconocerás al manejar.",
+                            accentColor = accentColor,
+                        )
                         OutlinedTextField(
                             value = diyGaugeName,
                             onValueChange = { gaugeStyleManager.saveDiyGaugeName(it) },
-                            placeholder = { Text("Mi Reloj Personalizado", color = Color.White.copy(alpha = 0.3f)) },
+                            placeholder = {
+                                Text(
+                                    "Mi Reloj Personalizado",
+                                    color = Color.White.copy(alpha = 0.3f),
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = accentColor,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                                cursorColor = accentColor,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White.copy(alpha = 0.7f)
-                            ),
-                            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = accentColor,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                                    cursorColor = accentColor,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White.copy(alpha = 0.7f),
+                                ),
+                            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                         )
 
                         val categories = ThemeColors.FULL_COLOR_PALETTE
 
                         DiySectionHeader(icon = "🎨", title = "COLOR DE ACENTO PRIMARIO")
+                        DiySectionHint(
+                            text =
+                                "Este color manda aguja, brillo y foco visual. Úsalo para la lectura principal.",
+                            accentColor = accentColor,
+                        )
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         ) {
                             itemsIndexed(categories) { index, category ->
                                 val isSelected = primaryCategoryIndex == index
                                 Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) accentColor.copy(alpha = 0.2f) else Color(0x0CFFFFFF))
-                                        .border(1.dp, if (isSelected) accentColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                        .clickable { primaryCategoryIndex = index }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier.clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isSelected) accentColor.copy(alpha = 0.2f)
+                                                else Color(0x0CFFFFFF)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) accentColor
+                                                else Color.White.copy(alpha = 0.1f),
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .clickable { primaryCategoryIndex = index }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = "${category.icon} ${category.title}",
-                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
+                                        color =
+                                            if (isSelected) Color.White
+                                            else Color.White.copy(alpha = 0.5f),
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -362,38 +670,88 @@ fun GaugeCustomizerDialog(
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         ) {
                             items(categories[primaryCategoryIndex].colors) { entry ->
                                 NeonColorSwatch(
                                     color = entry.color,
                                     isSelected = entry.color.toArgb() == diyAccentArgb,
-                                    onClick = { gaugeStyleManager.saveDiyAccentColor(entry.color.toArgb()) }
+                                    onClick = {
+                                        gaugeStyleManager.saveDiyAccentColor(entry.color.toArgb())
+                                    },
                                 )
                             }
                         }
 
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "🌈 SELECCIÓN LIBRE DE TONO PRIMARIO",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 2.dp),
+                        )
+                        var primaryHue by
+                            remember(diyAccentArgb) {
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV(diyAccentArgb, hsv)
+                                mutableFloatStateOf(hsv[0])
+                            }
+                        Slider(
+                            value = primaryHue,
+                            onValueChange = {
+                                primaryHue = it
+                                val colorInt =
+                                    android.graphics.Color.HSVToColor(floatArrayOf(it, 1f, 1f))
+                                gaugeStyleManager.saveDiyAccentColor(colorInt)
+                            },
+                            valueRange = 0f..360f,
+                            colors =
+                                SliderDefaults.colors(
+                                    thumbColor = Color(diyAccentArgb),
+                                    activeTrackColor = Color(diyAccentArgb).copy(alpha = 0.5f),
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.1f),
+                                ),
+                            modifier = Modifier.height(24.dp).fillMaxWidth(),
+                        )
+
                         DiySectionHeader(icon = "✨", title = "COLOR DE ACENTO SECUNDARIO")
+                        DiySectionHint(
+                            text =
+                                "El secundario crea profundidad; combínalo con contraste, no solo con gusto.",
+                            accentColor = accentColor,
+                        )
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         ) {
                             itemsIndexed(categories) { index, category ->
                                 val isSelected = secondaryCategoryIndex == index
                                 Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) accentColor.copy(alpha = 0.2f) else Color(0x0CFFFFFF))
-                                        .border(1.dp, if (isSelected) accentColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                        .clickable { secondaryCategoryIndex = index }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier.clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isSelected) accentColor.copy(alpha = 0.2f)
+                                                else Color(0x0CFFFFFF)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) accentColor
+                                                else Color.White.copy(alpha = 0.1f),
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .clickable { secondaryCategoryIndex = index }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = "${category.icon} ${category.title}",
-                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
+                                        color =
+                                            if (isSelected) Color.White
+                                            else Color.White.copy(alpha = 0.5f),
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -401,32 +759,80 @@ fun GaugeCustomizerDialog(
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         ) {
                             items(categories[secondaryCategoryIndex].colors) { entry ->
                                 NeonColorSwatch(
                                     color = entry.color,
                                     isSelected = entry.color.toArgb() == diyAccent2Argb,
-                                    onClick = { gaugeStyleManager.saveDiyAccentColor2(entry.color.toArgb()) }
+                                    onClick = {
+                                        gaugeStyleManager.saveDiyAccentColor2(entry.color.toArgb())
+                                    },
                                 )
                             }
                         }
 
-                        DiySectionHeader(icon = "🗡️", title = "ESTILO DE AGUJA")
-                        val needles = listOf(
-                            Triple(0, "⚡", "Cyber"),
-                            Triple(1, "🏎️", "Deportiva"),
-                            Triple(2, "💫", "Plasma"),
-                            Triple(3, "🔮", "Esfera"),
-                            Triple(4, "⚔️", "Katana"),
-                            Triple(5, "⚡", "Rayo"),
-                            Triple(6, "📟", "Digital"),
-                            Triple(7, "☄️", "Cometa")
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "🌈 SELECCIÓN LIBRE DE TONO SECUNDARIO",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 2.dp),
                         )
+                        var secondaryHue by
+                            remember(diyAccent2Argb) {
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV(diyAccent2Argb, hsv)
+                                mutableFloatStateOf(hsv[0])
+                            }
+                        Slider(
+                            value = secondaryHue,
+                            onValueChange = {
+                                secondaryHue = it
+                                val colorInt =
+                                    android.graphics.Color.HSVToColor(floatArrayOf(it, 1f, 1f))
+                                gaugeStyleManager.saveDiyAccentColor2(colorInt)
+                            },
+                            valueRange = 0f..360f,
+                            colors =
+                                SliderDefaults.colors(
+                                    thumbColor = Color(diyAccent2Argb),
+                                    activeTrackColor = Color(diyAccent2Argb).copy(alpha = 0.5f),
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.1f),
+                                ),
+                            modifier = Modifier.height(24.dp).fillMaxWidth(),
+                        )
+
+                        DiySectionHeader(icon = "🗡️", title = "ESTILO DE AGUJA (15 ESTILOS)")
+                        DiySectionHint(
+                            text =
+                                "La aguja debe ser clara al primer vistazo: simple para precisión, dramática para show.",
+                            accentColor = accentColor,
+                        )
+                        val needles =
+                            listOf(
+                                Triple(0, "⚡", "Cyber"),
+                                Triple(1, "🏎️", "Deportiva"),
+                                Triple(2, "💫", "Plasma"),
+                                Triple(3, "🔮", "Esfera"),
+                                Triple(4, "⚔️", "Katana"),
+                                Triple(5, "⚡", "Rayo"),
+                                Triple(6, "📟", "Digital"),
+                                Triple(7, "☄️", "Cometa"),
+                                Triple(8, "⏱️", "Retro"),
+                                Triple(9, "🗡️", "Espada"),
+                                Triple(10, "🧵", "Fibra"),
+                                Triple(11, "➖", "Guiones"),
+                                Triple(12, "🔷", "Hexágono"),
+                                Triple(13, "🔱", "Doble"),
+                                Triple(14, "🛸", "Virtual"),
+                            )
                         needles.chunked(4).forEach { rowNeedles ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 rowNeedles.forEach { (index, emoji, name) ->
                                     DiyVisualCard(
@@ -435,27 +841,45 @@ fun GaugeCustomizerDialog(
                                         isSelected = diyNeedle == index,
                                         accentColor = accentColor,
                                         onClick = { gaugeStyleManager.saveDiyNeedleStyle(index) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
                                     )
                                 }
                             }
                         }
 
-                        DiySectionHeader(icon = "⭕", title = "ESTILO DE BORDE")
-                        val bezels = listOf(
-                            Triple(0, "💠", "Neón"),
-                            Triple(1, "⏱️", "Cronógrafo"),
-                            Triple(2, "🔲", "Carbono"),
-                            Triple(3, "◽", "Minimal"),
-                            Triple(4, "⭕", "Doble"),
-                            Triple(5, "💎", "Diamante"),
-                            Triple(6, "💓", "Pulso"),
-                            Triple(7, "🏁", "Racing")
+                        DiySectionHeader(icon = "⭕", title = "ESTILO DE BORDE (20 ESTILOS)")
+                        DiySectionHint(
+                            text =
+                                "El borde define personalidad y peso visual; si hay mucho fondo, elige un borde limpio.",
+                            accentColor = accentColor,
                         )
+                        val bezels =
+                            listOf(
+                                Triple(0, "💠", "Neón"),
+                                Triple(1, "⏱️", "Cronógrafo"),
+                                Triple(2, "🔲", "Carbono"),
+                                Triple(3, "◽", "Minimal"),
+                                Triple(4, "⭕", "Doble"),
+                                Triple(5, "💎", "Diamante"),
+                                Triple(6, "💓", "Pulso"),
+                                Triple(7, "🏁", "Racing"),
+                                Triple(8, "🌀", "Holo"),
+                                Triple(9, "🛑", "Láser Pts"),
+                                Triple(10, "⚙️", "Metal Pes"),
+                                Triple(11, "🧬", "Carb Ros"),
+                                Triple(12, "🌈", "Dual Glow"),
+                                Triple(13, "⏹️", "Cuadrantes"),
+                                Triple(14, "📏", "Tacómetro"),
+                                Triple(15, "💫", "Shimmer"),
+                                Triple(16, "🛑", "Hexágono"),
+                                Triple(17, "🟩", "Cuadrado"),
+                                Triple(18, "⚙️", "Steampunk"),
+                                Triple(19, "🕸️", "Grid Cyber"),
+                            )
                         bezels.chunked(4).forEach { rowBezels ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 rowBezels.forEach { (index, emoji, name) ->
                                     DiyVisualCard(
@@ -464,27 +888,40 @@ fun GaugeCustomizerDialog(
                                         isSelected = diyBezel == index,
                                         accentColor = accentColor,
                                         onClick = { gaugeStyleManager.saveDiyBezelStyle(index) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
                                     )
                                 }
                             }
                         }
 
-                        DiySectionHeader(icon = "📊", title = "MARCADORES")
-                        val ticks = listOf(
-                            Triple(0, "📏", "Radial"),
-                            Triple(1, "🌈", "Arco"),
-                            Triple(2, "⚫", "Puntos"),
-                            Triple(3, "❌", "Ninguno"),
-                            Triple(4, "🌡️", "Gradiente"),
-                            Triple(5, "🟩", "LED Bar"),
-                            Triple(6, "🔺", "Triángulos"),
-                            Triple(7, "🕐", "Reloj")
+                        DiySectionHeader(icon = "📊", title = "MARCADORES / ESCALAS (15 ESTILOS)")
+                        DiySectionHint(
+                            text =
+                                "Los marcadores son la guía de lectura. Para RPM o boost, prioriza marcas rápidas y redline.",
+                            accentColor = accentColor,
                         )
+                        val ticks =
+                            listOf(
+                                Triple(0, "📏", "Radial"),
+                                Triple(1, "🌈", "Arco"),
+                                Triple(2, "⚫", "Puntos"),
+                                Triple(3, "❌", "Ninguno"),
+                                Triple(4, "🌡️", "Gradiente"),
+                                Triple(5, "🟩", "LED Bar"),
+                                Triple(6, "🔺", "Triángulos"),
+                                Triple(7, "🕐", "Reloj"),
+                                Triple(8, "〰️", "Doble Arc"),
+                                Triple(9, "📱", "Segmentado"),
+                                Triple(10, "🌓", "Semicírculo"),
+                                Triple(11, "🏎️", "Redline"),
+                                Triple(12, "🟥", "Bloques"),
+                                Triple(13, "➖", "Dashes Min"),
+                                Triple(14, "📐", "Cyber Dash"),
+                            )
                         ticks.chunked(4).forEach { rowTicks ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 rowTicks.forEach { (index, emoji, name) ->
                                     DiyVisualCard(
@@ -493,60 +930,139 @@ fun GaugeCustomizerDialog(
                                         isSelected = diyTicks == index,
                                         accentColor = accentColor,
                                         onClick = { gaugeStyleManager.saveDiyTicksStyle(index) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
                                     )
                                 }
                             }
                         }
 
                         DiySectionHeader(icon = "🎨", title = "TIPO DE FONDO")
+                        DiySectionHint(
+                            text =
+                                "El fondo debe apoyar la lectura. Si compite con números o aguja, simplifícalo.",
+                            accentColor = accentColor,
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            val bgTypes = listOf("🌀 Gradiente", "🎭 Preestablecido", "📸 Mi Imagen")
+                            val bgTypes =
+                                listOf("🌀 Gradiente", "🎭 Preestablecido", "📸 Mi Imagen")
                             bgTypes.forEachIndexed { idx, labelText ->
                                 val isSelected = diyBgType == idx
                                 Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) accentColor.copy(alpha = 0.15f) else Color(0xFF0A0E14))
-                                        .border(
-                                            width = if (isSelected) 1.5.dp else 0.5.dp,
-                                            color = if (isSelected) accentColor else Color.White.copy(alpha = 0.08f),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable { gaugeStyleManager.saveDiyBgType(idx) }
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier.weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (isSelected) accentColor.copy(alpha = 0.15f)
+                                                else Color(0xFF0A0E14)
+                                            )
+                                            .border(
+                                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                                color =
+                                                    if (isSelected) accentColor
+                                                    else Color.White.copy(alpha = 0.08f),
+                                                shape = RoundedCornerShape(12.dp),
+                                            )
+                                            .clickable { gaugeStyleManager.saveDiyBgType(idx) }
+                                            .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = labelText,
-                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
+                                        color =
+                                            if (isSelected) Color.White
+                                            else Color.White.copy(alpha = 0.5f),
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
                         }
 
                         if (diyBgType == 1) {
-                            DiySectionHeader(icon = "🎭", title = "FONDO PREESTABLECIDO")
-                            val presets = listOf(
-                                Triple(0, "⚙️", "Metal"),
-                                Triple(1, "🔳", "Carbono"),
-                                Triple(2, "📡", "Cyber"),
-                                Triple(3, "🌌", "Espacio"),
-                                Triple(4, "🌋", "Lava"),
-                                Triple(5, "🔌", "Circuito"),
-                                Triple(6, "🐝", "Panal"),
-                                Triple(7, "🌀", "Nebulosa")
+                            DiySectionHeader(
+                                icon = "🎭",
+                                title = "FONDO PREESTABLECIDO (60 PRESETS)",
                             )
-                            presets.chunked(4).forEach { rowPresets ->
+                            DiySectionHint(
+                                text =
+                                    "Prueba metal, carbono o grid para tableros técnicos; lava y galaxia para piezas de show.",
+                                accentColor = accentColor,
+                            )
+                            val backgroundPresets =
+                                (0..59).map { index ->
+                                    val (emoji, name) =
+                                        when (index) {
+                                            0 -> "⚙️" to "Metal"
+                                            1 -> "🔳" to "Carbono"
+                                            2 -> "📡" to "Cyber Grid"
+                                            3 -> "🌌" to "Espacio"
+                                            4 -> "🌋" to "Lava"
+                                            5 -> "🔌" to "Circuito"
+                                            6 -> "🐝" to "Panal"
+                                            7 -> "🌀" to "Nebulosa"
+                                            8 -> "🟫" to "Cobre"
+                                            9 -> "🌅" to "Sunset"
+                                            10 -> "💚" to "Aurora"
+                                            11 -> "👑" to "Oro"
+                                            12 -> "🔘" to "Acero"
+                                            13 -> "🌳" to "Bosque"
+                                            14 -> "❄️" to "Glaciar"
+                                            15 -> "🌊" to "Océano"
+                                            16 -> "📡" to "Radar"
+                                            17 -> "🎯" to "Retícula"
+                                            18 -> "🌀" to "Espiral"
+                                            19 -> "☀️" to "Helios"
+                                            20 -> "🌪️" to "Vórtice"
+                                            21 -> "🪐" to "Órbitas"
+                                            22 -> "⭕" to "Aros"
+                                            23 -> "🛰️" to "Constel"
+                                            24 -> "📐" to "Malla Tri"
+                                            25 -> "📈" to "Isométr"
+                                            26 -> "💎" to "Rombos"
+                                            27 -> "🏁" to "Checkers"
+                                            28 -> "〽️" to "Chevron"
+                                            29 -> "🧱" to "Muro"
+                                            30 -> "⚫" to "Dot Grid"
+                                            31 -> "💈" to "Diag Line"
+                                            32 -> "〰️" to "Seno Wave"
+                                            33 -> "📈" to "Ondas"
+                                            34 -> "🎀" to "Cintas"
+                                            35 -> "💫" to "Órbita HUD"
+                                            36 -> "♾️" to "Infinito"
+                                            37 -> "📊" to "Equalizer"
+                                            38 -> "🔊" to "Sonido"
+                                            39 -> "💦" to "Ripples"
+                                            40 -> "🌌" to "Galaxia"
+                                            41 -> "💥" to "Supernova"
+                                            42 -> "💫" to "Meteoros"
+                                            43 -> "🌑" to "Hole"
+                                            44 -> "✨" to "Stars"
+                                            45 -> "🛰️" to "Satélite"
+                                            46 -> "☄️" to "Comet"
+                                            47 -> "🌒" to "Eclipse"
+                                            48 -> "⚙️" to "Pistón"
+                                            49 -> "🏎️" to "Tire"
+                                            50 -> "⚙️" to "Gear"
+                                            51 -> "🏁" to "Race Flag"
+                                            52 -> "🔥" to "Flames"
+                                            53 -> "💨" to "Turbo"
+                                            54 -> "🛑" to "Redline"
+                                            55 -> "💿" to "Brake"
+                                            56 -> "🕶️" to "Synth Grid"
+                                            57 -> "📺" to "Glitch"
+                                            58 -> "📟" to "Matrix"
+                                            59 -> "✨" to "NeonWave"
+                                            else -> "🖼️" to "Preset $index"
+                                        }
+                                    Triple(index, emoji, name)
+                                }
+                            backgroundPresets.chunked(4).forEach { rowPresets ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     rowPresets.forEach { (index, emoji, name) ->
                                         DiyVisualCard(
@@ -554,69 +1070,114 @@ fun GaugeCustomizerDialog(
                                             name = name,
                                             isSelected = diyBgPreset == index,
                                             accentColor = accentColor,
-                                            onClick = { gaugeStyleManager.saveDiyBgPresetIndex(index) },
-                                            modifier = Modifier.weight(1f)
+                                            onClick = {
+                                                gaugeStyleManager.saveDiyBgPresetIndex(index)
+                                            },
+                                            modifier = Modifier.weight(1f),
                                         )
                                     }
                                 }
                             }
                         } else if (diyBgType == 2) {
-                            val imagePicker = rememberLauncherForActivityResult(
-                                contract = ActivityResultContracts.GetContent()
-                            ) { uri: android.net.Uri? ->
-                                if (uri != null) {
-                                    gaugeStyleManager.saveDiyBgImageUri(uri.toString())
-                                    gaugeStyleManager.saveDiyBgType(2)
+                            val imagePicker =
+                                rememberLauncherForActivityResult(
+                                    contract = ActivityResultContracts.GetContent()
+                                ) { uri: android.net.Uri? ->
+                                    if (uri != null) {
+                                        gaugeStyleManager.saveDiyBgImageUri(context, uri)
+                                        gaugeStyleManager.saveDiyBgType(2)
+                                    }
                                 }
-                            }
 
                             Spacer(Modifier.height(12.dp))
+                            DiySectionHint(
+                                text =
+                                    "Usa imágenes centradas y con zonas oscuras para que la escala respire.",
+                                accentColor = accentColor,
+                            )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Button(
                                     onClick = { imagePicker.launch("image/*") },
-                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor.copy(alpha = 0.2f)),
+                                    colors =
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = accentColor.copy(alpha = 0.2f)
+                                        ),
                                     border = BorderStroke(1.dp, accentColor),
                                     modifier = Modifier.weight(1f).height(48.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
                                 ) {
                                     Text(
-                                        text = if (diyBgUri.isEmpty()) "📂 SELECCIONAR IMAGEN..." else "📸 CAMBIAR IMAGEN...",
+                                        text =
+                                            if (diyBgUri.isEmpty()) "📂 SELECCIONAR IMAGEN..."
+                                            else "📸 CAMBIAR IMAGEN...",
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
+                                        fontSize = 11.sp,
                                     )
                                 }
 
                                 if (diyBgUri.isNotEmpty()) {
-                                    val previewBitmap = remember(diyBgUri) {
-                                        if (diyBgUri.isNotEmpty()) {
-                                            try {
-                                                val uri = android.net.Uri.parse(diyBgUri)
-                                                val stream = context.contentResolver.openInputStream(uri)
-                                                val bmp = android.graphics.BitmapFactory.decodeStream(stream)
-                                                stream?.close()
-                                                bmp?.asImageBitmap()
-                                            } catch (e: Exception) { null }
-                                        } else null
-                                    }
+                                    val previewBitmap =
+                                        remember(diyBgUri) {
+                                            if (diyBgUri.isNotEmpty()) {
+                                                try {
+                                                    if (diyBgUri.startsWith("/")) {
+                                                        val bmp =
+                                                            android.graphics.BitmapFactory
+                                                                .decodeFile(diyBgUri)
+                                                        bmp?.asImageBitmap()
+                                                    } else {
+                                                        val uri = android.net.Uri.parse(diyBgUri)
+                                                        val stream =
+                                                            context.contentResolver.openInputStream(
+                                                                uri
+                                                            )
+                                                        val bmp =
+                                                            android.graphics.BitmapFactory
+                                                                .decodeStream(stream)
+                                                        stream?.close()
+                                                        bmp?.asImageBitmap()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    null
+                                                }
+                                            } else null
+                                        }
                                     if (previewBitmap != null) {
                                         Box(
-                                            modifier = Modifier
-                                                .size(48.dp)
-                                                .clip(CircleShape)
-                                                .border(1.dp, accentColor, CircleShape)
+                                            modifier =
+                                                Modifier.size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .border(1.dp, accentColor, CircleShape)
                                         ) {
                                             Image(
                                                 bitmap = previewBitmap,
                                                 contentDescription = "Preview",
                                                 contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
+                                                modifier = Modifier.fillMaxSize(),
                                             )
                                         }
+                                    }
+
+                                    // 🗑️ Delete Image button
+                                    Box(
+                                        modifier =
+                                            Modifier.size(48.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color(0xFFFF1744).copy(alpha = 0.2f))
+                                                .border(
+                                                    1.dp,
+                                                    Color(0xFFFF1744),
+                                                    RoundedCornerShape(12.dp),
+                                                )
+                                                .clickable { gaugeStyleManager.clearDiyBgImage() },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text("🗑️", fontSize = 18.sp)
                                     }
                                 }
                             }
@@ -629,29 +1190,35 @@ fun GaugeCustomizerDialog(
                                     fontSize = 9.sp,
                                     fontFamily = FontFamily.Monospace,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                             Spacer(Modifier.height(16.dp))
                         }
 
-                        DiySectionHeader(icon = "🌀", title = "ANIMACIÓN DE FONDO")
-                        val animations = listOf(
-                            Triple(0, "❌", "Ninguna"),
-                            Triple(1, "🔥", "Fuego"),
-                            Triple(2, "⚡", "Rayos"),
-                            Triple(3, "❄️", "Nieve"),
-                            Triple(4, "🌧️", "Lluvia"),
-                            Triple(5, "⚙️", "Engranajes"),
-                            Triple(6, "🌌", "Galaxia"),
-                            Triple(7, "📡", "Radar"),
-                            Triple(8, "📟", "Matriz"),
-                            Triple(9, "🌀", "Aurora")
+                        DiySectionHeader(icon = "🌀", title = "ANIMACIÓN DE FONDO (10 ANIMACIONES)")
+                        DiySectionHint(
+                            text =
+                                "El movimiento agrega carácter. Si el gauge va en pantalla diaria, menos suele leerse mejor.",
+                            accentColor = accentColor,
                         )
+                        val animations =
+                            listOf(
+                                Triple(0, "❌", "Ninguna"),
+                                Triple(1, "🔥", "Fuego"),
+                                Triple(2, "⚡", "Rayos"),
+                                Triple(3, "❄️", "Nieve"),
+                                Triple(4, "🌧️", "Lluvia"),
+                                Triple(5, "⚙️", "Engranajes"),
+                                Triple(6, "🌌", "Galaxia"),
+                                Triple(7, "📡", "Radar"),
+                                Triple(8, "📟", "Matriz"),
+                                Triple(9, "🌀", "Aurora"),
+                            )
                         animations.chunked(5).forEach { rowAnims ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 rowAnims.forEach { (index, emoji, name) ->
                                     DiyVisualCard(
@@ -660,7 +1227,45 @@ fun GaugeCustomizerDialog(
                                         isSelected = diyAnimation == index,
                                         accentColor = accentColor,
                                         onClick = { gaugeStyleManager.saveDiyAnimation(index) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+
+                        DiySectionHeader(icon = "🔤", title = "TIPOGRAFÍA (10 ESTILOS)")
+                        DiySectionHint(
+                            text =
+                                "La tipografía manda legibilidad: técnica para datos, vintage para estética clásica.",
+                            accentColor = accentColor,
+                        )
+                        val typographies =
+                            listOf(
+                                Triple(0, "📟", "Monospace"),
+                                Triple(1, "🅰️", "Sans Serif"),
+                                Triple(2, "✒️", "Serif"),
+                                Triple(3, "✍️", "Cursive"),
+                                Triple(4, "🤖", "Cyber Bold"),
+                                Triple(5, "🏎️", "Tech Italic"),
+                                Triple(6, "🚥", "LCD Black"),
+                                Triple(7, "📜", "Vintage"),
+                                Triple(8, "🪖", "Military"),
+                                Triple(9, "📐", "Ultra Thin"),
+                            )
+                        typographies.chunked(5).forEach { rowTypo ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                rowTypo.forEach { (index, emoji, name) ->
+                                    DiyVisualCard(
+                                        icon = emoji,
+                                        name = name,
+                                        isSelected = diyTypography == index,
+                                        accentColor = accentColor,
+                                        onClick = { gaugeStyleManager.saveDiyTypography(index) },
+                                        modifier = Modifier.weight(1f),
                                     )
                                 }
                             }
@@ -668,23 +1273,29 @@ fun GaugeCustomizerDialog(
                         Spacer(Modifier.height(16.dp))
 
                         DiySectionHeader(icon = "🔧", title = "AJUSTE FINO")
-                        
+                        DiySectionHint(
+                            text =
+                                "Termina aquí: brillo suficiente para presencia, opacidad suficiente para lectura.",
+                            accentColor = accentColor,
+                        )
+
                         Text(
                             text = "Intensidad del Brillo: ${(diyGlowIntensity * 100).toInt()}%",
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 4.dp)
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                         Slider(
                             value = diyGlowIntensity,
                             onValueChange = { gaugeStyleManager.saveDiyGlowIntensity(it) },
                             valueRange = 0f..1f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = accentColor,
-                                activeTrackColor = accentColor
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                            colors =
+                                SliderDefaults.colors(
+                                    thumbColor = accentColor,
+                                    activeTrackColor = accentColor,
+                                ),
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         if (diyBgType == 2) {
@@ -693,20 +1304,632 @@ fun GaugeCustomizerDialog(
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                             Slider(
                                 value = diyImageOpacity,
                                 onValueChange = { gaugeStyleManager.saveDiyImageOpacity(it) },
                                 valueRange = 0f..1f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = accentColor,
-                                    activeTrackColor = accentColor
-                                ),
-                                modifier = Modifier.fillMaxWidth()
+                                colors =
+                                    SliderDefaults.colors(
+                                        thumbColor = accentColor,
+                                        activeTrackColor = accentColor,
+                                    ),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        
+
+                        // ══════════════════════════════════════
+                        // 💾 SAVE / SHARE / MARKET BUTTONS
+                        // ══════════════════════════════════════
+                        DiySectionHeader(icon = "🚀", title = "ACCIONES")
+                        DiySectionHint(
+                            text =
+                                "Cuando el preview comunique métrica, estilo y contraste, guárdalo o compártelo por QR.",
+                            accentColor = accentColor,
+                        )
+
+                        var showSaveDialog by remember { mutableStateOf(false) }
+                        var showMyGaugesDialog by remember { mutableStateOf(false) }
+                        var saveGaugeName by remember {
+                            mutableStateOf(diyGaugeName.ifEmpty { "Mi Gauge" })
+                        }
+                        var saveFeedback by remember { mutableStateOf<String?>(null) }
+                        var showQrCodeDialog by remember { mutableStateOf(false) }
+                        var showQrScannerDialog by remember { mutableStateOf(false) }
+                        var qrText by remember { mutableStateOf("") }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // 💾 SAVE
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        Color(0xFF00E676).copy(alpha = 0.12f),
+                                                        Color(0xFF00C853).copy(alpha = 0.08f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00E676).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showSaveDialog = true }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "💾 GUARDAR",
+                                    color = Color(0xFF00E676),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+
+                            // 📂 MY GAUGES
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        accentColor.copy(alpha = 0.12f),
+                                                        accentColor.copy(alpha = 0.06f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            accentColor.copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showMyGaugesDialog = true }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📂 MIS GAUGES",
+                                    color = accentColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+
+                            // 🌐 MARKET
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        Color(0xFF7C4DFF).copy(alpha = 0.12f),
+                                                        Color(0xFFB388FF).copy(alpha = 0.06f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF7C4DFF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            if (navController != null) {
+                                                navController.navigate("gauge_marketplace")
+                                                onDismiss()
+                                            } else {
+                                                saveFeedback = "🌐 Marketplace no disponible"
+                                            }
+                                        }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "🌐 MARKET",
+                                    color = Color(0xFF7C4DFF),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // 📤 COMPARTIR QR
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            try {
+                                                val config = gaugeStyleManager.exportDiyConfig()
+                                                val json =
+                                                    kotlinx.serialization.json.Json.encodeToString(
+                                                        com.elysium369.meet.data.local.entities
+                                                            .GaugeConfig
+                                                            .serializer(),
+                                                        config,
+                                                    )
+                                                qrText =
+                                                    com.elysium369.meet.core.share.QrCodeSharing
+                                                        .compressText(json)
+                                                showQrCodeDialog = true
+                                            } catch (e: Exception) {
+                                                saveFeedback = "❌ Error al generar QR"
+                                            }
+                                        }
+                                        .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📤 COMPARTIR QR",
+                                    color = Color(0xFF00B0FF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+
+                            // 📥 ESCANEAR QR
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFFCCFF00).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFFCCFF00).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showQrScannerDialog = true }
+                                        .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📥 ESCANEAR QR",
+                                    color = Color(0xFFCCFF00),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+                        }
+
+                        if (showQrCodeDialog && qrText.isNotEmpty()) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = { showQrCodeDialog = false }
+                            ) {
+                                Card(
+                                    colors =
+                                        CardDefaults.cardColors(containerColor = Color(0xFF0D1117)),
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier =
+                                        Modifier.fillMaxWidth(0.92f)
+                                            .border(
+                                                1.dp,
+                                                accentColor.copy(alpha = 0.3f),
+                                                RoundedCornerShape(20.dp),
+                                            ),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(20.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            "Compartir Diseño QR",
+                                            color = Color.White,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black,
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        com.elysium369.meet.core.share.QrCodeImage(
+                                            text = qrText,
+                                            modifier = Modifier.size(240.dp),
+                                            backgroundColor = Color.White,
+                                            qrColor = Color.Black,
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            "Escanea este código con otro dispositivo MEET para copiar el diseño al instante.",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                        Spacer(Modifier.height(16.dp))
+                                        Box(
+                                            modifier =
+                                                Modifier.fillMaxWidth()
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(accentColor)
+                                                    .clickable { showQrCodeDialog = false }
+                                                    .padding(vertical = 12.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                "Cerrar",
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (showQrScannerDialog) {
+                            com.elysium369.meet.core.share.QrScannerOverlay(
+                                onResult = { scannedText ->
+                                    try {
+                                        val decompressed =
+                                            com.elysium369.meet.core.share.QrCodeSharing
+                                                .decompressText(scannedText)
+                                        val importedConfig =
+                                            kotlinx.serialization.json.Json.decodeFromString(
+                                                com.elysium369.meet.data.local.entities.GaugeConfig
+                                                    .serializer(),
+                                                decompressed,
+                                            )
+                                        gaugeStyleManager.importDiyConfig(importedConfig)
+                                        saveFeedback = "✅ Diseño importado"
+                                    } catch (e: Exception) {
+                                        saveFeedback = "❌ Error: QR no válido"
+                                    }
+                                },
+                                onDismiss = { showQrScannerDialog = false },
+                            )
+                        }
+
+                        // Feedback snackbar
+                        if (saveFeedback != null) {
+                            LaunchedEffect(saveFeedback) {
+                                kotlinx.coroutines.delay(2000)
+                                saveFeedback = null
+                            }
+                            Box(
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF00E676).copy(alpha = 0.15f))
+                                        .border(
+                                            0.5.dp,
+                                            Color(0xFF00E676).copy(alpha = 0.3f),
+                                            RoundedCornerShape(10.dp),
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    saveFeedback ?: "",
+                                    color = Color(0xFF00E676),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+
+                        // ── Save Dialog ──
+                        if (showSaveDialog) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = { showSaveDialog = false }
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier.fillMaxWidth(0.9f)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(Color(0xFF0D1117))
+                                            .border(
+                                                1.dp,
+                                                accentColor.copy(alpha = 0.3f),
+                                                RoundedCornerShape(20.dp),
+                                            )
+                                            .padding(20.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            "💾 Guardar Gauge",
+                                            color = Color.White,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black,
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        OutlinedTextField(
+                                            value = saveGaugeName,
+                                            onValueChange = { saveGaugeName = it },
+                                            label = {
+                                                Text(
+                                                    "Nombre",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                )
+                                            },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors =
+                                                OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = accentColor,
+                                                    unfocusedBorderColor =
+                                                        Color.White.copy(alpha = 0.1f),
+                                                    cursorColor = accentColor,
+                                                    focusedTextColor = Color.White,
+                                                    unfocusedTextColor =
+                                                        Color.White.copy(alpha = 0.7f),
+                                                ),
+                                            textStyle =
+                                                TextStyle(
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                ),
+                                        )
+                                        Spacer(Modifier.height(16.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        ) {
+                                            Box(
+                                                modifier =
+                                                    Modifier.weight(1f)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(Color(0x33FFFFFF))
+                                                        .clickable { showSaveDialog = false }
+                                                        .padding(vertical = 12.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    "Cancelar",
+                                                    color = Color.White.copy(alpha = 0.6f),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                )
+                                            }
+                                            Box(
+                                                modifier =
+                                                    Modifier.weight(1f)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(Color(0xFF00E676))
+                                                        .clickable {
+                                                            // Save to Room via coroutine
+                                                            val entity =
+                                                                gaugeStyleManager
+                                                                    .exportToSavedEntity(
+                                                                        name = saveGaugeName
+                                                                    )
+                                                            val db =
+                                                                androidx.room.Room.databaseBuilder(
+                                                                        context,
+                                                                        com.elysium369.meet.data
+                                                                                .local
+                                                                                .MeetDatabase::class
+                                                                            .java,
+                                                                        "meet_database",
+                                                                    )
+                                                                    .build()
+                                                            scope.launch(
+                                                                kotlinx.coroutines.Dispatchers.IO
+                                                            ) {
+                                                                db.savedGaugeDao().insert(entity)
+                                                                db.close()
+                                                            }
+                                                            showSaveDialog = false
+                                                            saveFeedback =
+                                                                "✅ Gauge \"$saveGaugeName\" guardado"
+                                                        }
+                                                        .padding(vertical = 12.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    "💾 Guardar",
+                                                    color = Color.Black,
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 13.sp,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── My Gauges Dialog ──
+                        if (showMyGaugesDialog) {
+                            var savedGauges by remember {
+                                mutableStateOf<
+                                    List<com.elysium369.meet.data.local.entities.SavedGaugeEntity>
+                                >(
+                                    emptyList()
+                                )
+                            }
+
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val db =
+                                        androidx.room.Room.databaseBuilder(
+                                                context,
+                                                com.elysium369.meet.data.local.MeetDatabase::class
+                                                    .java,
+                                                "meet_database",
+                                            )
+                                            .build()
+                                    savedGauges = db.savedGaugeDao().getAll()
+                                    db.close()
+                                }
+                            }
+
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = { showMyGaugesDialog = false },
+                                properties = DialogProperties(usePlatformDefaultWidth = false),
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier.fillMaxWidth(0.92f)
+                                            .fillMaxHeight(0.6f)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(Color(0xFF0D1117))
+                                            .border(
+                                                1.dp,
+                                                accentColor.copy(alpha = 0.3f),
+                                                RoundedCornerShape(20.dp),
+                                            )
+                                            .padding(16.dp)
+                                ) {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Text(
+                                                "📂 Mis Gauges (${savedGauges.size})",
+                                                color = Color.White,
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Black,
+                                            )
+                                            Box(
+                                                modifier =
+                                                    Modifier.size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0x33FFFFFF))
+                                                        .clickable { showMyGaugesDialog = false },
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    "✕",
+                                                    color = Color.White,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(Modifier.height(12.dp))
+
+                                        if (savedGauges.isEmpty()) {
+                                            Box(
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment =
+                                                        Alignment.CenterHorizontally
+                                                ) {
+                                                    Text("🎨", fontSize = 40.sp)
+                                                    Spacer(Modifier.height(8.dp))
+                                                    Text(
+                                                        "Aún no tienes gauges guardados",
+                                                        color = Color.White.copy(alpha = 0.5f),
+                                                        fontSize = 13.sp,
+                                                    )
+                                                    Text(
+                                                        "Usa 💾 GUARDAR para salvar tu diseño",
+                                                        color = Color.White.copy(alpha = 0.3f),
+                                                        fontSize = 11.sp,
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Column(
+                                                modifier =
+                                                    Modifier.fillMaxSize()
+                                                        .verticalScroll(rememberScrollState()),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                savedGauges.forEach { gauge ->
+                                                    Row(
+                                                        modifier =
+                                                            Modifier.fillMaxWidth()
+                                                                .clip(RoundedCornerShape(12.dp))
+                                                                .background(Color(0xFF0A0E14))
+                                                                .border(
+                                                                    0.5.dp,
+                                                                    accentColor.copy(alpha = 0.15f),
+                                                                    RoundedCornerShape(12.dp),
+                                                                )
+                                                                .clickable {
+                                                                    gaugeStyleManager
+                                                                        .importFromSavedEntity(
+                                                                            gauge
+                                                                        )
+                                                                    showMyGaugesDialog = false
+                                                                    saveFeedback =
+                                                                        "✅ Gauge \"${gauge.name}\" cargado"
+                                                                }
+                                                                .padding(12.dp),
+                                                        verticalAlignment =
+                                                            Alignment.CenterVertically,
+                                                        horizontalArrangement =
+                                                            Arrangement.SpaceBetween,
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                gauge.name,
+                                                                color = Color.White,
+                                                                fontSize = 14.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                            )
+                                                            Text(
+                                                                "Creado ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(gauge.createdAt))}",
+                                                                color =
+                                                                    Color.White.copy(alpha = 0.3f),
+                                                                fontSize = 10.sp,
+                                                            )
+                                                        }
+
+                                                        if (gauge.isPublished) {
+                                                            Text(
+                                                                "🌐",
+                                                                fontSize = 14.sp,
+                                                                modifier =
+                                                                    Modifier.padding(end = 8.dp),
+                                                            )
+                                                        }
+
+                                                        Box(
+                                                            modifier =
+                                                                Modifier.clip(
+                                                                        RoundedCornerShape(8.dp)
+                                                                    )
+                                                                    .background(
+                                                                        accentColor.copy(
+                                                                            alpha = 0.15f
+                                                                        )
+                                                                    )
+                                                                    .padding(
+                                                                        horizontal = 10.dp,
+                                                                        vertical = 6.dp,
+                                                                    )
+                                                        ) {
+                                                            Text(
+                                                                "CARGAR",
+                                                                color = accentColor,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(24.dp))
                     } else {
                         // Render standard color palette categories
@@ -714,7 +1937,7 @@ fun GaugeCustomizerDialog(
                             // Category header
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = 8.dp, top = 12.dp)
+                                modifier = Modifier.padding(bottom = 8.dp, top = 12.dp),
                             ) {
                                 Text(category.icon, fontSize = 14.sp)
                                 Spacer(Modifier.width(6.dp))
@@ -723,7 +1946,7 @@ fun GaugeCustomizerDialog(
                                     color = Color.White.copy(alpha = 0.55f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 2.sp
+                                    letterSpacing = 2.sp,
                                 )
                             }
 
@@ -732,25 +1955,44 @@ fun GaugeCustomizerDialog(
                             category.colors.chunked(columns).forEach { rowColors ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
                                     rowColors.forEach { entry ->
                                         NeonColorSwatch(
                                             color = entry.color,
-                                            isSelected = entry.color.toArgb() == currentTargetColor.toArgb(),
+                                            isSelected =
+                                                entry.color.toArgb() == currentTargetColor.toArgb(),
                                             onClick = {
-                                                val newScheme = when (selectedTarget) {
-                                                    ColorTarget.BEZEL -> liveScheme.copy(bezelColor = entry.color)
-                                                    ColorTarget.INTERNAL -> liveScheme.copy(internalColor = entry.color)
-                                                    ColorTarget.TEXT -> liveScheme.copy(textColor = entry.color)
-                                                    ColorTarget.LABEL -> liveScheme.copy(labelColor = entry.color)
-                                                    ColorTarget.UNIT -> liveScheme.copy(unitColor = entry.color)
-                                                    ColorTarget.NEEDLE -> liveScheme.copy(needleColor = entry.color)
-                                                    ColorTarget.SPECIAL -> liveScheme.copy(specialColor = entry.color)
-                                                }
-                                                liveScheme = newScheme  // instant local update
+                                                val newScheme =
+                                                    when (selectedTarget) {
+                                                        ColorTarget.BEZEL ->
+                                                            liveScheme.copy(
+                                                                bezelColor = entry.color
+                                                            )
+                                                        ColorTarget.INTERNAL ->
+                                                            liveScheme.copy(
+                                                                internalColor = entry.color
+                                                            )
+                                                        ColorTarget.TEXT ->
+                                                            liveScheme.copy(textColor = entry.color)
+                                                        ColorTarget.LABEL ->
+                                                            liveScheme.copy(
+                                                                labelColor = entry.color
+                                                            )
+                                                        ColorTarget.UNIT ->
+                                                            liveScheme.copy(unitColor = entry.color)
+                                                        ColorTarget.NEEDLE ->
+                                                            liveScheme.copy(
+                                                                needleColor = entry.color
+                                                            )
+                                                        ColorTarget.SPECIAL ->
+                                                            liveScheme.copy(
+                                                                specialColor = entry.color
+                                                            )
+                                                    }
+                                                liveScheme = newScheme // instant local update
                                                 onSchemeChange(newScheme) // persist + notify
-                                            }
+                                            },
                                         )
                                     }
                                     // Fill remaining cells with spacers
@@ -769,6 +2011,309 @@ fun GaugeCustomizerDialog(
     }
 }
 
+@Composable
+private fun DiyGuidedHeader(
+    steps: List<DiyGuidedStep>,
+    currentIndex: Int,
+    accentColor: Color,
+    onSelect: (Int) -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+) {
+    if (steps.isEmpty()) return
+    val boundedIndex = currentIndex.coerceIn(0, steps.lastIndex)
+    val step = steps[boundedIndex]
+
+    Box(
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        colors =
+                            listOf(
+                                accentColor.copy(alpha = 0.16f),
+                                Color(0xFF0A0E14),
+                                Color(0xFF111827),
+                            )
+                    )
+                )
+                .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(18.dp))
+                .padding(14.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "GUÍA DIY DE INICIO A FIN",
+                    color = Color.White.copy(alpha = 0.58f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    text = "PASO ${boundedIndex + 1}/${steps.size}",
+                    color = accentColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = step.title,
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = step.summary,
+                color = Color.White.copy(alpha = 0.68f),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+
+            Box(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(top = 10.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.18f))
+                        .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = step.cue,
+                    color = accentColor.copy(alpha = 0.86f),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                steps.forEachIndexed { index, _ ->
+                    val selected = index == boundedIndex
+                    Box(
+                        modifier =
+                            Modifier.weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (selected) accentColor else Color.White.copy(alpha = 0.13f)
+                                )
+                                .clickable { onSelect(index) }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DiyGuideNavButton(
+                    label = "ANTERIOR",
+                    enabled = boundedIndex > 0,
+                    accentColor = accentColor,
+                    onClick = onPrev,
+                )
+                DiyGuideNavButton(
+                    label = if (boundedIndex == steps.lastIndex) "FINAL" else "SIGUIENTE",
+                    enabled = boundedIndex < steps.lastIndex,
+                    accentColor = accentColor,
+                    onClick = onNext,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiyGuideNavButton(
+    label: String,
+    enabled: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier.width(112.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    if (enabled) accentColor.copy(alpha = 0.16f)
+                    else Color.White.copy(alpha = 0.05f)
+                )
+                .border(
+                    1.dp,
+                    if (enabled) accentColor.copy(alpha = 0.35f)
+                    else Color.White.copy(alpha = 0.08f),
+                    RoundedCornerShape(10.dp),
+                )
+                .clickable(enabled = enabled) { onClick() }
+                .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (enabled) Color.White else Color.White.copy(alpha = 0.28f),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+        )
+    }
+}
+
+@Composable
+private fun DiyReadinessStrip(
+    statusItems: List<Pair<String, String>>,
+    accentColor: Color,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+    ) {
+        items(statusItems) { item ->
+            DiyInsightChip(
+                label = item.first,
+                value = item.second,
+                accentColor = accentColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiyInsightChip(
+    label: String,
+    value: String,
+    accentColor: Color,
+) {
+    Box(
+        modifier =
+            Modifier.widthIn(min = 108.dp, max = 170.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF0A0E14))
+                .border(0.5.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Column {
+            Text(
+                text = label.uppercase(),
+                color = accentColor.copy(alpha = 0.72f),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                color = Color.White.copy(alpha = 0.76f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiySectionHint(
+    text: String,
+    accentColor: Color,
+) {
+    Text(
+        text = text,
+        color = Color.White.copy(alpha = 0.45f),
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(bottom = 6.dp)
+                .border(0.5.dp, accentColor.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+                .background(Color.White.copy(alpha = 0.025f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+    )
+}
+
+@Composable
+private fun DiyQuickPresetCard(
+    preset: DiyQuickPreset,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier.width(154.dp)
+                .height(104.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF0A0E14))
+                .border(1.dp, preset.color.copy(alpha = 0.38f), RoundedCornerShape(12.dp))
+                .clickable { onClick() }
+                .padding(10.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Text(
+                text = preset.label,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = preset.description,
+                color = Color.White.copy(alpha = 0.52f),
+                fontSize = 9.sp,
+                lineHeight = 12.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "APLICAR",
+                color = preset.color,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+private fun diyBackgroundSummary(type: Int, preset: Int, uri: String): String =
+    when (type) {
+        0 -> "Gradiente base"
+        1 -> "Preset ${preset + 1}"
+        2 -> if (uri.isBlank()) "Imagen pendiente" else "Imagen propia"
+        else -> "Fondo $type"
+    }
+
+private fun diyAnimationSummary(index: Int): String {
+    val names =
+        listOf(
+            "Ninguna",
+            "Fuego",
+            "Rayos",
+            "Nieve",
+            "Lluvia",
+            "Engranajes",
+            "Galaxia",
+            "Radar",
+            "Matriz",
+            "Aurora",
+        )
+    return names.getOrElse(index) { "Animación $index" }
+}
+
 // ═══════════════════════════════════════════════════════
 // NEON COLOR SWATCH (single circle with glow effect)
 // ═══════════════════════════════════════════════════════
@@ -777,46 +2322,49 @@ fun GaugeCustomizerDialog(
 private fun NeonColorSwatch(
     color: Color,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val inf = rememberInfiniteTransition(label = "swatch_${color.toArgb()}")
-    val glow by inf.animateFloat(
-        0.3f, 0.8f,
-        infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "swGlow"
-    )
+    val glow by
+        inf.animateFloat(
+            0.3f,
+            0.8f,
+            infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "swGlow",
+        )
 
     Box(
-        modifier = Modifier
-            .size(38.dp)
-            .drawBehind {
-                // Neon glow ring behind selected swatch
-                if (isSelected) {
-                    drawCircle(
-                        color = color.copy(alpha = glow * 0.45f),
-                        radius = size.minDimension / 2f + 5.dp.toPx()
-                    )
-                    drawCircle(
-                        color = color.copy(alpha = glow * 0.2f),
-                        radius = size.minDimension / 2f + 9.dp.toPx()
-                    )
+        modifier =
+            Modifier.size(38.dp)
+                .drawBehind {
+                    // Neon glow ring behind selected swatch
+                    if (isSelected) {
+                        drawCircle(
+                            color = color.copy(alpha = glow * 0.45f),
+                            radius = size.minDimension / 2f + 5.dp.toPx(),
+                        )
+                        drawCircle(
+                            color = color.copy(alpha = glow * 0.2f),
+                            radius = size.minDimension / 2f + 9.dp.toPx(),
+                        )
+                    }
                 }
-            }
-            .clip(CircleShape)
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(
-                        color,
-                        color.copy(alpha = 0.75f)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                color,
+                                color.copy(alpha = 0.75f),
+                            )
                     )
                 )
-            )
-            .then(
-                if (isSelected) Modifier.border(2.5.dp, Color.White, CircleShape)
-                else Modifier.border(1.dp, color.copy(alpha = 0.25f), CircleShape)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+                .then(
+                    if (isSelected) Modifier.border(2.5.dp, Color.White, CircleShape)
+                    else Modifier.border(1.dp, color.copy(alpha = 0.25f), CircleShape)
+                )
+                .clickable { onClick() },
+        contentAlignment = Alignment.Center,
     ) {
         if (isSelected) {
             // White checkmark with shadow
@@ -824,7 +2372,7 @@ private fun NeonColorSwatch(
                 "✓",
                 color = Color.White,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Black
+                fontWeight = FontWeight.Black,
             )
         }
     }
@@ -836,23 +2384,28 @@ private fun TabButton(
     active: Boolean,
     accentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (active) accentColor.copy(alpha = 0.2f) else Color(0x0CFFFFFF))
-            .border(1.dp, if (active) accentColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (active) accentColor.copy(alpha = 0.2f) else Color(0x0CFFFFFF))
+                .border(
+                    1.dp,
+                    if (active) accentColor else Color.White.copy(alpha = 0.1f),
+                    RoundedCornerShape(12.dp),
+                )
+                .clickable { onClick() }
+                .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             color = if (active) Color.White else Color.White.copy(alpha = 0.5f),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
         )
     }
 }
@@ -863,7 +2416,7 @@ private fun DiyOptionSelector(
     options: List<String>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
-    accentColor: Color
+    accentColor: Color,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(
@@ -871,31 +2424,38 @@ private fun DiyOptionSelector(
             color = accentColor.copy(alpha = 0.8f),
             fontSize = 10.sp,
             fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
         )
         Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             options.forEachIndexed { idx, label ->
                 val isSelected = idx == selectedIndex
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) accentColor.copy(alpha = 0.15f) else Color(0x0CFFFFFF))
-                        .border(1.dp, if (isSelected) accentColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .clickable { onSelect(idx) }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier.weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) accentColor.copy(alpha = 0.15f)
+                                else Color(0x0CFFFFFF)
+                            )
+                            .border(
+                                1.dp,
+                                if (isSelected) accentColor else Color.White.copy(alpha = 0.1f),
+                                RoundedCornerShape(8.dp),
+                            )
+                            .clickable { onSelect(idx) }
+                            .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = label,
                         color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
                         fontSize = 9.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -907,7 +2467,7 @@ private fun DiyOptionSelector(
 private fun DiySectionHeader(icon: String, title: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
     ) {
         Text(icon, fontSize = 16.sp)
         Spacer(Modifier.width(8.dp))
@@ -916,7 +2476,7 @@ private fun DiySectionHeader(icon: String, title: String) {
             color = Color.White.copy(alpha = 0.6f),
             fontSize = 10.sp,
             fontWeight = FontWeight.Black,
-            letterSpacing = 2.sp
+            letterSpacing = 2.sp,
         )
     }
 }
@@ -928,20 +2488,21 @@ private fun DiyVisualCard(
     isSelected: Boolean,
     accentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) accentColor.copy(alpha = 0.15f) else Color(0xFF0A0E14))
-            .border(
-                width = if (isSelected) 1.5.dp else 0.5.dp,
-                color = if (isSelected) accentColor else Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isSelected) accentColor.copy(alpha = 0.15f) else Color(0xFF0A0E14))
+                .border(
+                    width = if (isSelected) 1.5.dp else 0.5.dp,
+                    color = if (isSelected) accentColor else Color.White.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .clickable { onClick() }
+                .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(icon, fontSize = 20.sp)
@@ -951,9 +2512,8 @@ private fun DiyVisualCard(
                 color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
                 fontSize = 9.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
     }
 }
-

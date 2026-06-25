@@ -923,6 +923,578 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 23→24: Creating Gauge Marketplace tables")
+            db.execSQL("""CREATE TABLE IF NOT EXISTS `saved_gauges` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `name` TEXT NOT NULL,
+                `bgType` INTEGER NOT NULL,
+                `bgPresetIndex` INTEGER NOT NULL,
+                `bgImageUri` TEXT NOT NULL,
+                `bezelStyle` INTEGER NOT NULL,
+                `needleStyle` INTEGER NOT NULL,
+                `ticksStyle` INTEGER NOT NULL,
+                `accentColor` INTEGER NOT NULL,
+                `accentColor2` INTEGER NOT NULL,
+                `glowIntensity` REAL NOT NULL,
+                `imageOpacity` REAL NOT NULL,
+                `animationIndex` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                `isPublished` INTEGER NOT NULL DEFAULT 0,
+                `marketplaceId` TEXT,
+                `thumbnailPath` TEXT
+            )""")
+            db.execSQL("""CREATE TABLE IF NOT EXISTS `gauge_listing_cache` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `creatorId` TEXT NOT NULL,
+                `creatorName` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `description` TEXT,
+                `configJson` TEXT NOT NULL,
+                `thumbnailUrl` TEXT,
+                `priceTier` INTEGER NOT NULL,
+                `totalSales` INTEGER NOT NULL,
+                `avgRating` REAL NOT NULL,
+                `reviewCount` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `cachedAt` INTEGER NOT NULL
+            )""")
+        }
+    }
+
+    private val MIGRATION_24_25 = object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 24→25: Adding individual styling fields to dashboard_widgets")
+            db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `widgetStyle` TEXT")
+            db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `savedStyleId` TEXT")
+        }
+    }
+
+    private val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 25→26: Adding typographyIndex and escrow columns")
+            db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `typographyIndex` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `saved_gauges` ADD COLUMN `typographyIndex` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `service_requests` ADD COLUMN `escrowStatus` TEXT DEFAULT 'NONE'")
+            db.execSQL("ALTER TABLE `service_requests` ADD COLUMN `paymentId` TEXT")
+        }
+    }
+
+    private fun createMechanicalKnowledgeTables(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `meet_knowledge_matrix` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `dtcCode` TEXT,
+                `componentName` TEXT,
+                `systemCategory` TEXT,
+                `urgencyLevel` TEXT,
+                `layerDiagnosticsJson` TEXT NOT NULL,
+                `layerRebuildSpecsJson` TEXT NOT NULL,
+                `layerTrenchKnowledgeJson` TEXT NOT NULL,
+                `layerAdvancedEngJson` TEXT NOT NULL,
+                `lastUpdated` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_dtcCode_componentName_unique` ON `meet_knowledge_matrix` (`dtcCode`, `componentName`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_dtcCode` ON `meet_knowledge_matrix` (`dtcCode`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_componentName` ON `meet_knowledge_matrix` (`componentName`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_systemCategory` ON `meet_knowledge_matrix` (`systemCategory`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_urgencyLevel` ON `meet_knowledge_matrix` (`urgencyLevel`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `mechanical_procedures` (
+                `componentId` TEXT NOT NULL PRIMARY KEY,
+                `system` TEXT NOT NULL,
+                `title` TEXT NOT NULL,
+                `difficulty` INTEGER NOT NULL,
+                `estimatedTimeHours` REAL NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mechanical_procedures_componentId` ON `mechanical_procedures` (`componentId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mechanical_procedures_system` ON `mechanical_procedures` (`system`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mechanical_procedures_difficulty` ON `mechanical_procedures` (`difficulty`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `component_rebuild_guides` (
+                `componentId` TEXT NOT NULL PRIMARY KEY,
+                `rebuildPossible` INTEGER NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_component_rebuild_guides_componentId` ON `component_rebuild_guides` (`componentId`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `symptom_guides` (
+                `symptomId` TEXT NOT NULL PRIMARY KEY,
+                `title` TEXT NOT NULL,
+                `dangerLevel` TEXT NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `relatedDtcs` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_symptom_guides_symptomId` ON `symptom_guides` (`symptomId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_symptom_guides_dangerLevel` ON `symptom_guides` (`dangerLevel`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `trench_knowledge` (
+                `scenarioId` TEXT NOT NULL PRIMARY KEY,
+                `title` TEXT NOT NULL,
+                `riskLevel` TEXT NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_trench_knowledge_scenarioId` ON `trench_knowledge` (`scenarioId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_trench_knowledge_riskLevel` ON `trench_knowledge` (`riskLevel`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `automotive_chemistry` (
+                `chemicalId` TEXT NOT NULL PRIMARY KEY,
+                `category` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_automotive_chemistry_chemicalId` ON `automotive_chemistry` (`chemicalId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_automotive_chemistry_category` ON `automotive_chemistry` (`category`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `tool_usage_guides` (
+                `toolId` TEXT NOT NULL PRIMARY KEY,
+                `name` TEXT NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_tool_usage_guides_toolId` ON `tool_usage_guides` (`toolId`)")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `safety_protocols` (
+                `protocolId` TEXT NOT NULL PRIMARY KEY,
+                `system` TEXT NOT NULL,
+                `title` TEXT NOT NULL,
+                `mandatoryBefore` TEXT NOT NULL,
+                `searchKeywords` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_protocols_protocolId` ON `safety_protocols` (`protocolId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_protocols_system` ON `safety_protocols` (`system`)")
+    }
+
+    private fun seedMechanicalKnowledge(db: SupportSQLiteDatabase) {
+        val now = System.currentTimeMillis()
+        db.execSQL("""
+            INSERT OR REPLACE INTO `safety_protocols`
+            (`protocolId`, `system`, `title`, `mandatoryBefore`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'hot_engine_fluids',
+                'engine',
+                'Motor caliente y fluidos inflamables',
+                'oil_leak;coolant_leak;fuel_smell;engine_bay_work',
+                'seguridad motor caliente aceite fuga fluido inflamable gato elevacion',
+                '{"ppe":["guantes de nitrilo","gafas","luz de inspeccion fria"],"steps":["Apagar motor y esperar hasta que el escape y el aceite bajen de temperatura","No rociar desengrasante sobre colector o catalizador caliente","Si hay que levantar el vehiculo, usar torres certificadas y calzar ruedas"],"fatal_risks":["quemaduras","incendio por solventes","aplastamiento"],"common_mistakes":["meter manos cerca del ventilador electrico","usar solo el gato hidraulico como soporte"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `symptom_guides`
+            (`symptomId`, `title`, `dangerLevel`, `searchKeywords`, `relatedDtcs`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'oil_leak',
+                'Como diagnosticar una fuga de aceite',
+                'medium',
+                'fuga aceite oil leak mancha goteo carter tapa valvulas reten motor',
+                'P0520,P0521,P0522,P0523,P0010,P0011,P0014',
+                '{"safety_protocols":["hot_engine_fluids"],"first_checks":["Confirmar si el fluido es aceite: color ambar/cafe/negro y tacto lubricante","Revisar nivel de aceite antes de arrancar","Ubicar el punto mas alto humedo, no solo la gota en el piso"],"diagnostic_tree":["Lavar zona con desengrasante seguro y secar","Agregar UV dye si la fuga no es evidente","Inspeccionar de arriba hacia abajo: tapa de valvulas, VVT, filtro, enfriador, carter, retenes","Arrancar 5-10 minutos y observar con lampara UV","Prueba de carretera corta y reinspeccion","Si aparece aceite entre motor y caja, sospechar reten trasero o fuga superior que escurre"],"most_common_causes_ranked":["Tapa de valvulas o junta superior","Filtro de aceite flojo o doble empaque","Tapon/arandela de carter","Sensor de presion de aceite","Carter golpeado o junta RTV fallida","Reten delantero/trasero"],"tools_required":["linterna","espejo telescopico","limpiador de frenos/desengrasante","UV dye","lampara UV","torquimetro"],"fluids_or_dyes":["UV dye compatible con aceite","desengrasante no inflamable en frio"],"confirmation_tests":["Nivel estable despues de reparar","Sin rastro UV nuevo despues de prueba de manejo","Sin olor a aceite quemado en escape"],"false_diagnosis_risks":["Cambiar carter cuando la fuga baja desde tapa de valvulas","Confundir aceite de direccion/transmision con aceite de motor"],"related_components":["valve_cover_gasket","oil_pan_gasket","oil_pressure_sensor","front_crank_seal","rear_main_seal"],"related_procedures":["valve_cover_gasket","oil_pan_gasket"],"common_mistakes":["apretar de mas tornillos pequeños en aluminio","usar RTV donde va junta seca","no limpiar respiradero PCV"],"when_not_to_diy":["goteo sobre escape caliente","perdida rapida de nivel","fuga entre motor y transmision","vehiculo hibrido/EV con zona HV cercana"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `mechanical_procedures`
+            (`componentId`, `system`, `title`, `difficulty`, `estimatedTimeHours`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'valve_cover_gasket',
+                'engine_lubrication',
+                'Cambio de empaque de tapa de valvulas',
+                2,
+                1.5,
+                'tapa valvulas empaque fuga aceite valve cover gasket',
+                '{"required_tools":["dado 10mm","torquimetro bajo rango","raspador plastico"],"required_consumables":["empaque nuevo","RTV solo en esquinas indicadas","limpiador de frenos"],"safety_warnings":["motor frio","desconectar bateria si se retiran bobinas"],"removal_steps":["Retirar cubierta decorativa y bobinas si aplica","Desconectar PCV y arneses sin jalar cables","Aflojar tornillos en cruz","Levantar tapa sin deformarla"],"installation_steps":["Limpiar superficies sin rayar aluminio","Aplicar RTV solo en medias lunas/esquinas segun diseno","Instalar empaque y apretar en secuencia"],"torque_specs":["tornillos tapa valvulas tipico 7-10 Nm; verificar manual"],"post_install_tests":["arranque 10 min","inspeccion con luz","prueba de manejo y reinspeccion"],"common_mistakes":["exceso de RTV","sobretorque","manguera PCV agrietada no reemplazada"],"when_not_to_diy":["tornillos barridos","tapa plastica deformada","fuga cerca de arnes principal"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `mechanical_procedures`
+            (`componentId`, `system`, `title`, `difficulty`, `estimatedTimeHours`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'oil_pan_gasket',
+                'engine_lubrication',
+                'Cambio de junta o sellado de carter',
+                4,
+                3.0,
+                'carter aceite fuga oil pan gasket rtv tapon drenaje',
+                '{"required_tools":["torquimetro","raspador plastico","charola de drenaje"],"required_consumables":["aceite","filtro","RTV especificado o junta"],"safety_warnings":["usar torres","no trabajar bajo vehiculo sostenido solo por gato"],"removal_steps":["Drenar aceite","Retirar protectores","Soltar carter siguiendo secuencia","Evitar palancas que doblen aluminio"],"installation_steps":["Limpiar pestañas","Aplicar cordon RTV continuo si aplica","Presentar carter antes de que cure","Torque en secuencia"],"post_install_tests":["llenar aceite","verificar presion/luz de aceite","inspeccion en frio y caliente"],"common_mistakes":["demasiado RTV dentro del motor","contaminar superficie con aceite antes de sellar"],"when_not_to_diy":["subchasis bloquea carter","escape debe desmontarse","roscas dañadas en bloque"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `automotive_chemistry`
+            (`chemicalId`, `category`, `name`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'uv_oil_dye',
+                'diagnostic_dye',
+                'Tinte UV para aceite',
+                'uv dye tinte aceite fuga lampara ultravioleta',
+                '{"use_cases":["fugas pequeñas o intermitentes de aceite","confirmar reparacion despues de limpieza"],"how_it_works":"Circula con el aceite y deja rastro fluorescente en el punto real de fuga.","safe_materials":["aceite de motor compatible segun etiqueta"],"unsafe_materials":["no usar en sistemas donde el fabricante prohiba aditivos"],"application_time_minutes":[10,30],"temporary_fix":false,"can_cause_damage":false,"do_not_use_when":["nivel de aceite criticamente bajo","motor con daño interno evidente"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `tool_usage_guides`
+            (`toolId`, `name`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'uv_lamp',
+                'Lampara UV de inspeccion',
+                'lampara uv ultravioleta tinte aceite fuga inspeccion',
+                '{"allowed_use_cases":["rastrear tinte UV en aceite, refrigerante o A/C segun producto"],"forbidden_use_cases":["apuntar a ojos","usar como unica prueba sin limpiar primero"],"ppe_required":["gafas"],"vehicle_risk_zones":["correas","ventilador electrico","escape caliente"],"fire_risk":false,"precision_risk":"low","safer_alternatives":["talco tecnico para fugas externas evidentes"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `trench_knowledge`
+            (`scenarioId`, `title`, `riskLevel`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES (
+                'seized_oil_pan_bolt',
+                'Tornillo de carter o tapa trabado',
+                'high',
+                'tornillo carter barrido pegado oxidado extractor helicoil aceite',
+                '{"escalation_ladder":["limpiar cabeza","dado de 6 puntas correcto","golpe seco controlado","penetrante 20-60 min","calor muy controlado lejos de aceite/solventes","extractor","soldar tuerca solo si no hay riesgo de incendio","reparacion de rosca helicoil/timesert"],"heat_allowed":true,"heat_forbidden_zones":["cerca de combustible","despues de rociar solvente","cerca de retenes"],"cutting_allowed":true,"fire_risk_warnings":["aceite y desengrasante pueden encender sobre escape"],"thread_repair_options":["helicoil","timesert","tapon sobredimensionado como solucion temporal"]}',
+                $now
+            )
+        """)
+        db.execSQL("""
+            INSERT OR REPLACE INTO `meet_knowledge_matrix`
+            (`dtcCode`, `componentName`, `systemCategory`, `urgencyLevel`, `layerDiagnosticsJson`, `layerRebuildSpecsJson`, `layerTrenchKnowledgeJson`, `layerAdvancedEngJson`, `lastUpdated`)
+            VALUES (
+                'P0520',
+                'Sensor de presion de aceite',
+                'Powertrain - Lubrication',
+                'pronto',
+                '{"related_symptom_guides":["oil_leak"],"diagnostic_steps":["verificar nivel","inspeccionar fuga en sensor","medir presion mecanica si hay luz de aceite"],"confirmation_tests":["presion real dentro de especificacion","sin fuga en rosca/conector"]}',
+                '{"electrical_specs":["5V referencia segun diseño","señal variable o switch segun motor"],"torque_specs":["ver manual; sensores en aluminio requieren bajo torque y sellador correcto"]}',
+                '{"related_trench_knowledge":["seized_oil_pan_bolt"],"common_shop_notes":["no confundir sensor mojado por fuga superior con sensor defectuoso"]}',
+                '{"scope_patterns":["verificar estabilidad de señal si aplica"],"ev_hvac_notes":[]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `safety_protocols`
+            (`protocolId`, `system`, `title`, `mandatoryBefore`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'srs_airbag',
+                'restraint_system',
+                'SRS / Airbag / Pretensores',
+                'steering_wheel_dash_seatbelt_module_work',
+                'airbag srs pretensor volante tablero seguridad bateria capacitores',
+                '{"ppe":["gafas","guantes"],"steps":["Desconectar terminal negativo y esperar minimo 10 minutos antes de tocar conectores SRS","No medir resistencia directa sobre infladores o pretensores","Transportar airbags con cubierta hacia arriba"],"fatal_risks":["despliegue accidental","lesiones faciales","daño de modulo"],"common_mistakes":["usar multimetro comun en circuito de detonacion","dejar bateria conectada","poner modulo boca abajo"]}',
+                $now
+            ),
+            (
+                'hybrid_high_voltage',
+                'hev_ev',
+                'Alto voltaje HEV / EV',
+                'battery_pack_inverter_ac_compressor_orange_cables',
+                'hibrido electrico alto voltaje guantes clase 0 loto desconexion servicio',
+                '{"ppe":["guantes clase 0 certificados","proteccion facial","candado LOTO"],"steps":["Verificar fabricante y procedimiento OEM","Retirar service plug y asegurar bloqueo/etiquetado","Confirmar ausencia de voltaje con equipo aprobado CAT III/CAT IV"],"fatal_risks":["electrocucion","arco electrico","arranque automatico de compresor electrico"],"common_mistakes":["confiar solo en que el vehiculo esta apagado","trabajar sin verificar ausencia de voltaje","tocar cables naranja sin aislamiento"]}',
+                $now
+            ),
+            (
+                'fuel_pressure_release',
+                'fuel_system',
+                'Despresurizacion de combustible',
+                'injector_rail_fuel_line_pump_filter_work',
+                'combustible presion inyeccion gasolina incendio riel inyector',
+                '{"ppe":["gafas","guantes resistentes a hidrocarburos"],"steps":["Desactivar bomba segun OEM o retirar fusible/relay y agotar motor si aplica","Capturar derrames con trapo absorbente y charola","No usar calor ni chispas en zona de trabajo"],"fatal_risks":["incendio","lesion ocular","salpicadura a escape caliente"],"common_mistakes":["abrir linea con motor caliente","trabajar cerca de baterias cargando","no ventilar area"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `symptom_guides`
+            (`symptomId`, `title`, `dangerLevel`, `searchKeywords`, `relatedDtcs`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'coolant_leak',
+                'Como diagnosticar una fuga de refrigerante',
+                'high',
+                'fuga agua refrigerante coolant leak radiador manguera deposito bomba agua',
+                'P0117,P0118,P0125,P0128,P0217',
+                '{"safety_protocols":["hot_engine_fluids"],"first_checks":["Nunca abrir tapon con el motor a temperatura","Confirmar color y olor del fluido","Revisar nivel en deposito y signos de sobrecalentamiento"],"diagnostic_tree":["Presurizar sistema en frio con bomba de prueba","Inspeccionar tanque, radiador, mangueras, bomba de agua, housing de termostato y calefaccion","Usar tinte UV si la fuga aparece solo en caliente","Verificar interior por olor dulce o vidrio empañado para descartar heater core","Si no hay fuga externa, realizar prueba de CO2 o leak-down por posible empaque de culata"],"most_common_causes_ranked":["Manguera envejecida o abrazadera floja","Depósito fisurado","Bomba de agua con sello vencido","Radiador con microfisura","Housing/termostato deformado","Empaque de culata"],"tools_required":["bomba presurizadora","linterna","lampara UV","detector de CO2"],"fluids_or_dyes":["tinte UV compatible con refrigerante"],"confirmation_tests":["sistema mantiene presion especificada","nivel estable varios ciclos termicos","ventiladores operan normal"],"false_diagnosis_risks":["confundir agua de A/C con refrigerante","reemplazar radiador cuando la fuga viene del deposito"],"related_components":["radiator","water_pump","thermostat_housing","heater_core"],"related_procedures":["water_pump_replacement"],"common_mistakes":["mezclar refrigerantes incompatibles","apretar abrazaderas en cuello plastico fragil"],"when_not_to_diy":["sobrecalentamiento severo","mezcla aceite-refrigerante","vehiculo HEV/EV con circuito HV de enfriamiento"]}',
+                $now
+            ),
+            (
+                'alternator_not_charging',
+                'Como diagnosticar alternador que no carga',
+                'medium',
+                'alternador no carga bateria descarga luz bateria system voltage low',
+                'P0560,P0562,P0563,P0620',
+                '{"safety_protocols":["fuel_pressure_release"],"first_checks":["Verificar tension de banda y estado del tensor","Medir voltaje KOEO y con motor en marcha","Confirmar que la luz de bateria o mensaje de carga este presente"],"diagnostic_tree":["Prueba de caida de voltaje B+ y tierra bajo carga maxima","Medir ripple AC en bateria","Verificar señal LIN/COM/FR si el sistema es inteligente","Comprobar fusible megafuse y continuidad del cable B+","Si el alternador responde pero no estabiliza, revisar IBS/BMS y demanda del modulo"],"most_common_causes_ranked":["Regulador interno defectuoso","Diodo rectificador dañado","Cable B+ sulfatado o megafuse abierto","Tierra deficiente entre motor y bateria","Tensor o polea overrunning fallando"],"tools_required":["multimetro","pinza amperimetrica","osciloscopio opcional"],"confirmation_tests":["13.5-14.8V tipico segun estrategia OEM","ripple AC menor a 0.5V","caida de voltaje dentro de especificacion"],"false_diagnosis_risks":["cambiar bateria cuando el problema es cableado","culpar alternador cuando el BMS ordena baja carga"],"related_components":["alternator","battery","serpentine_belt","battery_sensor"],"related_procedures":["alternator_replacement"],"when_not_to_diy":["vehiculos con alternador refrigerado por liquido","sistemas inteligentes LIN/BSS sin diagrama"]}',
+                $now
+            ),
+            (
+                'hard_start',
+                'Como diagnosticar arranque lento o dificil',
+                'medium',
+                'arranque lento hard start no arranca bateria motor arranque combustible chispa',
+                'P0335,P0340,P0562,P0563,P0685',
+                '{"safety_protocols":["fuel_pressure_release"],"first_checks":["Definir si el motor no gira, gira lento o gira normal pero no enciende","Verificar voltaje de bateria en reposo y durante cranking","Escuchar clic de solenoide o caida de voltaje severa"],"diagnostic_tree":["Prueba de caida de voltaje en circuito de arranque","Prueba de consumo amperimetrico del motor de arranque","Confirmar chispa, combustible y señal CKP/CMP si gira pero no enciende","Verificar presion residual de combustible en caliente","Comprobar inmovilizador si hay arranque y corte inmediato"],"most_common_causes_ranked":["Bateria sulfatada o baja","Terminales/tierra con alta resistencia","Motor de arranque desgastado","Bomba de combustible debil","Sensor CKP intermitente"],"tools_required":["multimetro","pinza amperimetrica","manometro de combustible"],"confirmation_tests":["caida de voltaje dentro de rango","rpm de cranking adecuadas","presion/encendido presentes"],"related_components":["battery","starter_motor","fuel_pump","crankshaft_sensor"],"related_procedures":["starter_replacement"],"when_not_to_diy":["vehiculos con inmovilizador activo","motor trabado mecanicamente"]}',
+                $now
+            ),
+            (
+                'spongy_brake_pedal',
+                'Como diagnosticar pedal de freno esponjoso',
+                'critical',
+                'freno esponjoso pedal largo abs fuga liquido aire lineas',
+                'C1201,C1234,C0020',
+                '{"safety_protocols":["hot_engine_fluids"],"first_checks":["No conducir si el pedal se va al piso","Revisar nivel y color del liquido","Inspeccionar fugas en ruedas, flexible, cilindro maestro y ABS"],"diagnostic_tree":["Purgar en secuencia OEM","Verificar expansion de mangueras flexibles bajo presion","Pinzar circuitos para aislar si el maestro colapsa internamente","Activar purga ABS con escaner si se abrio el modulo o el deposito se vacio","Comprobar ajuste de zapatas traseras en tambores si aplica"],"most_common_causes_ranked":["Aire en sistema","fuga externa","cilindro maestro by-pass interno","mangueras abombadas","ABS con aire atrapado"],"tools_required":["purga asistida o vacio","llave de purga","escaner con ABS bleed"],"confirmation_tests":["pedal firme motor apagado y encendido","sin fuga residual","frenada recta"],"related_components":["master_cylinder","brake_hose","abs_hcu"],"related_procedures":["brake_service_full"],"when_not_to_diy":["sistema ABS/ESC con purga por escaner obligatoria","lineas severamente corroídas"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `mechanical_procedures`
+            (`componentId`, `system`, `title`, `difficulty`, `estimatedTimeHours`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'alternator_replacement',
+                'charging_system',
+                'Cambio de alternador',
+                3,
+                1.8,
+                'alternador reemplazo charging system bateria luz carga',
+                '{"required_tools":["dados y llaves segun acceso","torquimetro","multimetro"],"required_consumables":["banda nueva si esta agrietada","limpiador de terminales"],"safety_warnings":["desconectar bateria negativa","no tocar B+ con herramienta a masa"],"removal_steps":["Registrar radio/codigos si aplica","Quitar tension de banda","Desconectar conector de control y terminal B+","Retirar pernos soporte sin forzar carcasa"],"installation_steps":["Comparar polea y offset antes de montar","Limpiar superficies de masa","Apretar soportes y terminal B+ a torque OEM","Reinstalar banda y verificar alineacion"],"torque_specs":["soporte alternador tipico 35-55 Nm","terminal B+ tipico 9-15 Nm; verificar OEM"],"electrical_specs":["carga tipica 13.5-14.8V","ripple AC <0.5V"],"post_install_tests":["medir caida de voltaje bajo carga maxima","verificar testigo de bateria apagado","revisar tension de banda"],"common_mistakes":["arrancar sin conectar arnes de control","contaminar polea con aceite"],"when_not_to_diy":["alternador refrigerado por agua","acceso requiere desmontar frente completo"]}',
+                $now
+            ),
+            (
+                'starter_replacement',
+                'starting_system',
+                'Cambio de motor de arranque',
+                3,
+                2.0,
+                'motor arranque starter solenoide no gira clic',
+                '{"required_tools":["dados profundos","extension","torquimetro"],"required_consumables":["limpiador de terminales","grasa dielectrica ligera para conector de mando"],"safety_warnings":["desconectar bateria","soportar vehiculo con torres si acceso inferior"],"removal_steps":["Confirmar que el fallo no sea bateria/cableado","Desconectar cable B+ y terminal de mando","Retirar pernos de montaje y bajar el conjunto"],"installation_steps":["Inspeccionar dientes de corona visibles","Montar arranque sin pellizcar arnes","Apretar pernos y cables al torque correcto"],"torque_specs":["pernos de arranque tipico 40-60 Nm","terminal solenoide pequeño bajo torque"],"electrical_specs":["caida de voltaje positiva <0.2V por tramo","tierra <0.1V por tramo"],"post_install_tests":["cranking estable","sin ruido de engrane","caida de voltaje dentro de rango"],"common_mistakes":["condenar el arranque sin prueba de voltaje","dejar flojo cable B+"],"when_not_to_diy":["arranque integrado con soportes complejos","acceso junto a catalizador extremadamente caliente"]}',
+                $now
+            ),
+            (
+                'water_pump_replacement',
+                'cooling_system',
+                'Cambio de bomba de agua',
+                4,
+                3.5,
+                'bomba agua water pump fuga coolant sobrecalentamiento',
+                '{"required_tools":["juego de dados","torquimetro","charola","herramienta de tensado segun motor"],"required_consumables":["refrigerante correcto","junta o RTV OEM"],"safety_warnings":["motor completamente frio","despresurizar sistema"],"removal_steps":["Drenar refrigerante","Retirar banda/accesorios o cubierta de distribucion segun diseño","Desmontar bomba sin golpear superficies"],"installation_steps":["Limpiar superficie","instalar junta o sellador segun OEM","torque en cruz","llenado y purga de aire"],"torque_specs":["pernos bomba tipico 10-25 Nm; verificar OEM"],"post_install_tests":["prueba de presion en frio","ciclos termicos con calefaccion","verificar ventiladores"],"common_mistakes":["mezclar refrigerantes","no purgar aire"],"when_not_to_diy":["bomba impulsada por cadena/correa interna","motores con timing critico"]}',
+                $now
+            ),
+            (
+                'brake_service_full',
+                'braking_system',
+                'Servicio completo de frenos',
+                3,
+                2.5,
+                'frenos pastillas discos caliper purga pedal',
+                '{"required_tools":["gato y torres","torquimetro","herramienta retraer piston","purga"],"required_consumables":["pastillas","grasa de frenos","liquido DOT especificado"],"safety_warnings":["no inhalar polvo","no contaminar friccion con grasa"],"removal_steps":["inspeccionar espesor y desgaste disparejo","retirar caliper y soporte","medir disco y runout si aplica"],"installation_steps":["limpiar cubo","lubricar puntos correctos","retraer piston con procedimiento adecuado","torque ruedas y soportes"],"torque_specs":["tuercas rueda segun OEM","pernos soporte caliper tipico 70-120 Nm"],"post_install_tests":["pedal firme antes de mover","asentamiento de pastillas","verificar fugas y nivel"],"common_mistakes":["dejar colgar caliper por manguera","usar grasa donde toca friccion"],"when_not_to_diy":["EPB electronico sin modo servicio","ABS requiere bleed por escaner"]}',
+                $now
+            ),
+            (
+                'windshield_replacement',
+                'body_glass',
+                'Cambio de parabrisas',
+                5,
+                4.0,
+                'parabrisas windshield vidrio uretano adas calibracion',
+                '{"required_tools":["cuerda o cuchilla fria","ventosas","pistola para uretano"],"required_consumables":["primer","uretano automotriz","clips nuevos si aplica"],"safety_warnings":["usar guantes anticorte","proteger tablero y pintura"],"removal_steps":["retirar molduras y sensores","cortar uretano sin dañar pinchweld","extraer vidrio con ventosas"],"installation_steps":["tratar corrosion del marco si existe","aplicar primer segun fabricante","cordon continuo de uretano","colocar vidrio y respetar tiempo safe-drive-away"],"post_install_tests":["prueba de fugas de agua","verificar ADAS/camara y calibrar si aplica"],"common_mistakes":["usar uretano sin tiempo de curado correcto","no calibrar ADAS"],"when_not_to_diy":["vehiculos con camaras/radar en parabrisas","pinchweld oxidado o deformado"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `component_rebuild_guides`
+            (`componentId`, `rebuildPossible`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'alternator',
+                1,
+                'alternador reconstruccion diodos rotor estator regulador escobillas ripple',
+                '{"internal_parts":["puente rectificador","regulador","rotor","estator","anillos rozantes","rodamientos","escobillas"],"bench_tests":["ripple AC en bateria <0.5V","prueba de diodos en modo diode","resistencia rotor tipica 2-6 ohm segun diseño","aislamiento rotor/masa infinito"],"failure_signatures":["luces que pulsan","ripple alto","rodamiento ruidoso","sobrecarga >15V"],"minimum_service_limits":["anillos rozantes sin surcos profundos","longitud minima de escobillas segun kit","rodamiento sin juego axial"],"rebuild_steps":["desarmar y marcar carcasa","prueba individual de diodos","rectificar o reemplazar anillos","instalar rodamientos/escobillas/regulador","prueba de banco antes de reinstalar"],"replace_vs_rebuild_decision":["reconstruir si carcasa/estator son recuperables y partes de calidad disponibles","reemplazar si hay daño severo por calor o carcasa fracturada"],"quality_control_tests":["voltaje estable bajo carga","ripple bajo","sin ruido mecanico"]}',
+                $now
+            ),
+            (
+                'starter_motor',
+                1,
+                'arranque reconstruccion solenoide bendix inducido escobillas bujes',
+                '{"internal_parts":["solenoide","bendix/overrunning clutch","inducido","escobillas","portaescobillas","bujes/rodamientos"],"bench_tests":["consumo de corriente comparado con especificacion","caida de voltaje interna","desplazamiento correcto del bendix"],"failure_signatures":["clic sin giro","giro lento con bateria sana","ruido de engrane"],"minimum_service_limits":["conmutador sin segmentos quemados","bujes con juego dentro de tolerancia","escobillas sobre longitud minima"],"rebuild_steps":["desarmar y limpiar sin contaminar embrague unidireccional","medir continuidad y cortos a masa del inducido","cambiar bujes/escobillas/solenoide segun daño","probar en banco"],"replace_vs_rebuild_decision":["reconstruir si inducido y carcasa son recuperables","reemplazar si el inducido esta carbonizado o el nose cone roto"],"quality_control_tests":["enganche consistente","velocidad de giro correcta","sin sobreconsumo"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `automotive_chemistry`
+            (`chemicalId`, `category`, `name`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'penetrating_oil_pb',
+                'penetrant',
+                'Penetrante tipo PB Blaster / Kroil',
+                'penetrante pb blaster kroil tornillo oxidado trabado',
+                '{"use_cases":["tornilleria oxidada","sensores roscados","uniones expuestas a sal"],"how_it_works":"Disuelve corrosion y reduce friccion capilarmente si se le da tiempo de saturacion.","safe_materials":["acero","hierro"],"unsafe_materials":["gomas sensibles segun producto"],"application_time_minutes":[20,60],"temporary_fix":false,"can_cause_damage":false,"do_not_use_when":["superficie extremadamente caliente","cerca de llama abierta"]}',
+                $now
+            ),
+            (
+                'atf_acetone_mix',
+                'penetrant',
+                'Mezcla ATF + acetona',
+                'atf acetona penetrante casero extractor perno',
+                '{"use_cases":["extraccion de pernos muy trabados cuando se prepara la mezcla justo antes de aplicar"],"how_it_works":"La acetona reduce viscosidad y ayuda a transportar el ATF a la rosca; es volatil e inflamable.","safe_materials":["acero"],"unsafe_materials":["plasticos y pinturas sensibles"],"application_time_minutes":[10,30],"temporary_fix":false,"can_cause_damage":true,"do_not_use_when":["cerca de chispa/llama","sobre componentes pintados delicados","en interiores sin ventilacion"]}',
+                $now
+            ),
+            (
+                'maf_cleaner',
+                'sensor_cleaner',
+                'Limpiador MAF',
+                'maf cleaner sensor flujo aire contaminacion',
+                '{"use_cases":["sensor MAF contaminado por polvo/aceite"],"how_it_works":"Evapora sin residuo y remueve contaminantes sin atacar la pelicula caliente.","safe_materials":["elemento MAF"],"unsafe_materials":["cuerpo de aceleracion en lugar de MAF"],"application_time_minutes":[5,10],"temporary_fix":false,"can_cause_damage":false,"do_not_use_when":["sensor roto fisicamente","usar cepillo o aire a alta presion"]}',
+                $now
+            ),
+            (
+                'dielectric_grease',
+                'electrical_protection',
+                'Grasa dielectrica',
+                'grasa dielectrica bobina conector humedad',
+                '{"use_cases":["botas de bobina","sellado ambiental en conectores no de alta presion de contacto"],"how_it_works":"Desplaza humedad y previene corrosion superficial.","safe_materials":["gomas y conectores apropiados"],"unsafe_materials":["superficies donde se requiere friccion seca especifica"],"application_time_minutes":[1,1],"temporary_fix":false,"can_cause_damage":false,"do_not_use_when":["rellenar terminales hembra completamente","pretender reparar caida de voltaje con grasa"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `tool_usage_guides`
+            (`toolId`, `name`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'induction_heater',
+                'Calentador por induccion',
+                'induccion calor extractor perno tuerca sin llama',
+                '{"allowed_use_cases":["tuercas/pernos ferrosos cercanos a lineas donde llama es riesgosa"],"forbidden_use_cases":["material no ferroso que no responde","componentes con electronica sensible muy cercana"],"ppe_required":["guantes","gafas"],"vehicle_risk_zones":["arneses cercanos","sensores plastico"],"fire_risk":false,"precision_risk":"medium","safer_alternatives":["penetrante y impacto controlado"]}',
+                $now
+            ),
+            (
+                'angle_grinder_metabo',
+                'Esmeril angular / Metabo',
+                'metabo esmeril angular corte destructivo perno trabado',
+                '{"allowed_use_cases":["extraccion destructiva de tornilleria o abrazaderas cuando otros escalones fallaron"],"forbidden_use_cases":["cerca de tanque/lineas de combustible","cerca de vidrio o modulos sin proteccion"],"ppe_required":["careta","guantes","proteccion auditiva"],"vehicle_risk_zones":["mangueras de freno","arneses","sellos","vidrio"],"fire_risk":true,"precision_risk":"high","safer_alternatives":["induccion","soldar tuerca","extractor"]}',
+                $now
+            ),
+            (
+                'smoke_machine',
+                'Maquina de humo',
+                'smoke machine evap admision fuga vacio',
+                '{"allowed_use_cases":["EVAP","fugas de vacio/admision"],"forbidden_use_cases":["presurizar escape caliente","exceder presion especificada"],"ppe_required":["gafas"],"vehicle_risk_zones":["tanque EVAP si se excede presion"],"fire_risk":false,"precision_risk":"low","safer_alternatives":["spray limpio para cambios de rpm","inspeccion visual"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `trench_knowledge`
+            (`scenarioId`, `title`, `riskLevel`, `searchKeywords`, `payloadJson`, `updatedAt`)
+            VALUES
+            (
+                'broken_stud_extraction',
+                'Extraccion de esparrago roto',
+                'critical',
+                'esparrago roto tuerca soldada extractor perforar centrado',
+                '{"escalation_ladder":["centrar con punzon","penetrante","broca zurda","extractor solo si queda suficiente material","soldar tuerca para choque termico","taladrado progresivo y reparacion de rosca"],"heat_allowed":true,"heat_forbidden_zones":["alrededor de combustible","aluminio delgado sin control"],"cutting_allowed":false,"fire_risk_warnings":["soldadura cerca de grasa/combustible"],"thread_repair_options":["helicoil","timesert","rosca sobremedida"],"common_failures":["romper extractor dentro del perno empeora radicalmente el trabajo"]}',
+                $now
+            ),
+            (
+                'aluminum_thread_repair',
+                'Reparacion de rosca en aluminio',
+                'high',
+                'aluminio rosca barrida helicoil timesert torque',
+                '{"escalation_ladder":["confirmar largo y paso original","taladrar perpendicular","machuelear limpio","instalar inserto adecuado","verificar protrusion y torque"],"heat_allowed":false,"heat_forbidden_zones":["aluminio tratado termicamente"],"cutting_allowed":true,"fire_risk_warnings":[],"thread_repair_options":["helicoil para servicio general","timesert para zonas criticas y reapriete frecuente"],"common_failures":["usar inserto demasiado corto","no retirar viruta"]}',
+                $now
+            )
+        """)
+
+        db.execSQL("""
+            INSERT OR REPLACE INTO `meet_knowledge_matrix`
+            (`dtcCode`, `componentName`, `systemCategory`, `urgencyLevel`, `layerDiagnosticsJson`, `layerRebuildSpecsJson`, `layerTrenchKnowledgeJson`, `layerAdvancedEngJson`, `lastUpdated`)
+            VALUES
+            (
+                'P0562',
+                'Alternador / sistema de carga',
+                'Powertrain - Charging',
+                'pronto',
+                '{"related_symptom_guides":["alternator_not_charging","hard_start"],"diagnostic_steps":["medir voltaje KOEO y en marcha","hacer prueba de caida de voltaje positiva y de tierra","medir ripple AC","verificar señal de control inteligente"],"confirmation_tests":["13.5-14.8V segun estrategia OEM","ripple bajo","sin caida excesiva en B+"]}',
+                '{"electrical_specs":["carga tipica 13.5-14.8V","ripple AC <0.5V","caida B+ <0.3V, tierra <0.1V"],"rebuild_paths":["alternator"]}',
+                '{"related_trench_knowledge":["aluminum_thread_repair"],"common_shop_notes":["no condenar alternador sin revisar megafuse, tierra motor y sensor IBS/BMS"]}',
+                '{"scope_patterns":["ripple de seis pulsos identifica diodos/fases"],"ev_hvac_notes":["en hibridos revisar estrategia DC-DC antes de culpar alternador"]}',
+                $now
+            ),
+            (
+                'P0420',
+                'Catalizador / eficiencia',
+                'Powertrain - Emissions',
+                'monitor',
+                '{"related_symptom_guides":["oil_leak"],"diagnostic_steps":["confirmar que no existan misfires ni fugas de escape","comparar O2 upstream/downstream","medir contrapresion si hay perdida de potencia"],"confirmation_tests":["contrapresion <1 psi a 2500 rpm","downstream mas estable que upstream","sin fugas antes del sensor downstream"]}',
+                '{"electrical_specs":["sensor O2 upstream debe cruzar rapido","sensor downstream mas estable"],"service_limits":["contrapresion alta implica restriccion fisica"]}',
+                '{"related_trench_knowledge":["broken_stud_extraction"],"common_shop_notes":["no cambiar catalizador antes de resolver consumo de aceite o misfire que lo destruye"]}',
+                '{"scope_patterns":["upstream oscilando y downstream copiando = catalizador agotado"],"ev_hvac_notes":[]}',
+                $now
+            )
+        """)
+    }
+
+    private val MIGRATION_26_27 = object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 26→27: Creating MEET Knowledge Engine v4.0 tables")
+            createMechanicalKnowledgeTables(db)
+            seedMechanicalKnowledge(db)
+        }
+    }
+
+    private val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("MeetDB", "Migration 27→28: Hardening hybrid knowledge matrix and expanding offline knowledge seeds")
+            createMechanicalKnowledgeTables(db)
+            db.execSQL("""
+                DELETE FROM meet_knowledge_matrix
+                WHERE id NOT IN (
+                    SELECT MIN(id)
+                    FROM meet_knowledge_matrix
+                    GROUP BY COALESCE(dtcCode, ''), COALESCE(componentName, '')
+                )
+            """.trimIndent())
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_meet_knowledge_matrix_dtcCode_componentName_unique` ON `meet_knowledge_matrix` (`dtcCode`, `componentName`)")
+            seedMechanicalKnowledge(db)
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -939,11 +1511,13 @@ object AppModule {
             MIGRATION_7_10, MIGRATION_8_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
             MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-            MIGRATION_21_22, MIGRATION_22_23
+            MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
+            MIGRATION_26_27, MIGRATION_27_28
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                seedMechanicalKnowledge(db)
                 android.util.Log.i("MeetDB", "Database created fresh — DtcDatabaseLoader will populate DTCs on first use")
             }
             override fun onOpen(db: SupportSQLiteDatabase) {
@@ -1075,4 +1649,11 @@ object AppModule {
     // KNOWLEDGE GRAPH DAO
     @Provides
     fun provideDtcKnowledgeGraphDao(db: MeetDatabase): DtcKnowledgeGraphDao = db.dtcKnowledgeGraphDao()
+
+    @Provides
+    fun provideMechanicalKnowledgeDao(db: MeetDatabase): MechanicalKnowledgeDao = db.mechanicalKnowledgeDao()
+
+    // GAUGE MARKETPLACE
+    @Provides
+    fun provideSavedGaugeDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.SavedGaugeDao = db.savedGaugeDao()
 }

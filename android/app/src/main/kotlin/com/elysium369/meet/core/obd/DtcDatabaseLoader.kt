@@ -17,11 +17,13 @@ class DtcDatabaseLoader(
     private val db: MeetDatabase
 ) {
     private val loaderScope = CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    private val minimumExpectedDtcDefinitions = 18_000
 
     fun loadIfEmpty() {
         loaderScope.launch {
-            if (db.dtcDefinitionDao().getCount() == 0) {
-                Log.i("DtcDatabaseLoader", "DTC definitions table is empty. Starting streaming load...")
+            val currentCount = db.dtcDefinitionDao().getCount()
+            if (currentCount < minimumExpectedDtcDefinitions) {
+                Log.i("DtcDatabaseLoader", "DTC definitions table has $currentCount records. Starting streaming refresh...")
                 try {
                     val stream = context.assets.open("dtc_database_es.json")
                     val reader = JsonReader(InputStreamReader(stream, "UTF-8"))
@@ -545,7 +547,11 @@ class DtcDatabaseLoader(
         if (raw.isNullOrBlank()) return null
         val items = parseStringListFromRaw(raw)
         if (items.isEmpty()) return null
-        return items.filter { it.matches(Regex("[PCBU]\\d{4,5}")) }.map { relatedCode ->
+        return items
+            .map { it.trim().uppercase() }
+            .filter { it.matches(Regex("[PCBU][0-9A-F]{4}")) }
+            .distinct()
+            .map { relatedCode ->
             com.elysium369.meet.data.local.entities.DtcCoOccurrenceEntity(
                 dtcCode = code,
                 relatedDtcCode = relatedCode,
@@ -575,6 +581,33 @@ class DtcDatabaseLoader(
     private fun parseRepairCost(code: String, manufacturer: String, costRaw: String?, laborRaw: String?): com.elysium369.meet.data.local.entities.DtcRepairCostEntity? {
         if (costRaw.isNullOrBlank()) return null
         try {
+            if (costRaw.trim().startsWith("{")) {
+                val costJson = org.json.JSONObject(costRaw)
+                val minCost = costJson.optDouble("minUSD", 0.0).toFloat()
+                val maxCost = costJson.optDouble("maxUSD", minCost.toDouble()).toFloat()
+                if (minCost <= 0f && maxCost <= 0f) return null
+
+                val laborHours = if (!laborRaw.isNullOrBlank() && laborRaw.trim().startsWith("{")) {
+                    val laborJson = org.json.JSONObject(laborRaw)
+                    laborJson.optDouble("minH", 0.0).takeIf { it > 0.0 }?.toFloat()
+                } else {
+                    null
+                }
+
+                return com.elysium369.meet.data.local.entities.DtcRepairCostEntity(
+                    dtcCode = code,
+                    manufacturer = manufacturer,
+                    region = "US",
+                    minCostUsd = minCost,
+                    maxCostUsd = maxCost,
+                    laborHours = laborHours,
+                    partsDescription = costJson.optString("note").takeIf { it.isNotBlank() },
+                    currency = "USD",
+                    source = "MEET_DTC_V4",
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+
             val cleaned = costRaw.replace("$", "").replace(",", "").trim()
             val costParts = cleaned.split("-", "–").map { it.trim().toFloatOrNull() ?: 0f }
             val minCost = costParts.getOrNull(0) ?: return null
@@ -594,6 +627,7 @@ class DtcDatabaseLoader(
                 minCostUsd = minCost,
                 maxCostUsd = maxCost,
                 laborHours = laborHours,
+                source = "MEET_DTC_V4",
                 updatedAt = System.currentTimeMillis()
             )
         } catch (e: Exception) {

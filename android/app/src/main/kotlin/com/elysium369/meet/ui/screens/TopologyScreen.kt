@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +57,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
     var selectedNetworkType by remember { mutableStateOf<NetworkType?>(null) }
     var aiDiagnosticResult by remember { mutableStateOf<com.elysium369.meet.core.ai.DiagnosticResult?>(null) }
     var isAnalyzingNetwork by remember { mutableStateOf(false) }
+    val isConnected = connectionState == ObdState.CONNECTED
 
     // Animation for the "Scanning" radar effect
     val infiniteTransition = rememberInfiniteTransition(label = "Radar")
@@ -131,9 +131,20 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    "RED NO ESCANEADA",
-                                    color = MeetColors.textSecondary,
+                                    if (isConnected) "LISTO PARA ESCANEO REAL" else "CONECTA OBD PARA MAPEAR",
+                                    color = if (isConnected) MeetColors.textSecondary else MeetColors.warning,
                                     fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    if (isConnected) {
+                                        "Se mostrarán solo ECUs que respondan por CAN/UDS."
+                                    } else {
+                                        "MEET no dibuja módulos simulados sin enlace físico."
+                                    },
+                                    color = MeetColors.textMuted,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 24.dp)
                                 )
                             }
                         } else {
@@ -160,7 +171,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    "ESCANEO ACTIVO: PINGING CAN IDs 0x7E0-0x7EB...",
+                                    "SONDEO REAL: direcciones físicas CAN/UDS, DTCs por módulo e identificación ECU...",
                                     color = MeetColors.electricBlue,
                                     style = MaterialTheme.typography.labelSmall,
                                     modifier = Modifier.padding(8.dp),
@@ -185,8 +196,8 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (connectionState == ObdState.CONNECTED) "MÓDULOS DETECTADOS: ${modules.size}" else "[DEMO] MÓDULOS: ${modules.size}",
-                    color = MeetColors.textSecondary,
+                    if (isConnected) "MÓDULOS REALES DETECTADOS: ${modules.size}" else "SIN ENLACE OBD: 0 MÓDULOS REALES",
+                    color = if (isConnected) MeetColors.textSecondary else MeetColors.warning,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -223,13 +234,39 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                             color = MeetColors.error
                         )
                     } else {
-                        val scanButtonText = if (connectionState == ObdState.CONNECTED) "INICIAR ESCANEO" else "SIMULAR ESCANEO"
-                        val scanButtonColor = if (connectionState == ObdState.CONNECTED) MeetColors.neonGreen else MeetColors.warning
+                        val scanButtonText = if (isConnected) "ESCANEAR ECUS REALES" else "CONECTA OBD PRIMERO"
+                        val scanButtonColor = if (isConnected) MeetColors.neonGreen else MeetColors.textMuted
                         
                         EliteButton(
                             text = scanButtonText,
                             onClick = { viewModel.scanNetworkTopology() },
-                            color = scanButtonColor
+                            color = scanButtonColor,
+                            isEnabled = isConnected
+                        )
+                    }
+                }
+            }
+
+            if (!isConnected) {
+                Spacer(modifier = Modifier.height(12.dp))
+                EliteCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    glowColor = MeetColors.warning,
+                    backgroundColor = MeetColors.backgroundDark
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            "MAPEO TOPOLÓGICO REAL",
+                            color = MeetColors.warning,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Conecta BT clásico, BLE, WiFi ELM o DoIP; pon ignición en ON; luego MEET sondea ECUs físicas y solo dibuja módulos que contestan.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
                         )
                     }
                 }
@@ -358,10 +395,11 @@ fun TacticalNodeMap(
         
         // Define system positions for a "Tactical Bubble" layout
         val systemPositions = mapOf(
-            NetworkType.CAN_HIGH to Offset(centerX.value, centerY.value - 80f), // Top
-            NetworkType.CAN_LOW to Offset(centerX.value + 100f, centerY.value + 60f), // Bottom Right
+            NetworkType.CAN_HS to Offset(centerX.value, centerY.value - 80f), // Top
+            NetworkType.CAN_LS to Offset(centerX.value + 100f, centerY.value + 60f), // Bottom Right
             NetworkType.LIN to Offset(centerX.value - 100f, centerY.value + 60f), // Bottom Left
-            NetworkType.K_LINE to Offset(centerX.value, centerY.value + 120f) // Bottom Center
+            NetworkType.K_LINE to Offset(centerX.value, centerY.value + 120f), // Bottom Center
+            NetworkType.ETHERNET to Offset(centerX.value - 120f, centerY.value - 70f) // Upper Left
         )
 
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -371,9 +409,10 @@ fun TacticalNodeMap(
             systemPositions.forEach { (type, pos) ->
                 val target = Offset(pos.x.dp.toPx(), pos.y.dp.toPx())
                 val color = when(type) {
-                    NetworkType.CAN_HIGH -> MeetColors.electricBlue
-                    NetworkType.CAN_LOW -> MeetColors.neonGreen
+                    NetworkType.CAN_HS -> MeetColors.electricBlue
+                    NetworkType.CAN_LS -> MeetColors.neonGreen
                     NetworkType.LIN -> MeetColors.warning
+                    NetworkType.ETHERNET -> MeetColors.cyberCyan
                     else -> MeetColors.textSecondary
                 }
                 
@@ -428,7 +467,6 @@ fun TacticalNodeMap(
         }
 
         // ── Node Label Overlays with Glitch Effect ──
-        val density = LocalDensity.current
         modules.forEachIndexed { index, module ->
             val basePos = systemPositions[module.networkType] ?: Offset(centerX.value, centerY.value)
             val angle = (index * (360.0 / maxOf(1, modules.count { it.networkType == module.networkType }))) * (Math.PI / 180.0)
@@ -485,6 +523,7 @@ fun ModuleItem(module: NetworkModule, onSelect: (NetworkType) -> Unit) {
     val statusColor = if (!module.isAlive) MeetColors.error 
                       else if (module.dtcs.isNotEmpty()) MeetColors.warning 
                       else MeetColors.neonGreen
+    val idLabel = if (module.networkType == NetworkType.ETHERNET) "ADDR: ${module.id.uppercase()}" else "CAN ID: 0x${module.id.uppercase()}"
 
     val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -532,10 +571,17 @@ fun ModuleItem(module: NetworkModule, onSelect: (NetworkType) -> Unit) {
                         fontSize = 16.sp
                     )
                     Text(
-                        "CAN ID: 0x${module.id.uppercase()}",
+                        idLabel,
                         color = MeetColors.textSecondary,
                         style = MaterialTheme.typography.bodySmall
                     )
+                    if (!module.protocolDetected.isNullOrBlank()) {
+                        Text(
+                            module.protocolDetected,
+                            color = MeetColors.textMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
 
                 if (module.dtcs.isNotEmpty()) {
@@ -721,7 +767,7 @@ fun ObdPinoutConnector(
         
         // Interactive Pin Description Legend
         val activeDesc = when (selectedNetworkType) {
-            NetworkType.CAN_HIGH, NetworkType.CAN_LOW -> {
+            NetworkType.CAN_HS, NetworkType.CAN_LS -> {
                 "Red CAN Bus activa: Pines 6 (CAN H) y 14 (CAN L) bajo análisis. Masa en pines 4/5."
             }
             NetworkType.LIN -> {
@@ -729,6 +775,9 @@ fun ObdPinoutConnector(
             }
             NetworkType.K_LINE -> {
                 "Línea K activa: Pin 7 (ISO 9141-2 / K-Line) para diagnóstico directo."
+            }
+            NetworkType.ETHERNET -> {
+                "Gateway DoIP/Ethernet detectado: la ruta física depende del gateway y del OEM. MEET valida el servidor UDS real, no un nodo CAN simulado."
             }
             else -> {
                 "Toque un módulo o bus para ver la asignación de pines físicos en el puerto OBD-II."
@@ -756,12 +805,12 @@ fun getPinGlowColor(pinNum: Int, selectedNetworkType: NetworkType?): Color? {
     }
     
     return when (selectedNetworkType) {
-        NetworkType.CAN_HIGH -> {
+        NetworkType.CAN_HS -> {
             if (pinNum == 6) MeetColors.electricBlue
             else if (pinNum == 14) MeetColors.neonGreen.copy(alpha = 0.5f) // highlight CAN L slightly
             else null
         }
-        NetworkType.CAN_LOW -> {
+        NetworkType.CAN_LS -> {
             if (pinNum == 14) MeetColors.neonGreen
             else if (pinNum == 6) MeetColors.electricBlue.copy(alpha = 0.5f) // highlight CAN H slightly
             else null

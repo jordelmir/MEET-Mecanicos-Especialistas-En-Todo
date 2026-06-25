@@ -52,13 +52,27 @@ fun StyledGauge(
     customColorScheme: GaugeColorScheme? = null,
     customLabelColor: Color? = null,
     customUnitColor: Color? = null,
+    diyConfig: com.elysium369.meet.data.local.entities.SavedGaugeEntity? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val gaugeStyleManager = remember { GaugeStyleManager(context) }
     val trigger = GaugeStyleManager.colorSchemeUpdateTrigger
-    val colorScheme = remember(style, trigger, customColorScheme, customLabelColor, customUnitColor) {
-        val baseScheme = customColorScheme ?: gaugeStyleManager.getColorScheme(style)
+    val colorScheme = remember(style, trigger, customColorScheme, customLabelColor, customUnitColor, diyConfig) {
+        val baseScheme = if (style == GaugeStyleSet.CUSTOM_DIY && diyConfig != null) {
+            val primaryColor = Color(diyConfig.accentColor)
+            GaugeColorScheme(
+                bezelColor = Color(0xFF3E3E3E),
+                internalColor = primaryColor,
+                textColor = primaryColor,
+                needleColor = Color(diyConfig.accentColor),
+                specialColor = Color(diyConfig.accentColor2),
+                labelColor = primaryColor,
+                unitColor = primaryColor
+            )
+        } else {
+            customColorScheme ?: gaugeStyleManager.getColorScheme(style)
+        }
         baseScheme.copy(
             labelColor = customLabelColor ?: baseScheme.labelColor,
             unitColor = customUnitColor ?: baseScheme.unitColor
@@ -77,6 +91,7 @@ fun StyledGauge(
                 label = label, value = value, minVal = minVal, maxVal = maxVal,
                 unit = unit, warningThreshold = warningThreshold,
                 criticalThreshold = criticalThreshold, isAnomaly = isAnomaly,
+                diyConfig = diyConfig,
                 modifier = Modifier
             )
             GaugeStyleSet.ELITE -> GaugeWidget(

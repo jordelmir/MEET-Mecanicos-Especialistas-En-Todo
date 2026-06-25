@@ -20,13 +20,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.data.local.MechanicalKnowledgeBundle
 import com.elysium369.meet.ui.RepairNetworkViewModel
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteButton
-import com.elysium369.meet.ui.components.PhantomSectionHeader
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.components.neonGlow
+import org.json.JSONArray
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +36,7 @@ fun RepairNetworkScreen(navController: NavController, viewModel: RepairNetworkVi
     val searchQuery by viewModel.searchQuery.collectAsState()
     val casesList by viewModel.casesList.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val knowledgeBundle by viewModel.knowledgeBundle.collectAsState()
     
     // Local filter display state
     var showFilters by remember { mutableStateOf(false) }
@@ -106,6 +109,17 @@ fun RepairNetworkScreen(navController: NavController, viewModel: RepairNetworkVi
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
+
+            RepairNetworkWorkflowGuide(
+                currentQuery = searchQuery,
+                onQuickSearch = { viewModel.setSearchQuery(it) },
+                onContribute = { navController.navigate("contribute_case") },
+                onOpenMarketplace = { navController.navigate("marketplace") }
+            )
+
+            if (searchQuery.isNotBlank() || dtcFilter.isNotBlank()) {
+                RepairKnowledgePanel(bundle = knowledgeBundle)
+            }
 
             // Advanced Filters Panel (Expandable)
             if (showFilters) {
@@ -217,14 +231,13 @@ fun RepairNetworkScreen(navController: NavController, viewModel: RepairNetworkVi
                     CircularProgressIndicator(color = MeetColors.neonGreen)
                 }
             } else if (casesList.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No se encontraron casos de reparación.\nPrueba cambiando el filtro o contribuye un nuevo caso.",
-                        color = MeetColors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        fontSize = 14.sp
-                    )
-                }
+                RepairNetworkEmptyState(
+                    modifier = Modifier.weight(1f),
+                    hasQuery = searchQuery.isNotBlank() || dtcFilter.isNotBlank() || makeFilter.isNotBlank() || modelFilter.isNotBlank() || countryFilter.isNotBlank(),
+                    onClearFilters = { viewModel.clearFilters() },
+                    onContribute = { navController.navigate("contribute_case") },
+                    onOpenScanner = { navController.navigate("scanner") }
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -312,4 +325,228 @@ fun RepairNetworkScreen(navController: NavController, viewModel: RepairNetworkVi
             }
         }
     }
+}
+
+@Composable
+private fun RepairNetworkWorkflowGuide(
+    currentQuery: String,
+    onQuickSearch: (String) -> Unit,
+    onContribute: () -> Unit,
+    onOpenMarketplace: () -> Unit
+) {
+    EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = MeetColors.neonGreen,
+        backgroundColor = MeetColors.backgroundDeep,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "FLUJO CLIENTE → TALLER → CASO VERIFICADO",
+                color = MeetColors.neonGreen,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+            Text(
+                "Busca por síntoma, DTC o componente. Si ya tienes evidencia, publícala como caso; si necesitas cotización, abre una solicitud a talleres.",
+                color = MeetColors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QuickActionPill("Fuga de aceite", isActive = currentQuery == "fuga de aceite", modifier = Modifier.weight(1f)) { onQuickSearch("fuga de aceite") }
+                QuickActionPill("Alternador", isActive = currentQuery == "alternador no carga", modifier = Modifier.weight(1f)) { onQuickSearch("alternador no carga") }
+                QuickActionPill("Arranque lento", isActive = currentQuery == "arranque lento", modifier = Modifier.weight(1f)) { onQuickSearch("arranque lento") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                EliteButton(
+                    text = "PUBLICAR CASO",
+                    onClick = onContribute,
+                    color = MeetColors.neonGreen,
+                    modifier = Modifier.weight(1f)
+                )
+                EliteButton(
+                    text = "PEDIR COTIZACIÓN",
+                    onClick = onOpenMarketplace,
+                    color = MeetColors.electricBlue,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionPill(text: String, isActive: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (isActive) MeetColors.neonGreen.copy(alpha = 0.16f) else MeetColors.backgroundDark)
+            .border(1.dp, if (isActive) MeetColors.neonGreen else MeetColors.borderSubtle, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            color = if (isActive) Color.White else MeetColors.textSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun RepairKnowledgePanel(bundle: MechanicalKnowledgeBundle) {
+    val cards = buildList {
+        bundle.symptomGuides.firstOrNull()?.let {
+            add(Triple("GUÍA POR SÍNTOMA", it.title, firstPayloadHint(it.payloadJson, listOf("first_checks", "diagnostic_tree"))))
+        }
+        bundle.procedures.firstOrNull()?.let {
+            add(Triple("PROCEDIMIENTO", it.title, firstPayloadHint(it.payloadJson, listOf("removal_steps", "installation_steps", "post_install_tests"))))
+        }
+        bundle.rebuildGuides.firstOrNull()?.let {
+            add(Triple("RECONSTRUCCIÓN", it.componentId.replace('_', ' ').uppercase(), firstPayloadHint(it.payloadJson, listOf("bench_tests", "failure_signatures", "rebuild_steps"))))
+        }
+        bundle.trenchKnowledge.firstOrNull()?.let {
+            add(Triple("TACTICA DE TALLER", it.title, firstPayloadHint(it.payloadJson, listOf("escalation_ladder", "thread_repair_options"))))
+        }
+        bundle.chemicals.firstOrNull()?.let {
+            add(Triple("QUÍMICA AUTOMOTRIZ", it.name, firstPayloadHint(it.payloadJson, listOf("use_cases", "safe_materials", "unsafe_materials"))))
+        }
+        bundle.matrixLinks.firstOrNull()?.let {
+            add(Triple("MATRIZ DTC + COMPONENTE", it.componentName ?: (it.dtcCode ?: "Sin componente"), firstMatrixHint(it.layerDiagnosticsJson, it.layerTrenchKnowledgeJson)))
+        }
+    }
+
+    if (cards.isEmpty()) return
+
+    EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = MeetColors.cyberCyan,
+        backgroundColor = MeetColors.backgroundDeep,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "INTELIGENCIA OFFLINE MEET",
+                color = MeetColors.cyberCyan,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+            cards.forEach { (label, title, hint) ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MeetColors.backgroundDark, RoundedCornerShape(10.dp))
+                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(10.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(label, color = MeetColors.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    if (hint.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(hint, color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RepairNetworkEmptyState(
+    modifier: Modifier = Modifier,
+    hasQuery: Boolean,
+    onClearFilters: () -> Unit,
+    onContribute: () -> Unit,
+    onOpenScanner: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        EliteCard(
+            modifier = Modifier.fillMaxWidth(),
+            glowColor = MeetColors.warning,
+            backgroundColor = MeetColors.backgroundDeep,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "AÚN NO HAY UN CASO COMUNITARIO QUE COINCIDA",
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Puedes afinar la búsqueda, capturar evidencia desde el escáner o sembrar el primer caso verificado para la comunidad.",
+                    color = MeetColors.textSecondary,
+                    textAlign = TextAlign.Center,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+                if (hasQuery) {
+                    EliteButton(
+                        text = "LIMPIAR FILTROS",
+                        onClick = onClearFilters,
+                        color = MeetColors.electricBlue,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                EliteButton(
+                    text = "ABRIR ESCÁNER",
+                    onClick = onOpenScanner,
+                    color = MeetColors.neonGreen,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                EliteButton(
+                    text = "PUBLICAR CASO",
+                    onClick = onContribute,
+                    color = MeetColors.warning,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+private fun firstMatrixHint(diagnosticsJson: String, trenchJson: String): String {
+    val diag = firstPayloadHint(diagnosticsJson, listOf("diagnostic_steps", "confirmation_tests", "related_symptom_guides"))
+    if (diag.isNotBlank()) return diag
+    return firstPayloadHint(trenchJson, listOf("common_shop_notes", "related_trench_knowledge"))
+}
+
+private fun firstPayloadHint(payloadJson: String, keys: List<String>): String {
+    return runCatching {
+        val obj = JSONObject(payloadJson)
+        keys.firstNotNullOfOrNull { key ->
+            when (val value = obj.opt(key)) {
+                is JSONArray -> value.optString(0).takeIf { it.isNotBlank() }
+                is String -> value.takeIf { it.isNotBlank() }
+                is JSONObject -> value.keys().asSequence().firstOrNull()?.let { childKey ->
+                    value.opt(childKey)?.toString()?.takeIf { it.isNotBlank() }?.let { "$childKey: $it" }
+                }
+                else -> null
+            }
+        } ?: ""
+    }.getOrDefault("")
 }

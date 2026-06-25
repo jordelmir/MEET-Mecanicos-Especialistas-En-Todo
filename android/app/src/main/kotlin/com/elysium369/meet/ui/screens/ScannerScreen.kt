@@ -400,7 +400,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTab) {
-                0 -> ScannerDashboardTab(viewModel, isLandscape, defaultGauges)
+                0 -> ScannerDashboardTab(viewModel, isLandscape, defaultGauges, navController)
                 1 -> ScannerPerformanceTab(viewModel, isLandscape)
                 2 -> ScannerDiagnosticTab(viewModel, snackbarHostState, navController)
                 3 -> ScannerSensorsTab(viewModel, defaultGauges)

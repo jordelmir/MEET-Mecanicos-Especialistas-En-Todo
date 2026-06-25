@@ -41,9 +41,24 @@ import com.elysium369.meet.data.local.entities.DashboardWidgetEntity
 import com.elysium369.meet.ui.DashboardViewModel
 import com.elysium369.meet.ui.components.gauges.StyledGauge
 import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
+import com.elysium369.meet.ui.components.gauges.GaugeStyleSet
+import com.elysium369.meet.data.local.entities.SavedGaugeEntity
 import com.elysium369.meet.ui.components.WaveGraphWidget
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+
+data class DiyBgConfig(
+    val bgType: Int,
+    val bgPreset: Int,
+    val bgImageUri: String,
+    val accentColor: Color,
+    val accentColor2: Color,
+    val glowIntensity: Float,
+    val imageOpacity: Float
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,8 +70,9 @@ fun DashboardBuilderScreen(
     val currentDashboardId by viewModel.currentDashboardId.collectAsState()
     val widgets by viewModel.currentWidgets.collectAsState()
     val customPids by viewModel.customPids.collectAsState()
+    val savedGauges by viewModel.savedGauges.collectAsState()
     val widgetStates by viewModel.widgetStates.collectAsState()
-    
+
     val clipboardManager = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
 
@@ -66,8 +82,79 @@ fun DashboardBuilderScreen(
     var editingWidget by remember { mutableStateOf<DashboardWidgetEntity?>(null) }
     var previewMode by remember { mutableStateOf(false) }
     var isMoveMode by remember { mutableStateOf(false) }
-    
+
     val aiInsight by viewModel.aiInsight.collectAsState()
+
+    val context = LocalContext.current
+    val styleManager = remember { GaugeStyleManager(context) }
+    val diyTrigger = GaugeStyleManager.diyUpdateTrigger
+
+    val bgConfig = remember(widgets, savedGauges, diyTrigger) {
+        val targetWidget = widgets.firstOrNull { it.widgetStyle == "CUSTOM_DIY" && it.savedStyleId != null }
+        if (targetWidget != null) {
+            val savedStyle = savedGauges.find { it.id == targetWidget.savedStyleId }
+            if (savedStyle != null) {
+                DiyBgConfig(
+                    bgType = savedStyle.bgType,
+                    bgPreset = savedStyle.bgPresetIndex,
+                    bgImageUri = savedStyle.bgImageUri ?: "",
+                    accentColor = Color(savedStyle.accentColor),
+                    accentColor2 = Color(savedStyle.accentColor2),
+                    glowIntensity = savedStyle.glowIntensity,
+                    imageOpacity = savedStyle.imageOpacity
+                )
+            } else {
+                DiyBgConfig(
+                    bgType = styleManager.getDiyBgType(),
+                    bgPreset = styleManager.getDiyBgPresetIndex(),
+                    bgImageUri = styleManager.getDiyBgImageUri(),
+                    accentColor = Color(styleManager.getDiyAccentColor()),
+                    accentColor2 = Color(styleManager.getDiyAccentColor2()),
+                    glowIntensity = styleManager.getDiyGlowIntensity(),
+                    imageOpacity = styleManager.getDiyImageOpacity()
+                )
+            }
+        } else {
+            DiyBgConfig(
+                bgType = styleManager.getDiyBgType(),
+                bgPreset = styleManager.getDiyBgPresetIndex(),
+                bgImageUri = styleManager.getDiyBgImageUri(),
+                accentColor = Color(styleManager.getDiyAccentColor()),
+                accentColor2 = Color(styleManager.getDiyAccentColor2()),
+                glowIntensity = styleManager.getDiyGlowIntensity(),
+                imageOpacity = styleManager.getDiyImageOpacity()
+            )
+        }
+    }
+
+    // Shift Flash & RPM Critical Alerts
+    var prevRpm by remember { mutableStateOf(0f) }
+    val shiftFlashAlpha = remember { Animatable(0f) }
+
+    val rpmWidget = remember(widgets) { widgets.find { it.pid == "RPM" || it.name.uppercase() == "RPM" } }
+    val rpmValue = if (rpmWidget != null) widgetStates[rpmWidget.pid] ?: 0f else 0f
+    val rpmMax = rpmWidget?.maxVal ?: 8000f
+    val isRpmCritical = rpmWidget != null && rpmValue > rpmMax * 0.9f
+
+    LaunchedEffect(rpmValue) {
+        if (prevRpm > rpmMax * 0.6f && rpmValue < prevRpm - 1200f) {
+            shiftFlashAlpha.snapTo(0.6f)
+            shiftFlashAlpha.animateTo(0f, animationSpec = tween(350, easing = LinearEasing))
+        }
+        prevRpm = rpmValue
+    }
+
+    val rpmPulseTransition = rememberInfiniteTransition(label = "rpmPulse")
+    val rpmPulseAlpha by if (isRpmCritical) {
+        rpmPulseTransition.animateFloat(
+            initialValue = 0.1f,
+            targetValue = 0.6f,
+            animationSpec = infiniteRepeatable(tween(250, easing = LinearEasing), RepeatMode.Reverse),
+            label = "pulse"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
 
     Scaffold(
         topBar = {
@@ -230,7 +317,7 @@ fun DashboardBuilderScreen(
                             letterSpacing = 1.2.sp
                         )
                     }
-                    
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "BUFFER: 1024ms • CORE: v3.1.0 • LOAD: 14%",
@@ -249,7 +336,7 @@ fun DashboardBuilderScreen(
                         )
                     }
                 }
-                
+
                 // ── AI INSIGHT TICKER (WORLD-CLASS FEATURE) ──
                 Box(
                     modifier = Modifier
@@ -263,7 +350,7 @@ fun DashboardBuilderScreen(
                         animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing)),
                         label = "ticker"
                     )
-                    
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Psychology, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -287,8 +374,32 @@ fun DashboardBuilderScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            CyberBackground()
+            CyberBackground(config = bgConfig)
             GlobalScreenOverlay()
+
+            // RPM critical alert border/vignette overlay
+            if (rpmPulseAlpha > 0f) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.Transparent, Color.Red.copy(alpha = rpmPulseAlpha)),
+                            center = center,
+                            radius = size.maxDimension / 1.2f
+                        ),
+                        size = size
+                    )
+                }
+            }
+
+            // Shift Flash overlay
+            if (shiftFlashAlpha.value > 0f) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawRect(
+                        color = Color.White.copy(alpha = shiftFlashAlpha.value),
+                        size = size
+                    )
+                }
+            }
 
             if (widgets.isEmpty()) {
                 EmptyDashboardPlaceholder(onAdd = { showAddWidgetDialog = true })
@@ -299,36 +410,39 @@ fun DashboardBuilderScreen(
                     widgetStates = widgetStates,
                     previewMode = previewMode,
                     isMoveMode = isMoveMode,
+                    savedGauges = savedGauges,
                     onDelete = { viewModel.deleteWidget(it) },
                     onEdit = { editingWidget = it },
                     onMoveUp = { w -> val idx = sortedWidgets.indexOf(w); if (idx > 0) viewModel.swapWidgets(w, sortedWidgets[idx - 1]) },
                     onMoveDown = { w -> val idx = sortedWidgets.indexOf(w); if (idx < sortedWidgets.lastIndex) viewModel.swapWidgets(w, sortedWidgets[idx + 1]) },
-                    onToggleMoveMode = { 
+                    onToggleMoveMode = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        isMoveMode = !isMoveMode 
+                        isMoveMode = !isMoveMode
                     }
                 )
             }
-            
+
             if (showAddWidgetDialog || editingWidget != null) {
                 AddWidgetDialog(
                     customPids = customPids,
+                    savedGauges = savedGauges,
                     editingWidget = editingWidget,
-                    onAdd = { name, pid, type, min, max, unit, w, h, color ->
+                    onAdd = { name, pid, type, min, max, unit, w, h, color, wStyle, sStyleId ->
                         val currentEditing = editingWidget
                         if (currentEditing != null) {
                             viewModel.updateWidget(currentEditing.copy(
-                                name = name, pid = pid, type = type, 
+                                name = name, pid = pid, type = type,
                                 minVal = min, maxVal = max, unit = unit,
-                                gridW = w, gridH = h, color = color
+                                gridW = w, gridH = h, color = color,
+                                widgetStyle = wStyle, savedStyleId = sStyleId
                             ))
                             editingWidget = null
                         } else {
-                            viewModel.addWidget(name, pid, type, min, max, unit, w, h, color)
+                            viewModel.addWidget(name, pid, type, min, max, unit, w, h, color, wStyle, sStyleId)
                         }
                         showAddWidgetDialog = false
                     },
-                    onDismiss = { 
+                    onDismiss = {
                         showAddWidgetDialog = false
                         editingWidget = null
                     }
@@ -338,15 +452,15 @@ fun DashboardBuilderScreen(
                 DashboardSelectionDialog(
                     dashboards = dashboards,
                     currentId = currentDashboardId,
-                    onSelect = { 
+                    onSelect = {
                         viewModel.selectDashboard(it)
-                        showDashboardList = false 
+                        showDashboardList = false
                     },
-                    onCreate = { 
+                    onCreate = {
                         viewModel.createDashboard(it)
                         showDashboardList = false
                     },
-                    onClone = { id, name -> 
+                    onClone = { id, name ->
                         viewModel.cloneDashboard(id, name)
                         showDashboardList = false
                     },
@@ -357,7 +471,7 @@ fun DashboardBuilderScreen(
 
             if (showTemplatesDialog) {
                 TemplateSelectorDialog(
-                    onSelect = { 
+                    onSelect = {
                         viewModel.applyTemplate(it)
                         showTemplatesDialog = false
                     },
@@ -379,13 +493,13 @@ fun TemplateSelectorDialog(onSelect: (String) -> Unit, onDismiss: () -> Unit) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("DASHBOARD MASTER TEMPLATES", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 val templates = listOf(
                     "PERFORMANCE" to "Optimizado para telemetría de motor y velocidad.",
                     "DIAGNOSTIC" to "Focado en salud de sensores y ondas WAVE.",
                     "ECO" to "Eficiencia de combustible y carga híbrida/EV."
                 )
-                
+
                 templates.forEach { (title, desc) ->
                     Surface(
                         onClick = { onSelect(title) },
@@ -456,9 +570,9 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
                 modifier = Modifier.size(56.dp)
             )
         }
-        
+
         Spacer(modifier = Modifier.height(40.dp))
-        
+
         Text(
             "LIENZO VIRGEN DETECTADO",
             color = Color.White,
@@ -466,9 +580,9 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
             fontWeight = FontWeight.Black,
             letterSpacing = 2.sp
         )
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         Text(
             "Inicia la construcción de tu terminal de diagnóstico personalizada inyectando PIDs estándar o comandos OEM exclusivos.",
             color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
@@ -476,9 +590,9 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(48.dp))
-        
+
         Button(
             onClick = onAdd,
             colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen),
@@ -501,6 +615,7 @@ fun DashboardGrid(
     widgetStates: Map<String, Float>,
     previewMode: Boolean,
     isMoveMode: Boolean,
+    savedGauges: List<SavedGaugeEntity>,
     onDelete: (DashboardWidgetEntity) -> Unit,
     onEdit: (DashboardWidgetEntity) -> Unit,
     onMoveUp: (DashboardWidgetEntity) -> Unit,
@@ -548,10 +663,11 @@ fun DashboardGrid(
                             contentAlignment = Alignment.Center
                         ) {
                             WidgetCard(
-                                widget = widget, 
+                                widget = widget,
                                 liveValueExt = widgetStates[widget.pid],
                                 previewMode = previewMode,
                                 isMoveMode = isMoveMode,
+                                savedGauges = savedGauges,
                                 onDelete = { onDelete(widget) },
                                 onEdit = { onEdit(widget) },
                                 onMoveUp = { onMoveUp(widget) },
@@ -589,6 +705,7 @@ fun WidgetCard(
     liveValueExt: Float? = null,
     previewMode: Boolean,
     isMoveMode: Boolean,
+    savedGauges: List<SavedGaugeEntity>,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onMoveUp: () -> Unit,
@@ -600,7 +717,7 @@ fun WidgetCard(
     val currentStyle by gaugeStyleManager.currentStyle.collectAsState()
     val widgetColor = try { Color(android.graphics.Color.parseColor(widget.color)) } catch(e: Exception) { com.elysium369.meet.ui.theme.MeetColors.neonGreen }
     var simValue by remember { mutableFloatStateOf((widget.minVal + widget.maxVal) / 2f) }
-    
+
     // Live Value Arbitration: External Live > Preview Simulation > Default
     val liveValue = if (liveValueExt != null && !previewMode) {
         liveValueExt
@@ -609,15 +726,15 @@ fun WidgetCard(
     } else {
         (widget.minVal + widget.maxVal) / 2f
     }
-    
+
     // Check for sensor characteristics to apply customized premium spring dynamics
-    val isFastSensor = widget.pid == "010D" || widget.pid == "010C" || 
-                       widget.unit.equals("km/h", ignoreCase = true) || 
-                       widget.unit.equals("rpm", ignoreCase = true) || 
+    val isFastSensor = widget.pid == "010D" || widget.pid == "010C" ||
+                       widget.unit.equals("km/h", ignoreCase = true) ||
+                       widget.unit.equals("rpm", ignoreCase = true) ||
                        widget.unit.contains("hp", ignoreCase = true) ||
                        widget.unit.equals("bar", ignoreCase = true) ||
                        widget.unit.equals("%", ignoreCase = true) ||
-                       widget.name.contains("velocidad", ignoreCase = true) || 
+                       widget.name.contains("velocidad", ignoreCase = true) ||
                        widget.name.contains("speed", ignoreCase = true) ||
                        widget.name.contains("rpm", ignoreCase = true) ||
                        widget.name.contains("boost", ignoreCase = true) ||
@@ -634,7 +751,7 @@ fun WidgetCard(
         ),
         label = "widgetAnimation"
     )
-    
+
     // Simulation logic (only active in preview mode)
     if (previewMode) {
         LaunchedEffect(widget.pid) {
@@ -642,7 +759,7 @@ fun WidgetCard(
             while(true) {
                 kotlinx.coroutines.delay(50)
                 val elapsed = (System.currentTimeMillis() - startTime) / 1000f
-                
+
                 val value = when(widget.pid) {
                     "010C" -> 700f + (Math.sin(elapsed.toDouble() * 2).toFloat() * 100f) + (Math.random().toFloat() * 20f) // RPM
                     "0105" -> 90f + (Math.random().toFloat() * 2f) // Temp
@@ -666,7 +783,7 @@ fun WidgetCard(
     )
 
     val anomalyActive = liveValue > widget.maxVal * 0.9f
-    
+
     // Anomaly Glow Animation
     val anomalyInfinite = rememberInfiniteTransition(label = "anomaly")
     val anomalyAlpha by anomalyInfinite.animateFloat(
@@ -714,16 +831,16 @@ fun WidgetCard(
             .clip(RoundedCornerShape(16.dp))
             .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark)
             .border(
-                1.dp, 
-                if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning.copy(alpha = glowAlpha) 
+                1.dp,
+                if (isMoveMode) com.elysium369.meet.ui.theme.MeetColors.warning.copy(alpha = glowAlpha)
                 else if (anomalyActive) com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = anomalyAlpha)
-                else widgetColor.copy(alpha = 0.15f), 
+                else widgetColor.copy(alpha = 0.15f),
                 RoundedCornerShape(16.dp)
             )
-            .clickable { 
+            .clickable {
                 if (!isMoveMode) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEdit() 
+                    onEdit()
                 }
             }
     ) {
@@ -770,7 +887,7 @@ fun WidgetCard(
                         )
                     }
                 }
-                
+
                 if (isMoveMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = {
@@ -792,18 +909,21 @@ fun WidgetCard(
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onDelete()
                         },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                            .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.6f), CircleShape)
                     ) {
                         Icon(
-                            Icons.Default.Close,
+                            Icons.Default.Delete,
                             contentDescription = "Eliminar",
-                            tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.4f),
-                            modifier = Modifier.size(16.dp)
+                            tint = com.elysium369.meet.ui.theme.MeetColors.error,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
             }
-            
+
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -861,14 +981,25 @@ fun WidgetCard(
                     }
                     else -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val wStyle = remember(widget.widgetStyle, currentStyle) {
+                                if (!widget.widgetStyle.isNullOrEmpty()) {
+                                    try { GaugeStyleSet.valueOf(widget.widgetStyle) } catch (e: Exception) { currentStyle }
+                                } else {
+                                    currentStyle
+                                }
+                            }
+                            val diyConfig = remember(widget.savedStyleId, savedGauges) {
+                                savedGauges.find { it.id == widget.savedStyleId }
+                            }
                             StyledGauge(
-                                style = currentStyle,
+                                style = wStyle,
                                 label = "",
                                 value = animatedValue,
                                 minVal = widget.minVal,
                                 maxVal = widget.maxVal,
                                 unit = widget.unit,
                                 isAnomaly = anomalyActive,
+                                diyConfig = diyConfig,
                                 modifier = Modifier.size(if (widget.gridH > 1) 220.dp else 140.dp)
                             )
                             // Min/Max Bracket
@@ -967,8 +1098,9 @@ fun WidgetCard(
 @Composable
 fun AddWidgetDialog(
     customPids: List<com.elysium369.meet.data.local.entities.CustomPidEntity>,
+    savedGauges: List<SavedGaugeEntity>,
     editingWidget: DashboardWidgetEntity? = null,
-    onAdd: (String, String, String, Float, Float, String, Int, Int, String) -> Unit,
+    onAdd: (String, String, String, Float, Float, String, Int, Int, String, String?, String?) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -983,6 +1115,8 @@ fun AddWidgetDialog(
     var gridW by remember { mutableIntStateOf(editingWidget?.gridW ?: 2) }
     var gridH by remember { mutableIntStateOf(editingWidget?.gridH ?: 1) }
     var selectedColor by remember { mutableStateOf(editingWidget?.color ?: "#00FFCC") }
+    var widgetStyle by remember { mutableStateOf(editingWidget?.widgetStyle) }
+    var savedStyleId by remember { mutableStateOf(editingWidget?.savedStyleId) }
 
     val colors = listOf("#00FFCC", "#FF00FF", "#0088FF", "#FF8800", "#FF0000", "#AAFF00")
 
@@ -994,26 +1128,26 @@ fun AddWidgetDialog(
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
                 .border(
-                    1.dp, 
-                    Brush.verticalGradient(listOf(Color(selectedColor.toColor()).copy(alpha = 0.5f), Color.Transparent)), 
+                    1.dp,
+                    Brush.verticalGradient(listOf(Color(selectedColor.toColor()).copy(alpha = 0.5f), Color.Transparent)),
                     RoundedCornerShape(24.dp)
                 )
         ) {
             Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    if (editingWidget == null) "INYECTAR NUEVO MÓDULO" else "RECONFIGURAR MÓDULO", 
-                    color = Color.White, 
-                    fontWeight = FontWeight.Black, 
+                    if (editingWidget == null) "INYECTAR NUEVO MÓDULO" else "RECONFIGURAR MÓDULO",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
                     style = MaterialTheme.typography.titleMedium,
                     letterSpacing = 1.sp
                 )
-                
+
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ── REAL-TIME PREVIEW ──
                 Text("VISTA PREVIA EN VIVO", color = Color(selectedColor.toColor()).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1028,18 +1162,40 @@ fun AddWidgetDialog(
                         targetValue = maxVal.toFloatOrNull() ?: 100f,
                         animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing), RepeatMode.Reverse)
                     )
-                    
+
                     when (type) {
                         "WAVE" -> WaveGraphWidget(label = "", currentValue = previewValue, minVal = minVal.toFloatOrNull() ?: 0f, maxVal = maxVal.toFloatOrNull() ?: 100f, unit = unit, isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f)
                         "DIGITAL" -> Text(String.format("%.1f %s", previewValue, unit), color = Color(selectedColor.toColor()), fontSize = 32.sp, fontWeight = FontWeight.Black)
-                        else -> StyledGauge(style = currentStyle, label = "", value = previewValue, minVal = minVal.toFloatOrNull() ?: 0f, maxVal = maxVal.toFloatOrNull() ?: 100f, unit = unit, isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f, modifier = Modifier.size(140.dp))
+                        else -> {
+                            val wStyle = remember(widgetStyle, currentStyle) {
+                                if (!widgetStyle.isNullOrEmpty()) {
+                                    try { GaugeStyleSet.valueOf(widgetStyle!!) } catch (e: Exception) { currentStyle }
+                                } else {
+                                    currentStyle
+                                }
+                            }
+                            val diyConfig = remember(savedStyleId, savedGauges) {
+                                savedGauges.find { it.id == savedStyleId }
+                            }
+                            StyledGauge(
+                                style = wStyle,
+                                label = "",
+                                value = previewValue,
+                                minVal = minVal.toFloatOrNull() ?: 0f,
+                                maxVal = maxVal.toFloatOrNull() ?: 100f,
+                                unit = unit,
+                                isAnomaly = previewValue > (maxVal.toFloatOrNull() ?: 100f) * 0.9f,
+                                diyConfig = diyConfig,
+                                modifier = Modifier.size(140.dp)
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // PID Selection
                 var expanded by remember { mutableStateOf(false) }
                 Box {
@@ -1055,8 +1211,8 @@ fun AddWidgetDialog(
                         ) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = if (selectedPid == null) "Seleccionar Sensor..." 
-                                           else (PidRegistry.STANDARD_PIDS.find { "${it.mode}${it.pid}" == selectedPid }?.name 
+                                    text = if (selectedPid == null) "Seleccionar Sensor..."
+                                           else (PidRegistry.STANDARD_PIDS.find { "${it.mode}${it.pid}" == selectedPid }?.name
                                                  ?: customPids.find { it.id == selectedPid }?.name ?: "Desconocido"),
                                     color = if (selectedPid == null) MeetColors.textMuted else Color.White,
                                     modifier = Modifier.weight(1f),
@@ -1066,7 +1222,7 @@ fun AddWidgetDialog(
                             }
                         }
                     }
-                    
+
                     DropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
@@ -1074,7 +1230,7 @@ fun AddWidgetDialog(
                     ) {
                         PidRegistry.STANDARD_PIDS.forEach { pid ->
                             DropdownMenuItem(
-                                text = { 
+                                text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(modifier = Modifier.size(8.dp).background(if(pid.isPremium) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.textSecondary, CircleShape))
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -1096,9 +1252,9 @@ fun AddWidgetDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
                     label = { Text("ETIQUETA", fontSize = 10.sp) },
@@ -1112,13 +1268,131 @@ fun AddWidgetDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Text("ESTILO DE VISUALIZACIÓN", color = Color(selectedColor.toColor()), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WidgetTypeButton(label = "GAUGE", selected = type == "GAUGE", icon = Icons.Default.Speed, color = Color(selectedColor.toColor()), onClick = { type = "GAUGE" }, modifier = Modifier.weight(1f))
                     WidgetTypeButton(label = "WAVE", selected = type == "WAVE", icon = Icons.Default.Timeline, color = Color(selectedColor.toColor()), onClick = { type = "WAVE" }, modifier = Modifier.weight(1f))
                     WidgetTypeButton(label = "DIGITAL", selected = type == "DIGITAL", icon = Icons.Default.Numbers, color = Color(selectedColor.toColor()), onClick = { type = "DIGITAL" }, modifier = Modifier.weight(1f))
+                }
+
+                if (type == "GAUGE") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("ESTILO DE GAUGE", color = Color(selectedColor.toColor()), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    var styleExpanded by remember { mutableStateOf(false) }
+                    val activeStyleText = if (widgetStyle == null) "ESTILO PREESTABLECIDO POR DEFECTO" else widgetStyle
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Surface(
+                            onClick = { styleExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderBlue)
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = activeStyleText ?: "Por defecto",
+                                    color = Color.White,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = styleExpanded,
+                            onDismissRequest = { styleExpanded = false },
+                            modifier = Modifier.background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark).fillMaxWidth(0.7f).heightIn(max = 280.dp)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("DASHBOARD DEFAULT (GLOBAL)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                                onClick = {
+                                    widgetStyle = null
+                                    styleExpanded = false
+                                }
+                            )
+                            GaugeStyleSet.values().forEach { styleOption ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(styleOption.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            if (styleOption == GaugeStyleSet.CUSTOM_DIY) {
+                                                Text("Usa tus diseños personalizados guardados", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary, fontSize = 9.sp)
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        widgetStyle = styleOption.name
+                                        if (styleOption != GaugeStyleSet.CUSTOM_DIY) {
+                                            savedStyleId = null
+                                        }
+                                        styleExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (widgetStyle == GaugeStyleSet.CUSTOM_DIY.name) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("DISEÑO PERSONALIZADO DIY", color = Color(selectedColor.toColor()), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        var diyExpanded by remember { mutableStateOf(false) }
+                        val activeDiyText = if (savedStyleId == null) "SELECCIONAR DISEÑO GUARDADO..."
+                                            else (savedGauges.find { it.id == savedStyleId }?.name ?: "Diseño Desconocido")
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Surface(
+                                onClick = { diyExpanded = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderBlue)
+                            ) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = activeDiyText,
+                                        color = if (savedStyleId == null) MeetColors.textMuted else Color.White,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = diyExpanded,
+                                onDismissRequest = { diyExpanded = false },
+                                modifier = Modifier.background(com.elysium369.meet.ui.theme.MeetColors.backgroundDark).fillMaxWidth(0.7f).heightIn(max = 200.dp)
+                            ) {
+                                if (savedGauges.isEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text("No tienes diseños DIY guardados", color = MeetColors.textMuted, fontSize = 12.sp) },
+                                        onClick = { diyExpanded = false }
+                                    )
+                                } else {
+                                    savedGauges.forEach { savedGauge ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Column {
+                                                    Text(savedGauge.name.ifEmpty { "Sin nombre" }, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                    Text("Creado: ${savedGauge.createdAt}", color = com.elysium369.meet.ui.theme.MeetColors.textSecondary, fontSize = 9.sp)
+                                                }
+                                            },
+                                            onClick = {
+                                                savedStyleId = savedGauge.id
+                                                diyExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1149,12 +1423,18 @@ fun AddWidgetDialog(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 Button(
                     onClick = {
                         val pid = selectedPid
                         if (pid != null && name.isNotEmpty()) {
-                            onAdd(name, pid, type, minVal.toFloatOrNull() ?: 0f, maxVal.toFloatOrNull() ?: 100f, unit, gridW, gridH, selectedColor)
+                            onAdd(
+                                name, pid, type,
+                                minVal.toFloatOrNull() ?: 0f,
+                                maxVal.toFloatOrNull() ?: 100f,
+                                unit, gridW, gridH, selectedColor,
+                                widgetStyle, savedStyleId
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -1242,16 +1522,16 @@ fun DashboardSelectionDialog(
                     Box(modifier = Modifier.size(4.dp, 20.dp).background(com.elysium369.meet.ui.theme.MeetColors.neonGreen))
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        "CENTRAL DE DASHBOARDS", 
-                        color = Color.White, 
-                        fontWeight = FontWeight.Black, 
+                        "CENTRAL DE DASHBOARDS",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
                         style = MaterialTheme.typography.titleMedium,
                         letterSpacing = 1.sp
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 350.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1263,7 +1543,7 @@ fun DashboardSelectionDialog(
                             color = if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.1f) else com.elysium369.meet.ui.theme.MeetColors.backgroundDeep,
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(
-                                1.dp, 
+                                1.dp,
                                 if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else Color.Transparent
                             )
                         ) {
@@ -1289,7 +1569,7 @@ fun DashboardSelectionDialog(
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
-                                
+
                                 IconButton(onClick = { onClone(db.id, "${db.name} (CLON)") }, modifier = Modifier.size(24.dp)) {
                                     Icon(Icons.Default.ContentCopy, contentDescription = "Clonar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                 }
@@ -1302,9 +1582,9 @@ fun DashboardSelectionDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 if (isCreating) {
                     OutlinedTextField(
                         value = newDashboardName,
@@ -1345,25 +1625,205 @@ fun DashboardSelectionDialog(
 }
 
 @Composable
-fun CyberBackground() {
+fun CyberBackground(config: DiyBgConfig) {
+    val context = LocalContext.current
+    val bitmap = remember(config.bgImageUri) {
+        if (config.bgType == 2 && config.bgImageUri.isNotEmpty()) {
+            try {
+                if (config.bgImageUri.startsWith("/")) {
+                    BitmapFactory.decodeFile(config.bgImageUri)?.asImageBitmap()
+                } else {
+                    val uri = android.net.Uri.parse(config.bgImageUri)
+                    val stream = context.contentResolver.openInputStream(uri)
+                    val bmp = BitmapFactory.decodeStream(stream)
+                    stream?.close()
+                    bmp?.asImageBitmap()
+                }
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val gridSize = 40.dp.toPx()
-        val color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.03f)
-        
-        // Main Grid
-        for (x in 0..size.width.toInt() step gridSize.toInt()) {
-            drawLine(color, start = androidx.compose.ui.geometry.Offset(x.toFloat(), 0f), end = androidx.compose.ui.geometry.Offset(x.toFloat(), size.height), strokeWidth = 1f)
-        }
-        for (y in 0..size.height.toInt() step gridSize.toInt()) {
-            drawLine(color, start = androidx.compose.ui.geometry.Offset(0f, y.toFloat()), end = androidx.compose.ui.geometry.Offset(size.width, y.toFloat()), strokeWidth = 1f)
+        when (config.bgType) {
+            1 -> { // Presets
+                when (config.bgPreset) {
+                    0 -> { // Metal cepillado
+                        drawRect(
+                            brush = Brush.sweepGradient(
+                                colors = listOf(Color(0xFF2C3E50), Color(0xFFBDC3C7), Color(0xFF2C3E50), Color(0xFFBDC3C7), Color(0xFF2C3E50)),
+                                center = center
+                            ),
+                            size = size
+                        )
+                    }
+                    1 -> { // Fibra de carbono
+                        drawRect(Color(0xFF15181E))
+                        val carbonGrid = 16.dp.toPx()
+                        for (x in 0..size.width.toInt() step carbonGrid.toInt()) {
+                            drawLine(Color.Black.copy(alpha = 0.4f), androidx.compose.ui.geometry.Offset(x.toFloat(), 0f), androidx.compose.ui.geometry.Offset(x.toFloat(), size.height), 1f)
+                            drawLine(Color.White.copy(alpha = 0.04f), androidx.compose.ui.geometry.Offset(x.toFloat() + carbonGrid/2, 0f), androidx.compose.ui.geometry.Offset(x.toFloat() + carbonGrid/2, size.height), 0.5f)
+                        }
+                        for (y in 0..size.height.toInt() step carbonGrid.toInt()) {
+                            drawLine(Color.Black.copy(alpha = 0.4f), androidx.compose.ui.geometry.Offset(0f, y.toFloat()), androidx.compose.ui.geometry.Offset(size.width, y.toFloat()), 1f)
+                            drawLine(Color.White.copy(alpha = 0.04f), androidx.compose.ui.geometry.Offset(0f, y.toFloat() + carbonGrid/2), androidx.compose.ui.geometry.Offset(size.width, y.toFloat() + carbonGrid/2), 0.5f)
+                        }
+                    }
+                    2 -> { // Rejilla Cyber
+                        drawRect(Color(0xFF030A16))
+                        val gridSize = 40.dp.toPx()
+                        val cyberColor = config.accentColor.copy(alpha = 0.05f)
+                        for (x in 0..size.width.toInt() step gridSize.toInt()) {
+                            drawLine(cyberColor, androidx.compose.ui.geometry.Offset(x.toFloat(), 0f), androidx.compose.ui.geometry.Offset(x.toFloat(), size.height), 1.5f)
+                        }
+                        for (y in 0..size.height.toInt() step gridSize.toInt()) {
+                            drawLine(cyberColor, androidx.compose.ui.geometry.Offset(0f, y.toFloat()), androidx.compose.ui.geometry.Offset(size.width, y.toFloat()), 1.5f)
+                        }
+                    }
+                    3 -> { // Espacio cósmico
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF1E0D35), Color(0xFF060312)),
+                                center = center,
+                                radius = size.maxDimension
+                            )
+                        )
+                        val rand = java.util.Random(12345)
+                        for (i in 0..24) {
+                            val sx = rand.nextFloat() * size.width
+                            val sy = rand.nextFloat() * size.height
+                            val r = rand.nextFloat() * 1.5f + 1f
+                            drawCircle(Color.White.copy(alpha = rand.nextFloat() * 0.7f + 0.3f), r, androidx.compose.ui.geometry.Offset(sx, sy))
+                        }
+                    }
+                    4 -> { // Lava volcánica
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF4A0000), Color(0xFF1A0000), Color(0xFF0A0000)),
+                                center = center,
+                                radius = size.maxDimension / 1.2f
+                            )
+                        )
+                        val lavaRand = java.util.Random(6789)
+                        val crackColor = Color(0xFFFF4500).copy(alpha = 0.25f)
+                        for (i in 0..6) {
+                            val sx = lavaRand.nextFloat() * size.width
+                            val sy = lavaRand.nextFloat() * size.height
+                            val ex = lavaRand.nextFloat() * size.width
+                            val ey = lavaRand.nextFloat() * size.height
+                            drawLine(crackColor, androidx.compose.ui.geometry.Offset(sx, sy), androidx.compose.ui.geometry.Offset(ex, ey), 1.5f)
+                        }
+                    }
+                    5 -> { // Placa de circuito
+                        drawRect(Color(0xFF0A0E14))
+                        val circuitColor = config.accentColor.copy(alpha = 0.07f)
+                        val circRand = java.util.Random(4321)
+                        for (i in 0..12) {
+                            val startY = circRand.nextFloat() * size.height
+                            val startX = 0f
+                            val midX = circRand.nextFloat() * size.width * 0.6f
+                            val endX = size.width
+                            val angleY = startY + (if (circRand.nextBoolean()) 60f else -60f)
+
+                            drawLine(circuitColor, androidx.compose.ui.geometry.Offset(startX, startY), androidx.compose.ui.geometry.Offset(midX, startY), 2f)
+                            drawLine(circuitColor, androidx.compose.ui.geometry.Offset(midX, startY), androidx.compose.ui.geometry.Offset(midX + 60f, angleY), 2f)
+                            drawLine(circuitColor, androidx.compose.ui.geometry.Offset(midX + 60f, angleY), androidx.compose.ui.geometry.Offset(endX, angleY), 2f)
+
+                            drawCircle(config.accentColor.copy(alpha = 0.2f), 4.dp.toPx(), androidx.compose.ui.geometry.Offset(midX, startY))
+                            drawCircle(config.accentColor.copy(alpha = 0.2f), 4.dp.toPx(), androidx.compose.ui.geometry.Offset(midX + 60f, angleY))
+                        }
+                    }
+                    6 -> { // Panal de abeja
+                        drawRect(Color(0xFF0D1117))
+                        val hexColor = config.accentColor.copy(alpha = 0.05f)
+                        val hexRadius = 24.dp.toPx()
+                        val wGrid = hexRadius * kotlin.math.sqrt(3f)
+                        val hHeight = hexRadius * 1.5f
+                        for (row in 0..(size.height / hHeight).toInt() + 1) {
+                            for (col in 0..(size.width / wGrid).toInt() + 1) {
+                                val cx = col * wGrid + (if (row % 2 == 1) wGrid / 2f else 0f)
+                                val cy = row * hHeight
+                                val path = androidx.compose.ui.graphics.Path()
+                                for (j in 0..5) {
+                                    val angle = j * (kotlin.math.PI / 3f)
+                                    val px = cx + hexRadius * kotlin.math.cos(angle).toFloat()
+                                    val py = cy + hexRadius * kotlin.math.sin(angle).toFloat()
+                                    if (j == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                                }
+                                path.close()
+                                drawPath(path, hexColor, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                            }
+                        }
+                    }
+                    else -> { // Nebulosa galáctica
+                        drawRect(Color(0xFF060312))
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF4A148C).copy(alpha = 0.3f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                radius = size.maxDimension / 1.2f
+                            ),
+                            size = size
+                        )
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFE91E63).copy(alpha = 0.2f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.4f),
+                                radius = size.maxDimension / 1.2f
+                            ),
+                            size = size
+                        )
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF1A237E).copy(alpha = 0.3f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.3f, size.height),
+                                radius = size.maxDimension / 1.2f
+                            ),
+                            size = size
+                        )
+                    }
+                }
+            }
+            2 -> { // User image background
+                bitmap?.let { bmp ->
+                    drawImage(
+                        image = bmp,
+                        dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+                    )
+                    drawRect(
+                        color = Color.Black.copy(alpha = (1f - config.imageOpacity) * 0.95f),
+                        size = size
+                    )
+                } ?: run {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(config.accentColor.copy(alpha = 0.08f), Color(0xFF1F2937), Color(0xFF111827)),
+                            center = center,
+                            radius = size.maxDimension / 1.1f
+                        ),
+                        size = size
+                    )
+                }
+            }
+            else -> { // Gradient
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(config.accentColor.copy(alpha = 0.08f), Color(0xFF1F2937), Color(0xFF111827)),
+                        center = center,
+                        radius = size.maxDimension / 1.1f
+                    ),
+                    size = size
+                )
+            }
         }
 
-        // Radial Vignette
+        // Vignette
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
                 center = center,
-                radius = size.maxDimension / 1.5f
+                radius = size.maxDimension / 1.4f
             ),
             size = size
         )

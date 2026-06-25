@@ -474,6 +474,52 @@ class GaugeStyleManager(context: Context) {
         diyUpdateTrigger++
     }
 
+    fun saveDiyBgImageUri(context: Context, uri: android.net.Uri): Boolean {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return false
+            val filesDir = context.filesDir
+            // Delete previous DIY background images
+            filesDir.listFiles()?.forEach { file ->
+                if (file.name.startsWith("diy_bg_image_")) {
+                    file.delete()
+                }
+            }
+
+            // Write to local file with unique name
+            val localFile = java.io.File(filesDir, "diy_bg_image_${System.currentTimeMillis()}.png")
+            val outputStream = java.io.FileOutputStream(localFile)
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            prefs.edit().putString("diy_bg_image_uri", localFile.absolutePath).apply()
+            diyUpdateTrigger++
+            return true
+        } catch (e: Exception) {
+            android.util.Log.e("GaugeStyleManager", "Error saving local background image copy: ${e.message}")
+            return false
+        }
+    }
+
+    fun clearDiyBgImage() {
+        val currentUri = getDiyBgImageUri()
+        if (currentUri.isNotEmpty() && currentUri.startsWith("/")) {
+            try {
+                val file = java.io.File(currentUri)
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("GaugeStyleManager", "Error deleting local image file: ${e.message}")
+            }
+        }
+        prefs.edit().putString("diy_bg_image_uri", "").apply()
+        saveDiyBgType(0) // Reset to Default Gradient
+        diyUpdateTrigger++
+    }
+
     fun getDiyBezelStyle(): Int = prefs.getInt("diy_bezel_style", 0)
     fun saveDiyBezelStyle(value: Int) {
         prefs.edit().putInt("diy_bezel_style", value).apply()
@@ -528,6 +574,97 @@ class GaugeStyleManager(context: Context) {
     fun getDiyAnimation(): Int = prefs.getInt("diy_animation", 0)
     fun saveDiyAnimation(value: Int) {
         prefs.edit().putInt("diy_animation", value).apply()
+        diyUpdateTrigger++
+    }
+
+    fun getDiyTypography(): Int = prefs.getInt("diy_typography", 0)
+    fun saveDiyTypography(value: Int) {
+        prefs.edit().putInt("diy_typography", value).apply()
+        diyUpdateTrigger++
+    }
+
+    // ── DIY CONFIG EXPORT / IMPORT ──
+
+    /** Serialize all DIY parameters into a shareable GaugeConfig */
+    fun exportDiyConfig(): com.elysium369.meet.data.local.entities.GaugeConfig {
+        return com.elysium369.meet.data.local.entities.GaugeConfig(
+            name = getDiyGaugeName(),
+            bgType = getDiyBgType(),
+            bgPresetIndex = getDiyBgPresetIndex(),
+            bezelStyle = getDiyBezelStyle(),
+            needleStyle = getDiyNeedleStyle(),
+            ticksStyle = getDiyTicksStyle(),
+            accentColor = getDiyAccentColor(),
+            accentColor2 = getDiyAccentColor2(),
+            glowIntensity = getDiyGlowIntensity(),
+            imageOpacity = getDiyImageOpacity(),
+            animationIndex = getDiyAnimation(),
+            typographyIndex = getDiyTypography()
+        )
+    }
+
+    /** Apply an external GaugeConfig to the current DIY parameters */
+    fun importDiyConfig(config: com.elysium369.meet.data.local.entities.GaugeConfig) {
+        prefs.edit()
+            .putString("diy_gauge_name", config.name)
+            .putInt("diy_bg_type", config.bgType)
+            .putInt("diy_bg_preset_index", config.bgPresetIndex)
+            .putInt("diy_bezel_style", config.bezelStyle)
+            .putInt("diy_needle_style", config.needleStyle)
+            .putInt("diy_ticks_style", config.ticksStyle)
+            .putInt("diy_accent_color", config.accentColor)
+            .putInt("diy_accent_color2", config.accentColor2)
+            .putFloat("diy_glow_intensity", config.glowIntensity)
+            .putFloat("diy_image_opacity", config.imageOpacity)
+            .putInt("diy_animation", config.animationIndex)
+            .putInt("diy_typography", config.typographyIndex)
+            .apply()
+        diyUpdateTrigger++
+    }
+
+    /** Export current DIY to a SavedGaugeEntity ready for Room insertion */
+    fun exportToSavedEntity(
+        id: String = java.util.UUID.randomUUID().toString(),
+        name: String? = null
+    ): com.elysium369.meet.data.local.entities.SavedGaugeEntity {
+        val now = System.currentTimeMillis()
+        return com.elysium369.meet.data.local.entities.SavedGaugeEntity(
+            id = id,
+            name = name ?: getDiyGaugeName().ifEmpty { "Mi Gauge" },
+            bgType = getDiyBgType(),
+            bgPresetIndex = getDiyBgPresetIndex(),
+            bgImageUri = getDiyBgImageUri(),
+            bezelStyle = getDiyBezelStyle(),
+            needleStyle = getDiyNeedleStyle(),
+            ticksStyle = getDiyTicksStyle(),
+            accentColor = getDiyAccentColor(),
+            accentColor2 = getDiyAccentColor2(),
+            glowIntensity = getDiyGlowIntensity(),
+            imageOpacity = getDiyImageOpacity(),
+            animationIndex = getDiyAnimation(),
+            typographyIndex = getDiyTypography(),
+            createdAt = now,
+            updatedAt = now
+        )
+    }
+
+    /** Import a saved gauge entity back into the active DIY config */
+    fun importFromSavedEntity(entity: com.elysium369.meet.data.local.entities.SavedGaugeEntity) {
+        prefs.edit()
+            .putString("diy_gauge_name", entity.name)
+            .putInt("diy_bg_type", entity.bgType)
+            .putInt("diy_bg_preset_index", entity.bgPresetIndex)
+            .putString("diy_bg_image_uri", entity.bgImageUri)
+            .putInt("diy_bezel_style", entity.bezelStyle)
+            .putInt("diy_needle_style", entity.needleStyle)
+            .putInt("diy_ticks_style", entity.ticksStyle)
+            .putInt("diy_accent_color", entity.accentColor)
+            .putInt("diy_accent_color2", entity.accentColor2)
+            .putFloat("diy_glow_intensity", entity.glowIntensity)
+            .putFloat("diy_image_opacity", entity.imageOpacity)
+            .putInt("diy_animation", entity.animationIndex)
+            .putInt("diy_typography", entity.typographyIndex)
+            .apply()
         diyUpdateTrigger++
     }
 }

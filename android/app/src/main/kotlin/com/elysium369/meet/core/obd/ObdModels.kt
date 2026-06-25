@@ -103,3 +103,92 @@ data class DtcAnalysis(
 )
 
 class ObdConnectionException(message: String) : Exception(message)
+
+// ═══════════════════════════════════════════════
+// MODE $05 — O2 SENSOR MONITORING TEST RESULTS
+// ═══════════════════════════════════════════════
+
+/**
+ * Result of an individual O2 Sensor Test from Mode $05 (pre-CAN vehicles).
+ * Each test measures a specific characteristic of the oxygen sensor.
+ */
+data class O2SensorTestResult(
+    val sensorId: String,           // e.g. "B1S1", "B2S2"
+    val bank: Int,                  // 1 or 2
+    val sensorNumber: Int,          // 1-4
+    val testId: Int,                // TID 01-09
+    val testDescription: String,    // Human-readable test name
+    val testDescriptionEs: String,  // Spanish description
+    val value: Float,               // Measured value
+    val minLimit: Float?,           // Lower threshold
+    val maxLimit: Float?,           // Upper threshold
+    val unit: String,               // "V", "ms", etc.
+    val passed: Boolean             // Within limits
+)
+
+// ═══════════════════════════════════════════════
+// MODE $02 — FREEZE FRAME ENTRY (for UI display)
+// ═══════════════════════════════════════════════
+
+/**
+ * A single parsed Freeze Frame parameter for display in the UI.
+ */
+data class FreezeFrameEntry(
+    val pid: String,        // e.g. "0D"
+    val name: String,       // e.g. "Vehicle Speed"
+    val nameEs: String,     // e.g. "Velocidad del Vehículo"
+    val value: String,      // Formatted value with unit
+    val rawValue: Float?,   // Numeric value if applicable
+    val unit: String,       // e.g. "km/h", "°C"
+    val icon: String = "📊" // Emoji icon for the parameter
+)
+
+// ═══════════════════════════════════════════════
+// UDS — UNIFIED DIAGNOSTIC SERVICES RESULTS
+// ═══════════════════════════════════════════════
+
+/**
+ * Result of a UDS Read Data By Identifier ($22) operation.
+ */
+data class UdsReadResult(
+    val did: String,            // Data Identifier (e.g. "F190")
+    val didName: String,        // Human-readable name
+    val rawHex: String,         // Raw hex data
+    val decodedValue: String,   // Decoded/formatted value
+    val success: Boolean
+)
+
+/**
+ * DTC entry from UDS Service $19 with extended status information.
+ */
+data class UdsDtcEntry(
+    val code: String,           // e.g. "P0300"
+    val statusByte: Int,        // Full status byte
+    val isConfirmed: Boolean,   // Bit 3
+    val isActive: Boolean,      // Bit 0 (testFailed)
+    val isPending: Boolean,     // Bit 2 (pendingDTC)
+    val isPermanent: Boolean,   // Bit 4
+    val warningIndicator: Boolean // Bit 7 (warning lamp)
+)
+
+/**
+ * Categorized DTC lists separated by type for UI display.
+ */
+data class CategorizedDtcs(
+    val confirmed: List<Pair<String, String>> = emptyList(),   // Mode $03
+    val pending: List<Pair<String, String>> = emptyList(),     // Mode $07
+    val permanent: List<Pair<String, String>> = emptyList()    // Mode $0A
+)
+
+/**
+ * Supported UDS Services discovered from the ECU.
+ */
+data class UdsCapabilities(
+    val supportsExtendedSession: Boolean = false,
+    val supportsIOControl: Boolean = false,
+    val supportsRoutineControl: Boolean = false,
+    val supportsReadByIdentifier: Boolean = false,
+    val supportsSecurityAccess: Boolean = false,
+    val supportsCommunicationControl: Boolean = false,
+    val discoveredDids: List<String> = emptyList()
+)

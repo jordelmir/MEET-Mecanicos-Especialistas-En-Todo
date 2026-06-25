@@ -119,7 +119,9 @@ data class ServiceRequestEntity(
     val radiusKm: Double,
     val status: String,            // OPEN, ACCEPTED, COMPLETED, CANCELLED
     val autoDtcCode: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    val escrowStatus: String? = "NONE", // "NONE", "HELD", "RELEASED", "REFUNDED"
+    val paymentId: String? = null
 )
 
 @Entity(tableName = "service_bids")

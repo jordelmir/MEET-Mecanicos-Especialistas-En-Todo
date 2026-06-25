@@ -57,7 +57,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         // Blind fallback for silent clones
         if (!isValidIdResponse(idResponse)) {
             val blindTest = sendWithTimeout("0100\r", 3000)
-            if (blindTest.contains("4100") || blindTest.contains("41 00")) {
+            if (isPositivePidSupportResponse(blindTest)) {
                 idResponse = "ELM327 v1.5 (Silent Clone)"
             } else {
                 throw ObdConnectionException("Adaptador no responde. Verifica el encendido.")
@@ -70,9 +70,8 @@ class ElmNegotiator(private val transport: TransportInterface) {
         // Test for STN specific support
         val stiResponse = sendWithTimeout("STI\r", 800)
         val isSTN = stiResponse.contains("STN", true) || idResponse.contains("STN", true) || idResponse.contains("vLinker", true)
+        val negotiationDelay = if (isClone) 60L else 30L
 
-        val baseDelay = if (isClone) 30L else 15L
-        
         Log.i(TAG, "Adapter Identified: $chipVersion | Clone=$isClone | STN=$isSTN")
         onProgress("Adaptador: $chipVersion")
 
@@ -81,15 +80,17 @@ class ElmNegotiator(private val transport: TransportInterface) {
         transport.drain()
 
         // 4. Initial AT Configuration
-        val initSequence = buildInitSequence(isClone, isSTN)
+        val initSequence = buildInitSequence(isSTN)
         for (cmd in initSequence) {
             sendWithTimeout("$cmd\r", 800)
-            delay(baseDelay)
+            delay(negotiationDelay)
         }
 
         // 5. Protocol Negotiation
         onProgress("Buscando protocolo del vehículo...")
-        val protocol = sweepProtocols(hintProtocol, isClone, baseDelay, onProgress)
+        val protocol = sweepProtocols(hintProtocol, negotiationDelay, onProgress)
+        val baseDelay = runtimeBaseDelay(protocol, isClone)
+        applyRuntimeSettings(protocol, isClone)
 
         Log.i(TAG, "═══ NEGOTIATION SUCCESS ═══ Protocol: ${protocol.displayName}")
         
@@ -105,7 +106,6 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
     private suspend fun sweepProtocols(
         hint: ObdProtocol,
-        isClone: Boolean,
         baseDelay: Long,
         onProgress: (String) -> Unit
     ): ObdProtocol {
@@ -115,7 +115,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
             sendWithTimeout("ATSP${hint.atspCode}\r", 1000)
             delay(baseDelay)
             val resp = sendWithTimeout("0100\r", 4000)
-            if (resp.contains("4100") || resp.contains("41 00")) {
+            if (isPositivePidSupportResponse(resp)) {
                 return hint
             }
             Log.w(TAG, "Hint protocol ${hint.name} failed, falling back to auto-search")
@@ -130,7 +130,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         for (attempt in 1..2) {
             onProgress("Auto-detectando protocolo ($attempt/2)...")
             val resp = sendWithTimeout("0100\r", 5000)
-            if (resp.contains("4100") || resp.contains("41 00")) {
+            if (isPositivePidSupportResponse(resp)) {
                 return detectActiveProtocol()
             }
             if (resp.contains("UNABLE") || resp.contains("ERROR")) break
@@ -146,7 +146,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
             sendWithTimeout("ATSP$pCode\r", 1000)
             delay(baseDelay)
             val resp = sendWithTimeout("0100\r", 3000)
-            if (resp.contains("4100") || resp.contains("41 00")) {
+            if (isPositivePidSupportResponse(resp)) {
                 return detectActiveProtocol()
             }
         }
@@ -169,25 +169,68 @@ class ElmNegotiator(private val transport: TransportInterface) {
         return ObdProtocol.values().find { it.atspCode == protocolCode } ?: ObdProtocol.AUTO
     }
 
-    private fun buildInitSequence(isClone: Boolean, isSTN: Boolean): List<String> = buildList {
+    private fun buildInitSequence(isSTN: Boolean): List<String> = buildList {
         add("ATE0") // Echo off
         add("ATL0") // Linefeeds off
         add("ATS0") // Spaces off
         add("ATH0") // Headers off
         add("ATCAF1") // CAN Auto Formatting on
-        
-        if (isClone) {
-            add("ATAT2") // Adaptive Timing 2 (Aggressive) — faster polling even on clones
-            add("ATST32") // Set Timeout 128ms (was 256ms) — CAN responds in 50-200ms
-        } else {
-            add("ATAT2") // Adaptive Timing 2 (Aggressive)
-            add("ATST19") // Set Timeout ~100ms for pro adapters
-        }
+        add("ATAT1") // Conservative adaptive timing while the vehicle protocol is unknown.
+        add("ATSTFF") // Give slow ISO/KWP/J1850 ECUs enough time during detection.
 
         if (isSTN) {
             add("ST AT 1") // STN Advanced Timing
             add("STP31")   // Optimization
             add("STPBR 1") // Baud rate optimization
+        }
+    }
+
+    private fun isPositivePidSupportResponse(resp: String): Boolean {
+        val clean = resp.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+        if (clean.contains("NODATA") || clean.contains("UNABLE") || clean.contains("ERROR") || clean == "?") {
+            return false
+        }
+        return clean.contains("4100")
+    }
+
+    private fun runtimeBaseDelay(protocol: ObdProtocol, isClone: Boolean): Long {
+        val isLegacy = protocol in setOf(
+            ObdProtocol.ISO9141,
+            ObdProtocol.KWP2000,
+            ObdProtocol.KWP2000_FAST,
+            ObdProtocol.J1850_PWM,
+            ObdProtocol.J1850_VPW
+        )
+        return when {
+            isLegacy && isClone -> 90L
+            isLegacy -> 55L
+            isClone -> 45L
+            else -> 20L
+        }
+    }
+
+    private suspend fun applyRuntimeSettings(protocol: ObdProtocol, isClone: Boolean) {
+        val isCan = protocol.name.contains("CAN") || protocol.displayName.contains("CAN", ignoreCase = true)
+        val isLegacy = protocol in setOf(
+            ObdProtocol.ISO9141,
+            ObdProtocol.KWP2000,
+            ObdProtocol.KWP2000_FAST,
+            ObdProtocol.J1850_PWM,
+            ObdProtocol.J1850_VPW
+        )
+        val timeout = when {
+            isLegacy -> "ATST96" // ~600ms for slow legacy ECUs.
+            isClone -> "ATST64"  // ~400ms keeps clones stable without feeling sluggish.
+            else -> "ATST32"     // ~200ms for genuine CAN/STN/OBDLink-style adapters.
+        }
+
+        sendWithTimeout("ATAT1\r", 800)
+        sendWithTimeout("$timeout\r", 800)
+        sendWithTimeout("ATH0\r", 800)
+        sendWithTimeout("ATCAF1\r", 800)
+        sendWithTimeout("ATCRA\r", 800)
+        if (isCan) {
+            sendWithTimeout("ATSH7DF\r", 800)
         }
     }
 
@@ -204,6 +247,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
     private fun parseChipVersion(raw: String): String {
         return raw.replace(">", "").replace("\r", "").replace("\n", "").trim()
+            .ifBlank { "ELM327-compatible adapter" }
     }
 
     private suspend fun sendWithTimeout(cmd: String, timeoutMs: Long): String {

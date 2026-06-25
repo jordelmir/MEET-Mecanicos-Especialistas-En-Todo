@@ -29,8 +29,7 @@ import java.util.Locale
 fun TripScreen(
     trips: List<TripEntity>,
     isPremium: Boolean,
-    onExportPdf: (TripEntity) -> Unit,
-    onGenerateMockTrip: () -> Unit
+    onExportPdf: (TripEntity) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -38,14 +37,7 @@ fun TripScreen(
         topBar = {
             EliteTopAppBar(
                 title = "Viajes Eco",
-                subtitle = "Telemetría y Eficiencia",
-                actions = {
-                    EliteIconButton(
-                        icon = { Text("⚡", color = MeetColors.neonGreen, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-                        onClick = onGenerateMockTrip,
-                        glowColor = MeetColors.neonGreen
-                    )
-                }
+                subtitle = "Telemetría y Eficiencia"
             )
         },
         containerColor = MeetColors.backgroundDeep
@@ -113,7 +105,7 @@ fun TripScreen(
                         }
                         Spacer(Modifier.height(24.dp))
                         Text(
-                            text = "Sin Viajes Registrados",
+                            text = "Sin Viajes Reales Registrados",
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                             fontSize = 20.sp,
@@ -121,19 +113,41 @@ fun TripScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "Los viajes se registran automáticamente cuando el adaptador OBD2 detecta que el motor está encendido y el vehículo está en marcha.",
+                            text = "Los viajes se registran automáticamente cuando el adaptador OBD2 detecta motor encendido, vehículo en marcha y una sesión real activa.",
                             color = MeetColors.textSecondary,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
-                        Spacer(Modifier.height(32.dp))
-                        EliteButton(
-                            text = "SIMULAR VIAJE ECO",
-                            onClick = onGenerateMockTrip,
-                            color = MeetColors.neonGreen,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Spacer(Modifier.height(24.dp))
+                        EliteCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            glowColor = MeetColors.borderBlue.copy(alpha = 0.12f),
+                            borderColor = MeetColors.borderBlue.copy(alpha = 0.28f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(18.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "CAPTURA REAL",
+                                    color = MeetColors.borderBlue,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 12.sp,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "1. Conecta el adaptador OBD.\n2. Enciende el vehículo.\n3. Conduce con la sesión activa.\n4. MEET guardará el trayecto automáticamente.",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
                     }
                 }
             } else {

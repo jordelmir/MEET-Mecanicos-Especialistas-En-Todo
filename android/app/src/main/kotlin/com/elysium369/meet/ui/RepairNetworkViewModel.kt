@@ -2,6 +2,8 @@ package com.elysium369.meet.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elysium369.meet.data.local.MechanicalKnowledgeBundle
+import com.elysium369.meet.data.local.MechanicalKnowledgeRepository
 import com.elysium369.meet.data.supabase.RepairCase
 import com.elysium369.meet.data.supabase.RepairComment
 import com.elysium369.meet.data.supabase.RepairCaseRepository
@@ -13,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class RepairNetworkViewModel @Inject constructor(
-    private val repository: RepairCaseRepository
+    private val repository: RepairCaseRepository,
+    private val mechanicalKnowledgeRepository: MechanicalKnowledgeRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -45,6 +48,9 @@ class RepairNetworkViewModel @Inject constructor(
 
     private val _casesList = MutableStateFlow<List<RepairCase>>(emptyList())
     val casesList = _casesList.asStateFlow()
+
+    private val _knowledgeBundle = MutableStateFlow(emptyKnowledgeBundle())
+    val knowledgeBundle = _knowledgeBundle.asStateFlow()
 
     val savedCases: StateFlow<List<RepairCase>> = repository.getSavedCases()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -87,6 +93,16 @@ class RepairNetworkViewModel @Inject constructor(
     fun setDtcFilter(dtc: String) { _dtcFilter.value = dtc }
     fun setSortByFilter(sort: String) { _sortByFilter.value = sort }
     fun setOnlyVerifiedFilter(verified: Boolean) { _onlyVerifiedFilter.value = verified }
+    fun clearFilters() {
+        _searchQuery.value = ""
+        _makeFilter.value = ""
+        _modelFilter.value = ""
+        _yearFilter.value = null
+        _countryFilter.value = ""
+        _dtcFilter.value = ""
+        _sortByFilter.value = "votes"
+        _onlyVerifiedFilter.value = false
+    }
 
     fun refreshSearch() {
         triggerSearch(
@@ -104,6 +120,15 @@ class RepairNetworkViewModel @Inject constructor(
             _isLoading.value = true
             val results = repository.searchCases(query, make, model, year, country, dtc, sort, verified)
             _casesList.value = results
+            val knowledgeQuery = listOf(query, dtc, make, model)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .joinToString(" ")
+            _knowledgeBundle.value = if (knowledgeQuery.isBlank()) {
+                emptyKnowledgeBundle()
+            } else {
+                mechanicalKnowledgeRepository.search(knowledgeQuery)
+            }
             _isLoading.value = false
         }
     }
@@ -216,4 +241,15 @@ class RepairNetworkViewModel @Inject constructor(
             else -> "Usuario"
         }
     }
+
+    private fun emptyKnowledgeBundle() = MechanicalKnowledgeBundle(
+        safetyProtocols = emptyList(),
+        symptomGuides = emptyList(),
+        procedures = emptyList(),
+        rebuildGuides = emptyList(),
+        trenchKnowledge = emptyList(),
+        chemicals = emptyList(),
+        tools = emptyList(),
+        matrixLinks = emptyList()
+    )
 }

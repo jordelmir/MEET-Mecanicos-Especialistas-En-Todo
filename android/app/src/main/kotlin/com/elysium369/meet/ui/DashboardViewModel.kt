@@ -19,6 +19,7 @@ import javax.inject.Inject
 class DashboardViewModel @Inject constructor(
     private val dashboardDao: DashboardDao,
     private val customPidDao: CustomPidDao,
+    private val savedGaugeDao: com.elysium369.meet.data.local.dao.SavedGaugeDao,
     private val obdSession: com.elysium369.meet.core.obd.ObdSession,
     private val gemini: com.elysium369.meet.core.ai.GeminiDiagnostic
 ) : ViewModel() {
@@ -33,6 +34,9 @@ class DashboardViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val savedGauges: StateFlow<List<com.elysium369.meet.data.local.entities.SavedGaugeEntity>> = savedGaugeDao.getAllFlow()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val currentWidgets: StateFlow<List<DashboardWidgetEntity>> = _currentDashboardId
@@ -55,7 +59,7 @@ class DashboardViewModel @Inject constructor(
                 createMasterTemplate("PERFORMANCE PRO")
             }
         }
-        
+
         // Periodic AI Insight Generation based on live data
         viewModelScope.launch {
             obdSession.liveData.collectLatest { data ->
@@ -77,7 +81,7 @@ class DashboardViewModel @Inject constructor(
         val id = UUID.randomUUID().toString()
         dashboardDao.insertDashboard(DashboardEntity(id, name, true))
         _currentDashboardId.value = id
-        
+
         // Inyectar widgets profesionales
         val templates = listOf(
             Triple("RPM MOTOR", "010C", "GAUGE"),
@@ -85,7 +89,7 @@ class DashboardViewModel @Inject constructor(
             Triple("TEMP COOLANT", "0105", "WAVE"),
             Triple("CARGA MOTOR", "0104", "DIGITAL")
         )
-        
+
         templates.forEachIndexed { i, (n, p, t) ->
             dashboardDao.insertWidget(
                 DashboardWidgetEntity(
@@ -151,13 +155,15 @@ class DashboardViewModel @Inject constructor(
         unit: String,
         gridW: Int = 2,
         gridH: Int = 1,
-        color: String = "#00FFCC"
+        color: String = "#00FFCC",
+        widgetStyle: String? = null,
+        savedStyleId: String? = null
     ) {
         val dashboardId = _currentDashboardId.value ?: return
         viewModelScope.launch {
             val widgets = currentWidgets.value
             val gridY = if (widgets.isEmpty()) 0 else widgets.maxOf { it.gridY } + 1
-            
+
             dashboardDao.insertWidget(
                 DashboardWidgetEntity(
                     dashboardId = dashboardId,
@@ -171,7 +177,9 @@ class DashboardViewModel @Inject constructor(
                     color = color,
                     minVal = minVal,
                     maxVal = maxVal,
-                    unit = unit
+                    unit = unit,
+                    widgetStyle = widgetStyle,
+                    savedStyleId = savedStyleId
                 )
             )
         }
@@ -209,7 +217,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             val newId = UUID.randomUUID().toString()
             dashboardDao.insertDashboard(DashboardEntity(newId, newName))
-            
+
             // Get original widgets and clone them
             dashboardDao.getWidgetsForDashboardSync(originalId).forEach { widget ->
                 dashboardDao.insertWidget(widget.copy(id = 0, dashboardId = newId))
@@ -220,27 +228,30 @@ class DashboardViewModel @Inject constructor(
 
     fun exportCurrentLayout(): String {
         val widgets = currentWidgets.value
-        return "MEET_LAYOUT_V1\n" + widgets.joinToString("\n") { 
-            "${it.name}|${it.pid}|${it.type}|${it.gridW}|${it.gridH}|${it.color}|${it.minVal}|${it.maxVal}|${it.unit}"
+        return "MEET_LAYOUT_V2\n" + widgets.joinToString("\n") {
+            "${it.name}|${it.pid}|${it.type}|${it.gridW}|${it.gridH}|${it.color}|${it.minVal}|${it.maxVal}|${it.unit}|${it.widgetStyle.orEmpty()}|${it.savedStyleId.orEmpty()}"
         }
     }
 
     fun importLayout(data: String) {
         val lines = data.split("\n")
         if (lines.isEmpty() || !lines[0].startsWith("MEET_LAYOUT")) return
-        
+        val isV2 = lines[0].startsWith("MEET_LAYOUT_V2")
+
         val dashboardId = _currentDashboardId.value ?: return
-        
+
         viewModelScope.launch {
             // Optional: Clear current widgets or create a new dashboard for the import
             // For "PRO" we'll create a new dashboard called "IMPORTED_LAYOUT"
             val newDashboardId = UUID.randomUUID().toString()
             dashboardDao.insertDashboard(DashboardEntity(newDashboardId, "IMPORTADO_${System.currentTimeMillis().toString().takeLast(4)}"))
             _currentDashboardId.value = newDashboardId
-            
+
             lines.drop(1).forEachIndexed { index, line ->
                 val parts = line.split("|")
                 if (parts.size >= 9) {
+                    val wStyle = if (isV2 && parts.size >= 10 && parts[9].isNotEmpty()) parts[9] else null
+                    val sStyleId = if (isV2 && parts.size >= 11 && parts[10].isNotEmpty()) parts[10] else null
                     dashboardDao.insertWidget(
                         DashboardWidgetEntity(
                             dashboardId = newDashboardId,
@@ -254,7 +265,9 @@ class DashboardViewModel @Inject constructor(
                             color = parts[5],
                             minVal = parts[6].toFloatOrNull() ?: 0f,
                             maxVal = parts[7].toFloatOrNull() ?: 100f,
-                            unit = parts[8]
+                            unit = parts[8],
+                            widgetStyle = wStyle,
+                            savedStyleId = sStyleId
                         )
                     )
                 }

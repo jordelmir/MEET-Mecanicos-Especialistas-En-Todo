@@ -3,6 +3,14 @@ package com.elysium369.meet.ui.components
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 
 object DtcUtils {
+    private val dtcDatabaseManufacturers = setOf(
+        "ACURA", "AUDI", "BMW", "BUICK", "CADILLAC", "CHEVY", "CHRYSLER",
+        "DODGE", "FORD", "GENERIC", "GEO", "GM", "GMC", "HONDA", "INFINITI",
+        "JAGUAR", "JEEP", "KIA", "LEXUS", "LINCOLN", "MAZDA", "MERCEDES",
+        "MERCURY", "MITSUBISHI", "NISSAN", "OLDSMOBILE", "OTHER", "PLYMOUTH",
+        "PONTIAC", "SATURN", "SUBARU", "SUZUKI", "TOYOTA", "VOLKSWAGEN"
+    )
+
     fun getDynamicDtcFallbackDescription(code: String, isSpanish: Boolean): String {
         if (code.length < 5) {
             return if (isSpanish) "Código de diagnóstico del sistema." else "System diagnostic code."
@@ -89,24 +97,51 @@ object DtcUtils {
     fun normalizeManufacturer(make: String?): String {
         if (make.isNullOrBlank()) return "GENERIC"
         val clean = make.trim().uppercase()
-        return when {
-            clean.contains("TOYOTA") || clean.contains("LEXUS") || clean.contains("SCION") -> "TOYOTA"
-            clean.contains("HONDA") || clean.contains("ACURA") -> "HONDA"
-            clean.contains("NISSAN") || clean.contains("INFINITI") -> "NISSAN"
-            clean.contains("FORD") || clean.contains("LINCOLN") || clean.contains("MERCURY") -> "FORD"
-            clean.contains("CHEVROLET") || clean.contains("CHEVY") || clean.contains("GMC") || clean.contains("CADILLAC") || clean.contains("BUICK") || clean.contains("GM") || clean.contains("GENERAL MOTORS") -> "CHEVROLET"
-            clean.contains("VOLKSWAGEN") || clean.contains("VW") || clean.contains("AUDI") || clean.contains("SEAT") || clean.contains("SKODA") || clean.contains("PORSCHE") -> "VOLKSWAGEN"
-            clean.contains("HYUNDAI") || clean.contains("KIA") -> "HYUNDAI"
-            clean.contains("CHRYSLER") || clean.contains("DODGE") || clean.contains("JEEP") || clean.contains("RAM") || clean.contains("STELLANTIS") || clean.contains("FIAT") || clean.contains("ALFA") -> "CHRYSLER"
+        val direct = when {
+            clean.contains("CHEVROLET") || clean.contains("CHEVY") -> "CHEVY"
+            clean.contains("MERCEDES") || clean.contains("BENZ") || clean == "MB" -> "MERCEDES"
+            clean.contains("VOLKSWAGEN") || clean == "VW" -> "VOLKSWAGEN"
+            clean.contains("ACURA") -> "ACURA"
+            clean.contains("HONDA") -> "HONDA"
+            clean.contains("LEXUS") -> "LEXUS"
+            clean.contains("TOYOTA") || clean.contains("SCION") -> "TOYOTA"
+            clean.contains("INFINITI") -> "INFINITI"
+            clean.contains("NISSAN") -> "NISSAN"
+            clean.contains("LINCOLN") -> "LINCOLN"
+            clean.contains("MERCURY") -> "MERCURY"
+            clean.contains("FORD") -> "FORD"
+            clean.contains("GMC") -> "GMC"
+            clean.contains("CADILLAC") -> "CADILLAC"
+            clean.contains("BUICK") -> "BUICK"
+            clean.contains("PONTIAC") -> "PONTIAC"
+            clean.contains("OLDSMOBILE") -> "OLDSMOBILE"
+            clean.contains("SATURN") -> "SATURN"
+            clean.contains("GEO") -> "GEO"
+            clean.contains("GENERAL MOTORS") || clean == "GM" -> "GM"
+            clean.contains("PLYMOUTH") -> "PLYMOUTH"
+            clean.contains("CHRYSLER") -> "CHRYSLER"
+            clean.contains("DODGE") || clean.contains("RAM") -> "DODGE"
+            clean.contains("JEEP") -> "JEEP"
+            clean.contains("AUDI") -> "AUDI"
+            clean.contains("PORSCHE") || clean.contains("SEAT") || clean.contains("SKODA") -> "VOLKSWAGEN"
+            clean.contains("KIA") -> "KIA"
+            clean.contains("HYUNDAI") -> "OTHER"
             clean.contains("MAZDA") -> "MAZDA"
             clean.contains("SUBARU") -> "SUBARU"
             clean.contains("MITSUBISHI") -> "MITSUBISHI"
-            clean.contains("VOLVO") -> "VOLVO"
-            clean.contains("LAND ROVER") || clean.contains("RANGE ROVER") || clean.contains("JAGUAR") -> "LAND ROVER"
-            clean.contains("MERCEDES") || clean.contains("BENZ") || clean.contains("MB") -> "MERCEDES"
-            clean.contains("RENAULT") -> "RENAULT"
-            clean.contains("PEUGEOT") || clean.contains("CITROEN") || clean.contains("PSA") -> "PEUGEOT"
+            clean.contains("SUZUKI") -> "SUZUKI"
+            clean.contains("JAGUAR") || clean.contains("LAND ROVER") || clean.contains("RANGE ROVER") -> "JAGUAR"
+            clean.contains("BMW") || clean.contains("MINI") -> "BMW"
             else -> clean
+        }
+
+        if (direct in dtcDatabaseManufacturers) return direct
+
+        return when {
+            clean.contains("STELLANTIS") || clean.contains("FIAT") || clean.contains("ALFA") -> "CHRYSLER"
+            clean.contains("VOLVO") || clean.contains("RENAULT") || clean.contains("PEUGEOT") ||
+                clean.contains("CITROEN") || clean.contains("PSA") -> "OTHER"
+            else -> "GENERIC"
         }
     }
 

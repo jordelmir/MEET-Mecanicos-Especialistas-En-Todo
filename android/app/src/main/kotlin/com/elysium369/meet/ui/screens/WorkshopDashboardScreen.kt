@@ -113,6 +113,31 @@ fun WorkshopDashboardScreen(
                 }
             }
 
+            item {
+                EliteCard(
+                    glowColor = MeetColors.cyberCyan,
+                    borderColor = MeetColors.borderSubtle,
+                    backgroundColor = MeetColors.backgroundDeep,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "CÓMO GANAR OFERTAS SIN ADIVINAR",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Responde con diagnóstico probable, rango realista de horas, qué incluye la garantía y si el precio contempla escaneo, desmontaje o repuestos. Una oferta clara filtra clientes y evita retrabajos.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
             // ── Quick Toolbar (Schedule / Chats / Statistics) ──
             item {
                 Row(
@@ -168,7 +193,7 @@ fun WorkshopDashboardScreen(
                 item {
                     Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            "No hay solicitudes de servicio activas en tu zona.",
+                            "No hay solicitudes activas en tu zona.\nCuando lleguen, prioriza las que traen síntoma claro, DTC y evidencia mínima.",
                             color = MeetColors.textMuted,
                             textAlign = TextAlign.Center,
                             fontSize = 13.sp
@@ -260,6 +285,12 @@ fun WorkshopDashboardScreen(
                 title = { Text("Enviar Oferta de Servicio", color = Color.White) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Entrega una oferta útil: valor, tiempo, garantía y la lógica de diagnóstico que vas a seguir.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
                         OutlinedTextField(
                             value = bidPrice,
                             onValueChange = { bidPrice = it },
@@ -275,9 +306,16 @@ fun WorkshopDashboardScreen(
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
                         )
                         OutlinedTextField(
+                            value = bidWarranty,
+                            onValueChange = { bidWarranty = it },
+                            label = { Text("Garantía (días)", color = MeetColors.textSecondary) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
+                        )
+                        OutlinedTextField(
                             value = bidMessage,
                             onValueChange = { bidMessage = it },
-                            label = { Text("Mensaje / Observaciones", color = MeetColors.textSecondary) },
+                            label = { Text("Mensaje / plan de diagnóstico", color = MeetColors.textSecondary) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
                         )

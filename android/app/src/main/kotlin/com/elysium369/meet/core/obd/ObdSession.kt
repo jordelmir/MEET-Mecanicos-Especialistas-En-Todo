@@ -27,20 +27,51 @@ enum class ObdState {
  * and robust ELM327/STN initialization.
  */
 enum class NetworkType {
-    CAN_HIGH,
-    CAN_LOW,
-    LIN,
-    K_LINE,
+    CAN_HS,      // CAN High-Speed (500 kbps, ISO 11898-2)
+    CAN_MS,      // CAN Mid-Speed (125-250 kbps)
+    CAN_LS,      // CAN Low-Speed (33-125 kbps, ISO 11519-2)
+    CAN_FD,      // CAN FD (Flexible Data-rate, 2-8 Mbps)
+    LIN,         // Local Interconnect Network (19.2 kbps)
+    K_LINE,      // ISO 9141-2 / ISO 14230 (KWP2000)
+    FLEXRAY,     // FlexRay (10 Mbps)
+    MOST,        // Media Oriented Systems Transport
+    ETHERNET,    // Automotive Ethernet (100BASE-T1)
+    SINGLE_WIRE, // GMLAN Single Wire CAN (33.33 kbps)
+    UNKNOWN
+}
+
+/** Physical addressing mode used to communicate with the ECU */
+enum class AddressingType {
+    CAN_11BIT,   // Standard 11-bit CAN ID (ISO 15765-4)
+    CAN_29BIT,   // Extended 29-bit CAN ID (ISO 15765-4)
+    KWP_FAST,    // KWP2000 Fast Init (ISO 14230)
+    KWP_SLOW,    // KWP2000 5-baud Init (ISO 14230)
+    ISO9141,     // ISO 9141-2
     UNKNOWN
 }
 
 data class NetworkModule(
-    val id: String,
-    val name: String,
-    val isAlive: Boolean,
-    val networkType: NetworkType = NetworkType.CAN_HIGH,
-    val latencyMs: Long = 0,
-    val dtcs: List<String> = emptyList()
+    val id: String,                          // CAN ID (e.g. "7E0") or ECU address
+    val name: String,                        // Human-readable name
+    val isAlive: Boolean,                    // Responded to ping
+    val networkType: NetworkType = NetworkType.CAN_HS,
+    val addressing: AddressingType = AddressingType.CAN_11BIT,
+    val latencyMs: Long = 0,                 // Response time in ms
+    val dtcs: List<String> = emptyList(),     // Active DTCs on this ECU
+    // ── Real ECU identification data ──
+    val responseId: String = "",             // ECU response CAN ID (e.g. "7E8")
+    val supportedPids: List<String> = emptyList(), // PIDs that responded
+    val ecuPartNumber: String? = null,       // From UDS $22 F187
+    val ecuSoftwareVersion: String? = null,  // From UDS $22 F189
+    val ecuHardwareVersion: String? = null,  // From UDS $22 F191
+    val ecuSerialNumber: String? = null,     // From UDS $22 F18C
+    val vinFromEcu: String? = null,          // VIN read from this specific ECU
+    val supportsUds: Boolean = false,        // Responded to UDS $10/$22
+    val supportedUdsServices: List<String> = emptyList(), // e.g. ["10","22","31"]
+    val calibrationId: String? = null,       // Calibration ID (Mode $09 InfoType 04)
+    val cvn: String? = null,                 // Calibration Verification Number
+    val busSpeed: String? = null,            // Detected bus speed
+    val protocolDetected: String? = null     // ELM protocol string
 )
 
 /** Callback for real-time OBD traffic monitoring */
@@ -222,23 +253,34 @@ class ObdSession(
 
     private var targetAddress: String? = null
     private var isDoIpMode = false
+    private val bluetoothMacRegex = Regex("(?i)^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     fun setTargetAddress(address: String) {
-        this.targetAddress = address
+        val normalizedAddress = address.trim()
+        this.targetAddress = normalizedAddress
         transport?.let { old ->
             scope.launch { runCatching { old.disconnect() } }
         }
 
-        isDoIpMode = address.contains(":13400")
+        val isBleAddress = normalizedAddress.startsWith("ble://", ignoreCase = true)
+        val bleMac = normalizedAddress.substringAfter("://", missingDelimiterValue = "")
+        val isBluetoothMac = bluetoothMacRegex.matches(normalizedAddress)
+        val networkAddress = normalizedAddress.removePrefix("tcp://")
+        isDoIpMode = !isBluetoothMac && !isBleAddress && networkAddress.endsWith(":13400")
 
-        if (address.contains(".") || address.contains(":") || address.startsWith("192.168.")) {
-            val parts = address.split(":")
-            val ip = parts.getOrNull(0) ?: "192.168.0.10"
-            val port = parts.getOrNull(1)?.toIntOrNull() ?: if (isDoIpMode) 13400 else 35000
+        if (isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac)) {
+            val device = bluetoothAdapter.getRemoteDevice(bleMac)
+            transport = BleTransport(context, device)
+        } else if (!isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":"))) {
+            val separatorIndex = networkAddress.lastIndexOf(':').takeIf { it > 0 }
+            val ip = separatorIndex?.let { networkAddress.substring(0, it) } ?: networkAddress
+            val port = separatorIndex
+                ?.let { networkAddress.substring(it + 1).toIntOrNull() }
+                ?: if (isDoIpMode) 13400 else 35000
             transport = WifiTransport(ip, port)
         } else {
             if (bluetoothAdapter != null) {
-                transport = BtClassicTransport(address, bluetoothAdapter)
+                transport = BtClassicTransport(normalizedAddress, bluetoothAdapter)
             }
         }
     }
@@ -993,48 +1035,292 @@ class ObdSession(
         }
         _isScanningTopology.value = true
         val discovered = mutableListOf<NetworkModule>()
+        _networkTopology.value = emptyList()
 
-        // Standard CAN IDs (11-bit) for physical addressing
-        val targetNodes = mapOf(
-            "7E0" to ("Engine Control Module (ECM)" to NetworkType.CAN_HIGH),
-            "7E1" to ("Transmission Control Module (TCM)" to NetworkType.CAN_HIGH),
-            "7E2" to ("Anti-lock Braking System (ABS)" to NetworkType.CAN_HIGH),
-            "7E3" to ("Supplemental Restraint System (SRS)" to NetworkType.CAN_LOW),
-            "7E4" to ("Body Control Module (BCM)" to NetworkType.CAN_LOW),
-            "7E5" to ("Instrument Cluster (IPC)" to NetworkType.CAN_LOW),
-            "7E6" to ("HVAC Module" to NetworkType.LIN),
-            "7E7" to ("Power Steering Control Module" to NetworkType.CAN_HIGH),
-            "7E8" to ("ECM Secondary" to NetworkType.CAN_HIGH),
-            "7E9" to ("Hybrid/EV Battery Pack" to NetworkType.CAN_HIGH),
-            "7EA" to ("Active Suspension" to NetworkType.CAN_HIGH),
-            "7EB" to ("Gateway Module" to NetworkType.CAN_HIGH)
+        if (isDoIpMode) {
+            try {
+                _statusMessage.value = "Sondeando gateway DoIP ISO 13400..."
+                val startTime = System.currentTimeMillis()
+                val sessionResp = sendRawCommand("1001")
+                val isAlive = sessionResp.isNotBlank() &&
+                        !sessionResp.contains("NO DATA", ignoreCase = true) &&
+                        !sessionResp.contains("UNABLE", ignoreCase = true) &&
+                        !sessionResp.contains("ERROR", ignoreCase = true) &&
+                        (sessionResp.contains("50 01") || sessionResp.contains("5001") ||
+                            sessionResp.contains("50 03") || sessionResp.contains("5003"))
+
+                if (isAlive) {
+                    var vinEcu: String? = null
+                    val udsServices = mutableListOf("10")
+                    runCatching {
+                        val vinResp = sendRawCommand("22F190")
+                        if (vinResp.contains("62") && vinResp.contains("F190", ignoreCase = true)) {
+                            udsServices.add("22")
+                            val hexPart = vinResp.replace(" ", "")
+                                .substringAfter("62F190", "")
+                                .substringAfter("62f190", "")
+                                .take(34)
+                            if (hexPart.length >= 34) {
+                                vinEcu = hexPart.chunked(2)
+                                    .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                    .joinToString("")
+                                    .filter { it.isLetterOrDigit() }
+                            }
+                        }
+                    }
+
+                    _networkTopology.value = listOf(
+                        NetworkModule(
+                            id = "1000",
+                            name = "DoIP Gateway / Diagnostic Server",
+                            isAlive = true,
+                            networkType = NetworkType.ETHERNET,
+                            addressing = AddressingType.UNKNOWN,
+                            latencyMs = System.currentTimeMillis() - startTime,
+                            responseId = "1000",
+                            vinFromEcu = vinEcu,
+                            supportsUds = true,
+                            supportedUdsServices = udsServices,
+                            busSpeed = "Ethernet / TCP 13400",
+                            protocolDetected = ObdProtocol.DOIP_ISO13400.displayName
+                        )
+                    )
+                    _statusMessage.value = "Topología DoIP real: gateway respondió por UDS."
+                } else {
+                    _statusMessage.value = "Topología DoIP: el gateway no respondió a sesión UDS."
+                }
+            } catch (e: CancellationException) {
+                _statusMessage.value = "Escaneo cancelado por el usuario."
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "DoIP topology scan failed", e)
+                _statusMessage.value = "Error en topología DoIP: ${e.message}"
+            } finally {
+                _isScanningTopology.value = false
+            }
+            return
+        }
+
+        // ── Detect active protocol & bus speed before scanning ──
+        val protocolString = runCatching { sendRawCommand("AT DP").trim() }.getOrDefault("Unknown")
+        val busSpeedStr = when {
+            protocolString.contains("500", ignoreCase = true) -> "500 kbps"
+            protocolString.contains("250", ignoreCase = true) -> "250 kbps"
+            protocolString.contains("125", ignoreCase = true) -> "125 kbps"
+            protocolString.contains("CAN", ignoreCase = true) -> "500 kbps (CAN)"
+            protocolString.contains("9141", ignoreCase = true) -> "10.4 kbps (ISO 9141)"
+            protocolString.contains("KWP", ignoreCase = true) -> "10.4 kbps (KWP2000)"
+            else -> null
+        }
+
+        // ── Determine if the protocol uses 29-bit addressing ──
+        val is29bit = protocolString.contains("29", ignoreCase = true) ||
+                protocolString.contains("EXT", ignoreCase = true)
+        val addressing = if (is29bit) AddressingType.CAN_29BIT else AddressingType.CAN_11BIT
+
+        // ── Standard 11-bit CAN IDs for physical ECU addressing ──
+        // ISO 15765-4: Request IDs 7E0-7E7, Response IDs 7E8-7EF
+        val targetNodes = listOf(
+            Triple("7E0", "Engine Control Module (ECM)", NetworkType.CAN_HS),
+            Triple("7E1", "Transmission Control Module (TCM)", NetworkType.CAN_HS),
+            Triple("7E2", "ABS / Stability Control (ABS/ESC)", NetworkType.CAN_HS),
+            Triple("7E3", "Supplemental Restraint System (SRS/Airbag)", NetworkType.CAN_LS),
+            Triple("7E4", "Body Control Module (BCM)", NetworkType.CAN_LS),
+            Triple("7E5", "Instrument Cluster (IPC)", NetworkType.CAN_LS),
+            Triple("7E6", "HVAC / Climate Control Module", NetworkType.CAN_LS),
+            Triple("7E7", "Power Steering Control Module (EPS)", NetworkType.CAN_HS),
+            // Extended range — common OEM-specific ECU addresses
+            Triple("7A0", "Park Assist / ADAS Module", NetworkType.CAN_HS),
+            Triple("7A1", "Tire Pressure Monitor (TPMS)", NetworkType.CAN_LS),
+            Triple("7B0", "Telematics / Gateway Module", NetworkType.CAN_HS),
+            Triple("7C0", "Hybrid/EV Battery Management (BMS)", NetworkType.CAN_HS),
+            Triple("7C4", "Electric Motor Controller (MCU)", NetworkType.CAN_HS),
+            Triple("7D0", "Infotainment / Head Unit (IVI)", NetworkType.CAN_LS),
+            Triple("7D4", "Keyless Entry / Immobilizer", NetworkType.CAN_LS)
         )
 
         try {
-            // Physical/Real scan
-            for ((id, data) in targetNodes) {
+            for ((id, name, netType) in targetNodes) {
                 currentCoroutineContext().ensureActive()
-                val (name, type) = data
                 _statusMessage.value = "Escaneando Nodo: $name ($id)..."
 
                 val startTime = System.currentTimeMillis()
                 var success = false
                 var dtcs = emptyList<String>()
+                var responseId = ""
+                val pidList = mutableListOf<String>()
+
+                // UDS identification fields
+                var ecuPart: String? = null
+                var ecuSw: String? = null
+                var ecuHw: String? = null
+                var ecuSerial: String? = null
+                var vinEcu: String? = null
+                var hasUds = false
+                val udsServices = mutableListOf<String>()
 
                 try {
-                    withTimeoutOrNull(2000L) { // Safe 2000ms timeout for slow/genuine adapters
+                    withTimeoutOrNull(3000L) {
+                        // ── Set physical addressing to this ECU ──
                         sendRawCommand("AT SH $id")
-                        id.toIntOrNull(16)?.let { requestHex ->
-                            val responseId = String.format("%03X", requestHex + 8)
-                            sendRawCommand("AT CRA $responseId")
+                        val computedResponse = id.toIntOrNull(16)?.let { reqHex ->
+                            String.format("%03X", reqHex + 8)
+                        } ?: ""
+                        if (computedResponse.isNotBlank()) {
+                            sendRawCommand("AT CRA $computedResponse")
                         }
+                        responseId = computedResponse
+
+                        // ── Phase 1: OBD-II PID 0100 — Basic alive check ──
                         val resp = sendRawCommand("0100")
-                        success = resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100"))
+                        success = resp.isNotBlank() &&
+                                !resp.contains("NO DATA", ignoreCase = true) &&
+                                !resp.contains("UNABLE", ignoreCase = true) &&
+                                !resp.contains("ERROR", ignoreCase = true) &&
+                                (resp.contains("41 00") || resp.contains("4100"))
+
                         if (success) {
-                            // Query DTCs immediately if alive
-                            val dtcResp = sendRawCommand("03")
-                            dtcs = DtcDecoder.decode(dtcResp, "03")
+                            pidList.add("0100")
+
+                            // ── Phase 2: PID range discovery (0120, 0140, 0160) ──
+                            for (pidGroup in listOf("0120", "0140", "0160")) {
+                                try {
+                                    val pidResp = sendRawCommand(pidGroup)
+                                    if (pidResp.isNotBlank() &&
+                                        !pidResp.contains("NO DATA", ignoreCase = true) &&
+                                        pidResp.contains("41")) {
+                                        pidList.add(pidGroup)
+                                    }
+                                } catch (_: Exception) { /* Non-critical */ }
+                            }
+
+                            // ── Phase 3: Read DTCs from this ECU ──
+                            try {
+                                val dtcResp = sendRawCommand("03")
+                                dtcs = DtcDecoder.decode(dtcResp, "03")
+                            } catch (_: Exception) { /* Non-critical */ }
                         }
+
+                        // ── Phase 4: UDS Identification (ISO 14229) ──
+                        // Some safety/body/ADAS ECUs do not answer generic OBD-II PID 0100,
+                        // but they are real topology nodes if they answer a physical UDS session.
+                        try {
+                            var sessionResp = sendRawCommand("1003")
+                            if (sessionResp.isBlank() ||
+                                sessionResp.contains("NO DATA", ignoreCase = true) ||
+                                sessionResp.contains("7F10", ignoreCase = true)
+                            ) {
+                                sessionResp = sendRawCommand("1001")
+                            }
+                            if (sessionResp.isNotBlank() &&
+                                !sessionResp.contains("NO DATA", ignoreCase = true) &&
+                                !sessionResp.contains("UNABLE", ignoreCase = true) &&
+                                !sessionResp.contains("ERROR", ignoreCase = true) &&
+                                (sessionResp.contains("50 03") || sessionResp.contains("5003") ||
+                                    sessionResp.contains("50 01") || sessionResp.contains("5001"))) {
+                                    success = true
+                                    hasUds = true
+                                    udsServices.add("10")
+
+                                    // Read VIN ($22 F190)
+                                    try {
+                                        val vinResp = sendRawCommand("22F190")
+                                        if (vinResp.contains("62") && vinResp.contains("F190", ignoreCase = true)) {
+                                            udsServices.add("22")
+                                            val hexPart = vinResp.replace(" ", "")
+                                                .substringAfter("62F190", "")
+                                                .substringAfter("62f190", "")
+                                                .take(34) // 17 chars * 2 hex digits
+                                            if (hexPart.length >= 34) {
+                                                vinEcu = hexPart.chunked(2)
+                                                    .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                                    .joinToString("")
+                                                    .filter { it.isLetterOrDigit() }
+                                            }
+                                        }
+                                    } catch (_: Exception) { }
+
+                                    // Read ECU Part Number ($22 F187)
+                                    try {
+                                        val partResp = sendRawCommand("22F187")
+                                        if (partResp.contains("62") && partResp.contains("F187", ignoreCase = true)) {
+                                            val hexPart = partResp.replace(" ", "")
+                                                .substringAfter("62F187", "")
+                                                .substringAfter("62f187", "")
+                                                .take(32)
+                                            ecuPart = hexPart.chunked(2)
+                                                .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                                .joinToString("")
+                                                .trim()
+                                                .ifBlank { null }
+                                        }
+                                    } catch (_: Exception) { }
+
+                                    // Read Software Version ($22 F189)
+                                    try {
+                                        val swResp = sendRawCommand("22F189")
+                                        if (swResp.contains("62") && swResp.contains("F189", ignoreCase = true)) {
+                                            val hexPart = swResp.replace(" ", "")
+                                                .substringAfter("62F189", "")
+                                                .substringAfter("62f189", "")
+                                                .take(32)
+                                            ecuSw = hexPart.chunked(2)
+                                                .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                                .joinToString("")
+                                                .trim()
+                                                .ifBlank { null }
+                                        }
+                                    } catch (_: Exception) { }
+
+                                    // Read Hardware Version ($22 F191)
+                                    try {
+                                        val hwResp = sendRawCommand("22F191")
+                                        if (hwResp.contains("62") && hwResp.contains("F191", ignoreCase = true)) {
+                                            val hexPart = hwResp.replace(" ", "")
+                                                .substringAfter("62F191", "")
+                                                .substringAfter("62f191", "")
+                                                .take(32)
+                                            ecuHw = hexPart.chunked(2)
+                                                .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                                .joinToString("")
+                                                .trim()
+                                                .ifBlank { null }
+                                        }
+                                    } catch (_: Exception) { }
+
+                                    // Read Serial Number ($22 F18C)
+                                    try {
+                                        val serialResp = sendRawCommand("22F18C")
+                                        if (serialResp.contains("62") && serialResp.contains("F18C", ignoreCase = true)) {
+                                            val hexPart = serialResp.replace(" ", "")
+                                                .substringAfter("62F18C", "")
+                                                .substringAfter("62f18c", "")
+                                                .take(32)
+                                            ecuSerial = hexPart.chunked(2)
+                                                .mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                                .joinToString("")
+                                                .trim()
+                                                .ifBlank { null }
+                                        }
+                                    } catch (_: Exception) { }
+
+                                    // ── Probe additional UDS services ──
+                                    // RoutineControl ($31)
+                                    try {
+                                        val rc = sendRawCommand("3101FF00")
+                                        if (rc.contains("71") || rc.contains("7F3131")) udsServices.add("31")
+                                    } catch (_: Exception) { }
+
+                                    // IOControlByIdentifier ($2F)
+                                    try {
+                                        val io = sendRawCommand("2F000003")
+                                        if (io.contains("6F") || io.contains("7F2F")) udsServices.add("2F")
+                                    } catch (_: Exception) { }
+
+                                    // Return to default session
+                                    runCatching { sendRawCommand("1001") }
+                            }
+                        } catch (_: Exception) { /* UDS not supported — OK */ }
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -1045,17 +1331,43 @@ class ObdSession(
                 }
 
                 val latency = System.currentTimeMillis() - startTime
-                discovered.add(NetworkModule(id, name, isAlive = success, networkType = type, latencyMs = latency, dtcs = dtcs))
+                if (success) {
+                    discovered.add(
+                        NetworkModule(
+                            id = id,
+                            name = name,
+                            isAlive = true,
+                            networkType = netType,
+                            addressing = addressing,
+                            latencyMs = latency,
+                            dtcs = dtcs,
+                            responseId = responseId,
+                            supportedPids = pidList.toList(),
+                            ecuPartNumber = ecuPart,
+                            ecuSoftwareVersion = ecuSw,
+                            ecuHardwareVersion = ecuHw,
+                            ecuSerialNumber = ecuSerial,
+                            vinFromEcu = vinEcu,
+                            supportsUds = hasUds,
+                            supportedUdsServices = udsServices.toList(),
+                            busSpeed = busSpeedStr,
+                            protocolDetected = protocolString
+                        )
+                    )
+                }
             }
 
             _networkTopology.value = discovered
-            _statusMessage.value = "Mapeo de Topología Completo: ${discovered.count { it.isAlive }} nodos activos."
+            val udsCount = discovered.count { it.supportsUds }
+            _statusMessage.value = "Topología real: ${discovered.size}/${targetNodes.size} direcciones respondieron, $udsCount con UDS."
         } catch (e: CancellationException) {
             _statusMessage.value = "Escaneo cancelado por el usuario."
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Topology scan failed", e)
+            _statusMessage.value = "Error en escaneo de topología: ${e.message}"
         } finally {
+            // ── Restore OBD-II functional addressing ──
             runCatching { sendRawCommand("AT SH 7DF") }
             runCatching { sendRawCommand("AT CRA") }
             _isScanningTopology.value = false
@@ -1659,6 +1971,289 @@ class ObdSession(
         Log.i(TAG, "Mode 06: ${allResults.size} test results read")
         return allResults
     }
+
+    // ═══════════════════════════════════════════════
+    // MODE $05 — O2 SENSOR MONITORING TEST RESULTS
+    // ═══════════════════════════════════════════════
+
+    private val o2SensorParser = O2SensorTestParser()
+
+    private val _o2SensorTests = MutableStateFlow<List<O2SensorTestResult>>(emptyList())
+    val o2SensorTests: StateFlow<List<O2SensorTestResult>> = _o2SensorTests.asStateFlow()
+
+    private val _isReadingO2Tests = MutableStateFlow(false)
+    val isReadingO2Tests: StateFlow<Boolean> = _isReadingO2Tests.asStateFlow()
+
+    /**
+     * Read O2 Sensor Monitoring Test Results (Mode $05).
+     * Only applicable to non-CAN (pre-2008) vehicles.
+     * CAN vehicles should use Mode $06 instead.
+     */
+    suspend fun readO2SensorTests(): List<O2SensorTestResult> {
+        if (_isReadingO2Tests.value) return _o2SensorTests.value
+        _isReadingO2Tests.value = true
+        val rawResponses = mutableListOf<String>()
+
+        try {
+            _statusMessage.value = "Escaneando sensores O2 (Mode \$05)..."
+
+            // Use quick commands (4 most common sensors × 9 TIDs = 36 commands)
+            val commands = o2SensorParser.generateQuickCommands()
+
+            for ((index, cmd) in commands.withIndex()) {
+                if (index % 9 == 0) {
+                    val sensorNum = (index / 9) + 1
+                    _statusMessage.value = "Probando sensor O2 #$sensorNum..."
+                }
+                try {
+                    val response = sendRawCommand(cmd)
+                    if (!response.contains("NO DATA", true) &&
+                        !response.contains("ERROR", true) &&
+                        !response.contains("UNABLE", true)) {
+                        rawResponses.add(response)
+                    }
+                } catch (_: Exception) {}
+            }
+
+            val results = o2SensorParser.parse(rawResponses)
+            _o2SensorTests.value = results
+            _statusMessage.value = "Prueba O2 completada. ${results.size} resultados."
+            Log.i(TAG, "Mode 05: ${results.size} O2 sensor test results read")
+            return results
+        } catch (e: Exception) {
+            Log.e(TAG, "Mode 05 O2 Sensor Test failure: ${e.message}")
+            _statusMessage.value = "Error en prueba de sensores O2."
+            return emptyList()
+        } finally {
+            _isReadingO2Tests.value = false
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // CATEGORIZED DTCs ($03 / $07 / $0A)
+    // ═══════════════════════════════════════════════
+
+    private val _categorizedDtcs = MutableStateFlow(CategorizedDtcs())
+    val categorizedDtcs: StateFlow<CategorizedDtcs> = _categorizedDtcs.asStateFlow()
+
+    /**
+     * Read DTCs separated by type: Confirmed ($03), Pending ($07), Permanent ($0A).
+     */
+    suspend fun readCategorizedDtcs(): CategorizedDtcs {
+        _statusMessage.value = "Clasificando códigos de falla..."
+
+        val confirmed = mutableListOf<Pair<String, String>>()
+        val pending = mutableListOf<Pair<String, String>>()
+        val permanent = mutableListOf<Pair<String, String>>()
+
+        try {
+            // Mode $03 — Confirmed/Stored DTCs
+            _statusMessage.value = "Leyendo DTCs confirmados (Mode \$03)..."
+            val mode03Response = sendRawCommand("03")
+            parseDtcResponseToList(mode03Response, "43").forEach { code ->
+                confirmed.add(code to (dtcLookup(code) ?: code))
+            }
+
+            // Mode $07 — Pending DTCs
+            _statusMessage.value = "Leyendo DTCs pendientes (Mode \$07)..."
+            val mode07Response = sendRawCommand("07")
+            parseDtcResponseToList(mode07Response, "47").forEach { code ->
+                pending.add(code to (dtcLookup(code) ?: code))
+            }
+
+            // Mode $0A — Permanent DTCs
+            _statusMessage.value = "Leyendo DTCs permanentes (Mode \$0A)..."
+            val mode0AResponse = sendRawCommand("0A")
+            parseDtcResponseToList(mode0AResponse, "4A").forEach { code ->
+                permanent.add(code to (dtcLookup(code) ?: code))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading categorized DTCs: ${e.message}")
+        }
+
+        val result = CategorizedDtcs(confirmed, pending, permanent)
+        _categorizedDtcs.value = result
+        _statusMessage.value = "DTCs: ${confirmed.size} confirmados, ${pending.size} pendientes, ${permanent.size} permanentes."
+        return result
+    }
+
+    /**
+     * Parse a standard DTC response (Modes $03/$07/$0A) into a list of DTC code strings.
+     */
+    private fun parseDtcResponseToList(response: String, expectedHeader: String): List<String> {
+        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+        val dtcs = mutableListOf<String>()
+
+        val idx = clean.indexOf(expectedHeader)
+        if (idx < 0) return emptyList()
+
+        // Skip header (2 chars) — DTCs start after
+        val dtcData = clean.substring(idx + 2)
+        var i = 0
+        while (i + 3 < dtcData.length) {
+            val highByte = dtcData.substring(i, i + 2).toIntOrNull(16) ?: break
+            val lowByte = dtcData.substring(i + 2, i + 4).toIntOrNull(16) ?: break
+
+            val firstChar = when ((highByte shr 6) and 0x03) {
+                0 -> 'P'; 1 -> 'C'; 2 -> 'B'; 3 -> 'U'; else -> 'P'
+            }
+            val secondDigit = (highByte shr 4) and 0x03
+            val thirdDigit = highByte and 0x0F
+            val dtcCode = "$firstChar$secondDigit${String.format("%X", thirdDigit)}${String.format("%02X", lowByte)}"
+            if (dtcCode != "P0000") dtcs.add(dtcCode)
+            i += 4
+        }
+        return dtcs
+    }
+
+    /**
+     * Lookup DTC description from the local database.
+     * Returns null if not found.
+     */
+    private fun dtcLookup(code: String): String? {
+        return try {
+            DtcDecoder.getLocalDescription(code)
+        } catch (_: Exception) { null }
+    }
+
+    // ═══════════════════════════════════════════════
+    // MODE $08 — CONTROL OF ON-BOARD SYSTEM/TEST
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Mode $08 — Request control of on-board system, test or component.
+     * ⚠️ Manufacturer-specific. Only safe for read-type operations.
+     * @param tid Test ID
+     * @return Raw response or null
+     */
+    suspend fun requestOnBoardSystemControl(tid: String): String? {
+        Log.d(TAG, "Mode 08: Requesting on-board system control TID=$tid")
+        val response = sendRawCommand("08$tid")
+        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+        if (clean.contains("NODATA") || clean.contains("ERROR")) return null
+        val idx = clean.indexOf("48")
+        if (idx < 0) return null
+        return clean.substring(idx + 2)
+    }
+
+    // ═══════════════════════════════════════════════
+    // MODE $09 — VEHICLE INFORMATION (EXTENDED)
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Read all available Mode $09 InfoTypes.
+     * Beyond VIN, includes Calibration IDs, CVN, ECU name, etc.
+     */
+    suspend fun readAllVehicleInfo(): Map<String, String> {
+        val info = mutableMapOf<String, String>()
+        val infoTypes = mapOf(
+            "02" to "VIN",
+            "04" to "Calibration ID",
+            "06" to "Calibration Verification Number (CVN)",
+            "08" to "In-use Performance Tracking (Spark)",
+            "0A" to "ECU Name",
+            "0B" to "In-use Performance Tracking (Compression)"
+        )
+
+        for ((infotype, label) in infoTypes) {
+            try {
+                val response = sendRawCommand("09$infotype")
+                val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+                val marker = "49${infotype.uppercase()}"
+                val idx = clean.indexOf(marker)
+                if (idx >= 0) {
+                    val data = clean.substring(idx + marker.length)
+                    // Decode as ASCII for text fields, hex for numeric
+                    val decoded = if (infotype in listOf("02", "04", "0A")) {
+                        hexToAsciiSafe(data)
+                    } else {
+                        data
+                    }
+                    if (decoded.isNotBlank()) info[label] = decoded
+                }
+            } catch (_: Exception) {}
+        }
+
+        return info
+    }
+
+    private fun hexToAsciiSafe(hex: String): String {
+        val sb = StringBuilder()
+        var i = 0
+        while (i + 1 < hex.length) {
+            val byte = hex.substring(i, i + 2).toIntOrNull(16) ?: break
+            if (byte in 32..126) sb.append(byte.toChar())
+            i += 2
+        }
+        return sb.toString().trim()
+    }
+
+    // ═══════════════════════════════════════════════
+    // MANUFACTURER-SPECIFIC MODES ($B0-$BF, $D0-$DF, $EA-$FF)
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Send a raw manufacturer-specific diagnostic command.
+     * Used for OEM-specific diagnostics in ranges:
+     *   $B0-$BF: Manufacturer-defined enhanced services
+     *   $D0-$DF: Manufacturer-defined enhanced services
+     *   $EA-$FF: System supplier specific
+     *
+     * @param serviceId The service byte (e.g. "B0", "D5", "F1")
+     * @param subFunction Optional sub-function or parameter bytes
+     * @return Raw hex response or null if no response / error
+     */
+    suspend fun sendManufacturerCommand(serviceId: String, subFunction: String = ""): String? {
+        Log.d(TAG, "Manufacturer command: SID=$serviceId, sub=$subFunction")
+        val command = "$serviceId$subFunction"
+        val response = sendRawCommand(command)
+        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+
+        if (clean.contains("NODATA") || clean.contains("ERROR") || clean.contains("UNABLE")) return null
+
+        // Positive response = SID + 0x40
+        val sidInt = serviceId.toIntOrNull(16) ?: return null
+        val positiveSid = String.format("%02X", sidInt + 0x40)
+        val idx = clean.indexOf(positiveSid)
+        if (idx >= 0) return clean.substring(idx)
+
+        // Some manufacturer modes don't follow standard response pattern
+        return if (clean.length > 4) clean else null
+    }
+
+    /**
+     * Probe manufacturer-specific modes to discover which ones the ECU supports.
+     * Sends each SID with no sub-function and checks for any response.
+     */
+    suspend fun probeManufacturerModes(): Map<String, Boolean> {
+        val results = mutableMapOf<String, Boolean>()
+        val ranges = listOf(
+            0xB0..0xBF,  // Manufacturer enhanced
+            0xD0..0xDF,  // Manufacturer enhanced
+            0xEA..0xFF   // System supplier specific
+        )
+
+        for (range in ranges) {
+            for (sid in range) {
+                val sidHex = String.format("%02X", sid)
+                try {
+                    val response = sendRawCommand(sidHex)
+                    val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
+                    val supported = !clean.contains("NODATA") &&
+                                    !clean.contains("ERROR") &&
+                                    !clean.contains("UNABLE") &&
+                                    clean.length > 2
+                    results[sidHex] = supported
+                } catch (_: Exception) {
+                    results[sidHex] = false
+                }
+            }
+        }
+
+        Log.i(TAG, "Manufacturer modes probe: ${results.count { it.value }} supported out of ${results.size}")
+        return results
+    }
+
 
     fun resetDrivingTime() {
         drivingTimeMs = 0L
@@ -2390,15 +2985,18 @@ class ObdSession(
      * This commands an actuator (pump, fan, valve) and monitors feedback.
      */
     fun runActiveTest(test: ActiveTest) {
-        val isOfflineSim = _state.value != ObdState.CONNECTED
-
         activeTestJob?.cancel()
         activeTestJob = scope.launch(Dispatchers.IO) {
             try {
                 _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "Iniciando: ${test.name}...", progress = 0.1f, testId = test.id)
 
-                if (isOfflineSim) {
-                    runOfflineActiveTestSim(test)
+                if (_state.value != ObdState.CONNECTED) {
+                    _activeTestStatus.value = ActiveTestStatus(
+                        isActive = false,
+                        message = "Conecta un vehículo real antes de ejecutar pruebas activas.",
+                        progress = 0f,
+                        testId = test.id
+                    )
                     return@launch
                 }
 
@@ -2507,124 +3105,6 @@ class ObdSession(
                 )
             }
         }
-    }
-
-    private suspend fun runOfflineActiveTestSim(test: ActiveTest) {
-        delay(1000) // Simulated startup handshake
-        _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA (SIMULADOR): ${test.name}", progress = 0.3f, testId = test.id)
-
-        val startTime = System.currentTimeMillis()
-        var finalData = emptyMap<String, Float>()
-        while (System.currentTimeMillis() - startTime < test.durationMs) {
-            currentCoroutineContext().ensureActive()
-
-            val elapsed = System.currentTimeMillis() - startTime
-            val safeDuration = test.durationMs.coerceAtLeast(1L)
-            val progress = 0.3f + (elapsed.toFloat() / safeDuration.toFloat() * 0.6f)
-
-            val monitoredData = mutableMapOf<String, Float>()
-            when (test.id) {
-                "FUEL_PUMP" -> {
-                    val noise = (-5..5).random().toFloat()
-                    monitoredData["Presión Comb."] = 320f + noise
-                }
-                "INJECTOR_BALANCE" -> {
-                    val dropIndex = (elapsed / 3000).toInt() % 4
-                    val basePress = 320f - (dropIndex * 40f)
-                    val noise = (-3..3).random().toFloat()
-                    monitoredData["Presión Comb."] = basePress + noise
-                    monitoredData["Trim Comb CT B1"] = -12f + (dropIndex * 3f)
-                }
-                "EVAP_PURGE" -> {
-                    val timeFactor = Math.sin(elapsed.toDouble() / 1000.0).toFloat()
-                    monitoredData["RPM"] = 750f - (30f * timeFactor)
-                    monitoredData["Trim Comb CT B1"] = -5f + (8f * timeFactor)
-                }
-                "EGR_VALVE" -> {
-                    val ratio = elapsed.toFloat() / safeDuration.toFloat()
-                    monitoredData["RPM"] = 750f - (120f * ratio)
-                    monitoredData["Carga Motor"] = 15f + (10f * ratio)
-                    monitoredData["Ciclo EGR"] = 80f * ratio
-                }
-                "SECONDARY_AIR" -> {
-                    monitoredData["O2 B1S1 (V)"] = 0.85f + ((-10..10).random() / 200f)
-                    monitoredData["Trim Comb CT B1"] = -15f
-                }
-                "COOLING_FAN_LOW", "COOLING_FAN_HIGH" -> {
-                    val coolingRate = if (test.id == "COOLING_FAN_HIGH") 0.3f else 0.15f
-                    val seconds = elapsed / 1000f
-                    monitoredData["Temp Motor"] = (98f - seconds * coolingRate).coerceAtLeast(85f)
-                }
-                "IDLE_SPEED_UP" -> {
-                    val ratio = (elapsed.toFloat() / safeDuration.toFloat()).coerceAtMost(1f)
-                    val targetRpm = 750f + (300f * ratio)
-                    monitoredData["RPM"] = targetRpm + (-5..5).random()
-                    monitoredData["Pos. Mariposa"] = 12f + (8f * ratio)
-                }
-                "THROTTLE_BODY" -> {
-                    val halfDuration = safeDuration / 2
-                    val angle = if (elapsed < halfDuration) {
-                        (elapsed.toFloat() / halfDuration.toFloat()) * 25f
-                    } else {
-                        25f - ((elapsed - halfDuration).toFloat() / halfDuration.toFloat()) * 25f
-                    }
-                    monitoredData["Pos. Mariposa"] = angle.coerceIn(0f, 25f)
-                    monitoredData["RPM"] = 0f
-                }
-                "TCC_SOLENOID" -> {
-                    monitoredData["Velocidad"] = 60f
-                    monitoredData["RPM"] = 2200f - (elapsed / 20)
-                }
-                "AC_COMPRESSOR" -> {
-                    monitoredData["Carga Motor"] = 22f + ((-2..2).random())
-                    monitoredData["RPM"] = 720f + ((-10..10).random())
-                }
-                "GLOW_PLUGS" -> {
-                    val ratio = (elapsed.toFloat() / safeDuration.toFloat())
-                    monitoredData["Voltaje ECU"] = 14.1f - (1.3f * ratio)
-                }
-                "TURBO_WASTEGATE" -> {
-                    monitoredData["Presión MAP"] = 101f + (elapsed / 100)
-                }
-                "HORN_TEST" -> {
-                    val isActivePulse = (elapsed / 1000) % 2 == 0L
-                    monitoredData["Consumo Amps"] = if (isActivePulse) 8.5f else 0f
-                    monitoredData["Voltaje Bat"] = if (isActivePulse) 12.2f else 12.5f
-                }
-                "HEADLIGHT_TEST" -> {
-                    monitoredData["Consumo Faros"] = 11.8f
-                    monitoredData["Voltaje Bat"] = 12.3f
-                }
-                "WIPER_TEST" -> {
-                    monitoredData["Consumo Limpia"] = 4.5f + ((-5..5).random() * 0.1f)
-                    monitoredData["Voltaje Bat"] = 12.4f
-                }
-                "RADIATOR_FAN_TEST" -> {
-                    monitoredData["Velocidad Fan RPM"] = 2850f + (-20..20).random()
-                    monitoredData["Temp Refrigerante"] = (96f - (elapsed / 1000f) * 0.5f).coerceAtLeast(88f)
-                }
-                else -> {
-                    test.monitoredPids.forEach { pid ->
-                        val def = PidRegistry.getPid(pid.substring(0, 2), pid.substring(2))
-                        if (def != null) {
-                            monitoredData[def.name] = (def.minValue + def.maxValue) / 2f
-                        }
-                    }
-                }
-            }
-
-            finalData = monitoredData
-            _activeTestStatus.value = _activeTestStatus.value.copy(progress = progress, currentValues = monitoredData)
-            delay(500)
-        }
-
-        _activeTestStatus.value = ActiveTestStatus(
-            isActive = false,
-            message = "Prueba completada con éxito (Simulación).",
-            progress = 1.0f,
-            testId = test.id,
-            currentValues = finalData
-        )
     }
 
     fun stopActiveTest() {

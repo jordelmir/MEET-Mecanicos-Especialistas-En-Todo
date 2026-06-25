@@ -1,9 +1,16 @@
 package com.elysium369.meet.ui.components
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -30,10 +37,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.cos
 import kotlin.math.sin
 
+private data class BleScanDevice(
+    val name: String,
+    val address: String,
+    val rssi: Int
+)
+
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdapterSearchSheet(
@@ -56,25 +71,73 @@ fun AdapterSearchSheet(
         }
     }
 
-    // ═══ BLE Scanning Simulation state ═══
-    val simulatedBleDevices = listOf(
-        Triple("OBDLink CX BLE", "12:34:56:AB:CD:EF", -62),
-        Triple("Veepeak OBDCheck BLE+", "AA:BB:CC:DD:EE:FF", -74),
-        Triple("V-Link BLE Adapter", "98:76:54:32:10:FE", -83),
-        Triple("Carista OBD2 Smart", "24:68:1A:3C:5E:7D", -90)
-    )
-    var discoveredCount by remember { mutableIntStateOf(0) }
-    LaunchedEffect(refreshTrigger, selectedTab) {
-        if (selectedTab == 1) {
-            discoveredCount = 0
-            kotlinx.coroutines.delay(600)
-            discoveredCount = 1
-            kotlinx.coroutines.delay(1000)
-            discoveredCount = 2
-            kotlinx.coroutines.delay(900)
-            discoveredCount = 3
-            kotlinx.coroutines.delay(800)
-            discoveredCount = 4
+    // ═══ Real BLE scan state ═══
+    val bleDevices = remember { mutableStateListOf<BleScanDevice>() }
+    var isBleScanning by remember { mutableStateOf(false) }
+    var bleScanError by remember { mutableStateOf<String?>(null) }
+    val hasBleScanPermission = remember(refreshTrigger) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    DisposableEffect(selectedTab, refreshTrigger, hasBleScanPermission, bluetoothAdapter?.isEnabled) {
+        if (selectedTab != 1 || bluetoothAdapter?.isEnabled != true || !hasBleScanPermission) {
+            onDispose { }
+        } else {
+            bleDevices.clear()
+            bleScanError = null
+            isBleScanning = true
+
+            val callback = object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult) {
+                    val device = result.device ?: return
+                    val address = device.address ?: return
+                    val name = result.scanRecord?.deviceName
+                        ?: device.name
+                        ?: "BLE OBD (${address.takeLast(5)})"
+                    val item = BleScanDevice(name = name, address = address, rssi = result.rssi)
+                    val existingIndex = bleDevices.indexOfFirst { it.address == address }
+                    if (existingIndex >= 0) {
+                        bleDevices[existingIndex] = item
+                    } else {
+                        bleDevices.add(item)
+                    }
+                }
+
+                override fun onScanFailed(errorCode: Int) {
+                    bleScanError = "Error de escaneo BLE: $errorCode"
+                    isBleScanning = false
+                }
+            }
+
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+
+            try {
+                val scanner = bluetoothAdapter.bluetoothLeScanner
+                if (scanner == null) {
+                    bleScanError = "El teléfono no expuso BluetoothLeScanner."
+                    isBleScanning = false
+                } else {
+                    scanner.startScan(null, settings, callback)
+                }
+            } catch (e: SecurityException) {
+                bleScanError = "Permiso BLE no concedido: ${e.message.orEmpty()}"
+                isBleScanning = false
+            } catch (e: Exception) {
+                bleScanError = "No se pudo iniciar BLE: ${e.message.orEmpty()}"
+                isBleScanning = false
+            }
+
+            onDispose {
+                runCatching { bluetoothAdapter.bluetoothLeScanner?.stopScan(callback) }
+                isBleScanning = false
+            }
         }
     }
 
@@ -319,6 +382,8 @@ fun AdapterSearchSheet(
                     val isBtEnabled = bluetoothAdapter?.isEnabled == true
                     if (!isBtEnabled) {
                         BluetoothDisabledView(context)
+                    } else if (!hasBleScanPermission) {
+                        BluetoothPermissionView(context)
                     } else {
                         Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
                             // Canvas Radar Scanner
@@ -394,8 +459,8 @@ fun AdapterSearchSheet(
                                 }
 
                                 Text(
-                                    text = "SCANNING",
-                                    color = MeetColors.electricBlue,
+                                    text = if (isBleScanning) "SCANNING" else "BLE READY",
+                                    color = if (isBleScanning) MeetColors.electricBlue else MeetColors.neonGreen,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 2.sp,
@@ -406,7 +471,7 @@ fun AdapterSearchSheet(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Text(
-                                text = "ADAPTADORES BLE DISPONIBLES",
+                                text = "ADAPTADORES BLE DETECTADOS",
                                 color = MeetColors.textSecondary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -414,13 +479,28 @@ fun AdapterSearchSheet(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
-                            if (discoveredCount == 0) {
+                            if (bleScanError != null) {
                                 Box(
                                     modifier = Modifier.fillMaxWidth().height(120.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "Iniciando escaneo del bus BLE...",
+                                        text = bleScanError.orEmpty(),
+                                        color = MeetColors.error,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            } else if (bleDevices.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isBleScanning) {
+                                            "Escaneando adaptadores BLE reales cercanos..."
+                                        } else {
+                                            "No se detectaron adaptadores BLE. Acerca el teléfono al OBD."
+                                        },
                                         color = MeetColors.textMuted,
                                         fontSize = 13.sp
                                     )
@@ -430,13 +510,13 @@ fun AdapterSearchSheet(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    itemsIndexed(simulatedBleDevices.take(discoveredCount)) { index, device ->
+                                    itemsIndexed(bleDevices.sortedByDescending { it.rssi }) { index, device ->
                                         AnimatedEntrance(index = index) {
                                             EliteCard(
                                                 backgroundColor = MeetColors.cardBackground,
                                                 borderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
                                                 onClick = {
-                                                    onConnect(device.first, device.second)
+                                                    onConnect(device.name, "ble://${device.address}")
                                                     onDismiss()
                                                 },
                                                 modifier = Modifier.fillMaxWidth()
@@ -461,14 +541,14 @@ fun AdapterSearchSheet(
                                                     Spacer(modifier = Modifier.width(14.dp))
                                                     Column(modifier = Modifier.weight(1f)) {
                                                         Text(
-                                                            text = device.first,
+                                                            text = device.name,
                                                             color = Color.White,
                                                             fontWeight = FontWeight.Bold,
                                                             fontSize = 14.sp
                                                         )
                                                         Spacer(modifier = Modifier.height(2.dp))
                                                         Text(
-                                                            text = device.second,
+                                                            text = device.address,
                                                             color = MeetColors.textSecondary,
                                                             fontFamily = FontFamily.Monospace,
                                                             fontSize = 11.sp
@@ -480,7 +560,7 @@ fun AdapterSearchSheet(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                                                     ) {
-                                                        val rssi = device.third
+                                                        val rssi = device.rssi
                                                         val barCount = when {
                                                             rssi > -65 -> 4
                                                             rssi > -75 -> 3
@@ -772,6 +852,53 @@ fun NoPairedDevicesView(context: Context) {
                 context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
             },
             color = MeetColors.hotMagenta,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+fun BluetoothPermissionView(context: Context) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .background(MeetColors.electricBlue.copy(alpha = 0.1f), RoundedCornerShape(50))
+                .border(1.dp, MeetColors.electricBlue, RoundedCornerShape(50)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("BLE", color = MeetColors.electricBlue, fontWeight = FontWeight.Black, fontSize = 18.sp)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "PERMISO BLE REQUERIDO",
+            color = Color.White,
+            fontWeight = FontWeight.Black,
+            fontSize = 16.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Android necesita permiso de dispositivos cercanos para detectar adaptadores OBDLink, vLinker, Veepeak o Carista BLE.",
+            color = MeetColors.textSecondary,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 24.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        EliteOutlinedButton(
+            text = "ABRIR PERMISOS DE LA APP",
+            onClick = {
+                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:${context.packageName}")
+                })
+            },
+            color = MeetColors.electricBlue,
             modifier = Modifier.fillMaxWidth()
         )
     }

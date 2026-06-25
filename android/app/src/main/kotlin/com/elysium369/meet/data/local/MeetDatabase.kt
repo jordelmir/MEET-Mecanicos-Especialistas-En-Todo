@@ -32,7 +32,7 @@ import com.elysium369.meet.data.local.entities.*
         VehicleDnaProfileEntity::class,
         RepairCaseEntity::class,
         PredictionEventEntity::class,
-        
+
         // FEATURE ENTITIES
         LiveSessionEntity::class,
         LiveSnapshotEntity::class,
@@ -47,7 +47,7 @@ import com.elysium369.meet.data.local.entities.*
         EvidencePackageEntity::class,
         VehicleTwinProfileEntity::class,
         TwinAnomalyEntity::class,
-        
+
         // KNOWLEDGE GRAPH ENTITIES
         DtcSymptomEntity::class,
         DtcCauseEntity::class,
@@ -57,9 +57,23 @@ import com.elysium369.meet.data.local.entities.*
         DtcVehicleCompatEntity::class,
         DtcVerifiedFixEntity::class,
         DtcRepairCostEntity::class,
-        DtcSearchIndexEntity::class
+        DtcSearchIndexEntity::class,
+
+        // MEET KNOWLEDGE ENGINE v4.0
+        MeetKnowledgeMatrixEntity::class,
+        MechanicalProcedureEntity::class,
+        ComponentRebuildGuideEntity::class,
+        SymptomGuideEntity::class,
+        TrenchKnowledgeEntity::class,
+        AutomotiveChemicalEntity::class,
+        ToolUsageGuideEntity::class,
+        SafetyProtocolEntity::class,
+
+        // GAUGE MARKETPLACE ENTITIES
+        SavedGaugeEntity::class,
+        GaugeListingCacheEntity::class
     ],
-    version = 23,
+    version = 28,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -84,14 +98,18 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun vehicleDnaDao(): VehicleDnaDao
     abstract fun repairCaseDao(): RepairCaseDao
     abstract fun predictionEventDao(): PredictionEventDao
-    
+
     // NEW FEATURE DAOS
     abstract fun liveSessionDao(): LiveSessionDao
     abstract fun repairNetworkAddonsDao(): RepairNetworkAddonsDao
     abstract fun marketplaceDao(): MarketplaceDao
     abstract fun blackBoxDao(): BlackBoxDao
     abstract fun vehicleTwinDao(): VehicleTwinDao
-    
+
     // KNOWLEDGE GRAPH DAO
     abstract fun dtcKnowledgeGraphDao(): DtcKnowledgeGraphDao
+    abstract fun mechanicalKnowledgeDao(): MechanicalKnowledgeDao
+
+    // GAUGE MARKETPLACE DAO
+    abstract fun savedGaugeDao(): SavedGaugeDao
 }

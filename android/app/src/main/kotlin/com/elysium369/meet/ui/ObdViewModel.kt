@@ -81,7 +81,6 @@ class ObdViewModel @Inject constructor(
     private val fuelEconomyTracker: FuelEconomyTracker,
     private val batteryHealthAnalyzer: BatteryHealthAnalyzer,
     private val turboBoostGauge: TurboBoostGauge,
-    private val demoModeSimulator: DemoModeSimulator,
     private val dvirReportDao: com.elysium369.meet.data.local.dao.DvirReportDao,
     private val predictionEventDao: com.elysium369.meet.data.local.dao.PredictionEventDao,
     private val healthSnapshotDao: com.elysium369.meet.data.local.dao.HealthSnapshotDao,
@@ -104,6 +103,11 @@ class ObdViewModel @Inject constructor(
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
+
+    // --- UDS Protocol Manager (lazy, uses existing obdSession) ---
+    private val udsProtocolManager by lazy {
+        com.elysium369.meet.core.obd.UdsProtocolManager(obdSession)
+    }
 
 
     // --- Force Clone Mode ---
@@ -1126,27 +1130,6 @@ class ObdViewModel @Inject constructor(
         _maintenanceItems.value = MaintenancePredictor.predict(currentKm = km, coolantTemp = coolant)
     }
 
-    // ═══════════════════════════════════════
-    //  DEMO MODE
-    // ═══════════════════════════════════════
-    private val _isDemoMode = MutableStateFlow(false)
-    val isDemoMode: StateFlow<Boolean> = _isDemoMode.asStateFlow()
-
-    val demoScenarioDescription: String get() = demoModeSimulator.getScenarioDescription()
-
-    fun toggleDemoMode() {
-        _isDemoMode.value = !_isDemoMode.value
-        if (_isDemoMode.value) {
-            voiceFeedbackManager.speak("Modo de demostración activado.", "Demo mode activated.")
-        } else {
-            voiceFeedbackManager.speak("Modo de demostración desactivado.", "Demo mode deactivated.")
-        }
-    }
-    fun setDemoScenario(scenario: DemoModeSimulator.Scenario) {
-        demoModeSimulator.currentScenario = scenario
-    }
-    fun generateDemoFrame(): Map<String, Float> = demoModeSimulator.generateFrame()
-
     // ── Vehicle Identification (Car Scanner Pro style) ──
     val detectedProtocol: StateFlow<String> = obdSession.detectedProtocolFlow
     val adapterVersion: StateFlow<String> = obdSession.adapterVersionFlow
@@ -2157,6 +2140,195 @@ class ObdViewModel @Inject constructor(
         obdSession.resetDrivingTime()
     }
 
+    // ═══════════════════════════════════════════════
+    // MODE $05 — O2 SENSOR MONITORING TEST RESULTS
+    // ═══════════════════════════════════════════════
+
+    val o2SensorTests = obdSession.o2SensorTests
+    val isReadingO2Tests = obdSession.isReadingO2Tests
+
+    fun readO2SensorTests() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                obdSession.readO2SensorTests()
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Mode 05 O2 Tests failed", e)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // CATEGORIZED DTCs ($03 / $07 / $0A)
+    // ═══════════════════════════════════════════════
+
+    val categorizedDtcs = obdSession.categorizedDtcs
+
+    fun readCategorizedDtcs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                obdSession.readCategorizedDtcs()
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Categorized DTCs failed", e)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // MODE $09 — EXTENDED VEHICLE INFORMATION
+    // ═══════════════════════════════════════════════
+
+    private val _vehicleInfoExtended = MutableStateFlow<Map<String, String>>(emptyMap())
+    val vehicleInfoExtended: StateFlow<Map<String, String>> = _vehicleInfoExtended.asStateFlow()
+
+    fun readExtendedVehicleInfo() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _vehicleInfoExtended.value = obdSession.readAllVehicleInfo()
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Extended vehicle info failed", e)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // UDS SERVICES (via UdsProtocolManager)
+    // ═══════════════════════════════════════════════
+
+    private val _udsCapabilities = MutableStateFlow<UdsCapabilities?>(null)
+    val udsCapabilities: StateFlow<UdsCapabilities?> = _udsCapabilities.asStateFlow()
+
+    private val _ecuInfo = MutableStateFlow<List<UdsReadResult>>(emptyList())
+    val ecuInfo: StateFlow<List<UdsReadResult>> = _ecuInfo.asStateFlow()
+
+    private val _lastUdsOperation = MutableStateFlow("")
+    val lastUdsOperation: StateFlow<String> = _lastUdsOperation.asStateFlow()
+
+    fun discoverUdsCapabilities() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Descubriendo capacidades UDS..."
+                _udsCapabilities.value = udsProtocolManager.discoverCapabilities()
+                _lastUdsOperation.value = "Capacidades UDS descubiertas."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "UDS discovery failed", e)
+                _lastUdsOperation.value = "Error: ${e.message}"
+            }
+        }
+    }
+
+    fun readEcuInfo() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Leyendo información ECU (UDS \$22)..."
+                _ecuInfo.value = udsProtocolManager.readEcuInfo()
+                _lastUdsOperation.value = "${_ecuInfo.value.size} DIDs leídos."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "ECU Info read failed", e)
+            }
+        }
+    }
+
+    fun resetEcu(resetType: String = "03") {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Ejecutando ECU Reset..."
+                val success = udsProtocolManager.resetEcu(resetType)
+                _lastUdsOperation.value = if (success) "ECU Reset exitoso." else "ECU Reset falló."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "ECU Reset failed", e)
+                _lastUdsOperation.value = "Error: ${e.message}"
+            }
+        }
+    }
+
+    fun clearDtcUds() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Borrando DTCs vía UDS \$14..."
+                val success = udsProtocolManager.clearDtcUds()
+                _lastUdsOperation.value = if (success) "DTCs borrados (UDS)." else "Borrado UDS no soportado."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "UDS Clear DTC failed", e)
+            }
+        }
+    }
+
+    fun readDtcUds() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Leyendo DTCs vía UDS \$19..."
+                val dtcs = udsProtocolManager.readDtcByStatusMask()
+                _lastUdsOperation.value = "${dtcs.size} DTCs encontrados (UDS)."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "UDS Read DTC failed", e)
+            }
+        }
+    }
+
+    fun readDataByIdentifier(did: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Leyendo DID \$$did..."
+                val result = udsProtocolManager.readDataByIdentifier(did)
+                _lastUdsOperation.value = if (result != null) "DID \$$did: $result" else "DID \$$did no disponible."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Read DID failed", e)
+            }
+        }
+    }
+
+    fun executeRoutine(routineId: String, params: String = "") {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Ejecutando rutina \$$routineId..."
+                val success = udsProtocolManager.startRoutine(routineId, params)
+                _lastUdsOperation.value = if (success) "Rutina \$$routineId ejecutada." else "Rutina \$$routineId falló."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Routine failed", e)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // MANUFACTURER-SPECIFIC MODES ($B0-$BF, $D0-$DF, $EA-$FF)
+    // ═══════════════════════════════════════════════
+
+    private val _manufacturerModes = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val manufacturerModes: StateFlow<Map<String, Boolean>> = _manufacturerModes.asStateFlow()
+
+    fun probeManufacturerModes() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _lastUdsOperation.value = "Probando modos del fabricante..."
+                _manufacturerModes.value = obdSession.probeManufacturerModes()
+                val supportedCount = _manufacturerModes.value.count { it.value }
+                _lastUdsOperation.value = "$supportedCount modos del fabricante detectados."
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Manufacturer probe failed", e)
+            }
+        }
+    }
+
+    fun sendManufacturerCommand(sid: String, sub: String = ""): StateFlow<String?> {
+        val result = MutableStateFlow<String?>(null)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                result.value = obdSession.sendManufacturerCommand(sid, sub)
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Manufacturer command failed", e)
+            }
+        }
+        return result.asStateFlow()
+    }
+
+    // ═══════════════════════════════════════════════
+    // POST-SCAN PDF REPORT
+    // ═══════════════════════════════════════════════
+
+    private val _lastScanReportPath = MutableStateFlow<String?>(null)
+    val lastScanReportPath: StateFlow<String?> = _lastScanReportPath.asStateFlow()
+
+
     private suspend fun saveSessionResults() {
         val vehicle = _selectedVehicle.value ?: return
         val currentDtcs = activeDtcs.value
@@ -2224,58 +2396,14 @@ class ObdViewModel @Inject constructor(
         if (manageState) _isScanning.value = true
         addTerminalLog("──── INICIO ESCANEO DTC PROFESIONAL ────", TerminalLineType.SYSTEM)
         if (connectionState.value != ObdState.CONNECTED) {
-            addTerminalLog("⚠ OBD no conectado — Iniciando simulación de escaneo...", TerminalLineType.WARNING)
-            voiceFeedbackManager.speak("Iniciando simulación de escaneo de códigos de error.", "Starting simulated fault code scan.")
-
-            val steps = listOf(
-                "Detectando protocolo de comunicación... OK (CAN ISO 15765-4)",
-                "Escaneando Módulo de Control del Motor (ECM)...",
-                "[ECM] P0300 — Fallo de encendido múltiple/aleatorio detectado",
-                "[ECM] P0301 — Fallo de encendido Cilindro #1",
-                "[ECM] P0302 — Fallo de encendido Cilindro #2",
-                "[ECM] P0304 — Fallo de encendido Cilindro #4",
-                "Escaneando Módulo de Transmisión (TCM)... OK (Sin fallas)",
-                "Escaneando Módulo ABS/ESP...",
-                "[ABS] C0040 — Falla circuito pedal freno",
-                "Escaneando Módulo de Carrocería (BCM)... OK",
-                "Leyendo códigos pendientes...",
-                "[ECM] P0171 — Mezcla pobre banco 1",
-                "[ECM] P0302 — Fallo de encendido Cilindro #2 (intermitente)",
-                "Leyendo Monitores de Emisiones..."
+            addTerminalLog(
+                "⚠ Conecta un vehículo real para escanear DTCs. MEET ya no genera resultados simulados.",
+                TerminalLineType.WARNING
             )
-            for (step in steps) {
-                addTerminalLog(step, TerminalLineType.SYSTEM)
-                kotlinx.coroutines.delay(180)
-            }
-
-            val simulatedCodes = listOf("P0300", "P0301", "P0302", "P0304", "P0171", "C0040")
-            if (_selectedVehicle.value != null) {
-                addTerminalLog(
-                    "[DEMO] Escaneo simulado no se guarda en historial ni se sincroniza como dato real.",
-                    TerminalLineType.WARNING
-                )
-            }
-
-            // Monitores I/M
-            _readinessMonitors.value = ReadinessResult(
-                milOn = true,
-                dtcCount = 5,
-                monitors = listOf(
-                    MonitorStatus("Misfire", true, true),
-                    MonitorStatus("Fuel System", true, true),
-                    MonitorStatus("Components", true, true),
-                    MonitorStatus("Catalyst", true, false), // incompleto
-                    MonitorStatus("O2 Sensor", true, true),
-                    MonitorStatus("EGR System", true, false) // incompleto
-                )
+            voiceFeedbackManager.speak(
+                "Conecta un vehículo real para escanear códigos de error.",
+                "Connect to a real vehicle to scan fault codes."
             )
-
-            // Simular carga de definiciones — incluir cada cilindro individual
-            fetchDtcDefinitions(simulatedCodes)
-
-            voiceFeedbackManager.speak("Escaneo simulado completado. Se detectaron 7 códigos de error, incluyendo fallos individuales por cilindro.", "Simulated scan complete. 7 fault codes detected, including individual cylinder misfires.")
-            updateHealthScore()
-            addTerminalLog("──── ESCANEO SIMULADO COMPLETADO — 7 códigos detectados (4 activos, 2 pendientes, 1 permanente) ────", TerminalLineType.SYSTEM)
             if (manageState) _isScanning.value = false
             return
         }
@@ -2692,16 +2820,12 @@ class ObdViewModel @Inject constructor(
         
         val success: Boolean
         if (connectionState.value != ObdState.CONNECTED) {
-            // Simulator Mode Clear
-            kotlinx.coroutines.delay(1500)
-            success = true
-            voiceFeedbackManager.speak("Borrado simulado completado con éxito. Memoria limpia.", "Simulated fault codes cleared successfully. Memory clean.")
-            _clearDtcResult.value = "✅ [SIMULADO] Códigos borrados exitosamente"
-            _selectedVehicle.value?.let { vehicle ->
-                dtcDao.resolveAllDtcsForVehicle(vehicle.id, System.currentTimeMillis())
-            }
-            _freezeFrameData.value = emptyMap()
-            updateHealthScore()
+            success = false
+            voiceFeedbackManager.speak(
+                "No hay conexión OBD activa. No se puede borrar la memoria real del vehículo.",
+                "No active OBD connection. Vehicle fault memory cannot be erased."
+            )
+            _clearDtcResult.value = "Conecta el adaptador OBD y verifica ignición en ON antes de borrar DTCs reales."
         } else {
             success = obdSession.clearDtcs()
             if (success) {
@@ -3083,39 +3207,6 @@ class ObdViewModel @Inject constructor(
             maintenanceAlertDao.insertAlert(alert)
         }
     }
-
-    fun generateMockTrip() {
-        val vehicle = _selectedVehicle.value ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            val random = java.util.Random()
-            val durationMin = 15 + random.nextInt(45)
-            val distance = 5f + random.nextFloat() * 45f
-            val ecoScore = 65 + random.nextInt(35)
-            val maxSpeed = 80f + random.nextFloat() * 40f
-            val maxTemp = 88f + random.nextFloat() * 12f
-
-            val mockTrip = TripEntity(
-                id = java.util.UUID.randomUUID().toString(),
-                vehicleId = vehicle.id,
-                sessionId = "mock_session_" + java.util.UUID.randomUUID().toString().take(8),
-                startedAt = System.currentTimeMillis() - (durationMin * 60 * 1000L),
-                endedAt = System.currentTimeMillis(),
-                distanceKm = distance,
-                durationSeconds = durationMin * 60L,
-                avgSpeedKmh = (distance / (durationMin / 60f)),
-                maxSpeedKmh = maxSpeed,
-                maxRpm = 2500f + random.nextInt(2000),
-                avgRpm = 1500f + random.nextInt(800),
-                maxTempC = maxTemp,
-                fuelEfficiency = 5.5f + random.nextFloat() * 4f,
-                ecoScore = ecoScore,
-	                gpsTrackJson = null,
-	                synced = true
-	            )
-	            tripDao.insertTrip(mockTrip)
-	            addTerminalLog("[DEMO] Viaje mock guardado solo localmente; no se sincronizará a la nube.", TerminalLineType.WARNING)
-	        }
-	    }
 
     fun addCustomPid(pid: CustomPidEntity) {
         viewModelScope.launch {

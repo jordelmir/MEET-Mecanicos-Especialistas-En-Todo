@@ -42,6 +42,19 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
     val isLoading by viewModel.isLoading.collectAsState()
 
     val scrollState = rememberScrollState()
+    val normalizedDtc = dtc.trim().uppercase()
+    val requiredCompletion = listOf(
+        make.isNotBlank(),
+        model.isNotBlank(),
+        yearText.toIntOrNull() != null,
+        engine.isNotBlank(),
+        country.isNotBlank(),
+        normalizedDtc.isNotBlank(),
+        symptoms.isNotBlank(),
+        solution.isNotBlank(),
+        costText.toDoubleOrNull() != null,
+        timeSpentText.toIntOrNull() != null
+    ).count { it }
 
     Scaffold(
         containerColor = MeetColors.backgroundDark,
@@ -68,6 +81,37 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
+
+            EliteCard(
+                modifier = Modifier.fillMaxWidth(),
+                glowColor = MeetColors.cyberCyan,
+                backgroundColor = MeetColors.backgroundDeep,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "CAPTURA MÍNIMA PARA UN CASO ÚTIL",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Cliente: qué falla, cuándo pasa, luces, olores o ruido. Taller: cómo lo confirmaste, qué pieza/procedimiento resolvió, cuánto tardó y cómo verificaste la reparación.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Text(
+                        "Completitud actual: $requiredCompletion/10",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             if (errorMessage != null) {
                 EliteCard(
@@ -179,7 +223,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
 
                     OutlinedTextField(
                         value = dtc,
-                        onValueChange = { dtc = it },
+                        onValueChange = { dtc = it.uppercase() },
                         label = { Text("Código DTC Asociado (Ej. P0300)", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, color = Color.White),
@@ -190,7 +234,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                     OutlinedTextField(
                         value = symptoms,
                         onValueChange = { symptoms = it },
-                        label = { Text("Síntomas (Ej. Motor tiembla al ralentí, luz check engine parpadea)", fontSize = 11.sp) },
+                        label = { Text("Síntomas y contexto del cliente", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth().height(90.dp),
                         textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, color = Color.White),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.cyberCyan, unfocusedBorderColor = MeetColors.borderSubtle),
@@ -200,7 +244,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                     OutlinedTextField(
                         value = solution,
                         onValueChange = { solution = it },
-                        label = { Text("Procedimiento de Solución Paso a Paso", fontSize = 11.sp) },
+                        label = { Text("Diagnóstico que confirmó la causa y solución paso a paso", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, color = Color.White),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.cyberCyan, unfocusedBorderColor = MeetColors.borderSubtle),
@@ -273,12 +317,15 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                         val year = yearText.toIntOrNull()
                         val cost = costText.toDoubleOrNull()
                         val timeSpent = timeSpentText.toIntOrNull()
+                        val dtcRegex = Regex("^[PCBU][0-3][0-9A-F]{3}$", RegexOption.IGNORE_CASE)
 
                         if (make.isBlank() || model.isBlank() || year == null || engine.isBlank() ||
-                            country.isBlank() || dtc.isBlank() || symptoms.isBlank() || solution.isBlank() ||
+                            country.isBlank() || normalizedDtc.isBlank() || symptoms.isBlank() || solution.isBlank() ||
                             cost == null || timeSpent == null
                         ) {
                             errorMessage = "Por favor, complete todos los campos obligatorios con valores válidos."
+                        } else if (!dtcRegex.matches(normalizedDtc)) {
+                            errorMessage = "El DTC debe tener formato real OBD/UDS. Ejemplo: P0300, U0100, B0028."
                         } else {
                             errorMessage = null
                             viewModel.submitCase(
@@ -287,7 +334,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                                 year = year,
                                 engine = engine,
                                 country = country,
-                                dtc = dtc,
+                                dtc = normalizedDtc,
                                 symptoms = symptoms,
                                 solution = solution,
                                 cost = cost,

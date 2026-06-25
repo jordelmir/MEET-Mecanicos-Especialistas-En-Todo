@@ -49,13 +49,15 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.min
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.navigation.NavController
 
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun ScannerDashboardTab(
     viewModel: ObdViewModel,
     isLandscape: Boolean,
-    defaultGauges: List<GaugeConfig>
+    defaultGauges: List<GaugeConfig>,
+    navController: NavController? = null
 ) {
     val pinnedPids by viewModel.pinnedPids.collectAsState()
     val anomalousPids by viewModel.anomalousPids.collectAsState()
@@ -438,7 +440,8 @@ fun ScannerDashboardTab(
                     gauge = gauge,
                     gaugeStyle = currentStyle,
                     isAnomaly = isAnomaly,
-                    onDismiss = { selectedGauge = null }
+                    onDismiss = { selectedGauge = null },
+                    navController = navController
                 )
             }
         }
@@ -485,7 +488,8 @@ fun ScannerDashboardTab(
                 currentScheme = dashColorScheme,
                 onSchemeChange = { gaugeStyleManager.saveColorScheme(currentStyle, it) },
                 onReset = { gaugeStyleManager.resetColorScheme(currentStyle) },
-                onDismiss = { showDashboardCustomizer = false }
+                onDismiss = { showDashboardCustomizer = false },
+                navController = navController
             )
         }
     }
@@ -1142,7 +1146,8 @@ private fun FullScreenGaugeOverlay(
     gauge: GaugeConfig,
     gaugeStyle: GaugeStyleSet,
     isAnomaly: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    navController: NavController? = null
 ) {
     // ── COLOR CUSTOMIZATION STATE ──
     val context = LocalContext.current
@@ -1377,7 +1382,8 @@ private fun FullScreenGaugeOverlay(
                     currentScheme = fsColorScheme,
                     onSchemeChange = { fsStyleManager.saveColorScheme(gaugeStyle, it) },
                     onReset = { fsStyleManager.resetColorScheme(gaugeStyle) },
-                    onDismiss = { showCustomizer = false }
+                    onDismiss = { showCustomizer = false },
+                    navController = navController
                 )
             }
         }
@@ -1750,28 +1756,18 @@ fun CarTpmsChassisView(
     colorScheme: GaugeColorScheme
 ) {
     val liveData by viewModel.liveData.collectAsState()
-    val isDemoMode by viewModel.isDemoMode.collectAsState()
+    val hasLiveTpms = false
 
     // Real Barometric Pressure (PID 0133) in kPa
     val rawBaro = liveData["0133"]
     val ecuBaro = rawBaro ?: 0.0f
     val isBaroSupported = rawBaro != null && rawBaro > 0f
 
-    // Standard tire pressures: in demo mode, simulate based on ECU baro pressure.
-    // In real mode, since OBD2 standard doesn't report individual tire pressures, set them to 0.0f (with inactive UI color).
-    val basePressure = if (isDemoMode) {
-        if (ecuBaro > 0f) ecuBaro / 3.1f else 32.5f
-    } else {
-        0.0f
-    }
-
-    // We want the values to update in real time with slight fluctuations (only in demo mode)
-    val time = rememberInfiniteTransition(label = "tpmsTime").animateFloat(
-        initialValue = 0f,
-        targetValue = 100f,
-        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
-        label = "time"
-    )
+    // Generic OBD does not expose individual tyre pressures. Keep the chassis view honest.
+    val pFL = 0.0f
+    val pFR = 0.0f
+    val pRL = 0.0f
+    val pRR = 0.0f
 
     // Animated dash phase for flowing holographic data packet lines
     val dashPhase by rememberInfiniteTransition(label = "dashPhase").animateFloat(
@@ -1792,35 +1788,6 @@ fun CarTpmsChassisView(
         label = "pulseRadius"
     )
 
-    val pFL = remember(basePressure, time.value) {
-        if (isDemoMode) {
-            (basePressure + Math.sin(time.value.toDouble() * 0.5).toFloat() * 0.4f + (Math.sin(time.value.toDouble() * 2.1).toFloat() * 0.1f)).coerceIn(10f, 50f)
-        } else {
-            0.0f
-        }
-    }
-    val pFR = remember(basePressure, time.value) {
-        if (isDemoMode) {
-            (basePressure + Math.cos(time.value.toDouble() * 0.4).toFloat() * 0.3f + (Math.cos(time.value.toDouble() * 1.8).toFloat() * 0.1f)).coerceIn(10f, 50f)
-        } else {
-            0.0f
-        }
-    }
-    val pRL = remember(basePressure, time.value) {
-        if (isDemoMode) {
-            (basePressure - 0.5f + Math.sin(time.value.toDouble() * 0.3).toFloat() * 0.4f + (Math.sin(time.value.toDouble() * 1.5).toFloat() * 0.1f)).coerceIn(10f, 50f)
-        } else {
-            0.0f
-        }
-    }
-    val pRR = remember(basePressure, time.value) {
-        if (isDemoMode) {
-            (basePressure - 0.5f + Math.cos(time.value.toDouble() * 0.3).toFloat() * 0.3f + (Math.cos(time.value.toDouble() * 1.4).toFloat() * 0.1f)).coerceIn(10f, 50f)
-        } else {
-            0.0f
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1837,8 +1804,8 @@ fun CarTpmsChassisView(
             fontFamily = FontFamily.Monospace
         )
         Text(
-            text = if (isDemoMode) "TELEMETRÍA SIMULADA — MODO PRESENTACIÓN" else if (isBaroSupported) "TELEMETRÍA REAL EN TIEMPO REAL DESDE LA ECU" else "ESPERANDO CONEXIÓN OBD2 (PID 0133)",
-            color = if (isDemoMode) MeetColors.warning.copy(alpha = 0.8f) else if (isBaroSupported) MeetColors.textSecondary else MeetColors.error.copy(alpha = 0.8f),
+            text = if (isBaroSupported) "TELEMETRÍA AUXILIAR REAL DESDE LA ECU" else "OBD GENÉRICO NO REPORTA PRESIONES TPMS INDIVIDUALES",
+            color = if (isBaroSupported) MeetColors.textSecondary else MeetColors.warning.copy(alpha = 0.8f),
             fontWeight = FontWeight.Bold,
             fontSize = 10.sp,
             letterSpacing = 1.sp,
@@ -2095,16 +2062,16 @@ fun CarTpmsChassisView(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    getTireColor(pFL, isDemoMode).copy(alpha = 0.45f),
+                                    getTireColor(pFL, hasLiveTpms).copy(alpha = 0.45f),
                                     Color.Black,
-                                    getTireColor(pFL, isDemoMode).copy(alpha = 0.25f)
+                                    getTireColor(pFL, hasLiveTpms).copy(alpha = 0.25f)
                                 )
                             )
                         )
                         .border(
                             width = 2.dp,
                             brush = Brush.linearGradient(
-                                listOf(getTireColor(pFL, isDemoMode), getTireColor(pFL, isDemoMode).copy(alpha = 0.3f))
+                                listOf(getTireColor(pFL, hasLiveTpms), getTireColor(pFL, hasLiveTpms).copy(alpha = 0.3f))
                             ),
                             shape = RoundedCornerShape(6.dp)
                         ),
@@ -2128,16 +2095,16 @@ fun CarTpmsChassisView(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    getTireColor(pFR, isDemoMode).copy(alpha = 0.45f),
+                                    getTireColor(pFR, hasLiveTpms).copy(alpha = 0.45f),
                                     Color.Black,
-                                    getTireColor(pFR, isDemoMode).copy(alpha = 0.25f)
+                                    getTireColor(pFR, hasLiveTpms).copy(alpha = 0.25f)
                                 )
                             )
                         )
                         .border(
                             width = 2.dp,
                             brush = Brush.linearGradient(
-                                listOf(getTireColor(pFR, isDemoMode), getTireColor(pFR, isDemoMode).copy(alpha = 0.3f))
+                                listOf(getTireColor(pFR, hasLiveTpms), getTireColor(pFR, hasLiveTpms).copy(alpha = 0.3f))
                             ),
                             shape = RoundedCornerShape(6.dp)
                         ),
@@ -2161,16 +2128,16 @@ fun CarTpmsChassisView(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    getTireColor(pRL, isDemoMode).copy(alpha = 0.45f),
+                                    getTireColor(pRL, hasLiveTpms).copy(alpha = 0.45f),
                                     Color.Black,
-                                    getTireColor(pRL, isDemoMode).copy(alpha = 0.25f)
+                                    getTireColor(pRL, hasLiveTpms).copy(alpha = 0.25f)
                                 )
                             )
                         )
                         .border(
                             width = 2.dp,
                             brush = Brush.linearGradient(
-                                listOf(getTireColor(pRL, isDemoMode), getTireColor(pRL, isDemoMode).copy(alpha = 0.3f))
+                                listOf(getTireColor(pRL, hasLiveTpms), getTireColor(pRL, hasLiveTpms).copy(alpha = 0.3f))
                             ),
                             shape = RoundedCornerShape(6.dp)
                         ),
@@ -2194,16 +2161,16 @@ fun CarTpmsChassisView(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    getTireColor(pRR, isDemoMode).copy(alpha = 0.45f),
+                                    getTireColor(pRR, hasLiveTpms).copy(alpha = 0.45f),
                                     Color.Black,
-                                    getTireColor(pRR, isDemoMode).copy(alpha = 0.25f)
+                                    getTireColor(pRR, hasLiveTpms).copy(alpha = 0.25f)
                                 )
                             )
                         )
                         .border(
                             width = 2.dp,
                             brush = Brush.linearGradient(
-                                listOf(getTireColor(pRR, isDemoMode), getTireColor(pRR, isDemoMode).copy(alpha = 0.3f))
+                                listOf(getTireColor(pRR, hasLiveTpms), getTireColor(pRR, hasLiveTpms).copy(alpha = 0.3f))
                             ),
                             shape = RoundedCornerShape(6.dp)
                         ),
@@ -2222,8 +2189,8 @@ fun CarTpmsChassisView(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val cx = size.width / 2
                 val cy = size.height / 2
-                val lineCol = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.35f) else Color(0x335A6E85)
-                val dotCol = if (isDemoMode) colorScheme.specialColor else Color(0xFF5A6E85)
+                val lineCol = if (hasLiveTpms) colorScheme.specialColor.copy(alpha = 0.35f) else Color(0x335A6E85)
+                val dotCol = if (hasLiveTpms) colorScheme.specialColor else Color(0xFF5A6E85)
                 val strokeW = 1.5f.dp.toPx()
                 val pulseRadius = pulseRadiusDp.dp.toPx()
 
@@ -2269,7 +2236,7 @@ fun CarTpmsChassisView(
             TirePressureBox(
                 pressure = pFL,
                 label = "DELANTERO IZQ (FL)",
-                isDemo = isDemoMode,
+                hasLiveTpms = hasLiveTpms,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = (-180).dp, y = (-100).dp)
@@ -2279,7 +2246,7 @@ fun CarTpmsChassisView(
             TirePressureBox(
                 pressure = pFR,
                 label = "DELANTERO DER (FR)",
-                isDemo = isDemoMode,
+                hasLiveTpms = hasLiveTpms,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = 180.dp, y = (-100).dp)
@@ -2289,7 +2256,7 @@ fun CarTpmsChassisView(
             TirePressureBox(
                 pressure = pRL,
                 label = "TRASERO IZQ (RL)",
-                isDemo = isDemoMode,
+                hasLiveTpms = hasLiveTpms,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = (-180).dp, y = 100.dp)
@@ -2299,7 +2266,7 @@ fun CarTpmsChassisView(
             TirePressureBox(
                 pressure = pRR,
                 label = "TRASERO DER (RR)",
-                isDemo = isDemoMode,
+                hasLiveTpms = hasLiveTpms,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = 180.dp, y = 100.dp)
@@ -2328,7 +2295,7 @@ fun CarTpmsChassisView(
                     .border(
                         width = 1.dp,
                         brush = Brush.linearGradient(
-                            colors = if (isDemoMode) {
+                            colors = if (hasLiveTpms) {
                                 listOf(colorScheme.specialColor.copy(alpha = animatedGlow.value), colorScheme.specialColor.copy(alpha = 0.1f))
                             } else {
                                 listOf(Color(0x335A6E85), Color(0x115A6E85))
@@ -2339,8 +2306,8 @@ fun CarTpmsChassisView(
                     .shadow(
                         elevation = 6.dp,
                         shape = RoundedCornerShape(14.dp),
-                        ambientColor = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent,
-                        spotColor = if (isDemoMode) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent
+                        ambientColor = if (hasLiveTpms) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent,
+                        spotColor = if (hasLiveTpms) colorScheme.specialColor.copy(alpha = 0.2f) else Color.Transparent
                     )
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
@@ -2348,7 +2315,7 @@ fun CarTpmsChassisView(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "TEMP. LLANTAS",
-                        color = if (isDemoMode) MeetColors.textSecondary else Color(0x885A6E85),
+                        color = if (hasLiveTpms) MeetColors.textSecondary else Color(0x885A6E85),
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
@@ -2356,16 +2323,16 @@ fun CarTpmsChassisView(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isDemoMode) "34°C" else "--°C",
-                        color = if (isDemoMode) Color.White else Color(0xFF5A6E85),
+                        text = if (hasLiveTpms) "34°C" else "--°C",
+                        color = if (hasLiveTpms) Color.White else Color(0xFF5A6E85),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isDemoMode) "SISTEMA: NOMINAL" else "SIN MEDICIÓN",
-                        color = if (isDemoMode) MeetColors.success else Color(0xFF5A6E85),
+                        text = if (hasLiveTpms) "SISTEMA: NOMINAL" else "SIN MEDICIÓN",
+                        color = if (hasLiveTpms) MeetColors.success else Color(0xFF5A6E85),
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp,
@@ -2418,13 +2385,13 @@ fun CarTpmsChassisView(
 fun TirePressureBox(
     pressure: Float,
     label: String,
-    isDemo: Boolean,
+    hasLiveTpms: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val isMeasured = isDemo && pressure > 0f
+    val isMeasured = hasLiveTpms && pressure > 0f
     val barVal = pressure * 0.0689476f
     
-    val shadowColor = if (isMeasured) getTireColor(pressure, isDemo) else Color.Transparent
+    val shadowColor = if (isMeasured) getTireColor(pressure, hasLiveTpms) else Color.Transparent
 
     Column(
         modifier = modifier
@@ -2435,8 +2402,8 @@ fun TirePressureBox(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        getTireColor(pressure, isDemo).copy(alpha = 0.5f),
-                        getTireColor(pressure, isDemo).copy(alpha = 0.15f)
+                        getTireColor(pressure, hasLiveTpms).copy(alpha = 0.5f),
+                        getTireColor(pressure, hasLiveTpms).copy(alpha = 0.15f)
                     )
                 ),
                 shape = RoundedCornerShape(10.dp)
@@ -2460,7 +2427,7 @@ fun TirePressureBox(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = if (isMeasured) "${String.format("%.1f", pressure)} PSI" else "0.0 PSI",
-            color = getTireColor(pressure, isDemo),
+            color = getTireColor(pressure, hasLiveTpms),
             fontSize = 18.sp,
             fontWeight = FontWeight.Black
         )
@@ -2484,13 +2451,12 @@ fun TirePressureBox(
     }
 }
 
-fun getTireColor(pressure: Float, isDemo: Boolean): Color {
-    if (!isDemo || pressure <= 0f) return Color(0xFF5A6E85)
+fun getTireColor(pressure: Float, hasLiveTpms: Boolean): Color {
+    if (!hasLiveTpms || pressure <= 0f) return Color(0xFF5A6E85)
     return when {
         pressure < 27f || pressure > 39f -> MeetColors.error
         pressure < 30f || pressure > 36f -> MeetColors.warning
         else -> MeetColors.success
     }
 }
-
 

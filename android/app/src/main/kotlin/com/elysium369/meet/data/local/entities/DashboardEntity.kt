@@ -25,5 +25,8 @@ data class DashboardWidgetEntity(
     val color: String,
     val minVal: Float,
     val maxVal: Float,
-    val unit: String
+    val unit: String,
+    val widgetStyle: String? = null,
+    val savedStyleId: String? = null,
+    val typographyIndex: Int = 0
 )

@@ -87,7 +87,26 @@ object PidRegistry {
         
         // ODOMETER / MILEAGE
         PidDefinition("01","A6","Odómetro Standard 01","km",0f,1000000f,0f,0f,{a,b,c,d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f}, PidCategory.ENGINE, isPremium=true),
-        PidDefinition("09","0D","Odómetro Standard 09","km",0f,1000000f,0f,0f,{a,b,c,d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f}, PidCategory.ENGINE, isPremium=true)
+        PidDefinition("09","0D","Odómetro Standard 09","km",0f,1000000f,0f,0f,{a,b,c,d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f}, PidCategory.ENGINE, isPremium=true),
+
+        // VIRTUAL CALCULATED SENSORS (CUSTOM)
+        PidDefinition("CALC", "_POWER", "Potencia Estimada", "hp", 0f, 500f, 350f, 450f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_TORQUE", "Torque Estimado", "Nm", 0f, 600f, 450f, 550f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_BOOST", "Turbo / Boost", "bar", -1f, 3f, 1.8f, 2.5f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_ACCELERATION", "Aceleración G", "g", -2f, 2f, 1.2f, 1.5f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_RATE", "Consumo Instantáneo (L/h)", "L/h", 0f, 50f, 35f, 45f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_CONSUMPTION", "Consumo L/100km", "L/100km", 0f, 50f, 35f, 45f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_TRIP_DISTANCE", "Distancia del Viaje", "km", 0f, 9999f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_TOTAL_DISTANCE", "Distancia Total Odo", "km", 0f, 999999f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_AVG_SPEED", "Velocidad Promedio", "km/h", 0f, 255f, 120f, 150f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_USED", "Combustible Usado (Viaje)", "L", 0f, 1000f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_USED_TOTAL", "Combustible Usado Total", "L", 0f, 99999f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_AVG_CONSUMPTION", "Consumo Promedio Viaje", "L/100km", 0f, 50f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_AVG_CONSUMPTION_TOTAL", "Consumo Promedio Total", "L/100km", 0f, 50f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_PRICE", "Costo Combustible Viaje", "$", 0f, 9999f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_FUEL_PRICE_TOTAL", "Costo Combustible Total", "$", 0f, 99999f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_CURRENT_TIME", "Hora del Sistema", "", 0f, 2359f, 0f, 0f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM),
+        PidDefinition("CALC", "_DTC_COUNT", "Cantidad de Códigos DTC", "", 0f, 50f, 1f, 3f, {_,_,_,_ -> 0f}, PidCategory.CUSTOM)
     )
 
     /**

@@ -46,6 +46,7 @@ fun MarketplaceScreen(
     val serviceRequests by viewModel.serviceRequests.collectAsState()
     val predictionEvents by viewModel.predictionEvents.collectAsState() // AI Health warnings
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val activeDtcs by viewModel.activeDtcs.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var problemInput by remember { mutableStateOf("") }
@@ -89,6 +90,39 @@ fun MarketplaceScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                EliteCard(
+                    glowColor = MeetColors.electricBlue,
+                    borderColor = MeetColors.borderSubtle,
+                    backgroundColor = MeetColors.backgroundDeep,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "SOLICITUD BIEN ARMADA = OFERTAS MEJORES",
+                            color = MeetColors.electricBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Describe síntoma, cuándo ocurre, si el vehículo arranca o se mueve, luces presentes, DTCs activos y si necesitas grúa o visita. Los talleres responden mejor cuando el caso llega triageado.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                        if (activeDtcs.isNotEmpty()) {
+                            Text(
+                                "DTCs detectados en esta sesión: ${activeDtcs.take(3).joinToString()}",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── AI Health Detected Issues ──
             if (predictionEvents.isNotEmpty()) {
                 item {
@@ -169,7 +203,7 @@ fun MarketplaceScreen(
                 item {
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            "No tienes solicitudes activas.\nToca el botón '+' para publicar una necesidad.",
+                            "No tienes solicitudes activas.\nPublica una necesidad con síntoma, contexto y prioridad para empezar a recibir cotizaciones útiles.",
                             color = MeetColors.textMuted,
                             textAlign = TextAlign.Center,
                             fontSize = 14.sp
@@ -303,6 +337,12 @@ fun MarketplaceScreen(
                 title = { Text("Publicar Solicitud de Servicio", color = Color.White) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Incluye qué falla, cuándo ocurre, si el auto se puede mover y cualquier DTC o diagnóstico previo.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
                         OutlinedTextField(
                             value = problemInput,
                             onValueChange = { problemInput = it },
@@ -313,7 +353,7 @@ fun MarketplaceScreen(
                         OutlinedTextField(
                             value = descInput,
                             onValueChange = { descInput = it },
-                            label = { Text("Descripción Detallada", color = MeetColors.textSecondary) },
+                            label = { Text("Descripción Detallada y evidencia", color = MeetColors.textSecondary) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
                         )
@@ -324,6 +364,30 @@ fun MarketplaceScreen(
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("HIGH" to "Hoy", "MEDIUM" to "Próximo turno", "LOW" to "Programable").forEach { (value, label) ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (priorityInput == value) MeetColors.neonGreen.copy(alpha = 0.14f) else MeetColors.backgroundDark)
+                                        .border(1.dp, if (priorityInput == value) MeetColors.neonGreen else MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                        .clickable { priorityInput = value }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (priorityInput == value) Color.White else MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
                 confirmButton = {

@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.FleetChatViewModel
 import com.elysium369.meet.ui.RepairNetworkViewModel
+import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.screens.*
 import com.elysium369.meet.ui.screens.chat.*
 import com.elysium369.meet.core.livelink.LiveLinkServer
@@ -269,8 +270,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 TripScreen(
                     trips = trips,
                     isPremium = isPremium,
-                    onExportPdf = { obdViewModel.exportTripToPdf(it) },
-                    onGenerateMockTrip = { obdViewModel.generateMockTrip() }
+                    onExportPdf = { obdViewModel.exportTripToPdf(it) }
                 )
             }
             composable("ai/{dtcCode}") { backStack ->
@@ -304,6 +304,9 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("active_tests") {
                 ActiveTestsScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("advanced_diagnostics") {
+                AdvancedDiagnosticsScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("service_resets") {
                 ServiceResetsScreen(navController = navController, viewModel = obdViewModel)
@@ -480,6 +483,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 MarketplaceScreen(
                     navController = navController,
                     viewModel = obdViewModel
+                )
+            }
+            composable("gauge_marketplace") {
+                val screenContext = LocalContext.current
+                val styleManager = remember { GaugeStyleManager(screenContext) }
+                GaugeMarketplaceScreen(
+                    navController = navController,
+                    gaugeStyleManager = styleManager
                 )
             }
             composable("workshop_dashboard") {
