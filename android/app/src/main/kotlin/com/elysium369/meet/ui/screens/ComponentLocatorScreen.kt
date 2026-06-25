@@ -253,7 +253,7 @@ fun ComponentLocatorScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(360.dp)
+                .height(392.dp)
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MeetColors.cardBackground)

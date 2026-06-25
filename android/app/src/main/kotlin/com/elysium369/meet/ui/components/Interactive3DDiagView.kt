@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -110,6 +111,16 @@ fun Interactive3DDiagView(
                 color = MeetColors.neonGreen.copy(alpha = 0.03f),
                 radius = min(w, h) * 0.58f,
                 center = Offset(centerX, centerY + h * 0.04f)
+            )
+            drawCircle(
+                color = MeetColors.cyberCyan.copy(alpha = 0.022f),
+                radius = min(w, h) * 0.74f,
+                center = Offset(centerX + w * 0.08f, centerY - h * 0.08f)
+            )
+            drawOval(
+                color = Color.Black.copy(alpha = 0.34f),
+                topLeft = Offset(centerX - w * 0.30f, centerY + h * 0.24f),
+                size = Size(w * 0.60f, h * 0.13f)
             )
 
             val gridColor = MeetColors.neonGreen.copy(alpha = 0.05f)
@@ -296,47 +307,94 @@ fun Interactive3DDiagView(
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.argb(178, 0, 10, 16)
+                color = android.graphics.Color.argb(92, 0, 10, 16)
             }
 
-            val labeledMeshes = meshCenters.values
+            data class Callout(
+                val mesh: Mesh3D,
+                val center: Offset,
+                val label: String,
+                val color: Color,
+                val priority: Int
+            )
+
+            val callouts = meshCenters.values
                 .filter { (mesh, _) -> shouldLabelMesh(mesh, selectedComponentId) }
-                .sortedByDescending { (mesh, _) -> if (mesh.isActiveDtc) 2 else if (selectedComponentId != null && mesh.id.startsWith(selectedComponentId)) 1 else 0 }
-                .take(8)
-
-            labeledMeshes.forEachIndexed { index, (mesh, center) ->
-                val label = serviceLabel(mesh.name)
-                val textWidth = labelPaint.measureText(label)
-                val labelX = if (index % 2 == 0) (center.x + 18f).coerceAtMost(w - textWidth - 18f) else (center.x - textWidth - 18f).coerceAtLeast(18f)
-                val labelY = (center.y - 18f - index * 2f).coerceIn(24f, h - 18f)
-                val color = when {
-                    mesh.isActiveDtc -> MeetColors.error
-                    selectedComponentId != null && mesh.id.startsWith(selectedComponentId) -> MeetColors.neonGreen
-                    else -> MeetColors.cyberCyan
+                .map { (mesh, center) ->
+                    val priority = when {
+                        mesh.isActiveDtc -> 4
+                        selectedComponentId != null && mesh.id.startsWith(selectedComponentId) -> 3
+                        mesh.id.startsWith("fuse_") || mesh.id.startsWith("relay_") -> 2
+                        else -> 1
+                    }
+                    val color = when {
+                        mesh.isActiveDtc -> MeetColors.error
+                        selectedComponentId != null && mesh.id.startsWith(selectedComponentId) -> MeetColors.neonGreen
+                        else -> MeetColors.cyberCyan
+                    }
+                    Callout(mesh, center, serviceLabel(mesh.name), color, priority)
                 }
+                .sortedWith(compareByDescending<Callout> { it.priority }.thenBy { it.center.y })
+                .take(if (sceneType == SceneType.RELAY_FUSE_BOX) 11 else 8)
 
-                drawLine(
-                    color = color.copy(alpha = 0.75f),
-                    start = center,
-                    end = Offset(labelX, labelY - 4f),
-                    strokeWidth = 1.2.dp.toPx()
-                )
-                drawCircle(color.copy(alpha = 0.85f), radius = 4.dp.toPx(), center = center)
-                drawIntoCanvas { canvas ->
-                    val native = canvas.nativeCanvas
-                    native.drawRoundRect(
-                        labelX - 7f,
-                        labelY - 18f,
-                        labelX + textWidth + 7f,
-                        labelY + 5f,
-                        8f,
-                        8f,
-                        labelBgPaint
+            fun drawCalloutColumn(items: List<Callout>, isLeft: Boolean) {
+                var lastY = 40f
+                items.sortedBy { it.center.y }.forEach { callout ->
+                    val textWidth = labelPaint.measureText(callout.label)
+                    val labelX = if (isLeft) {
+                        24f
+                    } else {
+                        (w - textWidth - 26f).coerceAtLeast(w * 0.58f)
+                    }
+                    val wantedY = callout.center.y.coerceIn(40f, h - 34f)
+                    val labelY = max(wantedY, lastY + 30f).coerceAtMost(h - 24f)
+                    lastY = labelY
+
+                    val textStart = Offset(labelX, labelY)
+                    val textEndX = labelX + textWidth
+                    val elbowX = if (isLeft) {
+                        min(callout.center.x - 18f, textEndX + 32f).coerceAtLeast(textEndX + 10f)
+                    } else {
+                        max(callout.center.x + 18f, labelX - 32f).coerceAtMost(labelX - 10f)
+                    }
+                    val elbow = Offset(elbowX, labelY - 4f)
+                    val labelJoin = Offset(if (isLeft) textEndX + 6f else labelX - 6f, labelY - 4f)
+
+                    drawLine(
+                        color = callout.color.copy(alpha = 0.82f),
+                        start = callout.center,
+                        end = elbow,
+                        strokeWidth = 1.2.dp.toPx()
                     )
-                    labelPaint.color = color.toArgbInt()
-                    native.drawText(label, labelX, labelY, labelPaint)
+                    drawLine(
+                        color = callout.color.copy(alpha = 0.82f),
+                        start = elbow,
+                        end = labelJoin,
+                        strokeWidth = 1.2.dp.toPx()
+                    )
+                    drawCircle(callout.color.copy(alpha = 0.92f), radius = 3.8.dp.toPx(), center = callout.center)
+                    drawCircle(Color.White.copy(alpha = 0.5f), radius = 1.4.dp.toPx(), center = callout.center)
+                    drawIntoCanvas { canvas ->
+                        val native = canvas.nativeCanvas
+                        native.drawRoundRect(
+                            labelX - 8f,
+                            labelY - 18f,
+                            labelX + textWidth + 8f,
+                            labelY + 5f,
+                            8f,
+                            8f,
+                            labelBgPaint
+                        )
+                        labelPaint.color = callout.color.toArgbInt()
+                        native.drawText(callout.label, textStart.x, textStart.y, labelPaint)
+                    }
                 }
             }
+
+            val left = callouts.filter { it.center.x < centerX }.take(5)
+            val right = (callouts - left.toSet()).take(6)
+            drawCalloutColumn(left, isLeft = true)
+            drawCalloutColumn(right, isLeft = false)
         }
     }
 }
