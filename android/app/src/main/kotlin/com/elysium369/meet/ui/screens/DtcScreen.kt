@@ -1057,7 +1057,10 @@ private fun HoloDtcCard(
     val desc = if (definition != null) {
         com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(definition, dtc)
     } else {
-        com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+        com.elysium369.meet.ui.components.DtcUtils.getSpanishDescriptionFromRaw(
+            dtc,
+            com.elysium369.meet.core.obd.DtcDecoder.getLocalDescription(dtc)
+        )
     }
     val causes = com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(dtc, definition?.possibleCauses)
     var expanded by remember { mutableStateOf(false) }

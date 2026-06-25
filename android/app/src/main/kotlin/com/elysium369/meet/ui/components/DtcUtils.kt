@@ -85,7 +85,11 @@ object DtcUtils {
     }
 
     fun getSpanishDescription(definition: DtcDefinitionEntity?, code: String): String {
-        val raw = definition?.descriptionEs?.trim().orEmpty()
+        return getSpanishDescriptionFromRaw(code, definition?.descriptionEs)
+    }
+
+    fun getSpanishDescriptionFromRaw(code: String, rawDescription: String?): String {
+        val raw = rawDescription?.trim().orEmpty()
         val normalizedCode = code.trim().uppercase()
         return when {
             raw.isBlank() -> getKnownSpanishTitle(normalizedCode)
@@ -325,7 +329,7 @@ object DtcUtils {
             val def = defMap[code]
             val severity = def?.severity ?: getDynamicSeverity(code)
             val urgency = def?.urgency ?: getDynamicUrgency(code)
-            val desc = def?.descriptionEs ?: getDynamicDtcFallbackDescription(code, isSpanish = true)
+            val desc = getSpanishDescription(def, code)
             sb.append("| **$code** | `$severity` | `$urgency` | $desc |\n")
         }
         sb.append("\n")
@@ -335,9 +339,12 @@ object DtcUtils {
             val def = defMap[code]
             val severity = def?.severity ?: getDynamicSeverity(code)
             val urgency = def?.urgency ?: getDynamicUrgency(code)
-            val desc = def?.descriptionEs ?: getDynamicDtcFallbackDescription(code, isSpanish = true)
-            val possibleCauses = def?.possibleCauses?.split(",")?.map { it.trim() }
-                ?: listOf("Fallo de sensor", "Cableado defectuoso", "Conexión floja")
+            val desc = getSpanishDescription(def, code)
+            val possibleCauses = getSpanishPossibleCauses(code, def?.possibleCauses)
+                .split('|', ',')
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .ifEmpty { listOf("Fallo de sensor", "Cableado defectuoso", "Conexión floja") }
                 
             sb.append("##### Código: **$code**\n")
             sb.append("- **Gravedad:** `$severity` | **Urgencia:** `$urgency`\n")
