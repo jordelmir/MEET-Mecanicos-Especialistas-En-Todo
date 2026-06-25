@@ -406,6 +406,12 @@ object ElysiumProceduralModels {
             else -> {}
         }
 
+        val servicePositions = serviceCylinderPositions(engineType)
+        addFuelAndIgnitionServiceLayer(meshes, servicePositions, activeDtcs)
+        addIntakeAirPath(meshes, engineType, activeDtcs)
+        addExhaustAftertreatment(meshes, engineType, activeDtcs)
+        addCoolingAndAccessoryDrive(meshes, activeDtcs)
+
         // ── 4. Sensores y Alternador ──
         meshes.add(
             createBox(
@@ -456,6 +462,27 @@ object ElysiumProceduralModels {
         )
 
         return meshes
+    }
+
+    private fun serviceCylinderPositions(engineType: EngineType): List<Pair<Int, Vector3D>> {
+        return when (engineType) {
+            EngineType.INLINE_4 -> listOf(-38f, -13f, 13f, 38f).mapIndexed { index, x ->
+                index to Vector3D(x, 5f, 0f)
+            }
+            EngineType.V6 -> listOf(-26f, 0f, 26f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x - 12f, -6f, -12f),
+                    (i * 2 + 1) to Vector3D(x + 12f, -6f, 12f)
+                )
+            }
+            EngineType.V8 -> listOf(-38f, -13f, 13f, 38f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x - 15f, -8f, -14f),
+                    (i * 2 + 1) to Vector3D(x + 15f, -8f, 14f)
+                )
+            }
+            EngineType.ELECTRIC -> emptyList()
+        }
     }
 
     private fun buildElectricMotorScene(activeDtcs: List<String>): List<Mesh3D> {
@@ -602,6 +629,320 @@ object ElysiumProceduralModels {
                     Face3D(listOf(1, 2), Color(0xFF00E5FF), isTranslucent = true, isLineOnly = true),
                     Face3D(listOf(2, 3), Color(0xFF00E5FF), isTranslucent = true, isLineOnly = true)
                 )
+            )
+        )
+    }
+
+    private fun addFuelAndIgnitionServiceLayer(
+        meshes: MutableList<Mesh3D>,
+        cylinderPositions: List<Pair<Int, Vector3D>>,
+        activeDtcs: List<String>
+    ) {
+        if (cylinderPositions.isEmpty()) return
+
+        cylinderPositions.forEach { (index, pos) ->
+            val cylinderNumber = index + 1
+            val coilDtc = activeDtcs.contains("P035$cylinderNumber") ||
+                (cylinderNumber == 1 && activeDtcs.contains("P0351")) ||
+                (cylinderNumber == 2 && activeDtcs.contains("P0352"))
+            meshes.add(
+                createBox(
+                    id = "ignition_coil_$index",
+                    name = "Bobina COP $cylinderNumber",
+                    width = 8f,
+                    height = 12f,
+                    depth = 8f,
+                    color = Color(0xFF263238),
+                    position = pos - Vector3D(0f, 35f, 0f),
+                    isActiveDtc = coilDtc || activeDtcs.contains("P030$cylinderNumber")
+                )
+            )
+            meshes.add(
+                createCylinder(
+                    id = "injector_$index",
+                    name = "Inyector $cylinderNumber",
+                    radius = 2.5f,
+                    height = 13f,
+                    segments = 10,
+                    color = Color(0xFF00C853),
+                    position = pos + Vector3D(0f, -20f, -18f),
+                    rotation = Vector3D(PI.toFloat() / 2f, 0f, 0f),
+                    isActiveDtc = activeDtcs.contains("P020$cylinderNumber")
+                )
+            )
+        }
+
+        val first = cylinderPositions.minBy { it.second.x }.second
+        val last = cylinderPositions.maxBy { it.second.x }.second
+        val railCenter = Vector3D((first.x + last.x) / 2f, -17f, -22f)
+        meshes.add(
+            createCylinder(
+                id = "fuel_rail",
+                name = "Riel de Combustible",
+                radius = 3.2f,
+                height = (last.x - first.x).absoluteValue + 22f,
+                segments = 12,
+                color = Color(0xFFB0BEC5),
+                position = railCenter,
+                rotation = Vector3D(0f, 0f, PI.toFloat() / 2f),
+                isActiveDtc = activeDtcs.contains("P0087") || activeDtcs.contains("P0191")
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "fuel_pressure_sensor",
+                name = "Sensor Presión Combustible",
+                radius = 3f,
+                height = 6f,
+                segments = 10,
+                color = Color(0xFFFFEA00),
+                position = railCenter + Vector3D((last.x - first.x) / 2f + 8f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0190") || activeDtcs.contains("P0191")
+            )
+        )
+    }
+
+    private fun addIntakeAirPath(
+        meshes: MutableList<Mesh3D>,
+        engineType: EngineType,
+        activeDtcs: List<String>
+    ) {
+        val manifoldWidth = if (engineType == EngineType.INLINE_4) 80f else 92f
+        meshes.add(
+            createBox(
+                id = "intake_manifold",
+                name = "Múltiple de Admisión",
+                width = manifoldWidth,
+                height = 14f,
+                depth = 18f,
+                color = Color(0xFF455A64),
+                position = Vector3D(5f, -42f, -34f),
+                isActiveDtc = activeDtcs.contains("P0105") || activeDtcs.contains("P0171") || activeDtcs.contains("P0174")
+            )
+        )
+        listOf(-36f, -12f, 12f, 36f).forEachIndexed { index, x ->
+            meshes.add(
+                createSplineCable(
+                    id = "intake_runner_$index",
+                    name = "Conducto Admisión ${index + 1}",
+                    points = listOf(
+                        Vector3D(x, -35f, -27f),
+                        Vector3D(x * 0.8f, -22f, -17f),
+                        Vector3D(x * 0.65f, -8f, -7f)
+                    ),
+                    radius = 4.5f,
+                    segments = 8,
+                    color = Color(0xFF607D8B),
+                    isTranslucent = true,
+                    opacity = 0.72f
+                )
+            )
+        }
+        meshes.add(
+            createCylinder(
+                id = "throttle_body",
+                name = "Cuerpo de Aceleración",
+                radius = 10f,
+                height = 12f,
+                segments = 16,
+                color = Color(0xFF90A4AE),
+                position = Vector3D(70f, -43f, -34f),
+                rotation = Vector3D(PI.toFloat() / 2f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0121") || activeDtcs.contains("P2119") || activeDtcs.contains("P2135")
+            )
+        )
+        meshes.add(
+            createBox(
+                id = "throttle_plate",
+                name = "Mariposa de Aceleración",
+                width = 1.6f,
+                height = 15f,
+                depth = 15f,
+                color = Color(0xFFCFD8DC),
+                position = Vector3D(70f, -43f, -34f),
+                rotation = Vector3D(0.25f, 0f, 0.55f)
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "air_intake_duct",
+                name = "Ducto de Admisión",
+                radius = 8f,
+                height = 44f,
+                segments = 14,
+                color = Color(0xFF1B242B),
+                position = Vector3D(94f, -43f, -34f),
+                rotation = Vector3D(0f, PI.toFloat() / 2f, 0f)
+            )
+        )
+        meshes.add(
+            createBox(
+                id = "map_sensor",
+                name = "Sensor MAP",
+                width = 8f,
+                height = 5f,
+                depth = 6f,
+                color = Color(0xFF00E5FF),
+                position = Vector3D(16f, -53f, -35f),
+                isActiveDtc = activeDtcs.contains("P0105") || activeDtcs.contains("P0107")
+            )
+        )
+        meshes.add(
+            createBox(
+                id = "iat_sensor",
+                name = "Sensor IAT",
+                width = 6f,
+                height = 5f,
+                depth = 5f,
+                color = Color(0xFF18FFFF),
+                position = Vector3D(88f, -53f, -34f),
+                isActiveDtc = activeDtcs.contains("P0110") || activeDtcs.contains("P0112") || activeDtcs.contains("P0113")
+            )
+        )
+    }
+
+    private fun addExhaustAftertreatment(
+        meshes: MutableList<Mesh3D>,
+        engineType: EngineType,
+        activeDtcs: List<String>
+    ) {
+        val runnerXs = if (engineType == EngineType.INLINE_4) listOf(-38f, -13f, 13f, 38f) else listOf(-48f, -24f, 0f, 24f, 48f)
+        runnerXs.forEachIndexed { index, x ->
+            meshes.add(
+                createSplineCable(
+                    id = "exhaust_runner_$index",
+                    name = "Ramal Escape ${index + 1}",
+                    points = listOf(
+                        Vector3D(x, -4f, 28f),
+                        Vector3D(x * 0.75f, 8f, 43f),
+                        Vector3D(x * 0.45f, 18f, 50f)
+                    ),
+                    radius = 3.8f,
+                    segments = 8,
+                    color = Color(0xFF795548),
+                    isActiveDtc = activeDtcs.contains("P0420") || activeDtcs.contains("P0430")
+                )
+            )
+        }
+        meshes.add(
+            createCylinder(
+                id = "exhaust_manifold",
+                name = "Múltiple de Escape",
+                radius = 5f,
+                height = 78f,
+                segments = 12,
+                color = Color(0xFF5D4037),
+                position = Vector3D(0f, 20f, 52f),
+                rotation = Vector3D(0f, 0f, PI.toFloat() / 2f)
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "o2_upstream",
+                name = "Sensor O2 Pre-Catalizador",
+                radius = 2.5f,
+                height = 12f,
+                segments = 10,
+                color = Color(0xFFECEFF1),
+                position = Vector3D(28f, 11f, 58f),
+                rotation = Vector3D(0.8f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0130") || activeDtcs.contains("P0135")
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "catalytic_converter",
+                name = "Catalizador",
+                radius = 12f,
+                height = 34f,
+                segments = 16,
+                color = Color(0xFFBCAAA4),
+                position = Vector3D(58f, 24f, 55f),
+                rotation = Vector3D(0f, PI.toFloat() / 2f, 0f),
+                isActiveDtc = activeDtcs.contains("P0420") || activeDtcs.contains("P0430")
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "o2_downstream",
+                name = "Sensor O2 Post-Catalizador",
+                radius = 2.4f,
+                height = 11f,
+                segments = 10,
+                color = Color(0xFFECEFF1),
+                position = Vector3D(78f, 16f, 58f),
+                rotation = Vector3D(0.8f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0136") || activeDtcs.contains("P0141")
+            )
+        )
+    }
+
+    private fun addCoolingAndAccessoryDrive(
+        meshes: MutableList<Mesh3D>,
+        activeDtcs: List<String>
+    ) {
+        meshes.add(
+            createCylinder(
+                id = "water_pump",
+                name = "Bomba de Agua",
+                radius = 10f,
+                height = 10f,
+                segments = 16,
+                color = Color(0xFF607D8B),
+                position = Vector3D(-67f, 5f, -8f),
+                rotation = Vector3D(PI.toFloat() / 2f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0128") || activeDtcs.contains("P0217")
+            )
+        )
+        meshes.add(
+            createBox(
+                id = "thermostat_housing",
+                name = "Carcasa Termostato",
+                width = 14f,
+                height = 11f,
+                depth = 14f,
+                color = Color(0xFF546E7A),
+                position = Vector3D(-62f, -20f, 16f),
+                isActiveDtc = activeDtcs.contains("P0128")
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "oil_filter",
+                name = "Filtro de Aceite",
+                radius = 7f,
+                height = 15f,
+                segments = 14,
+                color = Color(0xFF1565C0),
+                position = Vector3D(42f, 26f, -25f),
+                rotation = Vector3D(PI.toFloat() / 2f, 0f, 0f),
+                isActiveDtc = activeDtcs.contains("P0520") || activeDtcs.contains("P0522")
+            )
+        )
+        meshes.add(
+            Mesh3D(
+                id = "serpentine_belt",
+                name = "Banda Serpentina",
+                vertices = listOf(
+                    Vector3D(-45f, 10f, -24f),
+                    Vector3D(-67f, 5f, -8f),
+                    Vector3D(-42f, 30f, 8f),
+                    Vector3D(-45f, 10f, -24f)
+                ),
+                faces = listOf(
+                    Face3D(listOf(0, 1, 2, 3), Color(0xFF111111), isTranslucent = true, opacity = 0.9f, isLineOnly = true)
+                )
+            )
+        )
+        meshes.add(
+            createCylinder(
+                id = "camshaft_sensor",
+                name = "Sensor CMP Árbol de Levas",
+                radius = 3f,
+                height = 8f,
+                color = Color(0xFFE040FB),
+                position = Vector3D(42f, -31f, 23f),
+                isActiveDtc = activeDtcs.contains("P0340") || activeDtcs.contains("P0341")
             )
         )
     }

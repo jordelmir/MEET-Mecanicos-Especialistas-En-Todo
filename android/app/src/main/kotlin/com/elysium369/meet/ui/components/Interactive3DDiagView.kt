@@ -1,8 +1,11 @@
 package com.elysium369.meet.ui.components
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -10,9 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.engine3d.ElysiumProceduralModels
 import com.elysium369.meet.core.engine3d.Face3D
 import com.elysium369.meet.core.engine3d.Mesh3D
@@ -34,11 +40,12 @@ fun Interactive3DDiagView(
     activeDtcs: List<String>,
     selectedComponentId: String?,
     onComponentSelected: (componentId: String, componentName: String) -> Unit,
+    explodedServiceView: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var yaw by remember { mutableStateOf(-0.5f) }
-    var pitch by remember { mutableStateOf(-0.4f) }
-    var zoom by remember { mutableStateOf(1.2f) }
+    var yaw by remember { mutableStateOf(-0.72f) }
+    var pitch by remember { mutableStateOf(-0.58f) }
+    var zoom by remember { mutableStateOf(1.9f) }
     var panX by remember { mutableStateOf(0f) }
     var panY by remember { mutableStateOf(0f) }
 
@@ -65,27 +72,29 @@ fun Interactive3DDiagView(
         label = "dtcPulse"
     )
 
+    val explodedProgress by animateFloatAsState(
+        targetValue = if (explodedServiceView) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 120f),
+        label = "explodedProgress"
+    )
+
     var tapOffset by remember { mutableStateOf<Offset?>(null) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    yaw += dragAmount.x * 0.007f
-                    pitch += dragAmount.y * 0.007f
+                detectTransformGestures { _, pan, gestureZoom, gestureRotation ->
+                    yaw += pan.x * 0.0065f + (gestureRotation * PI.toFloat() / 180f) * 0.35f
+                    pitch = (pitch + pan.y * 0.0055f).coerceIn(-1.15f, 0.55f)
+                    zoom = (zoom * gestureZoom).coerceIn(0.75f, 4.25f)
+                    panX = (panX + pan.x * 0.08f).coerceIn(-220f, 220f)
+                    panY = (panY + pan.y * 0.08f).coerceIn(-180f, 180f)
                 }
             }
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val down = event.changes.firstOrNull()
-                        if (down != null && down.pressed) {
-                            tapOffset = down.position
-                        }
-                    }
+                detectTapGestures {
+                    tapOffset = it
                 }
             }
     ) {
@@ -93,26 +102,28 @@ fun Interactive3DDiagView(
             val w = size.width
             val h = size.height
             val centerX = w / 2f
-            val centerY = h / 2f
+            val centerY = h * 0.55f
+            val focalLength = min(w, h) * 1.22f
+            val cameraDistance = 245f
 
             drawCircle(
                 color = MeetColors.neonGreen.copy(alpha = 0.03f),
-                radius = min(w, h) * 0.45f,
-                center = Offset(centerX, centerY + 30f)
+                radius = min(w, h) * 0.58f,
+                center = Offset(centerX, centerY + h * 0.04f)
             )
 
             val gridColor = MeetColors.neonGreen.copy(alpha = 0.05f)
-            for (i in -4..4) {
+            for (i in -6..6) {
                 val zStart = i * 20f
-                val p1 = projectPoint(Vector3D(-80f, 40f, zStart), yaw, pitch, zoom, centerX, centerY, panX, panY)
-                val p2 = projectPoint(Vector3D(80f, 40f, zStart), yaw, pitch, zoom, centerX, centerY, panX, panY)
+                val p1 = projectPoint(Vector3D(-110f, 48f, zStart), yaw, pitch, zoom, centerX, centerY, panX, panY, focalLength, cameraDistance)
+                val p2 = projectPoint(Vector3D(110f, 48f, zStart), yaw, pitch, zoom, centerX, centerY, panX, panY, focalLength, cameraDistance)
                 if (p1 != null && p2 != null) {
                     drawLine(gridColor, p1, p2, 1f)
                 }
 
                 val xStart = i * 20f
-                val p3 = projectPoint(Vector3D(xStart, 40f, -80f), yaw, pitch, zoom, centerX, centerY, panX, panY)
-                val p4 = projectPoint(Vector3D(xStart, 40f, 80f), yaw, pitch, zoom, centerX, centerY, panX, panY)
+                val p3 = projectPoint(Vector3D(xStart, 48f, -110f), yaw, pitch, zoom, centerX, centerY, panX, panY, focalLength, cameraDistance)
+                val p4 = projectPoint(Vector3D(xStart, 48f, 110f), yaw, pitch, zoom, centerX, centerY, panX, panY, focalLength, cameraDistance)
                 if (p3 != null && p4 != null) {
                     drawLine(gridColor, p3, p4, 1f)
                 }
@@ -129,6 +140,7 @@ fun Interactive3DDiagView(
             )
 
             val projectedFaces = mutableListOf<ProjectedFace>()
+            val meshCenters = mutableMapOf<String, Pair<Mesh3D, Offset>>()
 
             meshes.forEach { mesh ->
                 val pistonIndex = if (mesh.id.startsWith("piston_")) mesh.id.removePrefix("piston_").toIntOrNull() else null
@@ -145,14 +157,21 @@ fun Interactive3DDiagView(
 
                 val isSparkTriggered = sparkIndex != null && (sin(animTime * 4 + sparkIndex) > 0.85f)
 
-                val worldVertices = mesh.transformToWorld(pistonOffset, isSparkTriggered)
+                val serviceOffset = serviceExplodedOffset(mesh.id, explodedProgress)
+                val worldVertices = mesh.transformToWorld(pistonOffset, isSparkTriggered).map { it + serviceOffset }
 
                 val screenPoints = worldVertices.map { v ->
                     val rotatedCam = v.rotateY(yaw).rotateX(pitch)
-                    val zDepth = rotatedCam.z + 180f
-                    val projX = centerX + (rotatedCam.x * zoom * 150f) / zDepth + panX
-                    val projY = centerY + (rotatedCam.y * zoom * 150f) / zDepth + panY
+                    val zDepth = rotatedCam.z + cameraDistance
+                    val projX = centerX + (rotatedCam.x * zoom * focalLength) / zDepth + panX
+                    val projY = centerY + (rotatedCam.y * zoom * focalLength) / zDepth + panY
                     Triple(Offset(projX, projY), zDepth, rotatedCam)
+                }
+
+                if (screenPoints.isNotEmpty()) {
+                    val avgX = screenPoints.map { it.first.x }.average().toFloat()
+                    val avgY = screenPoints.map { it.first.y }.average().toFloat()
+                    meshCenters[mesh.id] = mesh to Offset(avgX, avgY)
                 }
 
                 mesh.faces.forEach facesLoop@{ face ->
@@ -216,16 +235,27 @@ fun Interactive3DDiagView(
                         for (i in 1 until pts.size) {
                             lineTo(pts[i].x, pts[i].y)
                         }
-                        close()
+                        if (!face.isLineOnly && pts.size > 2) close()
                     }
                 }
 
                 if (face.isLineOnly) {
-                    drawPath(
-                        path = path,
-                        color = pf.shadingColor,
-                        style = Stroke(width = 2.dp.toPx())
-                    )
+                    if (pts.size >= 2) {
+                        for (i in 0 until pts.lastIndex) {
+                            drawLine(
+                                color = pf.shadingColor,
+                                start = pts[i],
+                                end = pts[i + 1],
+                                strokeWidth = if (mesh.isActiveDtc) 3.2.dp.toPx() else 2.dp.toPx()
+                            )
+                        }
+                    } else {
+                        drawPath(
+                            path = path,
+                            color = pf.shadingColor,
+                            style = Stroke(width = 2.dp.toPx())
+                        )
+                    }
                 } else {
                     drawPath(
                         path = path,
@@ -259,6 +289,54 @@ fun Interactive3DDiagView(
                     }
                 }
             }
+
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textSize = 12.sp.toPx()
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val labelBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.argb(178, 0, 10, 16)
+            }
+
+            val labeledMeshes = meshCenters.values
+                .filter { (mesh, _) -> shouldLabelMesh(mesh, selectedComponentId) }
+                .sortedByDescending { (mesh, _) -> if (mesh.isActiveDtc) 2 else if (selectedComponentId != null && mesh.id.startsWith(selectedComponentId)) 1 else 0 }
+                .take(8)
+
+            labeledMeshes.forEachIndexed { index, (mesh, center) ->
+                val label = serviceLabel(mesh.name)
+                val textWidth = labelPaint.measureText(label)
+                val labelX = if (index % 2 == 0) (center.x + 18f).coerceAtMost(w - textWidth - 18f) else (center.x - textWidth - 18f).coerceAtLeast(18f)
+                val labelY = (center.y - 18f - index * 2f).coerceIn(24f, h - 18f)
+                val color = when {
+                    mesh.isActiveDtc -> MeetColors.error
+                    selectedComponentId != null && mesh.id.startsWith(selectedComponentId) -> MeetColors.neonGreen
+                    else -> MeetColors.cyberCyan
+                }
+
+                drawLine(
+                    color = color.copy(alpha = 0.75f),
+                    start = center,
+                    end = Offset(labelX, labelY - 4f),
+                    strokeWidth = 1.2.dp.toPx()
+                )
+                drawCircle(color.copy(alpha = 0.85f), radius = 4.dp.toPx(), center = center)
+                drawIntoCanvas { canvas ->
+                    val native = canvas.nativeCanvas
+                    native.drawRoundRect(
+                        labelX - 7f,
+                        labelY - 18f,
+                        labelX + textWidth + 7f,
+                        labelY + 5f,
+                        8f,
+                        8f,
+                        labelBgPaint
+                    )
+                    labelPaint.color = color.toArgbInt()
+                    native.drawText(label, labelX, labelY, labelPaint)
+                }
+            }
         }
     }
 }
@@ -271,14 +349,64 @@ private fun projectPoint(
     centerX: Float,
     centerY: Float,
     panX: Float,
-    panY: Float
+    panY: Float,
+    focalLength: Float,
+    cameraDistance: Float
 ): Offset? {
     val rotated = v.rotateY(yaw).rotateX(pitch)
-    val zDepth = rotated.z + 180f
-    if (zDepth <= 10f) return null
-    val projX = centerX + (rotated.x * zoom * 150f) / zDepth + panX
-    val projY = centerY + (rotated.y * zoom * 150f) / zDepth + panY
+    val zDepth = rotated.z + cameraDistance
+    if (zDepth <= 18f) return null
+    val projX = centerX + (rotated.x * zoom * focalLength) / zDepth + panX
+    val projY = centerY + (rotated.y * zoom * focalLength) / zDepth + panY
     return Offset(projX, projY)
+}
+
+private fun serviceExplodedOffset(meshId: String, progress: Float): Vector3D {
+    if (progress <= 0f) return Vector3D(0f, 0f, 0f)
+    val direction = when {
+        meshId.startsWith("spark_plug_") || meshId.startsWith("ignition_coil_") || meshId.startsWith("spark_gap_") -> Vector3D(0f, -28f, 0f)
+        meshId.startsWith("injector_") || meshId == "fuel_rail" -> Vector3D(0f, -12f, -18f)
+        meshId == "intake_manifold" || meshId.startsWith("intake_runner_") || meshId == "throttle_body" -> Vector3D(0f, -10f, -30f)
+        meshId == "exhaust_manifold" || meshId.startsWith("exhaust_runner_") || meshId.contains("o2") || meshId == "catalytic_converter" -> Vector3D(0f, 8f, 34f)
+        meshId == "alternator" || meshId == "serpentine_belt" || meshId == "water_pump" || meshId == "thermostat_housing" -> Vector3D(-28f, 0f, 0f)
+        meshId == "oil_pan" || meshId == "oil_filter" -> Vector3D(0f, 26f, 0f)
+        else -> Vector3D(0f, 0f, 0f)
+    }
+    return direction * progress
+}
+
+private fun shouldLabelMesh(mesh: Mesh3D, selectedComponentId: String?): Boolean {
+    if (mesh.id == "engine_block" || mesh.id.startsWith("fuse_element_")) return false
+    if (mesh.isActiveDtc) return true
+    if (selectedComponentId != null && mesh.id.startsWith(selectedComponentId)) return true
+    return mesh.id in setOf(
+        "throttle_body",
+        "maf_sensor",
+        "fuel_rail",
+        "alternator",
+        "catalytic_converter",
+        "inverter_module",
+        "hv_battery_pack",
+        "safety_disconnect"
+    ) || mesh.id.startsWith("spark_plug_0") || mesh.id.startsWith("ignition_coil_0")
+}
+
+private fun serviceLabel(name: String): String {
+    return name
+        .replace("(Pre-Cat)", "pre-cat")
+        .replace("(Post-Cat)", "post-cat")
+        .replace("Sensor ", "")
+        .replace(" de ", " ")
+        .take(28)
+}
+
+private fun Color.toArgbInt(): Int {
+    return android.graphics.Color.argb(
+        (alpha * 255).roundToInt().coerceIn(0, 255),
+        (red * 255).roundToInt().coerceIn(0, 255),
+        (green * 255).roundToInt().coerceIn(0, 255),
+        (blue * 255).roundToInt().coerceIn(0, 255)
+    )
 }
 
 private fun isPointInPolygon(px: Float, py: Float, polygon: List<Offset>): Boolean {
