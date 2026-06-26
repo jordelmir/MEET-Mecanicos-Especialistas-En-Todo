@@ -129,6 +129,15 @@ Run the following Gradle wrapper commands:
 # Resulting file: app/build/outputs/bundle/release/app-release.aab
 ```
 
+### 3. Monetization Mode
+The current APK build is intentionally open while the product is being polished:
+
+```kotlin
+MonetizationPolicy.PAYWALLS_ENABLED = false
+```
+
+This grants local full access to PRO features, trip PDF exports, MEET Perito certification surfaces, and gauge marketplace previews/apply actions without launching Google Play Billing. Billing, Supabase verification, and entitlement tables remain in the codebase so production monetization can be restored later by turning the policy back on and publishing the Play products.
+
 ---
 
 ## 🧪 Hardware Compatibility & Tests

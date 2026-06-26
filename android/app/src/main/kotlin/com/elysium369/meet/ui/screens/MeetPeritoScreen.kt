@@ -2,6 +2,7 @@ package com.elysium369.meet.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,7 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -433,7 +433,7 @@ fun MeetPeritoScreen(
                             }
                         }
 
-                        // Premium Block / Monetización futura
+                        // Certificacion incluida mientras la APK opera con acceso completo temporal.
                         item {
                             EliteCard(
                                 glowColor = MeetColors.electricBlue,
@@ -450,9 +450,9 @@ fun MeetPeritoScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Lock, contentDescription = "Premium", tint = MeetColors.electricBlue)
+                                        Text("✓", color = MeetColors.electricBlue, fontWeight = FontWeight.Black)
                                         Text(
-                                            "CERTIFICACIÓN MEET PERITO PREMIUM",
+                                            "CERTIFICACIÓN MEET PERITO HABILITADA",
                                             color = MeetColors.electricBlue,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
@@ -461,18 +461,25 @@ fun MeetPeritoScreen(
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Text(
-                                        "Genera un sello digital único en Blockchain para tu peritaje, certificado oficial imprimible en alta definición y código QR de verificación rápida para compradores por $9.99 USD.",
+                                        "El sello digital, el PDF imprimible en alta definición y el código QR de verificación quedan incluidos en esta APK sin cobro ni suscripción.",
                                         color = MeetColors.textMuted,
                                         fontSize = 12.sp,
                                         textAlign = TextAlign.Center,
                                         lineHeight = 16.sp
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
-                                    Button(
-                                        onClick = { /* Paywall action simulator */ },
-                                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue)
+                                    Surface(
+                                        color = MeetColors.electricBlue.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(999.dp),
+                                        border = BorderStroke(1.dp, MeetColors.electricBlue.copy(alpha = 0.35f))
                                     ) {
-                                        Text("OBTENER CERTIFICACIÓN", color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            "INCLUIDO EN ACCESO COMPLETO",
+                                            color = MeetColors.electricBlue,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                        )
                                     }
                                 }
                             }

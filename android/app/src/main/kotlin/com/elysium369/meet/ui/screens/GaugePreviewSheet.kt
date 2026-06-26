@@ -40,6 +40,7 @@ import kotlinx.serialization.json.Json
 fun GaugePreviewSheet(
     listing: GaugeListing,
     isOwned: Boolean,
+    isMonetizationUnlocked: Boolean = false,
     reviews: List<GaugeReview> = emptyList(),
     isLoadingReviews: Boolean = false,
     onDismiss: () -> Unit,
@@ -268,12 +269,12 @@ fun GaugePreviewSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Precio",
+                                if (isMonetizationUnlocked) "Acceso" else "Precio",
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 13.sp
                             )
                             Text(
-                                GaugePriceTiers.displayPrice(listing.price_tier),
+                                if (isMonetizationUnlocked) "LIBERADO" else GaugePriceTiers.displayPrice(listing.price_tier),
                                 color = Color.White,
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Black
@@ -293,7 +294,7 @@ fun GaugePreviewSheet(
                                 shape = RoundedCornerShape(14.dp)
                             ) {
                                 Text(
-                                    "✅ APLICAR A MI GAUGE",
+                                    if (isMonetizationUnlocked) "✅ APLICAR SIN COBRO" else "✅ APLICAR A MI GAUGE",
                                     color = Color.Black,
                                     fontWeight = FontWeight.Black,
                                     fontSize = 15.sp

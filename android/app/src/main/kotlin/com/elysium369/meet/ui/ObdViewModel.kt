@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.obd.*
+import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.data.supabase.SubscriptionRepository
 import io.github.jan.supabase.gotrue.auth
 import com.elysium369.meet.data.supabase.Vehicle
@@ -1095,7 +1096,7 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    private val _isPremium = MutableStateFlow(false)
+    private val _isPremium = MutableStateFlow(MonetizationPolicy.LOCAL_FULL_ACCESS)
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
     private val _currentOdometer = MutableStateFlow(0f)
@@ -2430,7 +2431,11 @@ class ObdViewModel @Inject constructor(
 
                 // ─── STEP 2: Cloud sync (only if authenticated) ───
                 val user = SupabaseManager.client.auth.currentUserOrNull()
-                _isPremium.value = subscriptionRepository.isPremium()
+                _isPremium.value = if (MonetizationPolicy.PAYWALLS_ENABLED) {
+                    MonetizationPolicy.unlocksPremium(subscriptionRepository.isPremium())
+                } else {
+                    MonetizationPolicy.LOCAL_FULL_ACCESS
+                }
 
                 if (user != null) {
                     _cloudSyncState.value = "Sincronizando garaje..."

@@ -34,6 +34,7 @@ import androidx.navigation.NavController
 import com.elysium369.meet.core.billing.GaugeBillingManager
 import com.elysium369.meet.core.billing.GooglePlayPurchaseVerifier
 import com.elysium369.meet.core.billing.PlayBillingCatalog
+import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.data.local.entities.GaugeConfig
 import com.elysium369.meet.data.local.entities.SavedGaugeEntity
 import com.elysium369.meet.data.supabase.GaugeListing
@@ -79,36 +80,40 @@ fun GaugeMarketplaceScreen(
     val accentPurple = Color(0xFF7C4DFF)
 
     DisposableEffect(billingManager) {
-        billingManager.onPurchaseCompleted = { purchaseToken, productId ->
-            val listing = purchaseTarget
-            purchaseTarget = null
-            if (listing != null) {
-                scope.launch {
-                    val verification = purchaseVerifier.verify(
-                        productId = productId,
-                        productType = PlayBillingCatalog.productType(productId),
-                        purchaseToken = purchaseToken
-                    )
-                    if (verification.isSuccess) {
-                        viewModel.recordPurchase(listing, purchaseToken)
-                        snackbarHostState.showSnackbar("Compra verificada por Google Play. El gauge quedó registrado en tu cuenta.")
-                    } else {
-                        snackbarHostState.showSnackbar("Google Play confirmó el pago, pero el backend no pudo verificarlo: ${verification.exceptionOrNull()?.message.orEmpty()}")
+        if (MonetizationPolicy.PAYWALLS_ENABLED) {
+            billingManager.onPurchaseCompleted = { purchaseToken, productId ->
+                val listing = purchaseTarget
+                purchaseTarget = null
+                if (listing != null) {
+                    scope.launch {
+                        val verification = purchaseVerifier.verify(
+                            productId = productId,
+                            productType = PlayBillingCatalog.productType(productId),
+                            purchaseToken = purchaseToken
+                        )
+                        if (verification.isSuccess) {
+                            viewModel.recordPurchase(listing, purchaseToken)
+                            snackbarHostState.showSnackbar("Compra verificada por Google Play. El gauge quedo registrado en tu cuenta.")
+                        } else {
+                            snackbarHostState.showSnackbar("Google Play confirmo el pago, pero el backend no pudo verificarlo: ${verification.exceptionOrNull()?.message.orEmpty()}")
+                        }
                     }
                 }
             }
-        }
-        billingManager.onPurchaseError = { message ->
-            purchaseTarget = null
-            scope.launch {
-                snackbarHostState.showSnackbar(message)
+            billingManager.onPurchaseError = { message ->
+                purchaseTarget = null
+                scope.launch {
+                    snackbarHostState.showSnackbar(message)
+                }
             }
-        }
-        billingManager.connect()
-        onDispose {
-            billingManager.onPurchaseCompleted = null
-            billingManager.onPurchaseError = null
-            billingManager.disconnect()
+            billingManager.connect()
+            onDispose {
+                billingManager.onPurchaseCompleted = null
+                billingManager.onPurchaseError = null
+                billingManager.disconnect()
+            }
+        } else {
+            onDispose { }
         }
     }
 
@@ -314,7 +319,11 @@ fun GaugeMarketplaceScreen(
                                 GaugeMarketTab.POPULAR -> "Aún no hay gauges públicos"
                                 GaugeMarketTab.RECENT -> "Aún no hay gauges nuevos"
                                 GaugeMarketTab.MY_SALES -> "Todavía no has publicado gauges"
-                                GaugeMarketTab.MY_PURCHASES -> "Todavía no hay compras registradas"
+                                GaugeMarketTab.MY_PURCHASES -> if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
+                                    "Acceso local liberado"
+                                } else {
+                                    "Todavía no hay compras registradas"
+                                }
                             },
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 18.sp,
@@ -327,7 +336,11 @@ fun GaugeMarketplaceScreen(
                                 GaugeMarketTab.POPULAR -> "Cuando existan publicaciones activas en Supabase aparecerán aquí."
                                 GaugeMarketTab.RECENT -> "Los gauges más recientes aparecerán aquí cuando se publiquen."
                                 GaugeMarketTab.MY_SALES -> "Publica desde el editor DIY para ver tus diseños listados aquí."
-                                GaugeMarketTab.MY_PURCHASES -> "Las compras confirmadas por Google Play y registradas en Supabase aparecerán aquí."
+                                GaugeMarketTab.MY_PURCHASES -> if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
+                                    "Todos los gauges se pueden abrir y aplicar desde Populares o Recientes sin pasar por Google Play Billing."
+                                } else {
+                                    "Las compras confirmadas por Google Play y registradas en Supabase aparecerán aquí."
+                                }
                             },
                             color = Color.White.copy(alpha = 0.4f),
                             fontSize = 13.sp,
@@ -396,7 +409,7 @@ fun GaugeMarketplaceScreen(
         if (showPreviewSheet && selectedListing != null) {
             val listing = selectedListing!!
             val listingId = listing.id
-            val isOwned = when {
+            val isOwned = MonetizationPolicy.LOCAL_FULL_ACCESS || when {
                 uiState.selectedTab == GaugeMarketTab.MY_SALES -> true
                 listingId.isNullOrBlank() -> false
                 else -> uiState.ownershipByListingId[listingId] == true
@@ -404,6 +417,7 @@ fun GaugeMarketplaceScreen(
             GaugePreviewSheet(
                 listing = listing,
                 isOwned = isOwned,
+                isMonetizationUnlocked = MonetizationPolicy.LOCAL_FULL_ACCESS,
                 reviews = listingId?.let { uiState.reviewsByListingId[it] }.orEmpty(),
                 isLoadingReviews = !listingId.isNullOrBlank() && !uiState.reviewsByListingId.containsKey(listingId),
                 onDismiss = {
@@ -411,6 +425,12 @@ fun GaugeMarketplaceScreen(
                     selectedListing = null
                 },
                 onBuy = { listingToBuy ->
+                    if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(MonetizationPolicy.ACCESS_MESSAGE)
+                        }
+                        return@GaugePreviewSheet
+                    }
                     if (listingToBuy.id.isNullOrBlank()) {
                         scope.launch {
                             snackbarHostState.showSnackbar("La publicación no tiene un identificador válido.")

@@ -25,7 +25,7 @@ MEET es una plataforma Android de diagnostico automotriz offline-first orientada
 - WiFi TCP: conexion real a adaptadores ELM por socket.
 - DoIP: activacion de routing ISO 13400 real y sondeo real del gateway/servidor UDS cuando se usa `:13400`.
 - Diagnostico Visual 3D: el visor ya se alimenta de fichas tecnicas por componente con DTCs, PIDs, pruebas, flujo de reparacion, herramientas, seguridad y contexto listo para IA.
-- Monetizacion: Google Play Billing 9.1.0 queda integrado con catalogo de productos, verificacion backend y entitlements en Supabase.
+- Monetizacion: la APK actual opera con acceso completo temporal sin paywalls; Google Play Billing 9.1.0 queda integrado para reactivacion futura.
 - Analytics web: eventos estructurados, consentimiento, cola offline, retencion y panel debug opcional para medir embudos reales sin depender de logs sueltos.
 - Onboarding y Home: perfil de uso, adaptador preferido, centro de mando con siguiente accion y demo de entrenamiento rotulada.
 - Seguridad bidireccional: pruebas activas bloqueadas si no hay conexion real, si el enlace es inestable o si el voltaje esta bajo.
@@ -158,13 +158,16 @@ La idea es que una solicitud no sea solo "el carro falla", sino una orden de tri
 - el marketplace de gauges ya consume listados reales desde Supabase
 - las tarjetas y previews renderizan el gauge real a partir del `config_json`
 - el flujo de compra se engancha con Google Play Billing 9.1.0 y verifica cada `purchaseToken` en Supabase antes de activar el entitlement
+- en la APK actual, `MonetizationPolicy.PAYWALLS_ENABLED = false`: los gauges se pueden aplicar sin Google Play Billing mientras se decide el modelo comercial
 
 Limitacion honesta:
 
-- las compras in-app requieren un build distribuido por Google Play y productos `gauge_tier_*` activos
-- en debug local el flujo mostrara errores reales de Billing si el servicio o los productos no estan disponibles
+- cuando se reactive monetizacion, las compras in-app requeriran un build distribuido por Google Play y productos `gauge_tier_*` activos
+- si `PAYWALLS_ENABLED` vuelve a `true`, el flujo mostrara errores reales de Billing si el servicio o los productos no estan disponibles
 
 ## Monetizacion y entitlements
+
+Estado actual de la APK: sin restricciones de pago. La politica central vive en `android/app/src/main/kotlin/com/elysium369/meet/core/monetization/MonetizationPolicy.kt` y deja `PAYWALLS_ENABLED = false` con acceso PRO local completo.
 
 La app queda preparada para un modelo gratis + PRO sin cobrar la descarga inicial:
 

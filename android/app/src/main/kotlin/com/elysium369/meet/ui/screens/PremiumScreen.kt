@@ -12,6 +12,7 @@ import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteTextButton
 
@@ -34,10 +35,24 @@ fun PremiumScreen(onClose: () -> Unit) {
             )
             
             Text(
-                text = "Diagnóstico Sin Límites",
+                text = if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
+                    MonetizationPolicy.ACCESS_LABEL
+                } else {
+                    "Diagnóstico Sin Límites"
+                },
                 color = Color.White,
                 style = MaterialTheme.typography.titleLarge
             )
+
+            if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = MonetizationPolicy.ACCESS_MESSAGE,
+                    color = MeetColors.textSecondary,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             
             Spacer(modifier = Modifier.height(48.dp))
             
@@ -50,8 +65,8 @@ fun PremiumScreen(onClose: () -> Unit) {
             Spacer(modifier = Modifier.weight(1f))
             
             EliteButton(
-                text = "SUSCRIBIRSE POR $4.99/MES",
-                onClick = { /* Subscribe */ },
+                text = if (MonetizationPolicy.LOCAL_FULL_ACCESS) "ENTRAR CON ACCESO COMPLETO" else "SUSCRIBIRSE",
+                onClick = onClose,
                 color = MeetColors.warning,
                 textColor = Color.White
             )
@@ -59,7 +74,7 @@ fun PremiumScreen(onClose: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
             
             EliteTextButton(
-                text = "Continuar Gratis",
+                text = if (MonetizationPolicy.LOCAL_FULL_ACCESS) "Volver a la app" else "Continuar Gratis",
                 onClick = onClose,
                 color = Color.Gray
             )
