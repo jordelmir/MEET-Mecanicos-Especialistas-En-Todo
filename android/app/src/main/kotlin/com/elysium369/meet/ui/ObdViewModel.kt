@@ -679,6 +679,10 @@ class ObdViewModel @Inject constructor(
 
     val currentUserId: String? get() = currentCloudUserId()
 
+    private fun currentProviderUserId(): String {
+        return currentCloudUserId() ?: "local_device_$localDeviceId"
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // PROVIDER ROLE MANAGEMENT SYSTEM
     // ═══════════════════════════════════════════════════════════════
@@ -697,15 +701,19 @@ class ObdViewModel @Inject constructor(
     private val _isPartsStore = MutableStateFlow(false)
     val isPartsStore: StateFlow<Boolean> = _isPartsStore.asStateFlow()
 
+    private var providerRolesJob: Job? = null
+
     /** Load and refresh provider profiles for the current user */
     fun refreshProviderRoles() {
-        val userId = currentCloudUserId() ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            providerProfileDao.getActiveProfilesForUser(userId).collect { profiles ->
+        val userId = currentProviderUserId()
+        providerRolesJob?.cancel()
+        providerRolesJob = viewModelScope.launch(Dispatchers.IO) {
+            providerProfileDao.getProfilesForUser(userId).collect { profiles ->
+                val activeProfiles = profiles.filter { it.isActive }
                 _userProviderProfiles.value = profiles
-                _isMechanic.value = profiles.any { it.providerType == "MECHANIC" }
-                _isTowTruckDriver.value = profiles.any { it.providerType == "TOW_TRUCK" }
-                _isPartsStore.value = profiles.any { it.providerType == "PARTS_STORE" }
+                _isMechanic.value = activeProfiles.any { it.providerType == "MECHANIC" }
+                _isTowTruckDriver.value = activeProfiles.any { it.providerType == "TOW_TRUCK" }
+                _isPartsStore.value = activeProfiles.any { it.providerType == "PARTS_STORE" }
             }
         }
     }
@@ -724,28 +732,27 @@ class ObdViewModel @Inject constructor(
         licenseNumber: String = "",
         context: android.content.Context? = null
     ) {
-        val userId = currentCloudUserId()
-        if (userId == null) {
-            viewModelScope.launch(Dispatchers.Main) {
-                context?.let {
-                    android.widget.Toast.makeText(it, "⚠️ Inicia sesión para registrarte como proveedor", android.widget.Toast.LENGTH_LONG).show()
-                }
-            }
-            return
-        }
+        val cloudUserId = currentCloudUserId()
+        val userId = currentProviderUserId()
 
         viewModelScope.launch(Dispatchers.IO) {
             // Idempotent: check if already registered
             val existing = providerProfileDao.getProfileByUserAndType(userId, providerType)
             if (existing != null) {
+                if (!existing.isActive) {
+                    providerProfileDao.setProfileActive(existing.profileId, true, System.currentTimeMillis())
+                    withContext(Dispatchers.Main) {
+                        context?.let {
+                            val typeLabel = providerTypeLabel(providerType)
+                            android.widget.Toast.makeText(it, "✅ Perfil de $typeLabel reactivado", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    refreshProviderRoles()
+                    return@launch
+                }
                 withContext(Dispatchers.Main) {
                     context?.let {
-                        val typeLabel = when (providerType) {
-                            "MECHANIC" -> "Mecánico"
-                            "TOW_TRUCK" -> "Gruista"
-                            "PARTS_STORE" -> "Repuestera"
-                            else -> "Proveedor"
-                        }
+                        val typeLabel = providerTypeLabel(providerType)
                         android.widget.Toast.makeText(it, "✅ Ya estás registrado como $typeLabel", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -776,18 +783,15 @@ class ObdViewModel @Inject constructor(
             providerProfileDao.insertProfile(profile)
 
             // Sync to cloud
-            runCatching {
-                SupabaseManager.client.postgrest["provider_profiles"].upsert(profile)
-            }.onFailure { Log.w("ObdViewModel", "Provider profile saved locally; cloud sync unavailable", it) }
+            if (cloudUserId != null) {
+                runCatching {
+                    SupabaseManager.client.postgrest["provider_profiles"].upsert(profile)
+                }.onFailure { Log.w("ObdViewModel", "Provider profile saved locally; cloud sync unavailable", it) }
+            }
 
             withContext(Dispatchers.Main) {
                 context?.let {
-                    val typeLabel = when (providerType) {
-                        "MECHANIC" -> "Mecánico"
-                        "TOW_TRUCK" -> "Gruista"
-                        "PARTS_STORE" -> "Repuestera"
-                        else -> "Proveedor"
-                    }
+                    val typeLabel = providerTypeLabel(providerType)
                     android.widget.Toast.makeText(it, "🎉 ¡Registrado como $typeLabel exitosamente!", android.widget.Toast.LENGTH_LONG).show()
                 }
             }
@@ -814,8 +818,16 @@ class ObdViewModel @Inject constructor(
 
     /** Check if the current user can see provider-facing content for a given type */
     suspend fun canViewProviderContent(providerType: String): Boolean {
-        val userId = currentCloudUserId() ?: return false
-        return providerProfileDao.isUserRegisteredAs(userId, providerType)
+        return providerProfileDao.isUserRegisteredAs(currentProviderUserId(), providerType)
+    }
+
+    private fun providerTypeLabel(providerType: String): String {
+        return when (providerType) {
+            "MECHANIC" -> "Mecánico"
+            "TOW_TRUCK" -> "Gruista"
+            "PARTS_STORE" -> "Repuestera"
+            else -> "Proveedor"
+        }
     }
 
     private fun buildPartsStoreId(storeName: String, ownerId: String?): String {

@@ -25,8 +25,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteOutlinedButton
 import com.elysium369.meet.ui.components.EliteTextButton
+import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.Locale
@@ -59,33 +61,18 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         targetValue = if (animateContent) 0f else 50f,
         animationSpec = tween(500, easing = FastOutSlowInEasing), label = "co"
     )
+    val stepAccent = when (step) {
+        2 -> MeetColors.cyberCyan
+        3 -> MeetColors.electricBlue
+        else -> MeetColors.neonGreen
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDeep)
     ) {
-        // Ambient background orbs
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(MeetColors.electricBlue.copy(alpha = 0.06f), Color.Transparent),
-                    center = Offset(size.width * 0.7f, size.height * 0.15f),
-                    radius = size.width * 0.5f
-                ),
-                center = Offset(size.width * 0.7f, size.height * 0.15f),
-                radius = size.width * 0.5f
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(MeetColors.neonGreen.copy(alpha = 0.04f), Color.Transparent),
-                    center = Offset(size.width * 0.3f, size.height * 0.8f),
-                    radius = size.width * 0.5f
-                ),
-                center = Offset(size.width * 0.3f, size.height * 0.8f),
-                radius = size.width * 0.5f
-            )
-        }
+        HolographicBackgroundShared()
 
         Column(
             modifier = Modifier
@@ -101,11 +88,27 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     .alpha(contentAlpha)
                     .graphicsLayer { translationY = contentOffset }
             ) {
-                when (step) {
-                    1 -> OnboardingStep1()
-                    2 -> OnboardingStep2(selectedProfile) { selectedProfile = it }
-                    3 -> OnboardingStep3(selectedAdapter) { selectedAdapter = it }
-                    4 -> OnboardingStep4(selectedProfile, selectedAdapter, detectedLanguage)
+                EliteCard(
+                    glowColor = stepAccent,
+                    borderColor = stepAccent.copy(alpha = 0.32f),
+                    backgroundColor = MeetColors.cardBackground,
+                    shape = RoundedCornerShape(20.dp),
+                    enableHolo3D = true,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(22.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when (step) {
+                            1 -> OnboardingStep1()
+                            2 -> OnboardingStep2(selectedProfile) { selectedProfile = it }
+                            3 -> OnboardingStep3(selectedAdapter) { selectedAdapter = it }
+                            4 -> OnboardingStep4(selectedProfile, selectedAdapter, detectedLanguage)
+                        }
+                    }
                 }
             }
 
@@ -243,7 +246,7 @@ private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit)
             letterSpacing = 1.sp
         )
         Text(
-            "Ajustaremos la experiencia inicial",
+            "Ajustaremos la experiencia inicial; proveedor queda opcional",
             color = MeetColors.textSecondary,
             style = MaterialTheme.typography.bodyMedium
         )
@@ -266,7 +269,7 @@ private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit)
 
         Spacer(Modifier.height(16.dp))
         Text(
-            "Puedes cambiarlo luego desde ajustes.",
+            "Puedes cambiarlo luego desde ajustes. Esto no registra proveedor todavía.",
             color = MeetColors.textMuted,
             textAlign = TextAlign.Center,
             fontSize = 12.sp
@@ -367,7 +370,7 @@ private fun OnboardingStep4(profile: String, adapter: String, language: String) 
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            "Siguiente paso: agrega tu vehículo y conecta un adaptador OBD-II físico.",
+            "Siguiente paso: agrega tu vehículo y conecta un adaptador OBD-II físico. Si quieres ofrecer servicios, activa proveedor después desde Proveedores.",
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,

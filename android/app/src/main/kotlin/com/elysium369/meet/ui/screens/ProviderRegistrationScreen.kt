@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.ProviderProfileEntity
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.ElysiumSectionIcon
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.roundToInt
 
@@ -106,6 +109,7 @@ fun ProviderRegistrationScreen(
     val isTowTruck by viewModel.isTowTruckDriver.collectAsState()
     val isPartsStore by viewModel.isPartsStore.collectAsState()
     val driverVerification by viewModel.driverVerification.collectAsState()
+    val isCloudSession = viewModel.currentUserId != null
 
     // Registration dialog state
     var showRegistrationDialog by remember { mutableStateOf(false) }
@@ -145,19 +149,30 @@ fun ProviderRegistrationScreen(
             )
         }
     ) { innerPadding ->
-
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 16.dp,
-                bottom = 120.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
         ) {
+            HolographicBackgroundShared()
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = 120.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+            item {
+                ProviderRegistrationHeroCard(
+                    isCloudSession = isCloudSession,
+                    activeProfileCount = profiles.count { it.isActive }
+                )
+            }
 
             // ── Existing Profiles Section ────────────────────────────────
             if (profiles.isNotEmpty()) {
@@ -197,12 +212,20 @@ fun ProviderRegistrationScreen(
                     "MECHANIC" -> isMechanic
                     "TOW_TRUCK" -> isTowTruck
                     "PARTS_STORE" -> isPartsStore
-                    "RIDE_DRIVER" -> driverVerification != null
+                    "RIDE_DRIVER" -> driverVerification?.status == "APPROVED"
                     else -> false
+                }
+                val statusLabel = when {
+                    typeInfo.type != "RIDE_DRIVER" -> null
+                    driverVerification?.status == "PENDING" -> "Verificación en revisión"
+                    driverVerification?.status == "APPROVED" -> "Chofer verificado"
+                    driverVerification?.status == "REJECTED" -> "Reintentar verificación"
+                    else -> null
                 }
                 RegistrationTypeCard(
                     info = typeInfo,
                     alreadyRegistered = alreadyRegistered,
+                    statusLabel = statusLabel,
                     onClick = {
                         if (typeInfo.type == "RIDE_DRIVER") {
                             showDriverOnboarding = true
@@ -212,6 +235,7 @@ fun ProviderRegistrationScreen(
                         }
                     }
                 )
+            }
             }
         }
     }
@@ -286,6 +310,102 @@ fun ProviderRegistrationScreen(
                 viewModel.deleteDriverVerification()
                 showDriverOnboarding = false
             }
+        )
+    }
+}
+
+@Composable
+private fun ProviderRegistrationHeroCard(
+    isCloudSession: Boolean,
+    activeProfileCount: Int
+) {
+    EliteCard(
+        glowColor = MeetColors.neonGreen,
+        borderColor = MeetColors.neonGreen.copy(alpha = 0.28f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(18.dp),
+        enableHolo3D = true,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MeetColors.neonGreen.copy(alpha = 0.13f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ElysiumSectionIcon(
+                        key = "provider_registration",
+                        contentDescription = "Registro proveedor",
+                        tint = MeetColors.neonGreen,
+                        size = 30.dp,
+                        fallbackGlyph = "ID"
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Centro de proveedores",
+                        color = MeetColors.textPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        text = "Activa perfiles por servicio dentro de la APK",
+                        color = MeetColors.textSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProviderHeroChip(
+                    text = if (isCloudSession) "Cloud listo" else "Modo local",
+                    color = if (isCloudSession) MeetColors.neonGreen else MeetColors.warning,
+                    modifier = Modifier.weight(1f)
+                )
+                ProviderHeroChip(
+                    text = "$activeProfileCount activos",
+                    color = MeetColors.cyberCyan,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderHeroChip(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(34.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.32f), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -549,6 +669,7 @@ private fun RatingStars(rating: Double, accentColor: Color) {
 private fun RegistrationTypeCard(
     info: ProviderTypeInfo,
     alreadyRegistered: Boolean,
+    statusLabel: String? = null,
     onClick: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "card_glow_${info.type}")
@@ -682,6 +803,22 @@ private fun RegistrationTypeCard(
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp
                     )
+                    if (statusLabel != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = info.accentColor.copy(alpha = 0.10f),
+                            border = BorderStroke(1.dp, info.accentColor.copy(alpha = 0.24f))
+                        ) {
+                            Text(
+                                text = statusLabel,
+                                color = info.accentColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(14.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -699,7 +836,7 @@ private fun RegistrationTypeCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Toca para registrarte",
+                                text = if (statusLabel == null) "Toca para registrarte" else "Toca para ver estado",
                                 color = info.accentColor,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -1917,4 +2054,3 @@ fun CaptureGuideOverlay(
         }
     }
 }
-

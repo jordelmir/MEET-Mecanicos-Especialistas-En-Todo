@@ -508,6 +508,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     obdViewModel = obdViewModel
                 )
             }
+            composable("provider_registration") {
+                ProviderRegistrationScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
             composable("repair_case_detail/{caseId}") { backStack ->
                 val caseId = backStack.arguments?.getString("caseId") ?: ""
                 val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()

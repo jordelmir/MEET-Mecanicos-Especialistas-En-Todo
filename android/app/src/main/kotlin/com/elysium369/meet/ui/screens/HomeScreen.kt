@@ -389,6 +389,7 @@ fun HomeScreen(
                 Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance",
                 Triple("🍃", "Eco Viajes", MeetColors.neonGreen) to "trips",
                 Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link",
+                Triple("🪪", "Proveedores", MeetColors.warning) to "provider_registration",
                 Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub"
             )
 
