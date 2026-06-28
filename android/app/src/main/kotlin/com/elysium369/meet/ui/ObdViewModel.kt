@@ -12,6 +12,8 @@ import com.elysium369.meet.data.supabase.VehicleRepository
 import com.elysium369.meet.data.supabase.SupabaseManager
 import com.elysium369.meet.data.supabase.SessionLogRepository
 import com.elysium369.meet.data.supabase.DiagnosticSession
+import com.elysium369.meet.data.supabase.RepairCase
+import com.elysium369.meet.data.supabase.RepairCaseRepository
 import com.elysium369.meet.data.local.dao.*
 import com.elysium369.meet.data.local.entities.*
 import com.elysium369.meet.core.twin.VehicleTwinEngine
@@ -231,7 +233,6 @@ class ObdViewModel @Inject constructor(
     private val fuelEconomyTracker: FuelEconomyTracker,
     private val batteryHealthAnalyzer: BatteryHealthAnalyzer,
     private val turboBoostGauge: TurboBoostGauge,
-    private val demoModeSimulator: DemoModeSimulator,
     private val dvirReportDao: com.elysium369.meet.data.local.dao.DvirReportDao,
     private val predictionEventDao: com.elysium369.meet.data.local.dao.PredictionEventDao,
     private val healthSnapshotDao: com.elysium369.meet.data.local.dao.HealthSnapshotDao,
@@ -249,7 +250,12 @@ class ObdViewModel @Inject constructor(
     private val blackBoxDao: BlackBoxDao,
     private val vehicleTwinDao: VehicleTwinDao,
     private val vehicleTwinEngine: VehicleTwinEngine,
-    private val dtcKnowledgeGraphDao: com.elysium369.meet.data.local.dao.DtcKnowledgeGraphDao
+    private val repairCaseRepository: RepairCaseRepository,
+    private val dtcKnowledgeGraphDao: com.elysium369.meet.data.local.dao.DtcKnowledgeGraphDao,
+    private val towTruckDao: TowTruckDao,
+    private val ratingDao: RatingDao,
+    private val providerProfileDao: ProviderProfileDao,
+    private val rideDao: com.elysium369.meet.data.local.dao.RideDao
 ) : ViewModel() {
 
     val connectionState: StateFlow<ObdState> = obdSession.state
@@ -315,7 +321,7 @@ class ObdViewModel @Inject constructor(
     private val _terminalSessionLogs = MutableStateFlow<List<TerminalLine>>(
         listOf(
             TerminalLine("╔══════════════════════════════════════════╗", TerminalLineType.SYSTEM),
-            TerminalLine("║  MEET Expert Terminal v3.0               ║", TerminalLineType.SYSTEM),
+            TerminalLine("║  Elysium Vanguard Expert Terminal v3.0               ║", TerminalLineType.SYSTEM),
             TerminalLine("║  Motor de Diagnóstico Inteligente        ║", TerminalLineType.SYSTEM),
             TerminalLine("╚══════════════════════════════════════════╝", TerminalLineType.SYSTEM),
             TerminalLine("Escribe un comando OBD2 o AT. Cada comando incluye", TerminalLineType.SYSTEM),
@@ -487,6 +493,12 @@ class ObdViewModel @Inject constructor(
     val serviceRequests: StateFlow<List<ServiceRequestEntity>> = marketplaceDao.getRequests()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val openServiceRequests: StateFlow<List<ServiceRequestEntity>> = marketplaceDao.getOpenRequests()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val openPartRequests: StateFlow<List<PartRequestEntity>> = marketplaceDao.getOpenPartRequests()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     // Shop/Workshop bids derived dynamically
     private val _shopId = MutableStateFlow<String?>("local_shop_id") // Simulated shop ID
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -504,7 +516,11 @@ class ObdViewModel @Inject constructor(
         problem: String,
         description: String,
         location: String,
-        priority: String
+        priority: String,
+        latitude: Double = 0.0,
+        longitude: Double = 0.0,
+        phone: String = "",
+        priceOffer: Double = 0.0
     ) {
         val request = ServiceRequestEntity(
             requestId = UUID.randomUUID().toString(),
@@ -516,13 +532,19 @@ class ObdViewModel @Inject constructor(
             radiusKm = 15.0,
             status = "OPEN",
             autoDtcCode = activeDtcs.value.firstOrNull(),
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            latitude = latitude,
+            longitude = longitude,
+            phone = phone,
+            priceOffer = priceOffer
         )
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 marketplaceDao.insertRequest(request)
-                SupabaseManager.client.postgrest["service_requests"].insert(request)
+                runCatching {
+                    SupabaseManager.client.postgrest["service_requests"].insert(request)
+                }.onFailure { Log.w("ObdViewModel", "Service request saved locally; cloud unavailable", it) }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to create service request", e)
             }
@@ -560,21 +582,84 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    fun acceptBid(requestId: String, bidId: String) {
+    /** Idempotent: only accepts if request is still OPEN */
+    fun acceptBid(requestId: String, bidId: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                marketplaceDao.updateRequestStatus(requestId, "ACCEPTED")
+                val request = marketplaceDao.getRequestById(requestId)
+                if (request == null || request.status != "OPEN") {
+                    withContext(Dispatchers.Main) {
+                        context?.let {
+                            android.widget.Toast.makeText(it, "⚠️ Este servicio ya fue asignado a otro mecánico", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    return@launch
+                }
+                
+                val bid = marketplaceDao.getBidById(bidId)
+                if (bid != null) {
+                    marketplaceDao.updateMechanicStatusAndPrice(
+                        requestId = requestId,
+                        status = "ACCEPTED",
+                        mechanicId = bid.shopId,
+                        mechanicName = bid.shopName,
+                        mechanicPhone = "+506 8888-8888", // Teléfono del taller para contacto inmediato
+                        finalPrice = bid.price
+                    )
+                    // Reject all other bids to enforce business integrity
+                    marketplaceDao.rejectOtherBids(requestId, bidId)
+                } else {
+                    marketplaceDao.updateRequestStatus(requestId, "ACCEPTED")
+                }
+                
                 marketplaceDao.updateBidStatus(bidId, "ACCEPTED")
                 
-                SupabaseManager.client.postgrest["service_requests"].update(mapOf("status" to "ACCEPTED")) {
-                    filter { eq("requestId", requestId) }
-                }
-                SupabaseManager.client.postgrest["service_bids"].update(mapOf("status" to "ACCEPTED")) {
-                    filter { eq("bidId", bidId) }
-                }
+                runCatching {
+                    SupabaseManager.client.postgrest["service_requests"].update(mapOf("status" to "ACCEPTED")) {
+                        filter { eq("requestId", requestId) }
+                    }
+                    SupabaseManager.client.postgrest["service_bids"].update(mapOf("status" to "ACCEPTED")) {
+                        filter { eq("bidId", bidId) }
+                    }
+                }.onFailure { Log.w("ObdViewModel", "Bid accepted locally; cloud sync unavailable", it) }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to accept bid", e)
             }
+        }
+    }
+
+    /** Mechanic takes an open service request — idempotent, first-come-first-served */
+    fun takeMechanicRequest(requestId: String, mechanicId: String, mechanicName: String, mechanicPhone: String, context: android.content.Context? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = marketplaceDao.getRequestById(requestId)
+            if (request != null && request.status == "OPEN") {
+                marketplaceDao.updateMechanicStatusAndPrice(
+                    requestId = requestId,
+                    status = "ACCEPTED",
+                    mechanicId = mechanicId,
+                    mechanicName = mechanicName,
+                    mechanicPhone = mechanicPhone,
+                    finalPrice = request.priceOffer
+                )
+            } else {
+                withContext(Dispatchers.Main) {
+                    context?.let {
+                        android.widget.Toast.makeText(it, "⚠️ Este servicio ya fue tomado por otro mecánico", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    fun completeMechanicRequest(requestId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            marketplaceDao.completeServiceWithEscrow(requestId, "COMPLETED", System.currentTimeMillis())
+        }
+    }
+
+    fun cancelMechanicRequest(requestId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            marketplaceDao.cancelServiceWithEscrow(requestId)
         }
     }
 
@@ -590,6 +675,147 @@ class ObdViewModel @Inject constructor(
 
     private fun currentCloudUserId(): String? {
         return SupabaseManager.client.auth.currentUserOrNull()?.id
+    }
+
+    val currentUserId: String? get() = currentCloudUserId()
+
+    // ═══════════════════════════════════════════════════════════════
+    // PROVIDER ROLE MANAGEMENT SYSTEM
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Active provider profiles for the current user */
+    private val _userProviderProfiles = MutableStateFlow<List<ProviderProfileEntity>>(emptyList())
+    val userProviderProfiles: StateFlow<List<ProviderProfileEntity>> = _userProviderProfiles.asStateFlow()
+
+    /** Convenience booleans — is the current user registered as each type? */
+    private val _isMechanic = MutableStateFlow(false)
+    val isMechanic: StateFlow<Boolean> = _isMechanic.asStateFlow()
+
+    private val _isTowTruckDriver = MutableStateFlow(false)
+    val isTowTruckDriver: StateFlow<Boolean> = _isTowTruckDriver.asStateFlow()
+
+    private val _isPartsStore = MutableStateFlow(false)
+    val isPartsStore: StateFlow<Boolean> = _isPartsStore.asStateFlow()
+
+    /** Load and refresh provider profiles for the current user */
+    fun refreshProviderRoles() {
+        val userId = currentCloudUserId() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            providerProfileDao.getActiveProfilesForUser(userId).collect { profiles ->
+                _userProviderProfiles.value = profiles
+                _isMechanic.value = profiles.any { it.providerType == "MECHANIC" }
+                _isTowTruckDriver.value = profiles.any { it.providerType == "TOW_TRUCK" }
+                _isPartsStore.value = profiles.any { it.providerType == "PARTS_STORE" }
+            }
+        }
+    }
+
+    /** Register user as a provider (MECHANIC, TOW_TRUCK, or PARTS_STORE) */
+    fun registerAsProvider(
+        providerType: String,
+        businessName: String,
+        ownerName: String,
+        phone: String,
+        location: String,
+        latitude: Double = 0.0,
+        longitude: Double = 0.0,
+        specialties: String = "",
+        radiusKm: Double = 25.0,
+        licenseNumber: String = "",
+        context: android.content.Context? = null
+    ) {
+        val userId = currentCloudUserId()
+        if (userId == null) {
+            viewModelScope.launch(Dispatchers.Main) {
+                context?.let {
+                    android.widget.Toast.makeText(it, "⚠️ Inicia sesión para registrarte como proveedor", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            // Idempotent: check if already registered
+            val existing = providerProfileDao.getProfileByUserAndType(userId, providerType)
+            if (existing != null) {
+                withContext(Dispatchers.Main) {
+                    context?.let {
+                        val typeLabel = when (providerType) {
+                            "MECHANIC" -> "Mecánico"
+                            "TOW_TRUCK" -> "Gruista"
+                            "PARTS_STORE" -> "Repuestera"
+                            else -> "Proveedor"
+                        }
+                        android.widget.Toast.makeText(it, "✅ Ya estás registrado como $typeLabel", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                return@launch
+            }
+
+            val profile = ProviderProfileEntity(
+                profileId = java.util.UUID.randomUUID().toString(),
+                userId = userId,
+                providerType = providerType,
+                businessName = businessName,
+                ownerName = ownerName,
+                phone = phone,
+                location = location,
+                latitude = latitude,
+                longitude = longitude,
+                specialties = specialties,
+                radiusKm = radiusKm,
+                licenseNumber = licenseNumber,
+                isActive = true,
+                verified = false,
+                rating = 0.0,
+                totalJobs = 0,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+
+            providerProfileDao.insertProfile(profile)
+
+            // Sync to cloud
+            runCatching {
+                SupabaseManager.client.postgrest["provider_profiles"].upsert(profile)
+            }.onFailure { Log.w("ObdViewModel", "Provider profile saved locally; cloud sync unavailable", it) }
+
+            withContext(Dispatchers.Main) {
+                context?.let {
+                    val typeLabel = when (providerType) {
+                        "MECHANIC" -> "Mecánico"
+                        "TOW_TRUCK" -> "Gruista"
+                        "PARTS_STORE" -> "Repuestera"
+                        else -> "Proveedor"
+                    }
+                    android.widget.Toast.makeText(it, "🎉 ¡Registrado como $typeLabel exitosamente!", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+
+            refreshProviderRoles()
+        }
+    }
+
+    /** Toggle a provider profile active/inactive */
+    fun toggleProviderProfile(profileId: String, isActive: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            providerProfileDao.setProfileActive(profileId, isActive, System.currentTimeMillis())
+            refreshProviderRoles()
+        }
+    }
+
+    /** Delete a provider profile entirely */
+    fun deleteProviderProfile(profileId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            providerProfileDao.deleteProfile(profileId)
+            refreshProviderRoles()
+        }
+    }
+
+    /** Check if the current user can see provider-facing content for a given type */
+    suspend fun canViewProviderContent(providerType: String): Boolean {
+        val userId = currentCloudUserId() ?: return false
+        return providerProfileDao.isUserRegisteredAs(userId, providerType)
     }
 
     private fun buildPartsStoreId(storeName: String, ownerId: String?): String {
@@ -706,11 +932,24 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    fun acceptPartOffer(partRequestId: String, offerId: String) {
+    /** Idempotent: only accepts if part request is still OPEN */
+    fun acceptPartOffer(partRequestId: String, offerId: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val request = marketplaceDao.getPartRequestById(partRequestId)
+                if (request == null || request.status != "OPEN") {
+                    withContext(Dispatchers.Main) {
+                        context?.let {
+                            android.widget.Toast.makeText(it, "⚠️ Este pedido de repuesto ya fue tomado por otro proveedor", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    return@launch
+                }
                 marketplaceDao.updatePartRequestStatus(partRequestId, "ACCEPTED", offerId)
                 marketplaceDao.updatePartOfferStatus(offerId, "ACCEPTED")
+                // Reject all other part offers to maintain auction integrity
+                marketplaceDao.rejectOtherPartOffers(partRequestId, offerId)
+                
                 runCatching {
                     SupabaseManager.client.postgrest["part_requests"].update(
                         mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
@@ -906,68 +1145,6 @@ class ObdViewModel @Inject constructor(
         evaluateDnaInference()
     }
 
-    fun startDemoMode(scenario: DemoModeSimulator.Scenario = DemoModeSimulator.Scenario.ENGINE_MISFIRE) {
-        if (connectionState.value == ObdState.CONNECTED) {
-            addTerminalLog("[DEMO] Hay un vehículo real conectado; no se activó entrenamiento.", TerminalLineType.WARNING)
-            return
-        }
-
-        demoModeJob?.cancel()
-        demoModeSimulator.currentScenario = scenario
-        _isDemoMode.value = true
-        _demoScenarioDescription.value = demoModeSimulator.getScenarioDescription()
-
-        val demoDtcs = demoDtcsForScenario(scenario)
-        _latestScanActiveDtcs.value = demoDtcs
-        _latestScanPendingDtcs.value = emptyList()
-        _latestScanPermanentDtcs.value = emptyList()
-        _latestScanHistoricalDtcs.value = emptyList()
-        if (demoDtcs.isNotEmpty()) fetchDtcDefinitions(demoDtcs)
-
-        addTerminalLog("[DEMO] Entrenamiento activado: ${_demoScenarioDescription.value}", TerminalLineType.SYSTEM)
-        demoModeJob = viewModelScope.launch(Dispatchers.Default) {
-            while (isActive) {
-                val frame = demoModeSimulator.generateFrame()
-                _liveData.value = frame
-                updateTelemetryHistory(frame)
-                updateOscilloscopeBuffer(System.currentTimeMillis(), frame)
-                updateHealthScore()
-                delay(250L)
-            }
-        }
-    }
-
-    fun cycleDemoScenario() {
-        val scenarios = DemoModeSimulator.Scenario.entries
-        val currentIndex = scenarios.indexOf(demoModeSimulator.currentScenario).coerceAtLeast(0)
-        startDemoMode(scenarios[(currentIndex + 1) % scenarios.size])
-    }
-
-    fun stopDemoMode(clearDemoData: Boolean = true) {
-        demoModeJob?.cancel()
-        demoModeJob = null
-        _isDemoMode.value = false
-        _demoScenarioDescription.value = ""
-        if (clearDemoData && connectionState.value != ObdState.CONNECTED) {
-            _liveData.value = emptyMap()
-            _latestScanActiveDtcs.value = emptyList()
-            _latestScanPendingDtcs.value = emptyList()
-            _latestScanPermanentDtcs.value = emptyList()
-            _latestScanHistoricalDtcs.value = emptyList()
-        }
-        addTerminalLog("[DEMO] Entrenamiento desactivado.", TerminalLineType.SYSTEM)
-    }
-
-    private fun demoDtcsForScenario(scenario: DemoModeSimulator.Scenario): List<String> {
-        return when (scenario) {
-            DemoModeSimulator.Scenario.ENGINE_MISFIRE -> listOf("P0302")
-            DemoModeSimulator.Scenario.OVERHEATING -> listOf("P0128")
-            DemoModeSimulator.Scenario.RICH_MIXTURE -> listOf("P0172")
-            DemoModeSimulator.Scenario.TURBO_BOOST -> listOf("P0234")
-            else -> emptyList()
-        }
-    }
-
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
@@ -1117,13 +1294,6 @@ class ObdViewModel @Inject constructor(
     private val _qosMetrics = MutableStateFlow(QosMetrics())
     val qosMetrics: StateFlow<QosMetrics> = _qosMetrics.asStateFlow()
 
-    private var demoModeJob: Job? = null
-    private val _isDemoMode = MutableStateFlow(false)
-    val isDemoMode: StateFlow<Boolean> = _isDemoMode.asStateFlow()
-
-    private val _demoScenarioDescription = MutableStateFlow("")
-    val demoScenarioDescription: StateFlow<String> = _demoScenarioDescription.asStateFlow()
-
     // Telemetry History for Graphs
     private val _telemetryHistory = MutableStateFlow<Map<String, List<Float>>>(emptyMap())
     val telemetryHistory: StateFlow<Map<String, List<Float>>> = _telemetryHistory.asStateFlow()
@@ -1233,7 +1403,7 @@ class ObdViewModel @Inject constructor(
         if (newAlerts.isNotEmpty()) {
             _thresholdAlerts.value = newAlerts
         }
-        // Run MEET Copilot RuleEngine check
+        // Run Elysium Vanguard Copilot RuleEngine check
         ruleEngine.evaluate(data, activeDtcEvents.value.map { it.code })
     }
 
@@ -1254,6 +1424,11 @@ class ObdViewModel @Inject constructor(
 
     fun runPrePurchaseInspection() {
         viewModelScope.launch(Dispatchers.IO) {
+            if (connectionState.value != ObdState.CONNECTED) {
+                _inspectionResult.value = null
+                addTerminalLog("[REAL] Inspección pre-compra cancelada: requiere enlace OBD-II físico activo.", TerminalLineType.WARNING)
+                return@launch
+            }
             _isInspecting.value = true
             voiceFeedbackManager.speak("Iniciando inspección de pre-compra del vehículo.", "Starting vehicle pre-purchase inspection.")
             try {
@@ -1275,7 +1450,7 @@ class ObdViewModel @Inject constructor(
                     "Inspection complete. Vehicle score: ${result.overallScore} out of 100."
                 )
             } catch (e: Exception) {
-                Log.e("MEET", "Pre-purchase inspection failed", e)
+                Log.e("Elysium Vanguard", "Pre-purchase inspection failed", e)
             } finally {
                 _isInspecting.value = false
             }
@@ -1296,12 +1471,12 @@ class ObdViewModel @Inject constructor(
                 _prePurchaseReportFile.value = file
                 reportGenerator.shareReport(file)
             } catch (e: Exception) {
-                Log.e("MEET", "Failed to generate pre-purchase PDF", e)
+                Log.e("Elysium Vanguard", "Failed to generate pre-purchase PDF", e)
             }
         }
     }
 
-    // ──── MEET PERITO STATES ────
+    // ──── Elysium Vanguard PERITO STATES ────
     private val _isInspectingPerito = MutableStateFlow(false)
     val isInspectingPerito: StateFlow<Boolean> = _isInspectingPerito.asStateFlow()
 
@@ -1323,26 +1498,62 @@ class ObdViewModel @Inject constructor(
     private val meetPerito = com.elysium369.meet.core.obd.MeetPerito()
     private val peritoReportGenerator = com.elysium369.meet.core.export.PeritoReportGenerator(context)
 
-    // --- MEET DNA ---
+    // --- Elysium Vanguard DNA ---
     private val _dnaResult = MutableStateFlow<com.elysium369.meet.core.dna.DnaEvaluationResult>(com.elysium369.meet.core.dna.DnaEvaluationResult(isCalibrated = false))
     val dnaResult: StateFlow<com.elysium369.meet.core.dna.DnaEvaluationResult> = _dnaResult.asStateFlow()
 
     private val _isTrainingDna = MutableStateFlow(false)
     val isTrainingDna: StateFlow<Boolean> = _isTrainingDna.asStateFlow()
 
+    private var lastAdapterAddress: String? = null
+    private var dnaEvaluationJob: Job? = null
+    private var lastDnaEvaluationAtMs: Long = 0L
+    private val dnaEvaluationIntervalMs = 5_000L
+
     fun trainVehicleDna() {
         val vehicle = _selectedVehicle.value ?: return
         viewModelScope.launch {
             _isTrainingDna.value = true
-            meetDnaEngine.trainDnaProfile(vehicle.id)
-            evaluateDnaInference()
-            _isTrainingDna.value = false
+            try {
+                val progress = meetDnaEngine.getTrainingProgress(vehicle.id)
+                if (!progress.isReady) {
+                    val result = meetDnaEngine.evaluateCurrentStatus(vehicle.id, _liveData.value)
+                    _dnaResult.value = result.copy(
+                        message = "Faltan ${progress.missingSamples} lecturas alineadas para calibrar una firma real. No se inicia entrenamiento hasta cumplir el minimo.",
+                        nextAction = "Conduzca normal y mantenga el scanner conectado hasta llegar a ${progress.requiredSamples} muestras."
+                    )
+                    return@launch
+                }
+                val trained = meetDnaEngine.trainDnaProfile(vehicle.id, quickMode = progress.isQuickMode)
+                val result = meetDnaEngine.evaluateCurrentStatus(vehicle.id, _liveData.value)
+                _dnaResult.value =
+                    if (trained == null) {
+                        val missing = (progress.requiredSamples - progress.currentSamples).coerceAtLeast(0)
+                        result.copy(
+                            message = "Aun faltan $missing lecturas alineadas para entrenar la firma Elysium Vanguard DNA. Mientras tanto se muestra telemetria provisional."
+                        )
+                    } else {
+                        result
+                    }
+                vehicleTwinEngine.evaluateFrame(vehicle.id, _liveData.value)
+            } catch (e: Exception) {
+                _dnaResult.value = com.elysium369.meet.core.dna.DnaEvaluationResult(
+                    isCalibrated = false,
+                    message = "Elysium Vanguard DNA no pudo calibrar: ${e.message ?: "error interno"}"
+                )
+            } finally {
+                _isTrainingDna.value = false
+            }
         }
     }
 
-    fun evaluateDnaInference() {
+    fun evaluateDnaInference(force: Boolean = false) {
         val vehicle = _selectedVehicle.value ?: return
-        viewModelScope.launch {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastDnaEvaluationAtMs < dnaEvaluationIntervalMs) return
+        if (dnaEvaluationJob?.isActive == true) return
+        lastDnaEvaluationAtMs = now
+        dnaEvaluationJob = viewModelScope.launch {
             val res = meetDnaEngine.evaluateCurrentStatus(vehicle.id, _liveData.value)
             _dnaResult.value = res
             vehicleTwinEngine.evaluateFrame(vehicle.id, _liveData.value)
@@ -1372,7 +1583,7 @@ class ObdViewModel @Inject constructor(
                 _peritoConsoleLogs.value = ArrayList(logs)
             }
 
-            voiceFeedbackManager.speak("Iniciando peritaje clínico MEET Perito.", "Starting MEET Perito clinical vehicle check.")
+            voiceFeedbackManager.speak("Iniciando peritaje clínico Elysium Vanguard Perito.", "Starting Elysium Vanguard Perito clinical vehicle check.")
             
             // Step 1: VIN
             _currentPeritoStep.value = 1
@@ -1448,7 +1659,7 @@ class ObdViewModel @Inject constructor(
             addLog("ℹ️ Monitores listos: ${readiness.count { it.value }}/${readiness.size}")
             delay(800)
 
-            addLog("⚡ Compilando diagnóstico y generando reporte clínico MEET Perito...")
+            addLog("⚡ Compilando diagnóstico y generando reporte clínico Elysium Vanguard Perito...")
             delay(1500)
 
             val report = meetPerito.performInspection(
@@ -1492,7 +1703,7 @@ class ObdViewModel @Inject constructor(
                 _peritoReportFile.value = file
                 reportGenerator.shareReport(file)
             } catch (e: Exception) {
-                Log.e("MEET", "Failed to generate Perito PDF report", e)
+                Log.e("Elysium Vanguard", "Failed to generate Perito PDF report", e)
             }
         }
     }
@@ -1684,9 +1895,7 @@ class ObdViewModel @Inject constructor(
     val usbCh1Data: StateFlow<FloatArray> = usbOscilloscopeManager.ch1Data
     val usbCh2Data: StateFlow<FloatArray> = usbOscilloscopeManager.ch2Data
     val usbIsStreaming: StateFlow<Boolean> = usbOscilloscopeManager.isStreaming
-    val usbIsSimulationMode: StateFlow<Boolean> = usbOscilloscopeManager.isSimulationMode
     val usbDeviceConnected: StateFlow<Boolean> = usbOscilloscopeManager.deviceConnected
-    val usbSelectedWaveform: StateFlow<String> = usbOscilloscopeManager.selectedWaveform
     val usbCh1Attenuation: StateFlow<Float> = usbOscilloscopeManager.ch1Attenuation
     val usbCh2Attenuation: StateFlow<Float> = usbOscilloscopeManager.ch2Attenuation
     val usbTriggerLevel: StateFlow<Float> = usbOscilloscopeManager.triggerLevel
@@ -1699,14 +1908,6 @@ class ObdViewModel @Inject constructor(
         } else {
             usbOscilloscopeManager.startStreaming()
         }
-    }
-
-    fun setUsbOscilloscopeSimulation(enabled: Boolean) {
-        usbOscilloscopeManager.setSimulationMode(enabled)
-    }
-
-    fun changeUsbWaveform(type: String) {
-        usbOscilloscopeManager.setSelectedWaveform(type)
     }
 
     fun setUsbCh1Attenuation(factor: Float) {
@@ -2075,6 +2276,7 @@ class ObdViewModel @Inject constructor(
 
     init {
         startMarketplaceSync()
+        refreshProviderRoles()
         // Voice command manager callbacks and initial startup checking
         voiceCommandManager.onCommandRecognized = { command ->
             handleVoiceCommand(command)
@@ -2133,7 +2335,7 @@ class ObdViewModel @Inject constructor(
                         when (state) {
                             ObdState.CONNECTING -> voiceFeedbackManager.speak("Iniciando enlace con el adaptador OBD", "Initiating link with OBD adapter")
                             ObdState.NEGOTIATING -> voiceFeedbackManager.speak("Estableciendo protocolo de comunicación", "Establishing communication protocol")
-                            ObdState.CONNECTED -> voiceFeedbackManager.speak("Conexión establecida. Sistema de telemetría MEET activo.", "Connection established. MEET telemetry system active.")
+                            ObdState.CONNECTED -> voiceFeedbackManager.speak("Conexión establecida. Sistema de telemetría Elysium Vanguard activo.", "Connection established. Elysium Vanguard telemetry system active.")
                             ObdState.ERROR -> voiceFeedbackManager.speak("Error de conexión. Por favor, verifique el adaptador.", "Connection error. Please check the adapter.")
                             else -> {}
                         }
@@ -2213,7 +2415,7 @@ class ObdViewModel @Inject constructor(
                             updateBatteryHealth(smoothedData)
                             // ── Turbo Boost ──
                             updateBoost(smoothedData)
-                            // ── MEET DNA Real-time Inference ──
+                            // ── Elysium Vanguard DNA Real-time Inference ──
                             evaluateDnaInference()
 
                             // ── LiveLink broadcast (only if server is active) ──
@@ -2347,8 +2549,6 @@ class ObdViewModel @Inject constructor(
                         .collect { state ->
                             if (state != ObdState.CONNECTED) {
                                 hasCompletedInitialDtcScan = false
-                            } else if (_isDemoMode.value) {
-                                stopDemoMode(clearDemoData = true)
                             }
                         }
                 } catch (e: Exception) {
@@ -2578,11 +2778,19 @@ class ObdViewModel @Inject constructor(
 
     /** Connect to an OBD2 adapter by MAC address or IP */
     fun connect(address: String) {
+        lastAdapterAddress = address
+        context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("last_adapter_address", address)
+            .apply()
         obdSession.setTargetAddress(address)
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
             obdSession.connect()
-            runPostConnectDtcFirstStartup()
+            if (obdSession.state.value == ObdState.CONNECTED) {
+                runPostConnectDtcFirstStartup()
+                startForegroundService(_selectedVehicle.value?.id ?: "active_vehicle", address)
+            }
         }
     }
 
@@ -2594,7 +2802,7 @@ class ObdViewModel @Inject constructor(
             obdSession.connect()
             if (obdSession.state.value == ObdState.CONNECTED) {
                 runPostConnectDtcFirstStartup()
-                startForegroundService(vehicle.id)
+                startForegroundService(vehicle.id, lastAdapterAddress)
             }
         }
     }
@@ -2925,7 +3133,7 @@ class ObdViewModel @Inject constructor(
         addTerminalLog("──── INICIO ESCANEO DTC PROFESIONAL ────", TerminalLineType.SYSTEM)
         if (connectionState.value != ObdState.CONNECTED) {
             addTerminalLog(
-                "⚠ Conecta un vehículo real para escanear DTCs. MEET ya no genera resultados simulados.",
+                "⚠ Conecta un vehículo real para escanear DTCs. Elysium Vanguard ya no genera resultados simulados.",
                 TerminalLineType.WARNING
             )
             voiceFeedbackManager.speak(
@@ -3339,6 +3547,15 @@ class ObdViewModel @Inject constructor(
         return dtcKnowledgeGraphDao.getVerifiedFixesForDtc(code.uppercase())
     }
 
+    suspend fun getDtcCommunityRepairCases(code: String): List<RepairCase> {
+        return repairCaseRepository.searchCases(
+            query = "",
+            dtc = code.uppercase(),
+            sortBy = "votes",
+            onlyVerified = false
+        )
+    }
+
     suspend fun searchDtcKnowledgeGraph(query: String): List<DtcDefinitionEntity> {
         return dtcKnowledgeGraphDao.searchKnowledgeGraph(query)
     }
@@ -3378,7 +3595,10 @@ class ObdViewModel @Inject constructor(
                 scheduleSync()
             } else {
                 voiceFeedbackManager.speak("Fallo al borrar los códigos. Por favor, asegúrese que el motor esté apagado y en contacto.", "Failed to clear fault codes. Please ensure the engine is off and ignition is on.")
-                _clearDtcResult.value = "❌ Error al borrar códigos. Asegúrese que el motor esté apagado y en contacto (IGNITION ON)."
+                val detail = obdSession.statusMessage.value.ifBlank {
+                    "Asegúrese que el motor esté apagado, el contacto esté en ON y el voltaje sea estable."
+                }
+                _clearDtcResult.value = "❌ $detail"
             }
         }
         _isClearing.value = false
@@ -3603,7 +3823,7 @@ class ObdViewModel @Inject constructor(
             )
 
             _anomalousPids.value = emptyList()
-            modelUsed = "MEET Local Expert Engine"
+            modelUsed = "Elysium Vanguard Local Expert Engine"
         }
 
         // 3. Save to offline cache (both successful remote and generated local fallback)
@@ -3983,11 +4203,19 @@ class ObdViewModel @Inject constructor(
     private fun Int.toComposeColor() = androidx.compose.ui.graphics.Color(this)
 
     // --- Helpers ---
-    private fun startForegroundService(vehicleId: String) {
+    private fun startForegroundService(vehicleId: String, adapterAddress: String? = lastAdapterAddress) {
+        val resolvedAddress = adapterAddress
+            ?: context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE)
+                .getString("last_adapter_address", null)
         val intent = Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java).apply {
             putExtra("vehicle_id", vehicleId)
+            if (!resolvedAddress.isNullOrBlank()) putExtra("adapter_address", resolvedAddress)
         }
-        try { context.startService(intent) } catch (_: Exception) {}
+        try {
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        } catch (_: Exception) {
+            try { context.startService(intent) } catch (_: Exception) {}
+        }
     }
 
     fun saveVehicle(
@@ -4170,7 +4398,7 @@ class ObdViewModel @Inject constructor(
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(intent, "Compartir Log de MEET").apply {
+        val chooser = Intent.createChooser(intent, "Compartir Log de Elysium Vanguard").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
@@ -4488,18 +4716,18 @@ class ObdViewModel @Inject constructor(
     private fun speakVehicleDna() {
         val dna = dnaResult.value
         val msgEs = if (!dna.isCalibrated) {
-            "La firma digital MEET DNA aún no está calibrada para este vehículo. Por favor, realice una corrida de calibración en la pantalla DNA."
+            "La firma digital Elysium Vanguard DNA aún no está calibrada para este vehículo. Por favor, realice una corrida de calibración en la pantalla DNA."
         } else if (dna.isAnomalous) {
             "Alerta preventiva de comportamiento: El score de salud es del ${dna.healthScore} por ciento. Se detecta una desviación estadística anómala en los sensores."
         } else {
-            "Firma digital MEET DNA calibrada al ${dna.confidence.toInt()} por ciento de confianza. El vehículo se comporta de forma normal con un score de salud del ${dna.healthScore} por ciento."
+            "Firma digital Elysium Vanguard DNA calibrada al ${dna.confidence.toInt()} por ciento de confianza. El vehículo se comporta de forma normal con un score de salud del ${dna.healthScore} por ciento."
         }
         val msgEn = if (!dna.isCalibrated) {
-            "The MEET DNA digital signature is not yet calibrated for this vehicle. Please perform a calibration drive in the DNA section."
+            "The Elysium Vanguard DNA digital signature is not yet calibrated for this vehicle. Please perform a calibration drive in the DNA section."
         } else if (dna.isAnomalous) {
             "Preventive behavior alert: The health score is ${dna.healthScore} percent. Statistical anomaly detected in sensors."
         } else {
-            "MEET DNA signature calibrated at ${dna.confidence.toInt()} percent confidence. The vehicle behaves normally with a health score of ${dna.healthScore} percent."
+            "Elysium Vanguard DNA signature calibrated at ${dna.confidence.toInt()} percent confidence. The vehicle behaves normally with a health score of ${dna.healthScore} percent."
         }
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
@@ -4507,14 +4735,14 @@ class ObdViewModel @Inject constructor(
     private fun speakPeritoReport() {
         val report = activePeritoReport.value
         val msgEs = if (report != null) {
-            "El último reporte MEET Perito indica un score clínico de ${report.score0to100} sobre cien, con clasificación ${report.category}."
+            "El último reporte Elysium Vanguard Perito indica un score clínico de ${report.score0to100} sobre cien, con clasificación ${report.category}."
         } else {
-            "No se ha realizado ningún peritaje clínico MEET Perito para este vehículo en esta sesión."
+            "No se ha realizado ningún peritaje clínico Elysium Vanguard Perito para este vehículo en esta sesión."
         }
         val msgEn = if (report != null) {
-            "The latest MEET Perito report shows a clinical score of ${report.score0to100} out of one hundred, categorized as ${report.category}."
+            "The latest Elysium Vanguard Perito report shows a clinical score of ${report.score0to100} out of one hundred, categorized as ${report.category}."
         } else {
-            "No MEET Perito clinical check has been executed for this vehicle in this session."
+            "No Elysium Vanguard Perito clinical check has been executed for this vehicle in this session."
         }
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
@@ -4574,6 +4802,999 @@ class ObdViewModel @Inject constructor(
                 "Engine is off or RPM data is not available yet."
             )
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████ TOW TRUCK SERVICE (Grúas) — Indriver-style bidding & GPS ████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    val towTruckRequests: StateFlow<List<TowTruckRequestEntity>> = towTruckDao.getRequestsFlow()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val openTowTruckRequests: StateFlow<List<TowTruckRequestEntity>> = towTruckDao.getOpenRequestsFlow()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val _towTruckDriverMode = MutableStateFlow(false)
+    val towTruckDriverMode: StateFlow<Boolean> = _towTruckDriverMode.asStateFlow()
+
+    fun toggleTowTruckDriverMode() {
+        _towTruckDriverMode.value = !_towTruckDriverMode.value
+    }
+
+    /** Build a rich vehicle info string from the selected vehicle + active DTCs */
+    fun buildVehicleInfoForRequest(): String {
+        val v = _selectedVehicle.value
+        val dtcs = activeDtcEvents.value
+        val sb = StringBuilder()
+        if (v != null) {
+            sb.append("${v.year} ${v.make} ${v.model}")
+            if (v.engine.isNotBlank()) sb.append(" | Motor: ${v.engine}")
+            if (v.displacement_cc > 0) sb.append(" ${v.displacement_cc}cc")
+            if (v.fuel_type.isNotBlank()) sb.append(" | Combustible: ${v.fuel_type}")
+            if (v.transmission_type.isNotBlank()) sb.append(" | Trans: ${v.transmission_type}")
+            if (v.vin.isNotBlank()) sb.append(" | VIN: ${v.vin}")
+        } else {
+            sb.append("Vehículo no registrado")
+        }
+        if (dtcs.isNotEmpty()) {
+            sb.append(" | DTCs activos: ${dtcs.joinToString(", ") { it.code }}")
+        }
+        return sb.toString()
+    }
+
+    /** Build vehicle info from a specific DTC code for 1-click service request */
+    fun buildVehicleInfoForDtc(dtcCode: String, dtcDescription: String, isManualEntry: Boolean = false): String {
+        val v = _selectedVehicle.value
+        val sb = StringBuilder()
+        if (v != null) {
+            sb.append("${v.year} ${v.make} ${v.model}")
+            if (v.engine.isNotBlank()) sb.append(" | Motor: ${v.engine}")
+            if (v.displacement_cc > 0) sb.append(" ${v.displacement_cc}cc")
+            if (v.fuel_type.isNotBlank()) sb.append(" | Combustible: ${v.fuel_type}")
+            if (v.transmission_type.isNotBlank()) sb.append(" | Trans: ${v.transmission_type}")
+            if (v.vin.isNotBlank()) sb.append(" | VIN: ${v.vin}")
+        } else {
+            sb.append("Vehículo no registrado")
+        }
+        val tag = if (isManualEntry) "✍️ [INGRESADO MANUALMENTE POR USUARIO]" else "🔍 [DETECTADO VÍA ESCÁNER OBD-II]"
+        sb.append(" | ⚠️ DTC: $dtcCode — $dtcDescription | $tag")
+        return sb.toString()
+    }
+
+    /** Client creates a new tow truck / mechanic request */
+    fun createTowTruckRequest(
+        latitude: Double,
+        longitude: Double,
+        locationName: String,
+        destLat: Double? = null,
+        destLng: Double? = null,
+        destName: String? = null,
+        phone: String,
+        priceOffer: Double,
+        vehicleInfoOverride: String? = null
+    ) {
+        viewModelScope.launch {
+            val request = TowTruckRequestEntity(
+                requestId = java.util.UUID.randomUUID().toString(),
+                userId = _selectedVehicle.value?.user_id ?: "anonymous",
+                vehicleInfo = vehicleInfoOverride ?: buildVehicleInfoForRequest(),
+                latitude = latitude,
+                longitude = longitude,
+                locationName = locationName,
+                destinationLatitude = destLat,
+                destinationLongitude = destLng,
+                destinationName = destName,
+                phone = phone,
+                status = "OPEN",
+                priceOffer = priceOffer,
+                createdAt = System.currentTimeMillis()
+            )
+            towTruckDao.insertRequest(request)
+        }
+    }
+
+    /** Driver/mechanic takes an open request */
+    fun takeTowTruckRequest(requestId: String, driverId: String, driverName: String, driverPhone: String) {
+        viewModelScope.launch {
+            towTruckDao.updateDriverAndStatus(
+                requestId = requestId,
+                status = "TAKEN",
+                driverId = driverId,
+                driverName = driverName,
+                driverPhone = driverPhone
+            )
+        }
+    }
+
+    /** Mark a request as completed */
+    fun completeTowTruckRequest(requestId: String) {
+        viewModelScope.launch {
+            towTruckDao.updateRequestStatusAndCompletedTime(
+                requestId = requestId,
+                status = "COMPLETED",
+                completedAt = System.currentTimeMillis()
+            )
+        }
+    }
+
+    /** Cancel a request */
+    fun cancelTowTruckRequest(requestId: String) {
+        viewModelScope.launch {
+            towTruckDao.updateRequestStatusAndCompletedTime(
+                requestId = requestId,
+                status = "CANCELLED",
+                completedAt = System.currentTimeMillis()
+            )
+        }
+    }
+
+    /** User manually deletes a completed/cancelled request */
+    fun deleteTowTruckRequest(requestId: String) {
+        viewModelScope.launch {
+            towTruckDao.deleteRequest(requestId)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████ RATING SYSTEM — Uber/Didi/Indriver style 5-star ratings ████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    val allRatings: StateFlow<List<RatingEntity>> = ratingDao.getAllRatingsFlow()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun submitRating(
+        targetType: String,  // MECHANIC, STORE, TOW_TRUCK, CLIENT
+        targetId: String,
+        sourceName: String,
+        stars: Double,
+        comment: String
+    ) {
+        viewModelScope.launch {
+            val rating = RatingEntity(
+                ratingId = java.util.UUID.randomUUID().toString(),
+                targetType = targetType,
+                targetId = targetId,
+                sourceId = _selectedVehicle.value?.user_id ?: "anonymous",
+                sourceName = sourceName,
+                stars = stars.coerceIn(1.0, 5.0),
+                comment = comment,
+                createdAt = System.currentTimeMillis()
+            )
+            ratingDao.insertRating(rating)
+        }
+    }
+
+    suspend fun getAverageRating(targetType: String, targetId: String): Double {
+        return ratingDao.getAverageRatingForTarget(targetType, targetId) ?: 5.0
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████ 72-HOUR AUTO-CLEANUP — Purge completed/cancelled requests ████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    init {
+        // Launch a coroutine that runs every 15 minutes to clean up old requests
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    val seventyTwoHoursAgo = System.currentTimeMillis() - (72 * 60 * 60 * 1000L)
+                    towTruckDao.purgeOldRequests(seventyTwoHoursAgo)
+                } catch (e: Exception) {
+                    android.util.Log.e("ObdViewModel", "Auto-cleanup failed", e)
+                }
+                kotlinx.coroutines.delay(15 * 60 * 1000L) // every 15 minutes
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████ GPS / WAZE / WHATSAPP LOCATION SHARING UTILITIES ████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    data class GpsLocationInfo(
+        val latitude: Double,
+        val longitude: Double,
+        val addressName: String,
+        val countryCode: String,      // e.g. "CR"
+        val dialingPrefix: String,     // e.g. "+506"
+        val accuracy: Float = 0f,
+        val speed: Float = 0f,
+        val bearing: Float = 0f,
+        val timestamp: Long = 0L
+    )
+
+    private val countryPrefixMap = mapOf(
+        "CR" to "+506", "MX" to "+52", "CO" to "+57", "AR" to "+54",
+        "CL" to "+56", "PE" to "+51", "EC" to "+593", "PA" to "+507",
+        "UY" to "+598", "VE" to "+58", "GT" to "+502", "HN" to "+504",
+        "SV" to "+503", "NI" to "+505", "PY" to "+595", "BO" to "+591",
+        "DO" to "+1", "PR" to "+1", "US" to "+1", "ES" to "+34"
+    )
+
+    private val _currentGpsLocation = MutableStateFlow<GpsLocationInfo?>(null)
+    val currentGpsLocation: StateFlow<GpsLocationInfo?> = _currentGpsLocation.asStateFlow()
+
+    /** Trigger GPS detection, geocoding and dialing prefix detection using high-accuracy FusedLocationProviderClient */
+    fun detectCurrentLocation(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Log.w("ObdViewModel", "GPS permissions not granted")
+                    return@launch
+                }
+
+                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                
+                // Intentar obtener la última ubicación conocida primero
+                fusedLocationClient.lastLocation.addOnSuccessListener { location: android.location.Location? ->
+                    if (location != null && location.accuracy <= 30f) {
+                        resolveLocationDetails(context, location)
+                    } else {
+                        // Si es nula o imprecisa, forzar una actualización fresca de alta precisión
+                        requestFreshLocation(context, fusedLocationClient)
+                    }
+                }.addOnFailureListener {
+                    requestFreshLocation(context, fusedLocationClient)
+                }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Error starting FusedLocation check", e)
+            }
+        }
+    }
+
+    private fun requestFreshLocation(context: Context, client: com.google.android.gms.location.FusedLocationProviderClient) {
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+            
+            val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                2000
+            ).apply {
+                setMinUpdateDistanceMeters(0f)
+                setWaitForAccurateLocation(true)
+                setMaxUpdates(1)
+            }.build()
+
+            client.requestLocationUpdates(locationRequest, object : com.google.android.gms.location.LocationCallback() {
+                override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+                    val location = locationResult.lastLocation
+                    if (location != null) {
+                        resolveLocationDetails(context, location)
+                    }
+                }
+            }, android.os.Looper.getMainLooper())
+        } catch (e: Exception) {
+            Log.e("ObdViewModel", "Error requesting fresh high-accuracy location", e)
+        }
+    }
+
+    private fun resolveLocationDetails(context: Context, location: android.location.Location) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                val address = addresses?.firstOrNull()
+                val countryCode = address?.countryCode ?: ""
+                val addressLine = address?.getAddressLine(0) ?: "Ubicación GPS (${location.latitude}, ${location.longitude})"
+                val prefix = countryPrefixMap[countryCode.uppercase()] ?: "+506"
+
+                _currentGpsLocation.value = GpsLocationInfo(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    addressName = addressLine,
+                    countryCode = countryCode,
+                    dialingPrefix = prefix,
+                    accuracy = location.accuracy,
+                    speed = location.speed,
+                    bearing = location.bearing,
+                    timestamp = location.time
+                )
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Geocoder address look up failed", e)
+                _currentGpsLocation.value = GpsLocationInfo(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    addressName = "Ubicación GPS (${location.latitude}, ${location.longitude})",
+                    countryCode = "",
+                    dialingPrefix = "+506",
+                    accuracy = location.accuracy,
+                    speed = location.speed,
+                    bearing = location.bearing,
+                    timestamp = location.time
+                )
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MEET Rides (Viajes InDriver-Style) Business Logic
+    // ═══════════════════════════════════════════════════════════════
+
+    val rideRequests = rideDao.getAllRequestsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val openRideRequests = rideDao.getOpenRequestsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _activeRideRequest = MutableStateFlow<RideRequestEntity?>(null)
+    val activeRideRequest: StateFlow<RideRequestEntity?> = _activeRideRequest.asStateFlow()
+
+    private val _rideOffers = MutableStateFlow<List<RideOfferEntity>>(emptyList())
+    val rideOffers: StateFlow<List<RideOfferEntity>> = _rideOffers.asStateFlow()
+
+    private val _rideChatMessages = MutableStateFlow<List<RideChatMessageEntity>>(emptyList())
+    val rideChatMessages: StateFlow<List<RideChatMessageEntity>> = _rideChatMessages.asStateFlow()
+
+    private val _rideDriverMode = MutableStateFlow(false)
+    val rideDriverMode: StateFlow<Boolean> = _rideDriverMode.asStateFlow()
+
+    private val _driverPresetMessages = MutableStateFlow<List<String>>(listOf(
+        "Ya me encuentro en la ubicación",
+        "Voy en camino, llego en unos 5 minutos",
+        "Estoy parado en el semáforo/esquina",
+        "Hola, ya inicié el viaje",
+        "Estoy afuera con las luces intermitentes encendidas"
+    ))
+    val driverPresetMessages: StateFlow<List<String>> = _driverPresetMessages.asStateFlow()
+
+    private var jobOffersCollection: Job? = null
+    private var jobChatCollection: Job? = null
+
+    fun toggleRideDriverMode() {
+        _rideDriverMode.value = !_rideDriverMode.value
+    }
+
+    fun selectActiveRide(request: RideRequestEntity?) {
+        _activeRideRequest.value = request
+        jobOffersCollection?.cancel()
+        jobChatCollection?.cancel()
+
+        if (request != null) {
+            jobOffersCollection = viewModelScope.launch {
+                rideDao.getOffersForRequest(request.requestId).collect {
+                    _rideOffers.value = it
+                }
+            }
+            jobChatCollection = viewModelScope.launch {
+                rideDao.getChatMessagesFlow(request.requestId).collect {
+                    _rideChatMessages.value = it
+                }
+            }
+        } else {
+            _rideOffers.value = emptyList()
+            _rideChatMessages.value = emptyList()
+        }
+    }
+
+    fun createRideRequest(
+        passengerId: String,
+        passengerName: String,
+        passengerPhone: String,
+        pickupLat: Double,
+        pickupLng: Double,
+        pickupAddr: String,
+        pickupAcc: Float,
+        destLat: Double,
+        destLng: Double,
+        destAddr: String,
+        priceOffer: Double,
+        currency: String,
+        estDistance: Double,
+        estDuration: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = RideRequestEntity(
+                requestId = UUID.randomUUID().toString(),
+                passengerId = passengerId,
+                passengerName = passengerName,
+                passengerPhone = passengerPhone,
+                pickupLatitude = pickupLat,
+                pickupLongitude = pickupLng,
+                pickupAddress = pickupAddr,
+                pickupAccuracy = pickupAcc,
+                destLatitude = destLat,
+                destLongitude = destLng,
+                destAddress = destAddr,
+                priceOffer = priceOffer,
+                currency = currency,
+                estimatedDistanceKm = estDistance,
+                estimatedDurationMin = estDuration,
+                status = "OPEN",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertRequest(request)
+            withContext(Dispatchers.Main) {
+                selectActiveRide(request)
+            }
+        }
+    }
+
+    fun makeRideOffer(
+        requestId: String,
+        driverId: String,
+        driverName: String,
+        driverPhone: String,
+        driverRating: Double,
+        driverTotalTrips: Int,
+        vehicleDesc: String,
+        counterPrice: Double,
+        currency: String,
+        estArrivalMin: Int,
+        driverLat: Double,
+        driverLng: Double,
+        message: String?
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val offer = RideOfferEntity(
+                offerId = UUID.randomUUID().toString(),
+                requestId = requestId,
+                driverId = driverId,
+                driverName = driverName,
+                driverPhone = driverPhone,
+                driverRating = driverRating,
+                driverTotalTrips = driverTotalTrips,
+                vehicleDescription = vehicleDesc,
+                counterPrice = counterPrice,
+                currency = currency,
+                estimatedArrivalMin = estArrivalMin,
+                driverLatitude = driverLat,
+                driverLongitude = driverLng,
+                message = message,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertOffer(offer)
+        }
+    }
+
+    fun acceptRideOffer(requestId: String, offerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val offer = rideDao.getOfferById(offerId) ?: return@launch
+            // Update request status to ACCEPTED
+            rideDao.acceptOffer(
+                requestId = requestId,
+                offerId = offerId,
+                driverId = offer.driverId,
+                driverName = offer.driverName,
+                driverPhone = offer.driverPhone,
+                vehicle = offer.vehicleDescription,
+                price = offer.counterPrice
+            )
+            // Reject other offers
+            rideDao.updateOfferStatus(offerId, "ACCEPTED")
+            rideDao.rejectOtherOffers(requestId, offerId)
+
+            // Insert system notification in chat
+            val systemMsg = RideChatMessageEntity(
+                messageId = UUID.randomUUID().toString(),
+                rideRequestId = requestId,
+                senderId = "SYSTEM",
+                senderName = "Sistema",
+                senderRole = "SYSTEM",
+                messageType = "TEXT",
+                textContent = "Oferta de ${offer.driverName} aceptada por ${offer.counterPrice} ${offer.currency}.",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertChatMessage(systemMsg)
+
+            // Update active state flow
+            val updatedRequest = rideDao.getRequestById(requestId)
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updatedRequest
+            }
+        }
+    }
+
+    fun updateRideStatus(requestId: String, newStatus: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            rideDao.updateRequestStatus(requestId, newStatus)
+            
+            // Insert system chat msg about state change
+            val alertText = when(newStatus) {
+                "ARRIVED" -> "🚕 ¡El conductor ha llegado a tu ubicación de recogida!"
+                "IN_PROGRESS" -> "🚗 El viaje ha comenzado oficialmente."
+                "COMPLETED" -> "🏁 Viaje finalizado con éxito."
+                "CANCELLED" -> "❌ Viaje cancelado."
+                else -> "El viaje cambió de estado a $newStatus."
+            }
+
+            val systemMsg = RideChatMessageEntity(
+                messageId = UUID.randomUUID().toString(),
+                rideRequestId = requestId,
+                senderId = "SYSTEM",
+                senderName = "Sistema",
+                senderRole = "SYSTEM",
+                messageType = "TEXT",
+                textContent = alertText,
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertChatMessage(systemMsg)
+
+            val updatedRequest = rideDao.getRequestById(requestId)
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updatedRequest
+            }
+        }
+    }
+
+    fun submitRideRating(requestId: String, isPassengerRating: Boolean, stars: Double, comment: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val req = rideDao.getRequestById(requestId) ?: return@launch
+            if (isPassengerRating) {
+                // Pasajero califica al conductor
+                rideDao.updatePassengerRating(requestId, stars)
+                // Insert en la tabla global de ratings
+                val driverProfile = providerProfileDao.getProfileByUserAndType(req.assignedDriverId ?: "", "TOW_TRUCK") // o rol similar
+                val targetId = req.assignedDriverId ?: ""
+                val rating = RatingEntity(
+                    ratingId = UUID.randomUUID().toString(),
+                    targetType = "DRIVER",
+                    targetId = targetId,
+                    sourceId = req.passengerId,
+                    sourceName = req.passengerName,
+                    stars = stars,
+                    comment = comment,
+                    createdAt = System.currentTimeMillis()
+                )
+                ratingDao.insertRating(rating)
+
+                // Recalcular promedio si tiene perfil registrado
+                val avg = ratingDao.getAverageRatingForTarget("DRIVER", targetId)
+                if (avg != null) {
+                    val profile = providerProfileDao.getProfileByUserAndType(targetId, "RIDE_DRIVER")
+                    if (profile != null) {
+                        providerProfileDao.updateRatingAndJobs(profile.profileId, avg, System.currentTimeMillis())
+                    }
+                }
+            } else {
+                // Conductor califica al pasajero
+                rideDao.updateDriverRating(requestId, stars)
+                val rating = RatingEntity(
+                    ratingId = UUID.randomUUID().toString(),
+                    targetType = "CLIENT",
+                    targetId = req.passengerId,
+                    sourceId = req.assignedDriverId ?: "",
+                    sourceName = req.assignedDriverName ?: "",
+                    stars = stars,
+                    comment = comment,
+                    createdAt = System.currentTimeMillis()
+                )
+                ratingDao.insertRating(rating)
+            }
+
+            val updatedRequest = rideDao.getRequestById(requestId)
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updatedRequest
+            }
+        }
+    }
+
+    fun updateRidePrice(requestId: String, newPrice: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            val updated = request.copy(priceOffer = newPrice)
+            rideDao.insertRequest(updated)
+            
+            val systemMsg = RideChatMessageEntity(
+                messageId = UUID.randomUUID().toString(),
+                rideRequestId = requestId,
+                senderId = "SYSTEM",
+                senderName = "Sistema",
+                senderRole = "SYSTEM",
+                messageType = "TEXT",
+                textContent = "💵 El pasajero incrementó la oferta de tarifa a ${newPrice} ${request.currency}.",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertChatMessage(systemMsg)
+
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updated
+            }
+        }
+    }
+
+    fun rejectRideOffer(requestId: String, offerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            rideDao.updateOfferStatus(offerId, "REJECTED")
+            val updatedRequest = rideDao.getRequestById(requestId)
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updatedRequest
+            }
+        }
+    }
+
+    // Chat Functions
+    fun sendRideChatMessage(requestId: String, senderId: String, senderName: String, role: String, text: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val msg = RideChatMessageEntity(
+                messageId = UUID.randomUUID().toString(),
+                rideRequestId = requestId,
+                senderId = senderId,
+                senderName = senderName,
+                senderRole = role,
+                messageType = "TEXT",
+                textContent = text,
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertChatMessage(msg)
+        }
+    }
+
+    fun sendRidePresetMessage(requestId: String, senderId: String, senderName: String, role: String, presetText: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val msg = RideChatMessageEntity(
+                messageId = UUID.randomUUID().toString(),
+                rideRequestId = requestId,
+                senderId = senderId,
+                senderName = senderName,
+                senderRole = role,
+                messageType = "PRESET",
+                textContent = presetText,
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertChatMessage(msg)
+        }
+    }
+
+    // Preset messages management
+    fun addDriverPresetMessage(msg: String) {
+        val list = _driverPresetMessages.value.toMutableList()
+        if (!list.contains(msg) && msg.isNotBlank()) {
+            list.add(msg)
+            _driverPresetMessages.value = list
+        }
+    }
+
+    fun removeDriverPresetMessage(msg: String) {
+        val list = _driverPresetMessages.value.toMutableList()
+        list.remove(msg)
+        _driverPresetMessages.value = list
+    }
+
+    // local Audio Recording & Playback Logic
+    private var mediaRecorder: android.media.MediaRecorder? = null
+    private var mediaPlayer: android.media.MediaPlayer? = null
+    private var currentRecordingFile: java.io.File? = null
+    private var recordingStartTime: Long = 0L
+
+    private val _isRecordingAudio = MutableStateFlow(false)
+    val isRecordingAudio: StateFlow<Boolean> = _isRecordingAudio.asStateFlow()
+
+    private val _isPlayingAudio = MutableStateFlow<String?>(null) // Muestra el path reproduciéndose
+    val isPlayingAudio: StateFlow<String?> = _isPlayingAudio.asStateFlow()
+
+    fun startAudioRecording(context: Context) {
+        if (_isRecordingAudio.value) return
+        try {
+            val audioDir = java.io.File(context.filesDir, "meet_rides_audio")
+            if (!audioDir.exists()) audioDir.mkdirs()
+
+            currentRecordingFile = java.io.File(audioDir, "audio_${System.currentTimeMillis()}.m4a")
+            mediaRecorder = android.media.MediaRecorder(context).apply {
+                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                setOutputFile(currentRecordingFile?.absolutePath)
+                prepare()
+                start()
+            }
+            recordingStartTime = System.currentTimeMillis()
+            _isRecordingAudio.value = true
+        } catch (e: Exception) {
+            Log.e("ObdViewModel", "Failed to start audio recording", e)
+            _isRecordingAudio.value = false
+        }
+    }
+
+    fun stopAndSendAudioRecording(requestId: String, senderId: String, senderName: String, role: String) {
+        if (!_isRecordingAudio.value) return
+        try {
+            mediaRecorder?.apply {
+                stop()
+                release()
+            }
+            mediaRecorder = null
+            _isRecordingAudio.value = false
+
+            val file = currentRecordingFile
+            if (file != null && file.exists()) {
+                val duration = System.currentTimeMillis() - recordingStartTime
+                if (duration > 800) { // Al menos 0.8 segundos de audio
+                    viewModelScope.launch(Dispatchers.IO) {
+                        val msg = RideChatMessageEntity(
+                            messageId = UUID.randomUUID().toString(),
+                            rideRequestId = requestId,
+                            senderId = senderId,
+                            senderName = senderName,
+                            senderRole = role,
+                            messageType = "AUDIO",
+                            audioFilePath = file.absolutePath,
+                            audioDurationMs = duration,
+                            createdAt = System.currentTimeMillis()
+                        )
+                        rideDao.insertChatMessage(msg)
+                    }
+                } else {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ObdViewModel", "Failed to stop audio recording", e)
+            _isRecordingAudio.value = false
+        }
+    }
+
+    fun playAudioMessage(filePath: String) {
+        viewModelScope.launch(Dispatchers.Main) {
+            try {
+                if (_isPlayingAudio.value == filePath) {
+                    stopAudioMessage()
+                    return@launch
+                }
+                stopAudioMessage()
+
+                mediaPlayer = android.media.MediaPlayer().apply {
+                    setDataSource(filePath)
+                    prepare()
+                    start()
+                    setOnCompletionListener {
+                        stopAudioMessage()
+                    }
+                }
+                _isPlayingAudio.value = filePath
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "MediaPlayer failed", e)
+                _isPlayingAudio.value = null
+            }
+        }
+    }
+
+    fun stopAudioMessage() {
+        mediaPlayer?.let {
+            if (it.isPlaying) {
+                it.stop()
+            }
+            it.release()
+        }
+        mediaPlayer = null
+        _isPlayingAudio.value = null
+    }
+
+
+    /** Open Waze with navigation to coordinates. Explicitly targets package com.waze to bypass prompt issues */
+    fun openWaze(context: Context, lat: Double, lng: Double) {
+        try {
+            val wazeUri = android.net.Uri.parse("waze://?ll=$lat,$lng&navigate=yes")
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, wazeUri)
+            intent.setPackage("com.waze")
+            intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                // Fallback 1: open Waze web URL
+                val webUri = android.net.Uri.parse("https://waze.com/ul?ll=$lat,$lng&navigate=yes")
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, webUri)
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(intent)
+            } catch (ex: Exception) {
+                // Fallback 2: open standard geo maps intent (almost always works on Android via Google Maps)
+                try {
+                    val geoUri = android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng")
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, geoUri)
+                    intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    context.startActivity(intent)
+                } catch (e3: Exception) {
+                    android.widget.Toast.makeText(context, "No se pudo abrir Waze ni Google Maps", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /** Share location via WhatsApp */
+    fun shareLocationViaWhatsApp(context: Context, lat: Double, lng: Double, label: String) {
+        try {
+            val mapsLink = "https://www.google.com/maps?q=$lat,$lng"
+            val message = "📍 Ubicación: $label\n$mapsLink"
+            val waUri = android.net.Uri.parse("https://api.whatsapp.com/send?text=${android.net.Uri.encode(message)}")
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, waUri)
+            intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("ObdViewModel", "WhatsApp share failed", e)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FEATURE 9 — IDENTITY VERIFICATION (UBER-GRADE ONBOARDING)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ── Current user ID (device-level, consistent across sessions) ───────────
+    private val localDeviceId: String by lazy {
+        android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            android.provider.Settings.Secure.ANDROID_ID
+        ) ?: java.util.UUID.randomUUID().toString()
+    }
+
+    // ── Driver verification state ────────────────────────────────────────────
+    val driverVerification: StateFlow<com.elysium369.meet.data.local.entities.DriverVerificationEntity?> =
+        rideDao.getDriverVerificationFlow(localDeviceId)
+            .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    // ── Passenger verification state ─────────────────────────────────────────
+    val passengerVerification: StateFlow<com.elysium369.meet.data.local.entities.PassengerVerificationEntity?> =
+        rideDao.getPassengerVerificationFlow(localDeviceId)
+            .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    /**
+     * Create the local directory for storing identity verification photos.
+     * Returns the base directory path.
+     */
+    fun getVerificationPhotosDir(context: android.content.Context): java.io.File {
+        val dir = java.io.File(context.filesDir, "meet_verifications")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    /**
+     * Create a temporary file for a photo capture (camera intent result).
+     */
+    fun createVerificationPhotoFile(context: android.content.Context, prefix: String): java.io.File {
+        val dir = getVerificationPhotosDir(context)
+        return java.io.File(dir, "${prefix}_${System.currentTimeMillis()}.jpg")
+    }
+
+    /**
+     * Submit a complete driver verification application with all required
+     * document file paths. This is the single entry point for the multi-step
+     * onboarding wizard.
+     */
+    fun submitDriverVerification(
+        fullName: String,
+        phone: String,
+        email: String,
+        dateOfBirth: String,
+        vehicleMake: String,
+        vehicleModel: String,
+        vehicleYear: Int,
+        vehicleColor: String,
+        vehiclePlate: String,
+        pathLicenciaFront: String,
+        pathLicenciaBack: String,
+        pathCedulaFront: String,
+        pathCedulaBack: String,
+        pathHojaDelincuencia: String,
+        pathMarchamo: String,
+        pathDekra: String,
+        pathSeguro: String,
+        pathSelfieProfile: String,
+        pathSelfieWithCedula: String,
+        pathSelfieWithLicencia: String,
+        pathVehicleFront: String,
+        pathVehicleBack: String,
+        pathVehicleInterior: String
+    ) {
+        viewModelScope.launch {
+            val entity = com.elysium369.meet.data.local.entities.DriverVerificationEntity(
+                driverId = localDeviceId,
+                fullName = fullName,
+                phone = phone,
+                email = email,
+                dateOfBirth = dateOfBirth,
+                vehicleMake = vehicleMake,
+                vehicleModel = vehicleModel,
+                vehicleYear = vehicleYear,
+                vehicleColor = vehicleColor,
+                vehiclePlate = vehiclePlate,
+                pathLicenciaFront = pathLicenciaFront,
+                pathLicenciaBack = pathLicenciaBack,
+                pathCedulaFront = pathCedulaFront,
+                pathCedulaBack = pathCedulaBack,
+                pathHojaDelincuencia = pathHojaDelincuencia,
+                pathMarchamo = pathMarchamo,
+                pathDekra = pathDekra,
+                pathSeguro = pathSeguro,
+                pathSelfieProfile = pathSelfieProfile,
+                pathSelfieWithCedula = pathSelfieWithCedula,
+                pathSelfieWithLicencia = pathSelfieWithLicencia,
+                pathVehicleFront = pathVehicleFront,
+                pathVehicleBack = pathVehicleBack,
+                pathVehicleInterior = pathVehicleInterior,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertDriverVerification(entity)
+            android.util.Log.i("MeetRides", "Driver verification submitted for $localDeviceId")
+        }
+    }
+
+    /**
+     * Submit a passenger identity verification (lighter than driver).
+     */
+    fun submitPassengerVerification(
+        fullName: String,
+        phone: String,
+        pathProfilePhoto: String,
+        pathCedulaFront: String,
+        pathSelfieWithCedula: String
+    ) {
+        viewModelScope.launch {
+            val entity = com.elysium369.meet.data.local.entities.PassengerVerificationEntity(
+                passengerId = localDeviceId,
+                fullName = fullName,
+                phone = phone,
+                pathProfilePhoto = pathProfilePhoto,
+                pathCedulaFront = pathCedulaFront,
+                pathSelfieWithCedula = pathSelfieWithCedula,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            rideDao.insertPassengerVerification(entity)
+            android.util.Log.i("MeetRides", "Passenger verification submitted for $localDeviceId")
+        }
+    }
+
+    /**
+     * Auto-approve a driver verification (simulates admin review for testing).
+     * In production this would be a server-side review process.
+     */
+    fun autoApproveDriverVerification() {
+        viewModelScope.launch {
+            rideDao.updateDriverVerificationStatus(
+                driverId = localDeviceId,
+                status = "APPROVED",
+                approvedAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            android.util.Log.i("MeetRides", "Driver verification AUTO-APPROVED for $localDeviceId")
+        }
+    }
+
+    /**
+     * Auto-approve a passenger verification (simulates admin review for testing).
+     */
+    fun autoApprovePassengerVerification() {
+        viewModelScope.launch {
+            rideDao.updatePassengerVerificationStatus(
+                passengerId = localDeviceId,
+                status = "APPROVED",
+                approvedAt = System.currentTimeMillis()
+            )
+            android.util.Log.i("MeetRides", "Passenger verification AUTO-APPROVED for $localDeviceId")
+        }
+    }
+
+    /**
+     * Delete a driver verification (allows re-submission).
+     */
+    fun deleteDriverVerification() {
+        viewModelScope.launch {
+            rideDao.deleteDriverVerification(localDeviceId)
+        }
+    }
+
+    /**
+     * Delete a passenger verification (allows re-submission).
+     */
+    fun deletePassengerVerification() {
+        viewModelScope.launch {
+            rideDao.deletePassengerVerification(localDeviceId)
+        }
+    }
+
+    /**
+     * Check if the current device user is an approved driver.
+     */
+    fun isApprovedDriver(): Boolean {
+        return driverVerification.value?.status == "APPROVED"
+    }
+
+    /**
+     * Check if the current device user is an approved passenger.
+     */
+    fun isApprovedPassenger(): Boolean {
+        return passengerVerification.value?.status == "APPROVED"
     }
 
     override fun onCleared() {

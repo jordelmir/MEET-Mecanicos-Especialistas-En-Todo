@@ -217,7 +217,7 @@ fun ScannerStatisticsTab(
             ) {
                 Column {
                     Text(
-                        if (isSpanish) "Telemetría MEET" else "MEET Telemetry",
+                        if (isSpanish) "Telemetría Elysium Vanguard" else "Elysium Vanguard Telemetry",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -238,7 +238,7 @@ fun ScannerStatisticsTab(
                             .background(MeetColors.cardBackgroundLighter)
                             .size(36.dp)
                     ) {
-                        Text("⚙️", fontSize = 16.sp)
+                        AnimatedNeonGlyph("⚙️", contentDescription = null, fontSize = 16.sp)
                     }
 
                     EliteCard(
@@ -332,7 +332,7 @@ fun ScannerStatisticsTab(
                         ) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("⚠️", fontSize = 16.sp)
+                                    AnimatedNeonGlyph("⚠️", contentDescription = null, fontSize = 16.sp)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         if (isSpanish) "EFICIENCIA DEGRADADA" else "DEGRADED FUEL EFFICIENCY",
@@ -1011,11 +1011,11 @@ fun ScannerStatisticsTab(
                     .padding(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("💡", fontSize = 18.sp)
+                    AnimatedNeonGlyph("💡", contentDescription = null, fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (isSpanish) "ECO COACHING MEET" else "MEET ECO COACHING",
+                            text = if (isSpanish) "ECO COACHING Elysium Vanguard" else "Elysium Vanguard ECO COACHING",
                             color = MeetColors.electricBlue,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,
@@ -1341,7 +1341,7 @@ private fun StatCardItem(
             horizontalAlignment = Alignment.Start
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(icon, fontSize = 14.sp)
+                AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(label, color = MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
@@ -1402,7 +1402,7 @@ private fun TimeStatItem(
     val timeStr = TimeStatString(seconds)
     Column(horizontalAlignment = Alignment.Start) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, fontSize = 13.sp)
+            AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 13.sp)
             Spacer(modifier = Modifier.width(6.dp))
             Text(label, color = MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall)
         }
@@ -1675,7 +1675,7 @@ private fun TripHistoryCardWithBadge(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("📅", fontSize = 14.sp)
+                    AnimatedNeonGlyph("📅", contentDescription = null, fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         "$dateStr  •  $timeRange",
@@ -1776,7 +1776,7 @@ private fun TripStatRow(icon: String, label: String, value: String, unit: String
             .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(icon, fontSize = 13.sp)
+        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 13.sp)
         Spacer(modifier = Modifier.width(8.dp))
         Text(label, color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
         Text(

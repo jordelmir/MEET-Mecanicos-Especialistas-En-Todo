@@ -581,7 +581,7 @@ class GeminiDiagnostic(
             Se evaluaron las lecturas del bus para la prueba **$testId**:
             $dataSummary
             
-            *Nota: En condiciones normales de simulación, la señal del sensor retroalimenta la ECU según los ciclos programados del componente.*
+            *Nota: En condiciones normales de operación, la señal del sensor retroalimenta la ECU según los ciclos programados del componente.*
             
             ## ⚡ RECOMENDACIONES DE TALLER:
             1. **Revisión del Actuador:** Utilice una lámpara de prueba o multímetro en las terminales del actuador para verificar que le llegue voltaje de activación (+12V o control por tierra PWM) al dar el comando.
@@ -836,4 +836,3 @@ class GeminiDiagnostic(
         private val JSON_MARKDOWN_PATTERN = Pattern.compile("```json([\\s\\S]*?)```")
     }
 }
-

@@ -12,6 +12,9 @@ interface RepairCaseDao {
     @Query("SELECT * FROM repair_cases WHERE isMyContribution = 1 ORDER BY createdAt DESC")
     fun getMyCases(): Flow<List<RepairCaseEntity>>
 
+    @Query("SELECT * FROM repair_cases ORDER BY votes DESC, successRate DESC, createdAt DESC")
+    suspend fun getAllCases(): List<RepairCaseEntity>
+
     @Query("SELECT * FROM repair_cases WHERE id = :id")
     suspend fun getCaseById(id: String): RepairCaseEntity?
 

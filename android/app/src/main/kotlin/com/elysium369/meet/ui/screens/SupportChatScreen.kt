@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -186,7 +188,7 @@ fun SupportChatScreen(
                     
                     EliteIconButton(
                         icon = {
-                            Icon(
+                            AnimatedNeonIcon(
                                 Icons.Default.Send, 
                                 contentDescription = "Enviar", 
                                 tint = if (!isLoading && inputText.isNotBlank()) MeetColors.neonGreen else MeetColors.textSecondary
@@ -286,7 +288,7 @@ fun TelemetryCopilotPanel(
                         fontSize = 11.sp,
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Icon(
+                    AnimatedNeonIcon(
                         imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = "Expandir/Colapsar",
                         tint = Color.White

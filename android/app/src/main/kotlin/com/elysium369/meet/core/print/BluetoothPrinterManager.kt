@@ -29,7 +29,7 @@ data class PrintReportData(
 
 class BluetoothPrinterManager(private val context: Context) {
 
-    private val TAG = "MEET_PRINTER"
+    private val TAG = "EV_PRINTER"
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
@@ -72,7 +72,7 @@ class BluetoothPrinterManager(private val context: Context) {
             // Header (Branding)
             escPos.alignCenter()
             escPos.setTextSizeDouble()
-            escPos.printLine(data.workshopName.ifBlank { "MEET DIAGNOSTIC" })
+            escPos.printLine(data.workshopName.ifBlank { "Elysium Vanguard DIAGNOSTIC" })
             escPos.setTextSizeNormal()
             
             if (data.workshopAddress.isNotBlank()) escPos.printLine(data.workshopAddress)
@@ -147,7 +147,7 @@ class BluetoothPrinterManager(private val context: Context) {
             escPos.boldOn()
             escPos.printLine("GRACIAS POR SU PREFERENCIA")
             escPos.boldOff()
-            escPos.printLine("Certificado por MEET AI")
+            escPos.printLine("Certificado por Elysium Vanguard AI")
             
             escPos.feed(5)
             

@@ -406,7 +406,7 @@ fun MaintenanceScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(item.icon, fontSize = 22.sp)
+                                            AnimatedNeonGlyph(item.icon, contentDescription = null, fontSize = 22.sp)
                                             Column {
                                                 Text(item.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
                                                 Text(item.description, color = MeetColors.textSecondary, fontSize = 10.sp)
@@ -647,10 +647,16 @@ fun MaintenanceScreen(
                                                     saveExpenses(context, updatedList)
                                                     expenses = updatedList
                                                     Toast.makeText(context, "🗑️ Registro eliminado", Toast.LENGTH_SHORT).show()
-                                                },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Text("✕", color = MeetColors.error, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                                AnimatedNeonGlyph(
+                                                    glyph = "✕",
+                                                    contentDescription = "Eliminar registro",
+                                                    tint = MeetColors.error,
+                                                    fontSize = 12.sp,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
                                             }
                                         }
                                     }
@@ -1146,7 +1152,7 @@ fun FodaQuadrant(
                     border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(icon, color = color, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                        AnimatedNeonGlyph(icon, contentDescription = null, tint = color, fontSize = 16.sp)
                     }
                 }
                 Column {
@@ -1356,11 +1362,17 @@ fun PartsCatalogTabContent(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             placeholder = { Text("Buscar pieza (ej: Alternador, Bujía...)", color = MeetColors.textSecondary) },
-            leadingIcon = { Text("🔍", modifier = Modifier.padding(start = 8.dp)) },
+            leadingIcon = { AnimatedNeonGlyph("🔍", contentDescription = null, fontSize = 18.sp, modifier = Modifier.padding(start = 8.dp)) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Text("✕", color = MeetColors.textSecondary, fontWeight = FontWeight.Bold)
+                        AnimatedNeonGlyph(
+                            glyph = "✕",
+                            contentDescription = "Limpiar busqueda",
+                            tint = MeetColors.textSecondary,
+                            fontSize = 16.sp,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                 }
             },
@@ -1455,7 +1467,7 @@ fun PartsCatalogTabContent(
                                     .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(part.icon, fontSize = 20.sp)
+                                AnimatedNeonGlyph(part.icon, contentDescription = null, fontSize = 20.sp)
                             }
 
                             Spacer(modifier = Modifier.width(12.dp))
@@ -1498,7 +1510,13 @@ fun PartsCatalogTabContent(
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            Text("➔", color = MeetColors.cyberCyan, fontSize = 16.sp)
+                            AnimatedNeonGlyph(
+                                glyph = "➔",
+                                contentDescription = "Abrir",
+                                tint = MeetColors.cyberCyan,
+                                fontSize = 16.sp,
+                                modifier = Modifier.size(22.dp),
+                            )
                         }
                     }
                 }
@@ -1541,7 +1559,7 @@ fun PartsCatalogTabContent(
                             .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(part.icon, fontSize = 32.sp)
+                        AnimatedNeonGlyph(part.icon, contentDescription = null, fontSize = 32.sp)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -1602,7 +1620,7 @@ fun PartsCatalogTabContent(
                             .padding(12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("⚠️", fontSize = 16.sp)
+                            AnimatedNeonGlyph("⚠️", contentDescription = null, fontSize = 16.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "SÍNTOMAS DE FALLA COMUNES",
@@ -1923,4 +1941,3 @@ private fun parseIntervalKm(lifeStr: String): Long {
         20000L
     }
 }
-

@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.data.local.entities.ServiceBidEntity
 import com.elysium369.meet.data.local.entities.PartOfferEntity
@@ -81,12 +83,12 @@ fun MarketplaceScreen(
         containerColor = MeetColors.backgroundDark,
         topBar = {
             EliteTopAppBar(
-                title = "MEET MARKETPLACE\nServicios Automotrices VIP",
+                title = "Elysium Vanguard MARKETPLACE\nServicios Automotrices VIP",
                 onBackClick = { navController.popBackStack() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     IconButton(onClick = { navController.navigate("workshop_dashboard") }) {
-                        Icon(
+                        AnimatedNeonIcon(
                             Icons.Default.CarRepair,
                             contentDescription = "Taller",
                             tint = MeetColors.cyberCyan
@@ -102,7 +104,7 @@ fun MarketplaceScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.border(1.dp, MeetColors.neonGreen, RoundedCornerShape(12.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Nueva Solicitud", tint = MeetColors.neonGreen)
+                AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Nueva Solicitud", tint = MeetColors.neonGreen)
             }
         }
     ) { padding ->
@@ -142,28 +144,30 @@ fun MarketplaceScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                             EliteButton(
-                                text = "SOLICITAR SERVICIO",
-                                onClick = { showCreateDialog = true },
+                                text = "🛠️ PEDIR AYUDA A UN MECÁNICO",
+                                onClick = { navController.navigate("mechanic_service") },
                                 color = MeetColors.neonGreen,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth()
                             )
                             EliteButton(
-                                text = "PEDIR REPUESTO",
-                                onClick = {
-                                    partServiceRequestId = null
-                                    partVehicleId = selectedVehicle?.id
-                                    partDtcCode = activeDtcs.firstOrNull()
-                                    partNameInput = suggestPartNameForDtc(activeDtcs.firstOrNull(), "")
-                                    partNumberInput = ""
-                                    partNotesInput = activeDtcs.firstOrNull()?.let { "Relacionado al DTC $it detectado por MEET." }.orEmpty()
-                                    partDeliveryInput = locationInput
-                                    showPartRequestDialog = true
-                                },
+                                text = "🚛 PEDIR AYUDA A UNA GRÚA",
+                                onClick = { navController.navigate("tow_truck_service") },
+                                color = MeetColors.warning,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            EliteButton(
+                                text = "🚗 PEDIR UN VIAJE / RIDE (SUBASTA)",
+                                onClick = { navController.navigate("ride_service") },
+                                color = MeetColors.electricBlue,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            EliteButton(
+                                text = "🧩 PEDIR REPUESTOS",
+                                onClick = { navController.navigate("part_request") },
                                 color = MeetColors.cyberCyan,
-                                modifier = Modifier.weight(1f),
-                                isEnabled = selectedVehicle != null
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -201,7 +205,7 @@ fun MarketplaceScreen(
                                         .background(Color(0xFFFF4D4D).copy(alpha = 0.1f), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Warning, "Alerta", tint = Color(0xFFFF4D4D), modifier = Modifier.size(18.dp))
+                                    AnimatedNeonIcon(Icons.Default.Warning, "Alerta", tint = Color(0xFFFF4D4D), modifier = Modifier.size(18.dp))
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -304,7 +308,7 @@ fun MarketplaceScreen(
                             Text(req.description, color = MeetColors.textSecondary, fontSize = 12.sp)
                             Spacer(Modifier.height(10.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.LocationOn, "Ubicación", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
+                                AnimatedNeonIcon(Icons.Default.LocationOn, "Ubicación", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(req.location, color = MeetColors.textMuted, fontSize = 11.sp)
                             }
@@ -344,7 +348,7 @@ fun MarketplaceScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(bid.shopName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                                 Spacer(Modifier.width(6.dp))
-                                                Icon(Icons.Default.Star, "Rating", tint = Color(0xFFFFB300), modifier = Modifier.size(12.dp))
+                                                AnimatedNeonIcon(Icons.Default.Star, "Rating", tint = Color(0xFFFFB300), modifier = Modifier.size(12.dp))
                                                 Text(" ${bid.shopRating}", color = Color(0xFFFFB300), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
                                             Text("Tiempo: ${bid.estimatedHours}h | Garantía: ${bid.warrantyDays} días", color = MeetColors.textSecondary, fontSize = 11.sp)
@@ -481,7 +485,7 @@ fun MarketplaceScreen(
 
                             Text(partReq.customerNotes, color = MeetColors.textMuted, fontSize = 11.sp, lineHeight = 15.sp)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.LocationOn, "Entrega", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
+                                AnimatedNeonIcon(Icons.Default.LocationOn, "Entrega", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(partReq.deliveryLocation, color = MeetColors.textMuted, fontSize = 11.sp)
                             }

@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 
 class ElmNegotiator(private val transport: TransportInterface) {
 
-    private val TAG = "MEET_NEGOTIATOR"
+    private val TAG = "EV_NEGOTIATOR"
 
     data class AdapterProfile(
         val chipVersion: String,

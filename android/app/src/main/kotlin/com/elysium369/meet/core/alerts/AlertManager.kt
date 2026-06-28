@@ -73,7 +73,7 @@ class AlertManager @Inject constructor(
                     vibrator?.vibrate(longArrayOf(0, 200, 100, 200), -1)
                 }
             } catch (e: SecurityException) {
-                android.util.Log.w("MEET", "Vibrate permission not granted, skipping haptic feedback", e)
+                android.util.Log.w("ElysiumVanguard", "Vibrate permission not granted, skipping haptic feedback", e)
             }
             voiceFeedbackManager.speak("Atención. Alerta crítica de $title. $msg", "Warning. Critical alert: $title. $msg")
         } else if (severity == AlertSeverity.WARNING) {

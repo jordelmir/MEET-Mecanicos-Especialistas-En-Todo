@@ -16,7 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * VoiceFeedbackManager — Professional interactive voice assistant for MEET.
+ * VoiceFeedbackManager — Professional interactive voice assistant for OBD2 Elysium Vanguard.
  * Supports dynamic switching between Spanish and English depending on app settings.
  *
  * Utilizes native Android Text-to-Speech (TTS) for offline, low-latency voice notifications.
@@ -134,7 +134,7 @@ class VoiceFeedbackManager @Inject constructor(
             // Request Audio Focus with DUCKING support before speaking
             requestFocus()
 
-            tts?.speak(textToSpeak, queueMode, null, "MEET_TTS")
+            tts?.speak(textToSpeak, queueMode, null, "ELYSIUM_TTS")
         } catch (e: Exception) {
             Log.e("VoiceFeedback", "Error during speak", e)
             abandonFocus()

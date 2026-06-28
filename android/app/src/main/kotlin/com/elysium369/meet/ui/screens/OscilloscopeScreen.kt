@@ -43,8 +43,8 @@ fun OscilloscopeScreen(
     onNavigateBack: () -> Unit,
     viewModel: ObdViewModel
 ) {
-    // Mode selection: 0 = OBD VIRTUAL (Vía Scanner), 1 = FÍSICO / SIMULADOR USB Hantek
-    var activeTab by remember { mutableIntStateOf(0) } // Default to OBD Virtual (works without USB hardware)
+    // Mode selection: 0 = OBD live stream, 1 = physical USB Hantek.
+    var activeTab by remember { mutableIntStateOf(0) }
 
     // Safety warning states for physical mode
     var safetyAcknowledged by remember { mutableStateOf(false) }
@@ -115,9 +115,7 @@ fun OscilloscopeScreen(
     val usbCh1Data by viewModel.usbCh1Data.collectAsState()
     val usbCh2Data by viewModel.usbCh2Data.collectAsState()
     val usbIsStreaming by viewModel.usbIsStreaming.collectAsState()
-    val usbIsSimulationMode by viewModel.usbIsSimulationMode.collectAsState()
     val usbDeviceConnected by viewModel.usbDeviceConnected.collectAsState()
-    val usbSelectedWaveform by viewModel.usbSelectedWaveform.collectAsState()
     val usbCh1Attenuation by viewModel.usbCh1Attenuation.collectAsState()
     val usbCh2Attenuation by viewModel.usbCh2Attenuation.collectAsState()
     val usbTriggerLevel by viewModel.usbTriggerLevel.collectAsState()
@@ -139,7 +137,7 @@ fun OscilloscopeScreen(
             onDismissRequest = { showSafetyDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
+                    AnimatedNeonIcon(
                         Icons.Default.Warning,
                         contentDescription = null,
                         tint = Color(0xFFFF3333),
@@ -192,12 +190,7 @@ fun OscilloscopeScreen(
                         if (safetyChecked) {
                             safetyAcknowledged = true
                             showSafetyDialog = false
-                            if (usbIsSimulationMode) {
-                                viewModel.setUsbOscilloscopeSimulation(false)
-                                if (usbIsStreaming) viewModel.toggleUsbOscilloscopeStream()
-                            } else {
-                                viewModel.toggleUsbOscilloscopeStream()
-                            }
+                            viewModel.toggleUsbOscilloscopeStream()
                             usbDiagnosis = null
                         }
                     },
@@ -331,7 +324,7 @@ fun OscilloscopeScreen(
                     }
                     Spacer(Modifier.width(8.dp))
                     IconButton(onClick = { showPidPicker = !showPidPicker }) {
-                        Icon(Icons.Default.Tune, null, tint = MeetColors.electricBlue)
+                        AnimatedNeonIcon(Icons.Default.Tune, null, tint = MeetColors.electricBlue)
                     }
                 }
 
@@ -513,7 +506,7 @@ fun OscilloscopeScreen(
                                         "warning" -> Icons.Default.Warning
                                         else -> Icons.Default.CheckCircle
                                     }
-                                    Icon(icon, null, tint = sevColor, modifier = Modifier.size(28.dp))
+                                    AnimatedNeonIcon(icon, null, tint = sevColor, modifier = Modifier.size(28.dp))
                                     Spacer(Modifier.width(10.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(
@@ -614,8 +607,8 @@ fun OscilloscopeScreen(
                 ) {
                     Column {
                         Text(
-                            if (usbIsSimulationMode) "MODO SIMULADOR" else "MODO HANTEK 6022BE USB",
-                            color = if (usbIsSimulationMode) Color(0xFF00E5FF) else MeetColors.neonGreen,
+                            "MODO HANTEK 6022BE USB",
+                            color = MeetColors.neonGreen,
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp,
                             fontFamily = FontFamily.Monospace
@@ -725,7 +718,7 @@ fun OscilloscopeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.FlashOn, null, tint = Color(0xFFFF2222))
+                            AnimatedNeonIcon(Icons.Default.FlashOn, null, tint = Color(0xFFFF2222))
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 "🚨 SOBRETENSIÓN DETECTADA. CONECTE ATENUADOR FÍSICO YA.",
@@ -819,7 +812,7 @@ fun OscilloscopeScreen(
                 ) {
                     Column(Modifier.padding(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, null, tint = Color(0xFFFF3333), modifier = Modifier.size(18.dp))
+                            AnimatedNeonIcon(Icons.Default.Warning, null, tint = Color(0xFFFF3333), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 "ADVERTENCIA DE SEGURIDAD ELÉCTRICA",
@@ -849,7 +842,7 @@ fun OscilloscopeScreen(
                     EliteButton(
                         text = if (usbIsStreaming) "⏹ DETENER CAPTURA" else "▶ EMPEZAR CAPTURA",
                         onClick = {
-                            if (!usbIsSimulationMode && !safetyAcknowledged) {
+                            if (!safetyAcknowledged) {
                                 showSafetyDialog = true
                             } else {
                                 viewModel.toggleUsbOscilloscopeStream()
@@ -862,24 +855,6 @@ fun OscilloscopeScreen(
                         modifier = Modifier.weight(1.3f)
                     )
 
-                    // Toggle simulator vs USB hardware mode
-                    EliteButton(
-                        text = if (usbIsSimulationMode) "🔌 CONECTAR USB" else "💻 SIMULAR",
-                        onClick = {
-                            val targetSimMode = !usbIsSimulationMode
-                            if (!targetSimMode && !safetyAcknowledged) {
-                                showSafetyDialog = true
-                            } else {
-                                viewModel.setUsbOscilloscopeSimulation(targetSimMode)
-                                if (usbIsStreaming) {
-                                    viewModel.toggleUsbOscilloscopeStream()
-                                }
-                                usbDiagnosis = null
-                            }
-                        },
-                        color = MeetColors.electricBlue,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
 
                 val hasUsbData = usbCh1Data.any { it != 0f } || usbCh2Data.any { it != 0f }
@@ -896,7 +871,7 @@ fun OscilloscopeScreen(
                             onClick = {
                                 shareCsvCapture(
                                     context = context,
-                                    pidName = if (usbIsSimulationMode) usbSelectedWaveform else "Hantek 6022BE",
+                                    pidName = "Hantek 6022BE",
                                     ch1Data = usbCh1Data,
                                     ch2Data = usbCh2Data,
                                     isHantek = true
@@ -1113,63 +1088,7 @@ fun OscilloscopeScreen(
                     }
                 }
 
-                // SIMULATION WAVEFORMS CARDS (ONLY ACTIVE IN SIMULATION MODE)
-                if (usbIsSimulationMode) {
-                    Spacer(Modifier.height(14.dp))
-
-                    EliteCard(
-                        backgroundColor = MeetColors.backgroundDark,
-                        glowColor = Color(0xFF00E5FF),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(
-                                "SEÑALES AUTOMOTRICES SIMULADAS",
-                                color = Color(0xFF00E5FF),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Spacer(Modifier.height(10.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val signals = listOf(
-                                    "IGNITION_COP" to "BOBINA IGN. COP",
-                                    "INJECTOR_PWM" to "INYECTOR PWM",
-                                    "ALTERNATOR_RIPPLE" to "RIZADO ALT.",
-                                    "CKP_SENSOR" to "SENSOR CKP",
-                                    "CMP_SENSOR" to "SENSOR CMP",
-                                    "LAMBDA_O2" to "SONDA LAMBDA",
-                                    "CALIBRATION_WAVE" to "CALIBRACIÓN"
-                                )
-                                signals.forEach { (type, label) ->
-                                    val isSelected = usbSelectedWaveform == type
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f),
-                                        modifier = Modifier.clickable { viewModel.changeUsbWaveform(type) }
-                                    ) {
-                                        Text(
-                                            label,
-                                            color = if (isSelected) Color(0xFF00E5FF) else Color.White,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // AI DIAGNOSIS FOR HANTEK/SIMULATOR WAVEFORMS
+                // AI diagnosis for physical Hantek waveforms.
                 if (isAnalyzingUsb) {
                     Spacer(Modifier.height(14.dp))
                     EliteCard(
@@ -1202,7 +1121,7 @@ fun OscilloscopeScreen(
                     ) {
                         Column(Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CheckCircle, null, tint = sevColor, modifier = Modifier.size(24.dp))
+                                AnimatedNeonIcon(Icons.Default.CheckCircle, null, tint = sevColor, modifier = Modifier.size(24.dp))
                                 Spacer(Modifier.width(10.dp))
                                 Column {
                                     Text(
@@ -1409,8 +1328,8 @@ fun shareCsvCapture(
         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "text/csv"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
-            putExtra(android.content.Intent.EXTRA_SUBJECT, "MEET Osciloscopio - Captura $pidName")
-            putExtra(android.content.Intent.EXTRA_TEXT, "Adjunto reporte de oscilograma para la señal: $pidName, capturado con la app MEET.")
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Elysium Vanguard Osciloscopio - Captura $pidName")
+            putExtra(android.content.Intent.EXTRA_TEXT, "Adjunto reporte de oscilograma para la señal: $pidName, capturado con la app Elysium Vanguard.")
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 

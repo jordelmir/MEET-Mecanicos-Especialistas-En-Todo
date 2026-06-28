@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.ObdCommandExplainer
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.SimpleDateFormat
 import java.util.*
@@ -1076,7 +1077,13 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         fontSize = 14.sp
                     )
                     IconButton(onClick = { showUdsWizard = false }) {
-                        Text("✕", color = MeetColors.error, fontWeight = FontWeight.Bold)
+                        AnimatedNeonGlyph(
+                            glyph = "✕",
+                            contentDescription = "Cerrar",
+                            tint = MeetColors.error,
+                            fontSize = 18.sp,
+                            modifier = Modifier.size(24.dp),
+                        )
                     }
                 }
                 
@@ -1250,7 +1257,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
                                     "01" to "Hard Reset (Apagar físico)",
-                                    "02" to "Key Off On Reset (Simulación de llave)",
+                                    "02" to "Key Off On Reset (KOEO)",
                                     "03" to "Soft Reset (Reinicio software)"
                                 ).forEach { (rst, lbl) ->
                                     val isRstSelected = selectedReset == rst
@@ -1339,7 +1346,7 @@ private fun copyTerminalLogsToClipboard(context: Context, logs: List<TerminalLin
         "[${line.timestamp}] ${if (line.type == TerminalLineType.COMMAND) "❯" else if (line.type == TerminalLineType.RESPONSE) "←" else " "} ${line.text}"
     }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("MEET Terminal Logs", text)
+    val clip = ClipData.newPlainText("Elysium Vanguard Terminal Logs", text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
 }
@@ -1354,7 +1361,7 @@ private fun shareTerminalLogs(context: Context, logs: List<TerminalLine>) {
         putExtra(Intent.EXTRA_TEXT, text)
         type = "text/plain"
     }
-    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal MEET")
+    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard")
     context.startActivity(shareIntent)
 }
 
@@ -1362,7 +1369,7 @@ private fun copyLocalShellLogsToClipboard(context: Context, logs: List<String>) 
     if (logs.isEmpty()) return
     val text = logs.joinToString("\n")
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("MEET Local Terminal Logs", text)
+    val clip = ClipData.newPlainText("Elysium Vanguard Local Terminal Logs", text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
 }
@@ -1375,7 +1382,7 @@ private fun shareLocalShellLogs(context: Context, logs: List<String>) {
         putExtra(Intent.EXTRA_TEXT, text)
         type = "text/plain"
     }
-    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal MEET Android")
+    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard Android")
     context.startActivity(shareIntent)
 }
 

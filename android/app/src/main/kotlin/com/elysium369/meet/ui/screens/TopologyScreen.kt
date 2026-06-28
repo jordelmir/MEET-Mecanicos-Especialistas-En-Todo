@@ -123,7 +123,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                 modifier = Modifier.align(Alignment.Center),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(
+                                AnimatedNeonIcon(
                                     Icons.Default.Radar,
                                     contentDescription = null,
                                     tint = MeetColors.textMuted,
@@ -140,7 +140,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                     if (isConnected) {
                                         "Se mostrarán solo ECUs que respondan por CAN/UDS."
                                     } else {
-                                        "MEET no dibuja módulos simulados sin enlace físico."
+                                        "Elysium Vanguard no dibuja módulos simulados sin enlace físico."
                                     },
                                     color = MeetColors.textMuted,
                                     style = MaterialTheme.typography.labelSmall,
@@ -263,7 +263,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Conecta BT clásico, BLE, WiFi ELM o DoIP; pon ignición en ON; luego MEET sondea ECUs físicas y solo dibuja módulos que contestan.",
+                            "Conecta BT clásico, BLE, WiFi ELM o DoIP; pon ignición en ON; luego Elysium Vanguard sondea ECUs físicas y solo dibuja módulos que contestan.",
                             color = MeetColors.textSecondary,
                             fontSize = 12.sp,
                             lineHeight = 16.sp
@@ -308,7 +308,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                     onClick = { aiDiagnosticResult = null },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         Icons.Default.Close,
                                         contentDescription = "Close",
                                         tint = MeetColors.textMuted,
@@ -461,7 +461,7 @@ fun TacticalNodeMap(
                 )
             }
 
-            // Central Gateway (MEET VCI)
+            // Central Gateway (Elysium Vanguard VCI)
             drawCircle(color = MeetColors.electricBlue.copy(alpha = 0.3f), radius = 25.dp.toPx(), center = center)
             drawCircle(color = MeetColors.electricBlue, radius = 20.dp.toPx(), center = center, style = Stroke(width = 2.dp.toPx()))
         }
@@ -586,7 +586,7 @@ fun ModuleItem(module: NetworkModule, onSelect: (NetworkType) -> Unit) {
 
                 if (module.dtcs.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
+                        AnimatedNeonIcon(
                             Icons.Default.Warning,
                             contentDescription = null,
                             tint = MeetColors.warning,
@@ -626,7 +626,7 @@ fun ModuleItem(module: NetworkModule, onSelect: (NetworkType) -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
-                            Icon(Icons.Default.Info, null, tint = MeetColors.error, modifier = Modifier.size(14.dp))
+                            AnimatedNeonIcon(Icons.Default.Info, null, tint = MeetColors.error, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(dtc, color = Color.White, fontWeight = FontWeight.Bold)
                         }
@@ -777,7 +777,7 @@ fun ObdPinoutConnector(
                 "Línea K activa: Pin 7 (ISO 9141-2 / K-Line) para diagnóstico directo."
             }
             NetworkType.ETHERNET -> {
-                "Gateway DoIP/Ethernet detectado: la ruta física depende del gateway y del OEM. MEET valida el servidor UDS real, no un nodo CAN simulado."
+                "Gateway DoIP/Ethernet detectado: la ruta física depende del gateway y del OEM. Elysium Vanguard valida el servidor UDS real, no un nodo CAN simulado."
             }
             else -> {
                 "Toque un módulo o bus para ver la asignación de pines físicos en el puerto OBD-II."

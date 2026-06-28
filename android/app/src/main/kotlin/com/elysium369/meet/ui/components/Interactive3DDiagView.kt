@@ -58,20 +58,18 @@ fun Interactive3DDiagView(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pistonAnim")
-    val animTime by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2 * PI.toFloat(),
-        animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing)),
-        label = "time"
-    )
-
-    val dtcPulse by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "dtcPulse"
-    )
+    var animTime by remember { mutableFloatStateOf(0f) }
+    var dtcPulse by remember { mutableFloatStateOf(0.45f) }
+    LaunchedEffect(sceneType, activeDtcs.isNotEmpty()) {
+        val startedAt = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - startedAt
+            animTime = ((elapsed % 2600L) / 2600f) * 2f * PI.toFloat()
+            val pulseWave = ((sin(((elapsed % 1200L) / 1200f) * 2f * PI.toFloat()) + 1f) / 2f)
+            dtcPulse = if (activeDtcs.isNotEmpty()) 0.2f + (pulseWave * 0.8f) else 0.45f
+            kotlinx.coroutines.delay(if (sceneType == SceneType.ENGINE_BLOCK) 180L else 240L)
+        }
+    }
 
     val explodedProgress by animateFloatAsState(
         targetValue = if (explodedServiceView) 1f else 0f,

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MeetOBD" parent="android:Theme.Material.Light.NoActionBar" />
-    <style name="Theme.Meet.Starting" parent="Theme.MeetOBD">
+    <style name="Theme.ElysiumOBD" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Elysium.Starting" parent="Theme.ElysiumOBD">
         <item name="android:windowBackground">#0D0D0D</item>
         <item name="android:statusBarColor">#0D0D0D</item>
     </style>

@@ -334,8 +334,6 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val lastScanReport by viewModel.lastDtcScanReport.collectAsState()
-    val isDemoMode by viewModel.isDemoMode.collectAsState()
-    val demoDescription by viewModel.demoScenarioDescription.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -511,27 +509,6 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
             HolographicBackground()
 
             Column(modifier = Modifier.fillMaxSize()) {
-                if (isDemoMode) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MeetColors.warning.copy(alpha = 0.14f))
-                            .border(1.dp, MeetColors.warning.copy(alpha = 0.35f), RoundedCornerShape(0.dp))
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("DEMO", color = MeetColors.warning, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                        Text(
-                            demoDescription.ifBlank { "Datos de entrenamiento; no provienen de un vehículo real." },
-                            color = Color.White.copy(alpha = 0.82f),
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
                 // ═══════════ HOLOGRAPHIC TAB ROW ═══════════
                 Box(
                     modifier = Modifier
@@ -655,7 +632,11 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 } else {
                                     itemsIndexed(activeDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
-                                            HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact)
+                                            HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact,
+                                                onRequestService = { code, desc ->
+                                                    navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -666,7 +647,11 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 } else {
                                     itemsIndexed(pendingDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
-                                            HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact)
+                                            HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact,
+                                                onRequestService = { code, desc ->
+                                                    navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -677,7 +662,11 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 } else {
                                     itemsIndexed(permanentDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
-                                            HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact)
+                                            HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact,
+                                                onRequestService = { code, desc ->
+                                                    navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -1073,7 +1062,8 @@ private fun HoloDtcCard(
     accentColor: Color,
     navController: NavController,
     viewModel: ObdViewModel,
-    isCompact: Boolean
+    isCompact: Boolean,
+    onRequestService: (String, String) -> Unit = { _, _ -> }
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
     val definition = dtcDefinitions[dtc]
@@ -1166,7 +1156,7 @@ private fun HoloDtcCard(
                         .border(0.5.dp, MeetColors.borderSubtle, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AnimatedNeonIcon(
                         imageVector = if (expanded) Icons.Default.Warning else Icons.Default.Search,
                         contentDescription = null,
                         tint = MeetColors.textSecondary,
@@ -1294,6 +1284,58 @@ private fun HoloDtcCard(
                             EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
                             val cs = rememberCoroutineScope()
                             EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val vehicleInfoEncoded = try {
+                            java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(dtc, desc), "UTF-8")
+                        } catch (e: Exception) {
+                            ""
+                        }
+                        
+                        // Button 1: Mecánico
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MeetColors.neonGreen)
+                                .clickable { navController.navigate("mechanic_service?vehicleInfo=$vehicleInfoEncoded") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🛠️ PEDIR AYUDA A MECÁNICO", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        // Button 2: Grúa
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MeetColors.warning)
+                                .clickable { navController.navigate("tow_truck_service?vehicleInfo=$vehicleInfoEncoded") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🚛 PEDIR AYUDA A GRÚA", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        // Button 3: Repuestos
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MeetColors.cyberCyan)
+                                .clickable { navController.navigate("part_request?vehicleInfo=$vehicleInfoEncoded") }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🧩 PEDIR REPUESTOS", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -1686,6 +1728,58 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                         EliteButton("🛠️ CÓMO REPARAR", { navController.navigate("repair/${dtc.code}") }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
                                         EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/${dtc.code}") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
+                                    }
+                                }
+
+                                Spacer(Modifier.height(10.dp))
+                                val desc = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(dtc, dtc.code)
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    val vehicleInfoEncoded = try {
+                                        java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(dtc.code, desc, isManualEntry = true), "UTF-8")
+                                    } catch (e: Exception) {
+                                        ""
+                                    }
+                                    
+                                    // Button 1: Mecánico
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(MeetColors.neonGreen)
+                                            .clickable { navController.navigate("mechanic_service?vehicleInfo=$vehicleInfoEncoded") }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🛠️ PEDIR AYUDA A MECÁNICO", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+
+                                    // Button 2: Grúa
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(MeetColors.warning)
+                                            .clickable { navController.navigate("tow_truck_service?vehicleInfo=$vehicleInfoEncoded") }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🚛 PEDIR AYUDA A GRÚA", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+
+                                    // Button 3: Repuestos
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(MeetColors.cyberCyan)
+                                            .clickable { navController.navigate("part_request?vehicleInfo=$vehicleInfoEncoded") }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🧩 PEDIR REPUESTOS", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                 }
                             }

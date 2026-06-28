@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.Manifest
 import android.content.ContentValues
 import android.content.Context
@@ -95,7 +97,7 @@ fun DashcamScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "MEET necesita acceder a la cámara trasera para poder grabar la carretera y superponer la telemetría en tiempo real sobre el video.",
+                    text = "Elysium Vanguard necesita acceder a la cámara trasera para poder grabar la carretera y superponer la telemetría en tiempo real sobre el video.",
                     color = MeetColors.textMuted,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
@@ -177,13 +179,13 @@ private fun CameraPreviewAndOverlay(
     fun startRecordingHelper() {
         val capture = videoCapture ?: return
         val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-        val videoName = "MEET_Dash_${sdf.format(java.util.Date())}"
+        val videoName = "ElysiumVanguard_Dash_${sdf.format(java.util.Date())}"
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, videoName)
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/MEET_Dashcam")
+                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/ElysiumVanguard_Dashcam")
             }
         }
 
@@ -350,7 +352,7 @@ private fun CameraPreviewAndOverlay(
                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
             }
 
             if (isRecordingDashcam) {
@@ -412,7 +414,7 @@ private fun CameraPreviewAndOverlay(
                     .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
                 enabled = !isRecordingDashcam
             ) {
-                Icon(Icons.Default.Cameraswitch, contentDescription = "Girar Cámara", tint = Color.White)
+                AnimatedNeonIcon(Icons.Default.Cameraswitch, contentDescription = "Girar Cámara", tint = Color.White)
             }
         }
 
@@ -600,7 +602,7 @@ private fun CameraPreviewAndOverlay(
                     }, CircleShape)
                     .pulseOnHover()
             ) {
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = if (isRecordingDashcam) Icons.Default.Stop else Icons.Default.FiberManualRecord,
                     contentDescription = "Grabar",
                     tint = when {

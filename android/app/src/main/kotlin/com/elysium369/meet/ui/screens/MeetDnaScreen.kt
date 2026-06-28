@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.core.dna.DnaBusinessStage
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.components.*
@@ -55,13 +56,12 @@ fun MeetDnaScreen(
     val dnaResult by viewModel.dnaResult.collectAsState()
     val isTraining by viewModel.isTrainingDna.collectAsState()
     val twinAnomalies by viewModel.twinAnomalies.collectAsState()
-
-    val context = LocalContext.current
+    val hasDnaTelemetry = dnaResult.sensorStates.isNotEmpty()
 
     // Trigger initial evaluation on enter
     LaunchedEffect(activeVehicle) {
         if (activeVehicle != null) {
-            viewModel.evaluateDnaInference()
+            viewModel.evaluateDnaInference(force = true)
         }
     }
 
@@ -81,12 +81,12 @@ fun MeetDnaScreen(
                         .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                         .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                    AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "MEET DNA",
+                        "Elysium Vanguard DNA",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -116,7 +116,7 @@ fun MeetDnaScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Necesitas seleccionar un vehículo de tu Garage para ver su firma digital MEET DNA.",
+                            "Necesitas seleccionar un vehículo de tu Garage para ver su firma digital Elysium Vanguard DNA.",
                             color = MeetColors.textMuted,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
@@ -193,6 +193,21 @@ fun MeetDnaScreen(
                         }
                     }
 
+                    item {
+                        DnaBusinessStateCard(
+                            stage = dnaResult.stage,
+                            message = dnaResult.message,
+                            nextAction = dnaResult.nextAction,
+                            sampleCount = dnaResult.sampleCount,
+                            requiredSamples = dnaResult.requiredSamples,
+                            liveSensorCount = dnaResult.liveSensorCount,
+                            requiredLiveSensors = dnaResult.requiredLiveSensors,
+                            isConnected = connectionState == ObdState.CONNECTED,
+                            canTrain = dnaResult.canTrain,
+                            isCalibrated = dnaResult.isCalibrated
+                        )
+                    }
+
                     // DNA Helix Animation Card
                     item {
                         EliteCard(
@@ -242,9 +257,9 @@ fun MeetDnaScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            if (dnaResult.isCalibrated) "${dnaResult.healthScore}%" else "--",
+                                            if (dnaResult.isCalibrated || hasDnaTelemetry) "${dnaResult.healthScore}%" else "--",
                                             color = when {
-                                                !dnaResult.isCalibrated -> MeetColors.textMuted
+                                                !dnaResult.isCalibrated && !hasDnaTelemetry -> MeetColors.textMuted
                                                 dnaResult.healthScore >= 90 -> MeetColors.neonGreen
                                                 dnaResult.healthScore >= 80 -> MeetColors.cyberCyan
                                                 dnaResult.healthScore >= 60 -> Color(0xFFFFB300)
@@ -264,7 +279,11 @@ fun MeetDnaScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            if (dnaResult.isCalibrated) String.format("%.2f", dnaResult.anomalyScore) else "--",
+                                            when {
+                                                dnaResult.isCalibrated -> String.format("%.2f", dnaResult.anomalyScore)
+                                                hasDnaTelemetry -> "BASE"
+                                                else -> "--"
+                                            },
                                             color = if (dnaResult.isAnomalous) Color(0xFFFF4D4D) else Color(0xFF00FFCC),
                                             fontSize = 28.sp,
                                             fontWeight = FontWeight.Black
@@ -279,9 +298,19 @@ fun MeetDnaScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            if (dnaResult.isCalibrated) "${dnaResult.confidence.toInt()}%" else "NO APTO",
-                                            color = if (dnaResult.isCalibrated) MeetColors.cyberCyan else Color.Red,
+                                    Text(
+                                        when {
+                                            dnaResult.isCalibrated -> "${dnaResult.confidence.toInt()}%"
+                                            dnaResult.canTrain -> "LISTO"
+                                            hasDnaTelemetry -> "BASE"
+                                            else -> "SIN DATA"
+                                        },
+                                            color = when {
+                                                dnaResult.isCalibrated -> MeetColors.cyberCyan
+                                                dnaResult.canTrain -> MeetColors.neonGreen
+                                                hasDnaTelemetry -> Color(0xFFFFB300)
+                                                else -> Color.Red
+                                            },
                                             fontSize = 28.sp,
                                             fontWeight = FontWeight.Black
                                         )
@@ -313,7 +342,7 @@ fun MeetDnaScreen(
                                     .padding(16.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         Icons.Default.Warning,
                                         contentDescription = "Alerta",
                                         tint = Color.Red,
@@ -354,7 +383,7 @@ fun MeetDnaScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 if (!dnaResult.isCalibrated) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         Icons.Default.Info,
                                         contentDescription = "Calibrar",
                                         tint = MeetColors.cyberCyan,
@@ -362,14 +391,20 @@ fun MeetDnaScreen(
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        "FIRMA NO CALIBRADA",
+                                        when {
+                                            dnaResult.canTrain -> "FIRMA LISTA PARA CALIBRAR"
+                                            hasDnaTelemetry -> "BASE PROVISIONAL ACTIVA"
+                                            else -> "FIRMA NO CALIBRADA"
+                                        },
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        "Se requieren registrar al menos 50 lecturas normales de sensores OBD2 (RPM, temperatura, voltajes, etc.) durante la conducción para generar la firma única de este vehículo.",
+                                        dnaResult.message.ifBlank {
+                                            "Se requieren registrar lecturas normales de sensores OBD2 (RPM, temperatura, voltajes, etc.) durante la conducción para generar la firma única de este vehículo."
+                                        },
                                         color = MeetColors.textMuted,
                                         fontSize = 12.sp,
                                         textAlign = TextAlign.Center
@@ -399,19 +434,26 @@ fun MeetDnaScreen(
                                 } else {
                                     Button(
                                         onClick = { viewModel.trainVehicleDna() },
+                                        enabled = dnaResult.canTrain || dnaResult.isCalibrated,
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (dnaResult.isCalibrated) Color.DarkGray else MeetColors.cyberCyan
+                                            containerColor = if (dnaResult.isCalibrated) Color.DarkGray else MeetColors.cyberCyan,
+                                            disabledContainerColor = MeetColors.cardBackground,
+                                            disabledContentColor = MeetColors.textMuted
                                         ),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Icon(
+                                        AnimatedNeonIcon(
                                             Icons.Default.Refresh,
                                             contentDescription = "Entrenar",
                                             tint = if (dnaResult.isCalibrated) Color.White else Color.Black
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            if (dnaResult.isCalibrated) "RE-ENTRENAR FIRMA DNA" else "CALIBRAR FIRMA DNA",
+                                            when {
+                                                dnaResult.isCalibrated -> "RE-ENTRENAR FIRMA DNA"
+                                                dnaResult.canTrain -> "CALIBRAR FIRMA DNA"
+                                                else -> "RECOLECTANDO BASE REAL"
+                                            },
                                             color = if (dnaResult.isCalibrated) Color.White else Color.Black,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -434,7 +476,7 @@ fun MeetDnaScreen(
                     }
 
                     // 7 Sensors Detail list
-                    if (!dnaResult.isCalibrated || dnaResult.sensorStates.isEmpty()) {
+                    if (dnaResult.sensorStates.isEmpty()) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -444,7 +486,7 @@ fun MeetDnaScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "Esperando calibración o conexión OBD2 activa para mostrar desviaciones estadísticas.",
+                                    dnaResult.message.ifBlank { "Esperando calibración o conexión OBD2 activa para mostrar desviaciones estadísticas." },
                                     color = MeetColors.textMuted,
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center
@@ -590,7 +632,7 @@ fun MeetDnaScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Warning, contentDescription = "Alerta", tint = Color(0xFFFFB300))
+                                        AnimatedNeonIcon(Icons.Default.Warning, contentDescription = "Alerta", tint = Color(0xFFFFB300))
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column {
                                             Text("DEGRADACIÓN DEL ALTERNADOR / BATERÍA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -610,7 +652,7 @@ fun MeetDnaScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Warning, contentDescription = "Alerta", tint = Color(0xFFFFB300))
+                                        AnimatedNeonIcon(Icons.Default.Warning, contentDescription = "Alerta", tint = Color(0xFFFFB300))
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column {
                                             Text("SISTEMA DE ENFRIAMIENTO COMPROMETIDO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -628,21 +670,137 @@ fun MeetDnaScreen(
 }
 
 @Composable
+private fun DnaBusinessStateCard(
+    stage: DnaBusinessStage,
+    message: String,
+    nextAction: String,
+    sampleCount: Int,
+    requiredSamples: Int,
+    liveSensorCount: Int,
+    requiredLiveSensors: Int,
+    isConnected: Boolean,
+    canTrain: Boolean,
+    isCalibrated: Boolean
+) {
+    val accent = when (stage) {
+        DnaBusinessStage.ATTENTION, DnaBusinessStage.ERROR -> Color(0xFFFF4D4D)
+        DnaBusinessStage.READY_TO_TRAIN, DnaBusinessStage.MONITORING -> MeetColors.neonGreen
+        DnaBusinessStage.QUICK_PROFILE -> MeetColors.cyberCyan
+        DnaBusinessStage.COLLECTING -> Color(0xFFFFB300)
+        DnaBusinessStage.DISCONNECTED -> MeetColors.textMuted
+    }
+    val sampleProgress = if (requiredSamples > 0) sampleCount.toFloat() / requiredSamples else 0f
+    val sensorProgress = if (requiredLiveSensors > 0) liveSensorCount.toFloat() / requiredLiveSensors else 0f
+
+    EliteCard(
+        glowColor = accent,
+        borderColor = accent.copy(alpha = 0.18f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "ESTADO DNA DE NEGOCIO",
+                        color = MeetColors.textMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        stage.label.uppercase(),
+                        color = accent,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+                Text(
+                    when {
+                        isCalibrated -> "ACTIVO"
+                        canTrain -> "CALIBRAR"
+                        isConnected -> "CAPTURANDO"
+                        else -> "OBD REQUERIDO"
+                    },
+                    color = accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            DnaProgressLine("Muestras alineadas", sampleCount, requiredSamples, sampleProgress, accent)
+            Spacer(Modifier.height(8.dp))
+            DnaProgressLine("Sensores vivos", liveSensorCount, requiredLiveSensors, sensorProgress, accent)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                message.ifBlank { "Elysium Vanguard DNA esta esperando datos reales del vehiculo." },
+                color = Color.White.copy(alpha = 0.88f),
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+            if (nextAction.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Siguiente: $nextAction",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DnaProgressLine(
+    label: String,
+    value: Int,
+    max: Int,
+    progress: Float,
+    color: Color
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label.uppercase(), color = MeetColors.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("${value.coerceAtLeast(0)}/${max.coerceAtLeast(1)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = progress.coerceIn(0f, 1f),
+            color = color,
+            trackColor = Color.White.copy(alpha = 0.08f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(99.dp))
+        )
+    }
+}
+
+@Composable
 fun DnaHelixAnimation(
     modifier: Modifier = Modifier,
     isAnomalous: Boolean,
     healthScore: Int
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "dna")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2f * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
+    var phase by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val startedAt = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - startedAt
+            phase = ((elapsed % 4200L) / 4200f) * 2f * Math.PI.toFloat()
+            kotlinx.coroutines.delay(120L)
+        }
+    }
 
     val colorHelix = if (isAnomalous) Color(0xFFFF4D4D) else Color(0xFF00FFCC)
 

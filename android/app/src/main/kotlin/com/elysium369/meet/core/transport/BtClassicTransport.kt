@@ -18,7 +18,7 @@ import java.io.OutputStream
 import java.util.UUID
 
 /**
- * BtClassicTransport — MEET ELITE Performance Edition.
+ * BtClassicTransport — Elysium Vanguard Performance Edition.
  * Optimized for high-frequency OBD2 polling and robust physical link stability.
  */
 class BtClassicTransport(
@@ -287,6 +287,6 @@ class BtClassicTransport(
         get() = socket?.isConnected == true && inputStream != null && outputStream != null
     
     companion object {
-        private const val TAG = "MEET_BT"
+        private const val TAG = "EV_BT"
     }
 }

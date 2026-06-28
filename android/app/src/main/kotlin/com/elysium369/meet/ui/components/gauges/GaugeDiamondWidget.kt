@@ -143,7 +143,7 @@ fun GaugeDiamondWidget(
             drawText(lbl, topLeft = Offset(cx - lbl.size.width / 2f, cy + 22.dp.toPx() + vt.size.height + ut.size.height + 2.dp.toPx()))
 
             // Brand mark
-            val brand = tm.measure("MEET", TextStyle(color = silver.copy(alpha = 0.2f), fontSize = 6.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp))
+            val brand = tm.measure("Elysium Vanguard", TextStyle(color = silver.copy(alpha = 0.2f), fontSize = 6.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp))
             drawText(brand, topLeft = Offset(cx - brand.size.width / 2f, cy - 28.dp.toPx()))
         }
     })

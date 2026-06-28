@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.scanner
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -177,7 +179,7 @@ fun ScannerDiagnosticTab(
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("✅", fontSize = 48.sp)
+                                AnimatedNeonGlyph("✅", contentDescription = null, fontSize = 48.sp)
                                 Text("No se detectaron fallas", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                                 Text("El sistema está operando correctamente", color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
                             }
@@ -347,7 +349,7 @@ fun ScannerDiagnosticTab(
                                         }
                                     } else {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("✨", fontSize = 20.sp)
+                                            AnimatedNeonGlyph("✨", contentDescription = null, fontSize = 20.sp)
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text("INICIAR DIAGNÓSTICO MAESTRO AI", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelMedium)
                                         }

@@ -170,7 +170,14 @@ fun ActiveTestItem(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
-                            Text("✓ ", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                            AnimatedNeonGlyph(
+                                glyph = "✓",
+                                contentDescription = "Condicion cumplida",
+                                tint = MeetColors.neonGreen,
+                                fontSize = 14.sp,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(getSafetyConditionName(cond), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -268,7 +275,13 @@ fun ActiveTestProgressCard(
                         strokeWidth = 3.dp
                     )
                 } else {
-                    Text("✓", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    AnimatedNeonGlyph(
+                        glyph = "✓",
+                        contentDescription = "Prueba completada",
+                        tint = MeetColors.cyberCyan,
+                        fontSize = 20.sp,
+                        modifier = Modifier.size(26.dp),
+                    )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
@@ -281,14 +294,30 @@ fun ActiveTestProgressCard(
                 
                 if (status.isActive) {
                     EliteIconButton(
-                        icon = { Text("⏹", color = MeetColors.error, fontWeight = FontWeight.Bold) },
+                        icon = {
+                            AnimatedNeonGlyph(
+                                glyph = "■",
+                                contentDescription = "Detener",
+                                tint = MeetColors.error,
+                                fontSize = 18.sp,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
                         onClick = onStop,
                         glowColor = MeetColors.error,
                         modifier = Modifier.background(MeetColors.error.copy(alpha = 0.1f), CircleShape)
                     )
                 } else {
                     EliteIconButton(
-                        icon = { Text("✕", color = MeetColors.textSecondary, fontWeight = FontWeight.Bold) },
+                        icon = {
+                            AnimatedNeonGlyph(
+                                glyph = "✕",
+                                contentDescription = "Cerrar",
+                                tint = MeetColors.textSecondary,
+                                fontSize = 18.sp,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        },
                         onClick = onClose,
                         modifier = Modifier.background(Color.White.copy(alpha = 0.05f), CircleShape)
                     )
@@ -1034,13 +1063,13 @@ fun getTechnicalGuide(testId: String): String {
         """.trimIndent()
         "INJECTOR_BALANCE" -> """
             1. Conecte el manómetro mecánico al riel y abra switch (Ignición ON).
-            2. MEET pulsará de forma individual cada inyector seleccionado.
+            2. Elysium Vanguard pulsará de forma individual cada inyector seleccionado.
             3. Registre la caída de presión exacta tras el pulso (ej. de 50 PSI a 36 PSI).
             4. Todas las caídas deben ser similares dentro de ±1.5 PSI. Caídas desiguales sugieren inyector tapado o goteo constante.
         """.trimIndent()
         "EVAP_VENT", "EVAP_PURGE" -> """
             1. Utilice una máquina de humo conectada al puerto de llenado de combustible o puerto EVAP.
-            2. Active el solenoide con MEET para sellar o liberar la línea.
+            2. Active el solenoide con Elysium Vanguard para sellar o liberar la línea.
             3. Si sella el Vent, verifique con manómetro que el sistema alcance estanqueidad al vacío.
             4. Si abre el Purge, compruebe que succione vacío del múltiple de admisión.
         """.trimIndent()

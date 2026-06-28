@@ -31,7 +31,7 @@ import java.util.Collections
  * enables sharing from the LiveLink screen. It can be stopped at any time.
  * 
  * When active, it broadcasts real-time OBD telemetry to any connected
- * browser (the MEET web dashboard) on the same WiFi network.
+ * browser (the Elysium Vanguard web dashboard) on the same WiFi network.
  */
 class LiveLinkServer {
 
@@ -102,7 +102,7 @@ class LiveLinkServer {
                     // Send welcome
                     send(Frame.Text(json.encodeToString(LiveLinkMessage(
                         type = "welcome",
-                        payload = """{"message":"Conectado a MEET LiveLink"}"""
+                        payload = """{"message":"Conectado a Elysium Vanguard LiveLink"}"""
                     ))))
 
                     try {

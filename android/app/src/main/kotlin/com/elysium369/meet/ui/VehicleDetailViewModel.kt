@@ -55,12 +55,6 @@ class VehicleDetailViewModel @Inject constructor(
     private val _vehicle = MutableStateFlow<VehicleEntity?>(null)
     val vehicle: StateFlow<VehicleEntity?> = _vehicle.asStateFlow()
 
-    private val _telemetryActive = MutableStateFlow(false)
-    val telemetryActive: StateFlow<Boolean> = _telemetryActive.asStateFlow()
-
-    private val _simulatedPids = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val simulatedPids: StateFlow<Map<String, Float>> = _simulatedPids.asStateFlow()
-
     private val _expertProcedures = MutableStateFlow<List<com.elysium369.meet.core.obd.ExpertDiagnosticProcedure>>(emptyList())
     val expertProcedures: StateFlow<List<com.elysium369.meet.core.obd.ExpertDiagnosticProcedure>> = _expertProcedures.asStateFlow()
 
@@ -70,14 +64,10 @@ class VehicleDetailViewModel @Inject constructor(
     private val _dtcDefinitions = MutableStateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>>(emptyMap())
     val dtcDefinitions: StateFlow<Map<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>> = _dtcDefinitions.asStateFlow()
 
-    private val _selectedProfile = MutableStateFlow("NORMAL")
-    val selectedProfile: StateFlow<String> = _selectedProfile.asStateFlow()
-
     private val _recallsState = MutableStateFlow<NhtsaRecallsState>(NhtsaRecallsState.Idle)
     val recallsState: StateFlow<NhtsaRecallsState> = _recallsState.asStateFlow()
 
     private var currentVehicleId: String? = null
-    private var telemetryJob: kotlinx.coroutines.Job? = null
 
     fun loadVehicleData(vehicleId: String) {
         currentVehicleId = vehicleId
@@ -126,13 +116,11 @@ class VehicleDetailViewModel @Inject constructor(
                 }
                 _dtcDefinitions.value = definitionsMap
 
-                if (!_telemetryActive.value) {
-                    _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
-                        liveData = _simulatedPids.value,
-                        activeDtcs = codes,
-                        dtcDefinitions = definitionsMap
-                    )
-                }
+                _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
+                    liveData = emptyMap(),
+                    activeDtcs = codes,
+                    dtcDefinitions = definitionsMap
+                )
             }
         }
     }
@@ -212,92 +200,6 @@ class VehicleDetailViewModel @Inject constructor(
             return (kmDiff / daysDiff).toFloat()
         }
         return null
-    }
-
-    fun selectTelemetryProfile(profile: String) {
-        _selectedProfile.value = profile
-        if (_telemetryActive.value) {
-            updateTelemetryData()
-        }
-    }
-
-    fun startTelemetrySimulation() {
-        if (_telemetryActive.value) return
-        _telemetryActive.value = true
-        telemetryJob = viewModelScope.launch {
-            while (_telemetryActive.value) {
-                updateTelemetryData()
-                kotlinx.coroutines.delay(1000)
-            }
-        }
-    }
-
-    fun stopTelemetrySimulation() {
-        _telemetryActive.value = false
-        telemetryJob?.cancel()
-        telemetryJob = null
-    }
-
-    private fun updateTelemetryData() {
-        val random = java.util.Random()
-        val data = mutableMapOf<String, Float>()
-        when (_selectedProfile.value) {
-            "NORMAL" -> {
-                data["0142"] = 14.0f + (random.nextFloat() * 0.2f - 0.1f)
-                data["010C"] = 800f + (random.nextFloat() * 40f - 20f)
-                data["0105"] = 90f + (random.nextFloat() * 2f - 1f)
-                data["010B"] = 32f + (random.nextFloat() * 2f - 1f)
-                data["0106"] = 2f + (random.nextFloat() * 4f - 2f)
-                data["0107"] = 3f
-                data["0110"] = 3.2f + (random.nextFloat() * 0.4f - 0.2f)
-                data["0104"] = 22f + (random.nextFloat() * 2f - 1f)
-                data["010E"] = 12f + (random.nextFloat() * 2f - 1f)
-            }
-            "VACUUM_LEAK" -> {
-                data["0142"] = 13.8f + (random.nextFloat() * 0.2f - 0.1f)
-                data["010C"] = 950f + (random.nextFloat() * 120f - 60f)
-                data["0105"] = 94f + (random.nextFloat() * 2f - 1f)
-                data["010B"] = 70f + (random.nextFloat() * 4f - 2f)
-                data["0106"] = 18f + (random.nextFloat() * 4f - 2f)
-                data["0107"] = 15f
-                data["0110"] = 0.8f + (random.nextFloat() * 0.1f - 0.05f)
-                data["0104"] = 38f + (random.nextFloat() * 2f - 1f)
-                data["010E"] = -2f + (random.nextFloat() * 2f - 1f)
-            }
-            "OVERHEATING" -> {
-                data["0142"] = 13.5f + (random.nextFloat() * 0.2f - 0.1f)
-                data["010C"] = 780f + (random.nextFloat() * 30f - 15f)
-                data["0105"] = 115f + (random.nextFloat() * 2f - 1f)
-                data["010B"] = 35f + (random.nextFloat() * 2f - 1f)
-                data["0106"] = -2f + (random.nextFloat() * 2f - 1f)
-                data["0107"] = -1f
-                data["0110"] = 3.1f + (random.nextFloat() * 0.2f - 0.1f)
-                data["0104"] = 24f + (random.nextFloat() * 2f - 1f)
-                data["010E"] = 8f + (random.nextFloat() * 2f - 1f)
-            }
-            "BATTERY_FAIL" -> {
-                data["010C"] = 0f
-                data["0142"] = 11.1f + (random.nextFloat() * 0.2f - 0.1f)
-                data["0105"] = 45f
-                data["010B"] = 101f
-                data["0106"] = 0f
-                data["0107"] = 0f
-                data["0110"] = 0f
-                data["0104"] = 0f
-                data["010E"] = 0f
-            }
-        }
-        _simulatedPids.value = data
-        _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
-            liveData = data,
-            activeDtcs = _activeDtcs.value,
-            dtcDefinitions = _dtcDefinitions.value
-        )
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopTelemetrySimulation()
     }
 
     fun exportHistoryPdf(context: android.content.Context) {

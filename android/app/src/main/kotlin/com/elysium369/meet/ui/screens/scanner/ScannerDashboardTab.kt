@@ -1,9 +1,10 @@
 package com.elysium369.meet.ui.screens.scanner
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
@@ -50,6 +51,7 @@ import kotlin.math.min
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import com.elysium369.meet.core.obd.ObdState
 
 @Composable
 @Suppress("UNUSED_PARAMETER")
@@ -62,6 +64,7 @@ fun ScannerDashboardTab(
     val pinnedPids by viewModel.pinnedPids.collectAsState()
     val anomalousPids by viewModel.anomalousPids.collectAsState()
     val healthScore by viewModel.healthScore.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
 
     // Gauge style management
     val context = LocalContext.current
@@ -91,10 +94,13 @@ fun ScannerDashboardTab(
     val isFullscreen = selectedGauge != null || showMultiFullscreen
 
     // Staggered entry animation control
-    var visibleCount by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
+    var visibleCount by remember(sortedGauges.size, connectionState) {
+        mutableStateOf(if (connectionState == ObdState.CONNECTED) sortedGauges.size + 3 else 0)
+    }
+    LaunchedEffect(sortedGauges.size, connectionState) {
+        val entryDelay = if (connectionState == ObdState.CONNECTED) 12L else 40L
         for (i in 0..sortedGauges.size + 2) {
-            delay(40L)
+            delay(entryDelay)
             visibleCount = i
         }
     }
@@ -128,7 +134,7 @@ fun ScannerDashboardTab(
                     mutableStateOf(sortedGauges.firstOrNull() ?: GaugeConfig("1", "RPM", "010C", 0f, 8000f, "rpm"))
                 }
                 val primaryValue by remember(viewModel, activePrimaryGauge.pid) {
-                    viewModel.liveData.map { it[activePrimaryGauge.pid] ?: 0f }.distinctUntilChanged()
+                    viewModel.liveData.map { it.resolveGaugeValue(activePrimaryGauge.pid) ?: 0f }.distinctUntilChanged()
                 }.collectAsState(initial = 0f)
 
                 Row(
@@ -254,7 +260,7 @@ fun ScannerDashboardTab(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize().eliteScrollbar(gridStateLandscape)
                         ) {
-                            items(sortedGauges.size, key = { index -> "land_${sortedGauges[index].pid}" }) { index ->
+                            items(sortedGauges.size, key = { index -> "land_${sortedGauges[index].id}_${sortedGauges[index].pid}" }) { index ->
                                 val gauge = sortedGauges[index]
                                 val isAnomaly = anomalousPids.any { it.pid == gauge.pid }
                                 val isPinned = pinnedPids.contains(gauge.pid)
@@ -327,7 +333,7 @@ fun ScannerDashboardTab(
                                     )
                                 }
                             }
-                            items(sortedGauges.size, key = { index -> sortedGauges[index].pid }) { index ->
+                            items(sortedGauges.size, key = { index -> "${sortedGauges[index].id}_${sortedGauges[index].pid}" }) { index ->
                                 val gauge = sortedGauges[index]
                                 val isAnomaly = anomalousPids.any { it.pid == gauge.pid }
                                 val isPinned = pinnedPids.contains(gauge.pid)
@@ -492,6 +498,7 @@ fun ScannerDashboardTab(
                 navController = navController
             )
         }
+
     }
 }
 
@@ -550,6 +557,31 @@ fun Modifier.crtScanlines(color: Color = Color.Black.copy(alpha = 0.12f)): Modif
         )
         y += step
     }
+}
+
+private fun Map<String, Float>.resolveGaugeValue(pid: String): Float? {
+    val compact = pid.uppercase().replace(" ", "")
+    val core = compact.removePrefix("01")
+    val aliases = buildList {
+        add(pid)
+        add(compact)
+        add(core)
+        if (core.length == 2) add("01$core")
+        when (core) {
+            "0C" -> addAll(listOf("RPM", "rpm"))
+            "0D" -> addAll(listOf("SPEED", "speed", "VELOCIDAD"))
+            "05" -> addAll(listOf("COOLANT", "coolant", "ECT"))
+            "04" -> add("ENGINE_LOAD")
+            "0B" -> addAll(listOf("MAP", "map"))
+            "10" -> addAll(listOf("MAF", "maf"))
+            "11" -> addAll(listOf("THROTTLE", "throttle"))
+            "0F" -> add("IAT")
+            "0E" -> add("TIMING_ADVANCE")
+            "2F" -> add("FUEL_LEVEL")
+            "42" -> addAll(listOf("VOLTAGE", "voltage", "CTRL_VOLTAGE", "AT RV", "ATRV", "ELM_VOLTAGE"))
+        }
+    }
+    return aliases.firstNotNullOfOrNull { this[it] }
 }
 
 // ═══════════════════════════════════════
@@ -632,7 +664,7 @@ private fun HealthIndexCard(
                     glowColor = MeetColors.error.copy(alpha = 0.1f)
                 ) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("⚠️", fontSize = 16.sp, modifier = Modifier.alpha(borderGlow))
+                        AnimatedNeonGlyph("⚠️", contentDescription = null, fontSize = 16.sp, modifier = Modifier.alpha(borderGlow))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "DETECCIÓN DE IA: ${anomalousPids.size} PID(S) FUERA DE PARÁMETROS NOMINALES",
@@ -834,7 +866,7 @@ private fun GaugeStyleSwitcher(
                         .clickable { onCustomize() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🎨", fontSize = 14.sp)
+                    AnimatedNeonGlyph("🎨", contentDescription = null, fontSize = 14.sp)
                 }
 
                 // Next button
@@ -880,11 +912,11 @@ private fun GaugeStyleSwitcher(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("🛠️", fontSize = 18.sp)
+                AnimatedNeonGlyph("🛠️", contentDescription = null, fontSize = 18.sp)
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text(
-                        if (isDiyActive) "✦ MODO DIY ACTIVO — TOCA PARA EDITAR" else "CREAR TU RELOJ PERSONALIZADO",
+                        if (isDiyActive) "✦ CREAR OTRO RELOJ PERSONALIZADO" else "CREAR TU RELOJ PERSONALIZADO",
                         color = if (isDiyActive) Color(0xFF00FFCC) else Color(0xFFFFAB40),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
@@ -927,10 +959,14 @@ private fun GaugeCard(
     val colorScheme = remember(gaugeStyle, trigger) {
         gaugeStyleManager.getColorScheme(gaugeStyle)
     }
+    val connectionState by viewModel.connectionState.collectAsState()
 
     val currentValue by remember(viewModel, gauge.pid) {
-        viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
+        viewModel.liveData.map { it.resolveGaugeValue(gauge.pid) ?: 0f }.distinctUntilChanged()
     }.collectAsState(initial = 0f)
+    val hasLiveData by remember(viewModel, gauge.pid) {
+        viewModel.liveData.map { it.resolveGaugeValue(gauge.pid) != null }.distinctUntilChanged()
+    }.collectAsState(initial = false)
 
     val telemetryHistory by remember(viewModel, gauge.pid) {
         viewModel.telemetryHistory.map { it[gauge.pid] }.distinctUntilChanged()
@@ -1132,6 +1168,28 @@ private fun GaugeCard(
                     .border(2.dp, Color(0xFF00E5FF).copy(alpha = glowPulse * 0.8f), RoundedCornerShape(16.dp))
             )
         }
+
+        if (!hasLiveData) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .border(0.5.dp, effectiveAccent.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (connectionState == ObdState.CONNECTED) "ESPERANDO PID" else "SIN ENLACE",
+                    color = Color.White.copy(alpha = 0.62f),
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 0.8.sp
+                )
+            }
+        }
     }
 }
 
@@ -1159,7 +1217,7 @@ private fun FullScreenGaugeOverlay(
     var showCustomizer by remember { mutableStateOf(false) }
     // Live data stream
     val currentValue by remember(viewModel, gauge.pid) {
-        viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
+        viewModel.liveData.map { it.resolveGaugeValue(gauge.pid) ?: 0f }.distinctUntilChanged()
     }.collectAsState(initial = 0f)
 
     // ══════════════════════════════════════════
@@ -1354,7 +1412,7 @@ private fun FullScreenGaugeOverlay(
                         .clickable { showCustomizer = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🎨", fontSize = 20.sp)
+                    AnimatedNeonGlyph("🎨", contentDescription = null, fontSize = 20.sp)
                 }
 
                 // ✕ Close Button
@@ -1371,7 +1429,13 @@ private fun FullScreenGaugeOverlay(
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✕", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    AnimatedNeonGlyph(
+                        glyph = "✕",
+                        contentDescription = "Cerrar",
+                        tint = Color.White,
+                        fontSize = 24.sp,
+                        modifier = Modifier.size(30.dp),
+                    )
                 }
             }
 
@@ -1531,7 +1595,13 @@ private fun MultiGaugeFullscreenOverlay(
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        AnimatedNeonGlyph(
+                            glyph = "✕",
+                            contentDescription = "Cerrar",
+                            tint = Color.White,
+                            fontSize = 18.sp,
+                            modifier = Modifier.size(24.dp),
+                        )
                     }
                 }
             }
@@ -1643,7 +1713,7 @@ private fun MultiGaugeCell(
     }
 
     val currentValue by remember(viewModel, gauge.pid) {
-        viewModel.liveData.map { it[gauge.pid] ?: 0f }.distinctUntilChanged()
+        viewModel.liveData.map { it.resolveGaugeValue(gauge.pid) ?: 0f }.distinctUntilChanged()
     }.collectAsState(initial = 0f)
 
     val inf = rememberInfiniteTransition(label = "cell_${gauge.pid}")
@@ -2459,4 +2529,3 @@ fun getTireColor(pressure: Float, hasLiveTpms: Boolean): Color {
         else -> MeetColors.success
     }
 }
-

@@ -79,7 +79,7 @@ fun AdvancedDiagnosticsScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
+                        AnimatedNeonIcon(
                             Icons.Filled.BugReport,
                             contentDescription = null,
                             tint = MeetColors.neonGreen,
@@ -103,7 +103,7 @@ fun AdvancedDiagnosticsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, "Volver", tint = MeetColors.textPrimary)
+                        AnimatedNeonIcon(Icons.Filled.ArrowBack, "Volver", tint = MeetColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -152,7 +152,7 @@ fun AdvancedDiagnosticsScreen(
                             )
                         },
                         icon = {
-                            Icon(icon, title, modifier = Modifier.size(18.dp))
+                            AnimatedNeonIcon(icon, title, modifier = Modifier.size(18.dp))
                         },
                         selectedContentColor = MeetColors.neonGreen,
                         unselectedContentColor = MeetColors.textSecondary
@@ -190,7 +190,7 @@ private fun StatusBanner(message: String) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
+        AnimatedNeonIcon(
             if (isError) Icons.Filled.ErrorOutline else Icons.Filled.CheckCircle,
             null,
             tint = textColor,
@@ -357,10 +357,10 @@ private fun O2SensorTestsTab(
                             color = MeetColors.neonGreen
                         )
                     } else {
-                        Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+                        AnimatedNeonIcon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(6.dp))
-                    Text("Leer", fontSize = 12.sp)
+                    AnimatedNeonGlyph("Leer", contentDescription = null, fontSize = 12.sp)
                 }
             }
         }
@@ -407,7 +407,7 @@ private fun O2TestResultCard(result: O2SensorTestResult) {
                             .background(statusColor.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
+                        AnimatedNeonIcon(
                             if (result.passed) Icons.Filled.Check else Icons.Filled.Close,
                             null,
                             tint = statusColor,
@@ -549,7 +549,7 @@ private fun CategorizedDtcsTab(dtcs: CategorizedDtcs, viewModel: ObdViewModel) {
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+                    AnimatedNeonIcon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Escanear", fontSize = 12.sp)
                 }
@@ -743,9 +743,9 @@ private fun VehicleInfoTab(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+                    AnimatedNeonIcon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Leer", fontSize = 12.sp)
+                    AnimatedNeonGlyph("Leer", contentDescription = null, fontSize = 12.sp)
                 }
             }
         }
@@ -802,7 +802,7 @@ private fun VinCard(vin: String) {
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
+                    AnimatedNeonIcon(
                         Icons.Filled.Fingerprint,
                         null,
                         tint = MeetColors.neonGreen,
@@ -1076,7 +1076,7 @@ private fun QuickActionChip(label: String, icon: ImageVector, onClick: () -> Uni
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, tint = MeetColors.neonGreen, modifier = Modifier.size(14.dp))
+            AnimatedNeonIcon(icon, null, tint = MeetColors.neonGreen, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
             Text(label, color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Medium)
         }
@@ -1189,7 +1189,7 @@ private fun ManufacturerModesTab(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Filled.Radar, null, modifier = Modifier.size(16.dp))
+                    AnimatedNeonIcon(Icons.Filled.Radar, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Sondear", fontSize = 12.sp)
                 }
@@ -1258,7 +1258,7 @@ private fun ManufacturerModesTab(
                                 }
                             }
                         ) {
-                            Icon(Icons.Filled.Send, null, tint = MeetColors.neonGreen)
+                            AnimatedNeonIcon(Icons.Filled.Send, null, tint = MeetColors.neonGreen)
                         }
                     }
 
@@ -1381,7 +1381,7 @@ private fun EmptyStateCard(icon: ImageVector, title: String, subtitle: String) {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, null, tint = MeetColors.textMuted, modifier = Modifier.size(48.dp))
+            AnimatedNeonIcon(icon, null, tint = MeetColors.textMuted, modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(12.dp))
             Text(title, color = MeetColors.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Text(subtitle, color = MeetColors.textMuted, fontSize = 11.sp, textAlign = TextAlign.Center)

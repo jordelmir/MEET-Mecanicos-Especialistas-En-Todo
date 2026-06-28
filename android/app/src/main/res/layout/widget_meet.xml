@@ -10,7 +10,7 @@
         android:id="@android:id/text1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="MEET OBD2"
+        android:text="Elysium Vanguard OBD2"
         android:textColor="#FF6B35"
         android:textStyle="bold"
         android:textSize="14sp" />

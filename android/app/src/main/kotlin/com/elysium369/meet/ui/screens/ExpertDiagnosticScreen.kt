@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -134,7 +136,7 @@ fun ExpertDiagnosticScreen(
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(
+                        AnimatedNeonIcon(
                             imageVector = if (isExpertActive) Icons.Default.Close else Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = if (isExpertActive) Color.White else Color.Black,
@@ -175,7 +177,7 @@ fun ExpertDiagnosticScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
                                 tint = MeetColors.textSecondary,
@@ -210,7 +212,7 @@ fun ExpertDiagnosticScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
                                 tint = MeetColors.neonGreen,
@@ -270,7 +272,7 @@ fun DiagnosticProcedureCard(
             modifier = Modifier.padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = severityColor,

@@ -49,7 +49,7 @@ class BleTransport(
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // MEET ELITE: Request high priority for lower latency
+                // ELYSIUM VANGUARD: Request high priority for lower latency
                 gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 // requestMtu(512) debe ser el PRIMER comando después de onConnectionStateChange
                 gatt.requestMtu(512)
@@ -137,7 +137,7 @@ class BleTransport(
     }
 
     override suspend fun connect() {
-        // MEET ELITE: Multi-retry connection for flaky BLE stacks
+        // ELYSIUM VANGUARD: Multi-retry connection for flaky BLE stacks
         var lastException: Exception? = null
         for (attempt in 0 until 3) {
             try {
@@ -204,7 +204,7 @@ class BleTransport(
     }
 
     override suspend fun drain() {
-        // MEET ELITE: Clear all pending responses in the channel and the string accumulator
+        // ELYSIUM VANGUARD: Clear all pending responses in the channel and the string accumulator
         responseAccumulator.setLength(0)
         while (!responseReady.isEmpty) {
             responseReady.tryReceive()

@@ -122,12 +122,24 @@ fun SystemThemeCustomizerDialog(
                                 }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text(
-                                "🔄 Reset",
-                                color = Color(0xFFFF1744),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                AnimatedNeonGlyph(
+                                    glyph = "↻",
+                                    contentDescription = "Reset",
+                                    tint = Color(0xFFFF1744),
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Text(
+                                    "Reset",
+                                    color = Color(0xFFFF1744),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                         // Close
                         Box(
@@ -138,13 +150,19 @@ fun SystemThemeCustomizerDialog(
                                 .clickable { onDismiss() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("✕", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            AnimatedNeonGlyph(
+                                glyph = "✕",
+                                contentDescription = "Cerrar",
+                                tint = Color.White,
+                                fontSize = 16.sp,
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
                     }
                 }
 
                 Text(
-                    "Personaliza los colores primarios, secundarios y acentos del sistema MEET.",
+                    "Personaliza los colores primarios, secundarios y acentos del sistema Elysium Vanguard.",
                     color = Color.White.copy(alpha = 0.45f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
@@ -274,7 +292,7 @@ fun SystemThemeCustomizerDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(target.icon, fontSize = 14.sp)
+                                AnimatedNeonGlyph(target.icon, contentDescription = null, fontSize = 14.sp)
                                 Text(
                                     target.label,
                                     color = if (isSelected) targetColor else Color.White.copy(alpha = 0.5f),
@@ -316,7 +334,7 @@ fun SystemThemeCustomizerDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(bottom = 6.dp, top = 10.dp)
                         ) {
-                            Text(category.icon, fontSize = 12.sp)
+                            AnimatedNeonGlyph(category.icon, contentDescription = null, fontSize = 12.sp)
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 category.title,

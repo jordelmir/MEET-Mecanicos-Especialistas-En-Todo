@@ -150,7 +150,7 @@ fun FindingsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🔍", fontSize = 48.sp)
+                        AnimatedNeonGlyph("🔍", contentDescription = null, fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "No se encontraron hallazgos en este filtro.",
@@ -316,7 +316,7 @@ private fun FindingItemCard(
                 }
 
                 // Expand/Collapse icon
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.ArrowDropDown,
                     contentDescription = "Toggle",
                     tint = MeetColors.textSecondary

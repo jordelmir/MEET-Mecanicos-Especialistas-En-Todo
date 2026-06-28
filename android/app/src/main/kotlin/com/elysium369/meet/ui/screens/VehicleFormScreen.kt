@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -123,7 +127,7 @@ fun VehicleFormScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = neonCyan)
+                        AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = neonCyan)
                     }
                 },
                 actions = {
@@ -177,7 +181,7 @@ fun VehicleFormScreen(
                             .background(neonCyan.copy(alpha = 0.1f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🏎️", fontSize = 24.sp)
+                        AnimatedNeonGlyph("🏎️", contentDescription = null, fontSize = 24.sp)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -188,8 +192,8 @@ fun VehicleFormScreen(
                             fontWeight = FontWeight.Black
                         )
                         Text(
-                            t("Cada detalle permite a la IA MEET ajustar los algoritmos de diagnóstico para tu motor específico.", 
-                              "Every detail allows MEET AI to tune diagnostic algorithms for your specific engine."),
+                            t("Cada detalle permite a la IA Elysium Vanguard ajustar los algoritmos de diagnóstico para tu motor específico.",
+                              "Every detail allows Elysium Vanguard AI to tune diagnostic algorithms for your specific engine."),
                             color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -516,4 +520,3 @@ fun cyberpunkTextFieldColors(accentColor: Color) = OutlinedTextFieldDefaults.col
     unfocusedTextColor = Color.White,
     cursorColor = accentColor
 )
-

@@ -9,7 +9,7 @@ object SupabaseModule {
     /**
      * ═══════════════════════════════════════════════════════════
      * Supabase credentials loaded from BuildConfig at compile time.
-     * Set MEET_SUPABASE_URL and MEET_SUPABASE_KEY in local.properties
+     * Set ELYSIUM_SUPABASE_URL and ELYSIUM_SUPABASE_KEY in local.properties
      * or as environment variables for CI/CD builds.
      * ═══════════════════════════════════════════════════════════
      */

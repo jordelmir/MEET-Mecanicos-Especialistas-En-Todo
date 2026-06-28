@@ -100,7 +100,7 @@ fun TripScreen(
                             modifier = Modifier.size(80.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("🚗", fontSize = 36.sp)
+                                AnimatedNeonGlyph("🚗", contentDescription = null, fontSize = 36.sp)
                             }
                         }
                         Spacer(Modifier.height(24.dp))
@@ -140,7 +140,7 @@ fun TripScreen(
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = "1. Conecta el adaptador OBD.\n2. Enciende el vehículo.\n3. Conduce con la sesión activa.\n4. MEET guardará el trayecto automáticamente.",
+                                    text = "1. Conecta el adaptador OBD.\n2. Enciende el vehículo.\n3. Conduce con la sesión activa.\n4. Elysium Vanguard guardará el trayecto automáticamente.",
                                     color = Color.White.copy(alpha = 0.85f),
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center,
@@ -230,7 +230,7 @@ fun TripScreen(
                                             border = BorderStroke(1.dp, MeetColors.borderBlue.copy(alpha = 0.3f))
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
-                                                Text("⭐", fontSize = 16.sp)
+                                                AnimatedNeonGlyph("⭐", contentDescription = null, fontSize = 16.sp)
                                             }
                                         }
                                         Spacer(modifier = Modifier.width(16.dp))
@@ -583,7 +583,7 @@ fun EcoFodaQuadrant(
                     border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(icon, color = color, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                        AnimatedNeonGlyph(icon, contentDescription = null, tint = color, fontSize = 16.sp)
                     }
                 }
                 Column {

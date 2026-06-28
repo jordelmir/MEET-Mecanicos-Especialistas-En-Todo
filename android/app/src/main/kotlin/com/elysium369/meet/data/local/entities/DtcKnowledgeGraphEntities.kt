@@ -6,7 +6,7 @@ import androidx.room.*
  * DTC Knowledge Graph Entities
  *
  * These 8 entities normalize the flat DtcDefinitionEntity (table: dtc_definitions)
- * into a proper relational knowledge graph for the MEET Elite OBD2 diagnostic app.
+ * into a proper relational knowledge graph for the OBD2 Elysium Vanguard diagnostic app.
  *
  * All entities reference dtc_definitions via dtcCode (no @ForeignKey to avoid cascade issues).
  */
@@ -329,4 +329,3 @@ data class DtcSearchIndexEntity(
     @ColumnInfo(name = "causes")
     val causes: String
 )
-

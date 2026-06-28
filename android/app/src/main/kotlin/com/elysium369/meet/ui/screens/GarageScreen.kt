@@ -1,5 +1,8 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+import com.elysium369.meet.ui.components.ElysiumSectionIcon
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -73,7 +76,7 @@ fun GarageScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Añadir", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
         },
         containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
@@ -83,7 +86,13 @@ fun GarageScreen(
                 // Empty State
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🚗", style = MaterialTheme.typography.displayLarge)
+                        ElysiumSectionIcon(
+                            key = "garage",
+                            contentDescription = "Garage",
+                            tint = MeetColors.cyberCyan,
+                            size = 64.dp,
+                            fallbackGlyph = "🚗"
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("No tienes vehículos registrados", color = MeetColors.textSecondary,
                             style = MaterialTheme.typography.titleMedium)
@@ -293,7 +302,7 @@ private fun AnimatedVehicleCard(
                     onClick = onDelete,
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(
+                    AnimatedNeonIcon(
                         Icons.Default.Delete,
                         contentDescription = "Eliminar",
                         tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f),
@@ -319,7 +328,7 @@ private fun AnimatedVehicleCard(
                 border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(16.dp))
+                AnimatedNeonIcon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("HISTORIAL DE SERVICIO", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
             }

@@ -1,7 +1,9 @@
 package com.elysium369.meet.data.supabase
 
 import com.elysium369.meet.data.local.dao.RepairCaseDao
+import com.elysium369.meet.data.local.dao.RepairNetworkAddonsDao
 import com.elysium369.meet.data.local.entities.RepairCaseEntity
+import com.elysium369.meet.data.local.entities.RepairVoteEntity
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.Flow
@@ -15,8 +17,11 @@ private data class VotesUpdate(val votes: Int)
 
 @Singleton
 class RepairCaseRepository @Inject constructor(
-    private val repairCaseDao: RepairCaseDao
+    private val repairCaseDao: RepairCaseDao,
+    private val repairNetworkAddonsDao: RepairNetworkAddonsDao
 ) {
+    private val defaultUserId: String
+        get() = "local_user_" + android.os.Build.SERIAL.hashCode().toString(16)
     // Local bookmarks/saved cases
     fun getSavedCases(): Flow<List<RepairCase>> {
         return repairCaseDao.getSavedCases().map { entities ->
@@ -59,7 +64,7 @@ class RepairCaseRepository @Inject constructor(
         sortBy: String = "votes", // votes, success_rate, date
         onlyVerified: Boolean = false
     ): List<RepairCase> {
-        return try {
+        val remoteCases = try {
             val postgrest = SupabaseManager.client.postgrest
             val response = postgrest["repair_cases"].select {
                 filter {
@@ -77,23 +82,48 @@ class RepairCaseRepository @Inject constructor(
                 }
             }.decodeList<RepairCase>()
 
-            // In-memory filter for text search query if any
-            if (query.isBlank()) {
-                response
-            } else {
-                val lowerQuery = query.lowercase()
-                response.filter {
-                    it.vehicle_make.lowercase().contains(lowerQuery) ||
-                    it.vehicle_model.lowercase().contains(lowerQuery) ||
-                    it.dtc_code.lowercase().contains(lowerQuery) ||
-                    it.symptoms.lowercase().contains(lowerQuery) ||
-                    it.solution.lowercase().contains(lowerQuery)
-                }
-            }
+            response
         } catch (e: Exception) {
             android.util.Log.e("RepairCaseRepository", "Failed to search repair cases", e)
             emptyList()
         }
+
+        val localCases = repairCaseDao.getAllCases().map { it.toDomain() }
+        return (remoteCases + localCases)
+            .distinctBy { it.id.ifBlank { "${it.dtc_code}:${it.vehicle_make}:${it.vehicle_model}:${it.solution.hashCode()}" } }
+            .filter { repairCase ->
+                val matchesQuery = query.isBlank() || run {
+                    val lowerQuery = query.lowercase()
+                    repairCase.vehicle_make.lowercase().contains(lowerQuery) ||
+                        repairCase.vehicle_model.lowercase().contains(lowerQuery) ||
+                        repairCase.dtc_code.lowercase().contains(lowerQuery) ||
+                        repairCase.symptoms.lowercase().contains(lowerQuery) ||
+                        repairCase.solution.lowercase().contains(lowerQuery) ||
+                        repairCase.parts_used.lowercase().contains(lowerQuery)
+                }
+                val matchesMake = make.isBlank() || repairCase.vehicle_make.contains(make, ignoreCase = true)
+                val matchesModel = model.isBlank() || repairCase.vehicle_model.contains(model, ignoreCase = true)
+                val matchesDtc = dtc.isBlank() || repairCase.dtc_code.equals(dtc, ignoreCase = true)
+                val matchesYear = year == null || repairCase.year == year
+                val matchesCountry = country.isBlank() || repairCase.country.contains(country, ignoreCase = true)
+                val matchesVerified = !onlyVerified || repairCase.verified
+                matchesQuery && matchesMake && matchesModel && matchesDtc && matchesYear && matchesCountry && matchesVerified
+            }
+            .let { merged ->
+                when (sortBy) {
+                    "success_rate" -> merged.sortedWith(
+                        compareByDescending<RepairCase> { it.success_rate }
+                            .thenByDescending { it.votes }
+                            .thenByDescending { it.created_at?.toLongOrNull() ?: 0L }
+                    )
+                    "date" -> merged.sortedByDescending { it.created_at?.toLongOrNull() ?: 0L }
+                    else -> merged.sortedWith(
+                        compareByDescending<RepairCase> { it.votes }
+                            .thenByDescending { it.success_rate }
+                            .thenByDescending { it.created_at?.toLongOrNull() ?: 0L }
+                    )
+                }
+            }
     }
 
     suspend fun getCaseById(caseId: String): RepairCase? {
@@ -113,33 +143,44 @@ class RepairCaseRepository @Inject constructor(
     }
 
     suspend fun insertRepairCase(repairCase: RepairCase): Boolean {
+        repairCaseDao.insertCase(repairCase.toEntity(isBookmarked = false, isMyContribution = true))
         return try {
             val postgrest = SupabaseManager.client.postgrest
             postgrest["repair_cases"].insert(repairCase)
-            
-            // Cache locally as user contribution
-            repairCaseDao.insertCase(repairCase.toEntity(isBookmarked = false, isMyContribution = true))
             true
         } catch (e: Exception) {
             android.util.Log.e("RepairCaseRepository", "Failed to insert repair case", e)
-            false
+            true
         }
     }
 
+    /**
+     * Idempotent upvote: checks RepairVoteEntity to prevent duplicate votes.
+     * If user already upvoted, returns false (no-op).
+     * If user previously downvoted, switches the vote.
+     */
     suspend fun upvoteCase(caseId: String): Boolean {
         return try {
-            val currentCase = getCaseById(caseId) ?: return false
-            val newVotes = currentCase.votes + 1
-            
-            val postgrest = SupabaseManager.client.postgrest
-            postgrest["repair_cases"].update(VotesUpdate(newVotes)) {
-                filter { eq("id", caseId) }
+            val userId = defaultUserId
+            val existingVote = repairNetworkAddonsDao.getVoteForCaseByUser(caseId, userId)
+            if (existingVote != null && existingVote.voteType == "UP") {
+                // Already upvoted — idempotent no-op
+                return false
             }
-            
-            // Update local if cached
-            val local = repairCaseDao.getCaseById(caseId)
-            if (local != null) {
-                repairCaseDao.insertCase(local.copy(votes = newVotes))
+
+            val local = repairCaseDao.getCaseById(caseId) ?: return false
+            val delta = if (existingVote?.voteType == "DOWN") 2 else 1 // Switching from DOWN adds 2
+            val newVotes = local.votes + delta
+            repairCaseDao.insertCase(local.copy(votes = newVotes))
+
+            // Record or update the vote
+            repairNetworkAddonsDao.insertVote(
+                RepairVoteEntity(id = "${caseId}_${userId}", caseId = caseId, userId = userId, voteType = "UP")
+            )
+
+            runCatching {
+                val postgrest = SupabaseManager.client.postgrest
+                postgrest["repair_cases"].update(VotesUpdate(newVotes)) { filter { eq("id", caseId) } }
             }
             true
         } catch (e: Exception) {
@@ -148,20 +189,33 @@ class RepairCaseRepository @Inject constructor(
         }
     }
 
+    /**
+     * Idempotent downvote: checks RepairVoteEntity to prevent duplicate votes.
+     * If user already downvoted, returns false (no-op).
+     * If user previously upvoted, switches the vote.
+     */
     suspend fun downvoteCase(caseId: String): Boolean {
         return try {
-            val currentCase = getCaseById(caseId) ?: return false
-            val newVotes = (currentCase.votes - 1).coerceAtLeast(0)
-            
-            val postgrest = SupabaseManager.client.postgrest
-            postgrest["repair_cases"].update(VotesUpdate(newVotes)) {
-                filter { eq("id", caseId) }
+            val userId = defaultUserId
+            val existingVote = repairNetworkAddonsDao.getVoteForCaseByUser(caseId, userId)
+            if (existingVote != null && existingVote.voteType == "DOWN") {
+                // Already downvoted — idempotent no-op
+                return false
             }
-            
-            // Update local if cached
-            val local = repairCaseDao.getCaseById(caseId)
-            if (local != null) {
-                repairCaseDao.insertCase(local.copy(votes = newVotes))
+
+            val local = repairCaseDao.getCaseById(caseId) ?: return false
+            val delta = if (existingVote?.voteType == "UP") 2 else 1 // Switching from UP subtracts 2
+            val newVotes = (local.votes - delta).coerceAtLeast(0)
+            repairCaseDao.insertCase(local.copy(votes = newVotes))
+
+            // Record or update the vote
+            repairNetworkAddonsDao.insertVote(
+                RepairVoteEntity(id = "${caseId}_${userId}", caseId = caseId, userId = userId, voteType = "DOWN")
+            )
+
+            runCatching {
+                val postgrest = SupabaseManager.client.postgrest
+                postgrest["repair_cases"].update(VotesUpdate(newVotes)) { filter { eq("id", caseId) } }
             }
             true
         } catch (e: Exception) {

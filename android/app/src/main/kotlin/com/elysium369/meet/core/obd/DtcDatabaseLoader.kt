@@ -603,7 +603,7 @@ class DtcDatabaseLoader(
                     laborHours = laborHours,
                     partsDescription = costJson.optString("note").takeIf { it.isNotBlank() },
                     currency = "USD",
-                    source = "MEET_DTC_V4",
+                    source = "ELYSIUM_DTC_V4",
                     updatedAt = System.currentTimeMillis()
                 )
             }
@@ -627,7 +627,7 @@ class DtcDatabaseLoader(
                 minCostUsd = minCost,
                 maxCostUsd = maxCost,
                 laborHours = laborHours,
-                source = "MEET_DTC_V4",
+                source = "ELYSIUM_DTC_V4",
                 updatedAt = System.currentTimeMillis()
             )
         } catch (e: Exception) {

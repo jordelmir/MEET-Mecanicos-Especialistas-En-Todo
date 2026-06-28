@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -282,7 +286,7 @@ fun HealthScoreScreen(
                                             colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.15f)),
                                             border = BorderStroke(1.dp, MeetColors.neonGreen)
                                         ) {
-                                            Icon(Icons.Default.CompareArrows, contentDescription = "Comparar", tint = MeetColors.neonGreen)
+                                            AnimatedNeonIcon(Icons.Default.CompareArrows, contentDescription = "Comparar", tint = MeetColors.neonGreen)
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text("Comparar Inspecciones", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
@@ -784,7 +788,7 @@ private fun AlertCard(alert: PredictiveAlert) {
                     AlertSeverity.HIGH -> "🟡"
                     AlertSeverity.MODERATE -> "🔵"
                 }
-                Text(icon, fontSize = 15.sp)
+                AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 15.sp)
                 Spacer(Modifier.width(8.dp))
                 Text(alert.label.uppercase(), color = borderColor, fontWeight = FontWeight.Black, fontSize = 12.sp)
                 Spacer(Modifier.weight(1f))
@@ -866,7 +870,7 @@ private fun DataStatsCard(report: PredictiveHealthReport) {
 @Composable
 private fun StatItem(icon: String, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 18.sp)
+        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 18.sp)
         Text(value, color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
         Text(label, color = MeetColors.textMuted, fontSize = 9.sp)
     }

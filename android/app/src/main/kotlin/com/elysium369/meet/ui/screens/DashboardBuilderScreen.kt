@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -174,7 +176,7 @@ fun DashboardBuilderScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = Color.White)
+                            AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = Color.White)
                         }
                         Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
                             Text(
@@ -194,7 +196,7 @@ fun DashboardBuilderScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Black
                                 )
-                                Icon(
+                                AnimatedNeonIcon(
                                     Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
                                     tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
@@ -209,24 +211,24 @@ fun DashboardBuilderScreen(
                                 clipboardManager.setText(AnnotatedString(layout))
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }) {
-                                Icon(Icons.Default.Share, contentDescription = "Exportar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                                AnimatedNeonIcon(Icons.Default.Share, contentDescription = "Exportar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                             }
 
                             IconButton(onClick = {
                                 val clipboardData = clipboardManager.getText()?.text
-                                if (clipboardData != null && clipboardData.startsWith("MEET_LAYOUT")) {
+                                if (clipboardData != null && clipboardData.startsWith("ELYSIUM_VANGUARD_LAYOUT")) {
                                     viewModel.importLayout(clipboardData)
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
                             }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = "Importar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                                AnimatedNeonIcon(Icons.Default.ContentPaste, contentDescription = "Importar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                             }
 
                             IconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showTemplatesDialog = true
                             }) {
-                                Icon(Icons.Default.DashboardCustomize, contentDescription = "Plantillas", tint = com.elysium369.meet.ui.theme.MeetColors.warning)
+                                AnimatedNeonIcon(Icons.Default.DashboardCustomize, contentDescription = "Plantillas", tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                             }
 
                             Box(modifier = Modifier.width(1.dp).height(24.dp).padding(horizontal = 8.dp).background(MeetColors.borderBlue))
@@ -265,7 +267,7 @@ fun DashboardBuilderScreen(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
+                                    AnimatedNeonIcon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("WIDGET", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 12.sp)
                                 }
@@ -352,7 +354,7 @@ fun DashboardBuilderScreen(
                     )
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(12.dp))
+                        AnimatedNeonIcon(Icons.Default.Psychology, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "AI INSIGHT: $aiInsight",
@@ -508,7 +510,7 @@ fun TemplateSelectorDialog(onSelect: (String) -> Unit, onDismiss: () -> Unit) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
+                            AnimatedNeonIcon(Icons.Default.AutoAwesome, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(title, color = Color.White, fontWeight = FontWeight.Black)
@@ -563,7 +565,7 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
                     .background(com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.05f), CircleShape)
                     .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = alpha * 1.5f), CircleShape)
             )
-            Icon(
+            AnimatedNeonIcon(
                 Icons.Default.Dashboard,
                 contentDescription = null,
                 tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
@@ -602,7 +604,7 @@ fun EmptyDashboardPlaceholder(onAdd: () -> Unit) {
                 .fillMaxWidth(0.8f)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
+            AnimatedNeonIcon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
             Spacer(modifier = Modifier.width(12.dp))
             Text("DESPLEGAR PRIMER WIDGET", color = Color.Black, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
         }
@@ -688,7 +690,7 @@ fun DashboardGrid(
                     .padding(24.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(
+                AnimatedNeonIcon(
                     if (isMoveMode) Icons.Default.Check else Icons.Default.OpenWith,
                     contentDescription = null
                 )
@@ -716,13 +718,15 @@ fun WidgetCard(
     val gaugeStyleManager = remember { GaugeStyleManager(context) }
     val currentStyle by gaugeStyleManager.currentStyle.collectAsState()
     val widgetColor = try { Color(android.graphics.Color.parseColor(widget.color)) } catch(e: Exception) { com.elysium369.meet.ui.theme.MeetColors.neonGreen }
-    var simValue by remember { mutableFloatStateOf((widget.minVal + widget.maxVal) / 2f) }
+    val previewValue = remember(widget.id, widget.minVal, widget.maxVal) {
+        (widget.minVal + widget.maxVal) / 2f
+    }
 
-    // Live Value Arbitration: External Live > Preview Simulation > Default
+    // Live Value Arbitration: External Live > static editor preview > default.
     val liveValue = if (liveValueExt != null && !previewMode) {
         liveValueExt
     } else if (previewMode) {
-        simValue
+        previewValue
     } else {
         (widget.minVal + widget.maxVal) / 2f
     }
@@ -751,28 +755,6 @@ fun WidgetCard(
         ),
         label = "widgetAnimation"
     )
-
-    // Simulation logic (only active in preview mode)
-    if (previewMode) {
-        LaunchedEffect(widget.pid) {
-            val startTime = System.currentTimeMillis()
-            while(true) {
-                kotlinx.coroutines.delay(50)
-                val elapsed = (System.currentTimeMillis() - startTime) / 1000f
-
-                val value = when(widget.pid) {
-                    "010C" -> 700f + (Math.sin(elapsed.toDouble() * 2).toFloat() * 100f) + (Math.random().toFloat() * 20f) // RPM
-                    "0105" -> 90f + (Math.random().toFloat() * 2f) // Temp
-                    "010D" -> 40f + (Math.sin(elapsed.toDouble()).toFloat() * 30f) // Speed
-                    else -> {
-                        val variance = (widget.maxVal - widget.minVal) * 0.05f
-                        simValue + (Math.random().toFloat() - 0.5f) * variance
-                    }
-                }
-                simValue = value.coerceIn(widget.minVal, widget.maxVal)
-            }
-        }
-    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val glowAlpha by infiniteTransition.animateFloat(
@@ -894,13 +876,13 @@ fun WidgetCard(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onMoveUp()
                         }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
+                            AnimatedNeonIcon(Icons.Default.ArrowUpward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                         }
                         IconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onMoveDown()
                         }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
+                            AnimatedNeonIcon(Icons.Default.ArrowDownward, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.warning)
                         }
                     }
                 } else {
@@ -914,7 +896,7 @@ fun WidgetCard(
                             .background(Color.Black.copy(alpha = 0.4f), CircleShape)
                             .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.6f), CircleShape)
                     ) {
-                        Icon(
+                        AnimatedNeonIcon(
                             Icons.Default.Delete,
                             contentDescription = "Eliminar",
                             tint = com.elysium369.meet.ui.theme.MeetColors.error,
@@ -1062,7 +1044,7 @@ fun WidgetCard(
                 ) {
                     if (anomalyActive) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.error, modifier = Modifier.size(10.dp))
+                            AnimatedNeonIcon(Icons.Default.Warning, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.error, modifier = Modifier.size(10.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 "ANOMALÍA CRÍTICA",
@@ -1218,7 +1200,7 @@ fun AddWidgetDialog(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
+                                AnimatedNeonIcon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
                             }
                         }
                     }
@@ -1299,7 +1281,7 @@ fun AddWidgetDialog(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
+                                AnimatedNeonIcon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
                             }
                         }
 
@@ -1360,7 +1342,7 @@ fun AddWidgetDialog(
                                         modifier = Modifier.weight(1f),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
+                                    AnimatedNeonIcon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(selectedColor.toColor()))
                                 }
                             }
 
@@ -1488,7 +1470,7 @@ fun WidgetTypeButton(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(4.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = if (selected) color else com.elysium369.meet.ui.theme.MeetColors.textSecondary, modifier = Modifier.size(16.dp))
+            AnimatedNeonIcon(icon, contentDescription = null, tint = if (selected) color else com.elysium369.meet.ui.theme.MeetColors.textSecondary, modifier = Modifier.size(16.dp))
             Text(label, color = if (selected) color else com.elysium369.meet.ui.theme.MeetColors.textSecondary, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp)
         }
     }
@@ -1555,7 +1537,7 @@ fun DashboardSelectionDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         if (db.isDefault) Icons.Default.Lock else Icons.Default.Dashboard,
                                         contentDescription = null,
                                         tint = if (isSelected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else com.elysium369.meet.ui.theme.MeetColors.textSecondary,
@@ -1571,11 +1553,11 @@ fun DashboardSelectionDialog(
                                 }
 
                                 IconButton(onClick = { onClone(db.id, "${db.name} (CLON)") }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Clonar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                    AnimatedNeonIcon(Icons.Default.ContentCopy, contentDescription = "Clonar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                 }
                                 if (!db.isDefault) {
                                     IconButton(onClick = { onDelete(db) }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                        AnimatedNeonIcon(Icons.Default.Delete, contentDescription = "Eliminar", tint = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -1614,7 +1596,7 @@ fun DashboardSelectionDialog(
                         border = androidx.compose.foundation.BorderStroke(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
+                        AnimatedNeonIcon(Icons.Default.Add, contentDescription = null, tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("NUEVO DASHBOARD", color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, fontWeight = FontWeight.Black)
                     }
@@ -1867,4 +1849,3 @@ fun GlobalScreenOverlay() {
         )
     }
 }
-

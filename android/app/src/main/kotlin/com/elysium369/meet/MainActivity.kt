@@ -1,5 +1,7 @@
 package com.elysium369.meet
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.theme.MeetTheme
 import android.os.Bundle
@@ -33,6 +35,10 @@ import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
+import com.elysium369.meet.ui.components.LocalAnimatedIconClock
+import com.elysium369.meet.ui.components.LocalAnimatedIconStyle
+import com.elysium369.meet.ui.components.rememberAnimatedIconClock
+import com.elysium369.meet.ui.components.rememberAnimatedIconStyle
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.viewModels
 import androidx.compose.material.icons.Icons
@@ -73,17 +79,41 @@ val CyberpunkColorScheme = darkColorScheme(
 class MainActivity : ComponentActivity() {
     private val viewModel: ObdViewModel by viewModels()
 
+    companion object {
+        /** Volatile flag so ObdViewModel can check BT permission status before starting the FGS. */
+        @Volatile
+        var bluetoothPermissionsGranted: Boolean = false
+            private set
+    }
+
     private val permissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
-        if (!allGranted) {
-            // Handle denied permissions (e.g., show a dialog)
+        val btGranted = permissions.entries
+            .filter { it.key.contains("BLUETOOTH") }
+            .any { it.value }
+        bluetoothPermissionsGranted = btGranted || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+
+        if (!btGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.util.Log.w("MainActivity",
+                "Bluetooth permissions DENIED — OBD scanning will be limited. " +
+                "User must grant Bluetooth in Settings for full functionality.")
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Pre-check if permissions are already granted (e.g. from previous session)
+        bluetoothPermissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+
         checkPermissions()
         MeetColors.initialize(this)
 
@@ -99,6 +129,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(android.Manifest.permission.BLUETOOTH_SCAN)
             permissions.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+            permissions.add(android.Manifest.permission.BLUETOOTH_ADVERTISE)
         } else {
             permissions.add(android.Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -154,8 +185,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
     val trips by obdViewModel.trips.collectAsState()
     val customPids by obdViewModel.customPids.collectAsState()
     val isPremium by obdViewModel.isPremium.collectAsState()
+    val animatedIconStyle by rememberAnimatedIconStyle(context)
+    val animatedIconClock = rememberAnimatedIconClock(animatedIconStyle)
 
-    Scaffold(
+    CompositionLocalProvider(
+        LocalAnimatedIconStyle provides animatedIconStyle,
+        LocalAnimatedIconClock provides animatedIconClock
+    ) {
+        Scaffold(
         containerColor = Color(0xFF060612),
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
@@ -465,7 +502,11 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("repair_network") {
                 val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                RepairNetworkScreen(navController = navController, viewModel = repairViewModel)
+                RepairNetworkScreen(
+                    navController = navController,
+                    viewModel = repairViewModel,
+                    obdViewModel = obdViewModel
+                )
             }
             composable("repair_case_detail/{caseId}") { backStack ->
                 val caseId = backStack.arguments?.getString("caseId") ?: ""
@@ -478,6 +519,10 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             composable("contribute_case") {
                 val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 ContributeCaseScreen(navController = navController, viewModel = repairViewModel)
+            }
+            composable("community_cases") {
+                val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                com.elysium369.meet.ui.screens.CommunityCasesScreen(navController = navController, viewModel = repairViewModel)
             }
             composable("marketplace") {
                 MarketplaceScreen(
@@ -499,6 +544,76 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("technical_forum") {
+                TechnicalForumScreen(navController = navController)
+            }
+            composable("pro_chemical_guide") {
+                ProChemicalGuideScreen(navController = navController)
+            }
+            composable(
+                route = "tow_truck_service?vehicleInfo={vehicleInfo}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("vehicleInfo") {
+                        type = androidx.navigation.NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    }
+                )
+            ) { backStack ->
+                val vehicleInfo = backStack.arguments?.getString("vehicleInfo")?.let {
+                    try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }?.takeIf { it.isNotBlank() }
+                com.elysium369.meet.ui.screens.TowTruckServiceScreen(
+                    viewModel = obdViewModel,
+                    prefilledVehicleInfo = vehicleInfo,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = "mechanic_service?vehicleInfo={vehicleInfo}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("vehicleInfo") {
+                        type = androidx.navigation.NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    }
+                )
+            ) { backStack ->
+                val vehicleInfo = backStack.arguments?.getString("vehicleInfo")?.let {
+                    try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }?.takeIf { it.isNotBlank() }
+                com.elysium369.meet.ui.screens.MechanicServiceScreen(
+                    viewModel = obdViewModel,
+                    prefilledVehicleInfo = vehicleInfo,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = "part_request?vehicleInfo={vehicleInfo}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("vehicleInfo") {
+                        type = androidx.navigation.NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    }
+                )
+            ) { backStack ->
+                val vehicleInfo = backStack.arguments?.getString("vehicleInfo")?.let {
+                    try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }?.takeIf { it.isNotBlank() }
+                com.elysium369.meet.ui.screens.PartRequestScreen(
+                    viewModel = obdViewModel,
+                    prefilledVehicleInfo = vehicleInfo,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("ride_service") {
+                com.elysium369.meet.ui.screens.RideServiceScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+        }
         }
     }
 }
@@ -514,7 +629,7 @@ fun MeetBottomNavigation(navController: NavController) {
         contentColor = MeetColors.neonGreen
     ) {
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Home, "Home") },
+            icon = { AnimatedNeonIcon(Icons.Default.Home, "Home") },
             label = { Text("Inicio", fontSize = 10.sp) },
             selected = currentRoute == "home",
             onClick = { navController.navigate("home") { launchSingleTop = true; restoreState = true } },
@@ -527,7 +642,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Build, "Scanner") },
+            icon = { AnimatedNeonIcon(Icons.Default.Build, "Scanner") },
             label = { Text("Scanner", fontSize = 10.sp) },
             selected = currentRoute == "scanner",
             onClick = { navController.navigate("scanner") { launchSingleTop = true } },
@@ -540,7 +655,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Warning, "DTCs") },
+            icon = { AnimatedNeonIcon(Icons.Default.Warning, "DTCs") },
             label = { Text("DTCs", fontSize = 10.sp) },
             selected = currentRoute == "dtc",
             onClick = { navController.navigate("dtc") { launchSingleTop = true } },
@@ -553,7 +668,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.List, "Garage") },
+            icon = { AnimatedNeonIcon(Icons.Default.List, "Garage") },
             label = { Text("Garage", fontSize = 10.sp) },
             selected = currentRoute == "garage",
             onClick = { navController.navigate("garage") { launchSingleTop = true } },
@@ -566,7 +681,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Star, "PRO") },
+            icon = { AnimatedNeonIcon(Icons.Default.Star, "PRO") },
             label = { Text("PRO", fontSize = 10.sp) },
             selected = currentRoute == "pro_hub",
             onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },

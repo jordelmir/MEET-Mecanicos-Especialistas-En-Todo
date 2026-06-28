@@ -430,7 +430,7 @@ private fun HoloHeader(
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(currentStyle.icon, fontSize = 14.sp)
+                        AnimatedNeonGlyph(currentStyle.icon, contentDescription = null, fontSize = 14.sp)
                         Spacer(Modifier.width(6.dp))
                         Text(
                             currentStyle.displayName.uppercase(),
@@ -900,7 +900,7 @@ private fun HoloMetricCard(
         ) {
             // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(icon, fontSize = 14.sp)
+                AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 14.sp)
                 Spacer(Modifier.width(6.dp))
                 Text(
                     label,

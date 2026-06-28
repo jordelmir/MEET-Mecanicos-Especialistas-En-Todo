@@ -312,7 +312,7 @@ class LocalExpertSystem @Inject constructor() {
                 testSteps = listOf(
                     "1. Limpieza de Pasajes: Desmonte la válvula IAC y el cuerpo de aceleración. Limpie los pasajes de aire y la punta de la IAC con limpiador de carburador.",
                     "2. Resistencia de Bobinas: Mida la resistencia entre las terminales de la válvula IAC (~10-50 ohms según modelo). Si marca circuito abierto, reemplace la IAC.",
-                    "3. Prueba de Actuador: Use las pruebas bidireccionales de MEET para forzar la apertura y cierre de la IAC y observe el cambio en las RPM.",
+                    "3. Prueba de Actuador: Use las pruebas bidireccionales de Elysium Vanguard para forzar la apertura y cierre de la IAC y observe el cambio en las RPM.",
                     "4. Aprendizaje de Ralentí: Si el vehículo tiene cuerpo de aceleración electrónico, realice el procedimiento de aprendizaje de ralentí (Idle Relearn) con el escáner."
                 )
             ))
@@ -326,7 +326,7 @@ class LocalExpertSystem @Inject constructor() {
                     "Pérdida momentánea o permanente de comunicación en el bus CAN entre PCM y TCM."
                 ),
                 testSteps = listOf(
-                    "1. Leer Códigos de la TCM: Ingrese al módulo de la transmisión (TCM) utilizando el escáner MEET para leer los códigos específicos (ej: P0730, P0750). El código P0700 solo indica que el motor encendió la luz MIL a petición de la transmisión.",
+                    "1. Leer Códigos de la TCM: Ingrese al módulo de la transmisión (TCM) utilizando el escáner Elysium Vanguard para leer los códigos específicos (ej: P0730, P0750). El código P0700 solo indica que el motor encendió la luz MIL a petición de la transmisión.",
                     "2. Inspección del Aceite: Con el motor encendido en Parking, mida el nivel del aceite de transmisión. Inspeccione si huele a quemado o tiene color oscuro.",
                     "3. Conectores Eléctricos: Verifique el arnés principal que entra a la transmisión buscando pines doblados, sulfatados o con filtración de fluido hidráulico."
                 )
@@ -737,7 +737,7 @@ class LocalExpertSystem @Inject constructor() {
     }
 
     private fun checkO2Sensors(liveData: Map<String, Float>, procedures: MutableList<ExpertDiagnosticProcedure>) {
-        // En una lectura en vivo snapshot, solo podemos buscar si el sensor está atascado en límites extremos.
+        // En una lectura en vivo snapshot, solo es posible buscar si el sensor está atascado en límites extremos.
         val o2B1S1 = liveData["0114"] ?: return
 
         // 0 a 1V es el rango de O2 de Zirconio.

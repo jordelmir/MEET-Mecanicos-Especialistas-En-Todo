@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * CloudSyncRepository — Supabase-backed cloud data layer for MEET OBD2.
+ * CloudSyncRepository — Supabase-backed cloud data layer for OBD2 Elysium Vanguard.
  * Handles OEM PID vault, DTC lookups, and scan session uploads.
  */
 object CloudSyncRepository {

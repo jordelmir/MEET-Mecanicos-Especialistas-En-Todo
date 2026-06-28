@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -153,7 +155,7 @@ fun BackupSettingsScreen(navController: NavController) {
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         imageVector = Icons.Default.CloudDone,
                                         contentDescription = "Connected",
                                         tint = MeetColors.neonGreen,
@@ -183,7 +185,7 @@ fun BackupSettingsScreen(navController: NavController) {
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
+                                    AnimatedNeonIcon(
                                         imageVector = Icons.Default.CloudQueue,
                                         contentDescription = "Disconnected",
                                         tint = MeetColors.textSecondary,
@@ -382,7 +384,7 @@ fun BackupSettingsScreen(navController: NavController) {
             containerColor = MeetColors.backgroundDeep,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.SettingsBackupRestore, contentDescription = "Restaurar", tint = MeetColors.warning)
+                    AnimatedNeonIcon(imageVector = Icons.Default.SettingsBackupRestore, contentDescription = "Restaurar", tint = MeetColors.warning)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("¿Restaurar copia?", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }

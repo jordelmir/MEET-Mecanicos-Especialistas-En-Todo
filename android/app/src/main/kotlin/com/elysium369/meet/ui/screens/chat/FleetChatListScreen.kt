@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.chat
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -397,7 +399,7 @@ fun PanelTabContent(
                                 Text("Plan: ${activeBiz?.planType ?: "Básico"}", color = MeetColors.cyberCyan, fontSize = 11.sp)
                             }
                             IconButton(onClick = onCreateBusiness) {
-                                Icon(Icons.Default.AddBusiness, contentDescription = "Añadir negocio", tint = MeetColors.electricBlue)
+                                AnimatedNeonIcon(Icons.Default.AddBusiness, contentDescription = "Añadir negocio", tint = MeetColors.electricBlue)
                             }
                         }
                     }
@@ -415,7 +417,7 @@ fun PanelTabContent(
                 ) {
                     PhantomSectionHeader(label = "FLOTAS ACTIVAS (${fleets.size})", accentColor = MeetColors.electricBlue)
                     IconButton(onClick = onCreateFleet) {
-                        Icon(Icons.Default.Add, contentDescription = "Añadir Flota", tint = MeetColors.electricBlue)
+                        AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Añadir Flota", tint = MeetColors.electricBlue)
                     }
                 }
             }
@@ -468,7 +470,7 @@ fun PanelTabContent(
                                         fontSize = 12.sp
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copiar", tint = MeetColors.cyberCyan, modifier = Modifier.size(12.dp))
+                                    AnimatedNeonIcon(Icons.Default.ContentCopy, contentDescription = "Copiar", tint = MeetColors.cyberCyan, modifier = Modifier.size(12.dp))
                                 }
                             }
                         }
@@ -498,7 +500,7 @@ fun PanelTabContent(
                         OutlinedTextField(
                             value = inviteCodeInput,
                             onValueChange = { inviteCodeInput = it },
-                            placeholder = { Text("Ej: MEET-METRO", fontSize = 12.sp) },
+                            placeholder = { Text("Ej: EVG-METRO", fontSize = 12.sp) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp),
@@ -586,7 +588,7 @@ fun VehiclesTabContent(
                             }
                             
                             IconButton(onClick = { onAssignClick(vehicle) }) {
-                                Icon(Icons.Default.AssignmentInd, contentDescription = "Asignar", tint = MeetColors.electricBlue)
+                                AnimatedNeonIcon(Icons.Default.AssignmentInd, contentDescription = "Asignar", tint = MeetColors.electricBlue)
                             }
                         }
 
@@ -644,7 +646,7 @@ fun VehiclesTabContent(
 }
 
 // ══════════════════════════════════════════════════════
-// TAB CONTENT: MESSAGING & DVIR SIMULATOR
+// TAB CONTENT: MESSAGING
 // ══════════════════════════════════════════════════════
 @Composable
 fun MessagingTabContent(
@@ -656,64 +658,19 @@ fun MessagingTabContent(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showNewChatDialog by remember { mutableStateOf(false) }
-    var showDvirSimulator by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
-        // Expandable DVIR Simulation Section
-        EliteCard(
-            glowColor = MeetColors.cyberCyan.copy(alpha = 0.15f),
-            backgroundColor = MeetColors.cardBackground,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDvirSimulator = !showDvirSimulator },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.FactCheck, contentDescription = null, tint = MeetColors.cyberCyan)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Simulador DVIR (Reporte Diario Conductor)",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                    Icon(
-                        imageVector = if (showDvirSimulator) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MeetColors.cyberCyan
-                    )
-                }
-
-                if (showDvirSimulator) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    if (vehicles.isEmpty()) {
-                        Text("No hay vehículos para simular inspección.", color = MeetColors.textSecondary, fontSize = 11.sp)
-                    } else {
-                        DvirSimulationForm(vehicles = vehicles, onSubmit = onSubmitDvir)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Search conversations bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Buscar chofer o reporte...", color = MeetColors.textSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MeetColors.textSecondary) },
+            leadingIcon = { AnimatedNeonIcon(Icons.Default.Search, contentDescription = null, tint = MeetColors.textSecondary) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -736,7 +693,7 @@ fun MessagingTabContent(
             PhantomSectionHeader(label = "CHATS ACTIVOS", accentColor = MeetColors.electricBlue)
             TextButton(onClick = { showNewChatDialog = true }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Email, contentDescription = null, tint = MeetColors.electricBlue, modifier = Modifier.size(16.dp))
+                    AnimatedNeonIcon(Icons.Default.Email, contentDescription = null, tint = MeetColors.electricBlue, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Nuevo Chat", color = MeetColors.electricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -809,96 +766,6 @@ fun MessagingTabContent(
 }
 
 // ══════════════════════════════════════════════════════
-// HELPER COMPOSABLE: DVIR SIMULATION FORM
-// ══════════════════════════════════════════════════════
-@Composable
-fun DvirSimulationForm(
-    vehicles: List<VehicleEntity>,
-    onSubmit: (String, Boolean, Boolean, Boolean, Boolean, Boolean) -> Unit
-) {
-    var selectedVehicle by remember { mutableStateOf(vehicles.firstOrNull()) }
-    var brakesOk by remember { mutableStateOf(true) }
-    var lightsOk by remember { mutableStateOf(true) }
-    var tiresOk by remember { mutableStateOf(true) }
-    var fluidsOk by remember { mutableStateOf(true) }
-    var batteryOk by remember { mutableStateOf(true) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Vehicle picker
-        Text("Seleccionar Vehículo a Inspeccionar:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            vehicles.forEach { vehicle ->
-                val isSelected = selectedVehicle?.id == vehicle.id
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) MeetColors.cyberCyan else MeetColors.backgroundDeep)
-                        .clickable { selectedVehicle = vehicle }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        vehicle.model,
-                        color = if (isSelected) Color.Black else Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text("Estado de Puntos de Control:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-
-        // Checkboxes row 1
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = brakesOk, onCheckedChange = { brakesOk = it }, colors = CheckboxDefaults.colors(checkedColor = MeetColors.electricBlue))
-                Text("Frenos OK", color = Color.White, fontSize = 11.sp)
-            }
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = lightsOk, onCheckedChange = { lightsOk = it }, colors = CheckboxDefaults.colors(checkedColor = MeetColors.electricBlue))
-                Text("Luces OK", color = Color.White, fontSize = 11.sp)
-            }
-        }
-        
-        // Checkboxes row 2
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = tiresOk, onCheckedChange = { tiresOk = it }, colors = CheckboxDefaults.colors(checkedColor = MeetColors.electricBlue))
-                Text("Llantas OK", color = Color.White, fontSize = 11.sp)
-            }
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = fluidsOk, onCheckedChange = { fluidsOk = it }, colors = CheckboxDefaults.colors(checkedColor = MeetColors.electricBlue))
-                Text("Fluidos OK", color = Color.White, fontSize = 11.sp)
-            }
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = batteryOk, onCheckedChange = { batteryOk = it }, colors = CheckboxDefaults.colors(checkedColor = MeetColors.electricBlue))
-            Text("Batería/Sistema Eléctrico OK", color = Color.White, fontSize = 11.sp)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        EliteButton(
-            text = "Simular Envío de Reporte DVIR",
-            onClick = {
-                selectedVehicle?.let {
-                    onSubmit(it.id, brakesOk, lightsOk, tiresOk, fluidsOk, batteryOk)
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            color = MeetColors.cyberCyan,
-            textColor = Color.Black
-        )
-    }
-}
 
 @Composable
 fun ChatRowItem(
@@ -1016,7 +883,7 @@ fun NewChatDialog(
                                         .background(MeetColors.electricBlue.copy(alpha = 0.2f)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = MeetColors.electricBlue, modifier = Modifier.size(16.dp))
+                                    AnimatedNeonIcon(Icons.Default.Person, contentDescription = null, tint = MeetColors.electricBlue, modifier = Modifier.size(16.dp))
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {

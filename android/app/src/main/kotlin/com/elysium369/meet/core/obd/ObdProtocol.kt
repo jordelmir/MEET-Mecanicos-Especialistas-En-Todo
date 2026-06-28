@@ -11,7 +11,11 @@ enum class ObdProtocol(val atspCode: String, val displayName: String) {
     CAN_29BIT_500K("7", "ISO 15765-4 CAN 29bit 500K"),
     CAN_11BIT_250K("8", "ISO 15765-4 CAN 11bit 250K"),
     CAN_29BIT_250K("9", "ISO 15765-4 CAN 29bit 250K"),
-    CAN_ISO15765("6", "CAN ISO 15765 (detectado)"),
+    // J1939 for trucks and heavy-duty vehicles
+    J1939_CAN_29BIT("A", "SAE J1939 CAN 29bit 250K"),
+    // User-defined protocols (B, C used by some ELM327 variants)
+    USER1_CAN_11BIT("B", "User CAN 11bit"),
+    USER2_CAN_29BIT("C", "User CAN 29bit"),
     // Modern Protocols
     CAN_FD_11BIT("D", "CAN FD 11bit 500K/2M"),
     CAN_FD_29BIT("E", "CAN FD 29bit 500K/2M"),

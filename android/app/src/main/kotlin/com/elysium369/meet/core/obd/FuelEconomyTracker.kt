@@ -7,7 +7,7 @@ import kotlin.math.abs
  * 
  * Calcula MPG, L/100km y costo de combustible usando MAF o MAP+RPM.
  * Los escáneres profesionales como Torque Pro cobran extra por esto.
- * MEET lo incluye gratis con precisión de nivel industrial.
+ * OBD2 Elysium Vanguard lo incluye con precisión de nivel industrial.
  *
  * ═══════════════════════════════════════════════════════════════
  * FÓRMULAS:

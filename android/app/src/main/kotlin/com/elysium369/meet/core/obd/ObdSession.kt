@@ -183,6 +183,9 @@ class ObdSession(
 
     private var consecutiveErrors = 0
     private var isSelfHealing = false
+    @Volatile private var lastLiveDataUpdateMs = 0L
+    @Volatile private var lastRecoveryAttemptMs = 0L
+    private var recoveryFailureCount = 0
 
     private val _isUdsSessionActive = MutableStateFlow(false)
     val isUdsSessionActive: StateFlow<Boolean> = _isUdsSessionActive.asStateFlow()
@@ -337,6 +340,10 @@ class ObdSession(
                 _statusMessage.value = "Enlace Crítico Sincronizado: $adapterVersion"
                 isRunning = true
                 consecutiveErrors = 0
+                val connectedAt = System.currentTimeMillis()
+                lastHeartbeatTime = connectedAt
+                lastLiveDataUpdateMs = connectedAt
+                recoveryFailureCount = 0
                 Log.i(TAG, "═══ OBD CONNECT SUCCESS ═══ Attempt=$attempt | Total: ${System.currentTimeMillis()-t0}ms | Adapter=$adapterVersion | Protocol=$detectedProtocol")
 
                 // ── TELEMETRÍA SILENCIOSA (SUPABASE) SUCCESS ──
@@ -430,7 +437,7 @@ class ObdSession(
     fun setHighSpeedMode(enabled: Boolean) {
         _highSpeedMode.value = enabled
         if (enabled) {
-            _statusMessage.value = "Modo Alta Velocidad Activado (20Hz+)"
+            _statusMessage.value = "Modo Alta Velocidad Activado"
         }
         // Restart polling to apply mode
         if (isRunning) startLivePolling()
@@ -451,8 +458,11 @@ class ObdSession(
     fun startLivePolling() {
         if (!isRunning || _state.value != ObdState.CONNECTED) return
         pollingJob?.cancel()
+        if (lastLiveDataUpdateMs == 0L) lastLiveDataUpdateMs = System.currentTimeMillis()
         pollingJob = scope.launch {
-            val supportedPids = detectSupportedPids()
+            var supportedPids: Set<Int> = emptySet()
+            var supportDiscoveryComplete = false
+            val supportedPidsDeferred = async(Dispatchers.IO) { detectSupportedPids() }
 
             // Priority 1: High-frequency PIDs (RPM, Speed, Throttle)
             val baseHighPriority = listOf("0C", "0D", "11") // PID codes without '01'
@@ -465,6 +475,12 @@ class ObdSession(
                     continue
                 }
                 val cycleStartTime = System.currentTimeMillis()
+
+                if (!supportDiscoveryComplete && supportedPidsDeferred.isCompleted) {
+                    supportedPids = runCatching { supportedPidsDeferred.await() }.getOrDefault(emptySet())
+                    supportDiscoveryComplete = true
+                    Log.i(TAG, "Supported PID discovery complete: ${supportedPids.size} PIDs")
+                }
 
                 if (_highSpeedMode.value && _pinnedPids.value.isNotEmpty()) {
                     // HIGH SPEED MODE: Only poll pinned PIDs at max rate (Use Multi-PID on CAN for up to 6x faster refresh)
@@ -496,7 +512,7 @@ class ObdSession(
                         }
 
                     // 1. Poll High Priority (Every Cycle) - Use Multi-PID request if on CAN
-                    if (detectedProtocol.contains("CAN") && highPriorityPids.size > 1) {
+                    if (detectedProtocol.contains("CAN", ignoreCase = true) && highPriorityPids.size > 1) {
                         highPriorityPids.chunked(6).forEach { chunk ->
                             pollMultiPidBatch(chunk)
                         }
@@ -506,7 +522,7 @@ class ObdSession(
 
                     // 2. Poll Normal Priority (Every 3 cycles) - Chunked to prevent truncation
                     if (cycleCount % 3 == 0) {
-                        if (detectedProtocol.contains("CAN") && normalPriorityPids.size > 1) {
+                        if (detectedProtocol.contains("CAN", ignoreCase = true) && normalPriorityPids.size > 1) {
                             normalPriorityPids.chunked(6).forEach { chunk ->
                                 pollMultiPidBatch(chunk)
                             }
@@ -542,12 +558,12 @@ class ObdSession(
                 updateQos(System.currentTimeMillis() - cycleStartTime)
                 cycleCount++
 
-                // Adaptive delay: High speed mode on pro adapter has 0 delay
+                // Adaptive delay: keep a real hardware cadence without overheating the phone.
                 val targetDelay = when {
-                    _highSpeedMode.value && !isCloneAdapter -> 2L // Minimal breathing time
-                    _highSpeedMode.value && isCloneAdapter -> 15L
-                    isCloneAdapter -> 40L  // Was 80L — modern clones handle 25Hz+
-                    else -> 5L
+                    _highSpeedMode.value && !isCloneAdapter -> 25L
+                    _highSpeedMode.value && isCloneAdapter -> 45L
+                    isCloneAdapter -> 80L
+                    else -> 35L
                 }
                 if (targetDelay > 0) delay(targetDelay)
             }
@@ -763,13 +779,18 @@ class ObdSession(
     var fuelPricePerLiter: Float = 1.0f // default $1/L, user can change
 
     private fun updateLiveData(pid: String, value: Float) {
+        lastLiveDataUpdateMs = System.currentTimeMillis()
         // 1. Apply user/auto calibration offset
-        val offset = calibrationOffsets.value[pid] ?: 0f
+        val normalizedPid = pid.uppercase().replace(" ", "")
+        val corePid = normalizedPid.removePrefix("01")
+        val offset = calibrationOffsets.value[pid]
+            ?: calibrationOffsets.value[normalizedPid]
+            ?: calibrationOffsets.value[corePid]
+            ?: 0f
         val calibratedValue = value + offset
 
         // 2. Apply smoothing and outlier rejection
         // The PID to smooth is usually the hex code.
-        val corePid = pid.removePrefix("01")
         val smoothedValue = if (corePid == "42" || corePid == "AT RV" || corePid == "ATRV") {
             calibratedValue // Bypass smoothing for voltage to allow oscilloscope raw reading
         } else {
@@ -777,12 +798,68 @@ class ObdSession(
         }
 
         val current = _liveData.value.toMutableMap()
-        current[pid] = smoothedValue
+        putLiveDataAliases(current, pid, smoothedValue)
 
         // ── Compute derived/calculated sensors ──
         computeCalculatedSensors(current)
 
         _liveData.value = current
+    }
+
+    private fun putLiveDataAliases(data: MutableMap<String, Float>, pid: String, value: Float) {
+        val rawKey = pid.trim()
+        val compactKey = rawKey.uppercase().replace(" ", "")
+        val coreKey = compactKey.removePrefix("01")
+
+        data[rawKey] = value
+        data[compactKey] = value
+        if (coreKey.isNotBlank()) data[coreKey] = value
+        if (coreKey.length == 2) data["01$coreKey"] = value
+
+        when (coreKey) {
+            "0C" -> {
+                data["RPM"] = value
+                data["rpm"] = value
+            }
+            "0D" -> {
+                data["SPEED"] = value
+                data["speed"] = value
+                data["VELOCIDAD"] = value
+            }
+            "05" -> {
+                data["COOLANT"] = value
+                data["coolant"] = value
+                data["ECT"] = value
+            }
+            "04" -> data["ENGINE_LOAD"] = value
+            "0B" -> {
+                data["MAP"] = value
+                data["map"] = value
+            }
+            "10" -> {
+                data["MAF"] = value
+                data["maf"] = value
+            }
+            "11" -> {
+                data["THROTTLE"] = value
+                data["throttle"] = value
+            }
+            "0F" -> data["IAT"] = value
+            "0E" -> data["TIMING_ADVANCE"] = value
+            "2F" -> data["FUEL_LEVEL"] = value
+            "42" -> {
+                data["VOLTAGE"] = value
+                data["voltage"] = value
+                data["CTRL_VOLTAGE"] = value
+            }
+        }
+
+        if (compactKey == "ATRV") {
+            data["AT RV"] = value
+            data["ELM_VOLTAGE"] = value
+            data["VOLTAGE"] = data["VOLTAGE"] ?: value
+            data["voltage"] = data["voltage"] ?: value
+        }
     }
 
     private fun computeCalculatedSensors(data: MutableMap<String, Float>) {
@@ -1394,7 +1471,7 @@ class ObdSession(
                         val resp = result.await()
                         val value = parsePidResponse("01$pidCode", resp)
                         if (value != null) _oscilloscopeStream.emit(t to value)
-                        delay(5) // Max 200Hz fallback
+                        delay(25)
                     }
                     return@launch
                 }
@@ -1424,7 +1501,7 @@ class ObdSession(
                             }
                         }
                     }
-                    delay(1)
+                    delay(10)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Oscilloscope mode error", e)
@@ -1718,27 +1795,128 @@ class ObdSession(
     suspend fun clearDtcs(): Boolean {
         if (_state.value != ObdState.CONNECTED) return false
         return try {
-            _statusMessage.value = "Enviando comando de borrado (Mode 04)..."
+            _statusMessage.value = "Enviando borrado estándar OBD-II (Mode 04)..."
+            pauseLivePolling()
+            clearCommandQueue()
+
+            // Increase timeout for Mode 04 — some ECUs need up to 5 seconds to respond
+            val attempts = mutableListOf<String>()
+
+            // Try Mode 04 with extended timeout
             val response = sendRawCommand("04", priority = 1)
-            val success = response.contains("OK") || response.contains("44")
+            attempts.add("04=$response")
+            var success = isPositiveClearDtcResponse(response)
+
+            if (!success) {
+                // Some ECUs need headers set to broadcast first
+                _statusMessage.value = "Mode 04 sin confirmación. Reintentando con broadcast..."
+                runCatching { sendRawCommand("ATSH7DF", priority = 1) }
+                val response2 = sendRawCommand("04", priority = 1)
+                attempts.add("7DF/04=$response2")
+                success = isPositiveClearDtcResponse(response2)
+            }
+
+            if (!success) {
+                _statusMessage.value = "Mode 04 rechazado. Probando UDS Service 14..."
+                success = tryClearDtcsWithUds(attempts)
+            }
+
             if (success) {
                 _statusMessage.value = "Verificando eliminación física (Mode 03)..."
+                // Wait briefly for ECU to process the clear
+                kotlinx.coroutines.delay(500)
                 val checkResponse = sendRawCommand("03", priority = 1)
                 val remainingCodes = DtcDecoder.decode(checkResponse, "03")
                 if (remainingCodes.isNotEmpty()) {
-                    _statusMessage.value = "Advertencia: ${remainingCodes.size} códigos no pudieron ser borrados."
+                    _statusMessage.value = "El ECU aceptó el borrado, pero ${remainingCodes.size} DTC activos siguen presentes. Repara la falla o verifica: motor APAGADO, llave en ON."
+                    return false
                 } else {
-                    _statusMessage.value = "Borrado verificado exitosamente."
+                    _statusMessage.value = "✅ Borrado verificado exitosamente."
                     _allDetectedDtcs.value = emptySet()
                 }
             } else {
-                _statusMessage.value = "Error al borrar códigos: respuesta inesperada."
+                _statusMessage.value = explainClearDtcFailure(attempts)
             }
             success
         } catch (e: Exception) {
             _statusMessage.value = "Error en borrado: ${e.message}"
             false
+        } finally {
+            // Always restore clean state for live polling
+            runCatching { sendRawCommand("ATSH7DF", priority = 1) }
+            runCatching { sendRawCommand("ATCRA", priority = 1) }
+            runCatching { sendRawCommand("ATH0", priority = 1) }
+            runCatching { sendRawCommand("ATCAF1", priority = 1) }
+            resumeLivePolling()
         }
+    }
+
+    private fun isPositiveClearDtcResponse(response: String): Boolean {
+        val clean = response.uppercase().replace(" ", "").replace("\r", "").replace("\n", "")
+        // 44 = Mode 04 positive response
+        // 54FFFFFF / 54 = UDS Service 14 positive response
+        // OK = some adapters return this
+        return clean.contains("44") || clean.contains("54FFFFFF") || clean.contains("54") || clean.contains("OK")
+    }
+
+    private suspend fun tryClearDtcsWithUds(attempts: MutableList<String>): Boolean {
+        val isCan = detectedProtocol.contains("CAN", ignoreCase = true)
+        if (!isCan && !isDoIpMode) return false
+
+        val targets = listOf("7DF", "7E0", "7E1", "7E2", "7E3", "7E4", "7E5")
+        return try {
+            runCatching { sendRawCommand("ATH1", priority = 1) }
+            runCatching { sendRawCommand("ATAL", priority = 1) }
+            runCatching { sendRawCommand("ATCAF1", priority = 1) }
+            for (target in targets) {
+                runCatching { sendRawCommand("ATSH$target", priority = 1) }
+                if (target != "7DF") {
+                    val responseId = when (target) {
+                        "7E0" -> "7E8"
+                        "7E1" -> "7E9"
+                        "7E2" -> "7EA"
+                        "7E3" -> "7EB"
+                        "7E4" -> "7EC"
+                        "7E5" -> "7ED"
+                        else -> ""
+                    }
+                    if (responseId.isNotBlank()) runCatching { sendRawCommand("ATCRA$responseId", priority = 1) }
+                } else {
+                    runCatching { sendRawCommand("ATCRA", priority = 1) }
+                }
+
+                runCatching { sendRawCommand("1003", priority = 1) }
+                    .recoverCatching { sendRawCommand("1001", priority = 1) }
+
+                val udsResponse = runCatching { sendRawCommand("14FFFFFF", priority = 1) }
+                    .getOrElse { "ERR:${it.message}" }
+                attempts.add("$target/14FFFFFF=$udsResponse")
+                if (isPositiveClearDtcResponse(udsResponse)) return true
+            }
+            false
+        } finally {
+            runCatching { sendRawCommand("ATSH7DF", priority = 1) }
+            runCatching { sendRawCommand("ATCRA", priority = 1) }
+            runCatching { sendRawCommand("ATH0", priority = 1) }
+        }
+    }
+
+    private fun explainClearDtcFailure(attempts: List<String>): String {
+        val joined = attempts.joinToString(" | ").uppercase()
+        val reason = when {
+            joined.contains("7F1433") || joined.contains("SECURITY") ->
+                "el ECU exige acceso de seguridad para UDS \$14"
+            joined.contains("7F1422") || joined.contains("7F0422") ->
+                "condiciones incorrectas: usa contacto ON, motor apagado y voltaje estable"
+            joined.contains("7F1431") || joined.contains("7F0431") ->
+                "solicitud fuera de rango para ese módulo"
+            joined.contains("7F1411") || joined.contains("7F0411") ->
+                "servicio no soportado por ese ECU/adaptador"
+            joined.contains("NODATA") || joined.contains("NO DATA") ->
+                "el adaptador no recibió confirmación del ECU"
+            else -> "respuesta no positiva del ECU"
+        }
+        return "No se pudo borrar memoria DTC: $reason. Detalle: ${attempts.takeLast(3).joinToString(" | ")}"
     }
 
     suspend fun fetchVin(): String {
@@ -2809,7 +2987,7 @@ class ObdSession(
                 t.write("$command\r".toByteArray())
                 val resp = readResponse(timeoutMs)
                 Log.v(TAG, "RX (Direct): '$resp' (${resp.length} chars)")
-                delay(baseDelayMs) // Meet elite: adaptive delay
+                delay(baseDelayMs) // Elysium Vanguard: adaptive delay
                 resp
             }
         }
@@ -3219,7 +3397,7 @@ class ObdSession(
                         trafficListener?.onError(command.query, "Timeout after $attempts attempts")
 
                         if (consecutiveErrors >= 3 && !isSelfHealing) {
-                            scope.launch { attemptSelfHealing() }
+                            scope.launch { attemptSelfHealing("command timeouts") }
                         }
 
                         command.onError(Exception("Timeout"))
@@ -3258,23 +3436,58 @@ class ObdSession(
         return sendCommandDirectly(command, timeoutMs = 1000L)
     }
 
-    private suspend fun attemptSelfHealing() {
-        if (isSelfHealing || !isRunning) return
+    fun liveDataSilenceMs(nowMs: Long = System.currentTimeMillis()): Long {
+        val last = lastLiveDataUpdateMs
+        return if (last <= 0L) Long.MAX_VALUE else nowMs - last
+    }
+
+    suspend fun recoverFrozenLink(reason: String): Boolean {
+        val now = System.currentTimeMillis()
+        if (_state.value != ObdState.CONNECTED || !isRunning) return false
+        if (now - lastRecoveryAttemptMs < RECOVERY_COOLDOWN_MS) return false
+        return attemptSelfHealing(reason)
+    }
+
+    private suspend fun attemptSelfHealing(reason: String = "link instability"): Boolean {
+        if (isSelfHealing || !isRunning) return false
         isSelfHealing = true
-        _statusMessage.value = "Enlace inestable. Intentando autorecuperación..."
+        lastRecoveryAttemptMs = System.currentTimeMillis()
+        val wasPollingPaused = isPollingPaused
+        _statusMessage.value = "Enlace inestable. Recuperando telemetría..."
+        Log.w(TAG, "Self-healing started: $reason")
 
         try {
+            commandQueue.clear()
+            pollingJob?.cancelAndJoin()
+            currentJob?.cancelAndJoin()
+            keepAliveManager.stop()
+            drainInput()
             transport?.reconnect()
-            delay(500)
+            delay(700)
             initializeAdapter()
             consecutiveErrors = 0
-            _statusMessage.value = "Enlace recuperado exitosamente."
+            recoveryFailureCount = 0
+            val recoveredAt = System.currentTimeMillis()
+            lastHeartbeatTime = recoveredAt
+            lastLiveDataUpdateMs = recoveredAt
+            _state.value = ObdState.CONNECTED
+            _statusMessage.value = "Telemetría recuperada. Polling activo."
+            startQueueProcessor()
+            if (!wasPollingPaused) startLivePolling()
+            keepAliveManager.start(scope)
+            Log.i(TAG, "Self-healing completed successfully")
+            return true
         } catch (e: Exception) {
-            _statusMessage.value = "Fallo crítico en recuperación: ${e.message}"
-            // Reset errors and add cooldown to prevent infinite reconnection loop
+            recoveryFailureCount++
+            _statusMessage.value = "Recuperación OBD falló: ${e.message ?: "sin respuesta"}"
             consecutiveErrors = 0
-            Log.e(TAG, "Self-healing failed, entering cooldown", e)
-            delay(10000) // 10s cooldown before allowing another healing attempt
+            Log.e(TAG, "Self-healing failed ($recoveryFailureCount): $reason", e)
+            if (recoveryFailureCount >= 2) {
+                isRunning = false
+                _state.value = ObdState.ERROR
+                runCatching { transport?.disconnect() }
+            }
+            return false
         } finally {
             isSelfHealing = false
         }
@@ -3293,7 +3506,7 @@ class ObdSession(
                 // If no successful command in 15s while running, the link is likely frozen
                 if (now - lastHeartbeatTime > 15000 && !isSelfHealing && _state.value == ObdState.CONNECTED) {
                     _statusMessage.value = "Enlace inactivo. Re-sincronizando..."
-                    attemptSelfHealing()
+                    attemptSelfHealing("heartbeat silence")
                 }
             }
         }
@@ -3307,8 +3520,7 @@ class ObdSession(
         val results = mutableMapOf<String, String>()
 
         if (_state.value != ObdState.CONNECTED) {
-            // Offline diagnostic mode — provide meaningful feedback
-            kotlinx.coroutines.delay(500) // Simulate processing
+            // Offline diagnostic mode — provide meaningful feedback from real connection state.
             results["Estado"] = "Sin conexión OBD"
             results["Modo"] = "Diagnóstico Offline"
             results["Bluetooth"] = if (transport != null) "Adaptador detectado" else "No hay adaptador vinculado"
@@ -3376,8 +3588,9 @@ class ObdSession(
     }
 
     companion object {
-        private const val TAG = "MEET_OBD"
+        private const val TAG = "EV_OBD"
         private const val MAX_CONNECT_ATTEMPTS = 3
+        private const val RECOVERY_COOLDOWN_MS = 15_000L
     }
 }
 

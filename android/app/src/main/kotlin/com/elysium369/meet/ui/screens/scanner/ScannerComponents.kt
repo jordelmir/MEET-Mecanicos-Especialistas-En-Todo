@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens.scanner
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.animateContentSize
@@ -150,7 +154,7 @@ fun DtcItemCard(
                     }
                 }
 
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = "Expand",
                     tint = MeetColors.textSecondary
@@ -370,7 +374,7 @@ fun ToolCard(icon: String, title: String, desc: String, color: Color, onClick: (
         glowColor = color.copy(alpha = 0.5f)
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, style = MaterialTheme.typography.headlineMedium)
+            AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 28.sp)
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -650,7 +654,7 @@ fun AiDiagnosisReportCard(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(
+                    AnimatedNeonIcon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Close",
                         tint = MeetColors.textMuted,

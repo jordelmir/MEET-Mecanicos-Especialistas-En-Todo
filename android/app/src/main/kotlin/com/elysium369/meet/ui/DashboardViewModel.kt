@@ -146,6 +146,38 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Normalize a PID key to its canonical form to prevent duplicates.
+     * E.g., "010C", "0C", "RPM", "rpm" all normalize to "010C".
+     */
+    private fun canonicalPid(pid: String): String {
+        val upper = pid.trim().uppercase().replace(" ", "")
+        // Handle named aliases
+        val fromName = when (upper) {
+            "RPM" -> "010C"
+            "SPEED", "VELOCIDAD" -> "010D"
+            "COOLANT", "ECT" -> "0105"
+            "ENGINE_LOAD" -> "0104"
+            "MAP" -> "010B"
+            "MAF" -> "0110"
+            "THROTTLE" -> "0111"
+            "IAT" -> "010F"
+            "TIMING_ADVANCE" -> "010E"
+            "FUEL_LEVEL" -> "012F"
+            "VOLTAGE", "CTRL_VOLTAGE", "ELM_VOLTAGE" -> "0142"
+            else -> null
+        }
+        if (fromName != null) return fromName
+
+        // Handle short hex PIDs: "0C" -> "010C"
+        val hex = upper.removePrefix("01")
+        return if (hex.length == 2 && hex.all { it.isDigit() || it in 'A'..'F' }) {
+            "01$hex"
+        } else {
+            upper // CALC_* and other special PIDs stay as-is
+        }
+    }
+
     fun addWidget(
         name: String,
         pid: String,
@@ -162,6 +194,15 @@ class DashboardViewModel @Inject constructor(
         val dashboardId = _currentDashboardId.value ?: return
         viewModelScope.launch {
             val widgets = currentWidgets.value
+
+            // Prevent duplicate PIDs on the same dashboard
+            val canonical = canonicalPid(pid)
+            val hasDuplicate = widgets.any { canonicalPid(it.pid) == canonical }
+            if (hasDuplicate) {
+                android.util.Log.w("DashboardVM", "Widget with PID $pid (canonical=$canonical) already exists, skipping")
+                return@launch
+            }
+
             val gridY = if (widgets.isEmpty()) 0 else widgets.maxOf { it.gridY } + 1
 
             dashboardDao.insertWidget(
@@ -228,15 +269,16 @@ class DashboardViewModel @Inject constructor(
 
     fun exportCurrentLayout(): String {
         val widgets = currentWidgets.value
-        return "MEET_LAYOUT_V2\n" + widgets.joinToString("\n") {
+        return "ELYSIUM_VANGUARD_LAYOUT_V2\n" + widgets.joinToString("\n") {
             "${it.name}|${it.pid}|${it.type}|${it.gridW}|${it.gridH}|${it.color}|${it.minVal}|${it.maxVal}|${it.unit}|${it.widgetStyle.orEmpty()}|${it.savedStyleId.orEmpty()}"
         }
     }
 
     fun importLayout(data: String) {
         val lines = data.split("\n")
-        if (lines.isEmpty() || !lines[0].startsWith("MEET_LAYOUT")) return
-        val isV2 = lines[0].startsWith("MEET_LAYOUT_V2")
+        val header = lines.firstOrNull().orEmpty()
+        if (lines.isEmpty() || !header.startsWith("ELYSIUM_VANGUARD_LAYOUT")) return
+        val isV2 = header.startsWith("ELYSIUM_VANGUARD_LAYOUT_V2")
 
         val dashboardId = _currentDashboardId.value ?: return
 

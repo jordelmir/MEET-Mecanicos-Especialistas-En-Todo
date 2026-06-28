@@ -83,12 +83,12 @@ fun MeetPeritoScreen(
                         .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                         .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                    AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "MEET PERITO",
+                        "Elysium Vanguard PERITO",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -118,7 +118,7 @@ fun MeetPeritoScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Necesitas seleccionar un vehículo de tu Garage para iniciar el peritaje clínico MEET Perito.",
+                            "Necesitas seleccionar un vehículo de tu Garage para iniciar el peritaje clínico Elysium Vanguard Perito.",
                             color = MeetColors.textMuted,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
@@ -364,7 +364,7 @@ fun MeetPeritoScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f).height(48.dp)
                                 ) {
-                                    Icon(Icons.Default.Share, contentDescription = "Compartir", tint = Color.Black)
+                                    AnimatedNeonIcon(Icons.Default.Share, contentDescription = "Compartir", tint = Color.Black)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("COMPARTIR REPORT PDF", color = Color.Black, fontWeight = FontWeight.Bold)
                                 }
@@ -450,9 +450,15 @@ fun MeetPeritoScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("✓", color = MeetColors.electricBlue, fontWeight = FontWeight.Black)
+                                        AnimatedNeonGlyph(
+                                            glyph = "✓",
+                                            contentDescription = "Certificacion habilitada",
+                                            tint = MeetColors.electricBlue,
+                                            fontSize = 14.sp,
+                                            modifier = Modifier.size(18.dp),
+                                        )
                                         Text(
-                                            "CERTIFICACIÓN MEET PERITO HABILITADA",
+                                            "CERTIFICACIÓN Elysium Vanguard PERITO HABILITADA",
                                             color = MeetColors.electricBlue,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,

@@ -60,7 +60,7 @@ class LocalShellManager(
 
     private val _terminalLines = MutableStateFlow<List<String>>(
         listOf(
-            "⚡ MEET Android Terminal Shell v2.0 (Cyber-Termux)",
+            "⚡ Elysium Vanguard Android Terminal Shell v2.0 (Cyber-Termux)",
             "Sustituto avanzado de Termux para desarrollo e IA.",
             "Inicializando directorio de trabajo privado (sandbox)...",
             ""
@@ -296,7 +296,7 @@ class LocalShellManager(
             return
         }
         lastRestartAttempt = now
-        appendOutput("[MEET-Termux] Reiniciando la terminal...")
+        appendOutput("[Elysium Vanguard-Termux] Reiniciando la terminal...")
         startShell()
     }
 
@@ -311,11 +311,11 @@ class LocalShellManager(
         lastRestartTime = now
         
         if (restartCount > 3) {
-            appendOutput("[MEET-Termux] Reinicios automáticos deshabilitados para evitar bucle infinito.")
+            appendOutput("[Elysium Vanguard-Termux] Reinicios automáticos deshabilitados para evitar bucle infinito.")
             return
         }
         
-        appendOutput("[MEET-Termux] Reintentando iniciar la consola en 2 segundos...")
+        appendOutput("[Elysium Vanguard-Termux] Reintentando iniciar la consola en 2 segundos...")
         scope.launch {
             delay(2000)
             if (currentSessionId == sessionId) {
@@ -371,8 +371,8 @@ class LocalShellManager(
         // Intercept Special Install Nodejs command
         if (cmdTrimmed == "pkg install nodejs" || cmdTrimmed == "pkg install node") {
             _terminalLines.update { it + "❯ $command" }
-            _terminalLines.update { it + "[MEET-Termux] Android 10+ (targetSDK 34) restringe la ejecución de binarios ELF descargados dinámicamente." }
-            _terminalLines.update { it + "[MEET-Termux] Para ejecutar Node.js, Claude Code o Gemini CLI y conectarse a esta APK:" }
+            _terminalLines.update { it + "[Elysium Vanguard-Termux] Android 10+ (targetSDK 34) restringe la ejecución de binarios ELF descargados dinámicamente." }
+            _terminalLines.update { it + "[Elysium Vanguard-Termux] Para ejecutar Node.js, Claude Code o Gemini CLI y conectarse a esta APK:" }
             _terminalLines.update { it + "  1. Instale Termux en su dispositivo desde F-Droid." }
             _terminalLines.update { it + "  2. En Termux ejecute: pkg install nodejs" }
             _terminalLines.update { it + "  3. Instale sus herramientas globales (ej. npm install -g @google/generative-ai)." }
@@ -393,7 +393,7 @@ class LocalShellManager(
                     "ubuntu" -> "Ubuntu"
                     else -> "Linux"
                 }
-                _terminalLines.update { it + "[MEET-Termux] Iniciando instalación de $capName..." }
+                _terminalLines.update { it + "[Elysium Vanguard-Termux] Iniciando instalación de $capName..." }
                 
                 val downloadUrl = when (targetDistro) {
                     "alpine" -> "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/alpine-minirootfs-3.19.1-aarch64.tar.gz"
@@ -415,7 +415,7 @@ class LocalShellManager(
                     else -> ""
                 }
                 
-                _terminalLines.update { it + "[MEET-Termux] Descargando $capName rootfs ($sizeStr)..." }
+                _terminalLines.update { it + "[Elysium Vanguard-Termux] Descargando $capName rootfs ($sizeStr)..." }
                 
                 scope.launch(Dispatchers.IO) {
                     try {
@@ -424,7 +424,7 @@ class LocalShellManager(
                         val distroDir = File(appContext.filesDir, targetDistro)
                         
                         downloadBinary(downloadUrl, distroArchive)
-                        appendOutput("[MEET-Termux] Descarga completada. Extrayendo rootfs...")
+                        appendOutput("[Elysium Vanguard-Termux] Descarga completada. Extrayendo rootfs...")
                         
                         if (distroDir.exists()) {
                             distroDir.deleteRecursively()
@@ -471,10 +471,10 @@ class LocalShellManager(
                         createCliScripts(File(appContext.filesDir, "bin"))
                         updateInstalledDistros()
                         
-                        appendOutput("[MEET-Termux] ¡$capName instalado con éxito!")
-                        appendOutput("[MEET-Termux] Escribe '$targetDistro' para iniciar el contenedor.")
+                        appendOutput("[Elysium Vanguard-Termux] ¡$capName instalado con éxito!")
+                        appendOutput("[Elysium Vanguard-Termux] Escribe '$targetDistro' para iniciar el contenedor.")
                     } catch (e: Exception) {
-                        appendOutput("[MEET-Termux] Error al instalar $capName: ${e.message}")
+                        appendOutput("[Elysium Vanguard-Termux] Error al instalar $capName: ${e.message}")
                     }
                 }
                 return
@@ -523,12 +523,12 @@ class LocalShellManager(
             val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
             
             if (!nativeLibBusybox.exists()) {
-                appendOutput("[MEET-Termux] Error: No se encontró libbusybox.so en las librerías nativas.")
-                appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
+                appendOutput("[Elysium Vanguard-Termux] Error: No se encontró libbusybox.so en las librerías nativas.")
+                appendOutput("[Elysium Vanguard-Termux] Se utilizará la consola base del sistema.")
                 return@launch
             }
             
-            appendOutput("[MEET-Termux] Inicializando entorno de comandos de Android...")
+            appendOutput("[Elysium Vanguard-Termux] Inicializando entorno de comandos de Android...")
             try {
                 if (binDir.exists()) {
                     binDir.listFiles()?.forEach { it.delete() }
@@ -543,7 +543,7 @@ class LocalShellManager(
                     Log.e("LocalShellManager", "Failed to create symlink for busybox: ${e.message}")
                 }
 
-                appendOutput("[MEET-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
+                appendOutput("[Elysium Vanguard-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
                 val proc = ProcessBuilder(nativeLibBusybox.absolutePath, "--install", "-s", binDir.absolutePath)
                     .directory(binDir)
                     .start()
@@ -552,13 +552,13 @@ class LocalShellManager(
                 createCliScripts(binDir)
                 updateInstalledDistros()
                 if (exitCode == 0) {
-                    appendOutput("[MEET-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
+                    appendOutput("[Elysium Vanguard-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
                 } else {
-                    appendOutput("[MEET-Termux] Advertencia: BusyBox retornó código de salida $exitCode.")
+                    appendOutput("[Elysium Vanguard-Termux] Advertencia: BusyBox retornó código de salida $exitCode.")
                 }
             } catch (e: Exception) {
-                appendOutput("[MEET-Termux] Error al inicializar BusyBox: ${e.message}")
-                appendOutput("[MEET-Termux] Se utilizará la consola base del sistema.")
+                appendOutput("[Elysium Vanguard-Termux] Error al inicializar BusyBox: ${e.message}")
+                appendOutput("[Elysium Vanguard-Termux] Se utilizará la consola base del sistema.")
             }
         }
     }
@@ -669,7 +669,7 @@ class LocalShellManager(
             val nodeHelper = File(binDir, "node")
             nodeHelper.writeText("""
                 #!/system/bin/sh
-                echo "[MEET-Termux] Android 10+ (targetSDK 34) impide ejecutar Node directamente en el sandbox del APK."
+                echo "[Elysium Vanguard-Termux] Android 10+ (targetSDK 34) impide ejecutar Node directamente en el sandbox del APK."
                 echo "Para usar Node.js/Claude Code/Gemini CLI con los datos de esta app:"
                 echo "1. Instale la app Termux desde F-Droid."
                 echo "2. Ejecute en Termux: pkg install nodejs"
@@ -684,7 +684,7 @@ class LocalShellManager(
             val npmHelper = File(binDir, "npm")
             npmHelper.writeText("""
                 #!/system/bin/sh
-                echo "[MEET-Termux] Use npm desde la app Termux en su dispositivo."
+                echo "[Elysium Vanguard-Termux] Use npm desde la app Termux en su dispositivo."
                 echo "Una vez instalado Termux, ejecute: pkg install nodejs && npm install -g <paquete>"
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${npmHelper.absolutePath}").waitFor()
@@ -693,7 +693,7 @@ class LocalShellManager(
             val npxHelper = File(binDir, "npx")
             npxHelper.writeText("""
                 #!/system/bin/sh
-                echo "[MEET-Termux] Use npx desde la app Termux en su dispositivo."
+                echo "[Elysium Vanguard-Termux] Use npx desde la app Termux en su dispositivo."
                 echo "Una vez instalado Termux, ejecute: pkg install nodejs && npx <comando>"
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${npxHelper.absolutePath}").waitFor()
@@ -749,7 +749,7 @@ class LocalShellManager(
                     val capName = if (distro == "alpine") "Alpine" else if (distro == "debian") "Debian" else "Ubuntu"
                     bootFile.writeText("""
                         #!/system/bin/sh
-                        echo "[MEET-Termux] $capName no está instalado."
+                        echo "[Elysium Vanguard-Termux] $capName no está instalado."
                         echo "Ejecute el comando: pkg install $distro"
                     """.trimIndent().trim())
                     Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
@@ -767,7 +767,7 @@ class LocalShellManager(
             } else {
                 linuxBootFile.writeText("""
                     #!/system/bin/sh
-                    echo "[MEET-Termux] Ninguna distribución de Linux está instalada."
+                    echo "[Elysium Vanguard-Termux] Ninguna distribución de Linux está instalada."
                     echo "Ejecute el comando: pkg install alpine (o debian, o ubuntu)"
                 """.trimIndent().trim())
             }
@@ -840,7 +840,7 @@ class LocalShellManager(
                 }
                 
                 val chatMsg = com.elysium369.meet.core.ai.ChatMessage("user", enrichedPrompt)
-                val result = geminiDiagnostic.chat(listOf(chatMsg), "MEET Console Environment", emptyMap())
+                val result = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
                 appendOutput("[AI Response]")
                 result.split("\n").forEach { appendOutput(it) }
             } catch (e: Exception) {
@@ -972,7 +972,7 @@ class LocalControlServer(
                             }
                             
                             val chatMsg = com.elysium369.meet.core.ai.ChatMessage("user", enrichedPrompt)
-                            val result = geminiDiagnostic.chat(listOf(chatMsg), "MEET Console Environment", emptyMap())
+                            val result = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
                             val response = JSONObject().apply {
                                 put("response", result)
                             }.toString()

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -78,20 +79,28 @@ fun ComponentLocatorScreen(
 ) {
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     
-    // Auto-detectar el tipo de motor del OBD2 del vehículo (Cubre L4, V6, V8, y EV desde el 2000 a hoy)
+    // Auto-detectar el tipo de motor del OBD2 del vehículo
     val detectedEngineType = remember(selectedVehicle) {
-        val eng = selectedVehicle?.engine
-        val fuel = selectedVehicle?.fuel_type
-        if (fuel?.contains("Electric", ignoreCase = true) == true || fuel?.contains("EV", ignoreCase = true) == true) {
-            EngineType.ELECTRIC
-        } else {
-            val engLower = eng?.lowercase().orEmpty()
-            when {
-                engLower.contains("v8") || engLower.contains("8 cil") -> EngineType.V8
-                engLower.contains("v6") || engLower.contains("6 cil") -> EngineType.V6
-                engLower.contains("l4") || engLower.contains("i4") || engLower.contains("4 cil") || engLower.contains("linea") -> EngineType.INLINE_4
-                else -> EngineType.INLINE_4 // Default estándar
-            }
+        val eng = selectedVehicle?.engine?.lowercase().orEmpty()
+        val fuel = selectedVehicle?.fuel_type?.lowercase().orEmpty()
+        when {
+            fuel.contains("electric") || fuel.contains("ev") -> EngineType.ELECTRIC
+            fuel.contains("phev") || fuel.contains("plug-in") -> EngineType.PHEV
+            fuel.contains("hybrid") || fuel.contains("híbrido") -> EngineType.HYBRID
+            fuel.contains("diesel") && eng.contains("v8") -> EngineType.DIESEL_V8
+            fuel.contains("diesel") && eng.contains("v6") -> EngineType.DIESEL_V6
+            fuel.contains("diesel") -> EngineType.DIESEL_L4
+            eng.contains("v12") || eng.contains("12 cil") -> EngineType.V12
+            eng.contains("v10") || eng.contains("10 cil") -> EngineType.V10
+            eng.contains("v8") || eng.contains("8 cil") -> EngineType.V8
+            eng.contains("v6") || eng.contains("6 cil") -> EngineType.V6
+            eng.contains("h6") || eng.contains("boxer 6") || eng.contains("flat 6") -> EngineType.BOXER_6
+            eng.contains("h4") || eng.contains("boxer") || eng.contains("flat 4") -> EngineType.BOXER_4
+            eng.contains("rotary") || eng.contains("wankel") || eng.contains("rx-") -> EngineType.ROTARY
+            eng.contains("l6") || eng.contains("i6") || eng.contains("inline 6") || eng.contains("straight 6") -> EngineType.INLINE_6
+            eng.contains("l5") || eng.contains("i5") || eng.contains("5 cil") -> EngineType.INLINE_5
+            eng.contains("l3") || eng.contains("i3") || eng.contains("3 cil") || eng.contains("1.0") -> EngineType.INLINE_3
+            else -> EngineType.INLINE_4
         }
     }
 
@@ -151,6 +160,25 @@ fun ComponentLocatorScreen(
         }
     }
 
+    // Grouped engine types for selector
+    data class EngineGroup(val label: String, val types: List<Pair<EngineType, String>>)
+    val engineGroups = listOf(
+        EngineGroup("⛽ Gas", listOf(
+            EngineType.INLINE_3 to "L3", EngineType.INLINE_4 to "L4", EngineType.INLINE_5 to "L5",
+            EngineType.INLINE_6 to "L6", EngineType.V6 to "V6", EngineType.V8 to "V8",
+            EngineType.V10 to "V10", EngineType.V12 to "V12"
+        )),
+        EngineGroup("🛢️ Diesel", listOf(
+            EngineType.DIESEL_L4 to "D·L4", EngineType.DIESEL_V6 to "D·V6", EngineType.DIESEL_V8 to "D·V8"
+        )),
+        EngineGroup("⚡ Electrificado", listOf(
+            EngineType.HYBRID to "HEV", EngineType.PHEV to "PHEV", EngineType.ELECTRIC to "EV"
+        )),
+        EngineGroup("🔧 Especial", listOf(
+            EngineType.BOXER_4 to "H4", EngineType.BOXER_6 to "H6", EngineType.ROTARY to "RX"
+        ))
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -164,13 +192,29 @@ fun ComponentLocatorScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White)
+                AnimatedNeonIcon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White)
             }
             Text(
                 "Diagnóstico Visual 3D",
                 color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp,
                 modifier = Modifier.weight(1f)
             )
+            // Component count badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
+                    .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    "${components.size} piezas",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(6.dp))
             if (allActiveDtcs.isNotEmpty()) {
                 Box(
                     modifier = Modifier
@@ -180,7 +224,7 @@ fun ComponentLocatorScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, "Alerta", tint = MeetColors.error, modifier = Modifier.size(12.dp))
+                        AnimatedNeonIcon(Icons.Default.Warning, "Alerta", tint = MeetColors.error, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             "${allActiveDtcs.size} DTC",
@@ -193,40 +237,45 @@ fun ComponentLocatorScreen(
             }
         }
 
-        // ── Engine Type Selector Chips (Auto-detectado pero modificable) ──
+        // ── Engine Type Selector (Grouped horizontal scroll) ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            EngineType.entries.forEach { type ->
-                val isSelected = selectedEngineType == type
+            engineGroups.forEach { group ->
+                // Group divider label
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) MeetColors.electricBlue.copy(alpha = 0.2f) else Color.Transparent)
-                        .border(1.dp, if (isSelected) MeetColors.electricBlue else MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .clickable { 
-                            selectedEngineType = type
-                            selectedComponent = null
-                            aiContextPreview = null
-                        }
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 2.dp)
+                        .align(Alignment.CenterVertically)
                 ) {
-                    Text(
-                        text = when (type) {
-                            EngineType.INLINE_4 -> "L4"
-                            EngineType.V6 -> "V6"
-                            EngineType.V8 -> "V8"
-                            EngineType.ELECTRIC -> "EV ⚡"
-                        },
-                        color = if (isSelected) MeetColors.electricBlue else MeetColors.textSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(group.label, color = MeetColors.textMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                }
+                group.types.forEach { (type, chipLabel) ->
+                    val isSelected = selectedEngineType == type
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) MeetColors.electricBlue.copy(alpha = 0.2f) else Color.Transparent)
+                            .border(1.dp, if (isSelected) MeetColors.electricBlue else MeetColors.borderSubtle.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .clickable {
+                                selectedEngineType = type
+                                selectedComponent = null
+                                aiContextPreview = null
+                            }
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = chipLabel,
+                            color = if (isSelected) MeetColors.electricBlue else MeetColors.textSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -420,7 +469,7 @@ fun ComponentLocatorScreen(
                                         .border(0.5.dp, MeetColors.error, RoundedCornerShape(6.dp))
                                         .padding(horizontal = 8.dp, vertical = 6.dp)
                                 ) {
-                                    Icon(Icons.Default.Warning, "Falla", tint = MeetColors.error, modifier = Modifier.size(16.dp))
+                                    AnimatedNeonIcon(Icons.Default.Warning, "Falla", tint = MeetColors.error, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         "DTC DETECTADO: $activeDtcOnPiece",
@@ -543,7 +592,7 @@ fun ComponentLocatorScreen(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Search, "Buscar", tint = MeetColors.textSecondary, modifier = Modifier.size(18.dp))
+            AnimatedNeonIcon(Icons.Default.Search, "Buscar", tint = MeetColors.textSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             BasicTextField(
                 value = searchQuery,
@@ -1089,9 +1138,22 @@ private fun ComponentInfo.defaultSafetyNotes(): List<String> {
 
 private fun EngineType.toVisualEngineType(): VisualEngineType {
     return when (this) {
+        EngineType.INLINE_3 -> VisualEngineType.L3
         EngineType.INLINE_4 -> VisualEngineType.L4
+        EngineType.INLINE_5 -> VisualEngineType.L5
+        EngineType.INLINE_6 -> VisualEngineType.L6
         EngineType.V6 -> VisualEngineType.V6
         EngineType.V8 -> VisualEngineType.V8
+        EngineType.V10 -> VisualEngineType.V10
+        EngineType.V12 -> VisualEngineType.V12
+        EngineType.BOXER_4 -> VisualEngineType.H4
+        EngineType.BOXER_6 -> VisualEngineType.H6
+        EngineType.ROTARY -> VisualEngineType.ROTARY
+        EngineType.DIESEL_L4 -> VisualEngineType.DIESEL_L4
+        EngineType.DIESEL_V6 -> VisualEngineType.DIESEL_V6
+        EngineType.DIESEL_V8 -> VisualEngineType.DIESEL_V8
+        EngineType.HYBRID -> VisualEngineType.HYBRID
+        EngineType.PHEV -> VisualEngineType.PHEV
         EngineType.ELECTRIC -> VisualEngineType.EV
     }
 }
@@ -1138,6 +1200,17 @@ private fun VisualComponentCategory.toUiCategory(): ComponentCategory {
         VisualComponentCategory.RELAY_FUSE -> ComponentCategory.ELECTRICAL
         VisualComponentCategory.HARNESS -> ComponentCategory.ELECTRICAL
         VisualComponentCategory.EV_HIGH_VOLTAGE -> ComponentCategory.HIGH_VOLTAGE
+        VisualComponentCategory.TRANSMISSION -> ComponentCategory.ENGINE
+        VisualComponentCategory.SUSPENSION -> ComponentCategory.ENGINE
+        VisualComponentCategory.BRAKES -> ComponentCategory.ENGINE
+        VisualComponentCategory.STEERING -> ComponentCategory.ENGINE
+        VisualComponentCategory.TURBO_SUPERCHARGER -> ComponentCategory.INTAKE
+        VisualComponentCategory.BODY_CONTROL -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.INFOTAINMENT -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.HVAC -> ComponentCategory.COOLING
+        VisualComponentCategory.SAFETY_RESTRAINT -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.CONNECTOR -> ComponentCategory.ELECTRICAL
+        VisualComponentCategory.DIESEL_EMISSIONS -> ComponentCategory.EXHAUST
     }
 }
 

@@ -57,7 +57,7 @@ class GoogleDriveBackupManager(private val context: Context) {
             NetHttpTransport(),
             GsonFactory.getDefaultInstance(),
             credential
-        ).setApplicationName("MEET").build()
+        ).setApplicationName("Elysium Vanguard").build()
     }
 
     /**

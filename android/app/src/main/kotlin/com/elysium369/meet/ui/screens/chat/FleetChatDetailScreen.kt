@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.chat
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.annotation.SuppressLint
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -99,7 +101,7 @@ fun FleetChatDetailScreen(
                 onBackClick = onBack,
                 actions = {
                     IconButton(onClick = { viewModel.toggleBlockActivePartner() }) {
-                        Icon(
+                        AnimatedNeonIcon(
                             imageVector = if (isBlocked) Icons.Default.LockOpen else Icons.Default.Block,
                             contentDescription = if (isBlocked) "Desbloquear" else "Bloquear",
                             tint = if (isBlocked) MeetColors.electricBlue else MeetColors.error
@@ -202,11 +204,11 @@ fun FleetChatDetailScreen(
                                 .clip(CircleShape)
                                 .background(MeetColors.electricBlue)
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = "Enviar Audio", tint = Color.Black)
+                            AnimatedNeonIcon(Icons.Default.Send, contentDescription = "Enviar Audio", tint = Color.Black)
                         }
                     } else {
                         IconButton(onClick = { filePickerLauncher.launch("*/*") }) {
-                            Icon(Icons.Default.Add, contentDescription = "Adjuntar archivo", tint = MeetColors.electricBlue)
+                            AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Adjuntar archivo", tint = MeetColors.electricBlue)
                         }
 
                         OutlinedTextField(
@@ -239,7 +241,7 @@ fun FleetChatDetailScreen(
                                     .clip(CircleShape)
                                     .background(MeetColors.electricBlue)
                             ) {
-                                Icon(Icons.Default.Send, contentDescription = "Enviar", tint = Color.Black)
+                                AnimatedNeonIcon(Icons.Default.Send, contentDescription = "Enviar", tint = Color.Black)
                             }
                         } else {
                             IconButton(
@@ -261,7 +263,7 @@ fun FleetChatDetailScreen(
                                         )
                                     }
                             ) {
-                                Icon(Icons.Default.Mic, contentDescription = "Grabar", tint = MeetColors.electricBlue)
+                                AnimatedNeonIcon(Icons.Default.Mic, contentDescription = "Grabar", tint = MeetColors.electricBlue)
                             }
                         }
                     }
@@ -317,7 +319,7 @@ fun MessageBubble(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             IconButton(onClick = onPlayAudio) {
-                                Icon(
+                                AnimatedNeonIcon(
                                     imageVector = if (playingMessageId == message.id) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = "Reproducir nota de voz",
                                     tint = MeetColors.electricBlue
@@ -366,7 +368,7 @@ fun MessageBubble(
                     "DTC_ALERT" -> {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = MeetColors.error)
+                                AnimatedNeonIcon(Icons.Default.Warning, contentDescription = null, tint = MeetColors.error)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Falla de Motor Activa", color = MeetColors.error, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
@@ -395,7 +397,7 @@ fun MessageBubble(
                     }
                     "FILE" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AttachFile, contentDescription = null, tint = MeetColors.electricBlue)
+                            AnimatedNeonIcon(Icons.Default.AttachFile, contentDescription = null, tint = MeetColors.electricBlue)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = message.messageText ?: "Archivo",
@@ -427,7 +429,7 @@ fun MessageBubble(
                     )
                     if (isOwn) {
                         Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
+                        AnimatedNeonIcon(
                             imageVector = when (message.status) {
                                 "SENT" -> Icons.Default.Check
                                 "DELIVERED" -> Icons.Default.DoneAll

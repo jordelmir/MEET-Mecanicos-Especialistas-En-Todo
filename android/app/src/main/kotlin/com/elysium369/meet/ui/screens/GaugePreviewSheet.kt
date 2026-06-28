@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -119,7 +123,7 @@ fun GaugePreviewSheet(
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.1f))
                     ) {
-                        Icon(
+                        AnimatedNeonIcon(
                             Icons.Default.Close,
                             contentDescription = "Close",
                             tint = Color.White,
@@ -370,7 +374,7 @@ fun GaugePreviewSheet(
 @Composable
 private fun StatItem(icon: String, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 16.sp)
+        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 16.sp)
         Text(
             value,
             color = Color.White,

@@ -39,11 +39,11 @@ class DataLogger @Inject constructor() {
     fun startRecording(context: Context, vin: String? = null): Boolean {
         if (isRecording) return false
         try {
-            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MEET_Logs")
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "ElysiumVanguard_Logs")
             dir.mkdirs()
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val vinLabel = vin?.take(8) ?: "UNKNOWN"
-            val file = File(dir, "MEET_${vinLabel}_$timestamp.csv")
+            val file = File(dir, "ElysiumVanguard_${vinLabel}_$timestamp.csv")
             writer = FileWriter(file)
             currentFile = file
             startTimeMs = System.currentTimeMillis()
@@ -101,20 +101,20 @@ class DataLogger @Inject constructor() {
     }
 
     fun getLogFiles(context: Context): List<File> {
-        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MEET_Logs")
+        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "ElysiumVanguard_Logs")
         return dir.listFiles()?.filter { it.extension == "csv" }?.sortedByDescending { it.lastModified() } ?: emptyList()
     }
 
     fun writeDtcScanReport(context: Context, report: DtcScanReport, vin: String? = null): String? {
         return try {
-            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "MEET_DTC_Logs")
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "ElysiumVanguard_DTC_Logs")
             dir.mkdirs()
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(report.startedAtMs))
             val vinLabel = vin?.takeIf { it.isNotBlank() }?.take(8) ?: "UNKNOWN"
-            val file = File(dir, "MEET_DTC_${vinLabel}_$timestamp.txt")
+            val file = File(dir, "ElysiumVanguard_DTC_${vinLabel}_$timestamp.txt")
 
             FileWriter(file).use { writer ->
-                writer.write("MEET Professional DTC Scan\n")
+                writer.write("OBD2 Elysium Vanguard Professional DTC Scan\n")
                 writer.write("Started: ${Date(report.startedAtMs)}\n")
                 writer.write("Ended: ${Date(report.endedAtMs)}\n")
                 writer.write("Protocol: ${report.protocol}\n")

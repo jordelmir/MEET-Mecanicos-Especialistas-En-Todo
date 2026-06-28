@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens.scanner
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -256,7 +260,7 @@ private fun ExpertMonitorCard(result: Mode06TestResult, isSpanish: Boolean) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header: Component & Status
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = if (result.passed) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
                     tint = statusColor,
@@ -345,7 +349,7 @@ private fun ExpertMonitorCard(result: Mode06TestResult, isSpanish: Boolean) {
                 ) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.Info, 
                                 contentDescription = null, 
                                 tint = statusColor, 
@@ -562,7 +566,7 @@ fun Mode06VisualRange(
 private fun EmptyMonitorsState(isConnected: Boolean, isSpanish: Boolean) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-            Text("🔬", fontSize = 64.sp)
+            AnimatedNeonGlyph("🔬", contentDescription = null, fontSize = 64.sp)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 if (isConnected) {

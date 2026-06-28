@@ -807,7 +807,7 @@ fun SavedTabContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
+                    AnimatedNeonIcon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
                         tint = MeetColors.textSecondary,
@@ -887,7 +887,7 @@ fun SavedTabContent(
                                 contentColor = MeetColors.error
                             )
                         ) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Eliminar de memoria local",
                                 modifier = Modifier.size(20.dp)
@@ -921,7 +921,7 @@ fun generateManualPdf(context: Context, make: String, model: String, year: Strin
     // Title Block
     paint.textSize = 20f
     paint.isFakeBoldText = true
-    canvas.drawText("MEET PROFESSIONAL SERVICE MANUAL", 50f, 60f, paint)
+    canvas.drawText("Elysium Vanguard PROFESSIONAL SERVICE MANUAL", 50f, 60f, paint)
 
     paint.textSize = 14f
     paint.isFakeBoldText = false
@@ -951,7 +951,7 @@ fun generateManualPdf(context: Context, make: String, model: String, year: Strin
         "",
         "2. PROTOCOLO DE CONEXIÓN OBD-II:",
         "   - Localice el conector DLC (Data Link Connector) usualmente ubicado bajo el tablero de instrumentos del lado del conductor.",
-        "   - Conecte el escáner MEET. Asegúrese de que el LED de encendido del adaptador esté activo.",
+        "   - Conecte el escáner Elysium Vanguard. Asegúrese de que el LED de encendido del adaptador esté activo.",
         "   - Ponga el switch de encendido en posición ON (KOEO - Key On Engine Off) para establecer comunicación con la ECU.",
         "",
         "3. ESQUEMA SIMULADO DEL ARNES ELÉCTRICO DEL SENSOR:",
@@ -982,7 +982,7 @@ fun generateManualPdf(context: Context, make: String, model: String, year: Strin
     paint.textSize = 8f
     paint.color = AndroidColor.GRAY
     paint.isFakeBoldText = false
-    canvas.drawText("Página 1 de 1 | MEET Mecánicos Especialistas En Todo S.A. de C.V.", 150f, 800f, paint)
+    canvas.drawText("Página 1 de 1 | Elysium Vanguard Elysium Vanguard S.A. de C.V.", 150f, 800f, paint)
 
     document.finishPage(page)
 

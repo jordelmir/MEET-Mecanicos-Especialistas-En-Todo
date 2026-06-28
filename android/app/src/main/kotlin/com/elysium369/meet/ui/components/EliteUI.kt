@@ -70,18 +70,28 @@ private val sharedBackgroundParticles = List(30) { index ->
 }
 
 @Composable
-fun HolographicBackgroundShared(modifier: Modifier = Modifier) {
-    val infiniteTransition = rememberInfiniteTransition(label = "holoBgShared")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(14000, easing = LinearEasing)),
-        label = "bgPhase"
-    )
-    val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "bgGlow"
-    )
+fun HolographicBackgroundShared(
+    modifier: Modifier = Modifier,
+    animated: Boolean = true
+) {
+    var phase by remember { mutableFloatStateOf(0f) }
+    var glowPulse by remember { mutableFloatStateOf(0.42f) }
+
+    LaunchedEffect(animated) {
+        if (!animated) {
+            phase = 0f
+            glowPulse = 0.42f
+            return@LaunchedEffect
+        }
+        val startedAt = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - startedAt
+            phase = (elapsed % 24000L) / 24000f
+            val wave = ((sin(((elapsed % 6000L) / 6000f) * 2f * PI.toFloat()) + 1f) / 2f)
+            glowPulse = 0.30f + (wave * 0.25f)
+            kotlinx.coroutines.delay(220L)
+        }
+    }
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
@@ -129,7 +139,7 @@ fun HolographicBackgroundShared(modifier: Modifier = Modifier) {
         }
 
         // Drifting particles
-        sharedBackgroundParticles.forEach { p ->
+        sharedBackgroundParticles.take(10).forEach { p ->
             val px = ((p.xSeed * w) + (phase * p.speed * w) + (p.horizontalDrift * w * sin(phase * 2 * PI.toFloat()))) % w
             val py = ((p.ySeed * h) - (phase * p.speed * h)) % h
             
@@ -170,35 +180,36 @@ fun EliteCard(
     backgroundColor: Color = MeetColors.cardBackground,
     borderColor: Color = MeetColors.borderSubtle,
     glowColor: Color? = null,
-    enableHolo3D: Boolean = true,
+    enableHolo3D: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val accentColor = glowColor ?: MeetColors.neonGreen.copy(alpha = 0.5f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "eliteCardHolo")
-    val borderPhase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
-        label = "borderPhase"
-    )
-
-    // Gentle 3D float oscillation (subtle to remain highly usable)
-    val rotX by infiniteTransition.animateFloat(
-        initialValue = -1.5f, targetValue = 1.5f,
-        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotX"
-    )
-    val rotY by infiniteTransition.animateFloat(
-        initialValue = -2.0f, targetValue = 2.0f,
-        animationSpec = infiniteRepeatable(tween(5200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotY"
-    )
-    val translationYAnim by infiniteTransition.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(4700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "transY"
-    )
+    var rotX = 0f
+    var rotY = 0f
+    var translationYAnim = 0f
+    if (enableHolo3D) {
+        val infiniteTransition = rememberInfiniteTransition(label = "eliteCardHolo")
+        val animatedRotX by infiniteTransition.animateFloat(
+            initialValue = -1.0f, targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(tween(6200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "rotX"
+        )
+        val animatedRotY by infiniteTransition.animateFloat(
+            initialValue = -1.2f, targetValue = 1.2f,
+            animationSpec = infiniteRepeatable(tween(7600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "rotY"
+        )
+        val animatedTranslationY by infiniteTransition.animateFloat(
+            initialValue = -1.5f, targetValue = 1.5f,
+            animationSpec = infiniteRepeatable(tween(7000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "transY"
+        )
+        rotX = animatedRotX
+        rotY = animatedRotY
+        translationYAnim = animatedTranslationY
+    }
 
     val cardModifier = modifier
         .then(

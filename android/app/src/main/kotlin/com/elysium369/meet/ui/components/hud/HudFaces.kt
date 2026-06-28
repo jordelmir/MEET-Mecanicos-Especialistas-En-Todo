@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.*
 
@@ -694,7 +695,7 @@ private fun MiniReadout(label: String, value: String, color: Color) {
 @Composable
 private fun SideReadout(icon: String, label: String, value: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(icon, fontSize = 12.sp)
+        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 12.sp)
         Spacer(Modifier.width(4.dp))
         Column(horizontalAlignment = Alignment.End) {
             Text(label, color = color.copy(alpha = 0.4f), fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)

@@ -785,7 +785,7 @@ class ReportGenerator(private val context: Context) {
             canvas.drawText("POWERED BY ELYSIUM VANGUARD", 335f, 25f, paint)
         } else {
             titlePaint.color = accentColor
-            canvas.drawText("MEET CLINIC", x, y, titlePaint)
+            canvas.drawText("Elysium Vanguard CLINIC", x, y, titlePaint)
             titlePaint.textSize = 12f
             titlePaint.color = headerTextColor
             canvas.drawText("HISTORIAL DE SALUD VEHICULAR", x + 165f, y - 4f, titlePaint)
@@ -1156,7 +1156,7 @@ class ReportGenerator(private val context: Context) {
             canvas.drawText("POWERED BY ELYSIUM VANGUARD", 335f, 25f, paint)
         } else {
             titlePaint.color = accentColor
-            canvas.drawText("MEET CLINIC", x, y, titlePaint)
+            canvas.drawText("Elysium Vanguard CLINIC", x, y, titlePaint)
             titlePaint.textSize = 12f
             titlePaint.color = headerTextColor
             canvas.drawText("REPORTE DE INSPECCIÓN PRE-COMPRA", x + 165f, y - 4f, titlePaint)
@@ -1349,7 +1349,7 @@ class ReportGenerator(private val context: Context) {
                 y = 60f
             }
 
-            canvas.drawText("RECOMENDACIONES CLINICAS DE MEET:", x, y, sectionPaint)
+            canvas.drawText("RECOMENDACIONES CLINICAS DE ELYSIUM VANGUARD:", x, y, sectionPaint)
             y += 20f
 
             result.recommendations.forEach { rec ->
@@ -1417,7 +1417,7 @@ class ReportGenerator(private val context: Context) {
         paint.color = Color.WHITE
         paint.textSize = 20f
         paint.isFakeBoldText = true
-        canvas.drawText("MEET INSPECCIÓN DIARIA DVIR", 30f, 50f, paint)
+        canvas.drawText("Elysium Vanguard INSPECCIÓN DIARIA DVIR", 30f, 50f, paint)
         
         paint.textSize = 10f
         paint.isFakeBoldText = false
@@ -1570,7 +1570,7 @@ class ReportGenerator(private val context: Context) {
         paint.color = Color.DKGRAY
         paint.textSize = 8.5f
         paint.isFakeBoldText = false
-        canvas.drawText("Certificado MEET Pre-Trip Checklist. Válido por 24 horas.", x, y + sigBoxHeight + 20f, paint)
+        canvas.drawText("Certificado Elysium Vanguard Pre-Trip Checklist. Válido por 24 horas.", x, y + sigBoxHeight + 20f, paint)
 
         // Page footer
         val footerPaint = Paint().apply {

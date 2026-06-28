@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,7 +53,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                 actions = {
                     activeCase?.let { case ->
                         IconButton(onClick = { viewModel.toggleBookmark(case) }) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = "Guardar",
                                 tint = if (isBookmarked) MeetColors.neonGreen else Color.White
@@ -154,7 +156,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 modifier = Modifier.padding(12.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(Icons.Default.AttachMoney, contentDescription = "Costo", tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
+                                AnimatedNeonIcon(Icons.Default.AttachMoney, contentDescription = "Costo", tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("COSTO EST.", color = MeetColors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 Text("$${case.cost.toInt()} USD", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -174,7 +176,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 modifier = Modifier.padding(12.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Tasa", tint = MeetColors.neonGreen, modifier = Modifier.size(20.dp))
+                                AnimatedNeonIcon(Icons.Default.CheckCircle, contentDescription = "Tasa", tint = MeetColors.neonGreen, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("TASA ÉXITO", color = MeetColors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 Text("${case.success_rate.toInt()}%", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -194,7 +196,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 modifier = Modifier.padding(12.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(Icons.Default.AccessTime, contentDescription = "Tiempo", tint = MeetColors.warning, modifier = Modifier.size(20.dp))
+                                AnimatedNeonIcon(Icons.Default.AccessTime, contentDescription = "Tiempo", tint = MeetColors.warning, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("TIEMPO", color = MeetColors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 Text("${case.time_spent} min", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -231,7 +233,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 onClick = { viewModel.downvoteCase(case.id) },
                                 modifier = Modifier.background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
                             ) {
-                                Icon(Icons.Default.ThumbDown, contentDescription = "Voto Negativo", tint = MeetColors.error)
+                                AnimatedNeonIcon(Icons.Default.ThumbDown, contentDescription = "Voto Negativo", tint = MeetColors.error)
                             }
                             Text(
                                 text = case.votes.toString(),
@@ -244,7 +246,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 onClick = { viewModel.upvoteCase(case.id) },
                                 modifier = Modifier.background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
                             ) {
-                                Icon(Icons.Default.ThumbUp, contentDescription = "Voto Positivo", tint = MeetColors.neonGreen)
+                                AnimatedNeonIcon(Icons.Default.ThumbUp, contentDescription = "Voto Positivo", tint = MeetColors.neonGreen)
                             }
                         }
                     }

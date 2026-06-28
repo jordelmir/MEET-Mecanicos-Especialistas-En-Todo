@@ -127,7 +127,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
             ),
             ProFeature(
                 "meet_dna",
-                "Firma MEET DNA", "MEET DNA Signature",
+                "Firma Elysium Vanguard DNA", "Elysium Vanguard DNA Signature",
                 "Firma matemática y anomalías de comportamiento", "Mathematical vehicle signature and anomaly tracking",
                 "🧬", MeetColors.cyberCyan, "meet_dna"
             ),
@@ -243,9 +243,12 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                "⚠️",
-                                fontSize = 24.sp
+                            ElysiumSectionIcon(
+                                key = "warning",
+                                contentDescription = if (isSpanish) "Advertencia" else "Warning",
+                                tint = MeetColors.warning,
+                                size = 32.dp,
+                                fallbackGlyph = "⚠️"
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -283,9 +286,12 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                "🛡️",
-                                fontSize = 24.sp
+                            ElysiumSectionIcon(
+                                key = "shield",
+                                contentDescription = if (isSpanish) "Adaptador validado" else "Validated adapter",
+                                tint = MeetColors.neonGreen,
+                                size = 32.dp,
+                                fallbackGlyph = "🛡️"
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -399,10 +405,12 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
-                                            Text(
-                                                text = feature.icon,
-                                                fontSize = 32.sp,
-                                                textAlign = TextAlign.Center
+                                            ElysiumSectionIcon(
+                                                key = feature.id,
+                                                contentDescription = if (isSpanish) feature.titleEs else feature.titleEn,
+                                                tint = feature.color,
+                                                size = 46.dp,
+                                                fallbackGlyph = feature.icon
                                             )
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text(

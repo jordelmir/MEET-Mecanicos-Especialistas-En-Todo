@@ -4,9 +4,22 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.*
 
 enum class EngineType(val label: String) {
+    INLINE_3("3 Cilindros en Línea (L3)"),
     INLINE_4("4 Cilindros en Línea (L4)"),
+    INLINE_5("5 Cilindros en Línea (L5)"),
+    INLINE_6("6 Cilindros en Línea (L6)"),
     V6("Motor en V6 (V6)"),
     V8("Motor en V8 (V8)"),
+    V10("Motor en V10 (V10)"),
+    V12("Motor en V12 (V12)"),
+    BOXER_4("Boxer 4 Cilindros (H4)"),
+    BOXER_6("Boxer 6 Cilindros (H6)"),
+    ROTARY("Rotativo Wankel"),
+    DIESEL_L4("Diesel 4 Cilindros"),
+    DIESEL_V6("Diesel V6"),
+    DIESEL_V8("Diesel V8"),
+    HYBRID("Híbrido Paralelo/Serie"),
+    PHEV("Híbrido Enchufable (PHEV)"),
     ELECTRIC("Propulsión Eléctrica (EV)")
 }
 
@@ -466,20 +479,60 @@ object ElysiumProceduralModels {
 
     private fun serviceCylinderPositions(engineType: EngineType): List<Pair<Int, Vector3D>> {
         return when (engineType) {
-            EngineType.INLINE_4 -> listOf(-38f, -13f, 13f, 38f).mapIndexed { index, x ->
+            EngineType.INLINE_3 -> listOf(-25f, 0f, 25f).mapIndexed { index, x ->
                 index to Vector3D(x, 5f, 0f)
             }
-            EngineType.V6 -> listOf(-26f, 0f, 26f).flatMapIndexed { i, x ->
+            EngineType.INLINE_4, EngineType.DIESEL_L4 -> listOf(-38f, -13f, 13f, 38f).mapIndexed { index, x ->
+                index to Vector3D(x, 5f, 0f)
+            }
+            EngineType.INLINE_5 -> listOf(-50f, -25f, 0f, 25f, 50f).mapIndexed { index, x ->
+                index to Vector3D(x, 5f, 0f)
+            }
+            EngineType.INLINE_6 -> listOf(-62f, -38f, -13f, 13f, 38f, 62f).mapIndexed { index, x ->
+                index to Vector3D(x, 5f, 0f)
+            }
+            EngineType.V6, EngineType.DIESEL_V6 -> listOf(-26f, 0f, 26f).flatMapIndexed { i, x ->
                 listOf(
                     (i * 2) to Vector3D(x - 12f, -6f, -12f),
                     (i * 2 + 1) to Vector3D(x + 12f, -6f, 12f)
                 )
             }
-            EngineType.V8 -> listOf(-38f, -13f, 13f, 38f).flatMapIndexed { i, x ->
+            EngineType.V8, EngineType.DIESEL_V8 -> listOf(-38f, -13f, 13f, 38f).flatMapIndexed { i, x ->
                 listOf(
                     (i * 2) to Vector3D(x - 15f, -8f, -14f),
                     (i * 2 + 1) to Vector3D(x + 15f, -8f, 14f)
                 )
+            }
+            EngineType.V10 -> listOf(-50f, -25f, 0f, 25f, 50f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x - 15f, -8f, -14f),
+                    (i * 2 + 1) to Vector3D(x + 15f, -8f, 14f)
+                )
+            }
+            EngineType.V12 -> listOf(-62f, -38f, -13f, 13f, 38f, 62f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x - 15f, -8f, -14f),
+                    (i * 2 + 1) to Vector3D(x + 15f, -8f, 14f)
+                )
+            }
+            EngineType.BOXER_4 -> listOf(-25f, 25f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x, -4f, -18f),
+                    (i * 2 + 1) to Vector3D(x, -4f, 18f)
+                )
+            }
+            EngineType.BOXER_6 -> listOf(-32f, 0f, 32f).flatMapIndexed { i, x ->
+                listOf(
+                    (i * 2) to Vector3D(x, -4f, -18f),
+                    (i * 2 + 1) to Vector3D(x, -4f, 18f)
+                )
+            }
+            EngineType.ROTARY -> listOf(
+                0 to Vector3D(-15f, 0f, 0f),
+                1 to Vector3D(15f, 0f, 0f)
+            )
+            EngineType.HYBRID, EngineType.PHEV -> listOf(-38f, -13f, 13f, 38f).mapIndexed { index, x ->
+                index to Vector3D(x, 5f, 0f)
             }
             EngineType.ELECTRIC -> emptyList()
         }

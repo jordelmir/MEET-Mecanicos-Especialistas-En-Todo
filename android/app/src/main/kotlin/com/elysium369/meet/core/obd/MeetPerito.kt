@@ -262,9 +262,9 @@ class MeetPerito @Inject constructor() {
             val file = File(dir, "Inspection_${report.inspectionId}.json")
             val jsonStr = json.encodeToString(report)
             file.writeText(jsonStr)
-            Log.d("MeetPerito", "Saved inspection report to: ${file.absolutePath}")
+            Log.d("ElysiumPerito", "Saved inspection report to: ${file.absolutePath}")
         } catch (e: Exception) {
-            Log.e("MeetPerito", "Failed to save inspection report JSON", e)
+            Log.e("ElysiumPerito", "Failed to save inspection report JSON", e)
         }
     }
 
@@ -286,7 +286,7 @@ class MeetPerito @Inject constructor() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("MeetPerito", "Failed to retrieve inspection history", e)
+            Log.e("ElysiumPerito", "Failed to retrieve inspection history", e)
         }
         return list.sortedByDescending { it.createdAt }
     }

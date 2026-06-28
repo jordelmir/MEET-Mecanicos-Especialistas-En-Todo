@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
-import kotlin.math.sin
 
 @Singleton
 class UsbOscilloscopeManager @Inject constructor(
@@ -48,12 +47,6 @@ class UsbOscilloscopeManager @Inject constructor(
     private val _triggerEdgeRising = MutableStateFlow(true)
     val triggerEdgeRising = _triggerEdgeRising.asStateFlow()
 
-    private val _isSimulationMode = MutableStateFlow(true) // Simulation active by default
-    val isSimulationMode = _isSimulationMode.asStateFlow()
-
-    private val _selectedWaveform = MutableStateFlow("INJECTOR_PWM") // Default simulation waveform
-    val selectedWaveform = _selectedWaveform.asStateFlow()
-
     // Data streams
     private val _ch1Data = MutableStateFlow(FloatArray(RENDER_POINTS))
     val ch1Data = _ch1Data.asStateFlow()
@@ -69,17 +62,6 @@ class UsbOscilloscopeManager @Inject constructor(
 
     private var captureJob: Job? = null
     private val managerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
-    fun setSimulationMode(enabled: Boolean) {
-        _isSimulationMode.value = enabled
-        if (_isStreaming.value) {
-            restartStream()
-        }
-    }
-
-    fun setSelectedWaveform(type: String) {
-        _selectedWaveform.value = type
-    }
 
     fun setCh1Attenuation(factor: Float) {
         _ch1Attenuation.value = factor
@@ -108,24 +90,20 @@ class UsbOscilloscopeManager @Inject constructor(
         if (_isStreaming.value) return
         _isStreaming.value = true
 
-        // Try physical USB first if simulation is disabled
-        if (!_isSimulationMode.value) {
-            val list = usbManager.deviceList
-            val hantekDevice = list.values.firstOrNull { driver.isHantekDevice(it) }
-            if (hantekDevice != null) {
-                if (driver.connect(hantekDevice)) {
-                    _deviceConnected.value = true
-                    driver.configureDso(_samplingRate.value, _ch1Gain.value, _ch2Gain.value)
-                    driver.startCapture()
-                    Log.i(TAG, "Successfully started physical DSO capture")
-                } else {
-                    Log.w(TAG, "Hantek device found but failed to claim. Falling back to simulation.")
-                    _isSimulationMode.value = true
-                }
-            } else {
-                Log.i(TAG, "No physical Hantek DSO detected. Running simulation engine.")
-                _isSimulationMode.value = true
-            }
+        val list = usbManager.deviceList
+        val hantekDevice = list.values.firstOrNull { driver.isHantekDevice(it) }
+        if (hantekDevice != null && driver.connect(hantekDevice)) {
+            _deviceConnected.value = true
+            driver.configureDso(_samplingRate.value, _ch1Gain.value, _ch2Gain.value)
+            driver.startCapture()
+            Log.i(TAG, "Successfully started physical DSO capture")
+        } else {
+            Log.w(TAG, "No physical Hantek DSO available. Capture not started.")
+            _isStreaming.value = false
+            _deviceConnected.value = false
+            _ch1Data.value = FloatArray(RENDER_POINTS)
+            _ch2Data.value = FloatArray(RENDER_POINTS)
+            return
         }
 
         restartStream()
@@ -134,11 +112,7 @@ class UsbOscilloscopeManager @Inject constructor(
     private fun restartStream() {
         captureJob?.cancel()
         captureJob = managerScope.launch {
-            if (_isSimulationMode.value) {
-                runSimulationLoop()
-            } else {
-                runPhysicalCaptureLoop()
-            }
+            runPhysicalCaptureLoop()
         }
     }
 
@@ -151,113 +125,6 @@ class UsbOscilloscopeManager @Inject constructor(
             driver.disconnect()
         }
         _deviceConnected.value = false
-    }
-
-    private suspend fun runSimulationLoop() {
-        var phase = 0f
-        while (coroutineContext.isActive && _isStreaming.value) {
-            val ch1 = FloatArray(RENDER_POINTS)
-            val ch2 = FloatArray(RENDER_POINTS)
-            val type = _selectedWaveform.value
-
-            val triggerV = _triggerLevel.value
-            val atten1 = _ch1Attenuation.value
-            val atten2 = _ch2Attenuation.value
-
-            // Generate beautiful, physically accurate automotive diagnostic traces
-            for (i in 0 until RENDER_POINTS) {
-                val t = i / RENDER_POINTS.toFloat()
-                when (type) {
-                    "IGNITION_COP" -> {
-                        // Coil-on-Plug (COP) Primary Ignition Waveform:
-                        // 14V charging supply baseline
-                        // Dwell phase: dips to 0.1V (transistor charges coil)
-                        // Ignition spike: flyback kick clamped at 80V
-                        // Spark line: steady burn phase at ~20V
-                        // Ringing: coil resonance decay back to 14V
-                        val period = 0.4f
-                        val localT = (t + phase) % period
-                        ch1[i] = when {
-                            localT < 0.05f -> 14f * atten1 // Supply voltage
-                            localT < 0.15f -> 0.1f * atten1 // Dwell (transistor ON)
-                            localT < 0.16f -> 80f * atten1 // Inductive flyback spike (clamp)
-                            localT < 0.22f -> 20f * atten1 // Spark line (burn phase)
-                            localT < 0.28f -> {
-                                val ringTime = localT - 0.22f
-                                val decay = kotlin.math.exp(-ringTime * 25f).toFloat()
-                                val osc = 14f + 6f * decay + 20f * sin(ringTime * 300f) * decay
-                                osc * atten1
-                            }
-                            else -> 14f * atten1
-                        }
-                        // CH2: Crankshaft Position (CKP) reference
-                        ch2[i] = (2.5f + 2.5f * sin((t + phase) * 60f)) * atten2
-                    }
-                    "INJECTOR_PWM" -> {
-                        // High resolution representation of a PWM common-rail injector pulse:
-                        // 12V supply baseline, dips to 0V (driving gate), then flyback inductive kick (60-80V Vpp)
-                        val period = 0.3f
-                        val localT = (t + phase) % period
-                        ch1[i] = when {
-                            localT < 0.05f -> 12f * atten1 // Off state
-                            localT < 0.12f -> 0f           // Injecting state
-                            localT < 0.13f -> 75f * atten1 // Inductive peak
-                            localT < 0.18f -> (12f + 15f * sin((localT - 0.13f) * 100f)) * atten1 // Ramped decay
-                            else -> 12f * atten1
-                        }
-                        // CH2: CKP reference for synch
-                        ch2[i] = (2.5f + 2.5f * sin((t + phase) * 80f)) * atten2
-                    }
-                    "ALTERNATOR_RIPPLE" -> {
-                        // Alternator DC Charging baseline with a high-fidelity alternator ripple noise (burn diodes check)
-                        val baseline = 14.2f
-                        // 120Hz-300Hz AC Ripple on top
-                        val ripple = 0.25f * sin((t + phase) * 180f) + 0.05f * sin((t + phase) * 450f)
-                        ch1[i] = (baseline + ripple) * atten1
-                        // CH2: Battery Logical 13.8V
-                        ch2[i] = 13.8f * atten2
-                    }
-                    "CKP_SENSOR" -> {
-                        // Crankshaft Hall / Inductive sensor 60-2 missing teeth standard automotive wheel
-                        val angle = (t + phase) * 6f * Math.PI
-                        val teethCount = 60
-                        val toothIndex = (angle * teethCount / (2 * Math.PI)).toInt() % teethCount
-                        val isMissingTooth = toothIndex == 0 || toothIndex == 1
-                        val sineVal = if (isMissingTooth) 0f else sin(angle * teethCount).toFloat()
-                        ch1[i] = sineVal * 3.5f * atten1 // +/- 3.5V standard Vpp
-                        ch2[i] = (if (toothIndex % 2 == 0) 5f else 0f) * atten2
-                    }
-                    "CMP_SENSOR" -> {
-                        // Camshaft Hall sensor (square wave reference, 1 pulse per 720 degrees)
-                        val period = 0.5f
-                        val localT = (t + phase) % period
-                        ch1[i] = (if (localT < 0.25f) 5f else 0f) * atten1
-                        ch2[i] = (if (localT > 0.1f && localT < 0.2f) 5f else 0f) * atten2
-                    }
-                    "LAMBDA_O2" -> {
-                        // Lambda Oxygen Sensor: Sinusoidal rich/lean cycling (0.1V - 0.9V)
-                        val baseline = 0.5f
-                        val lambdaSin = 0.4f * sin((t + phase) * 8f)
-                        ch1[i] = (baseline + lambdaSin) * atten1
-                        // CH2: Catalytic downstream sensor (steady at 0.7V)
-                        ch2[i] = 0.7f * atten2
-                    }
-                    else -> {
-                        // Sinusoidal calibration wave
-                        ch1[i] = (2.5f * sin((t + phase) * 40f)) * atten1
-                        ch2[i] = (2.5f * sin((t + phase) * 40f + 1.5f)) * atten2
-                    }
-                }
-            }
-
-            // Slide phase forward
-            phase += 0.008f
-            
-            _ch1Data.value = ch1
-            _ch2Data.value = ch2
-
-            delay(33) // Fluid 30 FPS update
-        }
     }
 
     private suspend fun runPhysicalCaptureLoop() {

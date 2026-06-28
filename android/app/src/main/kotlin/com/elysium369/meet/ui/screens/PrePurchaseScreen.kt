@@ -178,109 +178,6 @@ fun CyberProgressBar(
     }
 }
 
-@Composable
-fun CyberConsoleInspectionStepper(
-    onFinished: () -> Unit
-) {
-    var logs by remember { mutableStateOf(listOf<String>()) }
-    var cursorVisible by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(350)
-            cursorVisible = !cursorVisible
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        logs = logs + "🤖 MEET V2 — INICIANDO DIAGNÓSTICO CLÍNICO AVANZADO"
-        delay(400)
-        logs = logs + "📡 Conectando al bus OBD-II del vehículo..."
-        delay(500)
-        logs = logs + "🔗 Enlace establecido exitosamente. Protocolo activo."
-        delay(300)
-        logs = logs + "🔋 Voltaje de la ECU: 14.1V — Rango óptimo"
-        delay(400)
-
-        val dimensions = listOf(
-            "DTCs Activos" to "Interrogando códigos de falla activos almacenados en la ECU...",
-            "DTCs Permanentes" to "Comprobando registros no borrables en la memoria profunda...",
-            "Monitores de Emisiones" to "Analizando los controladores de preparación y gases...",
-            "Fuel Trims (Mezcla)" to "Evaluando estabilidad de inyección y fugas de vacío...",
-            "Sistema Térmico" to "Analizando temperatura y comportamiento de refrigerante...",
-            "Sistema Eléctrico" to "Evaluando alternador, estabilidad y caída de voltaje...",
-            "DTCs Pendientes" to "Escaneando fallas intermitentes no consolidadas...",
-            "ECU Mode 06" to "Ejecutando pruebas de sensores y límites de tolerancia..."
-        )
-
-        dimensions.forEachIndexed { index, (dimName, dimDesc) ->
-            logs = logs + "⚡ Escaneando dimensión ${index + 1}/8: $dimName..."
-            delay(300)
-            logs = logs + "   └─ $dimDesc"
-            delay(600)
-            logs = logs + "   [✓] Dimensión ${index + 1}/8 completada con éxito."
-            delay(300)
-        }
-
-        logs = logs + "📊 Consolidando el reporte integral de 8 dimensiones..."
-        delay(600)
-        logs = logs + "🔬 Computando veredicto clínico final automatizado..."
-        delay(500)
-        logs = logs + "🚀 ¡PROCESAMIENTO FINALIZADO CON ÉXITO!"
-        delay(400)
-        onFinished()
-    }
-
-    EliteCard(
-        backgroundColor = Color.Black,
-        borderColor = MeetColors.neonGreen,
-        glowColor = MeetColors.neonGreen.copy(alpha = 0.2f),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(350.dp)
-    ) {
-        val scrollState = rememberScrollState()
-        LaunchedEffect(logs.size) {
-            scrollState.animateScrollTo(scrollState.maxValue)
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(scrollState)
-        ) {
-            logs.forEach { log ->
-                Text(
-                    text = log,
-                    color = MeetColors.neonGreen,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 2.dp)
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "> ",
-                    color = MeetColors.neonGreen,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                if (cursorVisible) {
-                    Box(
-                        modifier = Modifier
-                            .width(8.dp)
-                            .height(12.dp)
-                            .background(MeetColors.neonGreen)
-                    )
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrePurchaseScreen(
@@ -289,7 +186,6 @@ fun PrePurchaseScreen(
 ) {
     val result by viewModel.inspectionResult.collectAsState()
     val isInspecting by viewModel.isInspecting.collectAsState()
-    var isSimulating by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -317,7 +213,7 @@ fun PrePurchaseScreen(
             )
 
             // Welcome/Start Card
-            if (result == null && !isSimulating && !isInspecting) {
+            if (result == null && !isInspecting) {
                 EliteCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -339,7 +235,7 @@ fun PrePurchaseScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "MEET ejecutará un escaneo profundo de 8 dimensiones mecánicas y electrónicas para brindarle un dictamen clínico completo de alta fidelidad.",
+                            text = "Elysium Vanguard ejecutará un escaneo profundo de 8 dimensiones mecánicas y electrónicas usando únicamente datos OBD-II reales.",
                             color = MeetColors.textSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center
@@ -400,25 +296,13 @@ fun PrePurchaseScreen(
 
                         EliteButton(
                             text = "INICIAR EVALUACIÓN CLÍNICA",
-                            onClick = { isSimulating = true },
+                            onClick = { viewModel.runPrePurchaseInspection() },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
             }
 
-            // Simulating Stepper Console
-            if (isSimulating) {
-                Spacer(modifier = Modifier.height(12.dp))
-                CyberConsoleInspectionStepper(
-                    onFinished = {
-                        isSimulating = false
-                        viewModel.runPrePurchaseInspection()
-                    }
-                )
-            }
-
-            // Real OBD Inspection Running (if simulation finished but network delay still holds)
             if (isInspecting) {
                 Spacer(modifier = Modifier.height(40.dp))
                 Column(
@@ -522,7 +406,7 @@ fun PrePurchaseScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 ) {
-                                    Text("🚩", fontSize = 20.sp)
+                                    AnimatedNeonGlyph("🚩", contentDescription = null, fontSize = 20.sp)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "BANDERAS ROJAS DETECTADAS",
@@ -589,7 +473,7 @@ fun PrePurchaseScreen(
                                         .background(catColor.copy(alpha = 0.1f)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = cat.icon, fontSize = 16.sp)
+                                    AnimatedNeonGlyph(cat.icon, contentDescription = null, fontSize = 16.sp)
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
@@ -692,7 +576,7 @@ fun PrePurchaseScreen(
 
                 EliteOutlinedButton(
                     text = "REPETIR DIAGNÓSTICO",
-                    onClick = { isSimulating = true },
+                    onClick = { viewModel.runPrePurchaseInspection() },
                     color = MeetColors.neonGreen,
                     modifier = Modifier.fillMaxWidth()
                 )

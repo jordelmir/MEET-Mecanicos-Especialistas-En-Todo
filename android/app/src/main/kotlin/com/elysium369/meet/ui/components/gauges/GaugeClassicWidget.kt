@@ -30,7 +30,7 @@ private data class ClassicTickInfo(
 )
 
 /**
- * Classic V2.5 Style: Faithful reproduction of the MEET v2.5 gauge with premium upgrades.
+ * Classic V2.5 Style: Faithful reproduction of the previous gauge with premium upgrades.
  * Uses high-performance Canvas rendering with tick numbers, visible background tracks,
  * concentric dual speedometer scale, and a premium mechanical center hub needle.
  */

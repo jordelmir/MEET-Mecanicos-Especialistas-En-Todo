@@ -22,7 +22,7 @@ import java.util.zip.ZipOutputStream
 
 object EvidenceCompiler {
     private const val TAG = "EvidenceCompiler"
-    private const val KEY_ALIAS = "MEET_BLACK_BOX_KEY"
+    private const val KEY_ALIAS = "ELYSIUM_VANGUARD_BLACK_BOX_KEY"
 
     init {
         // Initialize local cryptographic keys in the Android Keystore if not present
@@ -141,7 +141,7 @@ object EvidenceCompiler {
         paint.textSize = 10f
         paint.isFakeBoldText = false
         paint.color = Color.parseColor("#94A3B8")
-        canvas.drawText("MEET BLACK BOX AUTOMOTIVE LEGAL TELEMETRY", 40f, 65f, paint)
+        canvas.drawText("Elysium Vanguard BLACK BOX AUTOMOTIVE LEGAL TELEMETRY", 40f, 65f, paint)
 
         // Incident Metadata
         paint.color = Color.BLACK

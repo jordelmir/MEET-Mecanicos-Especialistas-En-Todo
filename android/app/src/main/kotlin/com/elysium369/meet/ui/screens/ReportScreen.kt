@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.content.Context
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
@@ -123,7 +125,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp).align(Alignment.Start)
                     )
 
-                    // Simulación / Vista Previa en tiempo real
+                    // Vista previa en tiempo real
                     Text(
                         text = "VISTA PREVIA DEL DOCUMENTO",
                         color = MeetColors.textSecondary,
@@ -135,7 +137,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                     DocumentPreviewCard(
                         theme = selectedTheme,
                         scanMode = scanMode,
-                        workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "MEET CLINIC",
+                        workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard CLINIC",
                         healthScore = healthScore,
                         includeGraphs = includeGraphs,
                         includePredictive = includePredictive,
@@ -221,11 +223,11 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Settings, contentDescription = "Taller", tint = MeetColors.electricBlue, modifier = Modifier.size(20.dp))
+                                    AnimatedNeonIcon(Icons.Default.Settings, contentDescription = "Taller", tint = MeetColors.electricBlue, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("PERSONALIZACIÓN DEL TALLER (CABECERA)", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                 }
-                                Icon(
+                                AnimatedNeonIcon(
                                     imageVector = if (showWorkshopEditor) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                     contentDescription = "Expand",
                                     tint = Color.White
@@ -419,7 +421,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                 .border(2.dp, MeetColors.neonGreen.copy(alpha = pulseScale.coerceIn(0f, 1f)), RoundedCornerShape(45.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Compiling",
                                 tint = MeetColors.neonGreen,
@@ -429,7 +431,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
 
                         Spacer(modifier = Modifier.height(32.dp))
                         Text(
-                            text = "COMPILANDO TELEMETRÍA MEET ELITE",
+                            text = "COMPILANDO TELEMETRÍA Elysium Vanguard ELITE",
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                             style = MaterialTheme.typography.titleMedium
@@ -496,7 +498,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
+                    AnimatedNeonIcon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Success",
                         tint = MeetColors.neonGreen,
@@ -510,7 +512,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                         fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = "Documento firmado digitalmente por MEET AI y listo para enviar.",
+                        text = "Documento firmado digitalmente por Elysium Vanguard AI y listo para enviar.",
                         color = MeetColors.textSecondary,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
@@ -588,7 +590,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                                         }
                                                         
                                                         val printData = com.elysium369.meet.core.print.PrintReportData(
-                                                            workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "MEET CLINIC",
+                                                            workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard CLINIC",
                                                             workshopAddress = workshopAddress,
                                                             workshopPhone = workshopPhone,
                                                             workshopEmail = workshopEmail,
@@ -611,7 +613,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                                 .padding(12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Settings, contentDescription = null, tint = MeetColors.electricBlue)
+                                            AnimatedNeonIcon(Icons.Default.Settings, contentDescription = null, tint = MeetColors.electricBlue)
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Column {
                                                 @SuppressLint("MissingPermission")

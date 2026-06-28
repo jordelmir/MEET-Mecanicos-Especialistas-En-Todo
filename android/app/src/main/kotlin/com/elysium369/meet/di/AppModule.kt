@@ -31,7 +31,7 @@ object AppModule {
      * Rule: ALWAYS provide migrations from ALL possible source versions.
      */
     private fun migrateToV6(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→6: Starting comprehensive schema migration")
+        android.util.Log.i("ElysiumDB", "Migration $from→6: Starting comprehensive schema migration")
 
         // --- 1. Add missing vehicle columns ---
         val existingColumns = mutableSetOf<String>()
@@ -44,7 +44,7 @@ object AppModule {
         fun addColIfMissing(col: String, type: String) {
             if (!existingColumns.contains(col)) {
                 db.execSQL("ALTER TABLE vehicles ADD COLUMN $col $type")
-                android.util.Log.i("MeetDB", "Migration $from→6: Added vehicle column '$col'")
+                android.util.Log.i("ElysiumDB", "Migration $from→6: Added vehicle column '$col'")
             }
         }
         addColIfMissing("displacementCc", "INTEGER NOT NULL DEFAULT 0")
@@ -181,7 +181,7 @@ object AppModule {
             PRIMARY KEY(`code`)
         )""")
 
-        android.util.Log.i("MeetDB", "Migration $from→6: Complete — all tables & columns verified")
+        android.util.Log.i("ElysiumDB", "Migration $from→6: Complete — all tables & columns verified")
     }
 
     private val MIGRATION_1_6 = object : Migration(1, 6) {
@@ -202,7 +202,7 @@ object AppModule {
 
     // ── v6/v7 → v8: Predictive Health Engine tables ──
     private fun migrateToV8(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→8: Adding predictive health tables")
+        android.util.Log.i("ElysiumDB", "Migration $from→8: Adding predictive health tables")
         db.execSQL("""CREATE TABLE IF NOT EXISTS `sensor_history` (
             `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             `vehicleId` TEXT NOT NULL,
@@ -233,14 +233,14 @@ object AppModule {
             `timestamp` INTEGER NOT NULL
         )""")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_snapshots_vehicleId_timestamp` ON `health_snapshots` (`vehicleId`, `timestamp`)")
-        android.util.Log.i("MeetDB", "Migration $from→8: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→8: Complete")
     }
 
     private fun migrateToV9(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→9: Patching dtc_events missing columns")
+        android.util.Log.i("ElysiumDB", "Migration $from→9: Patching dtc_events missing columns")
         try { db.execSQL("ALTER TABLE `dtc_events` ADD COLUMN `lastSeenAt` INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
         try { db.execSQL("ALTER TABLE `dtc_events` ADD COLUMN `synced` INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
-        android.util.Log.i("MeetDB", "Migration $from→9: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→9: Complete")
     }
 
     private val MIGRATION_6_9 = object : Migration(6, 9) {
@@ -255,7 +255,7 @@ object AppModule {
 
     // ── v9 → v10: Maintenance Logs & Repair History ──
     private fun migrateToV10(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→10: Adding maintenance & repair tables")
+        android.util.Log.i("ElysiumDB", "Migration $from→10: Adding maintenance & repair tables")
         db.execSQL("""CREATE TABLE IF NOT EXISTS `maintenance_logs` (
             `id` TEXT NOT NULL PRIMARY KEY,
             `vehicleId` TEXT NOT NULL,
@@ -303,11 +303,11 @@ object AppModule {
             `photoPath` TEXT,
             `createdAt` INTEGER NOT NULL
         )""")
-        android.util.Log.i("MeetDB", "Migration $from→10: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→10: Complete")
     }
 
     private fun migrateToV11(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→11: Migrating dtc_definitions table to support OEM manufacturer primary key")
+        android.util.Log.i("ElysiumDB", "Migration $from→11: Migrating dtc_definitions table to support OEM manufacturer primary key")
         try {
             db.execSQL("ALTER TABLE `dtc_definitions` RENAME TO `dtc_definitions_old`")
             db.execSQL("""
@@ -329,9 +329,9 @@ object AppModule {
                 FROM `dtc_definitions_old`
             """)
             db.execSQL("DROP TABLE `dtc_definitions_old`")
-            android.util.Log.i("MeetDB", "Migration $from→11: Complete")
+            android.util.Log.i("ElysiumDB", "Migration $from→11: Complete")
         } catch (e: Exception) {
-            android.util.Log.e("MeetDB", "Migration $from→11 failed, recreating definitions table", e)
+            android.util.Log.e("ElysiumDB", "Migration $from→11 failed, recreating definitions table", e)
             db.execSQL("DROP TABLE IF EXISTS `dtc_definitions_old`")
             db.execSQL("DROP TABLE IF EXISTS `dtc_definitions`")
             db.execSQL("""
@@ -367,7 +367,7 @@ object AppModule {
     }
 
     private fun migrateToV12(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→12: Adding fleet management schema elements")
+        android.util.Log.i("ElysiumDB", "Migration $from→12: Adding fleet management schema elements")
         
         try { db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `businessId` TEXT") } catch (_: Exception) {}
         try { db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `fleetId` TEXT") } catch (_: Exception) {}
@@ -407,7 +407,7 @@ object AppModule {
             )
         """)
         
-        android.util.Log.i("MeetDB", "Migration $from→12: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→12: Complete")
     }
 
     private val MIGRATION_11_12 = object : Migration(11, 12) {
@@ -415,7 +415,7 @@ object AppModule {
     }
 
     private fun migrateToV13(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→13: Adding chat messaging schema elements")
+        android.util.Log.i("ElysiumDB", "Migration $from→13: Adding chat messaging schema elements")
         
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `chat_messages` (
@@ -443,14 +443,14 @@ object AppModule {
             )
         """)
         
-        android.util.Log.i("MeetDB", "Migration $from→13: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→13: Complete")
     }
 
     private fun migrateToV14(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→14: Adding inviteCode to fleets and fleetId to fleet_members")
+        android.util.Log.i("ElysiumDB", "Migration $from→14: Adding inviteCode to fleets and fleetId to fleet_members")
         try { db.execSQL("ALTER TABLE `fleets` ADD COLUMN `inviteCode` TEXT NOT NULL DEFAULT ''") } catch (_: Exception) {}
         try { db.execSQL("ALTER TABLE `fleet_members` ADD COLUMN `fleetId` TEXT") } catch (_: Exception) {}
-        android.util.Log.i("MeetDB", "Migration $from→14: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→14: Complete")
     }
 
     private val MIGRATION_12_13 = object : Migration(12, 13) {
@@ -462,7 +462,7 @@ object AppModule {
     }
 
     private fun migrateToV15(db: SupportSQLiteDatabase, from: Int) {
-        android.util.Log.i("MeetDB", "Migration $from→15: Adding dvir_reports table")
+        android.util.Log.i("ElysiumDB", "Migration $from→15: Adding dvir_reports table")
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `dvir_reports` (
                 `id` TEXT NOT NULL PRIMARY KEY,
@@ -478,7 +478,7 @@ object AppModule {
                 `signaturePath` TEXT
             )
         """)
-        android.util.Log.i("MeetDB", "Migration $from→15: Complete")
+        android.util.Log.i("ElysiumDB", "Migration $from→15: Complete")
     }
 
     private val MIGRATION_14_15 = object : Migration(14, 15) {
@@ -487,16 +487,16 @@ object AppModule {
 
     private val MIGRATION_15_16 = object : Migration(15, 16) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 15→16: Adding standalone indices on timestamp column")
+            android.util.Log.i("ElysiumDB", "Migration 15→16: Adding standalone indices on timestamp column")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_sensor_history_timestamp` ON `sensor_history` (`timestamp`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_snapshots_timestamp` ON `health_snapshots` (`timestamp`)")
-            android.util.Log.i("MeetDB", "Migration 15→16: Complete")
+            android.util.Log.i("ElysiumDB", "Migration 15→16: Complete")
         }
     }
 
     private val MIGRATION_16_17 = object : Migration(16, 17) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 16→17: Recreating dtc_definitions table to match Room schema exactly")
+            android.util.Log.i("ElysiumDB", "Migration 16→17: Recreating dtc_definitions table to match Room schema exactly")
             db.execSQL("DROP TABLE IF EXISTS `dtc_definitions`")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `dtc_definitions` (
@@ -549,7 +549,7 @@ object AppModule {
 
     private val MIGRATION_17_18 = object : Migration(17, 18) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 17→18: Creating vehicle_dna_profiles table")
+            android.util.Log.i("ElysiumDB", "Migration 17→18: Creating vehicle_dna_profiles table")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `vehicle_dna_profiles` (
                     `vehicleId` TEXT NOT NULL,
@@ -566,7 +566,7 @@ object AppModule {
 
     private val MIGRATION_18_19 = object : Migration(18, 19) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 18→19: Creating repair_cases table")
+            android.util.Log.i("ElysiumDB", "Migration 18→19: Creating repair_cases table")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `repair_cases` (
                     `id` TEXT NOT NULL,
@@ -613,7 +613,7 @@ object AppModule {
 
     private val MIGRATION_20_21 = object : Migration(20, 21) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 20→21: Creating new feature tables")
+            android.util.Log.i("ElysiumDB", "Migration 20→21: Creating new feature tables")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `live_sessions` (
                     `sessionId` TEXT NOT NULL,
@@ -789,7 +789,7 @@ object AppModule {
 
     private val MIGRATION_21_22 = object : Migration(21, 22) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 21→22: Creating DTC Knowledge Graph tables")
+            android.util.Log.i("ElysiumDB", "Migration 21→22: Creating DTC Knowledge Graph tables")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `dtc_symptoms` (
                     `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -918,14 +918,14 @@ object AppModule {
 
     private val MIGRATION_22_23 = object : Migration(22, 23) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 22→23: Creating FTS Search Index table")
+            android.util.Log.i("ElysiumDB", "Migration 22→23: Creating FTS Search Index table")
             db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `dtc_search_index` USING fts4(`code`, `descriptionEs`, `symptoms`, `causes`)")
         }
     }
 
     private val MIGRATION_23_24 = object : Migration(23, 24) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 23→24: Creating Gauge Marketplace tables")
+            android.util.Log.i("ElysiumDB", "Migration 23→24: Creating Gauge Marketplace tables")
             db.execSQL("""CREATE TABLE IF NOT EXISTS `saved_gauges` (
                 `id` TEXT NOT NULL PRIMARY KEY,
                 `name` TEXT NOT NULL,
@@ -966,7 +966,7 @@ object AppModule {
 
     private val MIGRATION_24_25 = object : Migration(24, 25) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 24→25: Adding individual styling fields to dashboard_widgets")
+            android.util.Log.i("ElysiumDB", "Migration 24→25: Adding individual styling fields to dashboard_widgets")
             db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `widgetStyle` TEXT")
             db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `savedStyleId` TEXT")
         }
@@ -974,7 +974,7 @@ object AppModule {
 
     private val MIGRATION_25_26 = object : Migration(25, 26) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 25→26: Adding typographyIndex and escrow columns")
+            android.util.Log.i("ElysiumDB", "Migration 25→26: Adding typographyIndex and escrow columns")
             db.execSQL("ALTER TABLE `dashboard_widgets` ADD COLUMN `typographyIndex` INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE `saved_gauges` ADD COLUMN `typographyIndex` INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE `service_requests` ADD COLUMN `escrowStatus` TEXT DEFAULT 'NONE'")
@@ -1470,9 +1470,33 @@ object AppModule {
         """)
     }
 
+    private fun seedCommunityCases(db: SupportSQLiteDatabase) {
+        val now = System.currentTimeMillis()
+        android.util.Log.i("ElysiumDB", "Seeding community cases for standard DTCs...")
+        
+        fun insertCase(id: String, make: String, model: String, year: Int, engine: String, country: String, dtc: String, symptoms: String, solution: String, cost: Double, time: Int, parts: String, verified: Int, votes: Int, rate: Double) {
+            db.execSQL("""
+                INSERT OR IGNORE INTO `repair_cases`
+                (`id`, `vehicleMake`, `vehicleModel`, `year`, `engine`, `country`, `dtcCode`, `symptoms`, `solution`, `cost`, `timeSpent`, `partsUsed`, `verified`, `votes`, `successRate`, `isBookmarked`, `isMyContribution`, `createdAt`)
+                VALUES ('$id', '$make', '$model', $year, '$engine', '$country', '$dtc', '$symptoms', '$solution', $cost, $time, '$parts', $verified, $votes, $rate, 0, 0, $now)
+            """)
+        }
+
+        insertCase("case_1", "Chevrolet", "Spark", 2018, "1.2L", "México", "P0300", "Motor tiembla mucho en ralentí, pérdida de potencia y check engine parpadea bajo carga.", "Reemplazo de cables de encendido agrietados y juego de bujías de iridio nuevas.", 75.0, 45, "Bujías NGK, Cables ACDelco", 1, 28, 96.0)
+        insertCase("case_2", "Toyota", "Corolla", 2012, "1.8L Dual VVT-i", "Costa Rica", "P0420", "Luz check engine encendida permanente, olor inusual en el escape tipo huevo podrido.", "Cambio de convertidor catalítico obstruido por uno homologado de flujo directo y sensor O2 secundario.", 380.0, 120, "Catalizador Magnaflow, Sensor Denso", 1, 45, 92.5)
+        insertCase("case_3", "Nissan", "Versa", 2017, "1.6L HR16DE", "Colombia", "P0171", "Ralentí inestable que oscila, tironeos leves al acelerar a bajas revoluciones.", "Limpieza del cuerpo de aceleración y cambio de junta del múltiple de admisión rota que causaba entrada de aire no medido.", 95.0, 90, "Empaque admisión original", 1, 19, 100.0)
+        insertCase("case_4", "Ford", "Focus", 2014, "2.0L GDI Duratec", "Argentina", "P0700", "Caja patina al pasar de segunda a tercera, golpe fuerte al colocar reversa.", "Actualización de software del módulo de control de transmisión (TCM) y limpieza de contactos a tierra.", 180.0, 150, "Ninguno (Mano de obra)", 1, 33, 85.0)
+        insertCase("case_5", "Hyundai", "Accent", 2016, "1.4L MPI", "Chile", "P0115", "El ventilador del radiador se queda encendido todo el tiempo, aguja de temperatura no sube.", "Reemplazo del sensor de temperatura de refrigerante del motor (ECT) dañado y purga de burbujas de aire.", 55.0, 60, "Sensor ECT original Hyundai", 1, 14, 98.0)
+        insertCase("case_6", "Kia", "Sportage", 2015, "2.0L Nu", "Perú", "P0442", "Check engine encendida, no hay fallas de rendimiento perceptibles en el manejo.", "Reemplazo de la junta de goma agrietada en el tapón de llenado de combustible por uno nuevo original.", 25.0, 15, "Tapón de gasolina Kia", 1, 9, 100.0)
+        insertCase("case_7", "Volkswagen", "Jetta", 2013, "2.5L 5 cil", "México", "P0122", "Pedal de aceleración no responde intermitentemente, motor entra en modo de seguridad (limp mode).", "Cambio del sensor de posición de mariposa (TPS) integrado y recalibración del cuerpo de aceleración electrónico.", 110.0, 80, "Sensor TPS Bosch", 1, 22, 94.0)
+        insertCase("case_8", "Honda", "Civic", 2011, "1.8L i-VTEC", "Panamá", "P0302", "Pérdida de potencia notable bajo aceleración, el motor trabaja en 3 cilindros.", "Bobina de encendido del cilindro 2 quemada por cortocircuito interno. Reemplazo por bobina nueva.", 85.0, 30, "Bobina Hitachi original", 1, 37, 100.0)
+        insertCase("case_9", "Renault", "Duster", 2016, "2.0L F4R", "Colombia", "P0562", "Luces de tablero parpadean de noche, dirección electro-asistida se pone dura ocasionalmente.", "Fallo del alternador por desgaste en las escobillas del regulador de voltaje. Cambio de regulador.", 140.0, 100, "Regulador Valeo, Batería nueva", 1, 15, 90.0)
+        insertCase("case_10", "Peugeot", "207", 2012, "1.4L VTi", "Uruguay", "P0011", "Cascabeleo del motor caliente al ralentí, luz de check engine encendida.", "Solenoide de control de válvula variable (VVT) del lado de admisión atascado por lodos. Limpieza de conductos y reemplazo del solenoide.", 125.0, 90, "Solenoide VVT PSA", 1, 18, 95.0)
+    }
+
     private val MIGRATION_26_27 = object : Migration(26, 27) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 26→27: Creating MEET Knowledge Engine v4.0 tables")
+            android.util.Log.i("ElysiumDB", "Migration 26→27: Creating Elysium Vanguard Knowledge Engine v4.0 tables")
             createMechanicalKnowledgeTables(db)
             seedMechanicalKnowledge(db)
         }
@@ -1480,7 +1504,7 @@ object AppModule {
 
     private val MIGRATION_27_28 = object : Migration(27, 28) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 27→28: Hardening hybrid knowledge matrix and expanding offline knowledge seeds")
+            android.util.Log.i("ElysiumDB", "Migration 27→28: Hardening hybrid knowledge matrix and expanding offline knowledge seeds")
             createMechanicalKnowledgeTables(db)
             db.execSQL("""
                 DELETE FROM meet_knowledge_matrix
@@ -1497,7 +1521,7 @@ object AppModule {
 
     private val MIGRATION_28_29 = object : Migration(28, 29) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("MeetDB", "Migration 28→29: Creating real parts-store auction tables")
+            android.util.Log.i("ElysiumDB", "Migration 28→29: Creating real parts-store auction tables")
             db.execSQL("""
                 CREATE TABLE IF NOT EXISTS `parts_stores` (
                     `storeId` TEXT NOT NULL,
@@ -1558,6 +1582,234 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_29_30 = object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 29→30: Creating tow-truck requests and ratings tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `tow_truck_requests` (
+                    `requestId` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `vehicleInfo` TEXT NOT NULL,
+                    `latitude` REAL NOT NULL,
+                    `longitude` REAL NOT NULL,
+                    `locationName` TEXT NOT NULL,
+                    `destinationLatitude` REAL,
+                    `destinationLongitude` REAL,
+                    `destinationName` TEXT,
+                    `phone` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `assignedDriverId` TEXT,
+                    `assignedDriverName` TEXT,
+                    `assignedDriverPhone` TEXT,
+                    `priceOffer` REAL NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `completedAt` INTEGER,
+                    PRIMARY KEY(`requestId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ratings` (
+                    `ratingId` TEXT NOT NULL,
+                    `targetType` TEXT NOT NULL,
+                    `targetId` TEXT NOT NULL,
+                    `sourceId` TEXT NOT NULL,
+                    `sourceName` TEXT NOT NULL,
+                    `stars` REAL NOT NULL,
+                    `comment` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`ratingId`)
+                )
+            """)
+            seedCommunityCases(db)
+        }
+    }
+
+    private val MIGRATION_30_31 = object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 30→31: Adding mechanic assignment, GPS, and part position fields")
+            // ServiceRequestEntity new columns
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN latitude REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN longitude REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN priceOffer REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN assignedMechanicId TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN assignedMechanicName TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN assignedMechanicPhone TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE service_requests ADD COLUMN completedAt INTEGER DEFAULT NULL")
+            // PartRequestEntity new columns
+            db.execSQL("ALTER TABLE part_requests ADD COLUMN partPosition TEXT NOT NULL DEFAULT 'N/A'")
+            db.execSQL("ALTER TABLE part_requests ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE part_requests ADD COLUMN latitude REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE part_requests ADD COLUMN longitude REAL NOT NULL DEFAULT 0.0")
+        }
+    }
+
+    private val MIGRATION_31_32 = object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 31→32: Creating provider_profiles table")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `provider_profiles` (
+                    `profileId` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `providerType` TEXT NOT NULL,
+                    `businessName` TEXT NOT NULL,
+                    `ownerName` TEXT NOT NULL,
+                    `phone` TEXT NOT NULL,
+                    `location` TEXT NOT NULL,
+                    `latitude` REAL NOT NULL DEFAULT 0.0,
+                    `longitude` REAL NOT NULL DEFAULT 0.0,
+                    `specialties` TEXT NOT NULL DEFAULT '',
+                    `radiusKm` REAL NOT NULL DEFAULT 25.0,
+                    `licenseNumber` TEXT NOT NULL DEFAULT '',
+                    `isActive` INTEGER NOT NULL DEFAULT 1,
+                    `verified` INTEGER NOT NULL DEFAULT 0,
+                    `rating` REAL NOT NULL DEFAULT 0.0,
+                    `totalJobs` INTEGER NOT NULL DEFAULT 0,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(`profileId`)
+                )
+            """)
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_provider_profiles_userId_providerType` ON `provider_profiles` (`userId`, `providerType`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_provider_profiles_providerType_isActive` ON `provider_profiles` (`providerType`, `isActive`)")
+        }
+    }
+
+    private val MIGRATION_32_33 = object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 32→33: Creating ride tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ride_requests` (
+                    `requestId` TEXT NOT NULL,
+                    `passengerId` TEXT NOT NULL,
+                    `passengerName` TEXT NOT NULL,
+                    `passengerPhone` TEXT NOT NULL,
+                    `pickupLatitude` REAL NOT NULL,
+                    `pickupLongitude` REAL NOT NULL,
+                    `pickupAddress` TEXT NOT NULL,
+                    `pickupAccuracy` REAL NOT NULL,
+                    `destLatitude` REAL NOT NULL,
+                    `destLongitude` REAL NOT NULL,
+                    `destAddress` TEXT NOT NULL,
+                    `priceOffer` REAL NOT NULL,
+                    `currency` TEXT NOT NULL,
+                    `estimatedDistanceKm` REAL NOT NULL,
+                    `estimatedDurationMin` INTEGER NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `acceptedOfferId` TEXT,
+                    `assignedDriverId` TEXT,
+                    `assignedDriverName` TEXT,
+                    `assignedDriverPhone` TEXT,
+                    `assignedDriverVehicle` TEXT,
+                    `finalPrice` REAL,
+                    `passengerRating` REAL,
+                    `driverRating` REAL,
+                    `createdAt` INTEGER NOT NULL,
+                    `completedAt` INTEGER,
+                    PRIMARY KEY(`requestId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ride_offers` (
+                    `offerId` TEXT NOT NULL,
+                    `requestId` TEXT NOT NULL,
+                    `driverId` TEXT NOT NULL,
+                    `driverName` TEXT NOT NULL,
+                    `driverPhone` TEXT NOT NULL,
+                    `driverRating` REAL NOT NULL,
+                    `driverTotalTrips` INTEGER NOT NULL,
+                    `vehicleDescription` TEXT NOT NULL,
+                    `counterPrice` REAL NOT NULL,
+                    `currency` TEXT NOT NULL,
+                    `estimatedArrivalMin` INTEGER NOT NULL,
+                    `driverLatitude` REAL NOT NULL,
+                    `driverLongitude` REAL NOT NULL,
+                    `message` TEXT,
+                    `status` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`offerId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ride_chat_messages` (
+                    `messageId` TEXT NOT NULL,
+                    `rideRequestId` TEXT NOT NULL,
+                    `senderId` TEXT NOT NULL,
+                    `senderName` TEXT NOT NULL,
+                    `senderRole` TEXT NOT NULL,
+                    `messageType` TEXT NOT NULL,
+                    `textContent` TEXT,
+                    `audioFilePath` TEXT,
+                    `audioDurationMs` INTEGER,
+                    `isRead` INTEGER NOT NULL DEFAULT 0,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`messageId`)
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_requests_passengerId` ON `ride_requests` (`passengerId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_requests_assignedDriverId` ON `ride_requests` (`assignedDriverId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_requests_status` ON `ride_requests` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_offers_requestId` ON `ride_offers` (`requestId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_offers_driverId` ON `ride_offers` (`driverId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ride_chat_messages_rideRequestId` ON `ride_chat_messages` (`rideRequestId`)")
+        }
+    }
+
+    private val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 33→34: Creating identity verification tables")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `driver_verifications` (
+                    `driverId` TEXT NOT NULL,
+                    `fullName` TEXT NOT NULL,
+                    `phone` TEXT NOT NULL,
+                    `email` TEXT NOT NULL,
+                    `dateOfBirth` TEXT NOT NULL,
+                    `vehicleMake` TEXT NOT NULL,
+                    `vehicleModel` TEXT NOT NULL,
+                    `vehicleYear` INTEGER NOT NULL,
+                    `vehicleColor` TEXT NOT NULL,
+                    `vehiclePlate` TEXT NOT NULL,
+                    `pathLicenciaFront` TEXT NOT NULL,
+                    `pathLicenciaBack` TEXT NOT NULL,
+                    `pathCedulaFront` TEXT NOT NULL,
+                    `pathCedulaBack` TEXT NOT NULL,
+                    `pathHojaDelincuencia` TEXT NOT NULL,
+                    `pathMarchamo` TEXT NOT NULL,
+                    `pathDekra` TEXT NOT NULL,
+                    `pathSeguro` TEXT NOT NULL,
+                    `pathSelfieProfile` TEXT NOT NULL,
+                    `pathSelfieWithCedula` TEXT NOT NULL,
+                    `pathSelfieWithLicencia` TEXT NOT NULL,
+                    `pathVehicleFront` TEXT NOT NULL,
+                    `pathVehicleBack` TEXT NOT NULL,
+                    `pathVehicleInterior` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `rejectionReason` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    `approvedAt` INTEGER,
+                    PRIMARY KEY(`driverId`)
+                )
+            """)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `passenger_verifications` (
+                    `passengerId` TEXT NOT NULL,
+                    `fullName` TEXT NOT NULL,
+                    `phone` TEXT NOT NULL,
+                    `pathProfilePhoto` TEXT NOT NULL,
+                    `pathCedulaFront` TEXT NOT NULL,
+                    `pathSelfieWithCedula` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `rejectionReason` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    `approvedAt` INTEGER,
+                    PRIMARY KEY(`passengerId`)
+                )
+            """)
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -1575,27 +1827,38 @@ object AppModule {
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
             MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
             MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
-            MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29
+            MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
+            MIGRATION_30_31,
+            MIGRATION_31_32,
+            MIGRATION_32_33,
+            MIGRATION_33_34
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 seedMechanicalKnowledge(db)
-                android.util.Log.i("MeetDB", "Database created fresh — DtcDatabaseLoader will populate DTCs on first use")
+                seedCommunityCases(db)
+                android.util.Log.i("ElysiumDB", "Database created fresh — DtcDatabaseLoader will populate DTCs on first use")
             }
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
                 try {
                     db.execSQL("PRAGMA synchronous = NORMAL;")
                 } catch (e: Exception) {
-                    android.util.Log.w("MeetDB", "Could not set synchronous: ${e.message}")
+                    android.util.Log.w("ElysiumDB", "Could not set synchronous: ${e.message}")
                 }
                 try {
                     db.execSQL("PRAGMA temp_store = MEMORY;")
                 } catch (e: Exception) {
-                    android.util.Log.w("MeetDB", "Could not set temp_store: ${e.message}")
+                    android.util.Log.w("ElysiumDB", "Could not set temp_store: ${e.message}")
                 }
-                android.util.Log.i("MeetDB", "Performance PRAGMAs configured (synchronous=NORMAL, temp_store=MEMORY)")
+                android.util.Log.i("ElysiumDB", "Performance PRAGMAs configured (synchronous=NORMAL, temp_store=MEMORY)")
+                // Make sure community cases are seeded
+                try {
+                    seedCommunityCases(db)
+                } catch (e: Exception) {
+                    android.util.Log.e("ElysiumDB", "Failed to seed community cases on open", e)
+                }
             }
         })
         .build()
@@ -1709,6 +1972,15 @@ object AppModule {
     @Provides
     fun provideVehicleTwinDao(db: MeetDatabase): VehicleTwinDao = db.vehicleTwinDao()
 
+    @Provides
+    fun provideTowTruckDao(db: MeetDatabase): TowTruckDao = db.towTruckDao()
+
+    @Provides
+    fun provideRatingDao(db: MeetDatabase): RatingDao = db.ratingDao()
+
+    @Provides
+    fun provideProviderProfileDao(db: MeetDatabase): ProviderProfileDao = db.providerProfileDao()
+
     // KNOWLEDGE GRAPH DAO
     @Provides
     fun provideDtcKnowledgeGraphDao(db: MeetDatabase): DtcKnowledgeGraphDao = db.dtcKnowledgeGraphDao()
@@ -1719,4 +1991,7 @@ object AppModule {
     // GAUGE MARKETPLACE
     @Provides
     fun provideSavedGaugeDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.SavedGaugeDao = db.savedGaugeDao()
+
+    @Provides
+    fun provideRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.RideDao = db.rideDao()
 }

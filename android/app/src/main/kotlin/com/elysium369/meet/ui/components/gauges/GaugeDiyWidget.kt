@@ -132,6 +132,19 @@ fun GaugeDiyWidget(
 
     val textMeasurer = rememberTextMeasurer()
     val labelText = if (diyGaugeName.isNotEmpty()) diyGaugeName else label
+    val normalizedUnit = unit.trim()
+    val normalizedLabel = labelText.trim()
+    val hasCustomArtwork = diyBgType == 2 && diyBgUri.isNotBlank()
+    val sameMetricName = normalizedUnit.isNotBlank() && areDiyGaugeTextDuplicates(normalizedLabel, normalizedUnit)
+    val displayUnit = if (hasCustomArtwork) "" else normalizedUnit
+    val displayLabel = when {
+        sameMetricName -> ""
+        hasCustomArtwork -> ""
+        else -> normalizedLabel
+    }
+    val drawGeneratedTicks = !hasCustomArtwork
+    val drawGeneratedBezel = !hasCustomArtwork
+    val drawGeneratedNeedle = !hasCustomArtwork
 
     // Typography customization mapping
     val diyFontFamily = when (diyTypography) {
@@ -184,7 +197,7 @@ fun GaugeDiyWidget(
                 val unitFontSize = (w * 0.045f).coerceIn(7f, 10f)
 
                 val labelMeasured = textMeasurer.measure(
-                    labelText.uppercase(),
+                    displayLabel.uppercase(),
                     TextStyle(
                         color = colorScheme.labelColor.copy(alpha = 0.7f),
                         fontSize = labelFontSize.sp,
@@ -739,14 +752,18 @@ fun GaugeDiyWidget(
                             2 -> { // User Custom Image with GIF decoder support
                                 val movie = userMovie
 
+                                drawRect(Color(0xFF02060D))
+
                                 if (movie != null) {
                                     drawIntoCanvas { canvas ->
                                         val movieCanvas = canvas.nativeCanvas
                                         val duration = movie.duration().let { if (it == 0) 1000 else it }
                                         val timeMs = (System.currentTimeMillis() % duration).toInt()
                                         movie.setTime(timeMs)
-                                        val scaleX = w / movie.width().toFloat()
-                                        val scaleY = h / movie.height().toFloat()
+                                        val movieW = movie.width().coerceAtLeast(1)
+                                        val movieH = movie.height().coerceAtLeast(1)
+                                        val scaleX = w / movieW.toFloat()
+                                        val scaleY = h / movieH.toFloat()
                                         movieCanvas.save()
                                         movieCanvas.scale(scaleX, scaleY)
                                         movie.draw(movieCanvas, 0f, 0f)
@@ -887,6 +904,7 @@ fun GaugeDiyWidget(
                     }
 
                     // 2. DRAW TICKS / SCALES (15 Styles)
+                    if (drawGeneratedTicks) {
                     when (diyTicks) {
                         0 -> { // Corona Completa (Radial Ticks)
                             val step = 10f
@@ -1224,8 +1242,10 @@ fun GaugeDiyWidget(
                             }
                         }
                     }
+                    }
 
                     // 3. DRAW BEZEL / BORDER (20 Styles)
+                    if (drawGeneratedBezel) {
                     when (diyBezel) {
                         0 -> { // Láser Neón
                             drawCircle(
@@ -1477,8 +1497,10 @@ fun GaugeDiyWidget(
                             }
                         }
                     }
+                    }
 
                     // 4. DRAW NEEDLE (15 Styles)
+                    if (drawGeneratedNeedle) {
                     val needleRad = Math.toRadians(activeAngle.toDouble())
 
                     // Native drop shadow support layer if glowIntensity > 0
@@ -1741,6 +1763,7 @@ fun GaugeDiyWidget(
                             drawCircle(activeColor.copy(alpha = 0.1f), 10.dp.toPx(), center)
                         }
                     }
+                    }
 
                     // 5. DRAW VALUE TEXT AND LABEL
                     val valueText = String.format("%.1f", animatedValue)
@@ -1757,7 +1780,7 @@ fun GaugeDiyWidget(
                     )
 
                     val unitMeasured = textMeasurer.measure(
-                        unit.uppercase(),
+                        displayUnit.uppercase(),
                         TextStyle(
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = unitFontSize.sp,
@@ -1768,10 +1791,68 @@ fun GaugeDiyWidget(
                         )
                     )
 
-                    drawText(valueMeasured, topLeft = Offset(center.x - valueMeasured.size.width / 2f, center.y - valueMeasured.size.height / 2f - 4.dp.toPx()))
-                    drawText(unitMeasured, topLeft = Offset(center.x - unitMeasured.size.width / 2f, center.y + valueMeasured.size.height / 2f - 8.dp.toPx()))
-                    drawText(labelMeasured, topLeft = Offset(center.x - labelMeasured.size.width / 2f, h - innerRadius * 0.65f))
+                    val textGap = (h * 0.018f).coerceIn(4.dp.toPx(), 10.dp.toPx())
+                    val hasUnit = displayUnit.isNotBlank()
+                    val unitHeight = if (hasUnit) unitMeasured.size.height.toFloat() else 0f
+                    val stackHeight = valueMeasured.size.height + if (hasUnit) unitHeight + textGap * 0.35f else 0f
+                    val stackTop = center.y - stackHeight / 2f - if (hasCustomArtwork) radius * 0.02f else 0f
+                    val valueTop = stackTop
+                    val unitTop = valueTop + valueMeasured.size.height + textGap * 0.35f
+
+                    drawText(
+                        valueMeasured,
+                        topLeft = Offset(center.x - valueMeasured.size.width / 2f, valueTop)
+                    )
+                    if (displayUnit.isNotBlank()) {
+                        drawText(
+                            unitMeasured,
+                            topLeft = Offset(center.x - unitMeasured.size.width / 2f, unitTop)
+                        )
+                    }
+                    if (displayLabel.isNotBlank()) {
+                        val labelTop = (h - radius * 0.32f - labelMeasured.size.height)
+                            .coerceAtLeast(unitTop + unitHeight + textGap)
+                            .coerceAtMost(h - radius * 0.14f - labelMeasured.size.height)
+                        drawText(
+                            labelMeasured,
+                            topLeft = Offset(center.x - labelMeasured.size.width / 2f, labelTop)
+                        )
+                    }
                 }
             }
     )
+}
+
+private fun areDiyGaugeTextDuplicates(label: String, unit: String): Boolean {
+    val labelToken = normalizeDiyGaugeToken(label)
+    val unitToken = normalizeDiyGaugeToken(unit)
+    if (labelToken.isBlank() || unitToken.isBlank()) return false
+    if (labelToken == unitToken) return true
+
+    val labelMetric = diyGaugeMetricKey(labelToken)
+    val unitMetric = diyGaugeMetricKey(unitToken)
+    return labelMetric.isNotBlank() && labelMetric == unitMetric
+}
+
+private fun normalizeDiyGaugeToken(value: String): String {
+    return value
+        .trim()
+        .lowercase()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("°", "")
+        .replace(Regex("[^a-z0-9%]+"), "")
+}
+
+private fun diyGaugeMetricKey(token: String): String {
+    return when {
+        token in setOf("kmh", "kph", "kmhr", "mph", "mihr") -> "vehicle_speed"
+        token.contains("velocidad") || token == "speed" -> "vehicle_speed"
+        token in setOf("rpm", "revmin", "revminuto") -> "engine_rpm"
+        token.contains("revolucion") || token.contains("tacometro") -> "engine_rpm"
+        else -> ""
+    }
 }

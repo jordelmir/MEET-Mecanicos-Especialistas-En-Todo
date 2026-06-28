@@ -583,6 +583,35 @@ class GaugeStyleManager(context: Context) {
         diyUpdateTrigger++
     }
 
+    fun resetDiyDraft() {
+        val currentUri = getDiyBgImageUri()
+        if (currentUri.startsWith("/")) {
+            runCatching {
+                val file = java.io.File(currentUri)
+                if (file.exists()) file.delete()
+            }.onFailure {
+                android.util.Log.w("GaugeStyleManager", "Could not delete previous DIY draft image", it)
+            }
+        }
+
+        prefs.edit()
+            .putString("diy_gauge_name", "")
+            .putInt("diy_bg_type", 0)
+            .putInt("diy_bg_preset_index", 0)
+            .putString("diy_bg_image_uri", "")
+            .putInt("diy_bezel_style", 0)
+            .putInt("diy_needle_style", 0)
+            .putInt("diy_ticks_style", 0)
+            .putInt("diy_accent_color", android.graphics.Color.parseColor("#00FFCC"))
+            .putInt("diy_accent_color2", android.graphics.Color.parseColor("#7C4DFF"))
+            .putFloat("diy_glow_intensity", 0.7f)
+            .putFloat("diy_image_opacity", 1.0f)
+            .putInt("diy_animation", 0)
+            .putInt("diy_typography", 0)
+            .apply()
+        diyUpdateTrigger++
+    }
+
     // ── DIY CONFIG EXPORT / IMPORT ──
 
     /** Serialize all DIY parameters into a shareable GaugeConfig */

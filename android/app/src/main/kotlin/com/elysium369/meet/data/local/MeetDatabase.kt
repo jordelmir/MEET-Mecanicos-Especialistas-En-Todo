@@ -50,6 +50,9 @@ import com.elysium369.meet.data.local.entities.*
         EvidencePackageEntity::class,
         VehicleTwinProfileEntity::class,
         TwinAnomalyEntity::class,
+        TowTruckRequestEntity::class,
+        RatingEntity::class,
+        ProviderProfileEntity::class,
 
         // KNOWLEDGE GRAPH ENTITIES
         DtcSymptomEntity::class,
@@ -62,7 +65,7 @@ import com.elysium369.meet.data.local.entities.*
         DtcRepairCostEntity::class,
         DtcSearchIndexEntity::class,
 
-        // MEET KNOWLEDGE ENGINE v4.0
+        // ELYSIUM VANGUARD KNOWLEDGE ENGINE v4.0
         MeetKnowledgeMatrixEntity::class,
         MechanicalProcedureEntity::class,
         ComponentRebuildGuideEntity::class,
@@ -74,9 +77,18 @@ import com.elysium369.meet.data.local.entities.*
 
         // GAUGE MARKETPLACE ENTITIES
         SavedGaugeEntity::class,
-        GaugeListingCacheEntity::class
+        GaugeListingCacheEntity::class,
+
+        // MEET RIDES
+        RideRequestEntity::class,
+        RideOfferEntity::class,
+        RideChatMessageEntity::class,
+
+        // IDENTITY VERIFICATION
+        DriverVerificationEntity::class,
+        PassengerVerificationEntity::class
     ],
-    version = 29,
+    version = 34,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -108,6 +120,9 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun marketplaceDao(): MarketplaceDao
     abstract fun blackBoxDao(): BlackBoxDao
     abstract fun vehicleTwinDao(): VehicleTwinDao
+    abstract fun towTruckDao(): TowTruckDao
+    abstract fun ratingDao(): RatingDao
+    abstract fun providerProfileDao(): ProviderProfileDao
 
     // KNOWLEDGE GRAPH DAO
     abstract fun dtcKnowledgeGraphDao(): DtcKnowledgeGraphDao
@@ -115,4 +130,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // GAUGE MARKETPLACE DAO
     abstract fun savedGaugeDao(): SavedGaugeDao
+
+    // MEET RIDES DAO
+    abstract fun rideDao(): RideDao
 }

@@ -386,7 +386,7 @@ class FleetChatViewModel @Inject constructor(
     fun createFleet(name: String, description: String?) {
         val businessId = _selectedBusinessId.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val randomCode = "MEET-FLT-${(1000..9999).random()}"
+            val randomCode = "EVG-FLT-${(1000..9999).random()}"
             val fleet = FleetEntity(
                 id = "f_${UUID.randomUUID().toString().take(6)}",
                 businessId = businessId,

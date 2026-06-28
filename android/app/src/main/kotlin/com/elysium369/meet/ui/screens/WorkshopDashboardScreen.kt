@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.data.local.entities.ServiceBidEntity
 import androidx.compose.animation.*
@@ -167,7 +169,7 @@ fun WorkshopDashboardScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(icon, label, tint = color, modifier = Modifier.size(18.dp))
+                                AnimatedNeonIcon(icon, label, tint = color, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }

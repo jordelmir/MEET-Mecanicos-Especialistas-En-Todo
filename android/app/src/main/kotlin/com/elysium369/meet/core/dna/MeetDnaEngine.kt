@@ -33,6 +33,17 @@ data class SensorDnaState(
 )
 
 @Serializable
+enum class DnaBusinessStage(val label: String) {
+    DISCONNECTED("Sin enlace OBD"),
+    COLLECTING("Recolectando firma"),
+    READY_TO_TRAIN("Listo para calibrar"),
+    QUICK_PROFILE("Perfil rapido activo"),
+    MONITORING("Monitoreo DNA activo"),
+    ATTENTION("Atencion preventiva"),
+    ERROR("Revision requerida")
+}
+
+@Serializable
 data class DnaEvaluationResult(
     val isCalibrated: Boolean,
     val confidence: Double = 0.0,
@@ -40,7 +51,14 @@ data class DnaEvaluationResult(
     val healthScore: Int = 100,
     val isAnomalous: Boolean = false,
     val sensorStates: List<SensorDnaState> = emptyList(),
-    val message: String = ""
+    val message: String = "",
+    val stage: DnaBusinessStage = DnaBusinessStage.DISCONNECTED,
+    val sampleCount: Int = 0,
+    val requiredSamples: Int = 15,
+    val liveSensorCount: Int = 0,
+    val requiredLiveSensors: Int = 5,
+    val canTrain: Boolean = false,
+    val nextAction: String = ""
 )
 
 @Singleton
@@ -52,13 +70,13 @@ class MeetDnaEngine @Inject constructor(
 
     // Map of PID -> Label
     private val dnaPids = mapOf(
-        "0105" to "Coolant Temp",
-        "0142" to "Battery Voltage",
-        "010C" to "Engine RPM",
-        "0107" to "Fuel Trim LTFT",
-        "010B" to "MAP Sensor",
-        "0110" to "MAF Sensor",
-        "010F" to "Intake Air Temp"
+        "0105" to "Temperatura refrigerante",
+        "0142" to "Voltaje de bateria",
+        "010C" to "RPM del motor",
+        "0107" to "Ajuste combustible LTFT",
+        "010B" to "Sensor MAP",
+        "0110" to "Sensor MAF",
+        "010F" to "Temperatura aire admision"
     )
 
     // Memory cache for real-time running EWMA per vehicle and PID
@@ -77,9 +95,42 @@ class MeetDnaEngine @Inject constructor(
      * Train the vehicle DNA signature using historical sensor readings.
      * Aligns time-series vectors and fits a Lightweight Isolation Forest.
      */
-    suspend fun trainDnaProfile(vehicleId: String): VehicleDnaProfileEntity? = withContext(Dispatchers.IO) {
+    /** Minimum vectors needed for DNA calibration — lowered from 50 for faster initial results */
+    private val MIN_VECTORS_QUICK = 15
+    private val MIN_VECTORS_FULL = 50
+
+    /** Observable progress for the UI */
+    data class TrainingProgress(val currentSamples: Int, val requiredSamples: Int, val isQuickMode: Boolean) {
+        val percentage: Float get() = (currentSamples.toFloat() / requiredSamples).coerceIn(0f, 1f)
+        val isReady: Boolean get() = currentSamples >= requiredSamples
+        val missingSamples: Int get() = (requiredSamples - currentSamples).coerceAtLeast(0)
+    }
+
+    /**
+     * Check how many aligned vectors are available for a vehicle without training.
+     * Used by the UI to show progress.
+     */
+    suspend fun getTrainingProgress(vehicleId: String): TrainingProgress = withContext(Dispatchers.IO) {
+        val rawDataByPid = mutableMapOf<String, List<com.elysium369.meet.data.local.entities.SensorHistoryEntity>>()
+        for (pid in dnaPids.keys) {
+            rawDataByPid[pid] = sensorHistoryDao.getSensorTrend(vehicleId, pid)
+        }
+        val alignedVectors = alignTimeSeries(rawDataByPid)
+        val existing = vehicleDnaDao.getDnaProfile(vehicleId)
+        val isQuick = existing == null // First time = quick mode
+        val required = if (isQuick) MIN_VECTORS_QUICK else MIN_VECTORS_FULL
+        TrainingProgress(alignedVectors.size, required, isQuick)
+    }
+
+    /**
+     * Train the vehicle DNA signature using historical sensor readings.
+     * Aligns time-series vectors and fits a Lightweight Isolation Forest.
+     * @param quickMode If true, use the lower threshold (15 vectors) for rapid initial calibration
+     */
+    suspend fun trainDnaProfile(vehicleId: String, quickMode: Boolean = false): VehicleDnaProfileEntity? = withContext(Dispatchers.IO) {
         try {
-            Log.d("MeetDnaEngine", "Starting DNA profile training for vehicle: $vehicleId")
+            val minRequired = if (quickMode) MIN_VECTORS_QUICK else MIN_VECTORS_FULL
+            Log.d("ElysiumDnaEngine", "Starting DNA profile training for vehicle: $vehicleId (quickMode=$quickMode, minRequired=$minRequired)")
 
             // 1. Fetch historical sensor trends
             val rawDataByPid = mutableMapOf<String, List<com.elysium369.meet.data.local.entities.SensorHistoryEntity>>()
@@ -91,9 +142,9 @@ class MeetDnaEngine @Inject constructor(
             val alignedVectors = alignTimeSeries(rawDataByPid)
             val sampleSize = alignedVectors.size
 
-            Log.d("MeetDnaEngine", "Aligned vectors size for training: $sampleSize")
-            if (sampleSize < 50) {
-                Log.w("MeetDnaEngine", "Insufficient data to train DNA profile. Required >= 50, found $sampleSize")
+            Log.d("ElysiumDnaEngine", "Aligned vectors size for training: $sampleSize (need $minRequired)")
+            if (sampleSize < minRequired) {
+                Log.w("ElysiumDnaEngine", "Insufficient data to train DNA profile. Required >= $minRequired, found $sampleSize")
                 return@withContext null
             }
 
@@ -121,7 +172,9 @@ class MeetDnaEngine @Inject constructor(
             }
 
             // 5. Fit the Isolation Forest model on standardized data
-            val forest = LightweightIsolationForest(numTrees = 60, subSampleSize = 128)
+            // Use fewer trees for quick mode to speed up initial calibration
+            val numTrees = if (quickMode) 30 else 60
+            val forest = LightweightIsolationForest(numTrees = numTrees, subSampleSize = 128.coerceAtMost(sampleSize))
             forest.fit(standardizedVectors)
 
             // 6. Serialize and persist DNA Profile
@@ -129,8 +182,9 @@ class MeetDnaEngine @Inject constructor(
             val varianceJsonStr = json.encodeToString(baseline.mapValues { it.value.stdDev })
             val forestJsonStr = json.encodeToString(forest)
             
-            // Confidence level ranges from 0 to 100 based on data size (max confidence at 500 samples)
-            val confidence = (sampleSize / 500.0 * 100.0).coerceIn(10.0, 100.0)
+            // Confidence: quick mode maxes out at 60%, full mode at 100%
+            val maxConfidence = if (quickMode) 60.0 else 100.0
+            val confidence = (sampleSize / 500.0 * 100.0).coerceIn(5.0, maxConfidence)
 
             val profile = VehicleDnaProfileEntity(
                 vehicleId = vehicleId,
@@ -143,11 +197,11 @@ class MeetDnaEngine @Inject constructor(
 
             vehicleDnaDao.insertDnaProfile(profile)
             clearCache()
-            Log.i("MeetDnaEngine", "DNA Profile trained successfully with confidence: ${String.format("%.1f", confidence)}%")
+            Log.i("ElysiumDnaEngine", "DNA Profile trained successfully with confidence: ${String.format("%.1f", confidence)}% (quickMode=$quickMode)")
             return@withContext profile
 
         } catch (e: Exception) {
-            Log.e("MeetDnaEngine", "Failed to train DNA profile", e)
+            Log.e("ElysiumDnaEngine", "Failed to train DNA profile", e)
             return@withContext null
         }
     }
@@ -166,7 +220,11 @@ class MeetDnaEngine @Inject constructor(
             cachedVehicleId = vehicleId
             cachedProfile = dbProfile
             dbProfile
-        } ?: return@withContext DnaEvaluationResult(isCalibrated = false)
+        } ?: return@withContext buildProvisionalEvaluation(
+            vehicleId = vehicleId,
+            currentLiveData = currentLiveData,
+            progress = getTrainingProgress(vehicleId)
+        )
 
         try {
             val baselineMeans = json.decodeFromString<Map<String, Float>>(profile.baselineJson)
@@ -192,11 +250,7 @@ class MeetDnaEngine @Inject constructor(
                 val mean = baselineMeans[pid] ?: 0f
                 val stdDev = baselineStdDevs[pid] ?: 1f
 
-                // Resolve voltage PIDs gracefully if they contain different keys
-                val rawVal = when (pid) {
-                    "0142" -> currentLiveData["VOLTAGE"] ?: currentLiveData["voltage"] ?: currentLiveData["CTRL_VOLTAGE"] ?: currentLiveData["0142"] ?: mean
-                    else -> currentLiveData[pid] ?: currentLiveData[pid.lowercase()] ?: mean
-                }
+                val rawVal = resolveLiveValue(currentLiveData, pid) ?: mean
 
                 // Update EWMA (smoothing factor alpha = 0.1)
                 val prevEwma = vehicleEwma[pid] ?: rawVal
@@ -262,13 +316,173 @@ class MeetDnaEngine @Inject constructor(
                 healthScore = healthScore,
                 isAnomalous = isAnomalous,
                 sensorStates = sensorStates,
-                message = message
+                message = message,
+                stage = when {
+                    isAnomalous -> DnaBusinessStage.ATTENTION
+                    profile.confidence < 65.0 -> DnaBusinessStage.QUICK_PROFILE
+                    else -> DnaBusinessStage.MONITORING
+                },
+                liveSensorCount = sensorStates.count { resolveLiveValue(currentLiveData, it.pid) != null },
+                requiredLiveSensors = 5,
+                canTrain = true,
+                nextAction = when {
+                    isAnomalous -> "Revise el sensor dominante, DTCs activos y condiciones fisicas antes de borrar codigos."
+                    profile.confidence < 65.0 -> "Siga conduciendo en condiciones normales y re-entrene para convertir el perfil rapido en perfil completo."
+                    else -> "Mantenga el monitoreo activo durante la prueba de ruta o diagnostico en taller."
+                }
             )
 
         } catch (e: Exception) {
-            Log.e("MeetDnaEngine", "Error during DNA inference evaluation", e)
-            return@withContext DnaEvaluationResult(isCalibrated = false)
+            Log.e("ElysiumDnaEngine", "Error during DNA inference evaluation", e)
+            return@withContext DnaEvaluationResult(
+                isCalibrated = false,
+                healthScore = 0,
+                stage = DnaBusinessStage.ERROR,
+                message = "Elysium Vanguard DNA no pudo evaluar esta lectura: ${e.message ?: "error interno"}",
+                nextAction = "Reintente la lectura y valide que haya telemetria OBD estable."
+            )
         }
+    }
+
+    private fun buildProvisionalEvaluation(
+        vehicleId: String,
+        currentLiveData: Map<String, Float>,
+        progress: TrainingProgress
+    ): DnaEvaluationResult {
+        if (currentLiveData.isEmpty()) {
+            return DnaEvaluationResult(
+                isCalibrated = false,
+                healthScore = 0,
+                stage = DnaBusinessStage.DISCONNECTED,
+                sampleCount = progress.currentSamples,
+                requiredSamples = progress.requiredSamples,
+                liveSensorCount = 0,
+                requiredLiveSensors = 5,
+                canTrain = progress.isReady,
+                message = if (progress.isReady) {
+                    "Hay historial suficiente para calibrar, pero la lectura actual requiere conectar el scanner OBD-II."
+                } else {
+                    "Conecta el scanner OBD-II y espera telemetria viva para iniciar la firma Elysium Vanguard DNA."
+                },
+                nextAction = if (progress.isReady) {
+                    "Conecta el adaptador y presiona calibrar para cerrar la firma."
+                } else {
+                    "Realiza una ruta normal hasta reunir ${progress.missingSamples} muestras alineadas mas."
+                }
+            )
+        }
+
+        val vehicleEwma = ewmaCache.getOrPut(vehicleId) { mutableMapOf() }
+        val sensorStates = dnaPids.mapNotNull { (pid, label) ->
+            val rawVal = resolveLiveValue(currentLiveData, pid) ?: return@mapNotNull null
+            val previous = vehicleEwma[pid] ?: rawVal
+            val ewma = 0.2f * rawVal + 0.8f * previous
+            vehicleEwma[pid] = ewma
+            SensorDnaState(
+                pid = pid,
+                label = label,
+                baselineMean = rawVal,
+                baselineStdDev = provisionalStdDev(pid),
+                currentValue = rawVal,
+                ewmaValue = ewma,
+                zScore = 0f
+            )
+        }
+
+        if (sensorStates.isEmpty()) {
+            return DnaEvaluationResult(
+                isCalibrated = false,
+                healthScore = 0,
+                stage = DnaBusinessStage.COLLECTING,
+                sampleCount = progress.currentSamples,
+                requiredSamples = progress.requiredSamples,
+                liveSensorCount = 0,
+                requiredLiveSensors = 5,
+                canTrain = progress.isReady,
+                message = "El enlace OBD esta activo, pero todavia no llegaron PIDs suficientes para Elysium Vanguard DNA.",
+                nextAction = "Mantenga contacto ON o motor encendido segun el sensor y espere lecturas de RPM, voltaje, temperatura y carga."
+            )
+        }
+
+        val penalty = sensorStates.sumOf { provisionalPenalty(it.pid, it.currentValue) }
+        val healthScore = (100 - penalty).coerceIn(35, 100)
+        val coverage = sensorStates.size.toDouble() / dnaPids.size.toDouble()
+
+        return DnaEvaluationResult(
+            isCalibrated = false,
+            confidence = (coverage * 35.0).coerceIn(10.0, 35.0),
+            anomalyScore = 0.0,
+            healthScore = healthScore,
+            isAnomalous = false,
+            sensorStates = sensorStates,
+            message = if (progress.isReady) {
+                "Elysium Vanguard DNA ya tiene ${progress.currentSamples}/${progress.requiredSamples} muestras alineadas. Puede calibrar la firma real."
+            } else {
+                "Elysium Vanguard DNA esta recolectando base real: ${progress.currentSamples}/${progress.requiredSamples} muestras y ${sensorStates.size}/${dnaPids.size} sensores vivos."
+            },
+            stage = if (progress.isReady) DnaBusinessStage.READY_TO_TRAIN else DnaBusinessStage.COLLECTING,
+            sampleCount = progress.currentSamples,
+            requiredSamples = progress.requiredSamples,
+            liveSensorCount = sensorStates.size,
+            requiredLiveSensors = 5,
+            canTrain = progress.isReady,
+            nextAction = if (progress.isReady) {
+                "Calibre ahora; luego re-entrene despues de una ruta completa para subir confianza."
+            } else {
+                "Conduzca suave en ralenti, ciudad y crucero hasta reunir ${progress.missingSamples} muestras alineadas mas."
+            }
+        )
+    }
+
+    private fun resolveLiveValue(data: Map<String, Float>, pid: String): Float? {
+        val compact = pid.uppercase().replace(" ", "")
+        val core = compact.removePrefix("01")
+        val aliases = buildList {
+            add(pid)
+            add(compact)
+            add(core)
+            if (core.length == 2) add("01$core")
+            when (core) {
+                "0C" -> addAll(listOf("RPM", "rpm"))
+                "0D" -> addAll(listOf("SPEED", "speed", "VELOCIDAD"))
+                "05" -> addAll(listOf("COOLANT", "coolant", "ECT"))
+                "07" -> addAll(listOf("LTFT", "long_fuel_trim"))
+                "0B" -> addAll(listOf("MAP", "map"))
+                "10" -> addAll(listOf("MAF", "maf"))
+                "0F" -> addAll(listOf("IAT", "iat"))
+                "42" -> addAll(listOf("VOLTAGE", "voltage", "CTRL_VOLTAGE", "AT RV", "ATRV", "ELM_VOLTAGE"))
+            }
+        }
+        return aliases.firstNotNullOfOrNull { data[it] }
+    }
+
+    private fun provisionalStdDev(pid: String): Float = when (pid) {
+        "010C" -> 150f
+        "0105", "010F" -> 4f
+        "0142" -> 0.25f
+        "0107" -> 3f
+        "010B" -> 5f
+        "0110" -> 2f
+        else -> 1f
+    }
+
+    private fun provisionalPenalty(pid: String, value: Float): Int = when (pid) {
+        "0105" -> when {
+            value > 112f || value < -20f -> 35
+            value > 104f -> 18
+            else -> 0
+        }
+        "0142" -> when {
+            value < 11.5f || value > 15.3f -> 30
+            value < 12.0f || value > 14.9f -> 12
+            else -> 0
+        }
+        "010C" -> if (value > 6500f) 15 else 0
+        "0107" -> if (abs(value) > 18f) 18 else if (abs(value) > 10f) 8 else 0
+        "010B" -> if (value > 115f) 8 else 0
+        "0110" -> if (value < 0f) 10 else 0
+        "010F" -> if (value > 80f || value < -30f) 8 else 0
+        else -> 0
     }
 
     /**

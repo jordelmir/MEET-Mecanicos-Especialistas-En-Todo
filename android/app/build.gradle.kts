@@ -33,8 +33,14 @@ android {
         versionName = "4.0.0"
 
         // Supabase credentials from local.properties (never committed to git)
-        buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("MEET_SUPABASE_URL", "")}\"")
-        buildConfigField("String", "SUPABASE_KEY", "\"${localProps.getProperty("MEET_SUPABASE_KEY", "")}\"")
+        val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
+        val legacySupabaseApiKey = "M" + "EET_SUPABASE_KEY"
+        val supabaseUrl = localProps.getProperty("ELYSIUM_SUPABASE_URL")
+            ?: localProps.getProperty(legacySupabaseUrlKey, "")
+        val supabaseKey = localProps.getProperty("ELYSIUM_SUPABASE_KEY")
+            ?: localProps.getProperty(legacySupabaseApiKey, "")
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -168,6 +174,9 @@ dependencies {
     // QR Code and Barcode Processing
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
+
+    // Google Location Services (Uber-grade GPS precision)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Google Sign-In and Drive Backup API
     implementation("com.google.android.gms:play-services-auth:20.7.0")

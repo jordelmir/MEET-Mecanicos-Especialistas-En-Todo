@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +21,7 @@ import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.CustomPidEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +43,7 @@ fun CustomPidEditorScreen(
                 },
                 actions = {
                     IconButton(onClick = onSyncPids) {
-                        Icon(
+                        AnimatedNeonIcon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Sincronizar de la Nube",
                             tint = MeetColors.neonGreen
@@ -55,7 +60,7 @@ fun CustomPidEditorScreen(
                     containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark,
                     modifier = Modifier.border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(16.dp))
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add PID", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                    AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Add PID", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                 }
             }
         },
@@ -80,7 +85,7 @@ fun CustomPidEditorScreen(
                 if (customPids.isEmpty()) {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("🔧", style = MaterialTheme.typography.displayLarge)
+                            AnimatedNeonGlyph("🔧", contentDescription = null, fontSize = 48.sp)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("SIN SENSORES CUSTOM", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                             Text("Toca el + para inyectar un nuevo PID OEM", color = MeetColors.borderBlue, style = MaterialTheme.typography.bodySmall)

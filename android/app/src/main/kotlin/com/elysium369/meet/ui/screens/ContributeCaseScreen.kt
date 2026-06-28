@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -125,7 +127,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Info, contentDescription = "Error", tint = MeetColors.error)
+                        AnimatedNeonIcon(Icons.Default.Info, contentDescription = "Error", tint = MeetColors.error)
                         Text(errorMessage!!, color = MeetColors.error, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }

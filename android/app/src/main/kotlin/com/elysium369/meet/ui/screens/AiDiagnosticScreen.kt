@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -93,7 +95,7 @@ fun AiDiagnosticScreen(
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     EliteIconButton(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Configuración", tint = MeetColors.electricBlue) },
+                        icon = { AnimatedNeonIcon(Icons.Default.Settings, contentDescription = "Configuración", tint = MeetColors.electricBlue) },
                         onClick = { isConfigOpen = !isConfigOpen }
                     )
                 }
@@ -331,7 +333,7 @@ fun AiDiagnosticScreen(
                                             ) {
                                                 Column {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(Icons.Default.Info, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(14.dp))
+                                                        AnimatedNeonIcon(Icons.Default.Info, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(14.dp))
                                                         Spacer(modifier = Modifier.width(6.dp))
                                                         Text("PID ${anomaly.pid}", color = MeetColors.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }

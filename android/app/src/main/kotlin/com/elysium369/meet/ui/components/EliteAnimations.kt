@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sin
 
 // ═══════════════════════════════════════════════════════════════
 // ELITE ANIMATIONS V2 — Phantom Carbon Edition
@@ -327,12 +328,15 @@ fun Modifier.pulseOnHover(
     maxScale: Float = 1.02f
 ): Modifier = composed {
     if (!enabled) return@composed this
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse_hover")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = minScale, targetValue = maxScale,
-        animationSpec = infiniteRepeatable(
-            tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse
-        ), label = "ps"
-    )
+    var scale by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(minScale, maxScale) {
+        val startedAt = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - startedAt
+            val wave = ((sin(((elapsed % 2200L) / 2200f) * 2f * PI.toFloat()) + 1f) / 2f)
+            scale = minScale + ((maxScale - minScale) * wave)
+            kotlinx.coroutines.delay(220L)
+        }
+    }
     this.scale(scale)
 }

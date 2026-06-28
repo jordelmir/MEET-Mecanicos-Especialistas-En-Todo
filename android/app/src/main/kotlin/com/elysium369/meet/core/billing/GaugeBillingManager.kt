@@ -32,7 +32,7 @@ import kotlin.coroutines.resume
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "MeetBilling"
+private const val TAG = "ElysiumBilling"
 
 @Singleton
 class GaugeBillingManager @Inject constructor(

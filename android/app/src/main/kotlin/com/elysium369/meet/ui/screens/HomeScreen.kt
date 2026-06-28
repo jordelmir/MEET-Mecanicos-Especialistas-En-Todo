@@ -55,8 +55,6 @@ fun HomeScreen(
     val readiness by viewModel.readinessMonitors.collectAsState()
     val healthScore by viewModel.healthScore.collectAsState()
     val liveData by viewModel.liveData.collectAsState()
-    val isDemoMode by viewModel.isDemoMode.collectAsState()
-    val demoDescription by viewModel.demoScenarioDescription.collectAsState()
     val protocol by viewModel.detectedProtocol.collectAsState()
     val adapterVer by viewModel.adapterVersion.collectAsState()
     val isClone by viewModel.isCloneAdapter.collectAsState()
@@ -70,7 +68,6 @@ fun HomeScreen(
         obdState,
         totalDtcs,
         healthScore,
-        isDemoMode,
         batteryVoltage,
         readyCount,
         monitorCount
@@ -82,8 +79,7 @@ fun HomeScreen(
             healthScore = healthScore,
             batteryVoltage = batteryVoltage,
             readyCount = readyCount,
-            monitorCount = monitorCount,
-            isDemoMode = isDemoMode
+            monitorCount = monitorCount
         )
     }
 
@@ -148,7 +144,13 @@ fun HomeScreen(
                                     .then(Modifier.pulseOnHover()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("🎨", fontSize = 20.sp)
+                                ElysiumSectionIcon(
+                                    key = "theme",
+                                    contentDescription = "Personalizar tema",
+                                    tint = MeetColors.neonGreen,
+                                    size = 24.dp,
+                                    fallbackGlyph = "🎨"
+                                )
                             }
                             Box(
                                 modifier = Modifier
@@ -160,7 +162,13 @@ fun HomeScreen(
                                     .then(Modifier.pulseOnHover()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("⚙️", fontSize = 20.sp)
+                                ElysiumSectionIcon(
+                                    key = "settings",
+                                    contentDescription = "Ajustes",
+                                    tint = MeetColors.electricBlue,
+                                    size = 24.dp,
+                                    fallbackGlyph = "⚙️"
+                                )
                             }
                         }
                     }
@@ -177,12 +185,7 @@ fun HomeScreen(
                 CommandCenterCard(
                     profile = userProfile,
                     state = commandState,
-                    isDemoMode = isDemoMode,
-                    demoDescription = demoDescription,
-                    onPrimaryAction = { navController.navigate(commandState.primaryRoute) },
-                    onStartDemo = { viewModel.startDemoMode() },
-                    onCycleDemo = { viewModel.cycleDemoScenario() },
-                    onStopDemo = { viewModel.stopDemoMode() }
+                    onPrimaryAction = { navController.navigate(commandState.primaryRoute) }
                 )
             }
 
@@ -368,8 +371,8 @@ fun HomeScreen(
             val actions = listOf(
                 Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner",
                 Triple("⚠️", "DTCs", MeetColors.error) to "dtc",
-                Triple("🛡️", "MEET Perito", MeetColors.neonGreen) to "meet_perito",
-                Triple("🧬", "MEET DNA", MeetColors.cyberCyan) to "meet_dna",
+                Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito",
+                Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna",
                 Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator",
                 Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
                 Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings",
@@ -397,6 +400,7 @@ fun HomeScreen(
                     ) {
                         row.forEach { (meta, route) ->
                             QuickActionCard(
+                                iconKey = route,
                                 icon = meta.first,
                                 label = meta.second,
                                 accentColor = meta.third,
@@ -433,12 +437,7 @@ private data class HomeCommandState(
 private fun CommandCenterCard(
     profile: String,
     state: HomeCommandState,
-    isDemoMode: Boolean,
-    demoDescription: String,
-    onPrimaryAction: () -> Unit,
-    onStartDemo: () -> Unit,
-    onCycleDemo: () -> Unit,
-    onStopDemo: () -> Unit
+    onPrimaryAction: () -> Unit
 ) {
     EliteCard(
         glowColor = state.severityColor,
@@ -450,7 +449,7 @@ private fun CommandCenterCard(
         Column(modifier = Modifier.padding(18.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill(profileLabel(profile), MeetColors.electricBlue)
-                StatusPill(if (isDemoMode) "DEMO" else "REAL", if (isDemoMode) MeetColors.warning else MeetColors.neonGreen)
+                StatusPill("REAL", MeetColors.neonGreen)
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -474,16 +473,6 @@ private fun CommandCenterCard(
                 lineHeight = 18.sp
             )
 
-            if (isDemoMode) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    demoDescription.ifBlank { "Entrenamiento activo con telemetría de muestra." },
-                    color = MeetColors.warning,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
             Spacer(Modifier.height(14.dp))
             EliteButton(
                 text = state.primaryAction,
@@ -491,37 +480,13 @@ private fun CommandCenterCard(
                 color = state.severityColor,
                 modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(Modifier.height(8.dp))
-            if (isDemoMode) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    EliteOutlinedButton(
-                        text = "CAMBIAR ESCENARIO",
-                        onClick = onCycleDemo,
-                        color = MeetColors.warning,
-                        modifier = Modifier.weight(1f)
-                    )
-                    EliteOutlinedButton(
-                        text = "DETENER DEMO",
-                        onClick = onStopDemo,
-                        color = MeetColors.error,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                EliteOutlinedButton(
-                    text = "EXPLORAR DEMO SIN ADAPTADOR",
-                    onClick = onStartDemo,
-                    color = MeetColors.warning,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
     }
 }
 
 @Composable
 private fun QuickActionCard(
+    iconKey: String,
     icon: String,
     label: String,
     accentColor: Color,
@@ -541,7 +506,13 @@ private fun QuickActionCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(icon, fontSize = 22.sp)
+            ElysiumSectionIcon(
+                key = iconKey,
+                contentDescription = label,
+                tint = accentColor,
+                size = 28.dp,
+                fallbackGlyph = icon
+            )
             Text(
                 label,
                 color = Color.White,
@@ -573,8 +544,7 @@ private fun buildHomeCommandState(
     healthScore: Int,
     batteryVoltage: Float?,
     readyCount: Int,
-    monitorCount: Int,
-    isDemoMode: Boolean
+    monitorCount: Int
 ): HomeCommandState {
     return when {
         !hasVehicle -> HomeCommandState(
@@ -585,17 +555,9 @@ private fun buildHomeCommandState(
             severityColor = MeetColors.electricBlue,
             statusLine = "Garaje pendiente"
         )
-        isDemoMode -> HomeCommandState(
-            title = "Demo de entrenamiento activo",
-            recommendation = "Estás viendo telemetría de práctica. Úsala para conocer DTCs, gauges, Motor 3D e IA sin escribir historial real.",
-            primaryAction = "VER DTC DEMO",
-            primaryRoute = "dtc",
-            severityColor = MeetColors.warning,
-            statusLine = "Datos simulados rotulados"
-        )
         obdState != ObdState.CONNECTED -> HomeCommandState(
             title = "Conecta el adaptador OBD",
-            recommendation = "Enciende el switch, conecta el adaptador y deja que MEET detecte protocolo, latencia y capacidades antes del escaneo.",
+            recommendation = "Enciende el switch, conecta el adaptador y deja que Elysium Vanguard detecte protocolo, latencia y capacidades antes del escaneo.",
             primaryAction = "CONECTAR ADAPTADOR",
             primaryRoute = "connect",
             severityColor = MeetColors.cyberCyan,
@@ -619,8 +581,8 @@ private fun buildHomeCommandState(
         )
         healthScore < 80 -> HomeCommandState(
             title = "Salud del vehículo requiere revisión",
-            recommendation = "El score bajó por telemetría o anomalías. Revisa MEET DNA para ver tendencia, sistema afectado y próxima prueba recomendada.",
-            primaryAction = "VER MEET DNA",
+            recommendation = "El score bajó por telemetría o anomalías. Revisa Elysium Vanguard DNA para ver tendencia, sistema afectado y próxima prueba recomendada.",
+            primaryAction = "VER Elysium Vanguard DNA",
             primaryRoute = "meet_dna",
             severityColor = MeetColors.warning,
             statusLine = "Score: $healthScore/100"

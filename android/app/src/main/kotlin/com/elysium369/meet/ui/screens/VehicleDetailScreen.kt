@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -114,7 +116,7 @@ fun VehicleDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -124,7 +126,7 @@ fun VehicleDetailScreen(
                     IconButton(onClick = { 
                         showReportCustomizer = true
                     }) {
-                        Icon(Icons.Default.Share, contentDescription = "Exportar Historial")
+                        AnimatedNeonIcon(Icons.Default.Share, contentDescription = "Exportar Historial")
                     }
                 }
             )
@@ -134,7 +136,7 @@ fun VehicleDetailScreen(
                 onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir Registro", tint = MaterialTheme.colorScheme.onPrimary)
+                AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Añadir Registro", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
     ) { paddingValues ->
@@ -249,7 +251,7 @@ fun VehicleDetailScreen(
                                     showReportCustomizer = false
                                     reportFile = null
                                 }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                                    AnimatedNeonIcon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
                                 }
                             }
                         }
@@ -280,7 +282,7 @@ fun VehicleDetailScreen(
 
                                 VehicleDocumentPreviewCard(
                                     theme = selectedTheme,
-                                    workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "MEET CLINIC",
+                                    workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard Clinic",
                                     make = make,
                                     model = model,
                                     includeMaint = includeMaint,
@@ -646,7 +648,7 @@ fun VehicleDetailScreen(
                                         .border(2.dp, MeetColors.neonGreen, RoundedCornerShape(36.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = "Éxito", tint = MeetColors.neonGreen, modifier = Modifier.size(36.dp))
+                                    AnimatedNeonIcon(Icons.Default.Check, contentDescription = "Éxito", tint = MeetColors.neonGreen, modifier = Modifier.size(36.dp))
                                 }
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Text(
@@ -676,7 +678,7 @@ fun VehicleDetailScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Share, contentDescription = null, tint = Color.Black)
+                                    AnimatedNeonIcon(Icons.Default.Share, contentDescription = null, tint = Color.Black)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("COMPARTIR / ENVIAR REPORTE", color = Color.Black, fontWeight = FontWeight.Bold)
                                 }
@@ -849,7 +851,7 @@ fun MetricCard(title: String, value: String, icon: androidx.compose.ui.graphics.
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(28.dp))
+            AnimatedNeonIcon(icon, contentDescription = null, tint = color, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
@@ -1175,7 +1177,7 @@ fun AddRecordDialog(
                         onClick = { imagePickerLauncher.launch("image/*") },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
                     ) {
-                        Icon(Icons.Default.Image, contentDescription = "Adjuntar Foto")
+                        AnimatedNeonIcon(Icons.Default.Image, contentDescription = "Adjuntar Foto")
                         Spacer(Modifier.width(8.dp))
                         Text(if (selectedImageUri == null) "Adjuntar Foto" else "Cambiar Foto")
                     }
@@ -1406,10 +1408,7 @@ fun TelemetryOscilloscope(
 fun ExpertTelemetryPanel(
     viewModel: VehicleDetailViewModel
 ) {
-    val telemetryActive by viewModel.telemetryActive.collectAsState()
-    val simulatedPids by viewModel.simulatedPids.collectAsState()
     val expertProcedures by viewModel.expertProcedures.collectAsState()
-    val selectedProfile by viewModel.selectedProfile.collectAsState()
 
     Column(
         modifier = Modifier
@@ -1417,190 +1416,31 @@ fun ExpertTelemetryPanel(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        TelemetryOscilloscope(active = telemetryActive, profile = selectedProfile)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "PERFIL DE SIMULACIÓN DE TELEMETRÍA",
+            text = "TELEMETRÍA REAL",
             color = MeetColors.textSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val profiles = listOf(
-                "NORMAL" to "Saludable",
-                "VACUUM_LEAK" to "Fuga Vacío",
-                "OVERHEATING" to "ECT Caliente",
-                "BATTERY_FAIL" to "Batería Baja"
-            )
-            profiles.forEach { (profileId, name) ->
-                val isSelected = selectedProfile == profileId
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) MeetColors.neonGreen.copy(alpha = 0.15f) else MeetColors.cardBackground)
-                        .border(
-                            1.dp,
-                            if (isSelected) MeetColors.neonGreen else MeetColors.borderSubtle,
-                            RoundedCornerShape(6.dp)
-                        )
-                        .clickable { viewModel.selectTelemetryProfile(profileId) }
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = name,
-                        color = if (isSelected) Color.White else MeetColors.textSecondary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                if (telemetryActive) {
-                    viewModel.stopTelemetrySimulation()
-                } else {
-                    viewModel.startTelemetrySimulation()
-                }
-            },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(45.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (telemetryActive) MeetColors.error else MeetColors.neonGreen
-            ),
-            shape = RoundedCornerShape(8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MeetColors.cardBackground)
+                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                .padding(14.dp)
         ) {
-            Icon(
-                imageVector = if (telemetryActive) Icons.Default.Close else Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (telemetryActive) "DETENER TELEMETRÍA EN VIVO" else "INICIAR TELEMETRÍA EN VIVO",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
+                text = "Los valores en vivo se leen desde Scanner con un adaptador OBD-II conectado. Este panel no genera datos artificiales.",
+                color = MeetColors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
-
-        if (telemetryActive) {
-            Text(
-                text = "VALORES DE SENSORES EN TIEMPO REAL",
-                color = MeetColors.textSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val rpm = simulatedPids["010C"]?.toInt() ?: 0
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("RPM MOTOR", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Text("$rpm", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                val voltage = String.format("%.2f", simulatedPids["0142"] ?: 0f)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("BATERÍA/ALT", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Text("${voltage}V", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                val ect = simulatedPids["0105"]?.toInt() ?: 0
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("TEMP REF (ECT)", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Text("${ect}°C", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val stft = String.format("%+.1f%%", simulatedPids["0106"] ?: 0f)
-                val ltft = String.format("%+.1f%%", simulatedPids["0107"] ?: 0f)
-                Box(
-                    modifier = Modifier
-                        .weight(1.5f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("FUEL TRIMS (STFT/LTFT)", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Text("$stft / $ltft", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                val maf = String.format("%.2fg/s", simulatedPids["0110"] ?: 0f)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MeetColors.cardBackground)
-                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("MAF SENSOR", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Text(maf, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-        }
 
         Text(
             text = "PROCEDIMIENTOS Y RECOMENDACIONES CLÍNICAS",
@@ -1610,24 +1450,7 @@ fun ExpertTelemetryPanel(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        if (!telemetryActive) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeetColors.cardBackground)
-                    .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Inicia la telemetría en vivo para realizar el análisis pericial del experto local en tiempo real.",
-                    color = MeetColors.textSecondary,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else if (expertProcedures.isEmpty()) {
+        if (expertProcedures.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1638,10 +1461,10 @@ fun ExpertTelemetryPanel(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(28.dp))
+                    AnimatedNeonIcon(Icons.Default.CheckCircle, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(28.dp))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "No se detectaron fallos activos en el perfil de telemetría. ¡El motor funciona a nivel óptimo!",
+                        text = "No hay procedimientos pendientes con los DTCs guardados para este vehículo. Conecta el scanner para actualizar lecturas reales.",
                         color = Color.White,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
@@ -1698,7 +1521,7 @@ fun ExpertTelemetryPanel(
                                     )
                                 }
                             }
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = null,
                                 tint = MeetColors.textSecondary
@@ -1786,7 +1609,7 @@ fun NhtsaRecallsPanel(viewModel: VehicleDetailViewModel) {
                     vehicle?.let { viewModel.fetchNhtsaRecalls(it.make, it.model, it.year) }
                 }
             ) {
-                Icon(
+                AnimatedNeonIcon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refrescar Recalls",
                     tint = MeetColors.neonGreen
@@ -1831,7 +1654,7 @@ fun NhtsaRecallsPanel(viewModel: VehicleDetailViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
+                        AnimatedNeonIcon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = null,
                             tint = MeetColors.error,
@@ -1868,7 +1691,7 @@ fun NhtsaRecallsPanel(viewModel: VehicleDetailViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = MeetColors.neonGreen,
@@ -1994,5 +1817,3 @@ fun NhtsaRecallsPanel(viewModel: VehicleDetailViewModel) {
         }
     }
 }
-
-

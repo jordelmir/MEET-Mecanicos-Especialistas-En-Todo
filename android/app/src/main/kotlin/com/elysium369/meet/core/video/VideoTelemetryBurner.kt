@@ -105,7 +105,7 @@ class VideoTelemetryBurner(private val context: Context) {
                         // Títulos del encabezado
                         paintText.color = greenColor
                         paintText.textSize = 14f * scale
-                        frameCanvas.drawText("MEET ELITE TELEMETRY SYSTEMS [UDS ACTIVE LINK]", 30f * scale, 28f * scale, paintText)
+                        frameCanvas.drawText("Elysium Vanguard ELITE TELEMETRY SYSTEMS [UDS ACTIVE LINK]", 30f * scale, 28f * scale, paintText)
                         
                         // Timer de grabación
                         val elapsedSeconds = frame.timestampMs / 1000

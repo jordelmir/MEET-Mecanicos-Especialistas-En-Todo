@@ -8,6 +8,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,10 +30,16 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.AnimatedIconPreset
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.PhantomSectionHeader
+import com.elysium369.meet.ui.components.rememberAnimatedIconStyle
+import com.elysium369.meet.ui.components.setAnimatedIconEnabled
+import com.elysium369.meet.ui.components.setAnimatedIconIntensity
+import com.elysium369.meet.ui.components.setAnimatedIconPreset
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -341,6 +348,17 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             }
 
             // ============================================================
+            //  SECCIÓN 1C: ICONOS 3D ANIMADOS
+            // ============================================================
+            item {
+                Column {
+                    PhantomSectionHeader(label = "ICONOS 3D ANIMADOS", accentColor = MeetColors.hotMagenta)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AnimatedIconSettingsCard(context = context)
+                }
+            }
+
+            // ============================================================
             //  SECCIÓN 2: INTELIGENCIA ARTIFICIAL
             // ============================================================
             item {
@@ -415,7 +433,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
                                     IconButton(onClick = { showApiKey = !showApiKey }) {
-                                        Icon(
+                                        AnimatedNeonIcon(
                                             if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                             contentDescription = "Toggle visibility",
                                             tint = MeetColors.electricBlue
@@ -811,7 +829,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                "Personaliza los colores acentuados, textos, iconos y bordes de todo el sistema MEET.",
+                                "Personaliza los colores acentuados, textos, iconos y bordes de todo el sistema Elysium Vanguard.",
                                 color = MeetColors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -862,6 +880,120 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
         com.elysium369.meet.ui.components.SystemThemeCustomizerDialog(
             onDismiss = { showThemeCustomizer = false }
         )
+    }
+}
+
+@Composable
+private fun AnimatedIconSettingsCard(context: Context) {
+    val iconStyle by rememberAnimatedIconStyle(context)
+    val presets = listOf(
+        AnimatedIconPreset.AUTO,
+        AnimatedIconPreset.AXIAL_SPIN,
+        AnimatedIconPreset.ORBITAL_SCANNER,
+        AnimatedIconPreset.PISTON_PULSE,
+        AnimatedIconPreset.HOLO_SCAN,
+        AnimatedIconPreset.IGNITION_GLITCH
+    )
+
+    EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = MeetColors.hotMagenta,
+        backgroundColor = MeetColors.backgroundDeep,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    AnimatedNeonIcon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = "Iconos animados",
+                        tint = MeetColors.hotMagenta,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Movimiento global", color = Color.White, fontWeight = FontWeight.Medium)
+                        Text(iconStyle.preset.label, color = MeetColors.textSecondary, fontSize = 11.sp)
+                    }
+                }
+                Switch(
+                    checked = iconStyle.enabled,
+                    onCheckedChange = { setAnimatedIconEnabled(context, it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MeetColors.hotMagenta,
+                        checkedTrackColor = MeetColors.hotMagenta.copy(alpha = 0.3f),
+                        uncheckedThumbColor = MeetColors.textSecondary,
+                        uncheckedTrackColor = MeetColors.textSecondary.copy(alpha = 0.2f)
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("Preset", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            presets.forEach { preset ->
+                val selected = iconStyle.preset == preset
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (selected) MeetColors.hotMagenta.copy(alpha = 0.16f)
+                            else Color.White.copy(alpha = 0.035f)
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) MeetColors.hotMagenta.copy(alpha = 0.72f)
+                            else Color.White.copy(alpha = 0.08f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { setAnimatedIconPreset(context, preset) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedNeonIcon(
+                        imageVector = if (preset == AnimatedIconPreset.IGNITION_GLITCH) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = preset.label,
+                        tint = if (selected) MeetColors.hotMagenta else MeetColors.cyberCyan,
+                        preset = preset,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        preset.label,
+                        color = if (selected) Color.White else MeetColors.textSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Intensidad", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("${(iconStyle.intensity * 100).toInt()}%", color = MeetColors.hotMagenta, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            }
+            Slider(
+                value = iconStyle.intensity,
+                onValueChange = { setAnimatedIconIntensity(context, it) },
+                valueRange = 0.35f..1.6f,
+                steps = 4,
+                colors = SliderDefaults.colors(
+                    thumbColor = MeetColors.hotMagenta,
+                    activeTrackColor = MeetColors.hotMagenta,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+                )
+            )
+        }
     }
 }
 

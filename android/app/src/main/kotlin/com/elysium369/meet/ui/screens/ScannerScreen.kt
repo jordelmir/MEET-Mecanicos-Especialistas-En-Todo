@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -256,7 +258,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                             },
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 imageVector = if (voiceCopilotEnabled) Icons.Default.Mic else Icons.Default.MicOff,
                                 contentDescription = "Voice Copilot Toggle",
                                 tint = if (voiceCopilotEnabled) {
@@ -393,7 +395,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                     .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp))
                     .neonGlow(com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp), minElevation = 4f, maxElevation = 12f)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
+                AnimatedNeonIcon(Icons.Default.Add, contentDescription = "Agregar", tint = com.elysium369.meet.ui.theme.MeetColors.neonGreen)
             }
         },
         containerColor = Color.Transparent

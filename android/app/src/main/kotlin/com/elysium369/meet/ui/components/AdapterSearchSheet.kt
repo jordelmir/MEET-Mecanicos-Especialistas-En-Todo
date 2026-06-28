@@ -197,7 +197,13 @@ fun AdapterSearchSheet(
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✕", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    AnimatedNeonGlyph(
+                        glyph = "✕",
+                        contentDescription = "Cerrar",
+                        tint = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
 
@@ -544,7 +550,7 @@ fun AdapterSearchSheet(
                                                             ),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Text("⚡", fontSize = 18.sp)
+                                                        AnimatedNeonGlyph("⚡", contentDescription = null, fontSize = 18.sp)
                                                     }
                                                     Spacer(modifier = Modifier.width(14.dp))
                                                     Column(modifier = Modifier.weight(1f)) {
@@ -799,7 +805,7 @@ fun BluetoothDisabledView(context: Context) {
                 .border(1.dp, MeetColors.error, RoundedCornerShape(50)),
             contentAlignment = Alignment.Center
         ) {
-            Text("⚠️", fontSize = 28.sp)
+            AnimatedNeonGlyph("⚠️", contentDescription = null, fontSize = 28.sp)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
@@ -844,7 +850,7 @@ fun NoPairedDevicesView(context: Context) {
                 .border(1.dp, MeetColors.hotMagenta, RoundedCornerShape(50)),
             contentAlignment = Alignment.Center
         ) {
-            Text("🔌", fontSize = 28.sp)
+            AnimatedNeonGlyph("🔌", contentDescription = null, fontSize = 28.sp)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(

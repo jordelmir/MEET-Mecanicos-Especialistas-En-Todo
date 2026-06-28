@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.scanner
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
 import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -139,7 +141,7 @@ fun ScannerToolsTab(
                             .border(1.dp, statusColor.copy(alpha = 0.3f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(icon, fontSize = 22.sp)
+                        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 22.sp)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -183,7 +185,7 @@ fun ScannerToolsTab(
                             .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("📦", fontSize = 22.sp)
+                        AnimatedNeonGlyph("📦", contentDescription = null, fontSize = 22.sp)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -329,7 +331,13 @@ fun ScannerToolsTab(
                                 .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("🖥️", fontSize = 22.sp)
+                            AnimatedNeonGlyph(
+                                glyph = "▣",
+                                contentDescription = "HUD",
+                                tint = MeetColors.electricBlue,
+                                fontSize = 22.sp,
+                                modifier = Modifier.size(28.dp),
+                            )
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -420,7 +428,7 @@ fun ScannerToolsTab(
                                 .border(1.dp, MeetColors.hotMagenta.copy(alpha = 0.3f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("📊", fontSize = 22.sp)
+                            AnimatedNeonGlyph("📊", contentDescription = null, fontSize = 22.sp)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {

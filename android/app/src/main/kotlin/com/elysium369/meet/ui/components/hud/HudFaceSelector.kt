@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.theme.MeetColors
 
 /**
@@ -88,7 +89,7 @@ fun HudFaceSelector(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(face.icon, fontSize = 14.sp)
+                    AnimatedNeonGlyph(face.icon, contentDescription = null, fontSize = 14.sp)
                     Spacer(Modifier.width(6.dp))
                     Text(
                         face.displayName.uppercase(),

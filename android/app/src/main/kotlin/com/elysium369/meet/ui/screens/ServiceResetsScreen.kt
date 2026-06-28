@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -200,7 +202,7 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                             .border(1.dp, (if (allMet && isConnected) MeetColors.neonGreen else MeetColors.electricBlue).copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(option.icon, style = MaterialTheme.typography.headlineSmall)
+                                        AnimatedNeonGlyph(option.icon, contentDescription = null, fontSize = 24.sp)
                                     }
                                     
                                     Spacer(modifier = Modifier.width(16.dp))

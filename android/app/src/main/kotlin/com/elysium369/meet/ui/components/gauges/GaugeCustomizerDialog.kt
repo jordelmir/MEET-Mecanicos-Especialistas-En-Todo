@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.theme.ThemeColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -280,7 +281,7 @@ fun GaugeCustomizerDialog(
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(target.icon, fontSize = 16.sp)
+                                AnimatedNeonGlyph(target.icon, contentDescription = null, fontSize = 16.sp)
                                 Text(
                                     target.label,
                                     color =
@@ -399,8 +400,7 @@ fun GaugeCustomizerDialog(
                             onSelect = { diyGuideStep = it },
                             onPrev = { diyGuideStep = (diyGuideStep - 1).coerceAtLeast(0) },
                             onNext = {
-                                diyGuideStep =
-                                    (diyGuideStep + 1).coerceAtMost(diyGuidedSteps.lastIndex)
+                                diyGuideStep = (diyGuideStep + 1).coerceAtMost(diyGuidedSteps.lastIndex)
                             },
                         )
 
@@ -1177,7 +1177,13 @@ fun GaugeCustomizerDialog(
                                                 .clickable { gaugeStyleManager.clearDiyBgImage() },
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Text("🗑️", fontSize = 18.sp)
+                                        AnimatedNeonGlyph(
+                                            glyph = "⌫",
+                                            contentDescription = "Eliminar imagen",
+                                            tint = Color(0xFFFF1744),
+                                            fontSize = 20.sp,
+                                            modifier = Modifier.size(24.dp),
+                                        )
                                     }
                                 }
                             }
@@ -1547,7 +1553,7 @@ fun GaugeCustomizerDialog(
                                         )
                                         Spacer(Modifier.height(12.dp))
                                         Text(
-                                            "Escanea este código con otro dispositivo MEET para copiar el diseño al instante.",
+                                            "Escanea este código con otro dispositivo Elysium Vanguard para copiar el diseño al instante.",
                                             color = Color.White.copy(alpha = 0.6f),
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center,
@@ -1828,7 +1834,7 @@ fun GaugeCustomizerDialog(
                                                     horizontalAlignment =
                                                         Alignment.CenterHorizontally
                                                 ) {
-                                                    Text("🎨", fontSize = 40.sp)
+                                                    AnimatedNeonGlyph("🎨", contentDescription = null, fontSize = 40.sp)
                                                     Spacer(Modifier.height(8.dp))
                                                     Text(
                                                         "Aún no tienes gauges guardados",
@@ -1939,7 +1945,7 @@ fun GaugeCustomizerDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(bottom = 8.dp, top = 12.dp),
                             ) {
-                                Text(category.icon, fontSize = 14.sp)
+                                AnimatedNeonGlyph(category.icon, contentDescription = null, fontSize = 14.sp)
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     category.title,
@@ -2469,7 +2475,7 @@ private fun DiySectionHeader(icon: String, title: String) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
     ) {
-        Text(icon, fontSize = 16.sp)
+        AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 16.sp)
         Spacer(Modifier.width(8.dp))
         Text(
             title,
@@ -2505,7 +2511,7 @@ private fun DiyVisualCard(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(icon, fontSize = 20.sp)
+            AnimatedNeonGlyph(icon, contentDescription = null, fontSize = 20.sp)
             Spacer(Modifier.height(4.dp))
             Text(
                 name,

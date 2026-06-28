@@ -1,5 +1,9 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.app.Activity
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -185,7 +189,7 @@ fun GaugeMarketplaceScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
+                            AnimatedNeonIcon(
                                 Icons.Default.ArrowBack,
                                 contentDescription = "Back",
                                 tint = Color.White
@@ -312,7 +316,7 @@ fun GaugeMarketplaceScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(48.dp)
                     ) {
-                        Text("🎨", fontSize = 64.sp)
+                        AnimatedNeonGlyph("🎨", contentDescription = null, fontSize = 64.sp)
                         Spacer(Modifier.height(16.dp))
                         Text(
                             when (uiState.selectedTab) {
@@ -393,7 +397,7 @@ fun GaugeMarketplaceScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🚀", fontSize = 18.sp)
+                AnimatedNeonGlyph("🚀", contentDescription = null, fontSize = 18.sp)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Publicar",
@@ -549,7 +553,7 @@ private fun GaugeListingCard(
                         )
                     }
                 } else {
-                    Text("🎨", fontSize = 40.sp)
+                    AnimatedNeonGlyph("🎨", contentDescription = null, fontSize = 40.sp)
                 }
             }
 
@@ -601,7 +605,7 @@ private fun GaugeListingCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Rating
                     if (listing.review_count > 0) {
-                        Text("⭐", fontSize = 10.sp)
+                        AnimatedNeonGlyph("⭐", contentDescription = null, fontSize = 10.sp)
                         Text(
                             " %.1f".format(listing.avg_rating),
                             color = Color(0xFFFFD600),

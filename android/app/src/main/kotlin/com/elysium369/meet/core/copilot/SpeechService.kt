@@ -27,7 +27,7 @@ class SpeechService @Inject constructor(
 
     fun startListeningToEvents() {
         if (job != null) return
-        Log.i("SpeechService", "Starting MEET Copilot SpeechService event listener...")
+        Log.i("SpeechService", "Starting Elysium Vanguard Copilot SpeechService event listener...")
         job = scope.launch {
             eventBus.events.collect { event ->
                 processEventSpeech(event)
@@ -38,7 +38,7 @@ class SpeechService @Inject constructor(
     fun stopListeningToEvents() {
         job?.cancel()
         job = null
-        Log.i("SpeechService", "Stopped MEET Copilot SpeechService event listener.")
+        Log.i("SpeechService", "Stopped Elysium Vanguard Copilot SpeechService event listener.")
     }
 
     private fun processEventSpeech(event: CopilotEvent) {

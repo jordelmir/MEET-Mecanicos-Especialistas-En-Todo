@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -101,13 +103,13 @@ fun AdaptationScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+                AnimatedNeonIcon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text("Adaptaciones & Codificación", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Soft-coding de módulos ECU", color = MeetColors.textSecondary, fontSize = 12.sp)
             }
-            Icon(Icons.Default.Build, "Tools", tint = MeetColors.electricBlue, modifier = Modifier.size(24.dp))
+            AnimatedNeonIcon(Icons.Default.Build, "Tools", tint = MeetColors.electricBlue, modifier = Modifier.size(24.dp))
         }
 
         // ── Warning Banner ──
@@ -121,7 +123,7 @@ fun AdaptationScreen(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Warning, "Warning", tint = MeetColors.warning, modifier = Modifier.size(18.dp))
+            AnimatedNeonIcon(Icons.Default.Warning, "Warning", tint = MeetColors.warning, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Estas funciones envían comandos al ECU. Asegúrese de que el motor esté apagado y la llave en posición ON.",
@@ -252,7 +254,7 @@ fun AdaptationScreen(
                                 }
                                 ProcedureState.SUCCESS -> {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.CheckCircle, "OK", tint = MeetColors.success, modifier = Modifier.size(18.dp))
+                                        AnimatedNeonIcon(Icons.Default.CheckCircle, "OK", tint = MeetColors.success, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(8.dp))
                                         Text(statusMessage, color = MeetColors.success, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                     }

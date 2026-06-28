@@ -103,9 +103,4 @@ object ObdModule {
         return com.elysium369.meet.core.obd.TurboBoostGauge()
     }
 
-    @Provides
-    @Singleton
-    fun provideDemoModeSimulator(): com.elysium369.meet.core.obd.DemoModeSimulator {
-        return com.elysium369.meet.core.obd.DemoModeSimulator()
-    }
 }

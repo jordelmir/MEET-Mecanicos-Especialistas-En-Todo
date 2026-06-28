@@ -6,11 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.elysium369.meet.MainActivity
 import com.elysium369.meet.core.alerts.AlertManager
 import com.elysium369.meet.core.trips.TripManager
@@ -31,32 +33,83 @@ class ObdForegroundService : Service() {
     private val CHANNEL_ID = "obd_channel"
     
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wakeLockAcquiredAtMs: Long = 0L
+    private var telemetryJob: Job? = null
+    private var watchdogJob: Job? = null
     
     val liveData: StateFlow<Map<String, Float>> get() = obdSession.liveData
     val connectionState: StateFlow<ObdState> get() = obdSession.state
+
+    /**
+     * Check whether the Bluetooth permissions required for
+     * FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE are granted at runtime.
+     * On SDK < 31 we only need ACCESS_FINE_LOCATION which is always
+     * in the "anyOf" bucket, so we return true.
+     */
+    private fun hasBluetoothPermissions(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val connect = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.BLUETOOTH_CONNECT
+        ) == PackageManager.PERMISSION_GRANTED
+        val scan = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.BLUETOOTH_SCAN
+        ) == PackageManager.PERMISSION_GRANTED
+        return connect || scan // "anyOf" — only one is needed
+    }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val vehicleId = intent?.getStringExtra("vehicle_id") ?: "unknown_vehicle"
+        val adapterAddress = intent?.getStringExtra("adapter_address")
         
         // Crear canal ANTES de startForeground — requerido en Android 8+
         createNotificationChannel()
         acquireWakeLock()
         
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasBluetoothPermissions()) {
+                // Full connectedDevice foreground service — requires BT permissions at runtime
                 startForeground(
                     NOTIF_ID,
                     buildNotification("Iniciando conexión..."),
                     android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
             } else {
+                // Fallback: start as plain foreground service (no special type).
+                // This keeps the service alive without crashing on missing permissions.
                 startForeground(NOTIF_ID, buildNotification("Iniciando conexión..."))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasBluetoothPermissions()) {
+                    Log.w("ObdForegroundService",
+                        "Started WITHOUT connectedDevice type — Bluetooth permissions not yet granted. " +
+                        "Service will function but may be restricted by the OS.")
+                }
+            }
+        } catch (e: SecurityException) {
+            // Even with our guard, some OEMs throw on startForeground itself.
+            // Fall back to the safest possible call.
+            Log.e("ObdForegroundService", "SecurityException on startForeground, retrying without type", e)
+            try {
+                startForeground(NOTIF_ID, buildNotification("Conexión OBD activa"))
+            } catch (e2: Exception) {
+                Log.e("ObdForegroundService", "Could not start foreground at all, stopping", e2)
+                stopSelf()
+                return START_NOT_STICKY
             }
         } catch (e: Exception) {
-            // Ignorar en desarrollo/pruebas si faltan permisos
+            Log.e("ObdForegroundService", "Unexpected error on startForeground", e)
+            try {
+                startForeground(NOTIF_ID, buildNotification("Conexión OBD activa"))
+            } catch (_: Exception) {
+                stopSelf()
+                return START_NOT_STICKY
+            }
         }
         
-        serviceScope.launch {
+        if (obdSession.state.value != ObdState.CONNECTED && !adapterAddress.isNullOrBlank()) {
+            obdSession.setTargetAddress(adapterAddress)
+        }
+
+        telemetryJob?.cancel()
+        telemetryJob = serviceScope.launch {
             alertManager.startMonitoring(liveData, serviceScope)
             
             val sessionId = java.util.UUID.randomUUID().toString()
@@ -86,16 +139,22 @@ class ObdForegroundService : Service() {
                 }
             }
         }
+
+        startContinuityWatchdog(adapterAddress)
         
         return START_STICKY
     }
 
     private fun acquireWakeLock() {
         try {
+            val now = System.currentTimeMillis()
+            if (wakeLock?.isHeld == true && now - wakeLockAcquiredAtMs < WAKE_LOCK_RENEW_MS) return
+            releaseWakeLock()
             val pm = getSystemService(android.content.Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MEET:ObdForegroundServiceWakeLock").apply {
-                acquire(15 * 60 * 1000L) // Limit to 15 mins for safety
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ElysiumVanguard:ObdForegroundServiceWakeLock").apply {
+                acquire(WAKE_LOCK_TIMEOUT_MS)
             }
+            wakeLockAcquiredAtMs = now
             Log.d("ObdForegroundService", "WakeLock acquired successfully")
         } catch (e: Exception) {
             Log.e("ObdForegroundService", "Failed to acquire WakeLock", e)
@@ -114,7 +173,62 @@ class ObdForegroundService : Service() {
             Log.e("ObdForegroundService", "Failed to release WakeLock", e)
         } finally {
             wakeLock = null
+            wakeLockAcquiredAtMs = 0L
         }
+    }
+
+    private fun startContinuityWatchdog(adapterAddress: String?) {
+        watchdogJob?.cancel()
+        watchdogJob = serviceScope.launch {
+            var reconnectAttempts = 0
+            while (isActive) {
+                delay(WATCHDOG_INTERVAL_MS)
+                acquireWakeLock()
+
+                val now = System.currentTimeMillis()
+                val state = connectionState.value
+
+                when (state) {
+                    ObdState.CONNECTED -> {
+                        val silenceMs = obdSession.liveDataSilenceMs(now)
+                        if (silenceMs > LIVE_DATA_STALE_MS) {
+                            updateNotification("Recuperando telemetría OBD...")
+                            val recovered = obdSession.recoverFrozenLink("foreground watchdog: ${silenceMs}ms sin telemetría")
+                            if (recovered) {
+                                reconnectAttempts = 0
+                            }
+                        }
+                    }
+                    ObdState.ERROR, ObdState.DISCONNECTED -> {
+                        if (!adapterAddress.isNullOrBlank()) {
+                            reconnectAttempts = (reconnectAttempts + 1).coerceAtMost(8)
+                            val backoffMs = (reconnectAttempts * 2_000L).coerceAtMost(20_000L)
+                            updateNotification("Reconectando OBD en ${backoffMs / 1000}s...")
+                            delay(backoffMs)
+                            runCatching {
+                                if (connectionState.value != ObdState.CONNECTED) {
+                                    obdSession.setTargetAddress(adapterAddress)
+                                    obdSession.connect()
+                                    if (connectionState.value == ObdState.CONNECTED) {
+                                        obdSession.startLivePolling()
+                                        reconnectAttempts = 0
+                                    }
+                                }
+                            }.onFailure {
+                                Log.w("ObdForegroundService", "Watchdog reconnect failed: ${it.message}")
+                            }
+                        }
+                    }
+                    ObdState.CONNECTING, ObdState.NEGOTIATING -> Unit
+                }
+            }
+        }
+    }
+
+    private fun updateNotification(text: String) {
+        try {
+            getSystemService(NotificationManager::class.java)?.notify(NOTIF_ID, buildNotification(text))
+        } catch (_: Exception) {}
     }
     
     private fun createNotificationChannel() {
@@ -156,14 +270,20 @@ class ObdForegroundService : Service() {
             try {
                 tripManager.endTrip()
             } catch (_: Exception) {}
-            try {
-                obdSession.disconnect()
-            } catch (_: Exception) {}
         }
+        telemetryJob?.cancel()
+        watchdogJob?.cancel()
         releaseWakeLock()
         serviceScope.cancel()
         super.onDestroy()
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val LIVE_DATA_STALE_MS = 18_000L
+        private const val WATCHDOG_INTERVAL_MS = 5_000L
+        private const val WAKE_LOCK_TIMEOUT_MS = 30 * 60 * 1000L
+        private const val WAKE_LOCK_RENEW_MS = 24 * 60 * 1000L
+    }
 }

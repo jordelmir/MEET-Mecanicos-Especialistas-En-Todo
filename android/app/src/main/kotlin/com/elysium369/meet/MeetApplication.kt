@@ -50,7 +50,7 @@ class MeetApplication : Application(), Configuration.Provider {
                 com.elysium369.meet.core.sync.ElysiumCloudServices.syncDtcDefinitionsFromCloud(db.dtcDefinitionDao())
                 com.elysium369.meet.core.sync.ElysiumCloudServices.syncCommunityCustomPIDs(db.customPidDao())
             } catch (e: Exception) {
-                android.util.Log.e("MeetApplication", "Error during automatic cloud dynamic update", e)
+                android.util.Log.e("ElysiumApplication", "Error during automatic cloud dynamic update", e)
             }
         }
     }
@@ -82,6 +82,6 @@ class MeetApplication : Application(), Configuration.Provider {
             maintenanceRequest
         )
 
-        android.util.Log.i("MeetApplication", "📋 Database maintenance scheduled (daily, battery-safe)")
+        android.util.Log.i("ElysiumApplication", "📋 Database maintenance scheduled (daily, battery-safe)")
     }
 }

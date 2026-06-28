@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonGlyph
+
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -146,7 +148,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                             .putString("user_profile", selectedProfile)
                             .putString("preferred_adapter", selectedAdapter)
                             .putString("app_language", detectedLanguage)
-                            .putBoolean("demo_hint_seen", false)
+                            .putBoolean("real_adapter_hint_seen", false)
                             .apply()
                         onFinish()
                     }
@@ -196,7 +198,7 @@ private fun OnboardingStep1() {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text("⚡", fontSize = 40.sp)
+            AnimatedNeonGlyph("⚡", contentDescription = null, fontSize = 40.sp)
         }
         Spacer(Modifier.height(32.dp))
         Text(
@@ -234,7 +236,7 @@ private fun OnboardingStep1() {
 private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            "¿CÓMO USARÁS MEET?",
+            "¿CÓMO USARÁS ELYSIUM VANGUARD?",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
             fontWeight = FontWeight.Black,
@@ -283,7 +285,7 @@ private fun OnboardingStep3(selectedAdapter: String, onSelect: (String) -> Unit)
             letterSpacing = 1.sp
         )
         Text(
-            "MEET buscará por todos, pero prioriza tu opción",
+            "Elysium Vanguard buscará por todos, pero prioriza tu opción",
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium
@@ -306,7 +308,7 @@ private fun OnboardingStep3(selectedAdapter: String, onSelect: (String) -> Unit)
 
         Spacer(Modifier.height(16.dp))
         Text(
-            "Si no tienes adaptador todavía, usa el modo demo de entrenamiento.",
+            "Para lecturas reales necesitas un adaptador OBD-II físico y el switch en ON.",
             color = MeetColors.textMuted,
             textAlign = TextAlign.Center,
             fontSize = 12.sp
@@ -345,7 +347,7 @@ private fun OnboardingStep4(profile: String, adapter: String, language: String) 
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text("✅", fontSize = 36.sp)
+            AnimatedNeonGlyph("✅", contentDescription = null, fontSize = 36.sp)
         }
         Spacer(Modifier.height(28.dp))
         Text(
@@ -365,7 +367,7 @@ private fun OnboardingStep4(profile: String, adapter: String, language: String) 
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            "Siguiente paso: agrega tu vehículo o activa demo si todavía no tienes adaptador.",
+            "Siguiente paso: agrega tu vehículo y conecta un adaptador OBD-II físico.",
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,

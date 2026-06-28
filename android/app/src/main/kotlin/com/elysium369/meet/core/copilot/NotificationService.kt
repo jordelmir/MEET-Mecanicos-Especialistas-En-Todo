@@ -29,7 +29,7 @@ class NotificationService @Inject constructor(
 
     fun startListeningToEvents() {
         if (job != null) return
-        Log.i("NotificationService", "Starting MEET Copilot NotificationService...")
+        Log.i("NotificationService", "Starting Elysium Vanguard Copilot NotificationService...")
         job = scope.launch {
             eventBus.events.collect { event ->
                 showNotification(event)
@@ -40,7 +40,7 @@ class NotificationService @Inject constructor(
     fun stopListeningToEvents() {
         job?.cancel()
         job = null
-        Log.i("NotificationService", "Stopped MEET Copilot NotificationService.")
+        Log.i("NotificationService", "Stopped Elysium Vanguard Copilot NotificationService.")
     }
 
     private fun showNotification(event: CopilotEvent) {
@@ -76,7 +76,7 @@ class NotificationService @Inject constructor(
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "MEET Copilot Alerts"
+            val name = "Elysium Vanguard Copilot Alerts"
             val descriptionText = "Notifications for vehicle diagnostics and safety alerts"
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {

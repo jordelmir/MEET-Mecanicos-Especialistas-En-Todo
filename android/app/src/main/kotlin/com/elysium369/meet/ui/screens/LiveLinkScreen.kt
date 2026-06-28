@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.components.AnimatedNeonIcon
+
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
@@ -111,7 +113,7 @@ fun LiveLinkScreen(
                     .background(MeetColors.cardBackground)
                     .border(1.dp, MeetColors.borderSubtle, CircleShape)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+                AnimatedNeonIcon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -334,7 +336,7 @@ private fun WiFiTelemetryPanel(
                             .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
                             .clickable {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MEET Live Link", serverUrl))
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Elysium Vanguard Live Link", serverUrl))
                                 Toast.makeText(context, "Enlace copiado al portapapeles", Toast.LENGTH_SHORT).show()
                             }
                             .padding(12.dp),
@@ -348,7 +350,7 @@ private fun WiFiTelemetryPanel(
                             fontFamily = FontFamily.Monospace,
                             modifier = Modifier.weight(1f)
                         )
-                        Icon(Icons.Default.ContentCopy, "Copy", tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
+                        AnimatedNeonIcon(Icons.Default.ContentCopy, "Copy", tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -516,7 +518,7 @@ private fun RemoteTelemetryPanel(
                             onClick = {
                                 val shareIntent = android.content.Intent().apply {
                                     action = android.content.Intent.ACTION_SEND
-                                    putExtra(android.content.Intent.EXTRA_TEXT, "MEET LiveLink PRO — Conéctate a mi telemetría: ${session.shareUrl}")
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "Elysium Vanguard LiveLink PRO — Conéctate a mi telemetría: ${session.shareUrl}")
                                     type = "text/plain"
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, "Compartir LiveLink PRO"))
@@ -524,7 +526,7 @@ private fun RemoteTelemetryPanel(
                             colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Share, "Share", tint = Color.Black, modifier = Modifier.size(18.dp))
+                            AnimatedNeonIcon(Icons.Default.Share, "Share", tint = Color.Black, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Compartir", color = Color.Black, fontWeight = FontWeight.Bold)
                         }

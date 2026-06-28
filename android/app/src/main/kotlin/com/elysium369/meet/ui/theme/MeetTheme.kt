@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 
 /**
  * ═══════════════════════════════════════════════════════════════
- * MEET V2 — PHANTOM CARBON Design System
+ * Elysium Vanguard V2 — PHANTOM CARBON Design System
  * ═══════════════════════════════════════════════════════════════
  * 
  * Masculine, futuristic, PlayStore-tier design language.
