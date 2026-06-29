@@ -97,10 +97,10 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
-      <div className="glass rounded-lg px-3 py-2 shadow-xl border border-white/10">
-        <p className="text-xs font-bold text-white">{label}</p>
+      <div className="tooltip-neon" style={{ background: 'rgba(5,15,30,0.95)', border: '1px solid rgba(0,240,255,0.2)', boxShadow: '0 0 20px rgba(0,240,255,0.1), 0 8px 25px rgba(0,0,0,0.5)' }}>
+        <p className="text-xs font-bold text-white mb-1">{label}</p>
         {payload.map((entry: any, i: number) => (
-          <p key={i} className="text-[10px] font-mono" style={{ color: entry.color }}>
+          <p key={i} className="text-[10px] font-mono font-bold" style={{ color: entry.color, textShadow: `0 0 8px ${entry.color}40` }}>
             {entry.name}: {typeof entry.value === 'number' && entry.value > 1000 
               ? `₡${entry.value.toLocaleString()}` 
               : entry.value}
@@ -115,13 +115,13 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
       {/* Revenue Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Revenue Chart */}
-        <div className="glass rounded-xl p-4">
+        <div className="stat-card chart-glow cyber-scan-line">
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={16} className="text-forge-500" />
-            <span className="font-mono text-[10px] tracking-widest text-steel-200 uppercase">
+            <TrendingUp size={16} style={{ color: '#00f0ff', filter: 'drop-shadow(0 0 6px rgba(0,240,255,0.5))' }} />
+            <span className="font-mono text-[10px] tracking-[3px] text-gray-400 uppercase font-bold">
               Ingresos — Últimos 7 Días
             </span>
-            <span className="ml-auto font-mono text-sm font-bold text-forge-500">
+            <span className="ml-auto font-mono text-sm font-bold neon-text-cyan" style={{ color: '#00f0ff' }}>
               ₡{totalRevenue.toLocaleString('es-CR')}
             </span>
           </div>
@@ -143,10 +143,10 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
         </div>
 
         {/* Mechanic Performance */}
-        <div className="glass rounded-xl p-4">
+        <div className="stat-card chart-glow">
           <div className="flex items-center gap-2 mb-4">
-            <Users size={16} className="text-blue-400" />
-            <span className="font-mono text-[10px] tracking-widest text-steel-200 uppercase">
+            <Users size={16} style={{ color: '#4d8dff', filter: 'drop-shadow(0 0 6px rgba(77,141,255,0.5))' }} />
+            <span className="font-mono text-[10px] tracking-[3px] text-gray-400 uppercase font-bold">
               Rendimiento por Mecánico
             </span>
           </div>
@@ -166,10 +166,10 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
       {/* Second Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Category Distribution */}
-        <div className="glass rounded-xl p-4">
+        <div className="stat-card chart-glow">
           <div className="flex items-center gap-2 mb-4">
-            <PieChartIcon size={16} className="text-purple-400" />
-            <span className="font-mono text-[10px] tracking-widest text-steel-200 uppercase">
+            <PieChartIcon size={16} style={{ color: '#bf00ff', filter: 'drop-shadow(0 0 6px rgba(191,0,255,0.5))' }} />
+            <span className="font-mono text-[10px] tracking-[3px] text-gray-400 uppercase font-bold">
               Distribución por Tipo de Servicio
             </span>
           </div>
@@ -206,10 +206,10 @@ export function AnalyticsPanel({ workOrders, mechanics, services }: AnalyticsPan
         </div>
 
         {/* Status Pipeline */}
-        <div className="glass rounded-xl p-4">
+        <div className="stat-card chart-glow">
           <div className="flex items-center gap-2 mb-4">
-            <Wrench size={16} className="text-green-400" />
-            <span className="font-mono text-[10px] tracking-widest text-steel-200 uppercase">
+            <Wrench size={16} style={{ color: '#39ff14', filter: 'drop-shadow(0 0 6px rgba(57,255,20,0.5))' }} />
+            <span className="font-mono text-[10px] tracking-[3px] text-gray-400 uppercase font-bold">
               Pipeline de Estados
             </span>
           </div>

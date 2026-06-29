@@ -32,6 +32,14 @@ import { ANALYTICS_EVENTS } from './src/analytics/analyticsEvents';
 import { ANALYTICS_FUNNELS } from './src/analytics/analyticsFunnels';
 import { useAnalyticsLifecycle, useAnalyticsScreen } from './src/analytics/analyticsHooks';
 import type { AnalyticsConsentState } from './src/analytics/analyticsTypes';
+import { useBrand } from './lib/BrandModuleRegistry';
+import FleetDashboard from './components/FleetDashboard';
+import WorkshopCRM from './components/WorkshopCRM';
+import VerifiedCompanyPanel from './components/VerifiedCompanyPanel';
+import AdCampaignConsole from './components/AdCampaignConsole';
+import GDPRComplianceView from './components/GDPRComplianceView';
+import SubscriptionCheckout from './components/SubscriptionCheckout';
+import PayoutsView from './components/PayoutsView';
 
 const OBD2Scanner = React.lazy(() =>
   import('./components/OBD2Scanner').then(module => ({ default: module.OBD2Scanner }))
@@ -42,6 +50,7 @@ const LiveLinkDashboard = React.lazy(() =>
 );
 
 export default function App() {
+  const { t } = useBrand();
   // ── AUTH STATE ──
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -92,6 +101,7 @@ export default function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [adminViewMode, setAdminViewMode] = useState<'DASHBOARD' | 'WORKSTATION'>('DASHBOARD');
+  const [vanguardTab, setVanguardTab] = useState<'DASHBOARD' | 'FLEET' | 'CRM' | 'VERIFIED' | 'CAMPAIGNS' | 'GDPR' | 'SUBSCRIPTIONS' | 'PAYOUTS'>('DASHBOARD');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
@@ -249,7 +259,7 @@ export default function App() {
     setLoggedInUser(newClient);
     setIsAuthenticated(true);
     analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: 'registration_success', role: Role.CLIENT });
-    toast('success', 'Cuenta Creada', `Bienvenido a MEET, ${newClient.name.split(' ')[0]}`);
+    toast('success', 'Cuenta Creada', t(`Bienvenido a MEET, ${newClient.name.split(' ')[0]}`));
   };
 
   const handleLogout = () => {
@@ -589,7 +599,7 @@ export default function App() {
       scans: [finalScan, ...(loggedInUser.scans || [])]
     };
     handleUpdateClient(updatedClient);
-    toast('success', 'Escaneo Recibido', 'Datos de OBD2 sincronizados desde la App MEET');
+    toast('success', 'Escaneo Recibido', t('Datos de OBD2 sincronizados desde la App MEET'));
   };
 
   const handleSaveOscilloscopeMeasurement = (measurement: OscilloscopeMeasurement) => {
@@ -640,13 +650,14 @@ export default function App() {
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* ── NAV BAR ── */}
-        <nav className="glass h-16 sm:h-20 md:h-16 fixed top-0 w-full z-50 flex flex-nowrap items-center justify-start md:justify-between px-3 md:px-6 shadow-lg overflow-x-auto hide-scrollbar gap-4 md:gap-0">
+        <nav className="fixed top-0 w-full z-50 flex flex-nowrap items-center justify-start md:justify-between px-3 md:px-6 overflow-x-auto hide-scrollbar gap-4 md:gap-0" style={{ height: '64px', background: 'linear-gradient(135deg, rgba(3,5,8,0.95) 0%, rgba(7,10,15,0.97) 50%, rgba(3,5,8,0.95) 100%)', backdropFilter: 'blur(30px) saturate(200%)', WebkitBackdropFilter: 'blur(30px) saturate(200%)', borderBottom: '1px solid rgba(0,240,255,0.15)', boxShadow: '0 4px 40px rgba(0,0,0,0.6), 0 0 60px rgba(0,240,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
           <div className="flex items-center gap-3 shrink-0 mr-auto md:mr-0">
-            <div className="bg-forge-500 p-1.5 rounded-lg text-black shadow-[0_0_15px_rgba(0, 240, 255,0.4)]">
-              <Wrench size={20} strokeWidth={2.5} />
+            <div className="relative p-2 rounded-xl text-black" style={{ background: 'linear-gradient(135deg, #00f0ff 0%, #00c2cf 50%, #00f0ff 100%)', boxShadow: '0 0 25px rgba(0,240,255,0.6), 0 0 50px rgba(0,240,255,0.2), inset 0 1px 0 rgba(255,255,255,0.3)' }}>
+              <Wrench size={20} strokeWidth={2.5} className="drop-shadow-lg" />
+              <div className="absolute inset-0 rounded-xl animate-ping opacity-20" style={{ background: 'rgba(0,240,255,0.4)' }} />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white inline whitespace-nowrap">
-              ME<span className="text-forge-500">ET</span>
+            <span className="font-bold text-xl tracking-tight text-white inline whitespace-nowrap" style={{ textShadow: '0 0 20px rgba(0,240,255,0.4)' }}>
+              Elysium <span className="text-forge-500" style={{ textShadow: '0 0 15px rgba(0,240,255,0.6), 0 0 30px rgba(0,240,255,0.3)' }}>Vanguard</span>
             </span>
           </div>
 
@@ -783,178 +794,348 @@ export default function App() {
 
         {/* ── MAIN CONTENT ── */}
         <main className="pt-24 px-4 md:px-6 flex-1 flex flex-col pb-4">
-          {showDashboard ? (
-            <>
-              {/* Header Area */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-slide-up">
-                <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                    {role === Role.MECHANIC ? 'Estación de Trabajo' : 'Centro de Operaciones'}
-                  </h1>
-                  <p className="text-gray-400 text-sm mt-1 font-medium">
-                    {role === Role.MECHANIC
-                      ? `Mecánico: ${loggedInUser.name}`
-                      : adminViewMode === 'WORKSTATION'
-                        ? 'Modo Operativo Activo (Vista de Mecánico)'
-                        : 'Gestión integral de taller'
-                    }
-                  </p>
-                </div>
+          {/* 🚀 VANGUARD AUTOMOTIVE ECOSYSTEM HUB — High-Tech Neon Navigation */}
+          <div className="mb-8 flex flex-wrap gap-2.5 p-3 rounded-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(3,5,8,0.8) 0%, rgba(7,10,15,0.9) 50%, rgba(3,5,8,0.8) 100%)', border: '1px solid rgba(0,240,255,0.2)', boxShadow: '0 0 40px rgba(0,240,255,0.08), 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+            {/* Animated scan line */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+              <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-forge-500/40 to-transparent" style={{ animation: 'scanDown 4s ease-in-out infinite', top: 0 }} />
+            </div>
+            {[
+              { id: 'DASHBOARD', label: 'Dashboard', icon: <BarChart3 size={15} />, activeColor: 'from-cyan-400 to-cyan-600', activeShadow: '0 0 30px rgba(0,240,255,0.6), 0 0 60px rgba(0,240,255,0.2)', hoverColor: 'hover:text-cyan-400 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(0,240,255,0.25)]' },
+              { id: 'CRM', label: 'Taller CRM', icon: <Users size={15} />, activeColor: 'from-blue-400 to-blue-600', activeShadow: '0 0 30px rgba(59,130,246,0.6), 0 0 60px rgba(59,130,246,0.2)', hoverColor: 'hover:text-blue-400 hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)]' },
+              { id: 'FLEET', label: 'Vanguard Fleet', icon: <Car size={15} />, activeColor: 'from-green-400 to-emerald-600', activeShadow: '0 0 30px rgba(74,222,128,0.6), 0 0 60px rgba(74,222,128,0.2)', hoverColor: 'hover:text-green-400 hover:border-green-500/40 hover:shadow-[0_0_20px_rgba(74,222,128,0.25)]' },
+              { id: 'VERIFIED', label: 'B2B Verified', icon: <Wrench size={15} />, activeColor: 'from-yellow-400 to-amber-600', activeShadow: '0 0 30px rgba(250,204,21,0.6), 0 0 60px rgba(250,204,21,0.2)', hoverColor: 'hover:text-yellow-400 hover:border-yellow-500/40 hover:shadow-[0_0_20px_rgba(250,204,21,0.25)]' },
+              { id: 'CAMPAIGNS', label: 'Anuncios', icon: <Radio size={15} />, activeColor: 'from-purple-400 to-violet-600', activeShadow: '0 0 30px rgba(192,132,252,0.6), 0 0 60px rgba(192,132,252,0.2)', hoverColor: 'hover:text-purple-400 hover:border-purple-500/40 hover:shadow-[0_0_20px_rgba(192,132,252,0.25)]' },
+              { id: 'PAYOUTS', label: 'Pagos', icon: <ClipboardList size={15} />, activeColor: 'from-emerald-400 to-teal-600', activeShadow: '0 0 30px rgba(52,211,153,0.6), 0 0 60px rgba(52,211,153,0.2)', hoverColor: 'hover:text-emerald-400 hover:border-emerald-500/40 hover:shadow-[0_0_20px_rgba(52,211,153,0.25)]' },
+              { id: 'SUBSCRIPTIONS', label: 'Planes', icon: <Gauge size={15} />, activeColor: 'from-orange-400 to-amber-600', activeShadow: '0 0 30px rgba(251,146,60,0.6), 0 0 60px rgba(251,146,60,0.2)', hoverColor: 'hover:text-orange-400 hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(251,146,60,0.25)]' },
+              { id: 'GDPR', label: 'Privacidad', icon: <FileText size={15} />, activeColor: 'from-red-400 to-rose-600', activeShadow: '0 0 30px rgba(248,113,113,0.6), 0 0 60px rgba(248,113,113,0.2)', hoverColor: 'hover:text-red-400 hover:border-red-500/40 hover:shadow-[0_0_20px_rgba(248,113,113,0.25)]' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  analytics.track(ANALYTICS_EVENTS.SCREEN_VIEWED, { screen_name: `tab_${tab.id.toLowerCase()}`, role });
+                  setVanguardTab(tab.id as any);
+                }}
+                className={`flex items-center gap-2.5 px-5 py-3 rounded-xl font-mono font-bold text-xs tracking-wider border transition-all duration-300 transform active:scale-95 ${
+                  vanguardTab === tab.id
+                    ? `bg-gradient-to-r ${tab.activeColor} text-black border-transparent font-extrabold translate-y-[-2px] scale-[1.05]`
+                    : `text-gray-400 border-white/5 ${tab.hoverColor} hover:translate-y-[-1px]`
+                }`}
+                style={vanguardTab === tab.id ? { boxShadow: tab.activeShadow } : { background: 'rgba(255,255,255,0.03)' }}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-                {/* Toolbar */}
-                <div className="flex flex-wrap gap-2">
-                  {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          analytics.track(ANALYTICS_EVENTS.CATALOG_OPENED, { role });
-                          analytics.moduleOpened('Catálogo', { role });
-                          setIsCatalogOpen(true);
-                        }}
-                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                      >
-                        <BookOpen size={16} />
-                        Catálogo
-                      </button>
-                      <button
-                        onClick={() => {
-                          analytics.moduleOpened('Config', { role });
-                          setIsSettingsOpen(true);
-                        }}
-                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                      >
-                        <Settings size={16} />
-                        Config
-                      </button>
-                      <button
-                        onClick={() => {
-                          analytics.track(ANALYTICS_EVENTS.MECHANICS_OPENED, { role });
-                          analytics.moduleOpened('Mecánicos', { role });
-                          setIsMechanicManagerOpen(true);
-                        }}
-                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                      >
-                        <Users size={16} />
-                        Mecánicos
-                      </button>
-                      <button
-                        onClick={() => {
-                          analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role });
-                          analytics.moduleOpened('Clientes', { role });
-                          setIsClientManagerOpen(true);
-                        }}
-                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                      >
-                        <Car size={16} />
-                        Clientes
-                      </button>
-                      <button
-                        onClick={() => {
-                          analytics.track(ANALYTICS_EVENTS.SERVICES_OPENED, { role });
-                          analytics.moduleOpened('Servicios', { role });
-                          setIsServiceManagerOpen(true);
-                        }}
-                        className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
-                      >
-                        <ClipboardList size={16} />
-                        Servicios
-                      </button>
-                    </>
-                  )}
-                  {(role === Role.ADMIN || role === Role.MECHANIC) && (
-                    <>
-                      {role === Role.MECHANIC && (
+          {/* ── ECOSYSTEM VIEW SWITCHER ── */}
+          {vanguardTab === 'CRM' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
+              <WorkshopCRM />
+            </div>
+          )}
+
+          {vanguardTab === 'FLEET' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-green-500/25 shadow-[0_0_30px_rgba(74,222,128,0.1)]">
+              <FleetDashboard />
+            </div>
+          )}
+
+          {vanguardTab === 'VERIFIED' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-yellow-500/25 shadow-[0_0_30px_rgba(250,204,21,0.1)]">
+              <VerifiedCompanyPanel />
+            </div>
+          )}
+
+          {vanguardTab === 'CAMPAIGNS' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-purple-500/25 shadow-[0_0_30px_rgba(192,132,252,0.1)]">
+              <AdCampaignConsole />
+            </div>
+          )}
+
+          {vanguardTab === 'PAYOUTS' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-emerald-500/25 shadow-[0_0_30px_rgba(52,211,153,0.1)]">
+              <PayoutsView />
+            </div>
+          )}
+
+          {vanguardTab === 'SUBSCRIPTIONS' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-orange-500/25 shadow-[0_0_30px_rgba(251,146,60,0.1)]">
+              <SubscriptionCheckout />
+            </div>
+          )}
+
+          {vanguardTab === 'GDPR' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-red-500/25 shadow-[0_0_30px_rgba(248,113,113,0.1)]">
+              <GDPRComplianceView />
+            </div>
+          )}
+
+          {vanguardTab === 'DASHBOARD' && (
+            showDashboard ? (
+              <>
+                {/* Header Area */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-slide-up">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" style={{ color: '#00f0ff', textShadow: '0 0 15px rgba(0,240,255,0.4), 0 0 30px rgba(0,240,255,0.15)' }}>
+                      {role === Role.MECHANIC ? 'Estación de Trabajo' : 'Centro de Operaciones'}
+                    </h1>
+                    <p className="text-gray-500 text-sm mt-1 font-mono tracking-wide">
+                      {role === Role.MECHANIC
+                        ? `Mecánico: ${loggedInUser.name}`
+                        : adminViewMode === 'WORKSTATION'
+                          ? 'Modo Operativo Activo (Vista de Mecánico)'
+                          : 'Gestión integral de taller'
+                      }
+                    </p>
+                  </div>
+
+                  {/* Toolbar */}
+                  <div className="flex flex-wrap gap-2.5">
+                    {role === Role.ADMIN && adminViewMode === 'DASHBOARD' && (
+                      <>
                         <button
                           onClick={() => {
-                            analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role, source: 'mechanic_toolbar' });
-                            analytics.moduleOpened('Clientes', { role, source: 'mechanic_toolbar' });
+                            analytics.track(ANALYTICS_EVENTS.CATALOG_OPENED, { role });
+                            analytics.moduleOpened('Catálogo', { role });
+                            setIsCatalogOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                          style={{
+                            background: 'rgba(0,240,255,0.03)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(0,240,255,0.3)';
+                            e.currentTarget.style.color = '#00f0ff';
+                            e.currentTarget.style.boxShadow = '0 0 15px rgba(0,240,255,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.boxShadow = '';
+                          }}
+                        >
+                          <BookOpen size={15} />
+                          Catálogo
+                        </button>
+                        <button
+                          onClick={() => {
+                            analytics.moduleOpened('Config', { role });
+                            setIsSettingsOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                          style={{
+                            background: 'rgba(0,240,255,0.03)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(0,240,255,0.3)';
+                            e.currentTarget.style.color = '#00f0ff';
+                            e.currentTarget.style.boxShadow = '0 0 15px rgba(0,240,255,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.boxShadow = '';
+                          }}
+                        >
+                          <Settings size={15} />
+                          Config
+                        </button>
+                        <button
+                          onClick={() => {
+                            analytics.track(ANALYTICS_EVENTS.MECHANICS_OPENED, { role });
+                            analytics.moduleOpened('Mecánicos', { role });
+                            setIsMechanicManagerOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                          style={{
+                            background: 'rgba(0,240,255,0.03)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(77,141,255,0.3)';
+                            e.currentTarget.style.color = '#4d8dff';
+                            e.currentTarget.style.boxShadow = '0 0 15px rgba(77,141,255,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.boxShadow = '';
+                          }}
+                        >
+                          <Users size={15} />
+                          Mecánicos
+                        </button>
+                        <button
+                          onClick={() => {
+                            analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role });
+                            analytics.moduleOpened('Clientes', { role });
                             setIsClientManagerOpen(true);
                           }}
-                          className="flex items-center gap-2 glass-inner text-gray-300 px-3 py-2 rounded-lg font-bold text-xs hover:bg-white/10 hover:text-white border border-white/5 transition-all"
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                          style={{
+                            background: 'rgba(0,240,255,0.03)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(57,255,20,0.3)';
+                            e.currentTarget.style.color = '#39ff14';
+                            e.currentTarget.style.boxShadow = '0 0 15px rgba(57,255,20,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.boxShadow = '';
+                          }}
                         >
-                          <Car size={16} />
-                          Gestión de Clientes
+                          <Car size={15} />
+                          Clientes
                         </button>
-                      )}
-                      <button
-                        onClick={() => openBooking('toolbar')}
-                        className="flex items-center gap-2 bg-forge-500 text-black px-4 py-2 rounded-lg font-bold text-xs hover:bg-forge-400 shadow-[0_4px_20px_-5px_rgba(0, 240, 255,0.4)] transition-all transform hover:scale-105"
-                      >
-                        <Plus size={16} strokeWidth={3} />
-                        Nueva Orden
-                      </button>
-                    </>
-                  )}
+                        <button
+                          onClick={() => {
+                            analytics.track(ANALYTICS_EVENTS.SERVICES_OPENED, { role });
+                            analytics.moduleOpened('Servicios', { role });
+                            setIsServiceManagerOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                          style={{
+                            background: 'rgba(0,240,255,0.03)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(191,0,255,0.3)';
+                            e.currentTarget.style.color = '#bf00ff';
+                            e.currentTarget.style.boxShadow = '0 0 15px rgba(191,0,255,0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.color = '';
+                            e.currentTarget.style.boxShadow = '';
+                          }}
+                        >
+                          <ClipboardList size={15} />
+                          Servicios
+                        </button>
+                      </>
+                    )}
+                    {(role === Role.ADMIN || role === Role.MECHANIC) && (
+                      <>
+                        {role === Role.MECHANIC && (
+                          <button
+                            onClick={() => {
+                              analytics.track(ANALYTICS_EVENTS.CLIENTS_OPENED, { role, source: 'mechanic_toolbar' });
+                              analytics.moduleOpened('Clientes', { role, source: 'mechanic_toolbar' });
+                              setIsClientManagerOpen(true);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl font-mono font-bold text-xs tracking-wider text-gray-300 border transition-all duration-300 transform active:scale-95"
+                            style={{
+                              background: 'rgba(0,240,255,0.03)',
+                              borderColor: 'rgba(255,255,255,0.06)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(0,240,255,0.3)';
+                              e.currentTarget.style.color = '#00f0ff';
+                              e.currentTarget.style.boxShadow = '0 0 15px rgba(0,240,255,0.15)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                              e.currentTarget.style.color = '';
+                              e.currentTarget.style.boxShadow = '';
+                            }}
+                          >
+                            <Car size={15} />
+                            Gestión de Clientes
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openBooking('toolbar')}
+                          className="flex items-center gap-2 text-black px-4 py-2.5 rounded-xl font-mono font-black text-xs tracking-[2px] uppercase transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)]"
+                          style={{
+                            background: 'linear-gradient(135deg, #00f0ff 0%, #00c2cf 50%, #00f0ff 100%)',
+                          }}
+                        >
+                          <Plus size={15} strokeWidth={3.5} />
+                          Nueva Orden
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Dashboard Content */}
-              {(role === Role.MECHANIC || (role === Role.ADMIN && adminViewMode === 'WORKSTATION')) ? (
-                <MechanicDashboard
-                  mechanicId={role === Role.MECHANIC ? loggedInUser.id : 'm1'}
-                  currentMechanic={currentMechanic || undefined}
-                  mechanics={mechanics}
-                  workOrders={visibleWorkOrders}
-                  services={services}
-                  onStatusChange={handleStatusChange}
-                  onUpdateMechanic={handleUpdateMechanic}
-                  openHour={openHour}
-                  closeHour={closeHour}
-                />
-              ) : (
-                <>
-                  <MetricsPanel
-                    metrics={metrics}
+                {/* Dashboard Content */}
+                {(role === Role.MECHANIC || (role === Role.ADMIN && adminViewMode === 'WORKSTATION')) ? (
+                  <MechanicDashboard
+                    mechanicId={role === Role.MECHANIC ? loggedInUser.id : 'm1'}
+                    currentMechanic={currentMechanic || undefined}
+                    mechanics={mechanics}
                     workOrders={visibleWorkOrders}
-                    currentDate={currentDate}
                     services={services}
+                    onStatusChange={handleStatusChange}
+                    onUpdateMechanic={handleUpdateMechanic}
                     openHour={openHour}
                     closeHour={closeHour}
                   />
-                  {/* Analytics Charts */}
-                  <AnalyticsPanel
-                    workOrders={workOrders}
-                    mechanics={mechanics}
-                    services={services}
-                  />
-                </>
-              )}
+                ) : (
+                  <>
+                    <MetricsPanel
+                      metrics={metrics}
+                      workOrders={visibleWorkOrders}
+                      currentDate={currentDate}
+                      services={services}
+                      openHour={openHour}
+                      closeHour={closeHour}
+                    />
+                    {/* Analytics Charts */}
+                    <AnalyticsPanel
+                      workOrders={workOrders}
+                      mechanics={mechanics}
+                      services={services}
+                    />
+                  </>
+                )}
 
-              {/* Timeline */}
-              <div className="glass rounded-xl shadow-2xl flex flex-col relative overflow-visible mt-6">
-                <Timeline
-                  mechanics={visibleMechanics}
-                  workOrders={visibleWorkOrders}
-                  services={services}
-                  currentDate={currentDate}
-                  openHour={openHour}
-                  closeHour={closeHour}
-                  timeSliceMinutes={timeSliceMinutes}
-                  onStatusChange={handleStatusChange}
-                  onDateChange={setCurrentDate}
-                  onEditWorkOrder={setEditingWorkOrder}
-                />
-              </div>
-            </>
-          ) : (
-            // CLIENT VIEW
-            <ClientDashboard
-              currentUser={loggedInUser}
-              workOrders={workOrders}
-              services={services}
-              mechanics={mechanics}
-              freeWashThreshold={freeWashThreshold}
-              onBookNew={() => openBooking('client_dashboard')}
-              onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
-              onUpdateUser={handleUpdateClient}
-              onSimulateAPKScan={handleSimulateAPKScan}
-            />
+                {/* Timeline */}
+                <div className="stat-card mt-6 relative overflow-visible">
+                  <Timeline
+                    mechanics={visibleMechanics}
+                    workOrders={visibleWorkOrders}
+                    services={services}
+                    currentDate={currentDate}
+                    openHour={openHour}
+                    closeHour={closeHour}
+                    timeSliceMinutes={timeSliceMinutes}
+                    onStatusChange={handleStatusChange}
+                    onDateChange={setCurrentDate}
+                    onEditWorkOrder={setEditingWorkOrder}
+                  />
+                </div>
+              </>
+            ) : (
+              // CLIENT VIEW
+              <ClientDashboard
+                currentUser={loggedInUser}
+                workOrders={workOrders}
+                services={services}
+                mechanics={mechanics}
+                freeWashThreshold={freeWashThreshold}
+                onBookNew={() => openBooking('client_dashboard')}
+                onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
+                onUpdateUser={handleUpdateClient}
+                onSimulateAPKScan={handleSimulateAPKScan}
+              />
+            )
           )}
         </main>
 
         {/* Footer */}
-        <footer className="text-center py-4 font-mono text-[10px] text-steel-400 tracking-wider border-t border-white/5">
-          MEET — MECÁNICOS ESPECIALISTAS EN TODO © {new Date().getFullYear()}
+        <footer className="text-center py-6 relative">
+          <div className="mx-auto mb-3 h-px w-48" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,240,255,0.2), transparent)' }} />
+          <p className="font-mono text-[10px] tracking-[4px] uppercase" style={{ color: 'rgba(0,240,255,0.2)' }}>
+            Elysium Vanguard — Vanguard Network © {new Date().getFullYear()}
+          </p>
         </footer>
       </div>
 
