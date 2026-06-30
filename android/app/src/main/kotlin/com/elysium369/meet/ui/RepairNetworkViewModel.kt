@@ -67,12 +67,17 @@ class RepairNetworkViewModel @Inject constructor(
     private val _isBookmarkedState = MutableStateFlow(false)
     val isBookmarkedState = _isBookmarkedState.asStateFlow()
 
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     init {
-        // Automatically search when filters or search query change
+        // Automatically search when filters or search query change, debouncing text input to prevent race conditions
+        @OptIn(kotlinx.coroutines.FlowPreview::class)
         combine(
-            _searchQuery, _makeFilter, _modelFilter, _yearFilter,
+            _searchQuery.debounce(300L), _makeFilter, _modelFilter, _yearFilter,
             _countryFilter, _dtcFilter, _sortByFilter, _onlyVerifiedFilter
         ) { array ->
+            array
+        }.onEach { array ->
             val search = array[0] as String
             val make = array[1] as String
             val model = array[2] as String
@@ -116,7 +121,8 @@ class RepairNetworkViewModel @Inject constructor(
         query: String, make: String, model: String, year: Int?,
         country: String, dtc: String, sort: String, verified: Boolean
     ) {
-        viewModelScope.launch {
+        searchJob?.cancel() // Cancel previous search execution to prevent race conditions
+        searchJob = viewModelScope.launch {
             _isLoading.value = true
             val results = repository.searchCases(query, make, model, year, country, dtc, sort, verified)
             _casesList.value = results
