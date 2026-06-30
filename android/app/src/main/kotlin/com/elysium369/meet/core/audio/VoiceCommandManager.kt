@@ -43,11 +43,17 @@ enum class VoiceCommand {
 }
 
 @Singleton
-class VoiceCommandManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+class VoiceCommandManager(
+    private val context: Context,
     private val voiceFeedbackManager: VoiceFeedbackManager,
-    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main
+    mainDispatcher: CoroutineDispatcher
 ) : RecognitionListener {
+
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        voiceFeedbackManager: VoiceFeedbackManager
+    ) : this(context, voiceFeedbackManager, Dispatchers.Main)
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
