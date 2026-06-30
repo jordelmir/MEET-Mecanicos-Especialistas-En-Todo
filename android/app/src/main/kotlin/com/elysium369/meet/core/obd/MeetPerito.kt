@@ -7,6 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -53,13 +54,20 @@ class MeetPerito @Inject constructor() {
 
         val resolvedVin = vin ?: "DESCONOCIDO"
 
-        // 1. Dimension VIN
+        // 1. Dimension VIN (Fusión de validación SAE J272 de VinDecoder)
         if (resolvedVin.length != 17 || resolvedVin.contains("?") || resolvedVin == "DESCONOCIDO") {
             score -= 5
             warnings.add("VIN no detectado o inválido: '$resolvedVin'")
             details["VIN"] = "❌ No detectado o formato inválido"
         } else {
-            details["VIN"] = "✅ Detectado: $resolvedVin"
+            val isVinValid = VinDecoder.validateCheckDigit(resolvedVin)
+            if (!isVinValid) {
+                score -= 20 // Penalización severa por posible clonación o fraude
+                criticalIssues.add("Fallo de Check Digit SAE J272: Posible alteración o clonación del VIN de la ECU ('$resolvedVin')")
+                details["VIN"] = "❌ VIN INVÁLIDO (Fallo Check Digit SAE J272)"
+            } else {
+                details["VIN"] = "✅ Detectado y verificado (SAE J272): $resolvedVin"
+            }
         }
 
         // 2. Dimension DTC Activos
@@ -120,15 +128,15 @@ class MeetPerito @Inject constructor() {
         val absLtft = abs(ltft)
         if (absLtft > 15f) {
             score -= 15
-            criticalIssues.add("Fuel Trim fuera de rango (${String.format("%.1f", ltft)}%) - Mezcla muy pobre/rica")
+            criticalIssues.add("Fuel Trim fuera de rango (${String.format(Locale.US, "%.1f", ltft)}%) - Mezcla muy pobre/rica")
             repairCost += 120.0
-            details["FUEL_TRIMS"] = "❌ LTFT: ${String.format("%.1f", ltft)}% (Anómalo, normal ±10%). Penalización -15 pts."
+            details["FUEL_TRIMS"] = "❌ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Anómalo, normal ±10%). Penalización -15 pts."
         } else if (absLtft > 10f) {
             score -= 5
-            warnings.add("Fuel Trim al límite (${String.format("%.1f", ltft)}%)")
-            details["FUEL_TRIMS"] = "⚠️ LTFT: ${String.format("%.1f", ltft)}% (Ligeramente desviado). Penalización -5 pts."
+            warnings.add("Fuel Trim al límite (${String.format(Locale.US, "%.1f", ltft)}%)")
+            details["FUEL_TRIMS"] = "⚠️ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Ligeramente desviado). Penalización -5 pts."
         } else {
-            details["FUEL_TRIMS"] = "✅ LTFT: ${String.format("%.1f", ltft)}% (Normal)."
+            details["FUEL_TRIMS"] = "✅ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Normal)."
         }
 
         // 6. Temperatura (Coolant Temp)
@@ -156,15 +164,15 @@ class MeetPerito @Inject constructor() {
         val voltage = liveData["VOLTAGE"] ?: liveData["voltage"] ?: liveData["CTRL_VOLTAGE"] ?: liveData["ELM_VOLTAGE"] ?: liveData["0142"] ?: 13.8f
         if (voltage < 12.0f || voltage > 15.5f) {
             score -= 15
-            criticalIssues.add("Voltaje de alternador/batería fuera de rango (${String.format("%.1f", voltage)}V)")
+            criticalIssues.add("Voltaje de alternador/batería fuera de rango (${String.format(Locale.US, "%.1f", voltage)}V)")
             repairCost += 200.0
-            details["VOLTAJE"] = "❌ Voltaje: ${String.format("%.1f", voltage)}V (Muy bajo/alto). Penalización -15 pts."
+            details["VOLTAJE"] = "❌ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Muy bajo/alto). Penalización -15 pts."
         } else if (voltage < 13.2f || voltage > 14.9f) {
             score -= 5
-            warnings.add("Voltaje subóptimo de carga (${String.format("%.1f", voltage)}V)")
-            details["VOLTAJE"] = "⚠️ Voltaje: ${String.format("%.1f", voltage)}V (Carga débil/inestable). Penalización -5 pts."
+            warnings.add("Voltaje subóptimo de carga (${String.format(Locale.US, "%.1f", voltage)}V)")
+            details["VOLTAJE"] = "⚠️ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Carga débil/inestable). Penalización -5 pts."
         } else {
-            details["VOLTAJE"] = "✅ Voltaje: ${String.format("%.1f", voltage)}V (Estable)."
+            details["VOLTAJE"] = "✅ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Estable)."
         }
 
         // 8. Sensores Críticos (MAF / MAP / O2)

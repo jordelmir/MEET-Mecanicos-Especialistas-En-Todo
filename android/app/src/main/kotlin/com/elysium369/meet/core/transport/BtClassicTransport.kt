@@ -235,6 +235,7 @@ class BtClassicTransport(
                 var totalWaited = 0L
                 val pollInterval = 5L  // 5ms polling for latency balance
 
+                var lastByte: Byte = 0
                 while (totalWaited < timeoutMs) {
                     val available = stream.available()
                     if (available > 0) {
@@ -242,16 +243,10 @@ class BtClassicTransport(
                         val bytesRead = stream.read(tempBuffer, 0, toRead)
                         if (bytesRead > 0) {
                             output.write(tempBuffer, 0, bytesRead)
-                            val currentData = output.toByteArray()
-                            var hasPrompt = false
-                            for (i in 0 until currentData.size) {
-                                if (currentData[i] == '>'.code.toByte()) {
-                                    hasPrompt = true
-                                    break
-                                }
-                            }
-                            if (currentData.size >= maxBytes || hasPrompt) {
-                                return@withContext currentData
+                            lastByte = tempBuffer[bytesRead - 1]
+                            val hasPrompt = (lastByte == '>'.code.toByte())
+                            if (output.size() >= maxBytes || hasPrompt) {
+                                return@withContext output.toByteArray()
                             }
                         }
                     }
