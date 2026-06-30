@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import com.elysium369.meet.core.obd.AdapterFingerprint
 import com.elysium369.meet.core.obd.ObdSession
+import com.elysium369.meet.core.vanguard.ObdSessionRecorder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,9 +45,10 @@ object ObdModule {
     fun provideObdSession(
         scope: CoroutineScope,
         bluetoothAdapter: BluetoothAdapter?,
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        sessionRecorder: ObdSessionRecorder
     ): ObdSession {
-        return ObdSession(scope, bluetoothAdapter, context)
+        return ObdSession(scope, bluetoothAdapter, context, sessionRecorder)
     }
 
     @Provides

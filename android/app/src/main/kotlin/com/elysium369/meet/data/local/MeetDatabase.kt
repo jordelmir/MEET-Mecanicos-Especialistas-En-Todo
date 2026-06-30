@@ -86,9 +86,32 @@ import com.elysium369.meet.data.local.entities.*
 
         // IDENTITY VERIFICATION
         DriverVerificationEntity::class,
-        PassengerVerificationEntity::class
+        PassengerVerificationEntity::class,
+
+        // ELYSIUM VANGUARD TELEMETRY INTELLIGENCE
+        VanguardObdSessionEntity::class,
+        ObdPidSampleEntity::class,
+        ObdCommandLogEntity::class,
+        EcuFailureEventEntity::class,
+        CompatibilityRuleEntity::class,
+        VehicleProfileSnapshotEntity::class,
+        Mode06ResultEntity::class,
+        FreezeFrameEntity::class,
+        DerivedMetricEntity::class,
+        HealthScoreEntity::class,
+        RepairRecommendationEntity::class,
+        AiDiagnosticResultEntity::class,
+        VehicleHistoryEntity::class,
+        PdfReportEntity::class,
+        AuditLogEntity::class,
+        FixRolloutEntity::class,
+
+        // ELYSIUM VANGUARD COMMERCE TRUST CORE
+        VanguardEventEntity::class,
+        MarketplaceLedgerEntryEntity::class,
+        VanguardOutboxEntity::class
     ],
-    version = 34,
+    version = 36,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -133,4 +156,10 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // MEET RIDES DAO
     abstract fun rideDao(): RideDao
+
+    // ELYSIUM VANGUARD TELEMETRY DAO
+    abstract fun vanguardTelemetryDao(): VanguardTelemetryDao
+
+    // ELYSIUM VANGUARD COMMERCE DAO
+    abstract fun vanguardCommerceDao(): VanguardCommerceDao
 }

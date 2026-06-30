@@ -17,10 +17,42 @@ object VinDecoder {
         val summary: String
     )
 
+    fun validateCheckDigit(vin: String): Boolean {
+        if (vin.length != 17) return false
+        
+        // Positional weights defined by SAE J272 / ISO 3779
+        val weights = intArrayOf(8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2)
+        
+        var sum = 0
+        for (i in 0 until 17) {
+            val char = vin[i]
+            val value = when (char) {
+                in '0'..'9' -> char - '0'
+                'A', 'J' -> 1
+                'B', 'K', 'S' -> 2
+                'C', 'L', 'T' -> 3
+                'D', 'M', 'U' -> 4
+                'E', 'N', 'V' -> 5
+                'F', 'W' -> 6
+                'G', 'P', 'X' -> 7
+                'H', 'Y' -> 8
+                'R', 'Z' -> 9
+                else -> return false // Invalid character I, O, Q
+            }
+            sum += value * weights[i]
+        }
+        
+        val remainder = sum % 11
+        val expectedCheckDigit = if (remainder == 10) 'X' else (remainder + '0'.code).toChar()
+        
+        return vin[8] == expectedCheckDigit
+    }
+
     fun decode(vin: String): VinInfo? {
         val clean = vin.uppercase().replace(" ", "").replace("-", "")
         if (clean.length != 17) return null
 
+        val isValid = validateCheckDigit(clean)
         val wmi = clean.substring(0, 3)
         val country = decodeCountry(clean[0])
         val manufacturer = decodeManufacturer(wmi)
@@ -30,6 +62,7 @@ object VinDecoder {
         val serial = clean.substring(11, 17)
 
         val summary = buildString {
+            if (!isValid) append("⚠️ VIN SOSPECHOSO (Check Digit Inválido) | ")
             append("🏭 $manufacturer")
             if (modelYear.isNotEmpty()) append(" | 📅 $modelYear")
             append(" | 🌍 $country")
@@ -40,7 +73,7 @@ object VinDecoder {
         return VinInfo(
             vin = clean, country = country, manufacturer = manufacturer,
             modelYear = modelYear, assemblyPlant = plant,
-            serialNumber = serial, isValid = true, summary = summary
+            serialNumber = serial, isValid = isValid, summary = summary
         )
     }
 

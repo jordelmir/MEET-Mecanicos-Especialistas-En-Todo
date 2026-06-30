@@ -18,6 +18,7 @@ import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { WorkOrderReceipt } from './components/WorkOrderReceipt';
 import { useToast } from './components/ToastSystem';
+import { PlatformCommandCenter } from './components/PlatformCommandCenter';
 import { canTransitionStatus, getStatusLabel, validateSchedule } from './services/timeEngine';
 import { saveState, loadState } from './services/storage';
 import { createId } from './services/ids';
@@ -33,13 +34,6 @@ import { ANALYTICS_FUNNELS } from './src/analytics/analyticsFunnels';
 import { useAnalyticsLifecycle, useAnalyticsScreen } from './src/analytics/analyticsHooks';
 import type { AnalyticsConsentState } from './src/analytics/analyticsTypes';
 import { useBrand } from './lib/BrandModuleRegistry';
-import FleetDashboard from './components/FleetDashboard';
-import WorkshopCRM from './components/WorkshopCRM';
-import VerifiedCompanyPanel from './components/VerifiedCompanyPanel';
-import AdCampaignConsole from './components/AdCampaignConsole';
-import GDPRComplianceView from './components/GDPRComplianceView';
-import SubscriptionCheckout from './components/SubscriptionCheckout';
-import PayoutsView from './components/PayoutsView';
 
 const OBD2Scanner = React.lazy(() =>
   import('./components/OBD2Scanner').then(module => ({ default: module.OBD2Scanner }))
@@ -48,6 +42,14 @@ const OBD2Scanner = React.lazy(() =>
 const LiveLinkDashboard = React.lazy(() =>
   import('./components/LiveLinkDashboard').then(module => ({ default: module.LiveLinkDashboard }))
 );
+
+const FleetDashboard = React.lazy(() => import('./components/FleetDashboard'));
+const WorkshopCRM = React.lazy(() => import('./components/WorkshopCRM'));
+const VerifiedCompanyPanel = React.lazy(() => import('./components/VerifiedCompanyPanel'));
+const AdCampaignConsole = React.lazy(() => import('./components/AdCampaignConsole'));
+const GDPRComplianceView = React.lazy(() => import('./components/GDPRComplianceView'));
+const SubscriptionCheckout = React.lazy(() => import('./components/SubscriptionCheckout'));
+const PayoutsView = React.lazy(() => import('./components/PayoutsView'));
 
 export default function App() {
   const { t } = useBrand();
@@ -63,6 +65,14 @@ export default function App() {
       <div className="glass rounded-xl px-6 py-4 font-mono text-xs font-bold text-forge-500">
         Cargando modulo...
       </div>
+    </div>
+  );
+  const ecosystemFallback = (
+    <div className="glass rounded-2xl border border-cyan-500/20 p-8 text-center shadow-[0_0_30px_rgba(34,211,238,0.08)]">
+      <div className="mx-auto mb-4 h-10 w-10 rounded-xl border border-cyan-400/25 bg-cyan-400/10 flex items-center justify-center">
+        <Gauge size={19} className="text-cyan-200 animate-pulse" />
+      </div>
+      <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">Cargando modulo</p>
     </div>
   );
 
@@ -832,43 +842,57 @@ export default function App() {
           {/* ── ECOSYSTEM VIEW SWITCHER ── */}
           {vanguardTab === 'CRM' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
-              <WorkshopCRM />
+              <React.Suspense fallback={ecosystemFallback}>
+                <WorkshopCRM />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'FLEET' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-green-500/25 shadow-[0_0_30px_rgba(74,222,128,0.1)]">
-              <FleetDashboard />
+              <React.Suspense fallback={ecosystemFallback}>
+                <FleetDashboard />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'VERIFIED' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-yellow-500/25 shadow-[0_0_30px_rgba(250,204,21,0.1)]">
-              <VerifiedCompanyPanel />
+              <React.Suspense fallback={ecosystemFallback}>
+                <VerifiedCompanyPanel />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'CAMPAIGNS' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-purple-500/25 shadow-[0_0_30px_rgba(192,132,252,0.1)]">
-              <AdCampaignConsole />
+              <React.Suspense fallback={ecosystemFallback}>
+                <AdCampaignConsole />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'PAYOUTS' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-emerald-500/25 shadow-[0_0_30px_rgba(52,211,153,0.1)]">
-              <PayoutsView />
+              <React.Suspense fallback={ecosystemFallback}>
+                <PayoutsView />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'SUBSCRIPTIONS' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-orange-500/25 shadow-[0_0_30px_rgba(251,146,60,0.1)]">
-              <SubscriptionCheckout />
+              <React.Suspense fallback={ecosystemFallback}>
+                <SubscriptionCheckout />
+              </React.Suspense>
             </div>
           )}
 
           {vanguardTab === 'GDPR' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-red-500/25 shadow-[0_0_30px_rgba(248,113,113,0.1)]">
-              <GDPRComplianceView />
+              <React.Suspense fallback={ecosystemFallback}>
+                <GDPRComplianceView />
+              </React.Suspense>
             </div>
           )}
 
@@ -1066,6 +1090,23 @@ export default function App() {
                 </div>
 
                 {/* Dashboard Content */}
+                <PlatformCommandCenter
+                  role={role}
+                  adminViewMode={adminViewMode}
+                  metrics={metrics}
+                  workOrders={workOrders}
+                  clients={clients}
+                  mechanics={mechanics}
+                  services={services}
+                  currentDate={currentDate}
+                  onNewOrder={() => openBooking('command_center')}
+                  onOpenOBD2={() => setIsOBD2Open(true)}
+                  onOpenLiveLink={() => setIsLiveLinkOpen(true)}
+                  onOpenCatalog={() => setIsCatalogOpen(true)}
+                  onOpenClients={() => setIsClientManagerOpen(true)}
+                  onSetVanguardTab={(tab) => setVanguardTab(tab)}
+                />
+
                 {(role === Role.MECHANIC || (role === Role.ADMIN && adminViewMode === 'WORKSTATION')) ? (
                   <MechanicDashboard
                     mechanicId={role === Role.MECHANIC ? loggedInUser.id : 'm1'}

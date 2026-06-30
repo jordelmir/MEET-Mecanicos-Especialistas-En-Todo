@@ -4,6 +4,14 @@
 
 echo "💈 Starting Deployment Sequence..."
 
+set -a
+if [ -f .env.local ]; then
+    . ./.env.local
+elif [ -f .env ]; then
+    . ./.env
+fi
+set +a
+
 # 1. Login Checks
 echo "👀 Checking Authentication..."
 if ! npx supabase projects list >/dev/null 2>&1; then
@@ -43,19 +51,15 @@ npx vercel deploy --prod
 
 # 4. Seeding Data
 echo "🌱 Seeding Admin Users..."
-echo "Enter your Supabase SERVICE_ROLE_KEY (from Project Settings -> API) to seed users:"
-read -s SERVICE_KEY
-
-if [ -n "$SERVICE_KEY" ]; then
-    export SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
+if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
     if node scripts/seed_auth.cjs; then
         echo "✅ Users Seeded Successfully."
     else
         echo "⚠️  Seeding had issues. Check logs."
     fi
 else
-    echo "⏭️  Skipping seeding (No key provided)."
+    echo "⏭️  Skipping seeding (SUPABASE_SERVICE_ROLE_KEY not set in local env)."
 fi
 
 echo "🎉 Deployment Complete!"
-echo "Check your Vercel URL and credentials in CREDENTIALS.md"
+echo "Check your deployment dashboard for URLs and runtime status."

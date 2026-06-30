@@ -29,6 +29,12 @@ data class GaugeListing(
     val config_json: String = "{}",
     val thumbnail_url: String? = null,
     val price_tier: Int = 1,
+    val product_id: String = "gauge_tier_1",
+    val sale_category: String = "performance",
+    val tags: String = "",
+    val currency: String = "USD",
+    val seller_terms_accepted: Boolean = false,
+    val published_from_saved_gauge_id: String? = null,
     val total_sales: Int = 0,
     val total_revenue_cents: Int = 0,
     val creator_earnings_cents: Int = 0,
@@ -121,6 +127,30 @@ class GaugeMarketplaceRepository @Inject constructor(
         }
     }
 
+    private fun currentCreatorId(): String {
+        val authenticated = currentUserId()
+        if (!authenticated.isNullOrBlank()) return authenticated
+
+        val prefs = context.getSharedPreferences("meet_gauge_marketplace", Context.MODE_PRIVATE)
+        val existing = prefs.getString("local_creator_id", null)
+        if (!existing.isNullOrBlank()) return existing
+
+        val generated = "local_creator_${java.util.UUID.randomUUID()}"
+        prefs.edit().putString("local_creator_id", generated).apply()
+        return generated
+    }
+
+    private fun currentCreatorName(): String {
+        val emailName = runCatching {
+            supabaseClient.auth.currentUserOrNull()?.email?.substringBefore("@")
+        }.getOrNull()
+        if (!emailName.isNullOrBlank()) return emailName
+
+        return context.getSharedPreferences("meet_gauge_marketplace", Context.MODE_PRIVATE)
+            .getString("local_creator_name", null)
+            ?: "MEET Creator"
+    }
+
     // ── PUBLISH ──
 
     /**
@@ -132,10 +162,40 @@ class GaugeMarketplaceRepository @Inject constructor(
         name: String,
         description: String,
         priceTier: Int,
-        thumbnailBytes: ByteArray?
+        thumbnailBytes: ByteArray?,
+        saleCategory: String = "performance",
+        tags: String = "",
+        publishedFromSavedGaugeId: String? = null,
+        sellerTermsAccepted: Boolean = false
     ): Result<String> = runCatching {
-        val userId = currentUserId() ?: throw IllegalStateException("User not authenticated")
-        val userName = supabaseClient.auth.currentUserOrNull()?.email?.substringBefore("@") ?: "Anonymous"
+        require(sellerTermsAccepted) {
+            "Debes aceptar las condiciones de venta para publicar."
+        }
+        val userId = currentCreatorId()
+        val userName = currentCreatorName()
+        val normalizedName = name.trim().ifBlank { config.name.ifBlank { "Gauge MEET" } }
+        val normalizedDescription = description.trim()
+        require(normalizedName.length >= 3) { "El nombre del gauge debe tener al menos 3 caracteres." }
+        require(normalizedDescription.length >= 12) { "Agrega una descripción útil para el comprador." }
+        val normalizedTier = priceTier.coerceIn(1, 10)
+
+        if (!publishedFromSavedGaugeId.isNullOrBlank()) {
+            val existingListing = supabaseClient.postgrest["gauge_listings"]
+                .select {
+                    filter {
+                        eq("creator_id", userId)
+                        eq("published_from_saved_gauge_id", publishedFromSavedGaugeId)
+                        eq("is_active", true)
+                    }
+                }
+                .decodeList<GaugeListing>()
+                .firstOrNull()
+            val existingListingId = existingListing?.id
+            if (!existingListingId.isNullOrBlank()) {
+                Log.i(TAG, "Publish ignored; saved gauge already listed: $existingListingId")
+                return@runCatching existingListingId
+            }
+        }
 
         // Upload thumbnail if provided
         var thumbnailUrl: String? = null
@@ -154,11 +214,17 @@ class GaugeMarketplaceRepository @Inject constructor(
         val listing = GaugeListing(
             creator_id = userId,
             creator_name = userName,
-            name = name,
-            description = description,
+            name = normalizedName,
+            description = normalizedDescription,
             config_json = configJsonStr,
             thumbnail_url = thumbnailUrl,
-            price_tier = priceTier.coerceIn(1, 10)
+            price_tier = normalizedTier,
+            product_id = GaugePriceTiers.productId(normalizedTier),
+            sale_category = saleCategory.trim().ifBlank { "performance" },
+            tags = tags.trim(),
+            currency = "USD",
+            seller_terms_accepted = sellerTermsAccepted,
+            published_from_saved_gauge_id = publishedFromSavedGaugeId
         )
 
         val result = supabaseClient.postgrest["gauge_listings"]
@@ -207,7 +273,7 @@ class GaugeMarketplaceRepository @Inject constructor(
 
     /** Fetch listings by the current user (their shop) */
     suspend fun fetchMyListings(): List<GaugeListing> {
-        val userId = currentUserId() ?: return emptyList()
+        val userId = currentCreatorId()
         return try {
             supabaseClient.postgrest["gauge_listings"]
                 .select {
@@ -242,6 +308,19 @@ class GaugeMarketplaceRepository @Inject constructor(
         priceTier: Int
     ): Result<Unit> = runCatching {
         val userId = currentUserId() ?: throw IllegalStateException("User not authenticated")
+        val existingPurchases = supabaseClient.postgrest["gauge_purchases"]
+            .select {
+                filter {
+                    eq("listing_id", listingId)
+                    eq("buyer_id", userId)
+                }
+            }
+            .decodeList<GaugePurchase>()
+        if (existingPurchases.isNotEmpty()) {
+            Log.i(TAG, "Purchase ignored; listing $listingId is already owned by current user")
+            return@runCatching
+        }
+
         val priceCents = GaugePriceTiers.TIER_PRICES[priceTier] ?: 99
         val (creatorShare, platformShare, _) = GaugePriceTiers.calculateSplit(priceTier)
 
@@ -353,7 +432,7 @@ class GaugeMarketplaceRepository @Inject constructor(
 
     /** Total earnings for the current creator */
     suspend fun getCreatorEarnings(): Int {
-        val userId = currentUserId() ?: return 0
+        val userId = currentCreatorId()
         return try {
             val listings = supabaseClient.postgrest["gauge_listings"]
                 .select {

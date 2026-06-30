@@ -5,9 +5,30 @@
 # --- Environment & Secrets ---
 .env
 .env.local
+.env.development
+.env.production
+.env.test
 .env.*.local
 *.env
+*.env.*
 !.env.example
+.env.keys
+.env.vault
+.envrc
+CREDENTIALS*
+credentials*
+*.credentials
+*.secret
+*.secrets
+secrets.*
+service-role*
+service_role*
+anon-key*
+publishable-key*
+*.pem
+*.key
+*.p12
+*.mobileprovision
 
 # --- Node.js ---
 node_modules/
@@ -42,6 +63,7 @@ android/app/build/
 android/.gradle/
 android/build/
 android/local.properties
+android/**/local.properties
 android/gradle-8.5/
 android/gradle-8.5-bin.zip
 temp_gradle/
@@ -50,6 +72,23 @@ temp_gradle/
 # --- Android Signing ---
 *.jks
 *.keystore
+android/*.jks
+android/*.keystore
+android/app/*.jks
+android/app/*.keystore
+keystore.properties
+signing.properties
+
+# --- Supabase Local/Remote Secrets ---
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+supabase/.env.*
+supabase/functions/.env
+supabase/functions/.env.*
+supabase/secrets.env
+supabase/.secrets
+supabase/.secrets.*
 
 # --- Python Temp ---
 __pycache__/

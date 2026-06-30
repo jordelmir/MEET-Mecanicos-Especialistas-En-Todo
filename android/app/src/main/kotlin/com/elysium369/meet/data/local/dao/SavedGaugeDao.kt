@@ -24,6 +24,6 @@ interface SavedGaugeDao {
     @Query("SELECT COUNT(*) FROM saved_gauges")
     suspend fun count(): Int
 
-    @Query("UPDATE saved_gauges SET isPublished = 1, marketplaceId = :marketplaceId WHERE id = :id")
-    suspend fun markAsPublished(id: String, marketplaceId: String)
+    @Query("UPDATE saved_gauges SET isPublished = 1, marketplaceId = :marketplaceId, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun markAsPublished(id: String, marketplaceId: String, updatedAt: Long)
 }

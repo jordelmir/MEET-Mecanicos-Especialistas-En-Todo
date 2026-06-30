@@ -24,7 +24,7 @@ export function OscilloscopeCanvas({
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const W = canvas.width;
@@ -213,7 +213,7 @@ export function OscilloscopeCanvas({
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (ctx) ctx.scale(dpr, dpr);
     // Reset canvas internal dimensions for drawing
     canvas.width = rect.width;

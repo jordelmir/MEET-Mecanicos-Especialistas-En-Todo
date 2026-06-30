@@ -2,6 +2,7 @@ package com.elysium369.meet.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elysium369.meet.data.local.entities.GaugeConfig
 import com.elysium369.meet.data.supabase.GaugeListing
 import com.elysium369.meet.data.supabase.GaugeMarketplaceRepository
 import com.elysium369.meet.data.supabase.GaugeReview
@@ -24,6 +25,9 @@ data class GaugeMarketplaceUiState(
     val selectedTab: GaugeMarketTab = GaugeMarketTab.POPULAR,
     val listings: List<GaugeListing> = emptyList(),
     val isLoading: Boolean = true,
+    val isPublishing: Boolean = false,
+    val publishingSourceGaugeId: String? = null,
+    val purchaseRecordingListingId: String? = null,
     val creatorEarningsCents: Int = 0,
     val ownershipByListingId: Map<String, Boolean> = emptyMap(),
     val reviewsByListingId: Map<String, List<GaugeReview>> = emptyMap(),
@@ -36,6 +40,7 @@ class GaugeMarketplaceViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GaugeMarketplaceUiState())
     val uiState: StateFlow<GaugeMarketplaceUiState> = _uiState.asStateFlow()
+    private val inFlightPurchaseKeys = mutableSetOf<String>()
 
     init {
         refresh()
@@ -104,20 +109,101 @@ class GaugeMarketplaceViewModel @Inject constructor(
     }
 
     fun recordPurchase(listing: GaugeListing, purchaseToken: String) {
-        val listingId = listing.id ?: return
+        val listingId = listing.id?.takeIf { it.isNotBlank() } ?: return
+        val normalizedToken = purchaseToken.trim()
+        if (normalizedToken.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "Google Play no devolvió token de compra.") }
+            return
+        }
+        val purchaseKey = "$listingId:$normalizedToken"
+        if (_uiState.value.ownershipByListingId[listingId] == true || !inFlightPurchaseKeys.add(purchaseKey)) {
+            return
+        }
+        _uiState.update {
+            it.copy(
+                purchaseRecordingListingId = listingId,
+                errorMessage = null
+            )
+        }
         viewModelScope.launch {
-            repository.recordPurchase(listingId, purchaseToken, listing.price_tier)
+            repository.recordPurchase(listingId, normalizedToken, listing.price_tier)
                 .onSuccess {
                     _uiState.update {
-                        it.copy(ownershipByListingId = it.ownershipByListingId + (listingId to true))
+                        it.copy(
+                            ownershipByListingId = it.ownershipByListingId + (listingId to true),
+                            purchaseRecordingListingId = null
+                        )
                     }
                     refresh()
                 }
                 .onFailure { error ->
                     _uiState.update {
-                        it.copy(errorMessage = error.message ?: "No se pudo registrar la compra.")
+                        it.copy(
+                            purchaseRecordingListingId = null,
+                            errorMessage = error.message ?: "No se pudo registrar la compra."
+                        )
                     }
                 }
+            inFlightPurchaseKeys.remove(purchaseKey)
+        }
+    }
+
+    fun publishGauge(
+        config: GaugeConfig,
+        name: String,
+        description: String,
+        priceTier: Int,
+        saleCategory: String,
+        tags: String,
+        publishedFromSavedGaugeId: String?,
+        sellerTermsAccepted: Boolean,
+        onResult: (Result<String>) -> Unit
+    ) {
+        if (_uiState.value.isPublishing) {
+            onResult(Result.failure(IllegalStateException("Ya hay una publicación en proceso.")))
+            return
+        }
+        val publishSourceKey = publishedFromSavedGaugeId?.takeIf { it.isNotBlank() }
+            ?: "draft:${name.trim().ifBlank { config.name }.take(48)}"
+        _uiState.update {
+            it.copy(
+                isPublishing = true,
+                publishingSourceGaugeId = publishSourceKey,
+                errorMessage = null
+            )
+        }
+        viewModelScope.launch {
+            val result = repository.publishGauge(
+                config = config.copy(name = name.trim().ifBlank { config.name }),
+                name = name,
+                description = description,
+                priceTier = priceTier,
+                thumbnailBytes = null,
+                saleCategory = saleCategory,
+                tags = tags,
+                publishedFromSavedGaugeId = publishedFromSavedGaugeId,
+                sellerTermsAccepted = sellerTermsAccepted
+            )
+            result
+                .onSuccess {
+                    _uiState.update { state ->
+                        state.copy(
+                            isPublishing = false,
+                            publishingSourceGaugeId = null
+                        )
+                    }
+                    refresh()
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isPublishing = false,
+                            publishingSourceGaugeId = null,
+                            errorMessage = error.message ?: "No se pudo publicar el gauge."
+                        )
+                    }
+                }
+            onResult(result)
         }
     }
 

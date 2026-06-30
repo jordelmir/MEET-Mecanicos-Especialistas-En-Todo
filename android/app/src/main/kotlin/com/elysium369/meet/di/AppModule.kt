@@ -7,6 +7,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.elysium369.meet.core.ai.GeminiDiagnostic
 import com.elysium369.meet.core.health.PredictiveHealthEngine
+import com.elysium369.meet.core.vanguard.SupabaseVanguardOutboxDispatcher
+import com.elysium369.meet.core.vanguard.VanguardOutboxDispatcher
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
 
@@ -1810,6 +1812,426 @@ object AppModule {
         }
     }
 
+    private fun createVanguardTelemetryTables(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_sessions` (
+            `sessionId` TEXT NOT NULL,
+            `userHash` TEXT,
+            `vehicleId` TEXT,
+            `vinHash` TEXT,
+            `appVersion` TEXT NOT NULL,
+            `androidVersion` TEXT NOT NULL,
+            `deviceModel` TEXT NOT NULL,
+            `adapterName` TEXT,
+            `adapterMacHash` TEXT,
+            `adapterFirmware` TEXT,
+            `protocolDetected` TEXT,
+            `connectionStartTime` INTEGER NOT NULL,
+            `connectionEndTime` INTEGER,
+            `pidPollingRateHz` REAL NOT NULL,
+            `commandCount` INTEGER NOT NULL,
+            `successCount` INTEGER NOT NULL,
+            `timeoutCount` INTEGER NOT NULL,
+            `retryCount` INTEGER NOT NULL,
+            `averageLatencyMs` REAL NOT NULL,
+            `p95LatencyMs` REAL NOT NULL,
+            `p99LatencyMs` REAL NOT NULL,
+            `jitterMs` REAL NOT NULL,
+            `droppedFrames` INTEGER NOT NULL,
+            `reconnectCount` INTEGER NOT NULL,
+            `batteryVoltageMin` REAL,
+            `batteryVoltageMax` REAL,
+            `ecuModulesJson` TEXT NOT NULL,
+            `dtcsJson` TEXT NOT NULL,
+            `mode06Json` TEXT NOT NULL,
+            `derivedMetricsJson` TEXT NOT NULL,
+            `consentGranted` INTEGER NOT NULL,
+            `compressedPayloadPath` TEXT,
+            `pendingUpload` INTEGER NOT NULL,
+            `uploadAttemptCount` INTEGER NOT NULL,
+            `nextUploadAt` INTEGER,
+            `createdAt` INTEGER NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`sessionId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_sessions_vehicleId_connectionStartTime` ON `obd_sessions` (`vehicleId`, `connectionStartTime`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_sessions_pendingUpload_nextUploadAt` ON `obd_sessions` (`pendingUpload`, `nextUploadAt`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_pid_samples` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `pid` TEXT NOT NULL,
+            `label` TEXT,
+            `state` TEXT NOT NULL,
+            `value` REAL,
+            `unit` TEXT,
+            `source` TEXT NOT NULL,
+            `confidence` REAL,
+            `ageMs` INTEGER,
+            `rawValue` TEXT,
+            `errorReason` TEXT,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_sessionId_pid_timestampMs` ON `obd_pid_samples` (`sessionId`, `pid`, `timestampMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_vehicleId_pid_timestampMs` ON `obd_pid_samples` (`vehicleId`, `pid`, `timestampMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_command_logs` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `command` TEXT NOT NULL,
+            `serviceMode` TEXT,
+            `pid` TEXT,
+            `moduleAddress` TEXT,
+            `rawResponse` TEXT,
+            `normalizedResponse` TEXT,
+            `success` INTEGER NOT NULL,
+            `errorType` TEXT,
+            `negativeResponseCode` TEXT,
+            `latencyMs` INTEGER,
+            `timeoutMs` INTEGER,
+            `retryCount` INTEGER NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_logs_sessionId_timestampMs` ON `obd_command_logs` (`sessionId`, `timestampMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_logs_command_success` ON `obd_command_logs` (`command`, `success`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `ecu_failure_events` (
+            `id` TEXT NOT NULL,
+            `eventType` TEXT NOT NULL,
+            `failureType` TEXT NOT NULL,
+            `confidence` REAL NOT NULL,
+            `reason` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `adapterType` TEXT,
+            `adapterFirmware` TEXT,
+            `transport` TEXT,
+            `protocolAttempted` TEXT,
+            `protocolSelected` TEXT,
+            `commandSent` TEXT NOT NULL,
+            `rawResponse` TEXT,
+            `normalizedResponse` TEXT,
+            `timeoutMs` INTEGER,
+            `latencyMs` INTEGER,
+            `retryCount` INTEGER NOT NULL,
+            `moduleAddress` TEXT,
+            `ecuName` TEXT,
+            `serviceMode` TEXT,
+            `pid` TEXT,
+            `negativeResponseCode` TEXT,
+            `batteryVoltage` REAL,
+            `ignitionState` TEXT,
+            `engineRunningState` TEXT,
+            `vehicleMake` TEXT,
+            `vehicleModel` TEXT,
+            `vehicleYear` INTEGER,
+            `vehicleEngine` TEXT,
+            `vehicleTransmission` TEXT,
+            `vehicleRegion` TEXT,
+            `vinHash` TEXT,
+            `appVersion` TEXT,
+            `androidVersion` TEXT,
+            `deviceModel` TEXT,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_sessionId_timestampMs` ON `ecu_failure_events` (`sessionId`, `timestampMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_failureType_vehicleMake_vehicleModel_vehicleYear` ON `ecu_failure_events` (`failureType`, `vehicleMake`, `vehicleModel`, `vehicleYear`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_adapterType_protocolSelected` ON `ecu_failure_events` (`adapterType`, `protocolSelected`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `compatibility_rules` (
+            `ruleId` TEXT NOT NULL,
+            `priority` INTEGER NOT NULL,
+            `matchJson` TEXT NOT NULL,
+            `fixJson` TEXT NOT NULL,
+            `rolloutPercentage` INTEGER NOT NULL,
+            `version` INTEGER NOT NULL,
+            `signature` TEXT,
+            `expiresAtMs` INTEGER,
+            `enabled` INTEGER NOT NULL,
+            `auditJson` TEXT NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`ruleId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_priority_enabled` ON `compatibility_rules` (`priority`, `enabled`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_expiresAtMs` ON `compatibility_rules` (`expiresAtMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_profiles` (
+            `vehicleId` TEXT NOT NULL,
+            `userHash` TEXT,
+            `vinHash` TEXT,
+            `make` TEXT,
+            `model` TEXT,
+            `year` INTEGER,
+            `engine` TEXT,
+            `transmission` TEXT,
+            `region` TEXT,
+            `odometerKm` INTEGER,
+            `createdAt` INTEGER NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`vehicleId`)
+        )""")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vehicle_profiles_vinHash` ON `vehicle_profiles` (`vinHash`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `mode06_results` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `mid` TEXT NOT NULL,
+            `tid` TEXT NOT NULL,
+            `value` REAL NOT NULL,
+            `minLimit` REAL,
+            `maxLimit` REAL,
+            `unit` TEXT NOT NULL,
+            `passed` INTEGER NOT NULL,
+            `testName` TEXT NOT NULL,
+            `componentName` TEXT NOT NULL,
+            `severity` TEXT NOT NULL,
+            `explanation` TEXT,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mode06_results_sessionId_mid_tid` ON `mode06_results` (`sessionId`, `mid`, `tid`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `freeze_frames` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `dtcCode` TEXT,
+            `frameNumber` INTEGER NOT NULL,
+            `payloadJson` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_freeze_frames_sessionId_dtcCode` ON `freeze_frames` (`sessionId`, `dtcCode`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `derived_metrics` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `metricId` TEXT NOT NULL,
+            `value` REAL,
+            `unit` TEXT NOT NULL,
+            `confidence` REAL NOT NULL,
+            `source` TEXT NOT NULL,
+            `formulaUsed` TEXT NOT NULL,
+            `inputSensorsJson` TEXT NOT NULL,
+            `fallbackSensorsJson` TEXT NOT NULL,
+            `errorBoundsJson` TEXT,
+            `validity` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_derived_metrics_sessionId_metricId_timestampMs` ON `derived_metrics` (`sessionId`, `metricId`, `timestampMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `health_scores` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `overall` INTEGER NOT NULL,
+            `engineHealth` INTEGER NOT NULL,
+            `fuelSystemHealth` INTEGER NOT NULL,
+            `ignitionHealth` INTEGER NOT NULL,
+            `emissionHealth` INTEGER NOT NULL,
+            `coolingHealth` INTEGER NOT NULL,
+            `chargingSystemHealth` INTEGER NOT NULL,
+            `transmissionHealth` INTEGER NOT NULL,
+            `sensorHealth` INTEGER NOT NULL,
+            `ecuCommunicationHealth` INTEGER NOT NULL,
+            `drivingEfficiencyScore` INTEGER NOT NULL,
+            `evidenceJson` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_scores_vehicleId_timestampMs` ON `health_scores` (`vehicleId`, `timestampMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `repair_recommendations` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `dtcCode` TEXT,
+            `cause` TEXT NOT NULL,
+            `probability` REAL NOT NULL,
+            `evidenceJson` TEXT NOT NULL,
+            `recommendedTest` TEXT NOT NULL,
+            `estimatedCostUsd` TEXT,
+            `riskIfIgnored` TEXT NOT NULL,
+            `suggestedRepair` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_recommendations_vehicleId_sessionId` ON `repair_recommendations` (`vehicleId`, `sessionId`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `ai_diagnostic_results` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `vehicleId` TEXT,
+            `promptHash` TEXT NOT NULL,
+            `response` TEXT NOT NULL,
+            `evidenceJson` TEXT NOT NULL,
+            `confidence` REAL NOT NULL,
+            `strictNoInventedData` INTEGER NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_diagnostic_results_sessionId_createdAt` ON `ai_diagnostic_results` (`sessionId`, `createdAt`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_history` (
+            `id` TEXT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `metric` TEXT NOT NULL,
+            `bucket` TEXT NOT NULL,
+            `bucketStartMs` INTEGER NOT NULL,
+            `bucketEndMs` INTEGER NOT NULL,
+            `sampleCount` INTEGER NOT NULL,
+            `minValue` REAL,
+            `maxValue` REAL,
+            `avgValue` REAL,
+            `payloadJson` TEXT NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_history_vehicleId_metric_bucketStartMs` ON `vehicle_history` (`vehicleId`, `metric`, `bucketStartMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `pdf_reports` (
+            `reportId` TEXT NOT NULL,
+            `sessionId` TEXT,
+            `vehicleId` TEXT,
+            `reportType` TEXT NOT NULL,
+            `filePath` TEXT,
+            `reportHash` TEXT NOT NULL,
+            `signed` INTEGER NOT NULL,
+            `payloadJson` TEXT NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`reportId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_pdf_reports_vehicleId_createdAt` ON `pdf_reports` (`vehicleId`, `createdAt`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `audit_logs` (
+            `id` TEXT NOT NULL,
+            `sessionId` TEXT,
+            `userHash` TEXT,
+            `eventType` TEXT NOT NULL,
+            `severity` TEXT NOT NULL,
+            `payloadJson` TEXT NOT NULL,
+            `timestampMs` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_sessionId_timestampMs` ON `audit_logs` (`sessionId`, `timestampMs`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `fix_rollouts` (
+            `id` TEXT NOT NULL,
+            `ruleId` TEXT NOT NULL,
+            `sessionId` TEXT,
+            `vehicleId` TEXT,
+            `applied` INTEGER NOT NULL,
+            `rollbackAvailable` INTEGER NOT NULL,
+            `result` TEXT NOT NULL,
+            `auditJson` TEXT NOT NULL,
+            `appliedAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_fix_rollouts_ruleId_appliedAt` ON `fix_rollouts` (`ruleId`, `appliedAt`)")
+    }
+
+    private val MIGRATION_34_35 = object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 34→35: Creating Elysium Vanguard telemetry tables")
+            createVanguardTelemetryTables(db)
+        }
+    }
+
+    private fun createVanguardCommerceTables(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vanguard_events` (
+            `eventId` TEXT NOT NULL,
+            `aggregateType` TEXT NOT NULL,
+            `aggregateId` TEXT NOT NULL,
+            `eventType` TEXT NOT NULL,
+            `actorId` TEXT,
+            `actorRole` TEXT,
+            `source` TEXT NOT NULL,
+            `correlationId` TEXT,
+            `causationId` TEXT,
+            `idempotencyKey` TEXT NOT NULL,
+            `payloadJson` TEXT NOT NULL,
+            `schemaVersion` INTEGER NOT NULL,
+            `occurredAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`eventId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_aggregateType_aggregateId_occurredAt` ON `vanguard_events` (`aggregateType`, `aggregateId`, `occurredAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_eventType_occurredAt` ON `vanguard_events` (`eventType`, `occurredAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_synced_occurredAt` ON `vanguard_events` (`synced`, `occurredAt`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vanguard_events_idempotencyKey` ON `vanguard_events` (`idempotencyKey`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `marketplace_ledger_entries` (
+            `ledgerEntryId` TEXT NOT NULL,
+            `transactionId` TEXT NOT NULL,
+            `relatedEventId` TEXT NOT NULL,
+            `orderType` TEXT NOT NULL,
+            `orderId` TEXT NOT NULL,
+            `participantId` TEXT,
+            `participantRole` TEXT NOT NULL,
+            `entryType` TEXT NOT NULL,
+            `direction` TEXT NOT NULL,
+            `amountCents` INTEGER NOT NULL,
+            `currency` TEXT NOT NULL,
+            `status` TEXT NOT NULL,
+            `metadataJson` TEXT NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `settledAt` INTEGER,
+            `idempotencyKey` TEXT NOT NULL,
+            `synced` INTEGER NOT NULL,
+            PRIMARY KEY(`ledgerEntryId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_transactionId` ON `marketplace_ledger_entries` (`transactionId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_orderType_orderId` ON `marketplace_ledger_entries` (`orderType`, `orderId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_status_createdAt` ON `marketplace_ledger_entries` (`status`, `createdAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_synced_createdAt` ON `marketplace_ledger_entries` (`synced`, `createdAt`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_idempotencyKey` ON `marketplace_ledger_entries` (`idempotencyKey`)")
+
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vanguard_outbox` (
+            `outboxId` TEXT NOT NULL,
+            `eventId` TEXT NOT NULL,
+            `destination` TEXT NOT NULL,
+            `operation` TEXT NOT NULL,
+            `payloadJson` TEXT NOT NULL,
+            `status` TEXT NOT NULL,
+            `attemptCount` INTEGER NOT NULL,
+            `nextAttemptAt` INTEGER,
+            `lastError` TEXT,
+            `createdAt` INTEGER NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            `idempotencyKey` TEXT NOT NULL,
+            PRIMARY KEY(`outboxId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_eventId` ON `vanguard_outbox` (`eventId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_status_nextAttemptAt` ON `vanguard_outbox` (`status`, `nextAttemptAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_destination_status` ON `vanguard_outbox` (`destination`, `status`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vanguard_outbox_idempotencyKey` ON `vanguard_outbox` (`idempotencyKey`)")
+    }
+
+    private val MIGRATION_35_36 = object : Migration(35, 36) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 35→36: Creating Vanguard commerce events, ledger, and outbox tables")
+            createVanguardCommerceTables(db)
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -1831,7 +2253,9 @@ object AppModule {
             MIGRATION_30_31,
             MIGRATION_31_32,
             MIGRATION_32_33,
-            MIGRATION_33_34
+            MIGRATION_33_34,
+            MIGRATION_34_35,
+            MIGRATION_35_36
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -1994,4 +2418,16 @@ object AppModule {
 
     @Provides
     fun provideRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.RideDao = db.rideDao()
+
+    @Provides
+    fun provideVanguardTelemetryDao(db: MeetDatabase): VanguardTelemetryDao = db.vanguardTelemetryDao()
+
+    @Provides
+    fun provideVanguardCommerceDao(db: MeetDatabase): VanguardCommerceDao = db.vanguardCommerceDao()
+
+    @Provides
+    @Singleton
+    fun provideVanguardOutboxDispatcher(
+        dispatcher: SupabaseVanguardOutboxDispatcher
+    ): VanguardOutboxDispatcher = dispatcher
 }

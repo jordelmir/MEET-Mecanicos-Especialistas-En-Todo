@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.hilt.work.HiltWorkerFactory
 import com.elysium369.meet.core.maintenance.DatabaseMaintenanceWorker
 import com.elysium369.meet.core.obd.DtcDatabaseLoader
+import com.elysium369.meet.core.vanguard.VanguardOutboxSyncWorker
 import com.elysium369.meet.data.local.MeetDatabase
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -43,6 +45,7 @@ class MeetApplication : Application(), Configuration.Provider {
 
         // ── Schedule automatic database maintenance (daily) ──
         scheduleDatabaseMaintenance()
+        scheduleVanguardCommerceOutboxSync()
 
         // Elite Cloud Dynamic Update Integration
         applicationScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -83,5 +86,26 @@ class MeetApplication : Application(), Configuration.Provider {
         )
 
         android.util.Log.i("ElysiumApplication", "📋 Database maintenance scheduled (daily, battery-safe)")
+    }
+
+    private fun scheduleVanguardCommerceOutboxSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val request = PeriodicWorkRequestBuilder<VanguardOutboxSyncWorker>(
+            15, TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .setInitialDelay(2, TimeUnit.MINUTES)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            VanguardOutboxSyncWorker.PERIODIC_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+
+        android.util.Log.i("ElysiumApplication", "Vanguard commerce outbox sync scheduled (network-gated)")
     }
 }

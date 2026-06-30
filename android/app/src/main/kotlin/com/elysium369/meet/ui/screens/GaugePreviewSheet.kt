@@ -47,6 +47,7 @@ fun GaugePreviewSheet(
     isMonetizationUnlocked: Boolean = false,
     reviews: List<GaugeReview> = emptyList(),
     isLoadingReviews: Boolean = false,
+    isPurchaseInProgress: Boolean = false,
     onDismiss: () -> Unit,
     onBuy: (GaugeListing) -> Unit,
     onApply: (GaugeConfig) -> Unit
@@ -308,18 +309,34 @@ fun GaugePreviewSheet(
                             // BUY button
                             Button(
                                 onClick = { onBuy(listing) },
+                                enabled = !isPurchaseInProgress,
                                 modifier = Modifier.fillMaxWidth().height(52.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = accentCyan
                                 ),
                                 shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text(
-                                    "🛒 COMPRAR ${GaugePriceTiers.displayPrice(listing.price_tier)}",
-                                    color = Color.Black,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 15.sp
-                                )
+                                if (isPurchaseInProgress) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color.Black
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "PROCESANDO",
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp
+                                    )
+                                } else {
+                                    Text(
+                                        "🛒 COMPRAR ${GaugePriceTiers.displayPrice(listing.price_tier)}",
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp
+                                    )
+                                }
                             }
                         }
                     }

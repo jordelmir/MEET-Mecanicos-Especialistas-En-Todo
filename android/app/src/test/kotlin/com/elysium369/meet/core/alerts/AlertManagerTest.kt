@@ -9,42 +9,36 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.times
 import org.mockito.Mockito.anyString
+import org.mockito.Mockito.never
 
 class AlertManagerTest {
-
-    private class FakeVoiceFeedbackManager : VoiceFeedbackManager(mock(Context::class.java)) {
-        var speakCount = 0
-        override fun speak(spanishText: String, englishText: String) {
-            speakCount++
-        }
-    }
 
     @Test
     fun testAlertCooldownPreventsFlooding() {
         val mockContext = mock(Context::class.java)
-        val fakeVoice = FakeVoiceFeedbackManager()
-        val manager = AlertManager(mockContext, fakeVoice)
+        val mockVoice = mock(VoiceFeedbackManager::class.java)
+        val manager = AlertManager(mockContext, mockVoice)
 
         // Threshold configuration
         manager.maxTempThreshold = 100f
 
-        // First event over threshold -> should trigger
+        // First event over threshold -> should trigger and speak
         manager.processLiveData(mapOf("0105" to 105f), isEngineRunning = true)
-        assertEquals(1, fakeVoice.speakCount)
+        verify(mockVoice, times(1)).speak(anyString(), anyString())
 
-        // Second event immediately after (no time elapsed) -> should be blocked by cooldown
+        // Second event immediately after (no time elapsed) -> should be blocked by cooldown and not speak again
         manager.processLiveData(mapOf("0105" to 107f), isEngineRunning = true)
-        assertEquals(1, fakeVoice.speakCount) // Remains 1, block was successful!
+        verify(mockVoice, times(1)).speak(anyString(), anyString()) // Speak count remains 1
     }
 
     @Test
-    fun testVoltageAlertThresholdChange() {
+    fun testVoltageAlertThresholdWarning() {
         val mockContext = mock(Context::class.java)
-        val fakeVoice = FakeVoiceFeedbackManager()
-        val manager = AlertManager(mockContext, fakeVoice)
+        val mockVoice = mock(VoiceFeedbackManager::class.java)
+        val manager = AlertManager(mockContext, mockVoice)
 
         // Min voltage with engine off is 11.8V. 11.5V should trigger warning
         manager.processLiveData(mapOf("AT RV" to 11.5f), isEngineRunning = false)
-        assertEquals(1, fakeVoice.speakCount)
+        verify(mockVoice, times(1)).speak(anyString(), anyString())
     }
 }

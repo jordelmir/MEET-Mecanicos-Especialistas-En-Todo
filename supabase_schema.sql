@@ -384,6 +384,43 @@ CREATE TABLE IF NOT EXISTS twin_anomalies (
   timestamp BIGINT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS vanguard_events (
+  event_id TEXT PRIMARY KEY,
+  aggregate_type TEXT NOT NULL,
+  aggregate_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  actor_id TEXT,
+  actor_role TEXT,
+  source TEXT NOT NULL,
+  correlation_id TEXT,
+  causation_id TEXT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  payload_json TEXT NOT NULL,
+  schema_version INT NOT NULL DEFAULT 1,
+  occurred_at_ms BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS marketplace_ledger_entries (
+  ledger_entry_id TEXT PRIMARY KEY,
+  transaction_id TEXT NOT NULL,
+  related_event_id TEXT NOT NULL REFERENCES vanguard_events(event_id) ON DELETE RESTRICT,
+  order_type TEXT NOT NULL,
+  order_id TEXT NOT NULL,
+  participant_id TEXT,
+  participant_role TEXT NOT NULL,
+  entry_type TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  amount_cents BIGINT NOT NULL CHECK (amount_cents >= 0),
+  currency TEXT NOT NULL DEFAULT 'USD',
+  status TEXT NOT NULL,
+  metadata_json TEXT NOT NULL,
+  created_at_ms BIGINT NOT NULL,
+  settled_at_ms BIGINT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Enable RLS
 ALTER TABLE live_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE live_snapshots ENABLE ROW LEVEL SECURITY;
@@ -398,6 +435,8 @@ ALTER TABLE service_bids ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_packages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_twin_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE twin_anomalies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vanguard_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_ledger_entries ENABLE ROW LEVEL SECURITY;
 
 -- Select/All policies
 CREATE POLICY "Public Select live_sessions" ON live_sessions FOR ALL USING (true);
@@ -413,6 +452,8 @@ CREATE POLICY "Public Select service_bids" ON service_bids FOR ALL USING (true);
 CREATE POLICY "Public Select evidence_packages" ON evidence_packages FOR ALL USING (true);
 CREATE POLICY "Public Select vehicle_twin_profiles" ON vehicle_twin_profiles FOR ALL USING (true);
 CREATE POLICY "Public Select twin_anomalies" ON twin_anomalies FOR ALL USING (true);
+CREATE POLICY "Public Select vanguard_events" ON vanguard_events FOR ALL USING (true);
+CREATE POLICY "Public Select marketplace_ledger_entries" ON marketplace_ledger_entries FOR ALL USING (true);
 
 -- HIGH SPEED INDICES FOR MILLIONS OF RECORDS (Repair Network & Twin)
 CREATE INDEX IF NOT EXISTS idx_repair_cases_vehicleMake_vehicleModel ON repair_cases (vehicleMake, vehicleModel);
@@ -426,4 +467,10 @@ CREATE INDEX IF NOT EXISTS idx_repair_cases_full_text ON repair_cases USING gin 
 CREATE INDEX IF NOT EXISTS idx_live_snapshots_session ON live_snapshots (session_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_service_bids_request ON service_bids (request_id);
 CREATE INDEX IF NOT EXISTS idx_twin_anomalies_vehicle ON twin_anomalies (vehicle_id, timestamp DESC);
-
+CREATE INDEX IF NOT EXISTS idx_vanguard_events_aggregate ON vanguard_events (aggregate_type, aggregate_id, occurred_at_ms);
+CREATE INDEX IF NOT EXISTS idx_vanguard_events_event_type ON vanguard_events (event_type, occurred_at_ms);
+CREATE INDEX IF NOT EXISTS idx_vanguard_events_correlation ON vanguard_events (correlation_id, occurred_at_ms);
+CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_transaction ON marketplace_ledger_entries (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_order ON marketplace_ledger_entries (order_type, order_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_event ON marketplace_ledger_entries (related_event_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_status ON marketplace_ledger_entries (status, created_at_ms);

@@ -1,24 +1,21 @@
 package com.elysium369.meet.core.obd
 
-import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
 
 class MeetPeritoTest {
 
     @Test
     fun testInspectionWithValidVin() {
         val perito = MeetPerito()
-        val mockContext = mock(Context::class.java)
 
         // Valid Ford Escape 2012 VIN
         val validVin = "1FMCU0GZ2CUA00001"
 
         val report = perito.performInspection(
-            context = mockContext,
+            context = null, // Safely nullable in tests
             vehicleId = "veh_test_123",
             vin = validVin,
             activeDtcs = emptyList(),
@@ -43,13 +40,12 @@ class MeetPeritoTest {
     @Test
     fun testInspectionWithTamperedVinTriggersRedFlag() {
         val perito = MeetPerito()
-        val mockContext = mock(Context::class.java)
 
         // Tampered VIN (check digit replaced by '9')
         val tamperedVin = "1FMCU0GZ9CUA00001"
 
         val report = perito.performInspection(
-            context = mockContext,
+            context = null, // Safely nullable in tests
             vehicleId = "veh_test_123",
             vin = tamperedVin,
             activeDtcs = emptyList(),

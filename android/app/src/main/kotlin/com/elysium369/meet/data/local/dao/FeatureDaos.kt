@@ -1,8 +1,12 @@
 package com.elysium369.meet.data.local.dao
 
 import androidx.room.*
+import com.elysium369.meet.core.access.CommissionEngine
+import com.elysium369.meet.core.access.TransactionKind
 import com.elysium369.meet.data.local.entities.*
 import kotlinx.coroutines.flow.Flow
+import org.json.JSONObject
+import kotlin.math.roundToLong
 
 @Dao
 interface LiveSessionDao {
@@ -78,11 +82,55 @@ interface MarketplaceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRequest(request: ServiceRequestEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertVanguardEvent(event: VanguardEventEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMarketplaceLedgerEntries(entries: List<MarketplaceLedgerEntryEntity>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertVanguardOutbox(message: VanguardOutboxEntity): Long
+
+    @Transaction
+    suspend fun upsertServiceRequestFromSync(request: ServiceRequestEntity): Boolean {
+        val local = getRequestById(request.requestId)
+        if (local == null) {
+            insertRequest(request)
+            return true
+        }
+
+        val localHasLocalClaim = local.status != "OPEN" && request.status == "OPEN"
+        val localPaymentFailed = local.escrowStatus == "REFUNDED" && request.escrowStatus != "REFUNDED"
+        val localIsTerminal = local.status == "COMPLETED" || local.status == "CANCELLED"
+        if (localHasLocalClaim || localPaymentFailed || (localIsTerminal && request.status != local.status)) {
+            return false
+        }
+
+        insertRequest(request)
+        return true
+    }
+
     @Query("SELECT * FROM service_bids WHERE requestId = :requestId ORDER BY createdAt DESC")
     fun getBidsForRequest(requestId: String): Flow<List<ServiceBidEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBid(bid: ServiceBidEntity)
+
+    @Transaction
+    suspend fun upsertBidRespectingRequestClaim(bid: ServiceBidEntity): Boolean {
+        val localBid = getBidById(bid.bidId)
+        val request = getRequestById(bid.requestId)
+        if (localBid?.status == "ACCEPTED" && request?.escrowStatus != "REFUNDED") return true
+
+        val normalizedBid = when {
+            request?.escrowStatus == "REFUNDED" -> bid.copy(status = "PENDING")
+            request == null || request.status == "OPEN" -> bid
+            request.status == "ACCEPTED" && bid.status == "ACCEPTED" && request.assignedMechanicId == bid.shopId -> bid
+            else -> bid.copy(status = "REJECTED")
+        }
+        insertBid(normalizedBid)
+        return normalizedBid.status != "REJECTED"
+    }
 
     @Query("UPDATE service_requests SET status = :status WHERE requestId = :requestId")
     suspend fun updateRequestStatus(requestId: String, status: String)
@@ -90,11 +138,20 @@ interface MarketplaceDao {
     @Query("UPDATE service_requests SET status = :status, assignedMechanicId = :mechanicId, assignedMechanicName = :mechanicName, assignedMechanicPhone = :mechanicPhone, priceOffer = :finalPrice, escrowStatus = 'HELD' WHERE requestId = :requestId")
     suspend fun updateMechanicStatusAndPrice(requestId: String, status: String, mechanicId: String, mechanicName: String, mechanicPhone: String, finalPrice: Double)
 
+    @Query("UPDATE service_requests SET status = 'ACCEPTED', assignedMechanicId = :mechanicId, assignedMechanicName = :mechanicName, assignedMechanicPhone = :mechanicPhone, priceOffer = :finalPrice, escrowStatus = 'HELD' WHERE requestId = :requestId AND status = 'OPEN'")
+    suspend fun claimOpenRequestForMechanic(requestId: String, mechanicId: String, mechanicName: String, mechanicPhone: String, finalPrice: Double): Int
+
     @Query("UPDATE service_requests SET status = :status, completedAt = :completedAt, escrowStatus = 'RELEASED' WHERE requestId = :requestId")
     suspend fun completeServiceWithEscrow(requestId: String, status: String, completedAt: Long)
 
+    @Query("UPDATE service_requests SET status = 'COMPLETED', completedAt = :completedAt, escrowStatus = 'RELEASED' WHERE requestId = :requestId AND status = 'ACCEPTED'")
+    suspend fun completeAcceptedServiceWithEscrow(requestId: String, completedAt: Long): Int
+
     @Query("UPDATE service_requests SET status = 'OPEN', assignedMechanicId = null, assignedMechanicName = null, assignedMechanicPhone = null, escrowStatus = 'REFUNDED' WHERE requestId = :requestId")
     suspend fun cancelServiceWithEscrow(requestId: String)
+
+    @Query("UPDATE service_bids SET status = 'PENDING' WHERE requestId = :requestId AND status = 'ACCEPTED'")
+    suspend fun reopenAcceptedBidsForPaymentFailure(requestId: String)
 
     @Query("UPDATE service_bids SET status = :status WHERE bidId = :bidId")
     suspend fun updateBidStatus(bidId: String, status: String)
@@ -107,6 +164,145 @@ interface MarketplaceDao {
 
     @Query("SELECT * FROM service_bids WHERE shopId = :shopId ORDER BY createdAt DESC")
     fun getBidsByShop(shopId: String): Flow<List<ServiceBidEntity>>
+
+    @Transaction
+    suspend fun acceptBidAtomically(
+        requestId: String,
+        bidId: String,
+        mechanicPhone: String
+    ): Boolean {
+        val request = getRequestById(requestId) ?: return false
+        val bid = getBidById(bidId) ?: return false
+        if (bid.requestId != requestId) return false
+
+        if (request.status == "ACCEPTED") {
+            return request.assignedMechanicId == bid.shopId && bid.status == "ACCEPTED"
+        }
+        if (request.status != "OPEN") return false
+
+        val claimed = claimOpenRequestForMechanic(
+            requestId = requestId,
+            mechanicId = bid.shopId,
+            mechanicName = bid.shopName,
+            mechanicPhone = mechanicPhone,
+            finalPrice = bid.price
+        )
+        if (claimed == 0) return false
+
+        updateBidStatus(bidId, "ACCEPTED")
+        rejectOtherBids(requestId, bidId)
+        recordMarketplaceEvent(
+            aggregateType = "SERVICE_REQUEST",
+            aggregateId = requestId,
+            eventType = "SERVICE_BID_ACCEPTED",
+            actorId = bid.shopId,
+            actorRole = "MECHANIC",
+            idempotencyKey = "service:$requestId:bid:$bidId:accepted",
+            payloadJson = jsonOf(
+                "requestId" to requestId,
+                "bidId" to bidId,
+                "mechanicId" to bid.shopId,
+                "mechanicName" to bid.shopName,
+                "finalPrice" to bid.price,
+                "escrowStatus" to "HELD"
+            )
+        )
+        return true
+    }
+
+    @Transaction
+    suspend fun takeMechanicRequestAtomically(
+        requestId: String,
+        mechanicId: String,
+        mechanicName: String,
+        mechanicPhone: String,
+        finalPrice: Double
+    ): Boolean {
+        val request = getRequestById(requestId) ?: return false
+        if (request.status == "ACCEPTED") {
+            return request.assignedMechanicId == mechanicId
+        }
+        if (request.status != "OPEN") return false
+        val claimed = claimOpenRequestForMechanic(
+            requestId = requestId,
+            mechanicId = mechanicId,
+            mechanicName = mechanicName,
+            mechanicPhone = mechanicPhone,
+            finalPrice = finalPrice
+        )
+        if (claimed == 0) return false
+
+        recordMarketplaceEvent(
+            aggregateType = "SERVICE_REQUEST",
+            aggregateId = requestId,
+            eventType = "SERVICE_REQUEST_TAKEN",
+            actorId = mechanicId,
+            actorRole = "MECHANIC",
+            idempotencyKey = "service:$requestId:mechanic:$mechanicId:taken",
+            payloadJson = jsonOf(
+                "requestId" to requestId,
+                "mechanicId" to mechanicId,
+                "mechanicName" to mechanicName,
+                "finalPrice" to finalPrice,
+                "escrowStatus" to "HELD"
+            )
+        )
+        return true
+    }
+
+    @Transaction
+    suspend fun completeAcceptedServiceOnce(requestId: String, completedAt: Long): Boolean {
+        val request = getRequestById(requestId) ?: return false
+        if (request.status == "COMPLETED") return true
+        if (request.status != "ACCEPTED") return false
+        val completed = completeAcceptedServiceWithEscrow(requestId, completedAt)
+        if (completed == 0) return false
+
+        val eventId = recordMarketplaceEvent(
+            aggregateType = "SERVICE_REQUEST",
+            aggregateId = requestId,
+            eventType = "SERVICE_COMPLETED",
+            actorId = request.assignedMechanicId,
+            actorRole = "MECHANIC",
+            idempotencyKey = "service:$requestId:completed",
+            payloadJson = jsonOf(
+                "requestId" to requestId,
+                "mechanicId" to request.assignedMechanicId,
+                "finalPrice" to request.priceOffer,
+                "escrowStatus" to "RELEASED",
+                "completedAt" to completedAt
+            ),
+            occurredAt = completedAt
+        )
+        recordServiceCompletionLedger(request, relatedEventId = eventId, createdAt = completedAt)
+        return true
+    }
+
+    @Transaction
+    suspend fun refundServiceAfterPaymentFailure(requestId: String): Boolean {
+        val request = getRequestById(requestId) ?: return false
+        if (request.escrowStatus == "REFUNDED") return true
+        cancelServiceWithEscrow(requestId)
+        reopenAcceptedBidsForPaymentFailure(requestId)
+        val now = System.currentTimeMillis()
+        val eventId = recordMarketplaceEvent(
+            aggregateType = "SERVICE_REQUEST",
+            aggregateId = requestId,
+            eventType = "SERVICE_PAYMENT_REFUNDED",
+            actorId = request.assignedMechanicId,
+            actorRole = "SYSTEM",
+            idempotencyKey = "service:$requestId:payment-refunded",
+            payloadJson = jsonOf(
+                "requestId" to requestId,
+                "previousStatus" to request.status,
+                "previousEscrowStatus" to request.escrowStatus,
+                "finalPrice" to request.priceOffer
+            ),
+            occurredAt = now
+        )
+        recordServiceRefundLedger(request, relatedEventId = eventId, createdAt = now)
+        return true
+    }
 
     @Query("SELECT * FROM parts_stores ORDER BY verified DESC, rating DESC, averageEtaMinutes ASC")
     fun getPartsStores(): Flow<List<PartsStoreEntity>>
@@ -129,14 +325,50 @@ interface MarketplaceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPartRequest(request: PartRequestEntity)
 
+    @Transaction
+    suspend fun upsertPartRequestFromSync(request: PartRequestEntity): Boolean {
+        val local = getPartRequestById(request.requestId)
+        if (local == null) {
+            insertPartRequest(request)
+            return true
+        }
+
+        val localHasLocalClaim = local.status != "OPEN" && request.status == "OPEN"
+        val localIsTerminal = local.status == "DELIVERED" || local.status == "CANCELLED"
+        if (localHasLocalClaim || (localIsTerminal && request.status != local.status)) {
+            return false
+        }
+
+        insertPartRequest(request)
+        return true
+    }
+
     @Query("SELECT * FROM part_offers WHERE partRequestId = :requestId ORDER BY etaMinutes ASC, price ASC")
     fun getPartOffersForRequest(requestId: String): Flow<List<PartOfferEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPartOffer(offer: PartOfferEntity)
 
+    @Transaction
+    suspend fun upsertPartOfferRespectingRequestClaim(offer: PartOfferEntity): Boolean {
+        val localOffer = getPartOfferById(offer.offerId)
+        if (localOffer?.status == "ACCEPTED") return true
+
+        val request = getPartRequestById(offer.partRequestId)
+        val normalizedOffer = when {
+            request == null || request.status == "OPEN" -> offer
+            request.status == "ACCEPTED" && request.acceptedOfferId == offer.offerId -> offer.copy(status = "ACCEPTED")
+            else -> offer.copy(status = "REJECTED")
+        }
+        insertPartOffer(normalizedOffer)
+        return normalizedOffer.status != "REJECTED"
+    }
+
     @Query("UPDATE part_requests SET status = :status, acceptedOfferId = :acceptedOfferId WHERE requestId = :requestId")
     suspend fun updatePartRequestStatus(requestId: String, status: String, acceptedOfferId: String?)
+
+    @Query("UPDATE part_requests SET status = 'ACCEPTED', acceptedOfferId = :acceptedOfferId WHERE requestId = :requestId AND status = 'OPEN'")
+    suspend fun claimOpenPartRequestForOffer(requestId: String, acceptedOfferId: String): Int
 
     @Query("UPDATE part_offers SET status = :status WHERE offerId = :offerId")
     suspend fun updatePartOfferStatus(offerId: String, status: String)
@@ -146,6 +378,239 @@ interface MarketplaceDao {
 
     @Query("SELECT * FROM part_offers WHERE offerId = :offerId")
     suspend fun getPartOfferById(offerId: String): PartOfferEntity?
+
+    @Transaction
+    suspend fun acceptPartOfferAtomically(partRequestId: String, offerId: String): Boolean {
+        val request = getPartRequestById(partRequestId) ?: return false
+        val offer = getPartOfferById(offerId) ?: return false
+        if (offer.partRequestId != partRequestId) return false
+
+        if (request.status == "ACCEPTED") {
+            return request.acceptedOfferId == offerId && offer.status == "ACCEPTED"
+        }
+        if (request.status != "OPEN") return false
+
+        val claimed = claimOpenPartRequestForOffer(partRequestId, offerId)
+        if (claimed == 0) return false
+
+        updatePartOfferStatus(offerId, "ACCEPTED")
+        rejectOtherPartOffers(partRequestId, offerId)
+        recordMarketplaceEvent(
+            aggregateType = "PART_REQUEST",
+            aggregateId = partRequestId,
+            eventType = "PART_OFFER_ACCEPTED",
+            actorId = offer.storeId,
+            actorRole = "PARTS_STORE",
+            idempotencyKey = "part:$partRequestId:offer:$offerId:accepted",
+            payloadJson = jsonOf(
+                "partRequestId" to partRequestId,
+                "offerId" to offerId,
+                "storeId" to offer.storeId,
+                "storeName" to offer.storeName,
+                "partNumber" to offer.partNumber,
+                "price" to offer.price,
+                "deliveryFee" to offer.deliveryFee,
+                "etaMinutes" to offer.etaMinutes
+            )
+        )
+        return true
+    }
+
+    private suspend fun recordMarketplaceEvent(
+        aggregateType: String,
+        aggregateId: String,
+        eventType: String,
+        actorId: String?,
+        actorRole: String?,
+        idempotencyKey: String,
+        payloadJson: String,
+        occurredAt: Long = System.currentTimeMillis(),
+        correlationId: String? = aggregateId,
+        causationId: String? = null
+    ): String {
+        val eventId = stableId("event:$idempotencyKey")
+        insertVanguardEvent(
+            VanguardEventEntity(
+                eventId = eventId,
+                aggregateType = aggregateType,
+                aggregateId = aggregateId,
+                eventType = eventType,
+                actorId = actorId,
+                actorRole = actorRole,
+                source = "LOCAL_ROOM",
+                correlationId = correlationId,
+                causationId = causationId,
+                idempotencyKey = idempotencyKey,
+                payloadJson = payloadJson,
+                schemaVersion = 1,
+                occurredAt = occurredAt,
+                synced = false
+            )
+        )
+        insertVanguardOutbox(
+            VanguardOutboxEntity(
+                outboxId = stableId("outbox:$idempotencyKey"),
+                eventId = eventId,
+                destination = "SUPABASE_EVENTS",
+                operation = "UPSERT_VANGUARD_EVENT",
+                payloadJson = payloadJson,
+                status = "PENDING",
+                attemptCount = 0,
+                nextAttemptAt = occurredAt,
+                lastError = null,
+                createdAt = occurredAt,
+                updatedAt = occurredAt,
+                idempotencyKey = "outbox:$idempotencyKey"
+            )
+        )
+        return eventId
+    }
+
+    private suspend fun recordServiceCompletionLedger(
+        request: ServiceRequestEntity,
+        relatedEventId: String,
+        createdAt: Long
+    ) {
+        val grossCents = moneyCents(request.priceOffer)
+        if (grossCents <= 0L) return
+
+        val commission = CommissionEngine.decide(
+            transactionKind = TransactionKind.REPAIR_SERVICE,
+            grossCents = grossCents
+        )
+        val transactionId = stableId("txn:service:${request.requestId}:completion")
+        val metadata = jsonOf(
+            "requestId" to request.requestId,
+            "paymentId" to request.paymentId,
+            "commissionRateBps" to commission.rateBps,
+            "commissionPolicy" to commission.policyCode,
+            "escrowStatus" to "RELEASED"
+        )
+
+        insertMarketplaceLedgerEntries(
+            listOf(
+                ledgerEntry(
+                    transactionId = transactionId,
+                    relatedEventId = relatedEventId,
+                    orderId = request.requestId,
+                    participantId = "escrow:${request.requestId}",
+                    participantRole = "ESCROW",
+                    entryType = "GROSS_CAPTURE",
+                    amountCents = grossCents,
+                    status = "POSTED",
+                    metadataJson = metadata,
+                    createdAt = createdAt
+                ),
+                ledgerEntry(
+                    transactionId = transactionId,
+                    relatedEventId = relatedEventId,
+                    orderId = request.requestId,
+                    participantId = "elysium_platform",
+                    participantRole = "PLATFORM",
+                    entryType = "PLATFORM_COMMISSION",
+                    amountCents = commission.platformCommissionCents,
+                    status = "POSTED",
+                    metadataJson = metadata,
+                    createdAt = createdAt
+                ),
+                ledgerEntry(
+                    transactionId = transactionId,
+                    relatedEventId = relatedEventId,
+                    orderId = request.requestId,
+                    participantId = request.assignedMechanicId,
+                    participantRole = "PROVIDER",
+                    entryType = "PROVIDER_PAYOUT",
+                    amountCents = commission.providerPayoutCents,
+                    status = "PENDING",
+                    metadataJson = metadata,
+                    createdAt = createdAt
+                )
+            )
+        )
+    }
+
+    private suspend fun recordServiceRefundLedger(
+        request: ServiceRequestEntity,
+        relatedEventId: String,
+        createdAt: Long
+    ) {
+        val grossCents = moneyCents(request.priceOffer)
+        if (grossCents <= 0L) return
+
+        val transactionId = stableId("txn:service:${request.requestId}:refund")
+        insertMarketplaceLedgerEntries(
+            listOf(
+                ledgerEntry(
+                    transactionId = transactionId,
+                    relatedEventId = relatedEventId,
+                    orderId = request.requestId,
+                    participantId = "customer:${request.requestId}",
+                    participantRole = "CUSTOMER",
+                    entryType = "PAYMENT_REFUND",
+                    direction = "CREDIT",
+                    amountCents = grossCents,
+                    status = "POSTED",
+                    metadataJson = jsonOf(
+                        "requestId" to request.requestId,
+                        "paymentId" to request.paymentId,
+                        "previousEscrowStatus" to request.escrowStatus
+                    ),
+                    createdAt = createdAt
+                )
+            )
+        )
+    }
+
+    private fun ledgerEntry(
+        transactionId: String,
+        relatedEventId: String,
+        orderId: String,
+        participantId: String?,
+        participantRole: String,
+        entryType: String,
+        amountCents: Long,
+        status: String,
+        metadataJson: String,
+        createdAt: Long,
+        direction: String = "CREDIT"
+    ): MarketplaceLedgerEntryEntity {
+        val idempotencyKey = "ledger:SERVICE_REPAIR:$orderId:$entryType"
+        return MarketplaceLedgerEntryEntity(
+            ledgerEntryId = stableId(idempotencyKey),
+            transactionId = transactionId,
+            relatedEventId = relatedEventId,
+            orderType = "SERVICE_REPAIR",
+            orderId = orderId,
+            participantId = participantId,
+            participantRole = participantRole,
+            entryType = entryType,
+            direction = direction,
+            amountCents = amountCents,
+            currency = "USD",
+            status = status,
+            metadataJson = metadataJson,
+            createdAt = createdAt,
+            settledAt = null,
+            idempotencyKey = idempotencyKey,
+            synced = false
+        )
+    }
+
+    private fun stableId(seed: String): String {
+        return java.util.UUID.nameUUIDFromBytes(seed.toByteArray(Charsets.UTF_8)).toString()
+    }
+
+    private fun moneyCents(amount: Double): Long {
+        return (amount.coerceAtLeast(0.0) * 100.0).roundToLong()
+    }
+
+    private fun jsonOf(vararg fields: Pair<String, Any?>): String {
+        val json = JSONObject()
+        fields.forEach { (key, value) ->
+            json.put(key, value ?: JSONObject.NULL)
+        }
+        return json.toString()
+    }
 }
 
 @Dao

@@ -52,6 +52,7 @@ import androidx.work.WorkManager
 import com.elysium369.meet.core.sync.SyncWorker
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.core.livelink.TelemetrySnapshot
+import com.elysium369.meet.core.vanguard.VanguardOutboxSyncWorker
 import com.elysium369.meet.ui.screens.TerminalLine
 import com.elysium369.meet.ui.screens.TerminalLineType
 import com.elysium369.meet.core.obd.ObdTrafficListener
@@ -257,6 +258,12 @@ class ObdViewModel @Inject constructor(
     private val providerProfileDao: ProviderProfileDao,
     private val rideDao: com.elysium369.meet.data.local.dao.RideDao
 ) : ViewModel() {
+
+    // Device-level identity must be initialized before init{} calls provider role refresh.
+    private val localDeviceId: String = android.provider.Settings.Secure.getString(
+        context.contentResolver,
+        android.provider.Settings.Secure.ANDROID_ID
+    ) ?: java.util.UUID.randomUUID().toString()
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
@@ -574,7 +581,7 @@ class ObdViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                marketplaceDao.insertBid(bid)
+                marketplaceDao.upsertBidRespectingRequestClaim(bid)
                 SupabaseManager.client.postgrest["service_bids"].insert(bid)
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to place bid", e)
@@ -586,8 +593,12 @@ class ObdViewModel @Inject constructor(
     fun acceptBid(requestId: String, bidId: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val request = marketplaceDao.getRequestById(requestId)
-                if (request == null || request.status != "OPEN") {
+                val accepted = marketplaceDao.acceptBidAtomically(
+                    requestId = requestId,
+                    bidId = bidId,
+                    mechanicPhone = "+506 8888-8888" // Teléfono del taller para contacto inmediato
+                )
+                if (!accepted) {
                     withContext(Dispatchers.Main) {
                         context?.let {
                             android.widget.Toast.makeText(it, "⚠️ Este servicio ya fue asignado a otro mecánico", android.widget.Toast.LENGTH_LONG).show()
@@ -595,30 +606,24 @@ class ObdViewModel @Inject constructor(
                     }
                     return@launch
                 }
-                
-                val bid = marketplaceDao.getBidById(bidId)
-                if (bid != null) {
-                    marketplaceDao.updateMechanicStatusAndPrice(
-                        requestId = requestId,
-                        status = "ACCEPTED",
-                        mechanicId = bid.shopId,
-                        mechanicName = bid.shopName,
-                        mechanicPhone = "+506 8888-8888", // Teléfono del taller para contacto inmediato
-                        finalPrice = bid.price
-                    )
-                    // Reject all other bids to enforce business integrity
-                    marketplaceDao.rejectOtherBids(requestId, bidId)
-                } else {
-                    marketplaceDao.updateRequestStatus(requestId, "ACCEPTED")
-                }
-                
-                marketplaceDao.updateBidStatus(bidId, "ACCEPTED")
-                
+                scheduleVanguardCommerceSync()
+
                 runCatching {
-                    SupabaseManager.client.postgrest["service_requests"].update(mapOf("status" to "ACCEPTED")) {
+                    val request = marketplaceDao.getRequestById(requestId)
+                    val bid = marketplaceDao.getBidById(bidId)
+                    SupabaseManager.client.postgrest["service_requests"].update(
+                        mapOf(
+                            "status" to "ACCEPTED",
+                            "assignedMechanicId" to request?.assignedMechanicId,
+                            "assignedMechanicName" to request?.assignedMechanicName,
+                            "assignedMechanicPhone" to request?.assignedMechanicPhone,
+                            "priceOffer" to request?.priceOffer,
+                            "escrowStatus" to request?.escrowStatus
+                        )
+                    ) {
                         filter { eq("requestId", requestId) }
                     }
-                    SupabaseManager.client.postgrest["service_bids"].update(mapOf("status" to "ACCEPTED")) {
+                    SupabaseManager.client.postgrest["service_bids"].update(mapOf("status" to bid?.status.orEmpty().ifBlank { "ACCEPTED" })) {
                         filter { eq("bidId", bidId) }
                     }
                 }.onFailure { Log.w("ObdViewModel", "Bid accepted locally; cloud sync unavailable", it) }
@@ -632,34 +637,41 @@ class ObdViewModel @Inject constructor(
     fun takeMechanicRequest(requestId: String, mechanicId: String, mechanicName: String, mechanicPhone: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = marketplaceDao.getRequestById(requestId)
-            if (request != null && request.status == "OPEN") {
-                marketplaceDao.updateMechanicStatusAndPrice(
-                    requestId = requestId,
-                    status = "ACCEPTED",
-                    mechanicId = mechanicId,
-                    mechanicName = mechanicName,
-                    mechanicPhone = mechanicPhone,
-                    finalPrice = request.priceOffer
-                )
-            } else {
+            val accepted = request != null && marketplaceDao.takeMechanicRequestAtomically(
+                requestId = requestId,
+                mechanicId = mechanicId,
+                mechanicName = mechanicName,
+                mechanicPhone = mechanicPhone,
+                finalPrice = request.priceOffer
+            )
+            if (!accepted) {
                 withContext(Dispatchers.Main) {
                     context?.let {
                         android.widget.Toast.makeText(it, "⚠️ Este servicio ya fue tomado por otro mecánico", android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
+            } else {
+                scheduleVanguardCommerceSync()
             }
         }
     }
 
     fun completeMechanicRequest(requestId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            marketplaceDao.completeServiceWithEscrow(requestId, "COMPLETED", System.currentTimeMillis())
+            val completed = marketplaceDao.completeAcceptedServiceOnce(requestId, System.currentTimeMillis())
+            if (!completed) {
+                Log.w("ObdViewModel", "Ignoring completion for non-accepted service request: $requestId")
+            } else {
+                scheduleVanguardCommerceSync()
+            }
         }
     }
 
     fun cancelMechanicRequest(requestId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            marketplaceDao.cancelServiceWithEscrow(requestId)
+            if (marketplaceDao.refundServiceAfterPaymentFailure(requestId)) {
+                scheduleVanguardCommerceSync()
+            }
         }
     }
 
@@ -929,7 +941,7 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 marketplaceDao.insertPartsStore(store)
-                marketplaceDao.insertPartOffer(offer)
+                marketplaceDao.upsertPartOfferRespectingRequestClaim(offer)
                 if (ownerId != null) {
                     runCatching { SupabaseManager.client.postgrest["parts_stores"].upsert(store.toRemote(ownerId)) }
                         .onFailure { Log.w("ObdViewModel", "Parts store saved locally; cloud table unavailable", it) }
@@ -948,8 +960,8 @@ class ObdViewModel @Inject constructor(
     fun acceptPartOffer(partRequestId: String, offerId: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val request = marketplaceDao.getPartRequestById(partRequestId)
-                if (request == null || request.status != "OPEN") {
+                val accepted = marketplaceDao.acceptPartOfferAtomically(partRequestId, offerId)
+                if (!accepted) {
                     withContext(Dispatchers.Main) {
                         context?.let {
                             android.widget.Toast.makeText(it, "⚠️ Este pedido de repuesto ya fue tomado por otro proveedor", android.widget.Toast.LENGTH_LONG).show()
@@ -957,15 +969,15 @@ class ObdViewModel @Inject constructor(
                     }
                     return@launch
                 }
-                marketplaceDao.updatePartRequestStatus(partRequestId, "ACCEPTED", offerId)
-                marketplaceDao.updatePartOfferStatus(offerId, "ACCEPTED")
-                // Reject all other part offers to maintain auction integrity
-                marketplaceDao.rejectOtherPartOffers(partRequestId, offerId)
-                
+                scheduleVanguardCommerceSync()
+
                 runCatching {
                     SupabaseManager.client.postgrest["part_requests"].update(
                         mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
                     ) { filter { eq("requestId", partRequestId) } }
+                    SupabaseManager.client.postgrest["part_offers"].update(
+                        mapOf("status" to "ACCEPTED")
+                    ) { filter { eq("offerId", offerId) } }
                 }.onFailure { Log.w("ObdViewModel", "Part request accepted locally; cloud table unavailable", it) }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to accept part offer", e)
@@ -990,7 +1002,7 @@ class ObdViewModel @Inject constructor(
         val cloudRequests = SupabaseManager.client.postgrest["service_requests"]
             .select().decodeList<ServiceRequestEntity>()
         cloudRequests.forEach { req ->
-            marketplaceDao.insertRequest(req)
+            marketplaceDao.upsertServiceRequestFromSync(req)
         }
 
         cloudRequests.forEach { req ->
@@ -1001,7 +1013,7 @@ class ObdViewModel @Inject constructor(
                     }
                 }.decodeList<ServiceBidEntity>()
             cloudBids.forEach { bid ->
-                marketplaceDao.insertBid(bid)
+                marketplaceDao.upsertBidRespectingRequestClaim(bid)
             }
         }
     }
@@ -1048,7 +1060,7 @@ class ObdViewModel @Inject constructor(
                 )
             )
             .decodeList<RemotePartRequest>()
-        requests.forEach { marketplaceDao.insertPartRequest(it.toLocal()) }
+        requests.forEach { marketplaceDao.upsertPartRequestFromSync(it.toLocal()) }
 
         val offers = SupabaseManager.client.postgrest["part_offers"]
             .select(
@@ -1071,7 +1083,7 @@ class ObdViewModel @Inject constructor(
                 )
             )
             .decodeList<RemotePartOffer>()
-        offers.forEach { marketplaceDao.insertPartOffer(it.toLocal()) }
+        offers.forEach { marketplaceDao.upsertPartOfferRespectingRequestClaim(it.toLocal()) }
     }
 
     // ── Black Box ──
@@ -3441,6 +3453,10 @@ class ObdViewModel @Inject constructor(
         WorkManager.getInstance(context).enqueue(syncRequest)
     }
 
+    private fun scheduleVanguardCommerceSync() {
+        VanguardOutboxSyncWorker.enqueueNow(context)
+    }
+
     private fun fetchDtcDefinitions(codes: List<String>) {
         viewModelScope.launch {
             val newDefinitions = _dtcDefinitions.value.toMutableMap()
@@ -5620,14 +5636,6 @@ class ObdViewModel @Inject constructor(
     // ═══════════════════════════════════════════════════════════════════════════
     // FEATURE 9 — IDENTITY VERIFICATION (UBER-GRADE ONBOARDING)
     // ═══════════════════════════════════════════════════════════════════════════
-
-    // ── Current user ID (device-level, consistent across sessions) ───────────
-    private val localDeviceId: String by lazy {
-        android.provider.Settings.Secure.getString(
-            context.contentResolver,
-            android.provider.Settings.Secure.ANDROID_ID
-        ) ?: java.util.UUID.randomUUID().toString()
-    }
 
     // ── Driver verification state ────────────────────────────────────────────
     val driverVerification: StateFlow<com.elysium369.meet.data.local.entities.DriverVerificationEntity?> =

@@ -2,6 +2,21 @@ package com.elysium369.meet.core.obd
 
 import android.content.Context
 import android.util.Log
+import com.elysium369.meet.BuildConfig
+import com.elysium369.meet.core.vanguard.AdapterQualityProfiler
+import com.elysium369.meet.core.vanguard.ClassifiedEcuFailure
+import com.elysium369.meet.core.vanguard.DerivedMetricsEngine
+import com.elysium369.meet.core.vanguard.EcuFailureContext
+import com.elysium369.meet.core.vanguard.EcuFailureIntelligence
+import com.elysium369.meet.core.vanguard.EcuFailureType
+import com.elysium369.meet.core.vanguard.ObdSessionFinishContext
+import com.elysium369.meet.core.vanguard.ObdSessionRecorder
+import com.elysium369.meet.core.vanguard.ObdSessionStartContext
+import com.elysium369.meet.core.vanguard.ObdPollingScheduler
+import com.elysium369.meet.core.vanguard.SensorSource
+import com.elysium369.meet.core.vanguard.SensorValueState
+import com.elysium369.meet.core.vanguard.VehicleProfileFingerprint
+import com.elysium369.meet.core.vanguard.VanguardPrivacyGuard
 import com.elysium369.meet.core.transport.BtClassicTransport
 import com.elysium369.meet.core.transport.BleTransport
 import com.elysium369.meet.core.transport.TransportInterface
@@ -84,7 +99,8 @@ interface ObdTrafficListener {
 class ObdSession(
     private val scope: CoroutineScope,
     private val bluetoothAdapter: android.bluetooth.BluetoothAdapter?,
-    private val context: Context
+    private val context: Context,
+    private val sessionRecorder: ObdSessionRecorder
 ) {
     private var trafficListener: ObdTrafficListener? = null
 
@@ -104,6 +120,9 @@ class ObdSession(
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
 
+    private val _liveSensorStates = MutableStateFlow<Map<String, SensorValueState>>(emptyMap())
+    val liveSensorStates: StateFlow<Map<String, SensorValueState>> = _liveSensorStates.asStateFlow()
+
     private val _freezeFrame = MutableStateFlow<Map<String, String>>(emptyMap())
     val freezeFrame: StateFlow<Map<String, String>> = _freezeFrame.asStateFlow()
 
@@ -114,6 +133,14 @@ class ObdSession(
     private var isRunning = false
     @Volatile
     private var isPollingPaused = false
+    @Volatile
+    private var currentVanguardSessionId: String? = null
+    private val derivedMetricsEngine = DerivedMetricsEngine()
+    private val ecuFailureIntelligence = EcuFailureIntelligence()
+    private val adapterQualityProfiler = AdapterQualityProfiler()
+    private val pollingScheduler = ObdPollingScheduler()
+    private val privacyGuard = VanguardPrivacyGuard()
+    private val lastSensorRecordMs = mutableMapOf<String, Long>()
 
     val isLivePollingPaused: Boolean
         get() = isPollingPaused
@@ -346,6 +373,26 @@ class ObdSession(
                 recoveryFailureCount = 0
                 Log.i(TAG, "═══ OBD CONNECT SUCCESS ═══ Attempt=$attempt | Total: ${System.currentTimeMillis()-t0}ms | Adapter=$adapterVersion | Protocol=$detectedProtocol")
 
+                scope.launch {
+                    currentVanguardSessionId = runCatching {
+                        sessionRecorder.startSession(
+                            ObdSessionStartContext(
+                                appVersion = BuildConfig.VERSION_NAME,
+                                vinHash = privacyGuard.vinHashOnly(_vin.value),
+                                adapterName = targetAddress?.let { if (bluetoothMacRegex.matches(it)) "Bluetooth OBD" else it },
+                                adapterMacHash = targetAddress?.takeIf { bluetoothMacRegex.matches(it) }?.let { privacyGuard.vinHashOnly(it) },
+                                adapterFirmware = adapterVersion.ifBlank { null },
+                                protocolDetected = detectedProtocol.ifBlank { null },
+                                consentGranted = false,
+                                startedAtMs = connectedAt
+                            )
+                        )
+                    }.getOrElse { e ->
+                        Log.w(TAG, "Vanguard session recorder start failed: ${e.message}")
+                        null
+                    }
+                }
+
                 // ── TELEMETRÍA SILENCIOSA (SUPABASE) SUCCESS ──
                 scope.launch {
                     com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
@@ -559,12 +606,23 @@ class ObdSession(
                 cycleCount++
 
                 // Adaptive delay: keep a real hardware cadence without overheating the phone.
-                val targetDelay = when {
-                    _highSpeedMode.value && !isCloneAdapter -> 25L
-                    _highSpeedMode.value && isCloneAdapter -> 45L
-                    isCloneAdapter -> 80L
-                    else -> 35L
-                }
+                val supportedPidKeys = supportedPids.map { "01${String.format("%02X", it)}" }.toSet()
+                val adapterProfile = adapterQualityProfiler.profile(
+                    adapterName = targetAddress,
+                    firmware = adapterVersion,
+                    transport = transport?.javaClass?.simpleName,
+                    qos = _qosMetrics.value,
+                    commandSupport = setOf("ATH1", "ATSP")
+                )
+                val pollingPlan = pollingScheduler.buildPlan(
+                    supportedPids = supportedPidKeys,
+                    pinnedPids = _pinnedPids.value,
+                    adapterQuality = adapterProfile,
+                    qos = _qosMetrics.value
+                )
+                val targetDelay = (1000f / pollingPlan.commandsPerSecondLimit)
+                    .toLong()
+                    .coerceIn(if (_highSpeedMode.value && pollingPlan.highPerformanceMode) 25L else 60L, 250L)
                 if (targetDelay > 0) delay(targetDelay)
             }
         }
@@ -722,10 +780,24 @@ class ObdSession(
             try {
                 val result = CompletableDeferred<String>()
                 commandQueue.enqueue(ObdCommand(pid, 0, { result.complete(it) }, { result.complete("") }))
-                val response = withTimeoutOrNull(800) { result.await() } ?: continue
+                val response = withTimeoutOrNull(800) { result.await() }
+                if (response == null) {
+                    markSensorState(pid, SensorValueState.Timeout)
+                    recordClassifiedFailure(pid, null, timeoutMs = 800L, latencyMs = 800L)
+                    continue
+                }
                 val parsed = parsePidResponse(pid, response)
-                if (parsed != null) updateLiveData(pid, parsed)
-            } catch (_: Exception) {}
+                if (parsed != null) {
+                    updateLiveData(pid, parsed)
+                } else {
+                    val state = stateForFailedResponse(response)
+                    markSensorState(pid, state, rawValue = response)
+                    recordClassifiedFailure(pid, response, timeoutMs = 800L, latencyMs = null)
+                }
+            } catch (e: Exception) {
+                markSensorState(pid, SensorValueState.AdapterError)
+                recordClassifiedFailure(pid, e.message, timeoutMs = 800L, latencyMs = null)
+            }
         }
     }
 
@@ -736,7 +808,12 @@ class ObdSession(
                 val result = CompletableDeferred<String>()
                 val command = cp.mode + cp.pid
                 commandQueue.enqueue(ObdCommand(command, 0, { result.complete(it) }, { result.complete("") }))
-                val response = withTimeoutOrNull(2000) { result.await() } ?: continue
+                val response = withTimeoutOrNull(2000) { result.await() }
+                if (response == null) {
+                    markSensorState(cp.id.toString(), SensorValueState.Timeout, source = SensorSource.OEM_OBD)
+                    recordClassifiedFailure(command, null, timeoutMs = 2000L, latencyMs = 2000L)
+                    continue
+                }
 
                 val clean = CanMultiFrameParser.parse(response)
                 // Extract bytes after mode + pid
@@ -752,11 +829,23 @@ class ObdSession(
                     }
 
                     if (cp.formula.isNotBlank()) {
-                        val value = FormulaEvaluator.evaluate(cp.formula, bytes)
-                        updateLiveData(cp.id.toString(), value)
+                        val value = FormulaEvaluator.evaluateOrNull(cp.formula, bytes)
+                        if (value != null) {
+                            updateLiveData(cp.id.toString(), value)
+                        } else {
+                            markSensorState(cp.id.toString(), SensorValueState.InvalidFormula, rawValue = response, source = SensorSource.OEM_OBD)
+                            recordClassifiedFailure(command, response, timeoutMs = 2000L, latencyMs = null)
+                        }
                     }
+                } else {
+                    val state = stateForFailedResponse(response)
+                    markSensorState(cp.id.toString(), state, rawValue = response, source = SensorSource.OEM_OBD)
+                    recordClassifiedFailure(command, response, timeoutMs = 2000L, latencyMs = null)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                markSensorState(cp.id.toString(), SensorValueState.AdapterError, source = SensorSource.OEM_OBD)
+                recordClassifiedFailure(cp.mode + cp.pid, e.message, timeoutMs = 2000L, latencyMs = null)
+            }
         }
     }
 
@@ -799,11 +888,228 @@ class ObdSession(
 
         val current = _liveData.value.toMutableMap()
         putLiveDataAliases(current, pid, smoothedValue)
+        val stateCurrent = _liveSensorStates.value.toMutableMap()
+        val unit = unitForPid(pid)
+        val supportedState = SensorValueState.Supported(smoothedValue, unit)
+        putSensorStateAliases(stateCurrent, pid, supportedState)
+        recordSensorStateIfDue(pid, null, supportedState, SensorSource.STANDARD_OBD)
 
         // ── Compute derived/calculated sensors ──
         computeCalculatedSensors(current)
+        val derivedMetrics = derivedMetricsEngine.calculateAll(stateCurrent, fuelPricePerLiter)
+        derivedMetrics.forEach { metric ->
+            val state = derivedMetricsEngine.stateFor(metric)
+            putSensorStateAliases(stateCurrent, metric.id, state)
+            if (metric.value != null && state.isDisplayable) {
+                current[metric.id] = metric.value
+            } else {
+                current.remove(metric.id)
+            }
+        }
+        recordDerivedMetricsIfDue(derivedMetrics)
 
+        _liveSensorStates.value = stateCurrent
         _liveData.value = current
+    }
+
+    private fun putSensorStateAliases(
+        data: MutableMap<String, SensorValueState>,
+        pid: String,
+        state: SensorValueState
+    ) {
+        val rawKey = pid.trim()
+        val compactKey = rawKey.uppercase().replace(" ", "")
+        val coreKey = compactKey.removePrefix("01")
+        data[rawKey] = state
+        data[compactKey] = state
+        if (coreKey.isNotBlank()) data[coreKey] = state
+        if (coreKey.length == 2) data["01$coreKey"] = state
+
+        when (coreKey) {
+            "0C" -> {
+                data["RPM"] = state
+                data["rpm"] = state
+            }
+            "0D" -> {
+                data["SPEED"] = state
+                data["speed"] = state
+                data["VELOCIDAD"] = state
+            }
+            "05" -> {
+                data["COOLANT"] = state
+                data["coolant"] = state
+                data["ECT"] = state
+            }
+            "04" -> data["ENGINE_LOAD"] = state
+            "0B" -> {
+                data["MAP"] = state
+                data["map"] = state
+            }
+            "10" -> {
+                data["MAF"] = state
+                data["maf"] = state
+            }
+            "11" -> {
+                data["THROTTLE"] = state
+                data["throttle"] = state
+            }
+            "0F" -> data["IAT"] = state
+            "0E" -> data["TIMING_ADVANCE"] = state
+            "2F" -> data["FUEL_LEVEL"] = state
+            "42" -> {
+                data["VOLTAGE"] = state
+                data["voltage"] = state
+                data["CTRL_VOLTAGE"] = state
+            }
+        }
+        if (compactKey == "ATRV") {
+            data["AT RV"] = state
+            data["ELM_VOLTAGE"] = state
+            data.putIfAbsent("VOLTAGE", state)
+            data.putIfAbsent("voltage", state)
+        }
+    }
+
+    private fun markSensorState(
+        pid: String,
+        state: SensorValueState,
+        rawValue: String? = null,
+        source: SensorSource = SensorSource.STANDARD_OBD
+    ) {
+        val current = _liveSensorStates.value.toMutableMap()
+        putSensorStateAliases(current, pid, state)
+        _liveSensorStates.value = current
+        recordSensorStateIfDue(pid, rawValue, state, source)
+    }
+
+    private fun stateForFailedResponse(raw: String): SensorValueState {
+        val normalized = raw.uppercase().replace(" ", "")
+        return when {
+            normalized.isBlank() -> SensorValueState.EcuNoResponse
+            normalized.contains("NODATA") || normalized.contains("NO DATA") -> SensorValueState.Unsupported
+            normalized.contains("UNABLE") -> SensorValueState.EcuNoResponse
+            normalized.contains("ERROR") || normalized.contains("CANERROR") -> SensorValueState.AdapterError
+            normalized.contains("?") -> SensorValueState.Unsupported
+            normalized.contains("7F") -> SensorValueState.NotAvailable
+            else -> SensorValueState.NotAvailable
+        }
+    }
+
+    private fun recordClassifiedFailure(
+        command: String,
+        rawResponse: String?,
+        timeoutMs: Long?,
+        latencyMs: Long?
+    ) {
+        val sessionId = currentVanguardSessionId ?: return
+        val now = System.currentTimeMillis()
+        val context = EcuFailureContext(
+            eventType = "PID_READ_FAILURE",
+            sessionId = sessionId,
+            adapterType = if (isCloneAdapter) "ELM327_CLONE" else "ELM327_OR_STN",
+            adapterFirmware = adapterVersion.ifBlank { null },
+            transport = transport?.javaClass?.simpleName,
+            protocolSelected = detectedProtocol.ifBlank { null },
+            commandSent = command,
+            rawResponse = rawResponse,
+            normalizedResponse = rawResponse?.uppercase()?.replace(Regex("\\s+"), " ")?.trim(),
+            timeoutMs = timeoutMs,
+            latencyMs = latencyMs,
+            retryCount = 0,
+            serviceMode = command.take(2).takeIf { it.matches(Regex("[0-9A-Fa-f]{2}")) },
+            pid = command.drop(2).takeIf { it.isNotBlank() },
+            negativeResponseCode = rawResponse?.let { negativeResponseCode(it) },
+            batteryVoltage = _liveData.value["VOLTAGE"] ?: _liveData.value["0142"],
+            engineRunningState = _liveData.value["RPM"]?.let { if (it > 0f) "RUNNING" else "STOPPED" },
+            vehicle = VehicleProfileFingerprint(vinHash = privacyGuard.vinHashOnly(_vin.value)),
+            appVersion = BuildConfig.VERSION_NAME,
+            androidVersion = android.os.Build.VERSION.RELEASE,
+            deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim(),
+            timestampMs = now
+        )
+        val classified = ecuFailureIntelligence.classify(context)
+        scope.launch {
+            runCatching { sessionRecorder.recordFailure(classified) }
+                .onFailure { Log.w(TAG, "Vanguard failure record failed: ${it.message}") }
+        }
+    }
+
+    private fun recordCommandLog(
+        command: String,
+        rawResponse: String?,
+        success: Boolean,
+        latencyMs: Long?,
+        retryCount: Int,
+        errorType: EcuFailureType? = null
+    ) {
+        val sessionId = currentVanguardSessionId ?: return
+        scope.launch {
+            runCatching {
+                sessionRecorder.recordCommand(
+                    sessionId = sessionId,
+                    command = command,
+                    rawResponse = rawResponse,
+                    success = success,
+                    latencyMs = latencyMs,
+                    timeoutMs = if (success) null else 2000L,
+                    retryCount = retryCount,
+                    errorType = errorType
+                )
+            }.onFailure { Log.w(TAG, "Vanguard command record failed: ${it.message}") }
+        }
+    }
+
+    private fun negativeResponseCode(raw: String): String? {
+        val clean = raw.uppercase().replace(Regex("[^0-9A-F]"), "")
+        val idx = clean.indexOf("7F")
+        return if (idx >= 0 && idx + 6 <= clean.length) clean.substring(idx + 4, idx + 6) else null
+    }
+
+    private fun unitForPid(pid: String): String? {
+        val normalized = pid.uppercase().replace(" ", "")
+        val core = normalized.removePrefix("01")
+        return PidRegistry.getPid("01", core)?.unit
+    }
+
+    private fun recordSensorStateIfDue(
+        pid: String,
+        rawValue: String?,
+        state: SensorValueState,
+        source: SensorSource
+    ) {
+        val sessionId = currentVanguardSessionId ?: return
+        val now = System.currentTimeMillis()
+        val key = pid.uppercase().replace(" ", "")
+        val last = lastSensorRecordMs[key] ?: 0L
+        if (now - last < 1000L && state is SensorValueState.Supported) return
+        lastSensorRecordMs[key] = now
+        scope.launch {
+            runCatching {
+                sessionRecorder.recordSensorState(
+                    sessionId = sessionId,
+                    vehicleId = null,
+                    pid = pid,
+                    label = PidRegistry.getPid("01", pid.uppercase().removePrefix("01"))?.name,
+                    state = state,
+                    source = source,
+                    rawValue = rawValue,
+                    timestampMs = now
+                )
+            }.onFailure { Log.w(TAG, "Vanguard sensor record failed: ${it.message}") }
+        }
+    }
+
+    private fun recordDerivedMetricsIfDue(metrics: List<com.elysium369.meet.core.vanguard.CalculatedMetric>) {
+        val sessionId = currentVanguardSessionId ?: return
+        val now = System.currentTimeMillis()
+        val last = lastSensorRecordMs["__derived_metrics"] ?: 0L
+        if (now - last < 1500L) return
+        lastSensorRecordMs["__derived_metrics"] = now
+        scope.launch {
+            runCatching {
+                sessionRecorder.recordDerivedMetrics(sessionId, null, metrics, now)
+            }.onFailure { Log.w(TAG, "Vanguard derived metrics record failed: ${it.message}") }
+        }
     }
 
     private fun putLiveDataAliases(data: MutableMap<String, Float>, pid: String, value: Float) {
@@ -2145,6 +2451,12 @@ class ObdSession(
         }
 
         _mode06Results.value = allResults
+        currentVanguardSessionId?.let { sessionId ->
+            scope.launch {
+                runCatching { sessionRecorder.recordMode06Results(sessionId, null, allResults) }
+                    .onFailure { Log.w(TAG, "Vanguard Mode 06 record failed: ${it.message}") }
+            }
+        }
         _statusMessage.value = "Escaneo profundo completado. ${allResults.size} pruebas procesadas."
         Log.i(TAG, "Mode 06: ${allResults.size} test results read")
         return allResults
@@ -3375,7 +3687,9 @@ class ObdSession(
                                     success = true
                                     consecutiveErrors = 0
                                     lastHeartbeatTime = System.currentTimeMillis()
-                                    updateQos(System.currentTimeMillis() - startTime, true)
+                                    val latency = System.currentTimeMillis() - startTime
+                                    updateQos(latency, true)
+                                    recordCommandLog(command.query, response, success = true, latencyMs = latency, retryCount = attempts)
                                     trafficListener?.onResponseReceived(command.query, response)
                                     command.onSuccess(response)
                                 } else {
@@ -3393,8 +3707,18 @@ class ObdSession(
                     }
                     if (!success) {
                         consecutiveErrors++
-                        updateQos(System.currentTimeMillis() - startTime, false)
+                        val latency = System.currentTimeMillis() - startTime
+                        updateQos(latency, false)
                         trafficListener?.onError(command.query, "Timeout after $attempts attempts")
+                        recordCommandLog(
+                            command = command.query,
+                            rawResponse = null,
+                            success = false,
+                            latencyMs = latency,
+                            retryCount = attempts,
+                            errorType = EcuFailureType.ECU_TIMEOUT
+                        )
+                        recordClassifiedFailure(command.query, null, timeoutMs = 2000L, latencyMs = latency)
 
                         if (consecutiveErrors >= 3 && !isSelfHealing) {
                             scope.launch { attemptSelfHealing("command timeouts") }
@@ -3563,6 +3887,28 @@ class ObdSession(
     }
 
     fun disconnect() {
+        val sessionIdToFinish = currentVanguardSessionId
+        if (sessionIdToFinish != null) {
+            val modulesJson = networkModulesJson()
+            val dtcsJson = org.json.JSONArray(_allDetectedDtcs.value.toList()).toString()
+            val mode06Json = mode06Json()
+            val derivedJson = derivedStatesJson()
+            scope.launch {
+                runCatching {
+                    sessionRecorder.finishSession(
+                        ObdSessionFinishContext(
+                            sessionId = sessionIdToFinish,
+                            ecuModulesJson = modulesJson,
+                            dtcsJson = dtcsJson,
+                            mode06Json = mode06Json,
+                            derivedMetricsJson = derivedJson,
+                            reconnectCount = recoveryFailureCount
+                        )
+                    )
+                }.onFailure { Log.w(TAG, "Vanguard session finish failed: ${it.message}") }
+            }
+            currentVanguardSessionId = null
+        }
         isRunning = false
         currentJob?.cancel()
         pollingJob?.cancel()
@@ -3573,6 +3919,7 @@ class ObdSession(
         _state.value = ObdState.DISCONNECTED
         _statusMessage.value = "Desconectado"
         _liveData.value = emptyMap()
+        _liveSensorStates.value = emptyMap()
         _activeTestStatus.value = ActiveTestStatus()
         // Clear identification data
         _calibrationId.value = null
@@ -3585,6 +3932,57 @@ class ObdSession(
         tripStartTimeMs = 0L
         speedAccumulator = 0.0
         speedSampleCount = 0
+    }
+
+    private fun networkModulesJson(): String {
+        val array = org.json.JSONArray()
+        _networkTopology.value.forEach { module ->
+            array.put(
+                org.json.JSONObject()
+                    .put("id", module.id)
+                    .put("name", module.name)
+                    .put("isAlive", module.isAlive)
+                    .put("latencyMs", module.latencyMs)
+                    .put("dtcCount", module.dtcs.size)
+                    .put("protocol", module.protocolDetected)
+            )
+        }
+        return array.toString()
+    }
+
+    private fun mode06Json(): String {
+        val array = org.json.JSONArray()
+        _mode06Results.value.forEach { result ->
+            array.put(
+                org.json.JSONObject()
+                    .put("mid", result.mid)
+                    .put("tid", result.tid)
+                    .put("value", result.value)
+                    .put("minLimit", result.minLimit)
+                    .put("maxLimit", result.maxLimit)
+                    .put("unit", result.unit)
+                    .put("passed", result.passed)
+                    .put("componentName", result.componentName)
+                    .put("testName", result.testName)
+                    .put("severity", result.severity.name)
+            )
+        }
+        return array.toString()
+    }
+
+    private fun derivedStatesJson(): String {
+        val array = org.json.JSONArray()
+        _liveSensorStates.value
+            .filterKeys { it.startsWith("CALC_") }
+            .forEach { (key, state) ->
+                array.put(
+                    org.json.JSONObject()
+                        .put("id", key)
+                        .put("state", state.stateName())
+                        .put("value", state.numericValueOrNull)
+                )
+            }
+        return array.toString()
     }
 
     companion object {

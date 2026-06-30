@@ -36,7 +36,7 @@ class MeetPerito @Inject constructor() {
      * Realiza la evaluación clínica completa del vehículo en base a las 10 dimensiones OBD y genera el reporte.
      */
     fun performInspection(
-        context: Context,
+        context: Context?,
         vehicleId: String,
         vin: String?,
         activeDtcs: List<String>,
@@ -261,7 +261,8 @@ class MeetPerito @Inject constructor() {
         return report
     }
 
-    private fun saveReportToFile(context: Context, report: VehicleInspectionReport) {
+    private fun saveReportToFile(context: Context?, report: VehicleInspectionReport) {
+        if (context == null) return
         try {
             val dir = context.getExternalFilesDir("PeritoInspections")
             if (dir != null && !dir.exists()) {
@@ -279,7 +280,8 @@ class MeetPerito @Inject constructor() {
     /**
      * Recupera el historial de reportes locales para un vehículo específico.
      */
-    fun getInspectionHistory(context: Context, vehicleId: String): List<VehicleInspectionReport> {
+    fun getInspectionHistory(context: Context?, vehicleId: String): List<VehicleInspectionReport> {
+        if (context == null) return emptyList()
         val list = mutableListOf<VehicleInspectionReport>()
         try {
             val dir = context.getExternalFilesDir("PeritoInspections") ?: return emptyList()

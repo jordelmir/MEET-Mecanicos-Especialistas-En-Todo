@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.livelink
 
+import android.util.Log
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -19,7 +20,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.ServerSocket
 import java.security.SecureRandom
 import java.time.Duration
 import java.util.Collections
@@ -39,6 +42,11 @@ class LiveLinkServer {
         const val DEFAULT_PORT = 8765
         private const val TOKEN_LENGTH = 18
         private const val TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+        private const val TAG = "LiveLinkServer"
+
+        private val sharedInstance by lazy { LiveLinkServer() }
+
+        fun shared(): LiveLinkServer = sharedInstance
     }
 
     private var server: ApplicationEngine? = null
@@ -58,14 +66,21 @@ class LiveLinkServer {
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
     /** Starts the embedded server. Call only after user opt-in. */
+    @Synchronized
     fun start(port: Int = DEFAULT_PORT) {
-        if (_isRunning.value) return
+        if (_isRunning.value || server != null) return
+        if (!isPortAvailable(port)) {
+            Log.w(TAG, "LiveLink port $port is already in use; start ignored.")
+            _isRunning.value = false
+            _serverUrl.value = null
+            return
+        }
 
         val localIp = getLocalIpAddress() ?: "0.0.0.0"
         val token = generatePairingToken()
         pairingToken = token
 
-        server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+        val engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(WebSockets) {
                 pingPeriod = Duration.ofSeconds(15)
                 timeout = Duration.ofSeconds(30)
@@ -122,12 +137,24 @@ class LiveLinkServer {
             }
         }
 
-        server?.start(wait = false)
-        _isRunning.value = true
-        _serverUrl.value = "http://$localIp:$port/live?token=$token"
+        runCatching {
+            engine.start(wait = false)
+        }.onSuccess {
+            server = engine
+            _isRunning.value = true
+            _serverUrl.value = "http://$localIp:$port/live?token=$token"
+        }.onFailure { error ->
+            Log.e(TAG, "Could not start LiveLink server on port $port", error)
+            runCatching { engine.stop(200, 500) }
+            server = null
+            pairingToken = null
+            _isRunning.value = false
+            _serverUrl.value = null
+        }
     }
 
     /** Stops the server. User can stop sharing at any time. */
+    @Synchronized
     fun stop() {
         server?.stop(1000, 2000)
         server = null
@@ -136,6 +163,16 @@ class LiveLinkServer {
         _isRunning.value = false
         _connectedClients.value = 0
         _serverUrl.value = null
+    }
+
+    private fun isPortAvailable(port: Int): Boolean {
+        return runCatching {
+            ServerSocket().use { socket ->
+                socket.reuseAddress = true
+                socket.bind(InetSocketAddress("0.0.0.0", port))
+            }
+            true
+        }.getOrDefault(false)
     }
 
     /** Broadcasts a telemetry snapshot to all connected browsers. */

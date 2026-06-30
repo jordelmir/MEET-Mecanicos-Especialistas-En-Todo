@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,8 +138,8 @@ fun GaugeDiyWidget(
     val normalizedLabel = labelText.trim()
     val hasCustomArtwork = diyBgType == 2 && diyBgUri.isNotBlank()
     val sameMetricName = normalizedUnit.isNotBlank() && areDiyGaugeTextDuplicates(normalizedLabel, normalizedUnit)
-    val displayUnit = if (hasCustomArtwork) "" else normalizedUnit
-    val displayLabel = when {
+    val baseDisplayUnit = if (hasCustomArtwork) "" else normalizedUnit
+    val baseDisplayLabel = when {
         sameMetricName -> ""
         hasCustomArtwork -> ""
         else -> normalizedLabel
@@ -195,6 +197,10 @@ fun GaugeDiyWidget(
                 val valueFontSize = (w * 0.14f).coerceIn(16f, 32f)
                 val labelFontSize = (w * 0.05f).coerceIn(8f, 12f)
                 val unitFontSize = (w * 0.045f).coerceIn(7f, 10f)
+                val maxTextWidth = (w * 0.76f).coerceAtLeast(24f).toInt()
+                val compactTextLayout = w < 156f
+                val displayUnit = if (compactTextLayout) "" else baseDisplayUnit
+                val displayLabel = if (compactTextLayout) "" else baseDisplayLabel
 
                 val labelMeasured = textMeasurer.measure(
                     displayLabel.uppercase(),
@@ -205,7 +211,10 @@ fun GaugeDiyWidget(
                         fontFamily = diyFontFamily,
                         fontStyle = diyFontStyle,
                         letterSpacing = diyLetterSpacing
-                    )
+                    ),
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    constraints = Constraints(maxWidth = maxTextWidth)
                 )
 
                 onDrawBehind {
@@ -1776,7 +1785,10 @@ fun GaugeDiyWidget(
                             fontStyle = diyFontStyle,
                             fontFamily = diyFontFamily,
                             letterSpacing = diyLetterSpacing
-                        )
+                        ),
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = maxTextWidth)
                     )
 
                     val unitMeasured = textMeasurer.measure(
@@ -1788,14 +1800,26 @@ fun GaugeDiyWidget(
                             fontStyle = diyFontStyle,
                             fontFamily = diyFontFamily,
                             letterSpacing = (diyLetterSpacingVal + 1f).sp
-                        )
+                        ),
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = maxTextWidth)
                     )
 
                     val textGap = (h * 0.018f).coerceIn(4.dp.toPx(), 10.dp.toPx())
                     val hasUnit = displayUnit.isNotBlank()
                     val unitHeight = if (hasUnit) unitMeasured.size.height.toFloat() else 0f
-                    val stackHeight = valueMeasured.size.height + if (hasUnit) unitHeight + textGap * 0.35f else 0f
-                    val stackTop = center.y - stackHeight / 2f - if (hasCustomArtwork) radius * 0.02f else 0f
+                    val hasLabel = displayLabel.isNotBlank() && !hasCustomArtwork
+                    val stackHeight =
+                        valueMeasured.size.height +
+                            if (hasUnit) unitHeight + textGap * 0.35f else 0f
+                    val valueBandTop = h * 0.36f
+                    val labelBandTop = h * 0.66f
+                    val maxStackBottom =
+                        if (hasLabel) labelBandTop - textGap else h * 0.72f
+                    val stackTop =
+                        (center.y - stackHeight / 2f - if (hasCustomArtwork) radius * 0.02f else 0f)
+                            .coerceIn(valueBandTop, (maxStackBottom - stackHeight).coerceAtLeast(valueBandTop))
                     val valueTop = stackTop
                     val unitTop = valueTop + valueMeasured.size.height + textGap * 0.35f
 
@@ -1809,14 +1833,21 @@ fun GaugeDiyWidget(
                             topLeft = Offset(center.x - unitMeasured.size.width / 2f, unitTop)
                         )
                     }
-                    if (displayLabel.isNotBlank()) {
-                        val labelTop = (h - radius * 0.32f - labelMeasured.size.height)
-                            .coerceAtLeast(unitTop + unitHeight + textGap)
-                            .coerceAtMost(h - radius * 0.14f - labelMeasured.size.height)
+                    if (hasLabel) {
+                        val labelLowerLimit = unitTop + unitHeight + textGap
+                        val labelBottomLimit = h - radius * 0.10f
+                        val labelTop = labelBandTop
+                            .coerceAtLeast(labelLowerLimit)
+                            .coerceAtMost(labelBottomLimit - labelMeasured.size.height)
+                        val labelFits =
+                            labelTop >= labelLowerLimit &&
+                                labelTop + labelMeasured.size.height <= labelBottomLimit
+                        if (labelFits) {
                         drawText(
                             labelMeasured,
                             topLeft = Offset(center.x - labelMeasured.size.width / 2f, labelTop)
                         )
+                        }
                     }
                 }
             }

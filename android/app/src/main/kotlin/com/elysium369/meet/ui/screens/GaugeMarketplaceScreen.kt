@@ -46,7 +46,9 @@ import com.elysium369.meet.data.supabase.GaugePriceTiers
 import com.elysium369.meet.ui.GaugeMarketTab
 import com.elysium369.meet.ui.GaugeMarketplaceViewModel
 import com.elysium369.meet.ui.components.gauges.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 // ═══════════════════════════════════════════════════════
@@ -58,6 +60,7 @@ import kotlinx.serialization.json.Json
 fun GaugeMarketplaceScreen(
     navController: NavController,
     gaugeStyleManager: GaugeStyleManager,
+    initialPublishGaugeId: String? = null,
     viewModel: GaugeMarketplaceViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -73,6 +76,9 @@ fun GaugeMarketplaceScreen(
     var selectedListing by remember { mutableStateOf<GaugeListing?>(null) }
     var showPreviewSheet by remember { mutableStateOf(false) }
     var purchaseTarget by remember { mutableStateOf<GaugeListing?>(null) }
+    var purchaseVerificationListingId by remember { mutableStateOf<String?>(null) }
+    var showPublishDialog by remember { mutableStateOf(initialPublishGaugeId != null) }
+    var publishSourceGauge by remember { mutableStateOf<SavedGaugeEntity?>(null) }
 
     val inf = rememberInfiniteTransition(label = "market")
     val headerGlow by inf.animateFloat(
@@ -82,6 +88,11 @@ fun GaugeMarketplaceScreen(
     )
     val accentCyan = Color(0xFF00FFCC)
     val accentPurple = Color(0xFF7C4DFF)
+    val isPurchaseFlowBusy =
+        isBillingProcessing ||
+            purchaseTarget != null ||
+            purchaseVerificationListingId != null ||
+            uiState.purchaseRecordingListingId != null
 
     DisposableEffect(billingManager) {
         if (MonetizationPolicy.PAYWALLS_ENABLED) {
@@ -89,23 +100,29 @@ fun GaugeMarketplaceScreen(
                 val listing = purchaseTarget
                 purchaseTarget = null
                 if (listing != null) {
+                    purchaseVerificationListingId = listing.id
                     scope.launch {
-                        val verification = purchaseVerifier.verify(
-                            productId = productId,
-                            productType = PlayBillingCatalog.productType(productId),
-                            purchaseToken = purchaseToken
-                        )
-                        if (verification.isSuccess) {
-                            viewModel.recordPurchase(listing, purchaseToken)
-                            snackbarHostState.showSnackbar("Compra verificada por Google Play. El gauge quedo registrado en tu cuenta.")
-                        } else {
-                            snackbarHostState.showSnackbar("Google Play confirmo el pago, pero el backend no pudo verificarlo: ${verification.exceptionOrNull()?.message.orEmpty()}")
+                        try {
+                            val verification = purchaseVerifier.verify(
+                                productId = productId,
+                                productType = PlayBillingCatalog.productType(productId),
+                                purchaseToken = purchaseToken
+                            )
+                            if (verification.isSuccess) {
+                                viewModel.recordPurchase(listing, purchaseToken)
+                                snackbarHostState.showSnackbar("Compra verificada por Google Play. El gauge quedo registrado en tu cuenta.")
+                            } else {
+                                snackbarHostState.showSnackbar("Google Play confirmo el pago, pero el backend no pudo verificarlo: ${verification.exceptionOrNull()?.message.orEmpty()}")
+                            }
+                        } finally {
+                            purchaseVerificationListingId = null
                         }
                     }
                 }
             }
             billingManager.onPurchaseError = { message ->
                 purchaseTarget = null
+                purchaseVerificationListingId = null
                 scope.launch {
                     snackbarHostState.showSnackbar(message)
                 }
@@ -132,6 +149,29 @@ fun GaugeMarketplaceScreen(
             viewModel.ensureOwnership(selectedListing?.id)
             viewModel.ensureReviews(selectedListing?.id)
         }
+    }
+
+    LaunchedEffect(initialPublishGaugeId) {
+        val id = initialPublishGaugeId?.takeIf { it.isNotBlank() }
+        if (id == null) return@LaunchedEffect
+        if (id == "draft") {
+            publishSourceGauge = null
+            showPublishDialog = true
+            return@LaunchedEffect
+        }
+        publishSourceGauge = withContext(Dispatchers.IO) {
+            val db = androidx.room.Room.databaseBuilder(
+                appContext,
+                com.elysium369.meet.data.local.MeetDatabase::class.java,
+                "meet_database"
+            ).build()
+            try {
+                db.savedGaugeDao().getById(id)
+            } finally {
+                db.close()
+            }
+        }
+        showPublishDialog = true
     }
 
     Box(
@@ -382,8 +422,8 @@ fun GaugeMarketplaceScreen(
         // ══════════════════════════════════════
         FloatingActionButton(
             onClick = {
-                // Navigate back to DIY editor where user can publish
-                navController.popBackStack()
+                publishSourceGauge = null
+                showPublishDialog = true
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -424,20 +464,34 @@ fun GaugeMarketplaceScreen(
                 isMonetizationUnlocked = MonetizationPolicy.LOCAL_FULL_ACCESS,
                 reviews = listingId?.let { uiState.reviewsByListingId[it] }.orEmpty(),
                 isLoadingReviews = !listingId.isNullOrBlank() && !uiState.reviewsByListingId.containsKey(listingId),
+                isPurchaseInProgress = isPurchaseFlowBusy,
                 onDismiss = {
                     showPreviewSheet = false
                     selectedListing = null
                 },
                 onBuy = { listingToBuy ->
+                    if (isPurchaseFlowBusy) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Ya hay una compra en proceso. Espera la confirmación antes de tocar de nuevo.")
+                        }
+                        return@GaugePreviewSheet
+                    }
                     if (MonetizationPolicy.LOCAL_FULL_ACCESS) {
                         scope.launch {
                             snackbarHostState.showSnackbar(MonetizationPolicy.ACCESS_MESSAGE)
                         }
                         return@GaugePreviewSheet
                     }
-                    if (listingToBuy.id.isNullOrBlank()) {
+                    val buyListingId = listingToBuy.id
+                    if (buyListingId.isNullOrBlank()) {
                         scope.launch {
                             snackbarHostState.showSnackbar("La publicación no tiene un identificador válido.")
+                        }
+                        return@GaugePreviewSheet
+                    }
+                    if (uiState.ownershipByListingId[buyListingId] == true) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Este gauge ya está registrado en tus compras.")
                         }
                         return@GaugePreviewSheet
                     }
@@ -467,6 +521,54 @@ fun GaugeMarketplaceScreen(
             )
         }
 
+        if (showPublishDialog) {
+            val diyTrigger = GaugeStyleManager.diyUpdateTrigger
+            val draftConfig = remember(diyTrigger, publishSourceGauge) {
+                publishSourceGauge?.toGaugeConfig() ?: gaugeStyleManager.exportDiyConfig()
+            }
+            GaugePublishDialog(
+                sourceGauge = publishSourceGauge,
+                draftConfig = draftConfig,
+                isPublishing = uiState.isPublishing,
+                accentColor = accentCyan,
+                onDismiss = {
+                    if (!uiState.isPublishing) {
+                        showPublishDialog = false
+                        publishSourceGauge = null
+                    }
+                },
+                onPublish = { name, description, priceTier, category, tags, acceptedTerms ->
+                    val sourceId = publishSourceGauge?.id
+                    viewModel.publishGauge(
+                        config = draftConfig,
+                        name = name,
+                        description = description,
+                        priceTier = priceTier,
+                        saleCategory = category,
+                        tags = tags,
+                        publishedFromSavedGaugeId = sourceId,
+                        sellerTermsAccepted = acceptedTerms
+                    ) { result ->
+                        scope.launch {
+                            result
+                                .onSuccess { listingId ->
+                                    if (sourceId != null) {
+                                        markSavedGaugeAsPublished(appContext, sourceId, listingId)
+                                    }
+                                    snackbarHostState.showSnackbar("Gauge publicado en venta: ${GaugePriceTiers.displayPrice(priceTier)}")
+                                    showPublishDialog = false
+                                    publishSourceGauge = null
+                                    viewModel.selectTab(GaugeMarketTab.MY_SALES)
+                                }
+                                .onFailure { error ->
+                                    snackbarHostState.showSnackbar(error.message ?: "No se pudo publicar el gauge.")
+                                }
+                        }
+                    }
+                }
+            )
+        }
+
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -474,6 +576,232 @@ fun GaugeMarketplaceScreen(
                 .padding(horizontal = 16.dp, vertical = 20.dp)
         )
     }
+}
+
+@Composable
+private fun GaugePublishDialog(
+    sourceGauge: SavedGaugeEntity?,
+    draftConfig: GaugeConfig,
+    isPublishing: Boolean,
+    accentColor: Color,
+    onDismiss: () -> Unit,
+    onPublish: (
+        name: String,
+        description: String,
+        priceTier: Int,
+        category: String,
+        tags: String,
+        acceptedTerms: Boolean
+    ) -> Unit
+) {
+    val categories = listOf("performance", "luxury", "racing", "diagnostic", "weather", "custom")
+    var name by remember(sourceGauge?.id, draftConfig.name) {
+        mutableStateOf(sourceGauge?.name ?: draftConfig.name.ifBlank { "Gauge MEET" })
+    }
+    var description by remember(sourceGauge?.id) { mutableStateOf("") }
+    var priceTier by remember(sourceGauge?.id) { mutableIntStateOf(1) }
+    var category by remember(sourceGauge?.id) { mutableStateOf("performance") }
+    var tags by remember(sourceGauge?.id) { mutableStateOf("") }
+    var acceptedTerms by remember(sourceGauge?.id) { mutableStateOf(false) }
+    val canPublish = name.trim().length >= 3 &&
+        description.trim().length >= 12 &&
+        acceptedTerms &&
+        !isPublishing
+    val split = GaugePriceTiers.calculateSplit(priceTier)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF0A0E14),
+        title = {
+            Text(
+                text = "Publicar gauge",
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF050810))
+                        .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val previewGauge = remember(draftConfig, name) {
+                        SavedGaugeEntity(
+                            id = sourceGauge?.id ?: "publish-preview",
+                            name = name,
+                            bgType = draftConfig.bgType,
+                            bgPresetIndex = draftConfig.bgPresetIndex,
+                            bgImageUri = sourceGauge?.bgImageUri.orEmpty(),
+                            bezelStyle = draftConfig.bezelStyle,
+                            needleStyle = draftConfig.needleStyle,
+                            ticksStyle = draftConfig.ticksStyle,
+                            accentColor = draftConfig.accentColor,
+                            accentColor2 = draftConfig.accentColor2,
+                            glowIntensity = draftConfig.glowIntensity,
+                            imageOpacity = draftConfig.imageOpacity,
+                            animationIndex = draftConfig.animationIndex,
+                            createdAt = sourceGauge?.createdAt ?: 0L,
+                            updatedAt = sourceGauge?.updatedAt ?: 0L,
+                            typographyIndex = draftConfig.typographyIndex
+                        )
+                    }
+                    Gauge3DWrapper(
+                        glowColor = Color(previewGauge.accentColor),
+                        style = GaugeStyleSet.CUSTOM_DIY,
+                        modifier = Modifier.size(132.dp)
+                    ) {
+                        GaugeDiyWidget(
+                            label = previewGauge.name,
+                            value = 68f,
+                            minVal = 0f,
+                            maxVal = 100f,
+                            unit = "%",
+                            warningThreshold = 72f,
+                            criticalThreshold = 90f,
+                            diyConfig = previewGauge,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(48) },
+                    label = { Text("Nombre") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it.take(240) },
+                    label = { Text("Descripción de venta") },
+                    minLines = 3,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Categoría", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categories.size) { index ->
+                        val option = categories[index]
+                        val selected = option == category
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (selected) accentColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f))
+                                .border(
+                                    1.dp,
+                                    if (selected) accentColor.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.08f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable { category = option }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                option.uppercase(),
+                                color = if (selected) Color.White else Color.White.copy(alpha = 0.62f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = tags,
+                    onValueChange = { tags = it.take(96) },
+                    label = { Text("Tags") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    "Precio ${GaugePriceTiers.displayPrice(priceTier)}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 14.sp
+                )
+                Slider(
+                    value = priceTier.toFloat(),
+                    onValueChange = { priceTier = it.toInt().coerceIn(1, 10) },
+                    valueRange = 1f..10f,
+                    steps = 8,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor
+                    )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "Producto Google Play: ${GaugePriceTiers.productId(priceTier)}",
+                        color = accentColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Creador: ${formatUsdFromCents(split.first)} · Plataforma: ${formatUsdFromCents(split.second)}",
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 11.sp
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = acceptedTerms,
+                        onCheckedChange = { acceptedTerms = it },
+                        colors = CheckboxDefaults.colors(checkedColor = accentColor)
+                    )
+                    Text(
+                        "Acepto vender este gauge bajo las reglas del marketplace.",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = canPublish,
+                onClick = {
+                    onPublish(name, description, priceTier, category, tags, acceptedTerms)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.Black)
+            ) {
+                if (isPublishing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Black)
+                } else {
+                    Text("Publicar", fontWeight = FontWeight.Black)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isPublishing, onClick = onDismiss) {
+                Text("Cancelar", color = Color.White.copy(alpha = 0.65f))
+            }
+        }
+    )
 }
 
 // ═══════════════════════════════════════════════════════
@@ -630,6 +958,42 @@ private fun formatUsdFromCents(cents: Int): String {
     val dollars = cents / 100
     val remainder = cents % 100
     return "$${dollars}.${"%02d".format(remainder)}"
+}
+
+private fun SavedGaugeEntity.toGaugeConfig(): GaugeConfig {
+    return GaugeConfig(
+        name = name,
+        bgType = bgType,
+        bgPresetIndex = bgPresetIndex,
+        bezelStyle = bezelStyle,
+        needleStyle = needleStyle,
+        ticksStyle = ticksStyle,
+        accentColor = accentColor,
+        accentColor2 = accentColor2,
+        glowIntensity = glowIntensity,
+        imageOpacity = imageOpacity,
+        animationIndex = animationIndex,
+        typographyIndex = typographyIndex
+    )
+}
+
+private suspend fun markSavedGaugeAsPublished(
+    context: android.content.Context,
+    savedGaugeId: String,
+    marketplaceId: String
+) {
+    withContext(Dispatchers.IO) {
+        val db = androidx.room.Room.databaseBuilder(
+            context,
+            com.elysium369.meet.data.local.MeetDatabase::class.java,
+            "meet_database"
+        ).build()
+        try {
+            db.savedGaugeDao().markAsPublished(savedGaugeId, marketplaceId, System.currentTimeMillis())
+        } finally {
+            db.close()
+        }
+    }
 }
 
 private fun GaugeListing.toPreviewGaugeEntity(): SavedGaugeEntity? {

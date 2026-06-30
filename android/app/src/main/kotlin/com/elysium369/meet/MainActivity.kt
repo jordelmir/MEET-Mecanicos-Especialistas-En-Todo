@@ -21,10 +21,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.FleetChatViewModel
 import com.elysium369.meet.ui.RepairNetworkViewModel
@@ -148,7 +150,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MeetApp(obdViewModel: ObdViewModel) {
     val navController = rememberNavController()
-    val liveLinkServer = remember { LiveLinkServer() }
+    val liveLinkServer = remember { LiveLinkServer.shared() }
 
     // Navigation collector for voice commands
     LaunchedEffect(Unit) {
@@ -536,12 +538,22 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
-            composable("gauge_marketplace") {
+            composable(
+                route = "gauge_marketplace?publishGaugeId={publishGaugeId}",
+                arguments = listOf(
+                    navArgument("publishGaugeId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
                 val screenContext = LocalContext.current
                 val styleManager = remember { GaugeStyleManager(screenContext) }
                 GaugeMarketplaceScreen(
                     navController = navController,
-                    gaugeStyleManager = styleManager
+                    gaugeStyleManager = styleManager,
+                    initialPublishGaugeId = backStackEntry.arguments?.getString("publishGaugeId")
                 )
             }
             composable("workshop_dashboard") {

@@ -4,7 +4,7 @@ import {
   Square, Save, ChevronDown, Zap, Gauge, Radio, BarChart3, Download,
   Cpu, CheckCircle2, History, RotateCcw, Link2, Sparkles, BookOpen, AlertCircle, RefreshCw
 } from 'lucide-react';
-import dtcDatabase from '../dtc_database.json';
+import dtcDatabaseUrl from '../dtc_database.json?url';
 import { OscilloscopeCanvas } from './OscilloscopeCanvas';
 import { SignalGenerator, SignalAnalyzer, SIGNAL_LIBRARY, type SignalDiagnosis, type SignalDefinition } from '../services/signalAnalysis';
 import type { OscilloscopeMeasurement, WorkOrder, Client } from '../types';
@@ -18,6 +18,30 @@ interface OBD2ScannerProps {
 }
 
 type TabMode = 'dtc' | 'oscilloscope';
+
+interface DtcDatabaseItem {
+  code: string;
+  manufacturer?: string;
+  descriptionEs: string;
+  descriptionEn?: string;
+  possibleCauses?: string;
+  system?: string;
+  severity?: string;
+}
+
+let dtcDatabasePromise: Promise<DtcDatabaseItem[]> | null = null;
+
+const loadDtcDatabase = () => {
+  if (!dtcDatabasePromise) {
+    dtcDatabasePromise = fetch(dtcDatabaseUrl, { cache: 'force-cache' }).then(async response => {
+      if (!response.ok) {
+        throw new Error(`No se pudo cargar la base DTC (${response.status})`);
+      }
+      return response.json() as Promise<DtcDatabaseItem[]>;
+    });
+  }
+  return dtcDatabasePromise;
+};
 
 export function OBD2Scanner({ onClose, currentUser, workOrders, onSaveMeasurement, onUpdateWorkOrder }: OBD2ScannerProps) {
   const [activeTab, setActiveTab] = useState<TabMode>('oscilloscope');
@@ -100,6 +124,9 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
   const [result, setResult] = useState<any>(null);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dtcDatabase, setDtcDatabase] = useState<DtcDatabaseItem[]>([]);
+  const [dtcDbLoading, setDtcDbLoading] = useState(false);
+  const [dtcDbError, setDtcDbError] = useState<string | null>(null);
   
   // Search state extensions
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -128,6 +155,28 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
   const [selectedWOId, setSelectedWOId] = useState('');
   const [linkSuccess, setLinkSuccess] = useState(false);
 
+  const ensureDtcDatabase = useCallback(async () => {
+    if (dtcDatabase.length > 0) return dtcDatabase;
+
+    setDtcDbLoading(true);
+    setDtcDbError(null);
+    try {
+      const database = await loadDtcDatabase();
+      setDtcDatabase(database);
+      return database;
+    } catch (error) {
+      console.error('[MEET:DTC_DATABASE_LOAD]', error);
+      setDtcDbError('No se pudo cargar la base de codigos DTC. Revisa conexion o assets del build.');
+      return [];
+    } finally {
+      setDtcDbLoading(false);
+    }
+  }, [dtcDatabase]);
+
+  useEffect(() => {
+    ensureDtcDatabase();
+  }, [ensureDtcDatabase]);
+
   // Suggestions Autocomplete Logic
   useEffect(() => {
     if (code.trim().length < 2) {
@@ -135,19 +184,26 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
       return;
     }
     const cleanQuery = code.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    let cancelled = false;
     const timer = setTimeout(() => {
-      const matches: any[] = [];
-      for (const item of dtcDatabase) {
-        const cleanItemCode = item.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        if (cleanItemCode.startsWith(cleanQuery)) {
-          matches.push(item);
-          if (matches.length >= 5) break;
+      ensureDtcDatabase().then(database => {
+        if (cancelled) return;
+        const matches: DtcDatabaseItem[] = [];
+        for (const item of database) {
+          const cleanItemCode = item.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          if (cleanItemCode.startsWith(cleanQuery)) {
+            matches.push(item);
+            if (matches.length >= 5) break;
+          }
         }
-      }
-      setSuggestions(matches);
+        setSuggestions(matches);
+      });
     }, 120);
-    return () => clearTimeout(timer);
-  }, [code]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [code, ensureDtcDatabase]);
 
   // Handle manual code search
   const handleSearch = (e?: React.FormEvent, searchCode?: string) => {
@@ -168,9 +224,10 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
       return [targetCode, ...next].slice(0, 5);
     });
 
-    setTimeout(() => {
+    setTimeout(async () => {
+      const database = await ensureDtcDatabase();
       // 1. Try exact match (punctuation insensitive)
-      const data = dtcDatabase.find(dtc => dtc.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanCode);
+      const data = database.find(dtc => dtc.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanCode);
       
       if (data) {
         setResult({
@@ -184,7 +241,7 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
         });
       } else {
         // 2. Try partial search (starts-with)
-        const partialMatches = dtcDatabase.filter(dtc => 
+        const partialMatches = database.filter(dtc => 
           dtc.code.toUpperCase().includes(cleanCode) || 
           dtc.descriptionEs.toUpperCase().includes(cleanCode)
         ).slice(0, 8);
@@ -315,6 +372,11 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
               <Search size={14} className="text-forge-500" />
               Búsqueda Manual de Códigos
             </h3>
+            {dtcDbError && (
+              <div className="mb-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+                {dtcDbError}
+              </div>
+            )}
             
             <form onSubmit={(e) => handleSearch(e)} className="relative">
               <div className="relative">
@@ -323,7 +385,7 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
                   value={code} 
                   onChange={e => { setCode(e.target.value); setShowSuggestions(true); }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder="Ingrese código (ej: P0300)" 
+                  placeholder={dtcDbLoading ? 'Cargando base DTC...' : 'Ingrese código (ej: P0300)'} 
                   className="w-full bg-steel-950 border border-steel-700 focus:border-forge-500 rounded-xl pl-4 pr-12 py-3 text-sm font-bold text-white uppercase outline-none transition-all placeholder:text-steel-600 font-mono tracking-wider"
                 />
                 <button 

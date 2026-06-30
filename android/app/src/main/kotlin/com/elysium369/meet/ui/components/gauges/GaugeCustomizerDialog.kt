@@ -29,10 +29,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import com.elysium369.meet.core.share.GaugeQrImport
+import com.elysium369.meet.core.share.QrCodeSharing
+import com.elysium369.meet.data.local.MeetDatabase
+import com.elysium369.meet.data.local.entities.GaugeConfig
+import com.elysium369.meet.data.local.entities.SavedGaugeEntity
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.theme.ThemeColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ═══════════════════════════════════════════════════════
 // CUSTOMIZER TARGET TABS
@@ -1340,15 +1346,64 @@ fun GaugeCustomizerDialog(
                         var saveGaugeName by remember {
                             mutableStateOf(diyGaugeName.ifEmpty { "Mi Gauge" })
                         }
+                        var editingGaugeId by remember { mutableStateOf<String?>(null) }
+                        var editingGaugeCreatedAt by remember { mutableStateOf<Long?>(null) }
+                        var editingGaugePublished by remember { mutableStateOf(false) }
+                        var editingGaugeMarketplaceId by remember { mutableStateOf<String?>(null) }
+                        var editingGaugeThumbnailPath by remember { mutableStateOf<String?>(null) }
                         var saveFeedback by remember { mutableStateOf<String?>(null) }
                         var showQrCodeDialog by remember { mutableStateOf(false) }
                         var showQrScannerDialog by remember { mutableStateOf(false) }
+                        var pendingQrImport by remember { mutableStateOf<GaugeQrImport?>(null) }
+                        var qrImportActionInProgress by remember { mutableStateOf(false) }
                         var qrText by remember { mutableStateOf("") }
+                        var qrShareTitle by remember { mutableStateOf("MEET Gauge") }
+                        var qrExportWarnings by remember { mutableStateOf<List<String>>(emptyList()) }
+                        var isSavingGauge by remember { mutableStateOf(false) }
+                        var deletingGaugeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            gaugeStyleManager.resetDiyDraft()
+                                            editingGaugeId = null
+                                            editingGaugeCreatedAt = null
+                                            editingGaugePublished = false
+                                            editingGaugeMarketplaceId = null
+                                            editingGaugeThumbnailPath = null
+                                            saveGaugeName = "Mi Gauge"
+                                            showSaveDialog = false
+                                            showQrCodeDialog = false
+                                            showQrScannerDialog = false
+                                            pendingQrImport = null
+                                            qrImportActionInProgress = false
+                                            saveFeedback = "✅ Nuevo gauge listo"
+                                        }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "➕ NUEVO",
+                                    color = Color(0xFF00B0FF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
                             // 💾 SAVE
                             Box(
                                 modifier =
@@ -1375,8 +1430,10 @@ fun GaugeCustomizerDialog(
                                 Text(
                                     "💾 GUARDAR",
                                     color = Color(0xFF00E676),
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
 
@@ -1404,10 +1461,12 @@ fun GaugeCustomizerDialog(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    "📂 MIS GAUGES",
+                                    "📂 MIS",
                                     color = accentColor,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
 
@@ -1432,7 +1491,7 @@ fun GaugeCustomizerDialog(
                                         )
                                         .clickable {
                                             if (navController != null) {
-                                                navController.navigate("gauge_marketplace")
+                                                navController.navigate("gauge_marketplace?publishGaugeId=draft")
                                                 onDismiss()
                                             } else {
                                                 saveFeedback = "🌐 Marketplace no disponible"
@@ -1444,8 +1503,10 @@ fun GaugeCustomizerDialog(
                                 Text(
                                     "🌐 MARKET",
                                     color = Color(0xFF7C4DFF),
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -1468,16 +1529,16 @@ fun GaugeCustomizerDialog(
                                         .clickable {
                                             try {
                                                 val config = gaugeStyleManager.exportDiyConfig()
-                                                val json =
-                                                    kotlinx.serialization.json.Json.encodeToString(
-                                                        com.elysium369.meet.data.local.entities
-                                                            .GaugeConfig
-                                                            .serializer(),
-                                                        config,
+                                                val export =
+                                                    QrCodeSharing.createGaugeQrExport(
+                                                        config = config,
+                                                        sourceGaugeId = editingGaugeId,
+                                                        sourceMarketplaceId = editingGaugeMarketplaceId,
+                                                        sourcePublished = editingGaugePublished,
                                                     )
-                                                qrText =
-                                                    com.elysium369.meet.core.share.QrCodeSharing
-                                                        .compressText(json)
+                                                qrText = export.qrText
+                                                qrShareTitle = export.envelope.displayName
+                                                qrExportWarnings = export.warnings
                                                 showQrCodeDialog = true
                                             } catch (e: Exception) {
                                                 saveFeedback = "❌ Error al generar QR"
@@ -1558,21 +1619,57 @@ fun GaugeCustomizerDialog(
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center,
                                         )
-                                        Spacer(Modifier.height(16.dp))
-                                        Box(
-                                            modifier =
-                                                Modifier.fillMaxWidth()
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(accentColor)
-                                                    .clickable { showQrCodeDialog = false }
-                                                    .padding(vertical = 12.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(
-                                                "Cerrar",
-                                                color = Color.Black,
-                                                fontWeight = FontWeight.Bold,
+                                        if (qrExportWarnings.isNotEmpty()) {
+                                            Spacer(Modifier.height(8.dp))
+                                            QrBusinessNote(
+                                                text = qrExportWarnings.joinToString(" "),
+                                                color = Color(0xFFFFD54F),
                                             )
+                                        }
+                                        Spacer(Modifier.height(16.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        ) {
+                                            Box(
+                                                modifier =
+                                                    Modifier.weight(1f)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(Color(0x33FFFFFF))
+                                                        .clickable { showQrCodeDialog = false }
+                                                        .padding(vertical = 12.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    "Cerrar",
+                                                    color = Color.White.copy(alpha = 0.75f),
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                            Box(
+                                                modifier =
+                                                    Modifier.weight(1f)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(accentColor)
+                                                        .clickable {
+                                                            QrCodeSharing.shareQrAsImage(
+                                                                context = context,
+                                                                qrText = qrText,
+                                                                title = qrShareTitle,
+                                                            ).onFailure {
+                                                                saveFeedback =
+                                                                    "❌ No se pudo compartir QR"
+                                                            }
+                                                        }
+                                                        .padding(vertical = 12.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    "Compartir",
+                                                    color = Color.Black,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1582,23 +1679,76 @@ fun GaugeCustomizerDialog(
                         if (showQrScannerDialog) {
                             com.elysium369.meet.core.share.QrScannerOverlay(
                                 onResult = { scannedText ->
-                                    try {
-                                        val decompressed =
-                                            com.elysium369.meet.core.share.QrCodeSharing
-                                                .decompressText(scannedText)
-                                        val importedConfig =
-                                            kotlinx.serialization.json.Json.decodeFromString(
-                                                com.elysium369.meet.data.local.entities.GaugeConfig
-                                                    .serializer(),
-                                                decompressed,
-                                            )
-                                        gaugeStyleManager.importDiyConfig(importedConfig)
-                                        saveFeedback = "✅ Diseño importado"
-                                    } catch (e: Exception) {
-                                        saveFeedback = "❌ Error: QR no válido"
-                                    }
+                                    QrCodeSharing.decodeGaugeQrText(scannedText)
+                                        .onSuccess { import ->
+                                            qrImportActionInProgress = false
+                                            pendingQrImport = import
+                                            saveFeedback = null
+                                        }
+                                        .onFailure { error ->
+                                            saveFeedback =
+                                                "❌ ${error.message ?: "QR no válido"}"
+                                        }
                                 },
                                 onDismiss = { showQrScannerDialog = false },
+                            )
+                        }
+
+                        pendingQrImport?.let { import ->
+                            GaugeQrImportDialog(
+                                import = import,
+                                accentColor = accentColor,
+                                isActionInProgress = qrImportActionInProgress,
+                                onDismiss = {
+                                    if (!qrImportActionInProgress) pendingQrImport = null
+                                },
+                                onApplyToEditor = {
+                                    if (qrImportActionInProgress) return@GaugeQrImportDialog
+                                    qrImportActionInProgress = true
+                                    gaugeStyleManager.importDiyConfig(import.config)
+                                    editingGaugeId = null
+                                    editingGaugeCreatedAt = null
+                                    editingGaugePublished = false
+                                    editingGaugeMarketplaceId = null
+                                    editingGaugeThumbnailPath = null
+                                    saveGaugeName = import.config.name.ifBlank { "Gauge QR" }
+                                    qrImportActionInProgress = false
+                                    pendingQrImport = null
+                                    saveFeedback = "✅ QR aplicado al editor"
+                                },
+                                onSaveCopy = {
+                                    if (qrImportActionInProgress) return@GaugeQrImportDialog
+                                    qrImportActionInProgress = true
+                                    scope.launch {
+                                        runCatching {
+                                            val entity =
+                                                import.config.toQrSavedGaugeEntity(
+                                                    id = java.util.UUID.randomUUID().toString(),
+                                                    nameOverride = uniqueQrGaugeName(
+                                                        context = context,
+                                                        preferredName = import.config.name,
+                                                    ),
+                                                )
+                                            saveImportedGauge(context, entity)
+                                            gaugeStyleManager.importDiyConfig(
+                                                import.config.copy(name = entity.name)
+                                            )
+                                            editingGaugeId = entity.id
+                                            editingGaugeCreatedAt = entity.createdAt
+                                            editingGaugePublished = false
+                                            editingGaugeMarketplaceId = null
+                                            editingGaugeThumbnailPath = null
+                                            saveGaugeName = entity.name
+                                            pendingQrImport = null
+                                            saveFeedback =
+                                                "✅ Gauge QR \"${entity.name}\" guardado"
+                                        }.onFailure { error ->
+                                            saveFeedback =
+                                                "❌ No se pudo guardar QR: ${error.message.orEmpty()}"
+                                        }
+                                        qrImportActionInProgress = false
+                                    }
+                                },
                             )
                         }
 
@@ -1709,38 +1859,97 @@ fun GaugeCustomizerDialog(
                                                     Modifier.weight(1f)
                                                         .clip(RoundedCornerShape(12.dp))
                                                         .background(Color(0xFF00E676))
-                                                        .clickable {
-                                                            // Save to Room via coroutine
-                                                            val entity =
-                                                                gaugeStyleManager
-                                                                    .exportToSavedEntity(
-                                                                        name = saveGaugeName
-                                                                    )
-                                                            val db =
-                                                                androidx.room.Room.databaseBuilder(
-                                                                        context,
-                                                                        com.elysium369.meet.data
-                                                                                .local
-                                                                                .MeetDatabase::class
-                                                                            .java,
-                                                                        "meet_database",
-                                                                    )
-                                                                    .build()
-                                                            scope.launch(
-                                                                kotlinx.coroutines.Dispatchers.IO
-                                                            ) {
-                                                                db.savedGaugeDao().insert(entity)
-                                                                db.close()
+                                                        .clickable(enabled = !isSavingGauge) {
+                                                            if (isSavingGauge) return@clickable
+                                                            isSavingGauge = true
+                                                            scope.launch {
+                                                                runCatching {
+                                                                    val targetId =
+                                                                        editingGaugeId
+                                                                            ?: java.util.UUID
+                                                                                .randomUUID()
+                                                                                .toString()
+                                                                    val isEditing =
+                                                                        editingGaugeId != null
+                                                                    val now =
+                                                                        System.currentTimeMillis()
+                                                                    val entity =
+                                                                        gaugeStyleManager
+                                                                            .exportToSavedEntity(
+                                                                                id = targetId,
+                                                                                name =
+                                                                                    saveGaugeName
+                                                                                        .ifBlank {
+                                                                                            "Mi Gauge"
+                                                                                        },
+                                                                            )
+                                                                            .copy(
+                                                                                createdAt =
+                                                                                    editingGaugeCreatedAt
+                                                                                        ?: now,
+                                                                                updatedAt = now,
+                                                                                isPublished =
+                                                                                    if (isEditing)
+                                                                                        editingGaugePublished
+                                                                                    else false,
+                                                                                marketplaceId =
+                                                                                    if (isEditing)
+                                                                                        editingGaugeMarketplaceId
+                                                                                    else null,
+                                                                                thumbnailPath =
+                                                                                    if (isEditing)
+                                                                                        editingGaugeThumbnailPath
+                                                                                    else null,
+                                                                            )
+                                                                    withContext(Dispatchers.IO) {
+                                                                        val db =
+                                                                            androidx.room
+                                                                                .Room
+                                                                                .databaseBuilder(
+                                                                                    context,
+                                                                                    com.elysium369
+                                                                                        .meet
+                                                                                        .data
+                                                                                        .local
+                                                                                        .MeetDatabase::class
+                                                                                        .java,
+                                                                                    "meet_database",
+                                                                                )
+                                                                                .build()
+                                                                        try {
+                                                                            db.savedGaugeDao()
+                                                                                .insert(entity)
+                                                                        } finally {
+                                                                            db.close()
+                                                                        }
+                                                                    }
+                                                                    editingGaugeId = entity.id
+                                                                    editingGaugeCreatedAt =
+                                                                        entity.createdAt
+                                                                    editingGaugePublished =
+                                                                        entity.isPublished
+                                                                    editingGaugeMarketplaceId =
+                                                                        entity.marketplaceId
+                                                                    editingGaugeThumbnailPath =
+                                                                        entity.thumbnailPath
+                                                                    showSaveDialog = false
+                                                                    saveFeedback =
+                                                                        if (isEditing)
+                                                                            "✅ Gauge \"$saveGaugeName\" actualizado"
+                                                                        else
+                                                                            "✅ Gauge \"$saveGaugeName\" guardado"
+                                                                }.onFailure { error ->
+                                                                    saveFeedback =
+                                                                        "❌ No se pudo guardar: ${error.message.orEmpty()}"
+                                                                }
+                                                                isSavingGauge = false
                                                             }
-                                                            showSaveDialog = false
-                                                            saveFeedback =
-                                                                "✅ Gauge \"$saveGaugeName\" guardado"
                                                         }
                                                         .padding(vertical = 12.dp),
                                                 contentAlignment = Alignment.Center,
                                             ) {
                                                 Text(
-                                                    "💾 Guardar",
+                                                    if (isSavingGauge) "Guardando..." else "💾 Guardar",
                                                     color = Color.Black,
                                                     fontWeight = FontWeight.Black,
                                                     fontSize = 13.sp,
@@ -1755,15 +1964,11 @@ fun GaugeCustomizerDialog(
                         // ── My Gauges Dialog ──
                         if (showMyGaugesDialog) {
                             var savedGauges by remember {
-                                mutableStateOf<
-                                    List<com.elysium369.meet.data.local.entities.SavedGaugeEntity>
-                                >(
-                                    emptyList()
-                                )
+                                mutableStateOf<List<SavedGaugeEntity>>(emptyList())
                             }
 
-                            LaunchedEffect(Unit) {
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            suspend fun loadSavedGaugeRows(): List<SavedGaugeEntity> {
+                                return withContext(Dispatchers.IO) {
                                     val db =
                                         androidx.room.Room.databaseBuilder(
                                                 context,
@@ -1772,9 +1977,34 @@ fun GaugeCustomizerDialog(
                                                 "meet_database",
                                             )
                                             .build()
-                                    savedGauges = db.savedGaugeDao().getAll()
-                                    db.close()
+                                    try {
+                                        db.savedGaugeDao().getAll()
+                                    } finally {
+                                        db.close()
+                                    }
                                 }
+                            }
+
+                            suspend fun deleteSavedGaugeRow(gauge: SavedGaugeEntity) {
+                                withContext(Dispatchers.IO) {
+                                    val db =
+                                        androidx.room.Room.databaseBuilder(
+                                                context,
+                                                com.elysium369.meet.data.local.MeetDatabase::class
+                                                    .java,
+                                                "meet_database",
+                                            )
+                                            .build()
+                                    try {
+                                        db.savedGaugeDao().delete(gauge)
+                                    } finally {
+                                        db.close()
+                                    }
+                                }
+                            }
+
+                            LaunchedEffect(Unit) {
+                                savedGauges = loadSavedGaugeRows()
                             }
 
                             androidx.compose.ui.window.Dialog(
@@ -1856,7 +2086,7 @@ fun GaugeCustomizerDialog(
                                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                             ) {
                                                 savedGauges.forEach { gauge ->
-                                                    Row(
+                                                    Column(
                                                         modifier =
                                                             Modifier.fillMaxWidth()
                                                                 .clip(RoundedCornerShape(12.dp))
@@ -1866,65 +2096,154 @@ fun GaugeCustomizerDialog(
                                                                     accentColor.copy(alpha = 0.15f),
                                                                     RoundedCornerShape(12.dp),
                                                                 )
-                                                                .clickable {
+                                                                .padding(12.dp),
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            verticalAlignment =
+                                                                Alignment.CenterVertically,
+                                                            horizontalArrangement =
+                                                                Arrangement.SpaceBetween,
+                                                        ) {
+                                                            Column(modifier = Modifier.weight(1f)) {
+                                                                Text(
+                                                                    gauge.name,
+                                                                    color = Color.White,
+                                                                    fontSize = 14.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis,
+                                                                )
+                                                                Text(
+                                                                    "Creado ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(gauge.createdAt))}",
+                                                                    color =
+                                                                        Color.White.copy(
+                                                                            alpha = 0.3f
+                                                                        ),
+                                                                    fontSize = 10.sp,
+                                                                )
+                                                            }
+
+                                                            if (gauge.isPublished) {
+                                                                Text(
+                                                                    "🌐",
+                                                                    fontSize = 14.sp,
+                                                                    modifier =
+                                                                        Modifier.padding(
+                                                                            start = 8.dp
+                                                                        ),
+                                                                )
+                                                            }
+                                                        }
+
+                                                        Spacer(Modifier.height(10.dp))
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement =
+                                                                Arrangement.spacedBy(8.dp),
+                                                        ) {
+                                                            GaugeMiniActionButton(
+                                                                text = "EDITAR",
+                                                                color = accentColor,
+                                                                modifier = Modifier.weight(1f),
+                                                                onClick = {
                                                                     gaugeStyleManager
-                                                                        .importFromSavedEntity(
-                                                                            gauge
-                                                                        )
+                                                                        .importFromSavedEntity(gauge)
+                                                                    editingGaugeId = gauge.id
+                                                                    editingGaugeCreatedAt =
+                                                                        gauge.createdAt
+                                                                    editingGaugePublished =
+                                                                        gauge.isPublished
+                                                                    editingGaugeMarketplaceId =
+                                                                        gauge.marketplaceId
+                                                                    editingGaugeThumbnailPath =
+                                                                        gauge.thumbnailPath
+                                                                    saveGaugeName = gauge.name
                                                                     showMyGaugesDialog = false
                                                                     saveFeedback =
-                                                                        "✅ Gauge \"${gauge.name}\" cargado"
-                                                                }
-                                                                .padding(12.dp),
-                                                        verticalAlignment =
-                                                            Alignment.CenterVertically,
-                                                        horizontalArrangement =
-                                                            Arrangement.SpaceBetween,
-                                                    ) {
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text(
-                                                                gauge.name,
-                                                                color = Color.White,
-                                                                fontSize = 14.sp,
-                                                                fontWeight = FontWeight.Bold,
+                                                                        "✅ Editando \"${gauge.name}\""
+                                                                },
                                                             )
-                                                            Text(
-                                                                "Creado ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(gauge.createdAt))}",
-                                                                color =
-                                                                    Color.White.copy(alpha = 0.3f),
-                                                                fontSize = 10.sp,
+                                                            GaugeMiniActionButton(
+                                                                text = "VENDER",
+                                                                color = Color(0xFFB388FF),
+                                                                modifier = Modifier.weight(1f),
+                                                                onClick = {
+                                                                    if (navController != null) {
+                                                                        gaugeStyleManager
+                                                                            .importFromSavedEntity(
+                                                                                gauge
+                                                                            )
+                                                                        showMyGaugesDialog = false
+                                                                        navController.navigate(
+                                                                            "gauge_marketplace?publishGaugeId=${gauge.id}"
+                                                                        )
+                                                                        onDismiss()
+                                                                    } else {
+                                                                        saveFeedback =
+                                                                            "🌐 Marketplace no disponible"
+                                                                    }
+                                                                },
                                                             )
-                                                        }
-
-                                                        if (gauge.isPublished) {
-                                                            Text(
-                                                                "🌐",
-                                                                fontSize = 14.sp,
-                                                                modifier =
-                                                                    Modifier.padding(end = 8.dp),
-                                                            )
-                                                        }
-
-                                                        Box(
-                                                            modifier =
-                                                                Modifier.clip(
-                                                                        RoundedCornerShape(8.dp)
-                                                                    )
-                                                                    .background(
-                                                                        accentColor.copy(
-                                                                            alpha = 0.15f
+                                                            GaugeMiniActionButton(
+                                                                text = "BORRAR",
+                                                                color = Color(0xFFFF5252),
+                                                                modifier = Modifier.weight(1f),
+                                                                enabled =
+                                                                    !deletingGaugeIds.contains(
+                                                                        gauge.id
+                                                                    ),
+                                                                onClick = {
+                                                                    if (
+                                                                        deletingGaugeIds.contains(
+                                                                            gauge.id
                                                                         )
                                                                     )
-                                                                    .padding(
-                                                                        horizontal = 10.dp,
-                                                                        vertical = 6.dp,
-                                                                    )
-                                                        ) {
+                                                                        return@GaugeMiniActionButton
+                                                                    deletingGaugeIds =
+                                                                        deletingGaugeIds + gauge.id
+                                                                    scope.launch {
+                                                                        runCatching {
+                                                                            deleteSavedGaugeRow(gauge)
+                                                                            savedGauges =
+                                                                                loadSavedGaugeRows()
+                                                                            if (editingGaugeId ==
+                                                                                gauge.id
+                                                                            ) {
+                                                                                editingGaugeId =
+                                                                                    null
+                                                                                editingGaugeCreatedAt =
+                                                                                    null
+                                                                                editingGaugePublished =
+                                                                                    false
+                                                                                editingGaugeMarketplaceId =
+                                                                                    null
+                                                                                editingGaugeThumbnailPath =
+                                                                                    null
+                                                                            }
+                                                                            saveFeedback =
+                                                                                "🗑 Gauge \"${gauge.name}\" borrado"
+                                                                        }.onFailure { error ->
+                                                                            saveFeedback =
+                                                                                "❌ No se pudo borrar: ${error.message.orEmpty()}"
+                                                                        }
+                                                                        deletingGaugeIds =
+                                                                            deletingGaugeIds -
+                                                                                gauge.id
+                                                                    }
+                                                                },
+                                                            )
+                                                        }
+                                                        if (gauge.marketplaceId != null) {
+                                                            Spacer(Modifier.height(6.dp))
                                                             Text(
-                                                                "CARGAR",
-                                                                color = accentColor,
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Black,
+                                                                "Market ID ${gauge.marketplaceId.take(8)}",
+                                                                color =
+                                                                    Color.White.copy(alpha = 0.28f),
+                                                                fontSize = 9.sp,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
                                                             )
                                                         }
                                                     }
@@ -2013,6 +2332,309 @@ fun GaugeCustomizerDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GaugeMiniActionButton(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            modifier
+                .height(34.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(color.copy(alpha = if (enabled) 0.13f else 0.05f))
+                .border(1.dp, color.copy(alpha = if (enabled) 0.36f else 0.12f), RoundedCornerShape(9.dp))
+                .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = color.copy(alpha = if (enabled) 1f else 0.42f),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun GaugeQrImportDialog(
+    import: GaugeQrImport,
+    accentColor: Color,
+    isActionInProgress: Boolean,
+    onDismiss: () -> Unit,
+    onApplyToEditor: () -> Unit,
+    onSaveCopy: () -> Unit,
+) {
+    val context = LocalContext.current
+    var duplicateGaugeName by remember(import.fingerprint) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(import.fingerprint) {
+        duplicateGaugeName = findDuplicateGaugeName(context, import.fingerprint)
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1117)),
+            shape = RoundedCornerShape(22.dp),
+            modifier =
+                Modifier.fillMaxWidth(0.92f)
+                    .border(1.dp, accentColor.copy(alpha = 0.34f), RoundedCornerShape(22.dp)),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "Importar gauge QR",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    import.displayName,
+                    color = accentColor,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Gauge3DWrapper(
+                    glowColor = accentColor,
+                    style = GaugeStyleSet.CUSTOM_DIY,
+                    modifier = Modifier.size(170.dp),
+                ) {
+                    GaugeDiyWidget(
+                        label = import.config.name.ifBlank { "QR" },
+                        value = 65f,
+                        minVal = 0f,
+                        maxVal = 100f,
+                        unit = "%",
+                        warningThreshold = 70f,
+                        criticalThreshold = 90f,
+                        diyConfig =
+                            import.config.toQrSavedGaugeEntity(
+                                id = "qr-preview",
+                                nameOverride = import.config.name,
+                            ),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                QrBusinessNote(
+                    text = "Huella ${import.fingerprint.take(12)} · ${if (import.importedFromLegacyFormat) "Legacy" else "MEET v1"}",
+                    color = Color(0xFF00B0FF),
+                )
+                duplicateGaugeName?.let { name ->
+                    Spacer(Modifier.height(6.dp))
+                    QrBusinessNote(
+                        text = "Ya tienes un gauge igual: $name. Puedes guardarlo como copia nueva si quieres.",
+                        color = Color(0xFFFFD54F),
+                    )
+                }
+                if (import.sourceMarketplaceId != null || import.sourcePublished) {
+                    Spacer(Modifier.height(6.dp))
+                    QrBusinessNote(
+                        text = "Origen marketplace detectado; al guardarlo será una copia local privada hasta que la publiques.",
+                        color = Color(0xFFB388FF),
+                    )
+                }
+                import.warnings.forEach { warning ->
+                    Spacer(Modifier.height(6.dp))
+                    QrBusinessNote(text = warning, color = Color(0xFFFFD54F))
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GaugeMiniActionButton(
+                        text = "CANCELAR",
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f),
+                        enabled = !isActionInProgress,
+                        onClick = onDismiss,
+                    )
+                    GaugeMiniActionButton(
+                        text = if (isActionInProgress) "..." else "APLICAR",
+                        color = accentColor,
+                        modifier = Modifier.weight(1f),
+                        enabled = !isActionInProgress,
+                        onClick = onApplyToEditor,
+                    )
+                    GaugeMiniActionButton(
+                        text = if (isActionInProgress) "..." else "GUARDAR",
+                        color = Color(0xFF00E676),
+                        modifier = Modifier.weight(1f),
+                        enabled = !isActionInProgress,
+                        onClick = onSaveCopy,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrBusinessNote(
+    text: String,
+    color: Color,
+) {
+    Box(
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(color.copy(alpha = 0.11f))
+                .border(0.5.dp, color.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+private fun GaugeConfig.toQrSavedGaugeEntity(
+    id: String,
+    nameOverride: String? = null,
+): SavedGaugeEntity {
+    val now = System.currentTimeMillis()
+    val resolvedName = nameOverride?.trim()?.takeIf { it.isNotBlank() }
+        ?: name.trim().ifBlank { "Gauge QR" }
+    return SavedGaugeEntity(
+        id = id,
+        name = resolvedName,
+        bgType = bgType,
+        bgPresetIndex = bgPresetIndex,
+        bgImageUri = "",
+        bezelStyle = bezelStyle,
+        needleStyle = needleStyle,
+        ticksStyle = ticksStyle,
+        accentColor = accentColor,
+        accentColor2 = accentColor2,
+        glowIntensity = glowIntensity,
+        imageOpacity = imageOpacity,
+        animationIndex = animationIndex,
+        createdAt = now,
+        updatedAt = now,
+        isPublished = false,
+        marketplaceId = null,
+        thumbnailPath = null,
+        typographyIndex = typographyIndex,
+    )
+}
+
+private fun SavedGaugeEntity.toQrGaugeConfig(): GaugeConfig {
+    return GaugeConfig(
+        name = name,
+        bgType = bgType,
+        bgPresetIndex = bgPresetIndex,
+        bezelStyle = bezelStyle,
+        needleStyle = needleStyle,
+        ticksStyle = ticksStyle,
+        accentColor = accentColor,
+        accentColor2 = accentColor2,
+        glowIntensity = glowIntensity,
+        imageOpacity = imageOpacity,
+        animationIndex = animationIndex,
+        typographyIndex = typographyIndex,
+    )
+}
+
+private suspend fun saveImportedGauge(
+    context: android.content.Context,
+    entity: SavedGaugeEntity,
+) {
+    withContext(Dispatchers.IO) {
+        val db =
+            androidx.room.Room.databaseBuilder(
+                context.applicationContext,
+                MeetDatabase::class.java,
+                "meet_database",
+            ).build()
+        try {
+            db.savedGaugeDao().insert(entity)
+        } finally {
+            db.close()
+        }
+    }
+}
+
+private suspend fun uniqueQrGaugeName(
+    context: android.content.Context,
+    preferredName: String,
+): String {
+    return withContext(Dispatchers.IO) {
+        val db =
+            androidx.room.Room.databaseBuilder(
+                context.applicationContext,
+                MeetDatabase::class.java,
+                "meet_database",
+            ).build()
+        try {
+            val existingNames = db.savedGaugeDao().getAll().map { it.name }.toSet()
+            val base = preferredName.trim().ifBlank { "Gauge QR" }.take(42)
+            if (base !in existingNames) {
+                base
+            } else {
+                var index = 2
+                var candidate = "$base QR $index"
+                while (candidate in existingNames) {
+                    index += 1
+                    candidate = "$base QR $index"
+                }
+                candidate
+            }
+        } finally {
+            db.close()
+        }
+    }
+}
+
+private suspend fun findDuplicateGaugeName(
+    context: android.content.Context,
+    fingerprint: String,
+): String? {
+    return withContext(Dispatchers.IO) {
+        val db =
+            androidx.room.Room.databaseBuilder(
+                context.applicationContext,
+                MeetDatabase::class.java,
+                "meet_database",
+            ).build()
+        try {
+            db.savedGaugeDao()
+                .getAll()
+                .firstOrNull { saved ->
+                    QrCodeSharing.fingerprintFor(saved.toQrGaugeConfig()) == fingerprint
+                }
+                ?.name
+        } finally {
+            db.close()
         }
     }
 }
