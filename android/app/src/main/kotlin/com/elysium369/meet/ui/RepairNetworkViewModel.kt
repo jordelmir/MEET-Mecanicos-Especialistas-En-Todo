@@ -9,15 +9,25 @@ import com.elysium369.meet.data.supabase.RepairComment
 import com.elysium369.meet.data.supabase.RepairCaseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class RepairNetworkViewModel @Inject constructor(
+class RepairNetworkViewModel(
     private val repository: RepairCaseRepository,
-    private val mechanicalKnowledgeRepository: MechanicalKnowledgeRepository
+    private val mechanicalKnowledgeRepository: MechanicalKnowledgeRepository,
+    private val customScope: CoroutineScope?
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        repository: RepairCaseRepository,
+        mechanicalKnowledgeRepository: MechanicalKnowledgeRepository
+    ) : this(repository, mechanicalKnowledgeRepository, null)
+
+    private val scope: CoroutineScope
+        get() = customScope ?: viewModelScope
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
@@ -53,10 +63,10 @@ class RepairNetworkViewModel @Inject constructor(
     val knowledgeBundle = _knowledgeBundle.asStateFlow()
 
     val savedCases: StateFlow<List<RepairCase>> = repository.getSavedCases()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(scope, SharingStarted.Lazily, emptyList())
 
     val myContributions: StateFlow<List<RepairCase>> = repository.getMyContributions()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(scope, SharingStarted.Lazily, emptyList())
 
     private val _activeCaseDetails = MutableStateFlow<RepairCase?>(null)
     val activeCaseDetails = _activeCaseDetails.asStateFlow()
@@ -67,11 +77,11 @@ class RepairNetworkViewModel @Inject constructor(
     private val _isBookmarkedState = MutableStateFlow(false)
     val isBookmarkedState = _isBookmarkedState.asStateFlow()
 
-    private var searchJob: kotlinx.coroutines.Job? = null
+    private var searchJob: Job? = null
 
     init {
         // Automatically search when filters or search query change, debouncing text input to prevent race conditions
-        @OptIn(kotlinx.coroutines.FlowPreview::class)
+        @OptIn(FlowPreview::class)
         combine(
             _searchQuery.debounce(300L), _makeFilter, _modelFilter, _yearFilter,
             _countryFilter, _dtcFilter, _sortByFilter, _onlyVerifiedFilter
@@ -87,7 +97,7 @@ class RepairNetworkViewModel @Inject constructor(
             val sort = array[6] as String
             val verified = array[7] as Boolean
             triggerSearch(search, make, model, year, country, dtc, sort, verified)
-        }.launchIn(viewModelScope)
+        }.launchIn(scope)
     }
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
@@ -122,7 +132,7 @@ class RepairNetworkViewModel @Inject constructor(
         country: String, dtc: String, sort: String, verified: Boolean
     ) {
         searchJob?.cancel() // Cancel previous search execution to prevent race conditions
-        searchJob = viewModelScope.launch {
+        searchJob = scope.launch {
             _isLoading.value = true
             val results = repository.searchCases(query, make, model, year, country, dtc, sort, verified)
             _casesList.value = results
@@ -140,7 +150,7 @@ class RepairNetworkViewModel @Inject constructor(
     }
 
     fun selectCase(caseId: String) {
-        viewModelScope.launch {
+        scope.launch {
             _isLoading.value = true
             val details = repository.getCaseById(caseId)
             _activeCaseDetails.value = details
@@ -154,14 +164,14 @@ class RepairNetworkViewModel @Inject constructor(
     }
 
     fun toggleBookmark(repairCase: RepairCase) {
-        viewModelScope.launch {
+        scope.launch {
             repository.toggleBookmark(repairCase)
             _isBookmarkedState.value = repository.isBookmarked(repairCase.id)
         }
     }
 
     fun upvoteCase(caseId: String) {
-        viewModelScope.launch {
+        scope.launch {
             if (repository.upvoteCase(caseId)) {
                 // Refresh active case details
                 _activeCaseDetails.value?.let { current ->
@@ -173,7 +183,7 @@ class RepairNetworkViewModel @Inject constructor(
     }
 
     fun downvoteCase(caseId: String) {
-        viewModelScope.launch {
+        scope.launch {
             if (repository.downvoteCase(caseId)) {
                 // Refresh active case details
                 _activeCaseDetails.value?.let { current ->
@@ -185,7 +195,7 @@ class RepairNetworkViewModel @Inject constructor(
     }
 
     fun submitComment(caseId: String, authorName: String, reputation: String, body: String) {
-        viewModelScope.launch {
+        scope.launch {
             if (body.isBlank()) return@launch
             val comment = RepairComment(
                 id = java.util.UUID.randomUUID().toString(),
@@ -208,7 +218,7 @@ class RepairNetworkViewModel @Inject constructor(
         dtc: String, symptoms: String, solution: String, cost: Double,
         timeSpent: Int, partsUsed: String, onSuccess: () -> Unit
     ) {
-        viewModelScope.launch {
+        scope.launch {
             _isLoading.value = true
             val newCase = RepairCase(
                 id = java.util.UUID.randomUUID().toString(),
