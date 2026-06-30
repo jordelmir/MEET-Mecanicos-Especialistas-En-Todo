@@ -10,12 +10,25 @@ import org.junit.Test
 
 class AlertManagerTest {
 
-    // Simple AudioManager fake to bypass non-null cast in VoiceFeedbackManager init block
-    private class FakeAudioManager(context: Context) : android.media.AudioManager(context)
-
-    // Context Wrapper Fake supplying minimal services to avoid NPE
+    // Context Wrapper Fake supplying minimal services to avoid NPE using Java reflection to bypass package-private AudioManager constructor
     private class FakeContext : ContextWrapper(null) {
-        private val fakeAudioManager by lazy { FakeAudioManager(this) }
+        private val fakeAudioManager by lazy {
+            try {
+                // Try obtaining the empty constructor reflexively
+                val constructor = android.media.AudioManager::class.java.getDeclaredConstructor()
+                constructor.isAccessible = true
+                constructor.newInstance()
+            } catch (e: Exception) {
+                try {
+                    // Fallback to the context-based constructor reflexively
+                    val constructor = android.media.AudioManager::class.java.getDeclaredConstructor(Context::class.java)
+                    constructor.isAccessible = true
+                    constructor.newInstance(this)
+                } catch (ex: Exception) {
+                    null
+                }
+            }
+        }
         
         override fun getSystemService(name: String): Any? {
             if (name == Context.AUDIO_SERVICE) return fakeAudioManager
@@ -46,7 +59,7 @@ class AlertManagerTest {
         override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
     }
 
-    // Now works perfectly because parent class is open
+    // Now works perfectly because parent class is open and AudioManager is reflexively provided
     private class FakeVoiceFeedbackManager(context: Context) : VoiceFeedbackManager(context) {
         var speakCount = 0
         override fun speak(es: String, en: String, queueMode: Int) {
