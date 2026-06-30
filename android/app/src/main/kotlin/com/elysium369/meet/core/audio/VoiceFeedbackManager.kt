@@ -23,7 +23,7 @@ import javax.inject.Singleton
  * Implements Audio Focus Ducking to avoid pausing background media like YouTube/Spotify.
  */
 @Singleton
-class VoiceFeedbackManager @Inject constructor(
+open class VoiceFeedbackManager @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) : TextToSpeech.OnInitListener {
 
@@ -99,7 +99,7 @@ class VoiceFeedbackManager @Inject constructor(
         }
     }
 
-    fun speak(es: String, en: String = es, queueMode: Int = TextToSpeech.QUEUE_FLUSH) {
+    open fun speak(es: String, en: String = es, queueMode: Int = TextToSpeech.QUEUE_FLUSH) {
         val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
         val isVoiceEnabled = prefs.getBoolean("voice_feedback_enabled", true)
         Log.d("VoiceFeedback", "speak() request. Enabled=$isVoiceEnabled. ES=\"$es\" EN=\"$en\"")
