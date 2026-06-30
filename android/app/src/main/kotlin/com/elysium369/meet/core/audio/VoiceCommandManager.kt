@@ -101,6 +101,25 @@ class VoiceCommandManager @Inject constructor(
         _isListeningState.value = false
         mainHandler.post {
             cancelListeningInternal()
+            destroyRecognizer()
+        }
+    }
+
+    private fun destroyRecognizer() {
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("VoiceCommand", "Error destroying SpeechRecognizer", e)
+        }
+        speechRecognizer = null
+        isRecognizerActive = false
+    }
+
+    fun destroy() {
+        scope.cancel() // Cancel Hilt coroutine scope
+        mainHandler.removeCallbacksAndMessages(null)
+        mainHandler.post {
+            destroyRecognizer()
         }
     }
 
