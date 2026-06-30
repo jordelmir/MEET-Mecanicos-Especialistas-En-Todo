@@ -3,6 +3,7 @@ package com.elysium369.meet.core.audio
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -50,7 +51,8 @@ class VoiceCommandManagerTest {
     fun testProcessSpokenTextWithWakeWordSpanish() {
         val fakeContext = FakeContext("es")
         val fakeVoice = FakeVoiceFeedbackManager(fakeContext)
-        val manager = VoiceCommandManager(fakeContext, fakeVoice)
+        // Pass Dispatchers.Unconfined to prevent main Looper dependency issues in JUnit
+        val manager = VoiceCommandManager(fakeContext, fakeVoice, Dispatchers.Unconfined)
 
         var recognizedCommand: VoiceCommand? = null
         manager.onCommandRecognized = { command ->
@@ -71,7 +73,8 @@ class VoiceCommandManagerTest {
     fun testProcessSpokenTextWithWakeWordEnglish() {
         val fakeContext = FakeContext("en")
         val fakeVoice = FakeVoiceFeedbackManager(fakeContext)
-        val manager = VoiceCommandManager(fakeContext, fakeVoice)
+        // Pass Dispatchers.Unconfined to prevent main Looper dependency issues in JUnit
+        val manager = VoiceCommandManager(fakeContext, fakeVoice, Dispatchers.Unconfined)
 
         var recognizedCommand: VoiceCommand? = null
         manager.onCommandRecognized = { command ->

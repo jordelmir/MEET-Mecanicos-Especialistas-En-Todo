@@ -45,7 +45,8 @@ enum class VoiceCommand {
 @Singleton
 class VoiceCommandManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val voiceFeedbackManager: VoiceFeedbackManager
+    private val voiceFeedbackManager: VoiceFeedbackManager,
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : RecognitionListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -60,7 +61,7 @@ class VoiceCommandManager @Inject constructor(
     private val CONVERSATION_WINDOW_MS = 10000L
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
 
     var onCommandRecognized: ((VoiceCommand) -> Unit)? = null
 
