@@ -5,6 +5,9 @@ import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -26,13 +29,16 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.elysium369.meet.core.billing.GaugeBillingManager
@@ -50,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 
 // ═══════════════════════════════════════════════════════
 // GAUGE MARKETPLACE SCREEN
@@ -601,7 +608,7 @@ private fun GaugePublishDialog(
     var name by remember(sourceGauge?.id, draftConfig.name) {
         mutableStateOf(sourceGauge?.name ?: draftConfig.name.ifBlank { "Gauge MEET" })
     }
-    var description by remember(sourceGauge?.id) { mutableStateOf(if (sourceGauge != null) "Diseño de gauge personalizado creado con MEET DIY Editor." else "") }
+    var description by remember(sourceGauge?.id) { mutableStateOf("Diseño de gauge personalizado creado con MEET DIY Editor.") }
     var priceTier by remember(sourceGauge?.id) { mutableIntStateOf(1) }
     var category by remember(sourceGauge?.id) { mutableStateOf(if (sourceGauge != null) "custom" else "performance") }
     var tags by remember(sourceGauge?.id) { mutableStateOf("") }
@@ -799,6 +806,21 @@ private fun GaugePublishDialog(
                         color = Color.White.copy(alpha = 0.72f),
                         fontSize = 12.sp,
                         modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (!canPublish) {
+                    val missingRequirements = mutableListOf<String>()
+                    if (!isNameValid) missingRequirements.add("Nombre de al menos 3 caracteres")
+                    if (!isDescriptionValid) missingRequirements.add("Descripción de al menos 3 caracteres")
+                    if (!acceptedTerms) missingRequirements.add("Aceptar las condiciones de venta")
+                    
+                    Text(
+                        text = "Falta: " + missingRequirements.joinToString(" · "),
+                        color = Color(0xFFFF5252),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
             }

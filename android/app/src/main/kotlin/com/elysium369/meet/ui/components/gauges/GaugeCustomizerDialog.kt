@@ -468,6 +468,253 @@ fun GaugeCustomizerDialog(
                             accentColor = accentColor,
                         )
 
+                        // ══════════════════════════════════════
+                        // 💾 SAVE / SHARE / MARKET BUTTONS
+                        // ══════════════════════════════════════
+                        DiySectionHeader(icon = "🚀", title = "ACCIONES")
+                        DiySectionHint(
+                            text =
+                                "Cuando el preview comunique métrica, estilo y contraste, guárdalo o compártelo por QR.",
+                            accentColor = accentColor,
+                        )
+
+                        var showSaveDialog by remember { mutableStateOf(false) }
+                        var showMyGaugesDialog by remember { mutableStateOf(false) }
+                        var saveGaugeName by remember {
+                            mutableStateOf(diyGaugeName.ifEmpty { "Mi Gauge" })
+                        }
+                        var editingGaugeId by remember { mutableStateOf<String?>(null) }
+                        var editingGaugeCreatedAt by remember { mutableStateOf<Long?>(null) }
+                        var editingGaugePublished by remember { mutableStateOf(false) }
+                        var editingGaugeMarketplaceId by remember { mutableStateOf<String?>(null) }
+                        var editingGaugeThumbnailPath by remember { mutableStateOf<String?>(null) }
+                        var saveFeedback by remember { mutableStateOf<String?>(null) }
+                        var showQrCodeDialog by remember { mutableStateOf(false) }
+                        var showQrScannerDialog by remember { mutableStateOf(false) }
+                        var pendingQrImport by remember { mutableStateOf<GaugeQrImport?>(null) }
+                        var qrImportActionInProgress by remember { mutableStateOf(false) }
+                        var qrText by remember { mutableStateOf("") }
+                        var qrShareTitle by remember { mutableStateOf("MEET Gauge") }
+                        var qrExportWarnings by remember { mutableStateOf<List<String>>(emptyList()) }
+                        var isSavingGauge by remember { mutableStateOf(false) }
+                        var deletingGaugeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            gaugeStyleManager.resetDiyDraft()
+                                            editingGaugeId = null
+                                            editingGaugeCreatedAt = null
+                                            editingGaugePublished = false
+                                            editingGaugeMarketplaceId = null
+                                            editingGaugeThumbnailPath = null
+                                            saveGaugeName = "Mi Gauge"
+                                            showSaveDialog = false
+                                            showQrCodeDialog = false
+                                            showQrScannerDialog = false
+                                            pendingQrImport = null
+                                            qrImportActionInProgress = false
+                                            saveFeedback = "✅ Nuevo gauge listo"
+                                        }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "➕ NUEVO",
+                                    color = Color(0xFF00B0FF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
+                            // 💾 SAVE
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        Color(0xFF00E676).copy(alpha = 0.12f),
+                                                        Color(0xFF00C853).copy(alpha = 0.08f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00E676).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showSaveDialog = true }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "💾 GUARDAR",
+                                    color = Color(0xFF00E676),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
+                            // 📂 MY GAUGES
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        accentColor.copy(alpha = 0.12f),
+                                                        accentColor.copy(alpha = 0.06f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            accentColor.copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showMyGaugesDialog = true }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📂 MIS",
+                                    color = accentColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
+                            // 🌐 MARKET
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors =
+                                                    listOf(
+                                                        Color(0xFF7C4DFF).copy(alpha = 0.12f),
+                                                        Color(0xFFB388FF).copy(alpha = 0.06f),
+                                                    )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF7C4DFF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            if (navController != null) {
+                                                navController.navigate("gauge_marketplace?publishGaugeId=draft")
+                                                onDismiss()
+                                            } else {
+                                                saveFeedback = "🌐 Marketplace no disponible"
+                                            }
+                                        }
+                                        .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "🌐 MARKET",
+                                    color = Color(0xFF7C4DFF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // 📤 COMPARTIR QR
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable {
+                                            try {
+                                                val config = gaugeStyleManager.exportDiyConfig()
+                                                val export =
+                                                    QrCodeSharing.createGaugeQrExport(
+                                                        config = config,
+                                                        sourceGaugeId = editingGaugeId,
+                                                        sourceMarketplaceId = editingGaugeMarketplaceId,
+                                                        sourcePublished = editingGaugePublished,
+                                                    )
+                                                qrText = export.qrText
+                                                qrShareTitle = export.envelope.displayName
+                                                qrExportWarnings = export.warnings
+                                                showQrCodeDialog = true
+                                            } catch (e: Exception) {
+                                                saveFeedback = "❌ Error al generar QR"
+                                            }
+                                        }
+                                        .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📤 COMPARTIR QR",
+                                    color = Color(0xFF00B0FF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+
+                            // 📥 ESCANEAR QR
+                            Box(
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFFCCFF00).copy(alpha = 0.12f))
+                                        .border(
+                                            1.dp,
+                                            Color(0xFFCCFF00).copy(alpha = 0.4f),
+                                            RoundedCornerShape(14.dp),
+                                        )
+                                        .clickable { showQrScannerDialog = true }
+                                        .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "📥 ESCANEAR QR",
+                                    color = Color(0xFFCCFF00),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+                        }
                         DiySectionHeader(icon = "🚀", title = "PLANTILLAS RÁPIDAS (1-CLICK)")
                         DiySectionHint(
                             text =
@@ -1331,253 +1578,6 @@ fun GaugeCustomizerDialog(
                             )
                         }
 
-                        // ══════════════════════════════════════
-                        // 💾 SAVE / SHARE / MARKET BUTTONS
-                        // ══════════════════════════════════════
-                        DiySectionHeader(icon = "🚀", title = "ACCIONES")
-                        DiySectionHint(
-                            text =
-                                "Cuando el preview comunique métrica, estilo y contraste, guárdalo o compártelo por QR.",
-                            accentColor = accentColor,
-                        )
-
-                        var showSaveDialog by remember { mutableStateOf(false) }
-                        var showMyGaugesDialog by remember { mutableStateOf(false) }
-                        var saveGaugeName by remember {
-                            mutableStateOf(diyGaugeName.ifEmpty { "Mi Gauge" })
-                        }
-                        var editingGaugeId by remember { mutableStateOf<String?>(null) }
-                        var editingGaugeCreatedAt by remember { mutableStateOf<Long?>(null) }
-                        var editingGaugePublished by remember { mutableStateOf(false) }
-                        var editingGaugeMarketplaceId by remember { mutableStateOf<String?>(null) }
-                        var editingGaugeThumbnailPath by remember { mutableStateOf<String?>(null) }
-                        var saveFeedback by remember { mutableStateOf<String?>(null) }
-                        var showQrCodeDialog by remember { mutableStateOf(false) }
-                        var showQrScannerDialog by remember { mutableStateOf(false) }
-                        var pendingQrImport by remember { mutableStateOf<GaugeQrImport?>(null) }
-                        var qrImportActionInProgress by remember { mutableStateOf(false) }
-                        var qrText by remember { mutableStateOf("") }
-                        var qrShareTitle by remember { mutableStateOf("MEET Gauge") }
-                        var qrExportWarnings by remember { mutableStateOf<List<String>>(emptyList()) }
-                        var isSavingGauge by remember { mutableStateOf(false) }
-                        var deletingGaugeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
-                                        .border(
-                                            1.dp,
-                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable {
-                                            gaugeStyleManager.resetDiyDraft()
-                                            editingGaugeId = null
-                                            editingGaugeCreatedAt = null
-                                            editingGaugePublished = false
-                                            editingGaugeMarketplaceId = null
-                                            editingGaugeThumbnailPath = null
-                                            saveGaugeName = "Mi Gauge"
-                                            showSaveDialog = false
-                                            showQrCodeDialog = false
-                                            showQrScannerDialog = false
-                                            pendingQrImport = null
-                                            qrImportActionInProgress = false
-                                            saveFeedback = "✅ Nuevo gauge listo"
-                                        }
-                                        .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "➕ NUEVO",
-                                    color = Color(0xFF00B0FF),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-
-                            // 💾 SAVE
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors =
-                                                    listOf(
-                                                        Color(0xFF00E676).copy(alpha = 0.12f),
-                                                        Color(0xFF00C853).copy(alpha = 0.08f),
-                                                    )
-                                            )
-                                        )
-                                        .border(
-                                            1.dp,
-                                            Color(0xFF00E676).copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable { showSaveDialog = true }
-                                        .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "💾 GUARDAR",
-                                    color = Color(0xFF00E676),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-
-                            // 📂 MY GAUGES
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors =
-                                                    listOf(
-                                                        accentColor.copy(alpha = 0.12f),
-                                                        accentColor.copy(alpha = 0.06f),
-                                                    )
-                                            )
-                                        )
-                                        .border(
-                                            1.dp,
-                                            accentColor.copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable { showMyGaugesDialog = true }
-                                        .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "📂 MIS",
-                                    color = accentColor,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-
-                            // 🌐 MARKET
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors =
-                                                    listOf(
-                                                        Color(0xFF7C4DFF).copy(alpha = 0.12f),
-                                                        Color(0xFFB388FF).copy(alpha = 0.06f),
-                                                    )
-                                            )
-                                        )
-                                        .border(
-                                            1.dp,
-                                            Color(0xFF7C4DFF).copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable {
-                                            if (navController != null) {
-                                                navController.navigate("gauge_marketplace?publishGaugeId=draft")
-                                                onDismiss()
-                                            } else {
-                                                saveFeedback = "🌐 Marketplace no disponible"
-                                            }
-                                        }
-                                        .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "🌐 MARKET",
-                                    color = Color(0xFF7C4DFF),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            // 📤 COMPARTIR QR
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(Color(0xFF00B0FF).copy(alpha = 0.12f))
-                                        .border(
-                                            1.dp,
-                                            Color(0xFF00B0FF).copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable {
-                                            try {
-                                                val config = gaugeStyleManager.exportDiyConfig()
-                                                val export =
-                                                    QrCodeSharing.createGaugeQrExport(
-                                                        config = config,
-                                                        sourceGaugeId = editingGaugeId,
-                                                        sourceMarketplaceId = editingGaugeMarketplaceId,
-                                                        sourcePublished = editingGaugePublished,
-                                                    )
-                                                qrText = export.qrText
-                                                qrShareTitle = export.envelope.displayName
-                                                qrExportWarnings = export.warnings
-                                                showQrCodeDialog = true
-                                            } catch (e: Exception) {
-                                                saveFeedback = "❌ Error al generar QR"
-                                            }
-                                        }
-                                        .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "📤 COMPARTIR QR",
-                                    color = Color(0xFF00B0FF),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                )
-                            }
-
-                            // 📥 ESCANEAR QR
-                            Box(
-                                modifier =
-                                    Modifier.weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(Color(0xFFCCFF00).copy(alpha = 0.12f))
-                                        .border(
-                                            1.dp,
-                                            Color(0xFFCCFF00).copy(alpha = 0.4f),
-                                            RoundedCornerShape(14.dp),
-                                        )
-                                        .clickable { showQrScannerDialog = true }
-                                        .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "📥 ESCANEAR QR",
-                                    color = Color(0xFFCCFF00),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                )
-                            }
-                        }
 
                         if (showQrCodeDialog && qrText.isNotEmpty()) {
                             androidx.compose.ui.window.Dialog(

@@ -232,6 +232,11 @@ class GaugeMarketplaceRepository @Inject constructor(
                 Log.w(TAG, "Thumbnail upload failed: ${e.message}")
             }
         }
+        
+        // Fallback: If no thumbnail bytes were provided but we have an uploaded custom background image, use it as thumbnail
+        if (thumbnailUrl.isNullOrEmpty() && finalConfig.bgImageUri.startsWith("http")) {
+            thumbnailUrl = finalConfig.bgImageUri
+        }
 
         val configJsonStr = json.encodeToString(finalConfig)
 

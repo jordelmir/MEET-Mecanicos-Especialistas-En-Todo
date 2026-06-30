@@ -157,6 +157,7 @@ class GaugeMarketplaceViewModel @Inject constructor(
         tags: String,
         publishedFromSavedGaugeId: String?,
         sellerTermsAccepted: Boolean,
+        thumbnailBytes: ByteArray? = null,
         onResult: (Result<String>) -> Unit
     ) {
         if (_uiState.value.isPublishing) {
@@ -178,7 +179,7 @@ class GaugeMarketplaceViewModel @Inject constructor(
                 name = name,
                 description = description,
                 priceTier = priceTier,
-                thumbnailBytes = null,
+                thumbnailBytes = thumbnailBytes,
                 saleCategory = saleCategory,
                 tags = tags,
                 publishedFromSavedGaugeId = publishedFromSavedGaugeId,

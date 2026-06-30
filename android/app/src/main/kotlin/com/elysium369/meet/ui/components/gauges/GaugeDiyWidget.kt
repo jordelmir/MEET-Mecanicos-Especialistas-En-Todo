@@ -85,52 +85,70 @@ fun GaugeDiyWidget(
         label = "diyGauge"
     )
 
-    // Load custom user image from URI if selected
-    val userBitmap = remember(diyBgUri, diyBgType) {
-        if (diyBgType == 2 && diyBgUri.isNotEmpty() && !diyBgUri.endsWith(".gif", true) && !diyBgUri.contains("gif", true)) {
-            try {
-                if (diyBgUri.startsWith("/")) {
-                    val bitmap = android.graphics.BitmapFactory.decodeFile(diyBgUri)
-                    bitmap?.asImageBitmap()
-                } else {
-                    val uri = android.net.Uri.parse(diyBgUri)
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                    inputStream?.close()
-                    bitmap?.asImageBitmap()
+    // Load custom user image/movie asynchronously with HTTP/HTTPS support
+    val userBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
+    val userMovieState = remember { mutableStateOf<android.graphics.Movie?>(null) }
+
+    LaunchedEffect(diyBgUri, diyBgType) {
+        if (diyBgType == 2 && diyBgUri.isNotEmpty()) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val isGif = diyBgUri.endsWith(".gif", true) || diyBgUri.contains("gif", true)
+                    if (isGif) {
+                        val bytes = if (diyBgUri.startsWith("http://") || diyBgUri.startsWith("https://")) {
+                            val url = java.net.URL(diyBgUri)
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.doInput = true
+                            connection.connect()
+                            val input = connection.inputStream
+                            val readBytes = input.readBytes()
+                            input.close()
+                            readBytes
+                        } else if (diyBgUri.startsWith("/")) {
+                            java.io.File(diyBgUri).readBytes()
+                        } else {
+                            val uri = android.net.Uri.parse(diyBgUri)
+                            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        }
+                        if (bytes != null) {
+                            userMovieState.value = android.graphics.Movie.decodeByteArray(bytes, 0, bytes.size)
+                        }
+                        userBitmapState.value = null
+                    } else {
+                        val bitmap = if (diyBgUri.startsWith("http://") || diyBgUri.startsWith("https://")) {
+                            val url = java.net.URL(diyBgUri)
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.doInput = true
+                            connection.connect()
+                            val input = connection.inputStream
+                            val decoded = android.graphics.BitmapFactory.decodeStream(input)
+                            input.close()
+                            decoded
+                        } else if (diyBgUri.startsWith("/")) {
+                            android.graphics.BitmapFactory.decodeFile(diyBgUri)
+                        } else {
+                            val uri = android.net.Uri.parse(diyBgUri)
+                            context.contentResolver.openInputStream(uri)?.use { 
+                                android.graphics.BitmapFactory.decodeStream(it)
+                            }
+                        }
+                        userBitmapState.value = bitmap?.asImageBitmap()
+                        userMovieState.value = null
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("GaugeDiyWidget", "Error loading background remote/local: ${e.message}")
+                    userBitmapState.value = null
+                    userMovieState.value = null
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("GaugeDiyWidget", "Error loading DIY background image: ${e.message}")
-                null
             }
         } else {
-            null
+            userBitmapState.value = null
+            userMovieState.value = null
         }
     }
 
-    val userMovie = remember(diyBgUri, diyBgType) {
-        if (diyBgType == 2 && diyBgUri.isNotEmpty() && (diyBgUri.endsWith(".gif", true) || diyBgUri.contains("gif", true))) {
-            try {
-                if (diyBgUri.startsWith("/")) {
-                    val file = java.io.File(diyBgUri)
-                    val bytes = file.readBytes()
-                    android.graphics.Movie.decodeByteArray(bytes, 0, bytes.size)
-                } else {
-                    val uri = android.net.Uri.parse(diyBgUri)
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bytes = inputStream?.readBytes()
-                    inputStream?.close()
-                    if (bytes != null) {
-                        android.graphics.Movie.decodeByteArray(bytes, 0, bytes.size)
-                    } else null
-                }
-            } catch (e: Exception) {
-                null
-            }
-        } else {
-            null
-        }
-    }
+    val userBitmap = userBitmapState.value
+    val userMovie = userMovieState.value
 
     val textMeasurer = rememberTextMeasurer()
     val labelText = if (diyGaugeName.isNotEmpty()) diyGaugeName else label
