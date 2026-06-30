@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.obd
 
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -104,9 +105,9 @@ class PrePurchaseInspection @Inject constructor() {
         val ftFindings = mutableListOf<String>()
         if (ltft != null && abs(ltft) > 15) {
             redFlags.add("🟡 FUEL TRIM EXCESIVO (${ltft.roundToInt()}%) — Posible fuga de vacío, inyectores sucios, o sensor MAF contaminado")
-            ftFindings.add("⚠️ LTFT: ${String.format("%.1f", ltft)}% (normal: ±10%)")
-        } else if (ltft != null) ftFindings.add("✅ LTFT: ${String.format("%.1f", ltft)}%")
-        if (stft != null) ftFindings.add("STFT: ${String.format("%.1f", stft)}%")
+            ftFindings.add("⚠️ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (normal: ±10%)")
+        } else if (ltft != null) ftFindings.add("✅ LTFT: ${String.format(Locale.US, "%.1f", ltft)}%")
+        if (stft != null) ftFindings.add("STFT: ${String.format(Locale.US, "%.1f", stft)}%")
         if (ftFindings.isEmpty()) ftFindings.add("ℹ️ Datos de Fuel Trim no disponibles")
         categories.add(InspectionCategory("Mezcla Combustible", "⛽", ftScore, 15, ftFindings,
             if (ftScore >= 10) DiagnosticSeverity.INFO else DiagnosticSeverity.HIGH))
@@ -143,11 +144,11 @@ class PrePurchaseInspection @Inject constructor() {
         if (voltage != null) {
             when {
                 voltage < 11.5f -> {
-                    redFlags.add("🔴 VOLTAJE MUY BAJO (${String.format("%.1f", voltage)}V) — Batería agotada o alternador fallando")
-                    elecFindings.add("❌ Voltaje: ${String.format("%.1f", voltage)}V")
+                    redFlags.add("🔴 VOLTAJE MUY BAJO (${String.format(Locale.US, "%.1f", voltage)}V) — Batería agotada o alternador fallando")
+                    elecFindings.add("❌ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V")
                 }
-                voltage > 15.5f -> elecFindings.add("⚠️ Voltaje alto: ${String.format("%.1f", voltage)}V (regulador?)")
-                else -> elecFindings.add("✅ Voltaje: ${String.format("%.1f", voltage)}V")
+                voltage > 15.5f -> elecFindings.add("⚠️ Voltaje alto: ${String.format(Locale.US, "%.1f", voltage)}V (regulador?)")
+                else -> elecFindings.add("✅ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V")
             }
         } else elecFindings.add("ℹ️ Voltaje no leído")
         categories.add(InspectionCategory("Sistema Eléctrico", "🔋", elecScore, 10, elecFindings,

@@ -1,5 +1,7 @@
 package com.elysium369.meet.core.obd
 
+import java.util.Locale
+
 object SmogCheckPredictor {
     enum class SmogVerdict { WILL_PASS, LIKELY_PASS, AT_RISK, WILL_FAIL }
 
@@ -43,14 +45,14 @@ object SmogCheckPredictor {
 
         listOf("STFT1" to (liveData["0106"]), "LTFT1" to (liveData["0107"])).forEach { (n, v) ->
             if (v != null && kotlin.math.abs(v) > 25)
-                blockers.add("❌ $n = ${"%.1f".format(v)}% — fuera de rango")
+                blockers.add("❌ $n = ${String.format(Locale.US, "%.1f", v)}% — fuera de rango")
             else if (v != null && kotlin.math.abs(v) > 15)
-                warnings.add("⚠️ $n = ${"%.1f".format(v)}% — elevado")
+                warnings.add("⚠️ $n = ${String.format(Locale.US, "%.1f", v)}% — elevado")
         }
 
         val coolant = liveData["0105"]
         if (coolant != null && coolant < 70f)
-            warnings.add("⚠️ Motor frío (${"%.0f".format(coolant)}°C), monitores no corren hasta >80°C")
+            warnings.add("⚠️ Motor frío (${String.format(Locale.US, "%.0f", coolant)}°C), monitores no corren hasta >80°C")
 
         val score = (100 - blockers.size * 30 - warnings.size * 8).coerceIn(0, 100)
         val (verdict, emoji, text) = when {

@@ -118,7 +118,15 @@ class PerformanceCalculator @Inject constructor() {
             acceleration = accel,
             gForce = accel?.div(9.81f),
             efficiencyPercent = volEff,
-            airFuelRatio = if (load != null) 14.7f * (1f + (load - 50f) * 0.003f) else null,
+            // Prefer real wideband lambda (PID 0144) over load-based estimation
+            airFuelRatio = run {
+                val lambda = liveData["Ratio Aire/Comb"] ?: liveData["EQUIVALENCE_RATIO"]
+                if (lambda != null && lambda > 0f) {
+                    lambda * 14.7f  // λ × stoichiometric = real AFR
+                } else if (load != null) {
+                    14.7f * (1f + (load - 50f) * 0.003f) // fallback estimate
+                } else null
+            },
             boostPsiEstimate = boostPsi
         )
     }

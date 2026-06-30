@@ -59,7 +59,9 @@ object EvidenceCompiler {
         dtcsList: List<String>
     ): EvidencePackageEntity = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis()
-        val formattedDate = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date(timestamp))
+        val formattedDate = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date(timestamp))
         val outputDir = File(context.filesDir, "blackbox_evidence").apply { mkdirs() }
         
         // 1. Generate PDF Report on Android canvas
@@ -153,7 +155,10 @@ object EvidenceCompiler {
         paint.isFakeBoldText = false
         paint.color = Color.parseColor("#334155")
         canvas.drawText("Tipo de Evento: $eventType", 40f, 170f, paint)
-        canvas.drawText("Fecha / Hora: ${Date(timestamp)}", 40f, 190f, paint)
+        val isoTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ROOT).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date(timestamp))
+        canvas.drawText("Fecha / Hora: $isoTimestamp (UTC)", 40f, 190f, paint)
         canvas.drawText("Coordenadas GPS: $gps", 40f, 210f, paint)
 
         // Telemetry Metrics
@@ -201,7 +206,7 @@ object EvidenceCompiler {
                 FileInputStream(file).use { fis ->
                     val zipEntry = ZipEntry(file.name)
                     zos.putNextEntry(zipEntry)
-                    val buffer = ByteArray(4096)
+                    val buffer = ByteArray(65_536) // 64KB for video performance
                     var len: Int
                     while (fis.read(buffer).also { len = it } > 0) {
                         zos.write(buffer, 0, len)
@@ -222,7 +227,7 @@ object EvidenceCompiler {
             }
         }
         val hashBytes = digest.digest()
-        return hashBytes.joinToString("") { "%02x".format(it) }
+        return hashBytes.joinToString("") { String.format(Locale.ROOT, "%02x", it) }
     }
 
     private fun signHash(hash: String): String {
@@ -233,7 +238,7 @@ object EvidenceCompiler {
             
             val signature = Signature.getInstance("SHA256withECDSA")
             signature.initSign(privateKeyEntry.privateKey)
-            signature.update(hash.toByteArray())
+            signature.update(hash.toByteArray(Charsets.UTF_8))
             val sigBytes = signature.sign()
             Base64.getEncoder().encodeToString(sigBytes)
         } catch (e: Exception) {
