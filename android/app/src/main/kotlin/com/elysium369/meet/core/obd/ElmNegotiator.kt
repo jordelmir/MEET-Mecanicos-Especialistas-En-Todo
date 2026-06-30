@@ -255,15 +255,37 @@ class ElmNegotiator(private val transport: TransportInterface) {
             transport.write(cmd.toByteArray())
             val buffer = StringBuilder()
             val startTime = System.currentTimeMillis()
+            val cleanCmd = cmd.trim()
             
             while (System.currentTimeMillis() - startTime < timeoutMs) {
-                val chunk = transport.read(1024, timeoutMs = 200)
+                // Low latency chunk polling of 50ms instead of 200ms
+                val chunk = transport.read(1024, timeoutMs = 50)
                 if (chunk != null) {
-                    buffer.append(String(chunk, Charsets.ISO_8859_1))
-                    if (buffer.contains(">")) break
+                    val part = String(chunk, Charsets.ISO_8859_1)
+                    buffer.append(part)
+                    
+                    // Early exit on hardware/bus errors to prevent waiting for timeouts
+                    val currentText = buffer.toString().uppercase()
+                    if (currentText.contains(">") || 
+                        currentText.contains("BUFFER FULL") || 
+                        currentText.contains("CAN ERROR") || 
+                        currentText.contains("STOPPED") || 
+                        currentText.contains("BUS BUSY") || 
+                        currentText.contains("FB ERROR") || 
+                        currentText.contains("ERR1") || 
+                        currentText.contains("ERR2")
+                    ) {
+                        break
+                    }
                 }
             }
-            buffer.toString()
+            
+            // Clean echo and prompt characters to protect the decoder parsers
+            var response = buffer.toString()
+            if (response.startsWith(cleanCmd, ignoreCase = true)) {
+                response = response.substring(cleanCmd.length)
+            }
+            response.replace(">", "").trim()
         }
     }
 }
