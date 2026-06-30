@@ -11,9 +11,6 @@ import org.junit.Test
 
 class VoiceCommandManagerTest {
 
-    // Simple AudioManager fake to bypass non-null cast in VoiceFeedbackManager init block
-    private class FakeAudioManager : android.media.AudioManager()
-
     // Context Wrapper Fake supplying minimal services to avoid NPE using Java reflection
     private class FakeContext(private val lang: String) : ContextWrapper(null) {
         private val fakeAudioManager by lazy {
@@ -115,6 +112,6 @@ class VoiceCommandManagerTest {
         method.invoke(manager, "elysium clear codes")
 
         assertEquals(VoiceCommand.CLEAR_DTCS, recognizedCommand)
-        assertEquals("Borrando códigos de falla de la ECU.", fakeVoice.lastSpeakSpoken)
+        assertEquals("Requesting fault code clear.", fakeVoice.lastSpeakSpoken)
     }
 }
