@@ -9,6 +9,7 @@ import com.elysium369.meet.data.local.entities.PredictionEventEntity
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -255,8 +256,8 @@ class PredictiveHealthEngine @Inject constructor(
                 pid = pid,
                 label = trend.label,
                 severity = AlertSeverity.CRITICAL,
-                message = "${trend.label} fuera de rango: ${String.format("%.1f", trend.currentValue)}${trend.unit} " +
-                    "(Normal: ${String.format("%.0f", min)}-${String.format("%.0f", max)}${trend.unit})",
+                message = "${trend.label} fuera de rango: ${String.format(Locale.US, "%.1f", trend.currentValue)}${trend.unit} " +
+                    "(Normal: ${String.format(Locale.US, "%.0f", min)}-${String.format(Locale.US, "%.0f", max)}${trend.unit})",
                 predictedDaysToFailure = 0
             )
         }
@@ -269,7 +270,7 @@ class PredictiveHealthEngine @Inject constructor(
                     pid = pid,
                     label = trend.label,
                     severity = if (daysToMax < 14) AlertSeverity.HIGH else AlertSeverity.MODERATE,
-                    message = "${trend.label} subiendo ${String.format("%.2f", trend.slopePerDay)}${trend.unit}/día. " +
+                    message = "${trend.label} subiendo ${String.format(Locale.US, "%.2f", trend.slopePerDay)}${trend.unit}/día. " +
                         "Alcanzará nivel crítico en ~$daysToMax días.",
                     predictedDaysToFailure = daysToMax
                 )
@@ -283,7 +284,7 @@ class PredictiveHealthEngine @Inject constructor(
                     pid = pid,
                     label = trend.label,
                     severity = if (daysToMin < 14) AlertSeverity.HIGH else AlertSeverity.MODERATE,
-                    message = "${trend.label} bajando ${String.format("%.2f", abs(trend.slopePerDay))}${trend.unit}/día. " +
+                    message = "${trend.label} bajando ${String.format(Locale.US, "%.2f", abs(trend.slopePerDay))}${trend.unit}/día. " +
                         "Alcanzará nivel crítico en ~$daysToMin días.",
                     predictedDaysToFailure = daysToMin
                 )
@@ -407,7 +408,7 @@ class PredictiveHealthEngine @Inject constructor(
         liveData: Map<String, Float>
     ) {
         val summary = try {
-            Json.encodeToString(liveData.mapKeys { it.key })
+            Json.encodeToString(liveData)
         } catch (_: Exception) { "{}" }
 
         healthSnapshotDao.insert(
