@@ -9,6 +9,8 @@ import android.os.Vibrator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.util.Locale
+import kotlin.math.roundToInt
 
 enum class AlertSeverity { INFO, WARNING, CRITICAL }
 
@@ -28,32 +30,43 @@ class AlertManager @Inject constructor(
     private val _alerts = MutableSharedFlow<ObdAlert>(extraBufferCapacity = 10)
     val alerts = _alerts.asSharedFlow()
 
-    // Thresholds configurables
+    // Thread-safe central cooldown tracker for warning and critical alerts
+    private val alertCooldowns = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    // Configurable thresholds
     var maxTempThreshold = 105f
     var minVoltEncendidoThreshold = 13.2f
     var minVoltApagadoThreshold = 11.8f
     var maxRpmThreshold = 5500f
 
     fun processLiveData(data: Map<String, Float>, isEngineRunning: Boolean) {
-        // Temperatura
+        val now = System.currentTimeMillis()
+
+        // Temperature Alert
         data["0105"]?.let { temp ->
-            if (temp >= maxTempThreshold) {
-                triggerAlert("Sobrecalentamiento", "Temp Motor: ${temp}°C", AlertSeverity.CRITICAL)
+            val lastAlert = alertCooldowns["TEMP_ENGINE"] ?: 0L
+            if (temp >= maxTempThreshold && (now - lastAlert > 60000L)) {
+                triggerAlert("Sobrecalentamiento", "Temp Motor: ${temp.roundToInt()}°C", AlertSeverity.CRITICAL)
+                alertCooldowns["TEMP_ENGINE"] = now
             }
         }
         
-        // Voltaje (AT RV / custom)
+        // Voltage Alert
         data["AT RV"]?.let { volt ->
             val minVolt = if (isEngineRunning) minVoltEncendidoThreshold else minVoltApagadoThreshold
-            if (volt < minVolt) {
-                triggerAlert("Voltaje Bajo", "Batería: ${volt}V", AlertSeverity.WARNING)
+            val lastAlert = alertCooldowns["VOLT_ALERT"] ?: 0L
+            if (volt < minVolt && (now - lastAlert > 60000L)) {
+                triggerAlert("Voltaje Bajo", "Batería: ${String.format(Locale.US, "%.1f", volt)}V", AlertSeverity.WARNING)
+                alertCooldowns["VOLT_ALERT"] = now
             }
         }
 
-        // RPM
+        // RPM Alert
         data["010C"]?.let { rpm ->
-            if (rpm >= maxRpmThreshold) {
+            val lastAlert = alertCooldowns["RPM_ENGINE"] ?: 0L
+            if (rpm >= maxRpmThreshold && (now - lastAlert > 10000L)) {
                 triggerAlert("RPM Elevado", "Motor a ${rpm.toInt()} RPM", AlertSeverity.WARNING)
+                alertCooldowns["RPM_ENGINE"] = now
             }
         }
     }
@@ -83,39 +96,42 @@ class AlertManager @Inject constructor(
     }
     
     fun startMonitoring(liveDataFlow: kotlinx.coroutines.flow.StateFlow<Map<String, Float>>, scope: kotlinx.coroutines.CoroutineScope) {
-        val alertCooldown = mutableMapOf<String, Long>()
         scope.launch {
             liveDataFlow.collect { data ->
                 val now = System.currentTimeMillis()
+                
+                // Temperature Alert
                 data["0105"]?.let { temp ->
-                    val lastTempAlert = alertCooldown["TEMP_ENGINE"] ?: 0L
-                    if (temp > maxTempThreshold && (now - lastTempAlert > 60000)) {
-                        triggerAlert("Sobrecalentamiento", "Temp Motor: ${temp}°C", AlertSeverity.CRITICAL)
-                        alertCooldown["TEMP_ENGINE"] = now
+                    val lastAlert = alertCooldowns["TEMP_ENGINE"] ?: 0L
+                    if (temp > maxTempThreshold && (now - lastAlert > 60000L)) {
+                        triggerAlert("Sobrecalentamiento", "Temp Motor: ${temp.roundToInt()}°C", AlertSeverity.CRITICAL)
+                        alertCooldowns["TEMP_ENGINE"] = now
                     }
                 }
                 
+                // RPM Alert
                 data["010C"]?.let { rpm ->
-                    val lastRpmAlert = alertCooldown["RPM_ENGINE"] ?: 0L
-                    if (rpm > maxRpmThreshold && (now - lastRpmAlert > 10000)) {
+                    val lastAlert = alertCooldowns["RPM_ENGINE"] ?: 0L
+                    if (rpm > maxRpmThreshold && (now - lastAlert > 10000L)) {
                         triggerAlert("RPM Elevado", "Motor a ${rpm.toInt()} RPM", AlertSeverity.WARNING)
-                        alertCooldown["RPM_ENGINE"] = now
+                        alertCooldowns["RPM_ENGINE"] = now
                     }
                 }
 
-                // Battery Voltage Alert Check
+                // Battery Voltage Alert
                 val volt = data["0142"] ?: data["AT RV"]
                 volt?.let { v ->
                     val rpm = data["010C"] ?: 0f
                     val isEngineRunning = rpm > 400f
                     val minVolt = if (isEngineRunning) minVoltEncendidoThreshold else minVoltApagadoThreshold
-                    val lastVoltAlert = alertCooldown["VOLT_ALERT"] ?: 0L
-                    if (v < minVolt && (now - lastVoltAlert > 60000)) {
-                        triggerAlert("Voltaje Bajo", "Batería: ${"%.1f".format(v)}V", AlertSeverity.WARNING)
-                        alertCooldown["VOLT_ALERT"] = now
+                    val lastAlert = alertCooldowns["VOLT_ALERT"] ?: 0L
+                    if (v < minVolt && (now - lastAlert > 60000L)) {
+                        triggerAlert("Voltaje Bajo", "Batería: ${String.format(Locale.US, "%.1f", v)}V", AlertSeverity.WARNING)
+                        alertCooldowns["VOLT_ALERT"] = now
                     }
                 }
             }
         }
     }
+}
 }
