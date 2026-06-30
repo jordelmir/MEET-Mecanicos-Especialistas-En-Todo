@@ -1609,22 +1609,40 @@ fun DashboardSelectionDialog(
 @Composable
 fun CyberBackground(config: DiyBgConfig) {
     val context = LocalContext.current
-    val bitmap = remember(config.bgImageUri) {
+    val bitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
+    val bitmap = bitmapState.value
+
+    LaunchedEffect(config.bgImageUri, config.bgType) {
         if (config.bgType == 2 && config.bgImageUri.isNotEmpty()) {
-            try {
-                if (config.bgImageUri.startsWith("/")) {
-                    BitmapFactory.decodeFile(config.bgImageUri)?.asImageBitmap()
-                } else {
-                    val uri = android.net.Uri.parse(config.bgImageUri)
-                    val stream = context.contentResolver.openInputStream(uri)
-                    val bmp = BitmapFactory.decodeStream(stream)
-                    stream?.close()
-                    bmp?.asImageBitmap()
+            withContext(Dispatchers.IO) {
+                try {
+                    val bmp = if (config.bgImageUri.startsWith("/")) {
+                        BitmapFactory.decodeFile(config.bgImageUri)
+                    } else if (config.bgImageUri.startsWith("http://") || config.bgImageUri.startsWith("https://")) {
+                        val url = java.net.URL(config.bgImageUri)
+                        val connection = url.openConnection() as java.net.HttpURLConnection
+                        connection.doInput = true
+                        connection.connect()
+                        val input = connection.inputStream
+                        val decoded = BitmapFactory.decodeStream(input)
+                        input.close()
+                        decoded
+                    } else {
+                        val uri = android.net.Uri.parse(config.bgImageUri)
+                        val stream = context.contentResolver.openInputStream(uri)
+                        val decoded = BitmapFactory.decodeStream(stream)
+                        stream?.close()
+                        decoded
+                    }
+                    bitmapState.value = bmp?.asImageBitmap()
+                } catch (e: Exception) {
+                    android.util.Log.e("CyberBackground", "Failed to load custom background image: ${e.message}")
+                    bitmapState.value = null
                 }
-            } catch (e: Exception) {
-                null
             }
-        } else null
+        } else {
+            bitmapState.value = null
+        }
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {

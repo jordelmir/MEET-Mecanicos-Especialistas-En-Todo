@@ -24,5 +24,6 @@ data class GaugeConfig(
     val glowIntensity: Float,
     val imageOpacity: Float,
     val animationIndex: Int,
-    val typographyIndex: Int = 0
+    val typographyIndex: Int = 0,
+    val bgImageUri: String = ""
 )

@@ -176,7 +176,7 @@ class GaugeMarketplaceRepository @Inject constructor(
         val normalizedName = name.trim().ifBlank { config.name.ifBlank { "Gauge MEET" } }
         val normalizedDescription = description.trim()
         require(normalizedName.length >= 3) { "El nombre del gauge debe tener al menos 3 caracteres." }
-        require(normalizedDescription.length >= 12) { "Agrega una descripción útil para el comprador." }
+        require(normalizedDescription.length >= 3) { "Agrega una descripción útil para el comprador." }
         val normalizedTier = priceTier.coerceIn(1, 10)
 
         if (!publishedFromSavedGaugeId.isNullOrBlank()) {
@@ -197,6 +197,30 @@ class GaugeMarketplaceRepository @Inject constructor(
             }
         }
 
+        // Upload custom background image to Supabase if config specifies a local image background
+        var finalConfig = config
+        val localBgUri = config.bgImageUri
+        if (config.bgType == 2 && localBgUri.isNotEmpty() && !localBgUri.startsWith("http")) {
+            try {
+                val bytes = if (localBgUri.startsWith("/")) {
+                    java.io.File(localBgUri).readBytes()
+                } else {
+                    val uri = android.net.Uri.parse(localBgUri)
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                }
+                
+                if (bytes != null) {
+                    val bgFileName = "backgrounds/$userId/${System.currentTimeMillis()}.png"
+                    supabaseClient.storage.from("gauge-thumbnails").upload(bgFileName, bytes)
+                    val publicBgUrl = supabaseClient.storage.from("gauge-thumbnails").publicUrl(bgFileName)
+                    finalConfig = config.copy(bgImageUri = publicBgUrl)
+                    Log.i(TAG, "Uploaded custom background image successfully: $publicBgUrl")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Custom background image upload failed: ${e.message}")
+            }
+        }
+
         // Upload thumbnail if provided
         var thumbnailUrl: String? = null
         if (thumbnailBytes != null) {
@@ -209,7 +233,7 @@ class GaugeMarketplaceRepository @Inject constructor(
             }
         }
 
-        val configJsonStr = json.encodeToString(config)
+        val configJsonStr = json.encodeToString(finalConfig)
 
         val listing = GaugeListing(
             creator_id = userId,

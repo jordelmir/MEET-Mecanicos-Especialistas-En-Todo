@@ -244,27 +244,58 @@ fun GaugeMarketplaceScreen(
                         )
                     }
 
-                    // Earnings badge
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFF00C853).copy(alpha = 0.15f),
-                                        Color(0xFF00E676).copy(alpha = 0.1f)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // "Crear nuevo gauge" action button at the top
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(accentCyan.copy(alpha = 0.15f))
+                                .border(1.5.dp, accentCyan.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    publishSourceGauge = null
+                                    showPublishDialog = true
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("🚀", fontSize = 11.sp)
+                                Text(
+                                    "Crear",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+
+                        // Earnings badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFF00C853).copy(alpha = 0.15f),
+                                            Color(0xFF00E676).copy(alpha = 0.1f)
+                                        )
                                     )
                                 )
+                                .border(1.dp, Color(0xFF00E676).copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "💎 ${formatUsdFromCents(uiState.creatorEarningsCents)}",
+                                color = Color(0xFF00E676),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            .border(1.dp, Color(0xFF00E676).copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            "💎 ${formatUsdFromCents(uiState.creatorEarningsCents)}",
-                            color = Color(0xFF00E676),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        }
                     }
                 }
             }
@@ -417,35 +448,7 @@ fun GaugeMarketplaceScreen(
             }
         }
 
-        // ══════════════════════════════════════
-        // FAB — Publish
-        // ══════════════════════════════════════
-        FloatingActionButton(
-            onClick = {
-                publishSourceGauge = null
-                showPublishDialog = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp),
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = if (isBillingProcessing) 2.dp else 6.dp),
-            containerColor = accentCyan.copy(alpha = 0.9f),
-            contentColor = Color.Black,
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AnimatedNeonGlyph("🚀", contentDescription = null, fontSize = 18.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Publicar",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 14.sp
-                )
-            }
-        }
+
 
         // ══════════════════════════════════════
         // Preview Sheet
@@ -598,15 +601,14 @@ private fun GaugePublishDialog(
     var name by remember(sourceGauge?.id, draftConfig.name) {
         mutableStateOf(sourceGauge?.name ?: draftConfig.name.ifBlank { "Gauge MEET" })
     }
-    var description by remember(sourceGauge?.id) { mutableStateOf("") }
+    var description by remember(sourceGauge?.id) { mutableStateOf(if (sourceGauge != null) "Diseño de gauge personalizado creado con MEET DIY Editor." else "") }
     var priceTier by remember(sourceGauge?.id) { mutableIntStateOf(1) }
-    var category by remember(sourceGauge?.id) { mutableStateOf("performance") }
+    var category by remember(sourceGauge?.id) { mutableStateOf(if (sourceGauge != null) "custom" else "performance") }
     var tags by remember(sourceGauge?.id) { mutableStateOf("") }
     var acceptedTerms by remember(sourceGauge?.id) { mutableStateOf(false) }
-    val canPublish = name.trim().length >= 3 &&
-        description.trim().length >= 12 &&
-        acceptedTerms &&
-        !isPublishing
+    val isNameValid = name.trim().length >= 3
+    val isDescriptionValid = description.trim().length >= 3
+    val canPublish = isNameValid && isDescriptionValid && acceptedTerms && !isPublishing
     val split = GaugePriceTiers.calculateSplit(priceTier)
 
     AlertDialog(
@@ -681,17 +683,37 @@ private fun GaugePublishDialog(
                     onValueChange = { name = it.take(48) },
                     label = { Text("Nombre") },
                     singleLine = true,
+                    isError = !isNameValid,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (!isNameValid) {
+                    Text(
+                        "El nombre debe tener al menos 3 caracteres.",
+                        color = Color(0xFFFF5252),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
 
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it.take(240) },
                     label = { Text("Descripción de venta") },
-                    minLines = 3,
-                    maxLines = 4,
+                    minLines = 2,
+                    maxLines = 3,
+                    isError = !isDescriptionValid,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (!isDescriptionValid) {
+                    Text(
+                        "La descripción debe tener al menos 3 caracteres.",
+                        color = Color(0xFFFF5252),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
 
                 Text("Categoría", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -973,7 +995,8 @@ private fun SavedGaugeEntity.toGaugeConfig(): GaugeConfig {
         glowIntensity = glowIntensity,
         imageOpacity = imageOpacity,
         animationIndex = animationIndex,
-        typographyIndex = typographyIndex
+        typographyIndex = typographyIndex,
+        bgImageUri = bgImageUri
     )
 }
 
@@ -1004,7 +1027,7 @@ private fun GaugeListing.toPreviewGaugeEntity(): SavedGaugeEntity? {
         name = config.name.ifBlank { name },
         bgType = config.bgType,
         bgPresetIndex = config.bgPresetIndex,
-        bgImageUri = "",
+        bgImageUri = config.bgImageUri,
         bezelStyle = config.bezelStyle,
         needleStyle = config.needleStyle,
         ticksStyle = config.ticksStyle,

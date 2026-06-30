@@ -455,7 +455,7 @@ private fun GaugeConfig.toPreviewGauge(id: String, fallbackName: String): SavedG
         name = name.ifBlank { fallbackName },
         bgType = bgType,
         bgPresetIndex = bgPresetIndex,
-        bgImageUri = "",
+        bgImageUri = bgImageUri,
         bezelStyle = bezelStyle,
         needleStyle = needleStyle,
         ticksStyle = ticksStyle,
