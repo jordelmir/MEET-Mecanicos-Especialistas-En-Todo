@@ -11,12 +11,41 @@ import org.junit.Test
 
 class VoiceCommandManagerTest {
 
+    // Simple AudioManager fake to bypass non-null cast in VoiceFeedbackManager init block
+    private class FakeAudioManager : android.media.AudioManager()
+
+    // Context Wrapper Fake supplying minimal services to avoid NPE using Java reflection
     private class FakeContext(private val lang: String) : ContextWrapper(null) {
-        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
-            return FakeSharedPreferences(lang)
+        private val fakeAudioManager by lazy {
+            try {
+                // Try obtaining the empty constructor reflexively
+                val constructor = android.media.AudioManager::class.java.getDeclaredConstructor()
+                constructor.isAccessible = true
+                constructor.newInstance()
+            } catch (e: Exception) {
+                try {
+                    // Fallback to the context-based constructor reflexively
+                    val constructor = android.media.AudioManager::class.java.getDeclaredConstructor(Context::class.java)
+                    constructor.isAccessible = true
+                    constructor.newInstance(this)
+                } catch (ex: Exception) {
+                    null
+                }
+            }
+        }
+        
+        override fun getSystemService(name: String): Any? {
+            if (name == Context.AUDIO_SERVICE) return fakeAudioManager
+            return null
         }
         override fun getApplicationContext(): Context {
             return this
+        }
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            return FakeSharedPreferences(lang)
+        }
+        override fun getPackageName(): String {
+            return "com.elysium369.meet.test"
         }
     }
 
@@ -51,7 +80,6 @@ class VoiceCommandManagerTest {
     fun testProcessSpokenTextWithWakeWordSpanish() {
         val fakeContext = FakeContext("es")
         val fakeVoice = FakeVoiceFeedbackManager(fakeContext)
-        // Pass Dispatchers.Unconfined to prevent main Looper dependency issues in JUnit
         val manager = VoiceCommandManager(fakeContext, fakeVoice, Dispatchers.Unconfined)
 
         var recognizedCommand: VoiceCommand? = null
@@ -73,7 +101,6 @@ class VoiceCommandManagerTest {
     fun testProcessSpokenTextWithWakeWordEnglish() {
         val fakeContext = FakeContext("en")
         val fakeVoice = FakeVoiceFeedbackManager(fakeContext)
-        // Pass Dispatchers.Unconfined to prevent main Looper dependency issues in JUnit
         val manager = VoiceCommandManager(fakeContext, fakeVoice, Dispatchers.Unconfined)
 
         var recognizedCommand: VoiceCommand? = null

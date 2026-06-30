@@ -66,7 +66,12 @@ class VoiceCommandManager(
     private var lastTriggerTime: Long = 0L
     private val CONVERSATION_WINDOW_MS = 10000L
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler: Handler? = try {
+        Looper.getMainLooper()?.let { Handler(it) }
+    } catch (e: Exception) {
+        null
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
 
     var onCommandRecognized: ((VoiceCommand) -> Unit)? = null
@@ -82,14 +87,32 @@ class VoiceCommandManager(
                     val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
                     val isCopilotEnabled = prefs.getBoolean("voice_copilot_enabled", false)
                     if (isListening && isCopilotEnabled) {
-                        mainHandler.postDelayed({
+                        runOnMainThreadDelayed(800L) {
                             if (isListening && !voiceFeedbackManager.isSpeaking.value) {
                                 startListeningInternal()
                             }
-                        }, 800) // Small delay to let audio channel settle
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private fun runOnMainThread(action: () -> Unit) {
+        val handler = mainHandler
+        if (handler != null) {
+            handler.post(action)
+        } else {
+            action()
+        }
+    }
+
+    private fun runOnMainThreadDelayed(delayMs: Long, action: () -> Unit) {
+        val handler = mainHandler
+        if (handler != null) {
+            handler.postDelayed(action, delayMs)
+        } else {
+            action()
         }
     }
 
@@ -97,7 +120,7 @@ class VoiceCommandManager(
         Log.i("VoiceCommand", "Starting Voice Copilot system...")
         isListening = true
         _isListeningState.value = true
-        mainHandler.post {
+        runOnMainThread {
             startListeningInternal()
         }
     }
@@ -106,7 +129,7 @@ class VoiceCommandManager(
         Log.i("VoiceCommand", "Stopping Voice Copilot system...")
         isListening = false
         _isListeningState.value = false
-        mainHandler.post {
+        runOnMainThread {
             cancelListeningInternal()
             destroyRecognizer()
         }
@@ -124,8 +147,8 @@ class VoiceCommandManager(
 
     fun destroy() {
         scope.cancel() // Cancel Hilt coroutine scope
-        mainHandler.removeCallbacksAndMessages(null)
-        mainHandler.post {
+        mainHandler?.removeCallbacksAndMessages(null)
+        runOnMainThread {
             destroyRecognizer()
         }
     }
@@ -396,14 +419,14 @@ class VoiceCommandManager(
         // Loop restart
         if (isListening && !voiceFeedbackManager.isSpeaking.value) {
             val retryDelay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 500L else 300L
-            mainHandler.postDelayed({
+            runOnMainThreadDelayed(retryDelay) {
                 if (isListening && !isRecognizerActive && !voiceFeedbackManager.isSpeaking.value) {
                     if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
                         cancelListeningInternal()
                     }
                     startListeningInternal()
                 }
-            }, retryDelay)
+            }
         }
     }
 
@@ -417,11 +440,11 @@ class VoiceCommandManager(
 
         // Restart listening to achieve continuous recognition
         if (isListening && !voiceFeedbackManager.isSpeaking.value) {
-            mainHandler.postDelayed({
+            runOnMainThreadDelayed(300L) {
                 if (isListening && !isRecognizerActive && !voiceFeedbackManager.isSpeaking.value) {
                     startListeningInternal()
                 }
-            }, 300)
+            }
         }
     }
 
@@ -438,8 +461,10 @@ class VoiceCommandManager(
                 playBeepSound()
                 
                 // Force reset listener to clear the microphone buffer and prepare it with full sensitivity for the command
-                cancelListeningInternal()
-                startListeningInternal()
+                runOnMainThread {
+                    cancelListeningInternal()
+                    startListeningInternal()
+                }
             }
         }
     }
