@@ -24,7 +24,7 @@ data class ObdAlert(
 
 class AlertManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager
+    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager?
 ) {
     
     private val _alerts = MutableSharedFlow<ObdAlert>(extraBufferCapacity = 10)
@@ -88,9 +88,9 @@ class AlertManager @Inject constructor(
             } catch (e: SecurityException) {
                 android.util.Log.w("ElysiumVanguard", "Vibrate permission not granted, skipping haptic feedback", e)
             }
-            voiceFeedbackManager.speak("Atención. Alerta crítica de $title. $msg", "Warning. Critical alert: $title. $msg")
+            voiceFeedbackManager?.speak("Atención. Alerta crítica de $title. $msg", "Warning. Critical alert: $title. $msg")
         } else if (severity == AlertSeverity.WARNING) {
-            voiceFeedbackManager.speak("Advertencia. $title. $msg", "Caution. $title. $msg")
+            voiceFeedbackManager?.speak("Advertencia. $title. $msg", "Caution. $title. $msg")
         }
         _alerts.tryEmit(ObdAlert(title = title, message = msg, severity = severity))
     }
