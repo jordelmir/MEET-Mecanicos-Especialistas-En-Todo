@@ -1614,7 +1614,7 @@ fun CyberBackground(config: DiyBgConfig) {
 
     LaunchedEffect(config.bgImageUri, config.bgType) {
         if (config.bgType == 2 && config.bgImageUri.isNotEmpty()) {
-            withContext(Dispatchers.IO) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 try {
                     val bmp = if (config.bgImageUri.startsWith("/")) {
                         BitmapFactory.decodeFile(config.bgImageUri)
