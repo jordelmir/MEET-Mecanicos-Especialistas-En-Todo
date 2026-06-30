@@ -158,6 +158,6 @@ class BatteryHealthAnalyzer {
         return BatteryReport(voltage, verdict, text, color, soc, altStatus, findings, recs)
     }
 
-    private fun format(v: Float) = "%.2f".format(v)
+    private fun format(v: Float) = "%.2f".format(java.util.Locale.US, v)
     fun reset() { voltageHistory.clear() }
 }

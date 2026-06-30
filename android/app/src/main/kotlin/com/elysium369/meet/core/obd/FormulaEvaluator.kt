@@ -10,32 +10,42 @@ import kotlin.math.pow
  */
 object FormulaEvaluator {
 
+    private val PATTERN_A = Regex("\\bA\\b")
+    private val PATTERN_B = Regex("\\bB\\b")
+    private val PATTERN_C = Regex("\\bC\\b")
+    private val PATTERN_D = Regex("\\bD\\b")
+    private val PATTERN_E = Regex("\\bE\\b")
+    private val PATTERN_F = Regex("\\bF\\b")
+
     fun evaluate(formula: String, bytes: List<Int>): Float {
         if (formula.isBlank()) return 0f
-        
-        // Replace variables A, B, C, D with their values
-        var expression = formula.uppercase()
-        val vars = mapOf(
-            "A" to (bytes.getOrNull(0) ?: 0),
-            "B" to (bytes.getOrNull(1) ?: 0),
-            "C" to (bytes.getOrNull(2) ?: 0),
-            "D" to (bytes.getOrNull(3) ?: 0),
-            "E" to (bytes.getOrNull(4) ?: 0),
-            "F" to (bytes.getOrNull(5) ?: 0)
-        )
+        return evaluateInternal(formula, bytes, zeroSafeDivision = true) ?: 0f
+    }
 
-        for ((name, value) in vars) {
-            expression = expression.replace(Regex("\\b$name\\b"), value.toString())
-        }
+    fun evaluateOrNull(formula: String, bytes: List<Int>): Float? {
+        if (formula.isBlank()) return null
+        return evaluateInternal(formula, bytes, zeroSafeDivision = false)
+    }
+
+    private fun evaluateInternal(formula: String, bytes: List<Int>, zeroSafeDivision: Boolean): Float? {
+        // Replace variables A, B, C, D, E, F with their values using precompiled patterns
+        var expression = formula.uppercase()
+        
+        expression = PATTERN_A.replace(expression, (bytes.getOrNull(0) ?: 0).toString())
+        expression = PATTERN_B.replace(expression, (bytes.getOrNull(1) ?: 0).toString())
+        expression = PATTERN_C.replace(expression, (bytes.getOrNull(2) ?: 0).toString())
+        expression = PATTERN_D.replace(expression, (bytes.getOrNull(3) ?: 0).toString())
+        expression = PATTERN_E.replace(expression, (bytes.getOrNull(4) ?: 0).toString())
+        expression = PATTERN_F.replace(expression, (bytes.getOrNull(5) ?: 0).toString())
 
         return try {
-            eval(expression).toFloat()
+            eval(expression, zeroSafeDivision).toFloat()
         } catch (e: Exception) {
-            0f
+            null
         }
     }
 
-    private fun eval(str: String): Double {
+    private fun eval(str: String, zeroSafeDivision: Boolean): Double {
         return object : Any() {
             var pos = -1
             var ch = 0
@@ -75,7 +85,11 @@ object FormulaEvaluator {
                     if (eat('*'.toInt())) x *= parseFactor() // multiplication
                     else if (eat('/'.toInt())) {
                         val divisor = parseFactor()
-                        x = if (divisor == 0.0) 0.0 else x / divisor // zero-safe division
+                        x = if (divisor == 0.0) {
+                            if (zeroSafeDivision) 0.0 else throw ArithmeticException("Division by zero")
+                        } else {
+                            x / divisor
+                        }
                     }
                     else return x
                 }

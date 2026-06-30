@@ -196,6 +196,34 @@ object DtcDecoder {
             "U0140" -> "Pérdida de comunicación con el módulo Body (BCM)"
             "U0155" -> "Pérdida de comunicación con el panel de instrumentos"
 
+            // INYECCIÓN Y TURBO (P02xx)
+            "P0201" -> "Fallo en circuito de inyector cilindro 1"
+            "P0202" -> "Fallo en circuito de inyector cilindro 2"
+            "P0203" -> "Fallo en circuito de inyector cilindro 3"
+            "P0204" -> "Fallo en circuito de inyector cilindro 4"
+            "P0219" -> "Condición de sobre-revolución del motor"
+            "P0234" -> "Condición de sobrealimentación límite del turbo (Overboost)"
+            "P0299" -> "Presión de sobrealimentación del turbo insuficiente (Underboost)"
+
+            // DETONACIÓN Y BOBINAS (P03xx)
+            "P0326" -> "Rango/Rendimiento del circuito del sensor de detonación 1 (Knock Sensor)"
+            "P0351" -> "Fallo circuito primario/secundario bobina de encendido A"
+            "P0352" -> "Fallo circuito primario/secundario bobina de encendido B"
+            "P0353" -> "Fallo circuito primario/secundario bobina de encendido C"
+            "P0354" -> "Fallo circuito primario/secundario bobina de encendido D"
+
+            // SISTEMAS DE CHASIS Y ABS (Cxxxx)
+            "C0035" -> "Sensor velocidad de rueda delantera izquierda ABS defectuoso"
+            "C0040" -> "Sensor velocidad de rueda delantera derecha ABS defectuoso"
+            "C0550" -> "Fallo en memoria interna de la ECU del ABS / Control de Tracción"
+
+            // RED Y BUS DE CONTROL (Uxxxx)
+            "U0073" -> "Bus de comunicación de módulos de control APAGADO"
+            "U0104" -> "Pérdida de comunicación con módulo de control de crucero"
+            "U0114" -> "Pérdida de comunicación con el módulo de tracción total (AWD)"
+            "U0122" -> "Pérdida de comunicación con el módulo del Control de Estabilidad"
+            "U0401" -> "Datos no válidos recibidos del módulo del motor (ECM)"
+
             else -> "Descripción no disponible localmente. El análisis de IA detallará causas y soluciones."
         }
     }
