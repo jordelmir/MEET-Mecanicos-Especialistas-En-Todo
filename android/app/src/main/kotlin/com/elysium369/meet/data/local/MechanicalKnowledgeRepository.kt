@@ -24,10 +24,10 @@ data class MechanicalKnowledgeBundle(
 )
 
 @Singleton
-class MechanicalKnowledgeRepository @Inject constructor(
+open class MechanicalKnowledgeRepository @Inject constructor(
     private val dao: MechanicalKnowledgeDao
 ) {
-    suspend fun search(query: String): MechanicalKnowledgeBundle {
+    open suspend fun search(query: String): MechanicalKnowledgeBundle {
         val normalized = normalizeQuery(query)
         val searchTerms = buildSearchTerms(normalized)
 

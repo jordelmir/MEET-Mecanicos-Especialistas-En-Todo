@@ -16,20 +16,20 @@ import javax.inject.Singleton
 private data class VotesUpdate(val votes: Int)
 
 @Singleton
-class RepairCaseRepository @Inject constructor(
+open class RepairCaseRepository @Inject constructor(
     private val repairCaseDao: RepairCaseDao,
     private val repairNetworkAddonsDao: RepairNetworkAddonsDao
 ) {
     private val defaultUserId: String
         get() = "local_user_" + android.os.Build.SERIAL.hashCode().toString(16)
     // Local bookmarks/saved cases
-    fun getSavedCases(): Flow<List<RepairCase>> {
+    open fun getSavedCases(): Flow<List<RepairCase>> {
         return repairCaseDao.getSavedCases().map { entities ->
             entities.map { it.toDomain() }
         }
     }
 
-    fun getMyContributions(): Flow<List<RepairCase>> {
+    open fun getMyContributions(): Flow<List<RepairCase>> {
         return repairCaseDao.getMyCases().map { entities ->
             entities.map { it.toDomain() }
         }
@@ -54,7 +54,7 @@ class RepairCaseRepository @Inject constructor(
     }
 
     // Remote queries via Supabase
-    suspend fun searchCases(
+    open suspend fun searchCases(
         query: String,
         make: String = "",
         model: String = "",
@@ -126,7 +126,7 @@ class RepairCaseRepository @Inject constructor(
             }
     }
 
-    suspend fun getCaseById(caseId: String): RepairCase? {
+    open suspend fun getCaseById(caseId: String): RepairCase? {
         // Check local first
         repairCaseDao.getCaseById(caseId)?.let { return it.toDomain() }
 
