@@ -131,6 +131,7 @@ class KnowledgePackImporter(
     }
 
     companion object {
-        private val NODE_ID_REGEX = Regex("^[a-z][a-z0-9_]*$")
+        // Allow lowercase or uppercase, digits, and underscore; must start with a letter.
+        private val NODE_ID_REGEX = Regex("^[A-Za-z][A-Za-z0-9_]*$")
     }
 }

@@ -93,7 +93,10 @@ data class KnowledgePack(
     val nodes: List<KnowledgeNode> = emptyList(),
     val edges: List<KnowledgeEdge> = emptyList(),
     val validationRules: List<ValidationRule> = emptyList()
-)
+) {
+    /** Optional inline profile list (DTC packs). Not required by all packs. */
+    val profiles: List<DtcProfile> = emptyList()
+}
 
 /**
  * Outcome of a pack import. Lists which nodes/edges were accepted,

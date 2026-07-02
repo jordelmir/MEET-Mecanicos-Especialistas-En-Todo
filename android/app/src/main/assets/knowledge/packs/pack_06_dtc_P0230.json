@@ -1,0 +1,392 @@
+{
+  "packId": "pack_06_dtc_P0230",
+  "title": "P0230 — Fuel Pump Primary Circuit",
+  "domain": "automotive.dtc.powertrain",
+  "schemaVersion": 1,
+  "packVersion": "1.0.0",
+  "language": "en-US",
+  "generatedAtEpochMs": 1751433600000,
+  "sourcePolicy": {
+    "tier": "A_OWNED_CREATED",
+    "licenseType": "OWNED_CONTENT",
+    "attributionRequired": false,
+    "commercialUseAllowed": true,
+    "redistributionAllowed": true,
+    "notes": "Conceptual content. No OEM data, no copyrighted material, no reverse-engineered service procedures. Always cross-check with vehicle-specific OEM documentation."
+  },
+  "disclaimer": "Conceptual DTC content for educational and triage purposes. Does not replace OEM service information. Always verify pinouts, wire colors, and torque specifications with the vehicle's authorized OEM documentation before any repair.",
+  "nodes": [
+    {
+      "id": "dtc_P0230",
+      "type": "Dtc",
+      "name": "P0230",
+      "description": "Fuel Pump Primary Circuit — generic powertrain code indicating the PCM has detected a fault in the fuel pump's primary control/feed circuit.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "symptom_no_start",
+      "type": "Symptom",
+      "name": "No start / extended cranking",
+      "description": "Engine cranks but does not start, or requires longer-than-normal cranking before starting.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "symptom_stall",
+      "type": "Symptom",
+      "name": "Engine stall while running",
+      "description": "Engine cuts out while driving, often after the fuel rail pressure drops below operating threshold.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "symptom_long_crank",
+      "type": "Symptom",
+      "name": "Long crank before start",
+      "description": "Several seconds of cranking before the engine fires, indicating delayed fuel pressure build-up.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_battery_ground",
+      "type": "FailureMode",
+      "name": "Battery / ground / supply deficiency",
+      "description": "Low voltage at the pump circuit due to weak battery, corroded ground, or high-resistance feed.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_relay",
+      "type": "FailureMode",
+      "name": "Fuel pump relay contact failure",
+      "description": "Relay contacts pitted, welded, or high-resistance. PCM commands ON but pump receives insufficient voltage.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_fuse_feed",
+      "type": "FailureMode",
+      "name": "Fuse / feed circuit open or high-resistance",
+      "description": "Fuse blown, corroded, or wiring harness open / chafed between battery and relay/pump.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_connector",
+      "type": "FailureMode",
+      "name": "Connector corrosion or loose pin",
+      "description": "Pump-side or relay-side connector corroded, terminal loose, or seal failed.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_pump_motor",
+      "type": "FailureMode",
+      "name": "Pump motor failure",
+      "description": "Pump motor brushes worn, locked, or shorted. Last-resort hypothesis — prove with voltage + pressure + amp draw first.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    },
+    {
+      "id": "cause_pcm_driver",
+      "type": "FailureMode",
+      "name": "PCM driver / software",
+      "description": "PCM internal driver failure or TSB-related software issue. Last hypothesis — only after power, ground, relay, fuse, harness, connector, and pump are all verified good.",
+      "sourceTier": "A_OWNED_CREATED",
+      "validationStatus": "VALIDATED"
+    }
+  ],
+  "edges": [
+    { "id": "e_dtc_symptom_no_start",      "from": "dtc_P0230",        "to": "symptom_no_start",      "type": "DTC_HAS_SYMPTOM" },
+    { "id": "e_dtc_symptom_stall",         "from": "dtc_P0230",        "to": "symptom_stall",         "type": "DTC_HAS_SYMPTOM" },
+    { "id": "e_dtc_symptom_long_crank",    "from": "dtc_P0230",        "to": "symptom_long_crank",    "type": "DTC_HAS_SYMPTOM" }
+  ],
+  "profiles": [
+    {
+      "code": "P0230",
+      "system": "Fuel System",
+      "severity": "HIGH",
+      "description": "Fuel Pump Primary Circuit malfunction detected by the PCM. The PCM monitors the fuel pump control circuit and sets this code when the commanded state does not match the observed state, or when voltage/current falls outside expected range.",
+      "relatedSystems": ["Fuel System", "Electrical System", "Ignition System"],
+      "likelyComponents": [
+        "Battery",
+        "Ground point",
+        "Fuel pump fuse",
+        "Fuel pump relay",
+        "Fuel pump connector",
+        "Wiring harness",
+        "Fuel pump motor",
+        "PCM driver"
+      ],
+      "rankedCauses": [
+        { "id": "cause_battery_ground", "probability": 0.32 },
+        { "id": "cause_relay",         "probability": 0.24 },
+        { "id": "cause_fuse_feed",     "probability": 0.18 },
+        { "id": "cause_connector",     "probability": 0.12 },
+        { "id": "cause_pump_motor",    "probability": 0.10 },
+        { "id": "cause_pcm_driver",    "probability": 0.04 }
+      ],
+      "diagnosticSteps": [
+        "Save DTC and freeze frame for record.",
+        "Measure battery voltage KOEO (key on, engine off): should be 12.4-12.7V.",
+        "Inspect fuel pump fuse for continuity and corrosion.",
+        "Activate fuel pump via bidirectional control or key cycle; listen for prime.",
+        "Measure voltage at relay control coil (PCM side) and relay output (pump side).",
+        "Measure voltage drop across the pump ground path (should be < 0.1V).",
+        "Inspect connector terminals for corrosion, spread, or backing-out.",
+        "Only after all of the above check out, perform pump current draw test.",
+        "PCM driver is the final hypothesis; do not replace PCM based on this code alone."
+      ],
+      "pidsToCheck": [
+        "BATTERY_VOLTAGE",
+        "FUEL_PUMP_COMMAND",
+        "FUEL_PUMP_RELAY_STATUS",
+        "RPM",
+        "ECT",
+        "ENGINE_LOAD",
+        "STFT_B1",
+        "LTFT_B1",
+        "MAP",
+        "MAF"
+      ],
+      "riskLevel": "HIGH"
+    }
+  ],
+  "diagram": {
+    "id": "diagram_P0230_fuel_pump_circuit",
+    "title": "Fuel Pump Primary Circuit (Conceptual)",
+    "disclaimer": "Conceptual diagram. Pinouts, wire colors, and component locations vary by vehicle. Always refer to the specific vehicle's OEM service information.",
+    "nodes": [
+      { "id": "battery",      "label": "Battery",            "kind": "source" },
+      { "id": "main_fuse",    "label": "Main Fuse",          "kind": "protection" },
+      { "id": "pump_fuse",    "label": "Fuel Pump Fuse",     "kind": "protection" },
+      { "id": "relay_coil",   "label": "Fuel Pump Relay Coil", "kind": "control_input" },
+      { "id": "relay_contact","label": "Fuel Pump Relay Contact", "kind": "switch" },
+      { "id": "pump",         "label": "Fuel Pump",          "kind": "load" },
+      { "id": "ground",       "label": "Ground Point",       "kind": "return" },
+      { "id": "pcm",          "label": "PCM Driver",         "kind": "control_source" }
+    ],
+    "edges": [
+      { "from": "battery",       "to": "main_fuse",     "kind": "12V" },
+      { "from": "main_fuse",     "to": "pump_fuse",     "kind": "12V" },
+      { "from": "pump_fuse",     "to": "relay_contact", "kind": "12V (load side)" },
+      { "from": "relay_contact", "to": "pump",          "kind": "12V (pump feed)" },
+      { "from": "pump",          "to": "ground",        "kind": "return" },
+      { "from": "pcm",           "to": "relay_coil",    "kind": "low-side driver" },
+      { "from": "relay_coil",    "to": "ground",        "kind": "return" }
+    ]
+  },
+  "decisionTree": {
+    "id": "tree_P0230",
+    "title": "P0230 Diagnostic Decision Tree",
+    "root": "n_battery_check",
+    "nodes": [
+      {
+        "id": "n_battery_check",
+        "question": "Battery voltage KOEO >= 12.4V?",
+        "howToTest": "Multimeter on battery posts, key ON, engine OFF.",
+        "tools": ["multimeter"],
+        "expectedValue": "12.4-12.7V",
+        "yes": "n_fuse_check",
+        "no":  "n_charge_battery",
+        "unknown": "n_fuse_check"
+      },
+      {
+        "id": "n_charge_battery",
+        "question": "Charge or replace battery, then retest.",
+        "howToTest": "Battery charger or replacement per OEM.",
+        "tools": ["battery charger"],
+        "expectedValue": "Voltage after charge >= 12.4V.",
+        "yes": "n_fuse_check",
+        "no":  "n_pcm_driver",
+        "unknown": "n_fuse_check"
+      },
+      {
+        "id": "n_fuse_check",
+        "question": "Fuel pump fuse continuity OK?",
+        "howToTest": "Pull fuse, multimeter continuity, inspect for corrosion.",
+        "tools": ["multimeter"],
+        "expectedValue": "0 ohms, no discoloration.",
+        "yes": "n_relay_check",
+        "no":  "n_replace_fuse",
+        "unknown": "n_relay_check"
+      },
+      {
+        "id": "n_replace_fuse",
+        "question": "Replace fuse. Same code after?",
+        "howToTest": "Install correct-rated fuse, clear code, drive cycle.",
+        "tools": ["fuse", "fuse puller"],
+        "expectedValue": "Code does not return.",
+        "yes": "n_relay_check",
+        "no":  "n_wiring_check",
+        "unknown": "n_wiring_check"
+      },
+      {
+        "id": "n_relay_check",
+        "question": "Relay control coil receives PCM command?",
+        "howToTest": "Back-probe relay coil terminals with PCM commanded ON.",
+        "tools": ["multimeter", "back probes"],
+        "expectedValue": "Coil voltage drops to near 0V when PCM commands ON.",
+        "yes": "n_relay_contact_check",
+        "no":  "n_pcm_driver",
+        "unknown": "n_wiring_check"
+      },
+      {
+        "id": "n_relay_contact_check",
+        "question": "Relay output voltage to pump within 0.5V of battery?",
+        "howToTest": "Measure output terminal with pump commanded ON.",
+        "tools": ["multimeter"],
+        "expectedValue": "Within 0.5V of battery voltage.",
+        "yes": "n_pump_connector",
+        "no":  "n_replace_relay",
+        "unknown": "n_wiring_check"
+      },
+      {
+        "id": "n_replace_relay",
+        "question": "Replace relay. Code clear after drive cycle?",
+        "howToTest": "Install new relay, clear code, drive cycle.",
+        "tools": ["replacement relay"],
+        "expectedValue": "Code does not return.",
+        "yes": "n_resolved",
+        "no":  "n_wiring_check",
+        "unknown": "n_wiring_check"
+      },
+      {
+        "id": "n_pump_connector",
+        "question": "Pump connector terminals clean and tight?",
+        "howToTest": "Inspect, clean, retest.",
+        "tools": ["contact cleaner", "small brush"],
+        "expectedValue": "No corrosion, no spread, full engagement.",
+        "yes": "n_pump_voltage",
+        "no":  "n_repair_connector",
+        "unknown": "n_pump_voltage"
+      },
+      {
+        "id": "n_repair_connector",
+        "question": "Repair or replace connector.",
+        "howToTest": "Replace terminal or pigtail, retest.",
+        "tools": ["terminal kit", "crimper"],
+        "expectedValue": "Voltage drop < 0.1V across repaired connection.",
+        "yes": "n_pump_voltage",
+        "no":  "n_wiring_check",
+        "unknown": "n_pump_voltage"
+      },
+      {
+        "id": "n_pump_voltage",
+        "question": "Pump feed voltage within 0.5V of battery?",
+        "howToTest": "Back-probe pump feed wire with pump commanded ON.",
+        "tools": ["multimeter", "back probes"],
+        "expectedValue": "Within 0.5V of battery.",
+        "yes": "n_pump_ground",
+        "no":  "n_wiring_check",
+        "unknown": "n_pump_ground"
+      },
+      {
+        "id": "n_pump_ground",
+        "question": "Voltage drop across pump ground < 0.1V?",
+        "howToTest": "Measure pump ground terminal to chassis ground.",
+        "tools": ["multimeter"],
+        "expectedValue": "< 0.1V drop.",
+        "yes": "n_pump_current",
+        "no":  "n_repair_ground",
+        "unknown": "n_pump_current"
+      },
+      {
+        "id": "n_repair_ground",
+        "question": "Repair ground path (clean, tighten, add supplemental ground if OEM allows).",
+        "howToTest": "Retest voltage drop after repair.",
+        "tools": ["wire brush", "terminal grease"],
+        "expectedValue": "< 0.1V drop.",
+        "yes": "n_pump_current",
+        "no":  "n_wiring_check",
+        "unknown": "n_pump_current"
+      },
+      {
+        "id": "n_pump_current",
+        "question": "Pump current draw within OEM range?",
+        "howToTest": "Clamp ammeter on pump feed wire, command pump ON.",
+        "tools": ["clamp ammeter"],
+        "expectedValue": "Per OEM spec; typical 4-8A at idle prime.",
+        "yes": "n_resolved",
+        "no":  "n_replace_pump",
+        "unknown": "n_pcm_driver"
+      },
+      {
+        "id": "n_replace_pump",
+        "question": "Replace pump. Code clear after drive cycle?",
+        "howToTest": "Install new pump, prime, clear code, drive cycle.",
+        "tools": ["replacement pump"],
+        "expectedValue": "Code does not return; normal fuel pressure.",
+        "yes": "n_resolved",
+        "no":  "n_wiring_check",
+        "unknown": "n_wiring_check"
+      },
+      {
+        "id": "n_wiring_check",
+        "question": "Harness and connectors between battery, fuse, relay, and pump all intact?",
+        "howToTest": "Visual inspection + continuity test on each conductor.",
+        "tools": ["multimeter", "wire tracer"],
+        "expectedValue": "< 1 ohm end-to-end on each conductor.",
+        "yes": "n_resolved",
+        "no":  "n_repair_wiring",
+        "unknown": "n_pcm_driver"
+      },
+      {
+        "id": "n_repair_wiring",
+        "question": "Repair or replace damaged wiring per OEM spec.",
+        "howToTest": "Continuity retest after repair.",
+        "tools": ["wire", "crimper", "heat shrink"],
+        "expectedValue": "< 1 ohm; no voltage drop under load.",
+        "yes": "n_resolved",
+        "no":  "n_pcm_driver",
+        "unknown": "n_pcm_driver"
+      },
+      {
+        "id": "n_pcm_driver",
+        "question": "PCM driver TSB / scan tool actuation test?",
+        "howToTest": "Run OEM bidirectional test, check TSB list for known PCM driver issues.",
+        "tools": ["scan tool with bidirectional support", "OEM TSB database"],
+        "expectedValue": "Driver commands output, TSB applies if listed.",
+        "yes": "n_apply_tsb",
+        "no":  "n_pcm_specialist",
+        "unknown": "n_pcm_specialist"
+      },
+      {
+        "id": "n_apply_tsb",
+        "question": "Apply TSB per OEM. Code clear after?",
+        "howToTest": "Per TSB; typically reflash or driver update.",
+        "tools": ["OEM scan tool"],
+        "expectedValue": "Code does not return.",
+        "yes": "n_resolved",
+        "no":  "n_pcm_specialist",
+        "unknown": "n_pcm_specialist"
+      },
+      {
+        "id": "n_pcm_specialist",
+        "question": "Escalate to OEM-trained specialist for PCM diagnosis.",
+        "howToTest": "Out of scope for generalist.",
+        "tools": ["OEM scan tool", "oscilloscope"],
+        "expectedValue": "Per specialist.",
+        "yes": "n_resolved",
+        "no":  "n_resolved",
+        "unknown": "n_resolved"
+      },
+      {
+        "id": "n_resolved",
+        "question": "Repair complete. Drive cycle confirms monitor ready and code does not return.",
+        "howToTest": "Drive cycle per OEM; verify readiness monitor.",
+        "tools": ["scan tool"],
+        "expectedValue": "Monitor COMPLETE; code absent.",
+        "yes": null,
+        "no":  null,
+        "unknown": null
+      }
+    ]
+  },
+  "validationRules": [
+    { "id": "vr_dtc_format",     "rule": "DTC code must match ^[PBCU][0-3][0-9A-F]{3}$" },
+    { "id": "vr_concept_only",  "rule": "All content is conceptual; no OEM data, no copyrighted material" }
+  ],
+  "tests": []
+}
