@@ -42,6 +42,15 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
 
+        // Car2DB API (opcional). Si no se configura, la app funciona en modo "solo genéricos".
+        val car2DbApiKey = localProps.getProperty("CAR2DB_API_KEY", "")
+        val car2DbReferer = localProps.getProperty("CAR2DB_REFERER", "https://elysium-vanguard.app")
+        val car2DbLanguage = localProps.getProperty("CAR2DB_LANGUAGE", "en-US")
+        buildConfigField("String", "CAR2DB_API_KEY", "\"$car2DbApiKey\"")
+        buildConfigField("String", "CAR2DB_REFERER", "\"$car2DbReferer\"")
+        buildConfigField("String", "CAR2DB_LANGUAGE", "\"$car2DbLanguage\"")
+        buildConfigField("boolean", "CAR2DB_ENABLED", "${car2DbApiKey.isNotBlank()}")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

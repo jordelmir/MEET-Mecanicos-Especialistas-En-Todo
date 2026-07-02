@@ -1,0 +1,470 @@
+package com.elysium.vanguard.forge.presentation.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.elysium.vanguard.forge.domain.FeatureType
+import com.elysium.vanguard.forge.domain.ForgePart
+import com.elysium.vanguard.forge.domain.MaterialSpec
+import com.elysium.vanguard.forge.domain.ParametricFeature
+import com.elysium.vanguard.forge.domain.SafetyClassification
+import com.elysium.vanguard.forge.presentation.components.NeonCard
+import com.elysium.vanguard.forge.presentation.components.ProvenanceBadge
+import com.elysium.vanguard.forge.presentation.components.SectionHeader
+import com.elysium.vanguard.forge.presentation.components.SeverityBadge
+import com.elysium.vanguard.forge.presentation.components.TechLabel
+import com.elysium.vanguard.forge.presentation.components.UiState
+import com.elysium.vanguard.forge.presentation.theme.ForgeColors
+import com.elysium.vanguard.forge.presentation.viewmodels.DimensionField
+import com.elysium.vanguard.forge.presentation.viewmodels.ForgePartEditorEvent
+import com.elysium.vanguard.forge.presentation.viewmodels.ForgePartEditorViewModel
+
+/**
+ * ForgePartEditorScreen — editor paramétrico de pieza.
+ *
+ * Layout: viewport 3D placeholder + árbol de features + parámetros + material + validación.
+ */
+@Composable
+fun ForgePartEditorScreen(
+    viewModel: ForgePartEditorViewModel,
+    onBack: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val materials by viewModel.materials.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (val state = uiState) {
+            is UiState.Loading -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "CARGANDO PIEZA",
+                    color = ForgeColors.Primary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    letterSpacing = 2.sp
+                )
+            }
+            is UiState.Empty -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Sin pieza cargada", color = ForgeColors.OnSurface.copy(alpha = 0.5f))
+            }
+            is UiState.Error -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(state.message, color = ForgeColors.Error)
+            }
+            is UiState.Ready -> EditorContent(
+                part = state.data,
+                materials = materials,
+                onEvent = viewModel::onEvent,
+                onBack = onBack
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorContent(
+    part: ForgePart,
+    materials: List<MaterialSpec>,
+    onEvent: (ForgePartEditorEvent) -> Unit,
+    onBack: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        item {
+            HeaderBar(part = part, onBack = onBack, onEvent = onEvent)
+            Spacer(Modifier.height(16.dp))
+        }
+        item {
+            Viewport3DPlaceholder(part = part)
+            Spacer(Modifier.height(16.dp))
+        }
+        item {
+            SafetyClassificationPicker(
+                current = part.artifact.safetyClassification,
+                onChange = { sc -> onEvent(ForgePartEditorEvent.OnSetSafetyClassification(sc)) }
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+        item {
+            SectionHeader("DIMENSIONES")
+        }
+        items(count = DimensionField.values().size) { index ->
+            val field = DimensionField.values()[index]
+            DimensionRow(
+                field = field,
+                valueMm = readDimension(part, field),
+                onChange = { v -> onEvent(ForgePartEditorEvent.OnUpdateDimension(field, v)) }
+            )
+        }
+        item {
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("MATERIAL")
+            MaterialPicker(
+                currentId = part.materialId,
+                materials = materials,
+                onChange = { onEvent(ForgePartEditorEvent.OnAssignMaterial(it)) }
+            )
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("FEATURES")
+        }
+        items(count = part.featureTree.size) { index ->
+            FeatureRow(feature = part.featureTree[index])
+        }
+        item {
+            AddFeatureButton(onAdd = { type ->
+                val newFeature = ParametricFeature(
+                    id = "f_${System.currentTimeMillis()}",
+                    type = type,
+                    name = type.name
+                )
+                onEvent(ForgePartEditorEvent.OnAddFeature(newFeature))
+            })
+            Spacer(Modifier.height(16.dp))
+        }
+        item {
+            ActionButtons(onEvent = onEvent)
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun HeaderBar(part: ForgePart, onBack: () -> Unit, onEvent: (ForgePartEditorEvent) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Button(
+            onClick = onBack,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ForgeColors.SurfaceVariant,
+                contentColor = ForgeColors.OnSurface
+            )
+        ) { Text("← BACK") }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            var name by remember { mutableStateOf(part.artifact.name) }
+            OutlinedTextField(
+                value = name,
+                onValueChange = {
+                    name = it
+                    onEvent(ForgePartEditorEvent.OnRename(it))
+                },
+                singleLine = true,
+                label = { Text("Nombre", fontSize = 11.sp) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun Viewport3DPlaceholder(part: ForgePart) {
+    NeonCard(modifier = Modifier.fillMaxWidth().height(220.dp), accentColor = ForgeColors.Accent) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "3D VIEWPORT",
+                    color = ForgeColors.Accent,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 3.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "${part.featureTree.size} features · ${part.dimensions.lengthMm?.toInt() ?: 0}x${part.dimensions.widthMm?.toInt() ?: 0}x${part.dimensions.heightMm?.toInt() ?: 0}mm",
+                    color = ForgeColors.OnSurface.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(Modifier.height(8.dp))
+                TechLabel("(MESH SE COMPONE EN FORGE GEOMETRY COMPILER · BACKEND)")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SafetyClassificationPicker(
+    current: SafetyClassification,
+    onChange: (SafetyClassification) -> Unit
+) {
+    Column {
+        SectionHeader("CLASIFICACIÓN DE SEGURIDAD")
+        Spacer(Modifier.height(8.dp))
+        NeonCard(modifier = Modifier.fillMaxWidth(), accentColor = safetyColor(current)) {
+            Column {
+                Text(
+                    text = current.displayName,
+                    color = safetyColor(current),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(8.dp))
+                SafetyClassification.values().forEach { sc ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { onChange(sc) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (sc == current) safetyColor(sc).copy(alpha = 0.3f) else Color.Transparent,
+                                contentColor = safetyColor(sc)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(sc.displayName, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DimensionRow(
+    field: DimensionField,
+    valueMm: Double?,
+    onChange: (Double) -> Unit
+) {
+    var text by remember(valueMm) { mutableStateOf(valueMm?.let { "%.1f".format(it) } ?: "") }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = field.displayName,
+            color = ForgeColors.OnSurface,
+            fontSize = 13.sp,
+            modifier = Modifier.width(140.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = {
+                text = it
+                val v = it.replace(',', '.').toDoubleOrNull()
+                if (v != null) onChange(v)
+            },
+            singleLine = true,
+            suffix = { Text("mm", fontSize = 11.sp) },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent
+            ),
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun MaterialPicker(
+    currentId: String?,
+    materials: List<MaterialSpec>,
+    onChange: (String) -> Unit
+) {
+    if (materials.isEmpty()) {
+        Text(
+            text = "Cargando materiales…",
+            color = ForgeColors.OnSurface.copy(alpha = 0.5f),
+            fontSize = 12.sp
+        )
+        return
+    }
+    Column {
+        materials.take(8).forEach { m ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { onChange(m.id) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (m.id == currentId) ForgeColors.Primary.copy(alpha = 0.2f) else Color.Transparent,
+                        contentColor = if (m.id == currentId) ForgeColors.Primary else ForgeColors.OnSurface
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(m.displayName, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            "${m.densityKgM3.toInt()}kg/m³ · ${m.yieldStrengthMPa.toInt()}MPa",
+                            fontSize = 10.sp,
+                            color = ForgeColors.OnSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeatureRow(feature: ParametricFeature) {
+    NeonCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        accentColor = if (feature.type.supportedV1) ForgeColors.Success else ForgeColors.Warning
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = if (feature.type.supportedV1) ForgeColors.Success else ForgeColors.Warning,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(feature.name.ifBlank { feature.type.name }, fontSize = 12.sp, color = ForgeColors.OnSurface)
+                Text(
+                    "id=${feature.id} · ${feature.operation.name}",
+                    fontSize = 10.sp,
+                    color = ForgeColors.OnSurface.copy(alpha = 0.5f),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            if (!feature.type.supportedV1) {
+                SeverityBadge("MARK V1", ForgeColors.Warning)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddFeatureButton(onAdd: (FeatureType) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        Button(
+            onClick = { expanded = !expanded },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ForgeColors.Secondary.copy(alpha = 0.2f),
+                contentColor = ForgeColors.Secondary
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (expanded) "Cancelar" else "Agregar feature")
+        }
+        if (expanded) {
+            Spacer(Modifier.height(8.dp))
+            FeatureType.values().filter { it.supportedV1 }.forEach { type ->
+                Button(
+                    onClick = {
+                        onAdd(type)
+                        expanded = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ForgeColors.Surface,
+                        contentColor = ForgeColors.OnSurface
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                ) {
+                    Text("+ ${type.name}", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButtons(onEvent: (ForgePartEditorEvent) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { onEvent(ForgePartEditorEvent.OnValidatePart) },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ForgeColors.Accent.copy(alpha = 0.2f),
+                contentColor = ForgeColors.Accent
+            ),
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(Icons.Default.Verified, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Validar")
+        }
+        Button(
+            onClick = { onEvent(ForgePartEditorEvent.OnSavePart) },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ForgeColors.Primary.copy(alpha = 0.2f),
+                contentColor = ForgeColors.Primary
+            ),
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(Icons.Default.Save, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Guardar")
+        }
+    }
+}
+
+private fun readDimension(part: ForgePart, field: DimensionField): Double? = when (field) {
+    DimensionField.LENGTH -> part.dimensions.lengthMm
+    DimensionField.WIDTH -> part.dimensions.widthMm
+    DimensionField.HEIGHT -> part.dimensions.heightMm
+    DimensionField.DIAMETER -> part.dimensions.diameterMm
+    DimensionField.INNER_DIAMETER -> part.dimensions.innerDiameterMm
+    DimensionField.OUTER_DIAMETER -> part.dimensions.outerDiameterMm
+    DimensionField.THICKNESS -> part.dimensions.thicknessMm
+    DimensionField.TOLERANCE -> part.dimensions.toleranceMm
+}
+
+private fun safetyColor(sc: SafetyClassification): Color = when {
+    sc.isSafetyCritical -> ForgeColors.Error
+    sc.displayName.contains("Educational") -> ForgeColors.ProvenanceOffline
+    else -> ForgeColors.Warning
+}

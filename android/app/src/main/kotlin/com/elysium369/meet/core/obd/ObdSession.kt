@@ -623,7 +623,7 @@ class ObdSession(
                 val targetDelay = (1000f / pollingPlan.commandsPerSecondLimit)
                     .toLong()
                     .coerceIn(if (_highSpeedMode.value && pollingPlan.highPerformanceMode) 25L else 60L, 250L)
-                if (targetDelay > 0) delay(targetDelay)
+                if (targetDelay > 0) delay(timeMillis = targetDelay)
             }
         }
     }
@@ -833,7 +833,7 @@ class ObdSession(
                         if (value != null) {
                             updateLiveData(cp.id.toString(), value)
                         } else {
-                            markSensorState(cp.id.toString(), SensorValueState.InvalidFormula, rawValue = response, source = SensorSource.OEM_OBD)
+                            markSensorState(cp.id.toString(), SensorValueState.InvalidFormula(rawValue = response), source = SensorSource.OEM_OBD)
                             recordClassifiedFailure(command, response, timeoutMs = 2000L, latencyMs = null)
                         }
                     }
@@ -986,10 +986,10 @@ class ObdSession(
         val normalized = raw.uppercase().replace(" ", "")
         return when {
             normalized.isBlank() -> SensorValueState.EcuNoResponse
-            normalized.contains("NODATA") || normalized.contains("NO DATA") -> SensorValueState.Unsupported
+            normalized.contains("NODATA") || normalized.contains("NO DATA") -> SensorValueState.Unsupported()
             normalized.contains("UNABLE") -> SensorValueState.EcuNoResponse
             normalized.contains("ERROR") || normalized.contains("CANERROR") -> SensorValueState.AdapterError
-            normalized.contains("?") -> SensorValueState.Unsupported
+            normalized.contains("?") -> SensorValueState.Unsupported()
             normalized.contains("7F") -> SensorValueState.NotAvailable
             else -> SensorValueState.NotAvailable
         }
@@ -1099,7 +1099,7 @@ class ObdSession(
         }
     }
 
-    private fun recordDerivedMetricsIfDue(metrics: List<com.elysium369.meet.core.vanguard.CalculatedMetric>) {
+    private fun recordDerivedMetricsIfDue(metrics: List<com.elysium369.meet.core.vanguard.DerivedMetric>) {
         val sessionId = currentVanguardSessionId ?: return
         val now = System.currentTimeMillis()
         val last = lastSensorRecordMs["__derived_metrics"] ?: 0L
@@ -3978,7 +3978,7 @@ class ObdSession(
                 array.put(
                     org.json.JSONObject()
                         .put("id", key)
-                        .put("state", state.stateName())
+                        .put("state", state.stateName)
                         .put("value", state.numericValueOrNull)
                 )
             }

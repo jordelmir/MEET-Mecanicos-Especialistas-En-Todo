@@ -2232,6 +2232,27 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_36_37 = object : Migration(36, 37) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 36→37: Guarding Vanguard commerce schema")
+            createVanguardCommerceTables(db)
+        }
+    }
+
+    private val MIGRATION_37_38 = object : Migration(37, 38) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 37→38: Guarding Vanguard commerce schema")
+            createVanguardCommerceTables(db)
+        }
+    }
+
+    private val MIGRATION_38_39 = object : Migration(38, 39) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 38→39: Advancing existing installs without data loss")
+            createVanguardCommerceTables(db)
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -2255,7 +2276,10 @@ object AppModule {
             MIGRATION_32_33,
             MIGRATION_33_34,
             MIGRATION_34_35,
-            MIGRATION_35_36
+            MIGRATION_35_36,
+            MIGRATION_36_37,
+            MIGRATION_37_38,
+            MIGRATION_38_39
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

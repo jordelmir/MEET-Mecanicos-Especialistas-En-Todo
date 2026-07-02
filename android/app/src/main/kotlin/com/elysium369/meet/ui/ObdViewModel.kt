@@ -2702,16 +2702,16 @@ class ObdViewModel @Inject constructor(
         }
 
         val loadedConfig = AiConfig(
-            provider = prefs.getString("ai_provider", "gemini") ?: "gemini",
+            provider = normalizeAiProvider(prefs.getString("ai_provider", "gemini") ?: "gemini"),
             apiKey = prefs.getString("ai_api_key", "") ?: "",
             endpoint = prefs.getString("ai_base_url", "") ?: "",
             modelName = prefs.getString("ai_model_name", "") ?: ""
         )
         _aiConfig.value = loadedConfig
         // Push to diagnostic engine on startup
-        if (loadedConfig.apiKey.isNotBlank()) {
-            val resolvedEp = resolveAiEndpoint(loadedConfig.provider, loadedConfig.endpoint, loadedConfig.modelName)
-            geminiDiagnostic.updateConfig(loadedConfig.apiKey, resolvedEp, loadedConfig.provider)
+        if (loadedConfig.apiKey.isNotBlank() || loadedConfig.provider == "ollama") {
+            val resolvedEp = resolveAiEndpoint(loadedConfig.provider, loadedConfig.endpoint)
+            geminiDiagnostic.updateConfig(loadedConfig.apiKey, resolvedEp, loadedConfig.provider, loadedConfig.modelName)
         }
 
         // Load terminal command history
@@ -2770,31 +2770,46 @@ class ObdViewModel @Inject constructor(
 
     /** Save AI configuration and push to diagnostic engine */
     fun saveAiConfig(provider: String, apiKey: String, endpoint: String, modelName: String) {
-        val config = AiConfig(provider, apiKey, endpoint, modelName)
+        val normalizedProvider = normalizeAiProvider(provider)
+        val config = AiConfig(normalizedProvider, apiKey.trim(), endpoint.trim(), modelName.trim())
         _aiConfig.value = config
 
         val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE).edit()
-        prefs.putString("ai_provider", provider)
-        prefs.putString("ai_api_key", apiKey)
-        prefs.putString("ai_base_url", endpoint)
-        prefs.putString("ai_model_name", modelName)
+        prefs.putString("ai_provider", config.provider)
+        prefs.putString("ai_api_key", config.apiKey)
+        prefs.putString("ai_base_url", config.endpoint)
+        prefs.putString("ai_model_name", config.modelName)
         prefs.apply()
 
         // Push config to the diagnostic engine immediately
-        val resolvedEndpoint = resolveAiEndpoint(provider, endpoint, modelName)
-        geminiDiagnostic.updateConfig(apiKey, resolvedEndpoint, provider)
-        Log.d("ObdVM", "AI Config saved: provider=$provider, model=$modelName")
+        val resolvedEndpoint = resolveAiEndpoint(config.provider, config.endpoint)
+        geminiDiagnostic.updateConfig(config.apiKey, resolvedEndpoint, config.provider, config.modelName)
+        Log.d("ObdVM", "AI Config saved: provider=${config.provider}, model=${config.modelName.ifBlank { "default" }}")
     }
 
     /** Resolve endpoint URL based on provider selection */
-    private fun resolveAiEndpoint(provider: String, customEndpoint: String, modelName: String): String? {
-        return when (provider) {
+    private fun resolveAiEndpoint(provider: String, customEndpoint: String): String? {
+        return when (normalizeAiProvider(provider)) {
             "gemini" -> null // use default Gemini endpoint inside GeminiDiagnostic
             "openai" -> if (customEndpoint.isNotBlank()) customEndpoint else "https://api.openai.com/v1/chat/completions"
             "anthropic" -> if (customEndpoint.isNotBlank()) customEndpoint else "https://api.anthropic.com/v1/messages"
             "ollama" -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:11434/v1/chat/completions"
-            "custom" -> customEndpoint.ifBlank { null }
+            "mavis", "custom" -> customEndpoint.ifBlank { null }
             else -> null
+        }
+    }
+
+    private fun normalizeAiProvider(provider: String): String {
+        val clean = provider.trim().lowercase()
+        return when {
+            clean.contains("gemini") -> "gemini"
+            clean.contains("openai") || clean.contains("gpt") -> "openai"
+            clean.contains("anthropic") || clean.contains("claude") -> "anthropic"
+            clean.contains("ollama") || clean.contains("local") -> "ollama"
+            clean.contains("mavis") -> "mavis"
+            clean.contains("custom") -> "custom"
+            clean.isBlank() -> "gemini"
+            else -> clean
         }
     }
 
@@ -3797,29 +3812,48 @@ class ObdViewModel @Inject constructor(
         return if (isSuccess) "SUCCESS" else response
     }
 
-    suspend fun consultAi(apiKey: String?, endpointUrl: String?, dtcList: List<String>): String {
+    suspend fun consultAi(
+        apiKey: String?,
+        endpointUrl: String?,
+        dtcList: List<String>,
+        providerOverride: String? = null,
+        modelNameOverride: String? = null
+    ): String {
         val dtcCodesStr = dtcList.sorted().joinToString(",")
+        val savedConfig = _aiConfig.value
+        val effectiveProvider = normalizeAiProvider(providerOverride ?: savedConfig.provider)
+        val effectiveApiKey = apiKey ?: savedConfig.apiKey
+        val effectiveModel = modelNameOverride ?: savedConfig.modelName
+        val effectiveEndpoint = endpointUrl ?: resolveAiEndpoint(effectiveProvider, savedConfig.endpoint)
+        val remoteAiConfigured = when (effectiveProvider) {
+            "ollama" -> !effectiveEndpoint.isNullOrBlank()
+            "gemini" -> effectiveApiKey.isNotBlank()
+            "openai", "anthropic", "mavis", "custom" -> effectiveApiKey.isNotBlank() && !effectiveEndpoint.isNullOrBlank()
+            else -> effectiveApiKey.isNotBlank() && !effectiveEndpoint.isNullOrBlank()
+        }
 
-        // 1. Check offline cache
-        try {
-            val cached = aiConsultDao.getCachedConsult(dtcCodesStr)
-            if (cached != null) {
-                android.util.Log.i("ObdViewModel", "Retrieved cached AI consultation offline for DTCs: $dtcCodesStr")
-                val cleanResult = parseCachedResponsePids(cached.response)
-                _anomalousPids.value = cleanResult.anomalousPids.map {
-                    com.elysium369.meet.core.ai.HealthAnomaly(it, "Anomalía detectada en diagnóstico profundo (Caché)")
+        // 1. Check offline cache only when there is no remote provider configured.
+        if (!remoteAiConfigured) {
+            try {
+                val cached = aiConsultDao.getCachedConsult(dtcCodesStr)
+                if (cached != null) {
+                    android.util.Log.i("ObdViewModel", "Retrieved cached AI consultation offline for DTCs: $dtcCodesStr")
+                    val cleanResult = parseCachedResponsePids(cached.response)
+                    _anomalousPids.value = cleanResult.anomalousPids.map {
+                        com.elysium369.meet.core.ai.HealthAnomaly(it, "Anomalía detectada en diagnóstico profundo (Caché)")
+                    }
+                    return cached.response
                 }
-                return cached.response
+            } catch (e: Exception) {
+                android.util.Log.w("ObdViewModel", "Error reading AI consult cache: ${e.message}")
             }
-        } catch (e: Exception) {
-            android.util.Log.w("ObdViewModel", "Error reading AI consult cache: ${e.message}")
         }
 
         // 2. Cache miss -> Query remote AI
         var resultText = ""
-        var modelUsed = geminiDiagnostic.javaClass.simpleName
+        var modelUsed = "$effectiveProvider:${effectiveModel.ifBlank { "default" }}"
         try {
-            geminiDiagnostic.updateConfig(apiKey, endpointUrl)
+            geminiDiagnostic.updateConfig(effectiveApiKey, effectiveEndpoint, effectiveProvider, effectiveModel)
             val info = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
             val result = geminiDiagnostic.analyzeDtc(
                 dtcList,
@@ -4521,20 +4555,24 @@ class ObdViewModel @Inject constructor(
 
     suspend fun analyzeOscilloscopeTelemetry(vehicleInfo: String, data: Map<String, List<Pair<Long, Float>>>): com.elysium369.meet.core.ai.DiagnosticResult {
         val currentConfig = _aiConfig.value
+        val endpoint = resolveAiEndpoint(currentConfig.provider, currentConfig.endpoint)
         geminiDiagnostic.updateConfig(
             newApiKey = currentConfig.apiKey,
-            newEndpoint = currentConfig.endpoint,
-            newProvider = currentConfig.provider
+            newEndpoint = endpoint,
+            newProvider = currentConfig.provider,
+            newModelName = currentConfig.modelName
         )
         return geminiDiagnostic.analyzeLiveTelemetry(vehicleInfo, data)
     }
 
     suspend fun analyzeNetworkTopology(vehicleInfo: String, modules: List<com.elysium369.meet.core.obd.NetworkModule>): com.elysium369.meet.core.ai.DiagnosticResult {
         val currentConfig = _aiConfig.value
+        val endpoint = resolveAiEndpoint(currentConfig.provider, currentConfig.endpoint)
         geminiDiagnostic.updateConfig(
             newApiKey = currentConfig.apiKey,
-            newEndpoint = currentConfig.endpoint,
-            newProvider = currentConfig.provider
+            newEndpoint = endpoint,
+            newProvider = currentConfig.provider,
+            newModelName = currentConfig.modelName
         )
         return geminiDiagnostic.analyzeNetworkTopology(vehicleInfo, modules)
     }
@@ -4546,10 +4584,12 @@ class ObdViewModel @Inject constructor(
         monitoredData: Map<String, Float>
     ): com.elysium369.meet.core.ai.DiagnosticResult {
         val currentConfig = _aiConfig.value
+        val endpoint = resolveAiEndpoint(currentConfig.provider, currentConfig.endpoint)
         geminiDiagnostic.updateConfig(
             newApiKey = currentConfig.apiKey,
-            newEndpoint = currentConfig.endpoint,
-            newProvider = currentConfig.provider
+            newEndpoint = endpoint,
+            newProvider = currentConfig.provider,
+            newModelName = currentConfig.modelName
         )
         return geminiDiagnostic.analyzeActiveTest(vehicleInfo, testName, testId, monitoredData)
     }

@@ -30,7 +30,8 @@ data class ChatMessage(
 class GeminiDiagnostic(
     private var apiKey: String? = null,
     private var customEndpointUrl: String? = null,
-    private var provider: String = "gemini" // gemini, openai, anthropic, ollama, custom
+    private var provider: String = "gemini", // gemini, openai, anthropic, ollama, mavis, custom
+    private var modelName: String? = null
 ) {
     
     private val defaultEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
@@ -46,8 +47,42 @@ class GeminiDiagnostic(
         provider = newProvider
     }
 
+    fun updateConfig(newApiKey: String?, newEndpoint: String?, newProvider: String, newModelName: String?) {
+        apiKey = newApiKey
+        customEndpointUrl = newEndpoint
+        provider = newProvider
+        modelName = newModelName
+    }
+
     /** Whether this provider uses OpenAI-compatible request/response format */
-    private fun isOpenAiFormat(): Boolean = provider in listOf("openai", "anthropic", "ollama", "custom")
+    private fun isOpenAiFormat(): Boolean = providerKey() in listOf("openai", "ollama", "custom", "mavis")
+
+    private fun isAnthropicFormat(): Boolean = providerKey() == "anthropic"
+
+    private fun providerKey(): String {
+        return provider.trim().lowercase()
+            .replace("google gemini", "gemini")
+            .replace("local/ollama", "ollama")
+            .replace("openai (gpt)", "openai")
+            .replace("anthropic (claude)", "anthropic")
+            .replace("mavis/custom", "mavis")
+    }
+
+    private fun selectedModel(defaultModel: String): String =
+        modelName?.takeIf { it.isNotBlank() } ?: defaultModel
+
+    private fun requiresApiKey(): Boolean = providerKey() != "ollama"
+
+    private fun hasUsableRemoteConfig(): Boolean {
+        val hasKey = !apiKey.isNullOrBlank()
+        val hasEndpoint = !customEndpointUrl.isNullOrBlank()
+        return when (providerKey()) {
+            "ollama" -> hasEndpoint
+            "gemini" -> hasKey
+            "openai", "anthropic", "custom", "mavis" -> hasKey && hasEndpoint
+            else -> hasKey && hasEndpoint
+        }
+    }
 
     suspend fun analyzeDtc(
         dtcList: List<String>, 
@@ -123,7 +158,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                val response = callGemini(endpoint, prompt)
                 if (response == null) {
                     return@withContext DiagnosticResult(runFallbackDiagnosis(dtcList))
                 }
@@ -144,7 +179,7 @@ class GeminiDiagnostic(
             val prompt = "Analiza estos datos OBD2 y da una conclusión técnica de MÁXIMO 10 PALABRAS en español: $snapshot"
             
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey) ?: "ESTADO NOMINAL"
+                val response = callGemini(endpoint, prompt) ?: "ESTADO NOMINAL"
                 return@withContext response.trim().replace(".", "").uppercase()
             } catch (e: Exception) {
                 "MONITOREANDO FLUJO"
@@ -186,16 +221,23 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val isCustomEndpointActive = !customEndpointUrl.isNullOrEmpty()
-                val useOpenAi = isOpenAiFormat() && isCustomEndpointActive
+                val useOpenAi = isOpenAiFormat()
+                val useAnthropic = isAnthropicFormat()
 
-                if (useOpenAi) {
-                    // OpenAI-compatible chat format
+                if (useOpenAi || useAnthropic) {
                     val messages = JSONArray()
-                    messages.put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt)
-                    })
+                    if (useOpenAi) {
+                        messages.put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        })
+                    }
+                    if (history.isEmpty() && useOpenAi) {
+                        messages.put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", "Hola, necesito ayuda con diagnostico automotriz.")
+                        })
+                    }
                     history.forEach { msg ->
                         messages.put(JSONObject().apply {
                             put("role", if (msg.role == "user") "user" else "assistant")
@@ -203,9 +245,20 @@ class GeminiDiagnostic(
                         })
                     }
                     val body = JSONObject().apply {
-                        put("messages", messages)
+                        put("model", selectedModel(if (useAnthropic) "claude-3-5-sonnet-20241022" else "gpt-4o-mini"))
+                        if (useAnthropic && history.isEmpty()) {
+                            put("system", systemPrompt)
+                            put("messages", JSONArray().put(JSONObject()
+                                .put("role", "user")
+                                .put("content", "Hola, necesito ayuda con diagnostico automotriz.")))
+                        } else if (useAnthropic) {
+                            put("system", systemPrompt)
+                            put("messages", messages)
+                        } else {
+                            put("messages", messages)
+                        }
                         put("max_tokens", 4096)
-                        put("temperature", 0.7)
+                        put("temperature", 0.35)
                     }
                     val response = callApiRaw(endpoint, body)
                     return@withContext parseOpenAiResponse(response) ?: "Lo siento, hubo un error al procesar tu mensaje."
@@ -253,17 +306,7 @@ class GeminiDiagnostic(
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.connectTimeout = 15000
                 connection.readTimeout = 30000
-                // Auth headers
-                val hasKey = !apiKey.isNullOrEmpty()
-                val isCustom = !customEndpointUrl.isNullOrEmpty()
-                if (isCustom && hasKey) {
-                    if (provider == "anthropic") {
-                        connection.setRequestProperty("x-api-key", apiKey)
-                        connection.setRequestProperty("anthropic-version", "2023-06-01")
-                    } else {
-                        connection.setRequestProperty("Authorization", "Bearer $apiKey")
-                    }
-                }
+                applyAuthHeaders(connection)
                 connection.doOutput = true
                 
                 connection.outputStream.use { os ->
@@ -332,7 +375,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey) ?: return@withContext emptyList()
+                val response = callGemini(endpoint, prompt) ?: return@withContext emptyList()
                 val jsonStr = extractJsonFromText(response) ?: return@withContext emptyList()
                 
                 val resultObj = JSONObject(jsonStr)
@@ -418,7 +461,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                val response = callGemini(endpoint, prompt)
                 if (response == null) {
                     return@withContext DiagnosticResult("Error en el análisis de telemetría.")
                 }
@@ -488,7 +531,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                val response = callGemini(endpoint, prompt)
                 if (response == null) {
                     return@withContext DiagnosticResult("Error en el análisis de topología.")
                 }
@@ -558,7 +601,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                val response = callGemini(endpoint, prompt)
                 if (response == null) {
                     return@withContext DiagnosticResult(runFallbackActiveTestDiagnosis(testId, monitoredData))
                 }
@@ -590,30 +633,48 @@ class GeminiDiagnostic(
         """.trimIndent()
     }
 
-    private suspend fun callGemini(endpoint: String, prompt: String, isCustom: Boolean, hasKey: Boolean): String? {
+    private suspend fun callGemini(endpoint: String, prompt: String): String? {
         return withContext(Dispatchers.IO) {
-            val useOpenAiFormat = isOpenAiFormat() && isCustom
+            val useOpenAiFormat = isOpenAiFormat()
+            val useAnthropicFormat = isAnthropicFormat()
             
-            val jsonBody = if (useOpenAiFormat) {
-                // OpenAI-compatible format (works with OpenAI, Ollama, LM Studio, vLLM, etc.)
-                JSONObject().apply {
-                    put("messages", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("role", "user")
-                            put("content", prompt)
+            val jsonBody = when {
+                useOpenAiFormat -> {
+                    // OpenAI-compatible format: OpenAI, Mavis/custom compatible gateways,
+                    // Ollama, LM Studio, vLLM, OpenRouter, Together, Groq, Heroku/OCI, etc.
+                    JSONObject().apply {
+                        put("model", selectedModel(if (providerKey() == "ollama") "llama3.1" else "gpt-4o-mini"))
+                        put("messages", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("role", "user")
+                                put("content", prompt)
+                            })
                         })
-                    })
-                    put("max_tokens", 4096)
-                    put("temperature", 0.7)
+                        put("max_tokens", 4096)
+                        put("temperature", 0.35)
+                    }
                 }
-            } else {
-                // Gemini native format
-                JSONObject().apply {
-                    put("contents", JSONArray().put(
-                        JSONObject().put("parts", JSONArray().put(
-                            JSONObject().put("text", prompt)
+                useAnthropicFormat -> {
+                    JSONObject().apply {
+                        put("model", selectedModel("claude-3-5-sonnet-20241022"))
+                        put("max_tokens", 4096)
+                        put("temperature", 0.35)
+                        put("messages", JSONArray().put(
+                            JSONObject()
+                                .put("role", "user")
+                                .put("content", prompt)
                         ))
-                    ))
+                    }
+                }
+                else -> {
+                    // Gemini native format
+                    JSONObject().apply {
+                        put("contents", JSONArray().put(
+                            JSONObject().put("parts", JSONArray().put(
+                                JSONObject().put("text", prompt)
+                            ))
+                        ))
+                    }
                 }
             }
 
@@ -624,14 +685,7 @@ class GeminiDiagnostic(
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.connectTimeout = 15000
                 connection.readTimeout = 30000
-                if (isCustom && hasKey) {
-                    if (provider == "anthropic") {
-                        connection.setRequestProperty("x-api-key", apiKey)
-                        connection.setRequestProperty("anthropic-version", "2023-06-01")
-                    } else {
-                        connection.setRequestProperty("Authorization", "Bearer $apiKey")
-                    }
-                }
+                applyAuthHeaders(connection)
                 connection.doOutput = true
                 
                 connection.outputStream.use { os ->
@@ -643,7 +697,7 @@ class GeminiDiagnostic(
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
                     val jsonResponse = JSONObject(response)
                     
-                    return@withContext if (useOpenAiFormat) {
+                    return@withContext if (useOpenAiFormat || useAnthropicFormat) {
                         parseOpenAiResponse(jsonResponse)
                     } else {
                         parseGeminiResponse(jsonResponse)
@@ -693,6 +747,20 @@ class GeminiDiagnostic(
             }
         }
         return null
+    }
+
+    private fun applyAuthHeaders(connection: HttpURLConnection) {
+        val key = apiKey?.takeIf { it.isNotBlank() } ?: return
+        when (providerKey()) {
+            "anthropic" -> {
+                connection.setRequestProperty("x-api-key", key)
+                connection.setRequestProperty("anthropic-version", "2023-06-01")
+            }
+            "gemini" -> {
+                // Gemini native endpoint uses ?key=... in the URL.
+            }
+            else -> connection.setRequestProperty("Authorization", "Bearer $key")
+        }
     }
 
     private fun parseDiagnosticResponse(rawText: String): DiagnosticResult {
@@ -800,7 +868,7 @@ class GeminiDiagnostic(
             """.trimIndent()
 
             try {
-                val response = callGemini(endpoint, prompt, isCustomEndpoint, hasValidKey)
+                val response = callGemini(endpoint, prompt)
                 if (response == null) {
                     return@withContext DiagnosticResult(runFallbackServiceResetDiagnosis(resetId, manufacturer, isSuccess))
                 }

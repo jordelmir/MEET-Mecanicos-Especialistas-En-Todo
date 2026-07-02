@@ -116,6 +116,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
         "openai" to "OpenAI (GPT)",
         "anthropic" to "Anthropic (Claude)",
         "ollama" to "Ollama (Local)",
+        "mavis" to "Mavis / OpenAI-compatible",
         "custom" to "Custom Endpoint"
     )
 
@@ -412,6 +413,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                                     "openai" -> if (endpointInput.isBlank()) endpointInput = "https://api.openai.com/v1/chat/completions"
                                                     "anthropic" -> if (endpointInput.isBlank()) endpointInput = "https://api.anthropic.com/v1/messages"
                                                     "ollama" -> if (endpointInput.isBlank()) endpointInput = "http://localhost:11434/v1/chat/completions"
+                                                    "mavis" -> if (endpointInput.isBlank()) endpointInput = "https://api.tu-proveedor-mavis.com/v1/chat/completions"
                                                     "gemini" -> endpointInput = ""
                                                 }
                                             }
@@ -503,7 +505,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             }
 
                             // --- Model Name ---
-                            AnimatedVisibility(visible = selectedProvider in listOf("openai", "ollama", "custom")) {
+                            AnimatedVisibility(visible = selectedProvider in listOf("openai", "ollama", "mavis", "custom")) {
                                 Column {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text("Modelo (opcional)", color = Color.White, fontWeight = FontWeight.Medium)
@@ -576,6 +578,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                     "openai" -> "🔑 Usa tu API key de platform.openai.com"
                                     "anthropic" -> "🔑 Usa tu API key de console.anthropic.com"
                                     "ollama" -> "🏠 Ollama corre localmente. Asegúrate de que el servidor esté activo."
+                                    "mavis" -> "🌐 Usa el endpoint Mavis que exponga formato /v1/chat/completions o compatible OpenAI."
                                     "custom" -> "🌐 Ingresa la URL de cualquier API compatible con OpenAI."
                                     else -> ""
                                 },

@@ -113,6 +113,19 @@ MEET_SUPABASE_URL=https://your-supabase-project.supabase.co
 MEET_SUPABASE_KEY=your-supabase-anonymous-key
 ```
 
+### AI Provider Configuration
+The APK supports user-supplied AI APIs from inside `Ajustes > Motor de Inteligencia Artificial`.
+
+Supported providers:
+* `gemini` — Gemini native generateContent.
+* `openai` — OpenAI Chat Completions compatible.
+* `anthropic` — Anthropic Messages API.
+* `ollama` — local OpenAI-compatible endpoint.
+* `mavis` — configurable Mavis/vendor endpoint using OpenAI-compatible payloads.
+* `custom` — any compatible third-party API.
+
+Do not commit real API keys. Use the in-app settings for user keys or ignored local files for developer testing. Remote AI calls bypass stale local DTC cache when configured; offline/local expert fallback remains available and is labeled as local.
+
 ### 2. Building from Command Line
 Run the following Gradle wrapper commands:
 

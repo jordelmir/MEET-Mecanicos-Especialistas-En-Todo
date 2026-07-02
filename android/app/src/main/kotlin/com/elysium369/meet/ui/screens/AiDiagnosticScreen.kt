@@ -51,9 +51,31 @@ fun AiDiagnosticScreen(
     val context = LocalContext.current
     val sharedPrefs = context.getSharedPreferences("meet_prefs", android.content.Context.MODE_PRIVATE)
     
-    var provider by remember { mutableStateOf(sharedPrefs.getString("ai_provider", "Google Gemini") ?: "Google Gemini") }
+    fun normalizeAiProvider(value: String): String {
+        val clean = value.trim().lowercase()
+        return when {
+            clean.contains("gemini") -> "gemini"
+            clean.contains("openai") || clean.contains("gpt") -> "openai"
+            clean.contains("anthropic") || clean.contains("claude") -> "anthropic"
+            clean.contains("ollama") || clean.contains("local") -> "ollama"
+            clean.contains("mavis") -> "mavis"
+            clean.contains("custom") -> "custom"
+            else -> "gemini"
+        }
+    }
+
+    val providers = listOf(
+        "gemini" to "Google Gemini",
+        "openai" to "OpenAI (GPT)",
+        "anthropic" to "Anthropic (Claude)",
+        "ollama" to "Ollama (Local)",
+        "mavis" to "Mavis / OpenAI-compatible",
+        "custom" to "Custom Endpoint"
+    )
+    var provider by remember { mutableStateOf(normalizeAiProvider(sharedPrefs.getString("ai_provider", "gemini") ?: "gemini")) }
     var apiKey by remember { mutableStateOf(sharedPrefs.getString("ai_api_key", "") ?: "") }
     var baseUrl by remember { mutableStateOf(sharedPrefs.getString("ai_base_url", "") ?: "") }
+    var modelName by remember { mutableStateOf(sharedPrefs.getString("ai_model_name", "") ?: "") }
     var isConfigOpen by remember { mutableStateOf(false) }
 
     var aiResponse by remember { mutableStateOf<String?>(null) }
@@ -80,9 +102,15 @@ fun AiDiagnosticScreen(
     }
 
     LaunchedEffect(dtcCode) {
-        if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "Local/Ollama")) {
+        if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "ollama")) {
             isLoading = true
-            aiResponse = viewModel.consultAi(apiKey.takeIf { it.isNotBlank() }, baseUrl.takeIf { it.isNotBlank() }, listOf(dtcCode))
+            aiResponse = viewModel.consultAi(
+                apiKey.takeIf { it.isNotBlank() },
+                baseUrl.takeIf { it.isNotBlank() },
+                listOf(dtcCode),
+                provider,
+                modelName
+            )
             isLoading = false
         }
     }
@@ -127,8 +155,6 @@ fun AiDiagnosticScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         
-                        // Providers
-                        val providers = listOf("Google Gemini", "OpenAI", "Anthropic", "Local/Ollama")
                         var expanded by remember { mutableStateOf(false) }
                         
                         ExposedDropdownMenuBox(
@@ -136,7 +162,7 @@ fun AiDiagnosticScreen(
                             onExpandedChange = { expanded = !expanded }
                         ) {
                             OutlinedTextField(
-                                value = provider,
+                                value = providers.find { it.first == provider }?.second ?: provider,
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text("Proveedor de IA", color = MeetColors.textSecondary) },
@@ -155,11 +181,18 @@ fun AiDiagnosticScreen(
                                 expanded = expanded,
                                 onDismissRequest = { expanded = false }
                             ) {
-                                providers.forEach { p ->
+                                providers.forEach { (key, label) ->
                                     DropdownMenuItem(
-                                        text = { Text(p, color = Color.White) },
+                                        text = { Text(label, color = Color.White) },
                                         onClick = {
-                                            provider = p
+                                            provider = key
+                                            when (key) {
+                                                "openai" -> if (baseUrl.isBlank()) baseUrl = "https://api.openai.com/v1/chat/completions"
+                                                "anthropic" -> if (baseUrl.isBlank()) baseUrl = "https://api.anthropic.com/v1/messages"
+                                                "ollama" -> if (baseUrl.isBlank()) baseUrl = "http://localhost:11434/v1/chat/completions"
+                                                "mavis" -> if (baseUrl.isBlank()) baseUrl = "https://api.tu-proveedor-mavis.com/v1/chat/completions"
+                                                "gemini" -> baseUrl = ""
+                                            }
                                             expanded = false
                                         },
                                         modifier = Modifier.background(MeetColors.backgroundDark)
@@ -183,12 +216,28 @@ fun AiDiagnosticScreen(
                             )
                         )
                         
-                        if (provider == "Local/Ollama" || provider == "OpenAI") {
+                        if (provider != "gemini") {
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = baseUrl,
                                 onValueChange = { baseUrl = it },
                                 label = { Text("URL Base Customizada (Ollama/Custom)", color = MeetColors.textSecondary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = MeetColors.electricBlue,
+                                    unfocusedBorderColor = MeetColors.borderSubtle
+                                )
+                            )
+                        }
+
+                        if (provider in listOf("openai", "ollama", "mavis", "custom")) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = modelName,
+                                onValueChange = { modelName = it },
+                                label = { Text("Modelo (opcional)", color = MeetColors.textSecondary) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
@@ -205,9 +254,11 @@ fun AiDiagnosticScreen(
                             TextButton(onClick = { 
                                 apiKey = ""
                                 baseUrl = ""
+                                modelName = ""
                                 sharedPrefs.edit()
                                     .remove("ai_api_key")
                                     .remove("ai_base_url")
+                                    .remove("ai_model_name")
                                     .apply()
                             }) {
                                 Text("Limpiar", color = MeetColors.error)
@@ -215,16 +266,18 @@ fun AiDiagnosticScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = { 
-                                    sharedPrefs.edit()
-                                        .putString("ai_provider", provider)
-                                        .putString("ai_api_key", apiKey)
-                                        .putString("ai_base_url", baseUrl)
-                                        .apply()
+                                    viewModel.saveAiConfig(provider, apiKey, baseUrl, modelName)
                                     isConfigOpen = false
-                                    if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "Local/Ollama")) {
+                                    if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "ollama")) {
                                         coroutineScope.launch {
                                             isLoading = true
-                                            aiResponse = viewModel.consultAi(apiKey.takeIf { it.isNotBlank() }, baseUrl.takeIf { it.isNotBlank() }, listOf(dtcCode))
+                                            aiResponse = viewModel.consultAi(
+                                                apiKey.takeIf { it.isNotBlank() },
+                                                baseUrl.takeIf { it.isNotBlank() },
+                                                listOf(dtcCode),
+                                                provider,
+                                                modelName
+                                            )
                                             isLoading = false
                                         }
                                     }
@@ -570,4 +623,3 @@ fun CyberConsoleProgressStepper() {
         }
     }
 }
-
