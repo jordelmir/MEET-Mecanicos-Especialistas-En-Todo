@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "last_refresh_utc": "",
+  "source_commit": "",
+  "included_paths": [],
+  "excluded_paths": [
+    ".env",
+    ".env.*",
+    "keystores",
+    "signing keys",
+    "tokens",
+    "production dumps",
+    "raw VIN/GPS logs",
+    "PII"
+  ],
+  "chunking_policy": "symbol-aware",
+  "embedding_model": "",
+  "vector_store": "",
+  "security_exclusions_applied": true,
+  "notes": [
+    "Bootstrap metadata. Full RAG refresh pending verified repo inspection."
+  ]
+}

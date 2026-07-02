@@ -1,0 +1,47 @@
+included:
+  code:
+    - src/
+    - app/
+    - backend/
+    - frontend/
+    - android/
+    - supabase/
+    - migrations/
+  docs:
+    - README.md
+    - CHANGELOG.md
+    - docs/
+    - .mavis/memory/
+    - .mavis/adr/
+    - .mavis/runbooks/
+  ci:
+    - .github/workflows/
+  config:
+    - package.json
+    - build.gradle
+    - build.gradle.kts
+    - settings.gradle
+    - settings.gradle.kts
+    - Cargo.toml
+    - docker-compose.yml
+    - compose.yaml
+
+excluded:
+  - .env
+  - .env.*
+  - "**/*secret*"
+  - "**/*password*"
+  - "**/*token*"
+  - "**/*keystore*"
+  - "**/*.jks"
+  - "**/*.p12"
+  - "**/*.apk"
+  - "**/*.aab"
+  - "**/build/**"
+  - "**/.gradle/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "**/*dump*"
+  - "**/*vin*raw*"
+  - "**/*gps*raw*"

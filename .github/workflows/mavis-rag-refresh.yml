@@ -1,0 +1,48 @@
+name: Mavis RAG Freshness Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  rag-freshness:
+    name: RAG freshness check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check memory files
+        shell: bash
+        run: |
+          mkdir -p .mavis/reports
+          {
+            echo "# RAG Freshness Check"
+            echo
+            echo "## Changed files"
+            git diff --name-only origin/main...HEAD || true
+            echo
+            echo "## Memory files"
+            find .mavis/memory .mavis/rag .mavis/adr -type f 2>/dev/null || true
+          } > .mavis/reports/rag-freshness.md
+
+      - name: Warn if critical files changed without memory/docs update
+        shell: bash
+        run: |
+          CHANGED="$(git diff --name-only origin/main...HEAD || true)"
+
+          echo "$CHANGED" | grep -E "supabase/|migrations/|src/|app/|backend/|frontend/|android/|Cargo.toml|build.gradle|build.gradle.kts|package.json" >/tmp/critical_changed || true
+
+          echo "$CHANGED" | grep -E ".mavis/memory/|.mavis/rag/|.mavis/adr/|docs/|README.md|CHANGELOG.md" >/tmp/memory_changed || true
+
+          if [ -s /tmp/critical_changed ] && [ ! -s /tmp/memory_changed ]; then
+            echo "Critical files changed without memory/docs/RAG update."
+            exit 1
+          fi

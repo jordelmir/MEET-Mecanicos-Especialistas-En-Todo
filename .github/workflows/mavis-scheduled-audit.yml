@@ -1,0 +1,54 @@
+name: Mavis Scheduled Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 10 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Weekly technical audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repo signals
+        shell: bash
+        run: |
+          mkdir -p .mavis/reports
+          {
+            echo "# Mavis Scheduled Audit"
+            echo
+            echo "## Commit"
+            git rev-parse HEAD
+            echo
+            echo "## Risk Signals"
+            echo '```txt'
+            grep -RInE "TODO|FIXME|HACK|XXX|unsafe|unwrap\(|expect\(|catch \(Exception|GlobalScope|!!|SELECT \*|service_role|secret|password|token|api_key" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=dist \
+              --exclude-dir=coverage \
+              --exclude=".env" \
+              --exclude=".env.*" \
+              || true
+            echo '```'
+          } > .mavis/reports/scheduled-audit.md
+
+      - name: Create issue if audit found signals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if grep -qE "TODO|FIXME|HACK|XXX|unsafe|unwrap\(|expect\(|catch \(Exception|GlobalScope|!!|SELECT \*|service_role|secret|password|token|api_key" .mavis/reports/scheduled-audit.md; then
+            gh issue create \
+              --title "[Mavis] Weekly technical audit findings" \
+              --body-file .mavis/reports/scheduled-audit.md \
+              --label "mavis,tech-debt" || true
+          fi
