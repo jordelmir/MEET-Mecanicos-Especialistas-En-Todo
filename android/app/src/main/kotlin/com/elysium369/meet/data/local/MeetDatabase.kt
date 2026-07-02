@@ -111,7 +111,7 @@ import com.elysium369.meet.data.local.entities.*
         MarketplaceLedgerEntryEntity::class,
         VanguardOutboxEntity::class
     ],
-    version = 39,
+    version = 40,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -1812,340 +1812,523 @@ object AppModule {
         }
     }
 
+    private data class RoomColumnShape(
+        val type: String,
+        val notNull: Boolean,
+        val primaryKeyPosition: Int = 0
+    )
+
+    private fun tableExists(db: SupportSQLiteDatabase, tableName: String): Boolean {
+        db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'").use { cursor ->
+            return cursor.moveToFirst()
+        }
+    }
+
+    private fun readColumnShapes(db: SupportSQLiteDatabase, tableName: String): Map<String, RoomColumnShape> {
+        val columns = linkedMapOf<String, RoomColumnShape>()
+        db.query("PRAGMA table_info(`$tableName`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            val typeIndex = cursor.getColumnIndex("type")
+            val notNullIndex = cursor.getColumnIndex("notnull")
+            val pkIndex = cursor.getColumnIndex("pk")
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(nameIndex)
+                val type = cursor.getString(typeIndex).uppercase()
+                columns[name] = RoomColumnShape(
+                    type = type,
+                    notNull = cursor.getInt(notNullIndex) == 1,
+                    primaryKeyPosition = cursor.getInt(pkIndex)
+                )
+            }
+        }
+        return columns
+    }
+
+    private fun ensureRoomTableShape(
+        db: SupportSQLiteDatabase,
+        tableName: String,
+        expectedColumns: Map<String, RoomColumnShape>,
+        managedIndices: List<String> = emptyList()
+    ) {
+        managedIndices.forEach { indexName ->
+            db.execSQL("DROP INDEX IF EXISTS `$indexName`")
+        }
+
+        if (!tableExists(db, tableName)) return
+
+        val currentColumns = readColumnShapes(db, tableName)
+        val matchesExpectedShape =
+            currentColumns.keys == expectedColumns.keys &&
+                expectedColumns.all { (name, expected) ->
+                    currentColumns[name]?.let { current ->
+                        current.type == expected.type &&
+                            current.notNull == expected.notNull &&
+                            current.primaryKeyPosition == expected.primaryKeyPosition
+                    } == true
+                }
+
+        if (matchesExpectedShape) return
+
+        var backupName = "${tableName}_legacy_before_v40"
+        var suffix = 2
+        while (tableExists(db, backupName)) {
+            backupName = "${tableName}_legacy_before_v40_$suffix"
+            suffix += 1
+        }
+        android.util.Log.w(
+            "ElysiumDB",
+            "Backing up incompatible Vanguard table '$tableName' as '$backupName' before Room schema repair"
+        )
+        db.execSQL("ALTER TABLE `$tableName` RENAME TO `$backupName`")
+    }
+
     private fun createVanguardTelemetryTables(db: SupportSQLiteDatabase) {
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_sessions` (
+        ensureRoomTableShape(
+            db,
+            "vanguard_obd_sessions",
+            linkedMapOf(
+                "sessionId" to RoomColumnShape("TEXT", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "adapterId" to RoomColumnShape("TEXT", false),
+                "protocol" to RoomColumnShape("TEXT", true),
+                "startedAt" to RoomColumnShape("INTEGER", true),
+                "endedAt" to RoomColumnShape("INTEGER", false),
+                "status" to RoomColumnShape("TEXT", true),
+                "totalPidsRead" to RoomColumnShape("INTEGER", true),
+                "errorCount" to RoomColumnShape("INTEGER", true),
+                "lastError" to RoomColumnShape("TEXT", false)
+            )
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vanguard_obd_sessions` (
             `sessionId` TEXT NOT NULL,
-            `userHash` TEXT,
-            `vehicleId` TEXT,
-            `vinHash` TEXT,
-            `appVersion` TEXT NOT NULL,
-            `androidVersion` TEXT NOT NULL,
-            `deviceModel` TEXT NOT NULL,
-            `adapterName` TEXT,
-            `adapterMacHash` TEXT,
-            `adapterFirmware` TEXT,
-            `protocolDetected` TEXT,
-            `connectionStartTime` INTEGER NOT NULL,
-            `connectionEndTime` INTEGER,
-            `pidPollingRateHz` REAL NOT NULL,
-            `commandCount` INTEGER NOT NULL,
-            `successCount` INTEGER NOT NULL,
-            `timeoutCount` INTEGER NOT NULL,
-            `retryCount` INTEGER NOT NULL,
-            `averageLatencyMs` REAL NOT NULL,
-            `p95LatencyMs` REAL NOT NULL,
-            `p99LatencyMs` REAL NOT NULL,
-            `jitterMs` REAL NOT NULL,
-            `droppedFrames` INTEGER NOT NULL,
-            `reconnectCount` INTEGER NOT NULL,
-            `batteryVoltageMin` REAL,
-            `batteryVoltageMax` REAL,
-            `ecuModulesJson` TEXT NOT NULL,
-            `dtcsJson` TEXT NOT NULL,
-            `mode06Json` TEXT NOT NULL,
-            `derivedMetricsJson` TEXT NOT NULL,
-            `consentGranted` INTEGER NOT NULL,
-            `compressedPayloadPath` TEXT,
-            `pendingUpload` INTEGER NOT NULL,
-            `uploadAttemptCount` INTEGER NOT NULL,
-            `nextUploadAt` INTEGER,
-            `createdAt` INTEGER NOT NULL,
-            `updatedAt` INTEGER NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `adapterId` TEXT,
+            `protocol` TEXT NOT NULL,
+            `startedAt` INTEGER NOT NULL,
+            `endedAt` INTEGER,
+            `status` TEXT NOT NULL,
+            `totalPidsRead` INTEGER NOT NULL,
+            `errorCount` INTEGER NOT NULL,
+            `lastError` TEXT,
             PRIMARY KEY(`sessionId`)
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_sessions_vehicleId_connectionStartTime` ON `obd_sessions` (`vehicleId`, `connectionStartTime`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_sessions_pendingUpload_nextUploadAt` ON `obd_sessions` (`pendingUpload`, `nextUploadAt`)")
 
+        ensureRoomTableShape(
+            db,
+            "obd_pid_samples",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "sessionId" to RoomColumnShape("TEXT", true),
+                "pid" to RoomColumnShape("TEXT", true),
+                "value" to RoomColumnShape("REAL", true),
+                "unit" to RoomColumnShape("TEXT", true),
+                "capturedAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf(
+                "index_obd_pid_samples_sessionId",
+                "index_obd_pid_samples_capturedAt",
+                "index_obd_pid_samples_sessionId_pid_timestampMs",
+                "index_obd_pid_samples_vehicleId_pid_timestampMs"
+            )
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_pid_samples` (
-            `id` TEXT NOT NULL,
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
             `pid` TEXT NOT NULL,
-            `label` TEXT,
-            `state` TEXT NOT NULL,
-            `value` REAL,
-            `unit` TEXT,
-            `source` TEXT NOT NULL,
-            `confidence` REAL,
-            `ageMs` INTEGER,
-            `rawValue` TEXT,
-            `errorReason` TEXT,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
+            `value` REAL NOT NULL,
+            `unit` TEXT NOT NULL,
+            `capturedAt` INTEGER NOT NULL
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_sessionId_pid_timestampMs` ON `obd_pid_samples` (`sessionId`, `pid`, `timestampMs`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_vehicleId_pid_timestampMs` ON `obd_pid_samples` (`vehicleId`, `pid`, `timestampMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_sessionId` ON `obd_pid_samples` (`sessionId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_pid_samples_capturedAt` ON `obd_pid_samples` (`capturedAt`)")
 
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_command_logs` (
-            `id` TEXT NOT NULL,
+        ensureRoomTableShape(
+            db,
+            "obd_command_log",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "sessionId" to RoomColumnShape("TEXT", true),
+                "command" to RoomColumnShape("TEXT", true),
+                "response" to RoomColumnShape("TEXT", true),
+                "latencyMs" to RoomColumnShape("INTEGER", true),
+                "success" to RoomColumnShape("INTEGER", true),
+                "sentAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_obd_command_log_sessionId", "index_obd_command_log_sentAt")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `obd_command_log` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             `sessionId` TEXT NOT NULL,
             `command` TEXT NOT NULL,
-            `serviceMode` TEXT,
-            `pid` TEXT,
-            `moduleAddress` TEXT,
-            `rawResponse` TEXT,
-            `normalizedResponse` TEXT,
-            `success` INTEGER NOT NULL,
-            `errorType` TEXT,
-            `negativeResponseCode` TEXT,
-            `latencyMs` INTEGER,
-            `timeoutMs` INTEGER,
-            `retryCount` INTEGER NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_logs_sessionId_timestampMs` ON `obd_command_logs` (`sessionId`, `timestampMs`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_logs_command_success` ON `obd_command_logs` (`command`, `success`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `ecu_failure_events` (
-            `id` TEXT NOT NULL,
-            `eventType` TEXT NOT NULL,
-            `failureType` TEXT NOT NULL,
-            `confidence` REAL NOT NULL,
-            `reason` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `adapterType` TEXT,
-            `adapterFirmware` TEXT,
-            `transport` TEXT,
-            `protocolAttempted` TEXT,
-            `protocolSelected` TEXT,
-            `commandSent` TEXT NOT NULL,
-            `rawResponse` TEXT,
-            `normalizedResponse` TEXT,
-            `timeoutMs` INTEGER,
-            `latencyMs` INTEGER,
-            `retryCount` INTEGER NOT NULL,
-            `moduleAddress` TEXT,
-            `ecuName` TEXT,
-            `serviceMode` TEXT,
-            `pid` TEXT,
-            `negativeResponseCode` TEXT,
-            `batteryVoltage` REAL,
-            `ignitionState` TEXT,
-            `engineRunningState` TEXT,
-            `vehicleMake` TEXT,
-            `vehicleModel` TEXT,
-            `vehicleYear` INTEGER,
-            `vehicleEngine` TEXT,
-            `vehicleTransmission` TEXT,
-            `vehicleRegion` TEXT,
-            `vinHash` TEXT,
-            `appVersion` TEXT,
-            `androidVersion` TEXT,
-            `deviceModel` TEXT,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_sessionId_timestampMs` ON `ecu_failure_events` (`sessionId`, `timestampMs`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_failureType_vehicleMake_vehicleModel_vehicleYear` ON `ecu_failure_events` (`failureType`, `vehicleMake`, `vehicleModel`, `vehicleYear`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_adapterType_protocolSelected` ON `ecu_failure_events` (`adapterType`, `protocolSelected`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `compatibility_rules` (
-            `ruleId` TEXT NOT NULL,
-            `priority` INTEGER NOT NULL,
-            `matchJson` TEXT NOT NULL,
-            `fixJson` TEXT NOT NULL,
-            `rolloutPercentage` INTEGER NOT NULL,
-            `version` INTEGER NOT NULL,
-            `signature` TEXT,
-            `expiresAtMs` INTEGER,
-            `enabled` INTEGER NOT NULL,
-            `auditJson` TEXT NOT NULL,
-            `createdAt` INTEGER NOT NULL,
-            `updatedAt` INTEGER NOT NULL,
-            PRIMARY KEY(`ruleId`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_priority_enabled` ON `compatibility_rules` (`priority`, `enabled`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_expiresAtMs` ON `compatibility_rules` (`expiresAtMs`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_profiles` (
-            `vehicleId` TEXT NOT NULL,
-            `userHash` TEXT,
-            `vinHash` TEXT,
-            `make` TEXT,
-            `model` TEXT,
-            `year` INTEGER,
-            `engine` TEXT,
-            `transmission` TEXT,
-            `region` TEXT,
-            `odometerKm` INTEGER,
-            `createdAt` INTEGER NOT NULL,
-            `updatedAt` INTEGER NOT NULL,
-            PRIMARY KEY(`vehicleId`)
-        )""")
-        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vehicle_profiles_vinHash` ON `vehicle_profiles` (`vinHash`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `mode06_results` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `mid` TEXT NOT NULL,
-            `tid` TEXT NOT NULL,
-            `value` REAL NOT NULL,
-            `minLimit` REAL,
-            `maxLimit` REAL,
-            `unit` TEXT NOT NULL,
-            `passed` INTEGER NOT NULL,
-            `testName` TEXT NOT NULL,
-            `componentName` TEXT NOT NULL,
-            `severity` TEXT NOT NULL,
-            `explanation` TEXT,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mode06_results_sessionId_mid_tid` ON `mode06_results` (`sessionId`, `mid`, `tid`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `freeze_frames` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `dtcCode` TEXT,
-            `frameNumber` INTEGER NOT NULL,
-            `payloadJson` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_freeze_frames_sessionId_dtcCode` ON `freeze_frames` (`sessionId`, `dtcCode`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `derived_metrics` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `metricId` TEXT NOT NULL,
-            `value` REAL,
-            `unit` TEXT NOT NULL,
-            `confidence` REAL NOT NULL,
-            `source` TEXT NOT NULL,
-            `formulaUsed` TEXT NOT NULL,
-            `inputSensorsJson` TEXT NOT NULL,
-            `fallbackSensorsJson` TEXT NOT NULL,
-            `errorBoundsJson` TEXT,
-            `validity` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_derived_metrics_sessionId_metricId_timestampMs` ON `derived_metrics` (`sessionId`, `metricId`, `timestampMs`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `health_scores` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `overall` INTEGER NOT NULL,
-            `engineHealth` INTEGER NOT NULL,
-            `fuelSystemHealth` INTEGER NOT NULL,
-            `ignitionHealth` INTEGER NOT NULL,
-            `emissionHealth` INTEGER NOT NULL,
-            `coolingHealth` INTEGER NOT NULL,
-            `chargingSystemHealth` INTEGER NOT NULL,
-            `transmissionHealth` INTEGER NOT NULL,
-            `sensorHealth` INTEGER NOT NULL,
-            `ecuCommunicationHealth` INTEGER NOT NULL,
-            `drivingEfficiencyScore` INTEGER NOT NULL,
-            `evidenceJson` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_scores_vehicleId_timestampMs` ON `health_scores` (`vehicleId`, `timestampMs`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `repair_recommendations` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `dtcCode` TEXT,
-            `cause` TEXT NOT NULL,
-            `probability` REAL NOT NULL,
-            `evidenceJson` TEXT NOT NULL,
-            `recommendedTest` TEXT NOT NULL,
-            `estimatedCostUsd` TEXT,
-            `riskIfIgnored` TEXT NOT NULL,
-            `suggestedRepair` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
-        )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_recommendations_vehicleId_sessionId` ON `repair_recommendations` (`vehicleId`, `sessionId`)")
-
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `ai_diagnostic_results` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT NOT NULL,
-            `vehicleId` TEXT,
-            `promptHash` TEXT NOT NULL,
             `response` TEXT NOT NULL,
-            `evidenceJson` TEXT NOT NULL,
-            `confidence` REAL NOT NULL,
-            `strictNoInventedData` INTEGER NOT NULL,
-            `createdAt` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
+            `latencyMs` INTEGER NOT NULL,
+            `success` INTEGER NOT NULL,
+            `sentAt` INTEGER NOT NULL
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_diagnostic_results_sessionId_createdAt` ON `ai_diagnostic_results` (`sessionId`, `createdAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_log_sessionId` ON `obd_command_log` (`sessionId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_obd_command_log_sentAt` ON `obd_command_log` (`sentAt`)")
 
-        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_history` (
-            `id` TEXT NOT NULL,
+        ensureRoomTableShape(
+            db,
+            "ecu_failure_events",
+            linkedMapOf(
+                "eventId" to RoomColumnShape("TEXT", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "dtcCode" to RoomColumnShape("TEXT", true),
+                "source" to RoomColumnShape("TEXT", true),
+                "severity" to RoomColumnShape("TEXT", true),
+                "description" to RoomColumnShape("TEXT", true),
+                "detectedAt" to RoomColumnShape("INTEGER", true),
+                "resolvedAt" to RoomColumnShape("INTEGER", false)
+            ),
+            listOf(
+                "index_ecu_failure_events_vehicleId",
+                "index_ecu_failure_events_detectedAt",
+                "index_ecu_failure_events_sessionId_timestampMs",
+                "index_ecu_failure_events_failureType_vehicleMake_vehicleModel_vehicleYear",
+                "index_ecu_failure_events_adapterType_protocolSelected"
+            )
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `ecu_failure_events` (
+            `eventId` TEXT NOT NULL,
             `vehicleId` TEXT NOT NULL,
-            `metric` TEXT NOT NULL,
-            `bucket` TEXT NOT NULL,
-            `bucketStartMs` INTEGER NOT NULL,
-            `bucketEndMs` INTEGER NOT NULL,
-            `sampleCount` INTEGER NOT NULL,
-            `minValue` REAL,
-            `maxValue` REAL,
-            `avgValue` REAL,
-            `payloadJson` TEXT NOT NULL,
-            `updatedAt` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
+            `dtcCode` TEXT NOT NULL,
+            `source` TEXT NOT NULL,
+            `severity` TEXT NOT NULL,
+            `description` TEXT NOT NULL,
+            `detectedAt` INTEGER NOT NULL,
+            `resolvedAt` INTEGER,
+            PRIMARY KEY(`eventId`)
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_history_vehicleId_metric_bucketStartMs` ON `vehicle_history` (`vehicleId`, `metric`, `bucketStartMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_vehicleId` ON `ecu_failure_events` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ecu_failure_events_detectedAt` ON `ecu_failure_events` (`detectedAt`)")
 
+        ensureRoomTableShape(
+            db,
+            "compatibility_rules",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleMake" to RoomColumnShape("TEXT", true),
+                "vehicleModel" to RoomColumnShape("TEXT", true),
+                "vehicleYear" to RoomColumnShape("INTEGER", false),
+                "featureId" to RoomColumnShape("TEXT", true),
+                "compatible" to RoomColumnShape("INTEGER", true),
+                "notes" to RoomColumnShape("TEXT", false)
+            ),
+            listOf(
+                "index_compatibility_rules_vehicleMake",
+                "index_compatibility_rules_vehicleModel",
+                "index_compatibility_rules_priority_enabled",
+                "index_compatibility_rules_expiresAtMs"
+            )
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `compatibility_rules` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleMake` TEXT NOT NULL,
+            `vehicleModel` TEXT NOT NULL,
+            `vehicleYear` INTEGER,
+            `featureId` TEXT NOT NULL,
+            `compatible` INTEGER NOT NULL,
+            `notes` TEXT
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_vehicleMake` ON `compatibility_rules` (`vehicleMake`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_compatibility_rules_vehicleModel` ON `compatibility_rules` (`vehicleModel`)")
+
+        ensureRoomTableShape(
+            db,
+            "vehicle_profile_snapshots",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "capturedAt" to RoomColumnShape("INTEGER", true),
+                "odometerKm" to RoomColumnShape("REAL", false),
+                "batteryVoltage" to RoomColumnShape("REAL", false),
+                "coolantTempC" to RoomColumnShape("REAL", false),
+                "oilLifePercent" to RoomColumnShape("REAL", false),
+                "payloadJson" to RoomColumnShape("TEXT", true)
+            ),
+            listOf("index_vehicle_profile_snapshots_vehicleId", "index_vehicle_profile_snapshots_capturedAt")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_profile_snapshots` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `capturedAt` INTEGER NOT NULL,
+            `odometerKm` REAL,
+            `batteryVoltage` REAL,
+            `coolantTempC` REAL,
+            `oilLifePercent` REAL,
+            `payloadJson` TEXT NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_profile_snapshots_vehicleId` ON `vehicle_profile_snapshots` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_profile_snapshots_capturedAt` ON `vehicle_profile_snapshots` (`capturedAt`)")
+
+        ensureRoomTableShape(
+            db,
+            "mode06_results",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "sessionId" to RoomColumnShape("TEXT", true),
+                "testId" to RoomColumnShape("TEXT", true),
+                "componentId" to RoomColumnShape("TEXT", true),
+                "value" to RoomColumnShape("REAL", true),
+                "minValue" to RoomColumnShape("REAL", true),
+                "maxValue" to RoomColumnShape("REAL", true),
+                "status" to RoomColumnShape("TEXT", true),
+                "capturedAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_mode06_results_sessionId", "index_mode06_results_sessionId_mid_tid")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `mode06_results` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `sessionId` TEXT NOT NULL,
+            `testId` TEXT NOT NULL,
+            `componentId` TEXT NOT NULL,
+            `value` REAL NOT NULL,
+            `minValue` REAL NOT NULL,
+            `maxValue` REAL NOT NULL,
+            `status` TEXT NOT NULL,
+            `capturedAt` INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_mode06_results_sessionId` ON `mode06_results` (`sessionId`)")
+
+        ensureRoomTableShape(
+            db,
+            "freeze_frames",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "dtcCode" to RoomColumnShape("TEXT", true),
+                "capturedAt" to RoomColumnShape("INTEGER", true),
+                "payloadJson" to RoomColumnShape("TEXT", true)
+            ),
+            listOf("index_freeze_frames_dtcCode", "index_freeze_frames_vehicleId", "index_freeze_frames_sessionId_dtcCode")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `freeze_frames` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `dtcCode` TEXT NOT NULL,
+            `capturedAt` INTEGER NOT NULL,
+            `payloadJson` TEXT NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_freeze_frames_dtcCode` ON `freeze_frames` (`dtcCode`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_freeze_frames_vehicleId` ON `freeze_frames` (`vehicleId`)")
+
+        ensureRoomTableShape(
+            db,
+            "derived_metrics",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "metricName" to RoomColumnShape("TEXT", true),
+                "value" to RoomColumnShape("REAL", true),
+                "unit" to RoomColumnShape("TEXT", true),
+                "computedAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_derived_metrics_vehicleId", "index_derived_metrics_computedAt", "index_derived_metrics_sessionId_metricId_timestampMs")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `derived_metrics` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `metricName` TEXT NOT NULL,
+            `value` REAL NOT NULL,
+            `unit` TEXT NOT NULL,
+            `computedAt` INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_derived_metrics_vehicleId` ON `derived_metrics` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_derived_metrics_computedAt` ON `derived_metrics` (`computedAt`)")
+
+        ensureRoomTableShape(
+            db,
+            "health_scores",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "overallScore" to RoomColumnShape("INTEGER", true),
+                "engineScore" to RoomColumnShape("INTEGER", false),
+                "batteryScore" to RoomColumnShape("INTEGER", false),
+                "brakesScore" to RoomColumnShape("INTEGER", false),
+                "tiresScore" to RoomColumnShape("INTEGER", false),
+                "payloadJson" to RoomColumnShape("TEXT", false),
+                "computedAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_health_scores_vehicleId", "index_health_scores_computedAt", "index_health_scores_vehicleId_timestampMs")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `health_scores` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `overallScore` INTEGER NOT NULL,
+            `engineScore` INTEGER,
+            `batteryScore` INTEGER,
+            `brakesScore` INTEGER,
+            `tiresScore` INTEGER,
+            `payloadJson` TEXT,
+            `computedAt` INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_scores_vehicleId` ON `health_scores` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_health_scores_computedAt` ON `health_scores` (`computedAt`)")
+
+        ensureRoomTableShape(
+            db,
+            "repair_recommendations",
+            linkedMapOf(
+                "recommendationId" to RoomColumnShape("TEXT", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "dtcCode" to RoomColumnShape("TEXT", false),
+                "priority" to RoomColumnShape("TEXT", true),
+                "title" to RoomColumnShape("TEXT", true),
+                "description" to RoomColumnShape("TEXT", true),
+                "estimatedCostCents" to RoomColumnShape("INTEGER", false),
+                "estimatedTimeMinutes" to RoomColumnShape("INTEGER", false),
+                "createdAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_repair_recommendations_vehicleId", "index_repair_recommendations_dtcCode", "index_repair_recommendations_vehicleId_sessionId")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `repair_recommendations` (
+            `recommendationId` TEXT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `dtcCode` TEXT,
+            `priority` TEXT NOT NULL,
+            `title` TEXT NOT NULL,
+            `description` TEXT NOT NULL,
+            `estimatedCostCents` INTEGER,
+            `estimatedTimeMinutes` INTEGER,
+            `createdAt` INTEGER NOT NULL,
+            PRIMARY KEY(`recommendationId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_recommendations_vehicleId` ON `repair_recommendations` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_recommendations_dtcCode` ON `repair_recommendations` (`dtcCode`)")
+
+        ensureRoomTableShape(
+            db,
+            "ai_diagnostic_results",
+            linkedMapOf(
+                "resultId" to RoomColumnShape("TEXT", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "inputContextJson" to RoomColumnShape("TEXT", true),
+                "outputDiagnosisJson" to RoomColumnShape("TEXT", true),
+                "modelVersion" to RoomColumnShape("TEXT", true),
+                "confidence" to RoomColumnShape("REAL", true),
+                "generatedAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_ai_diagnostic_results_vehicleId", "index_ai_diagnostic_results_generatedAt", "index_ai_diagnostic_results_sessionId_createdAt")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `ai_diagnostic_results` (
+            `resultId` TEXT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `inputContextJson` TEXT NOT NULL,
+            `outputDiagnosisJson` TEXT NOT NULL,
+            `modelVersion` TEXT NOT NULL,
+            `confidence` REAL NOT NULL,
+            `generatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`resultId`)
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_diagnostic_results_vehicleId` ON `ai_diagnostic_results` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_diagnostic_results_generatedAt` ON `ai_diagnostic_results` (`generatedAt`)")
+
+        ensureRoomTableShape(
+            db,
+            "vehicle_history",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "eventType" to RoomColumnShape("TEXT", true),
+                "eventAt" to RoomColumnShape("INTEGER", true),
+                "summary" to RoomColumnShape("TEXT", true),
+                "payloadJson" to RoomColumnShape("TEXT", false)
+            ),
+            listOf("index_vehicle_history_vehicleId", "index_vehicle_history_eventAt", "index_vehicle_history_vehicleId_metric_bucketStartMs")
+        )
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `vehicle_history` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `vehicleId` TEXT NOT NULL,
+            `eventType` TEXT NOT NULL,
+            `eventAt` INTEGER NOT NULL,
+            `summary` TEXT NOT NULL,
+            `payloadJson` TEXT
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_history_vehicleId` ON `vehicle_history` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_history_eventAt` ON `vehicle_history` (`eventAt`)")
+
+        ensureRoomTableShape(
+            db,
+            "pdf_reports",
+            linkedMapOf(
+                "reportId" to RoomColumnShape("TEXT", true, 1),
+                "vehicleId" to RoomColumnShape("TEXT", true),
+                "reportType" to RoomColumnShape("TEXT", true),
+                "title" to RoomColumnShape("TEXT", true),
+                "filePath" to RoomColumnShape("TEXT", true),
+                "generatedAt" to RoomColumnShape("INTEGER", true),
+                "signatureHash" to RoomColumnShape("TEXT", false)
+            ),
+            listOf("index_pdf_reports_vehicleId", "index_pdf_reports_generatedAt", "index_pdf_reports_vehicleId_createdAt")
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `pdf_reports` (
             `reportId` TEXT NOT NULL,
-            `sessionId` TEXT,
-            `vehicleId` TEXT,
+            `vehicleId` TEXT NOT NULL,
             `reportType` TEXT NOT NULL,
-            `filePath` TEXT,
-            `reportHash` TEXT NOT NULL,
-            `signed` INTEGER NOT NULL,
-            `payloadJson` TEXT NOT NULL,
-            `createdAt` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
+            `title` TEXT NOT NULL,
+            `filePath` TEXT NOT NULL,
+            `generatedAt` INTEGER NOT NULL,
+            `signatureHash` TEXT,
             PRIMARY KEY(`reportId`)
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_pdf_reports_vehicleId_createdAt` ON `pdf_reports` (`vehicleId`, `createdAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_pdf_reports_vehicleId` ON `pdf_reports` (`vehicleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_pdf_reports_generatedAt` ON `pdf_reports` (`generatedAt`)")
 
+        ensureRoomTableShape(
+            db,
+            "audit_logs",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "actorId" to RoomColumnShape("TEXT", false),
+                "actorRole" to RoomColumnShape("TEXT", false),
+                "action" to RoomColumnShape("TEXT", true),
+                "resourceType" to RoomColumnShape("TEXT", true),
+                "resourceId" to RoomColumnShape("TEXT", true),
+                "payloadJson" to RoomColumnShape("TEXT", false),
+                "occurredAt" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf("index_audit_logs_actorId", "index_audit_logs_occurredAt", "index_audit_logs_sessionId_timestampMs")
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `audit_logs` (
-            `id` TEXT NOT NULL,
-            `sessionId` TEXT,
-            `userHash` TEXT,
-            `eventType` TEXT NOT NULL,
-            `severity` TEXT NOT NULL,
-            `payloadJson` TEXT NOT NULL,
-            `timestampMs` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `actorId` TEXT,
+            `actorRole` TEXT,
+            `action` TEXT NOT NULL,
+            `resourceType` TEXT NOT NULL,
+            `resourceId` TEXT NOT NULL,
+            `payloadJson` TEXT,
+            `occurredAt` INTEGER NOT NULL
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_sessionId_timestampMs` ON `audit_logs` (`sessionId`, `timestampMs`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_actorId` ON `audit_logs` (`actorId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_occurredAt` ON `audit_logs` (`occurredAt`)")
 
+        ensureRoomTableShape(
+            db,
+            "fix_rollouts",
+            linkedMapOf(
+                "id" to RoomColumnShape("INTEGER", true, 1),
+                "fixId" to RoomColumnShape("TEXT", true),
+                "rolloutType" to RoomColumnShape("TEXT", true),
+                "affectedVersions" to RoomColumnShape("TEXT", true),
+                "targetVersion" to RoomColumnShape("TEXT", true),
+                "status" to RoomColumnShape("TEXT", true),
+                "rolledOutAt" to RoomColumnShape("INTEGER", false)
+            ),
+            listOf("index_fix_rollouts_fixId", "index_fix_rollouts_rolledOutAt", "index_fix_rollouts_ruleId_appliedAt")
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `fix_rollouts` (
-            `id` TEXT NOT NULL,
-            `ruleId` TEXT NOT NULL,
-            `sessionId` TEXT,
-            `vehicleId` TEXT,
-            `applied` INTEGER NOT NULL,
-            `rollbackAvailable` INTEGER NOT NULL,
-            `result` TEXT NOT NULL,
-            `auditJson` TEXT NOT NULL,
-            `appliedAt` INTEGER NOT NULL,
-            `synced` INTEGER NOT NULL,
-            PRIMARY KEY(`id`)
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `fixId` TEXT NOT NULL,
+            `rolloutType` TEXT NOT NULL,
+            `affectedVersions` TEXT NOT NULL,
+            `targetVersion` TEXT NOT NULL,
+            `status` TEXT NOT NULL,
+            `rolledOutAt` INTEGER
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_fix_rollouts_ruleId_appliedAt` ON `fix_rollouts` (`ruleId`, `appliedAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_fix_rollouts_fixId` ON `fix_rollouts` (`fixId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_fix_rollouts_rolledOutAt` ON `fix_rollouts` (`rolledOutAt`)")
     }
 
     private val MIGRATION_34_35 = object : Migration(34, 35) {
@@ -2156,6 +2339,34 @@ object AppModule {
     }
 
     private fun createVanguardCommerceTables(db: SupportSQLiteDatabase) {
+        ensureRoomTableShape(
+            db,
+            "vanguard_events",
+            linkedMapOf(
+                "eventId" to RoomColumnShape("TEXT", true, 1),
+                "aggregateType" to RoomColumnShape("TEXT", true),
+                "aggregateId" to RoomColumnShape("TEXT", true),
+                "eventType" to RoomColumnShape("TEXT", true),
+                "actorId" to RoomColumnShape("TEXT", false),
+                "actorRole" to RoomColumnShape("TEXT", false),
+                "source" to RoomColumnShape("TEXT", true),
+                "correlationId" to RoomColumnShape("TEXT", false),
+                "causationId" to RoomColumnShape("TEXT", false),
+                "idempotencyKey" to RoomColumnShape("TEXT", true),
+                "payloadJson" to RoomColumnShape("TEXT", true),
+                "schemaVersion" to RoomColumnShape("INTEGER", true),
+                "occurredAt" to RoomColumnShape("INTEGER", true),
+                "synced" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf(
+                "index_vanguard_events_aggregateId",
+                "index_vanguard_events_occurredAt",
+                "index_vanguard_events_idempotencyKey",
+                "index_vanguard_events_aggregateType_aggregateId_occurredAt",
+                "index_vanguard_events_eventType_occurredAt",
+                "index_vanguard_events_synced_occurredAt"
+            )
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `vanguard_events` (
             `eventId` TEXT NOT NULL,
             `aggregateType` TEXT NOT NULL,
@@ -2173,15 +2384,45 @@ object AppModule {
             `synced` INTEGER NOT NULL,
             PRIMARY KEY(`eventId`)
         )""")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_aggregateType_aggregateId_occurredAt` ON `vanguard_events` (`aggregateType`, `aggregateId`, `occurredAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_eventType_occurredAt` ON `vanguard_events` (`eventType`, `occurredAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_synced_occurredAt` ON `vanguard_events` (`synced`, `occurredAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_aggregateId` ON `vanguard_events` (`aggregateId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_events_occurredAt` ON `vanguard_events` (`occurredAt`)")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vanguard_events_idempotencyKey` ON `vanguard_events` (`idempotencyKey`)")
 
+        ensureRoomTableShape(
+            db,
+            "marketplace_ledger_entries",
+            linkedMapOf(
+                "ledgerEntryId" to RoomColumnShape("TEXT", true, 1),
+                "transactionId" to RoomColumnShape("TEXT", true),
+                "relatedEventId" to RoomColumnShape("TEXT", false),
+                "orderType" to RoomColumnShape("TEXT", true),
+                "orderId" to RoomColumnShape("TEXT", true),
+                "participantId" to RoomColumnShape("TEXT", false),
+                "participantRole" to RoomColumnShape("TEXT", true),
+                "entryType" to RoomColumnShape("TEXT", true),
+                "direction" to RoomColumnShape("TEXT", true),
+                "amountCents" to RoomColumnShape("INTEGER", true),
+                "currency" to RoomColumnShape("TEXT", true),
+                "status" to RoomColumnShape("TEXT", true),
+                "metadataJson" to RoomColumnShape("TEXT", false),
+                "createdAt" to RoomColumnShape("INTEGER", true),
+                "settledAt" to RoomColumnShape("INTEGER", false),
+                "idempotencyKey" to RoomColumnShape("TEXT", true),
+                "synced" to RoomColumnShape("INTEGER", true)
+            ),
+            listOf(
+                "index_marketplace_ledger_entries_transactionId",
+                "index_marketplace_ledger_entries_orderId",
+                "index_marketplace_ledger_entries_idempotencyKey",
+                "index_marketplace_ledger_entries_orderType_orderId",
+                "index_marketplace_ledger_entries_status_createdAt",
+                "index_marketplace_ledger_entries_synced_createdAt"
+            )
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `marketplace_ledger_entries` (
             `ledgerEntryId` TEXT NOT NULL,
             `transactionId` TEXT NOT NULL,
-            `relatedEventId` TEXT NOT NULL,
+            `relatedEventId` TEXT,
             `orderType` TEXT NOT NULL,
             `orderId` TEXT NOT NULL,
             `participantId` TEXT,
@@ -2191,7 +2432,7 @@ object AppModule {
             `amountCents` INTEGER NOT NULL,
             `currency` TEXT NOT NULL,
             `status` TEXT NOT NULL,
-            `metadataJson` TEXT NOT NULL,
+            `metadataJson` TEXT,
             `createdAt` INTEGER NOT NULL,
             `settledAt` INTEGER,
             `idempotencyKey` TEXT NOT NULL,
@@ -2199,11 +2440,34 @@ object AppModule {
             PRIMARY KEY(`ledgerEntryId`)
         )""")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_transactionId` ON `marketplace_ledger_entries` (`transactionId`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_orderType_orderId` ON `marketplace_ledger_entries` (`orderType`, `orderId`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_status_createdAt` ON `marketplace_ledger_entries` (`status`, `createdAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_synced_createdAt` ON `marketplace_ledger_entries` (`synced`, `createdAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_orderId` ON `marketplace_ledger_entries` (`orderId`)")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_marketplace_ledger_entries_idempotencyKey` ON `marketplace_ledger_entries` (`idempotencyKey`)")
 
+        ensureRoomTableShape(
+            db,
+            "vanguard_outbox",
+            linkedMapOf(
+                "outboxId" to RoomColumnShape("TEXT", true, 1),
+                "eventId" to RoomColumnShape("TEXT", true),
+                "destination" to RoomColumnShape("TEXT", true),
+                "operation" to RoomColumnShape("TEXT", true),
+                "payloadJson" to RoomColumnShape("TEXT", true),
+                "status" to RoomColumnShape("TEXT", true),
+                "attemptCount" to RoomColumnShape("INTEGER", true),
+                "nextAttemptAt" to RoomColumnShape("INTEGER", true),
+                "lastError" to RoomColumnShape("TEXT", false),
+                "createdAt" to RoomColumnShape("INTEGER", true),
+                "updatedAt" to RoomColumnShape("INTEGER", true),
+                "idempotencyKey" to RoomColumnShape("TEXT", true)
+            ),
+            listOf(
+                "index_vanguard_outbox_eventId",
+                "index_vanguard_outbox_status",
+                "index_vanguard_outbox_idempotencyKey",
+                "index_vanguard_outbox_status_nextAttemptAt",
+                "index_vanguard_outbox_destination_status"
+            )
+        )
         db.execSQL("""CREATE TABLE IF NOT EXISTS `vanguard_outbox` (
             `outboxId` TEXT NOT NULL,
             `eventId` TEXT NOT NULL,
@@ -2212,7 +2476,7 @@ object AppModule {
             `payloadJson` TEXT NOT NULL,
             `status` TEXT NOT NULL,
             `attemptCount` INTEGER NOT NULL,
-            `nextAttemptAt` INTEGER,
+            `nextAttemptAt` INTEGER NOT NULL,
             `lastError` TEXT,
             `createdAt` INTEGER NOT NULL,
             `updatedAt` INTEGER NOT NULL,
@@ -2220,28 +2484,30 @@ object AppModule {
             PRIMARY KEY(`outboxId`)
         )""")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_eventId` ON `vanguard_outbox` (`eventId`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_status_nextAttemptAt` ON `vanguard_outbox` (`status`, `nextAttemptAt`)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_destination_status` ON `vanguard_outbox` (`destination`, `status`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_vanguard_outbox_status` ON `vanguard_outbox` (`status`)")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vanguard_outbox_idempotencyKey` ON `vanguard_outbox` (`idempotencyKey`)")
     }
 
     private val MIGRATION_35_36 = object : Migration(35, 36) {
         override fun migrate(db: SupportSQLiteDatabase) {
             android.util.Log.i("ElysiumDB", "Migration 35→36: Creating Vanguard commerce events, ledger, and outbox tables")
+            createVanguardTelemetryTables(db)
             createVanguardCommerceTables(db)
         }
     }
 
     private val MIGRATION_36_37 = object : Migration(36, 37) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("ElysiumDB", "Migration 36→37: Guarding Vanguard commerce schema")
+            android.util.Log.i("ElysiumDB", "Migration 36→37: Guarding Vanguard telemetry and commerce schema")
+            createVanguardTelemetryTables(db)
             createVanguardCommerceTables(db)
         }
     }
 
     private val MIGRATION_37_38 = object : Migration(37, 38) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("ElysiumDB", "Migration 37→38: Guarding Vanguard commerce schema")
+            android.util.Log.i("ElysiumDB", "Migration 37→38: Guarding Vanguard telemetry and commerce schema")
+            createVanguardTelemetryTables(db)
             createVanguardCommerceTables(db)
         }
     }
@@ -2249,6 +2515,15 @@ object AppModule {
     private val MIGRATION_38_39 = object : Migration(38, 39) {
         override fun migrate(db: SupportSQLiteDatabase) {
             android.util.Log.i("ElysiumDB", "Migration 38→39: Advancing existing installs without data loss")
+            createVanguardTelemetryTables(db)
+            createVanguardCommerceTables(db)
+        }
+    }
+
+    private val MIGRATION_39_40 = object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 39→40: Repairing Vanguard Room schema after legacy debug builds")
+            createVanguardTelemetryTables(db)
             createVanguardCommerceTables(db)
         }
     }
@@ -2279,7 +2554,8 @@ object AppModule {
             MIGRATION_35_36,
             MIGRATION_36_37,
             MIGRATION_37_38,
-            MIGRATION_38_39
+            MIGRATION_38_39,
+            MIGRATION_39_40
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
