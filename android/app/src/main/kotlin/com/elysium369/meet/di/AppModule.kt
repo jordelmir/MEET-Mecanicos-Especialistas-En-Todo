@@ -2528,6 +2528,379 @@ object AppModule {
         }
     }
 
+    private fun fallbackVehicleIdSql(): String =
+        "COALESCE((SELECT id FROM vehicles ORDER BY createdAt DESC LIMIT 1), 'legacy-vanguard-vehicle')"
+
+    private fun migrateLegacyVanguardTelemetry(db: SupportSQLiteDatabase) {
+        createVanguardTelemetryTables(db)
+        createVanguardCommerceTables(db)
+
+        if (tableExists(db, "obd_pid_samples_legacy_before_v40")) {
+            db.execSQL("""
+                INSERT OR IGNORE INTO `vanguard_obd_sessions`
+                    (`sessionId`, `vehicleId`, `adapterId`, `protocol`, `startedAt`, `endedAt`, `status`, `totalPidsRead`, `errorCount`, `lastError`)
+                SELECT
+                    `sessionId`,
+                    COALESCE(NULLIF(TRIM(`vehicleId`), ''), ${fallbackVehicleIdSql()}),
+                    NULL,
+                    'LEGACY_PID_STREAM',
+                    MIN(`timestampMs`),
+                    MAX(`timestampMs`),
+                    'RECOVERED_LEGACY',
+                    SUM(CASE WHEN `value` IS NOT NULL THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN `errorReason` IS NOT NULL AND TRIM(`errorReason`) <> '' THEN 1 ELSE 0 END),
+                    MAX(NULLIF(TRIM(`errorReason`), ''))
+                FROM `obd_pid_samples_legacy_before_v40`
+                WHERE `sessionId` IS NOT NULL AND TRIM(`sessionId`) <> ''
+                GROUP BY `sessionId`
+            """)
+            db.execSQL("""
+                INSERT INTO `obd_pid_samples` (`sessionId`, `pid`, `value`, `unit`, `capturedAt`)
+                SELECT
+                    legacy.`sessionId`,
+                    legacy.`pid`,
+                    legacy.`value`,
+                    COALESCE(NULLIF(TRIM(legacy.`unit`), ''), ''),
+                    legacy.`timestampMs`
+                FROM `obd_pid_samples_legacy_before_v40` legacy
+                WHERE legacy.`value` IS NOT NULL
+                  AND legacy.`sessionId` IS NOT NULL
+                  AND TRIM(legacy.`sessionId`) <> ''
+                  AND legacy.`pid` IS NOT NULL
+                  AND TRIM(legacy.`pid`) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `obd_pid_samples` live
+                      WHERE live.`sessionId` = legacy.`sessionId`
+                        AND live.`pid` = legacy.`pid`
+                        AND live.`capturedAt` = legacy.`timestampMs`
+                  )
+            """)
+            db.execSQL("""
+                INSERT INTO `audit_logs` (`actorId`, `actorRole`, `action`, `resourceType`, `resourceId`, `payloadJson`, `occurredAt`)
+                SELECT
+                    NULL,
+                    'SYSTEM',
+                    'IMPORT_LEGACY_VANGUARD_SKIPPED',
+                    'obd_pid_samples',
+                    'null_value_samples',
+                    '{"skippedNullValueRows":' || c || ',"reason":"new_schema_requires_real_numeric_value","backupTable":"obd_pid_samples_legacy_before_v40"}',
+                    CAST(strftime('%s','now') AS INTEGER) * 1000
+                FROM (SELECT COUNT(*) AS c FROM `obd_pid_samples_legacy_before_v40` WHERE `value` IS NULL)
+                WHERE c > 0
+            """)
+        }
+
+        if (tableExists(db, "derived_metrics_legacy_before_v40")) {
+            db.execSQL("""
+                INSERT OR IGNORE INTO `vanguard_obd_sessions`
+                    (`sessionId`, `vehicleId`, `adapterId`, `protocol`, `startedAt`, `endedAt`, `status`, `totalPidsRead`, `errorCount`, `lastError`)
+                SELECT
+                    `sessionId`,
+                    COALESCE(NULLIF(TRIM(`vehicleId`), ''), ${fallbackVehicleIdSql()}),
+                    NULL,
+                    'LEGACY_DERIVED_METRICS',
+                    MIN(`timestampMs`),
+                    MAX(`timestampMs`),
+                    'RECOVERED_LEGACY',
+                    0,
+                    0,
+                    NULL
+                FROM `derived_metrics_legacy_before_v40`
+                WHERE `sessionId` IS NOT NULL AND TRIM(`sessionId`) <> ''
+                GROUP BY `sessionId`
+            """)
+            db.execSQL("""
+                INSERT INTO `derived_metrics` (`vehicleId`, `metricName`, `value`, `unit`, `computedAt`)
+                SELECT
+                    COALESCE(NULLIF(TRIM(legacy.`vehicleId`), ''), ${fallbackVehicleIdSql()}),
+                    legacy.`metricId`,
+                    legacy.`value`,
+                    COALESCE(NULLIF(TRIM(legacy.`unit`), ''), ''),
+                    legacy.`timestampMs`
+                FROM `derived_metrics_legacy_before_v40` legacy
+                WHERE legacy.`value` IS NOT NULL
+                  AND legacy.`metricId` IS NOT NULL
+                  AND TRIM(legacy.`metricId`) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `derived_metrics` live
+                      WHERE live.`vehicleId` = COALESCE(NULLIF(TRIM(legacy.`vehicleId`), ''), ${fallbackVehicleIdSql()})
+                        AND live.`metricName` = legacy.`metricId`
+                        AND live.`computedAt` = legacy.`timestampMs`
+                  )
+            """)
+            db.execSQL("""
+                INSERT INTO `audit_logs` (`actorId`, `actorRole`, `action`, `resourceType`, `resourceId`, `payloadJson`, `occurredAt`)
+                SELECT
+                    NULL,
+                    'SYSTEM',
+                    'IMPORT_LEGACY_VANGUARD_SKIPPED',
+                    'derived_metrics',
+                    'null_value_metrics',
+                    '{"skippedNullValueRows":' || c || ',"reason":"new_schema_requires_real_numeric_value","backupTable":"derived_metrics_legacy_before_v40"}',
+                    CAST(strftime('%s','now') AS INTEGER) * 1000
+                FROM (SELECT COUNT(*) AS c FROM `derived_metrics_legacy_before_v40` WHERE `value` IS NULL)
+                WHERE c > 0
+            """)
+        }
+
+        if (tableExists(db, "ecu_failure_events_legacy_before_v40")) {
+            db.execSQL("""
+                INSERT OR IGNORE INTO `vanguard_obd_sessions`
+                    (`sessionId`, `vehicleId`, `adapterId`, `protocol`, `startedAt`, `endedAt`, `status`, `totalPidsRead`, `errorCount`, `lastError`)
+                SELECT
+                    `sessionId`,
+                    ${fallbackVehicleIdSql()},
+                    MAX(NULLIF(TRIM(`adapterType`), '')),
+                    COALESCE(MAX(NULLIF(TRIM(`protocolSelected`), '')), MAX(NULLIF(TRIM(`protocolAttempted`), '')), 'LEGACY_ECU_FAILURES'),
+                    MIN(`timestampMs`),
+                    MAX(`timestampMs`),
+                    'RECOVERED_LEGACY',
+                    0,
+                    COUNT(*),
+                    MAX(NULLIF(TRIM(`failureType` || ': ' || `reason`), ''))
+                FROM `ecu_failure_events_legacy_before_v40`
+                WHERE `sessionId` IS NOT NULL AND TRIM(`sessionId`) <> ''
+                GROUP BY `sessionId`
+            """)
+            db.execSQL("""
+                INSERT INTO `obd_command_log` (`sessionId`, `command`, `response`, `latencyMs`, `success`, `sentAt`)
+                SELECT
+                    legacy.`sessionId`,
+                    legacy.`commandSent`,
+                    COALESCE(NULLIF(TRIM(legacy.`normalizedResponse`), ''), NULLIF(TRIM(legacy.`rawResponse`), ''), NULLIF(TRIM(legacy.`negativeResponseCode`), ''), ''),
+                    COALESCE(legacy.`latencyMs`, legacy.`timeoutMs`, 0),
+                    CASE WHEN UPPER(COALESCE(legacy.`failureType`, '')) IN ('', 'NONE', 'SUCCESS') THEN 1 ELSE 0 END,
+                    legacy.`timestampMs`
+                FROM `ecu_failure_events_legacy_before_v40` legacy
+                WHERE legacy.`sessionId` IS NOT NULL
+                  AND TRIM(legacy.`sessionId`) <> ''
+                  AND legacy.`commandSent` IS NOT NULL
+                  AND TRIM(legacy.`commandSent`) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `obd_command_log` live
+                      WHERE live.`sessionId` = legacy.`sessionId`
+                        AND live.`command` = legacy.`commandSent`
+                        AND live.`sentAt` = legacy.`timestampMs`
+                  )
+            """)
+            db.execSQL("""
+                INSERT OR IGNORE INTO `ecu_failure_events`
+                    (`eventId`, `vehicleId`, `dtcCode`, `source`, `severity`, `description`, `detectedAt`, `resolvedAt`)
+                SELECT
+                    legacy.`id`,
+                    ${fallbackVehicleIdSql()},
+                    CASE
+                        WHEN legacy.`pid` IS NOT NULL AND TRIM(legacy.`pid`) <> '' THEN 'PID_' || legacy.`pid`
+                        WHEN legacy.`commandSent` IS NOT NULL AND TRIM(legacy.`commandSent`) <> '' THEN 'OBD_' || legacy.`commandSent`
+                        ELSE 'LEGACY_' || COALESCE(NULLIF(TRIM(legacy.`failureType`), ''), 'ECU_FAILURE')
+                    END,
+                    'TELEMETRY',
+                    CASE
+                        WHEN legacy.`confidence` >= 0.85 THEN 'HIGH'
+                        WHEN legacy.`confidence` >= 0.50 THEN 'MEDIUM'
+                        ELSE 'LOW'
+                    END,
+                    'Legacy Vanguard ECU failure recovered. Type=' || COALESCE(legacy.`failureType`, 'UNKNOWN') ||
+                        '; Reason=' || COALESCE(legacy.`reason`, '') ||
+                        '; Command=' || COALESCE(legacy.`commandSent`, '') ||
+                        '; Response=' || COALESCE(NULLIF(TRIM(legacy.`normalizedResponse`), ''), NULLIF(TRIM(legacy.`rawResponse`), ''), '') ||
+                        '; Session=' || COALESCE(legacy.`sessionId`, ''),
+                    legacy.`timestampMs`,
+                    NULL
+                FROM `ecu_failure_events_legacy_before_v40` legacy
+                WHERE legacy.`id` IS NOT NULL AND TRIM(legacy.`id`) <> ''
+            """)
+        }
+
+        if (tableExists(db, "mode06_results_legacy_before_v40")) {
+            db.execSQL("""
+                INSERT OR IGNORE INTO `vanguard_obd_sessions`
+                    (`sessionId`, `vehicleId`, `adapterId`, `protocol`, `startedAt`, `endedAt`, `status`, `totalPidsRead`, `errorCount`, `lastError`)
+                SELECT
+                    `sessionId`,
+                    COALESCE(NULLIF(TRIM(`vehicleId`), ''), ${fallbackVehicleIdSql()}),
+                    NULL,
+                    'LEGACY_MODE_06',
+                    MIN(`timestampMs`),
+                    MAX(`timestampMs`),
+                    'RECOVERED_LEGACY',
+                    0,
+                    SUM(CASE WHEN `passed` = 0 THEN 1 ELSE 0 END),
+                    MAX(CASE WHEN `passed` = 0 THEN NULLIF(TRIM(`testName` || ': ' || `explanation`), '') ELSE NULL END)
+                FROM `mode06_results_legacy_before_v40`
+                WHERE `sessionId` IS NOT NULL AND TRIM(`sessionId`) <> ''
+                GROUP BY `sessionId`
+            """)
+            db.execSQL("""
+                INSERT INTO `mode06_results` (`sessionId`, `testId`, `componentId`, `value`, `minValue`, `maxValue`, `status`, `capturedAt`)
+                SELECT
+                    legacy.`sessionId`,
+                    COALESCE(NULLIF(TRIM(legacy.`mid` || ':' || legacy.`tid`), ':'), legacy.`id`),
+                    COALESCE(NULLIF(TRIM(legacy.`componentName`), ''), NULLIF(TRIM(legacy.`testName`), ''), 'Legacy Mode 06'),
+                    legacy.`value`,
+                    COALESCE(legacy.`minLimit`, legacy.`value`),
+                    COALESCE(legacy.`maxLimit`, legacy.`value`),
+                    CASE WHEN legacy.`passed` = 1 THEN 'PASS' ELSE 'FAIL' END,
+                    legacy.`timestampMs`
+                FROM `mode06_results_legacy_before_v40` legacy
+                WHERE legacy.`value` IS NOT NULL
+                  AND legacy.`sessionId` IS NOT NULL
+                  AND TRIM(legacy.`sessionId`) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `mode06_results` live
+                      WHERE live.`sessionId` = legacy.`sessionId`
+                        AND live.`testId` = COALESCE(NULLIF(TRIM(legacy.`mid` || ':' || legacy.`tid`), ':'), legacy.`id`)
+                        AND live.`capturedAt` = legacy.`timestampMs`
+                  )
+            """)
+        }
+
+        db.execSQL("""
+            UPDATE `vanguard_obd_sessions`
+            SET `totalPidsRead` = (
+                SELECT COUNT(*) FROM `obd_pid_samples` samples
+                WHERE samples.`sessionId` = `vanguard_obd_sessions`.`sessionId`
+            )
+            WHERE `status` = 'RECOVERED_LEGACY'
+        """)
+
+        db.execSQL("""
+            INSERT INTO `vehicle_history` (`vehicleId`, `eventType`, `eventAt`, `summary`, `payloadJson`)
+            SELECT
+                session.`vehicleId`,
+                'LEGACY_VANGUARD_IMPORT',
+                session.`startedAt`,
+                'Telemetría Vanguard legacy recuperada para sesión ' || session.`sessionId`,
+                '{"sessionId":"' || session.`sessionId` || '","totalPidsRead":' || session.`totalPidsRead` || ',"errorCount":' || session.`errorCount` || '}'
+            FROM `vanguard_obd_sessions` session
+            WHERE session.`status` = 'RECOVERED_LEGACY'
+              AND NOT EXISTS (
+                  SELECT 1 FROM `vehicle_history` history
+                  WHERE history.`eventType` = 'LEGACY_VANGUARD_IMPORT'
+                    AND history.`payloadJson` LIKE '%"sessionId":"' || session.`sessionId` || '"%'
+              )
+        """)
+
+        db.execSQL("""
+            INSERT INTO `audit_logs` (`actorId`, `actorRole`, `action`, `resourceType`, `resourceId`, `payloadJson`, `occurredAt`)
+            VALUES (
+                NULL,
+                'SYSTEM',
+                'IMPORT_LEGACY_VANGUARD',
+                'ROOM_MIGRATION',
+                '40_to_41',
+                '{"obdPidSamples":' || (SELECT COUNT(*) FROM `obd_pid_samples`) ||
+                    ',"derivedMetrics":' || (SELECT COUNT(*) FROM `derived_metrics`) ||
+                    ',"ecuFailures":' || (SELECT COUNT(*) FROM `ecu_failure_events`) ||
+                    ',"mode06Results":' || (SELECT COUNT(*) FROM `mode06_results`) || '}',
+                CAST(strftime('%s','now') AS INTEGER) * 1000
+            )
+        """)
+    }
+
+    private fun ensureRepairCasesAndEventsForDtcEvents(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            INSERT OR IGNORE INTO `repair_cases`
+                (`id`, `vehicleMake`, `vehicleModel`, `year`, `engine`, `country`, `dtcCode`, `symptoms`, `solution`, `cost`, `timeSpent`, `partsUsed`, `verified`, `votes`, `successRate`, `isBookmarked`, `isMyContribution`, `createdAt`)
+            SELECT
+                'dtc_event_case_' || event.`id`,
+                COALESCE(NULLIF(TRIM(vehicle.`make`), ''), 'Desconocido'),
+                COALESCE(NULLIF(TRIM(vehicle.`model`), ''), 'Desconocido'),
+                COALESCE(vehicle.`year`, 0),
+                COALESCE(NULLIF(TRIM(vehicle.`engine`), ''), 'Motor no especificado'),
+                'Local',
+                event.`code`,
+                'Evento DTC ' || event.`status` || ' detectado por scanner. ' || COALESCE(event.`description`, ''),
+                'Caso generado automáticamente desde DTC real. Abrir la guía de reparación de ' || event.`code` ||
+                    ' y validar freeze frame, causa raíz, prueba después de reparación y borrado controlado del código.',
+                0.0,
+                0,
+                COALESCE(
+                    (SELECT NULLIF(TRIM(definition.`affectedComponents`), '') FROM `dtc_definitions` definition WHERE definition.`code` = event.`code` ORDER BY CASE WHEN definition.`manufacturer` = 'GENERIC' THEN 0 ELSE 1 END LIMIT 1),
+                    (SELECT NULLIF(TRIM(definition.`possibleCauses`), '') FROM `dtc_definitions` definition WHERE definition.`code` = event.`code` ORDER BY CASE WHEN definition.`manufacturer` = 'GENERIC' THEN 0 ELSE 1 END LIMIT 1),
+                    'Por diagnosticar'
+                ),
+                0,
+                0,
+                0.0,
+                0,
+                1,
+                COALESCE(NULLIF(event.`firstSeenAt`, 0), CAST(strftime('%s','now') AS INTEGER) * 1000)
+            FROM `dtc_events` event
+            LEFT JOIN `vehicles` vehicle ON vehicle.`id` = event.`vehicleId`
+            WHERE event.`id` IS NOT NULL AND TRIM(event.`id`) <> ''
+              AND event.`code` IS NOT NULL AND TRIM(event.`code`) <> ''
+        """)
+
+        db.execSQL("""
+            INSERT OR IGNORE INTO `vanguard_events`
+                (`eventId`, `aggregateType`, `aggregateId`, `eventType`, `actorId`, `actorRole`, `source`, `correlationId`, `causationId`, `idempotencyKey`, `payloadJson`, `schemaVersion`, `occurredAt`, `synced`)
+            SELECT
+                'v41_dtc_' || event.`id`,
+                'DTC',
+                event.`id`,
+                'DTC_EVENT_RESTORED',
+                NULL,
+                'SYSTEM',
+                'LOCAL_ROOM',
+                event.`sessionId`,
+                NULL,
+                'v41_dtc_' || event.`id`,
+                '{"dtcCode":"' || event.`code` || '","vehicleId":"' || event.`vehicleId` || '","status":"' || event.`status` || '","repairCaseId":"dtc_event_case_' || event.`id` || '"}',
+                1,
+                COALESCE(NULLIF(event.`lastSeenAt`, 0), event.`firstSeenAt`, CAST(strftime('%s','now') AS INTEGER) * 1000),
+                0
+            FROM `dtc_events` event
+            WHERE event.`id` IS NOT NULL AND TRIM(event.`id`) <> ''
+        """)
+
+        db.execSQL("""
+            INSERT OR IGNORE INTO `vanguard_events`
+                (`eventId`, `aggregateType`, `aggregateId`, `eventType`, `actorId`, `actorRole`, `source`, `correlationId`, `causationId`, `idempotencyKey`, `payloadJson`, `schemaVersion`, `occurredAt`, `synced`)
+            SELECT
+                'v41_repair_case_' || event.`id`,
+                'REPAIR',
+                'dtc_event_case_' || event.`id`,
+                'REPAIR_CASE_ENSURED_FOR_DTC',
+                NULL,
+                'SYSTEM',
+                'LOCAL_ROOM',
+                event.`sessionId`,
+                'v41_dtc_' || event.`id`,
+                'v41_repair_case_' || event.`id`,
+                '{"dtcCode":"' || event.`code` || '","dtcEventId":"' || event.`id` || '","source":"room_migration_40_41"}',
+                1,
+                COALESCE(NULLIF(event.`lastSeenAt`, 0), event.`firstSeenAt`, CAST(strftime('%s','now') AS INTEGER) * 1000),
+                0
+            FROM `dtc_events` event
+            WHERE event.`id` IS NOT NULL AND TRIM(event.`id`) <> ''
+        """)
+
+        db.execSQL("""
+            INSERT INTO `vehicle_history` (`vehicleId`, `eventType`, `eventAt`, `summary`, `payloadJson`)
+            SELECT
+                event.`vehicleId`,
+                'DTC_REPAIR_CASE_ENSURED',
+                COALESCE(NULLIF(event.`lastSeenAt`, 0), event.`firstSeenAt`, CAST(strftime('%s','now') AS INTEGER) * 1000),
+                'Caso de reparación asegurado para DTC ' || event.`code`,
+                '{"dtcEventId":"' || event.`id` || '","repairCaseId":"dtc_event_case_' || event.`id` || '"}'
+            FROM `dtc_events` event
+            WHERE NOT EXISTS (
+                SELECT 1 FROM `vehicle_history` history
+                WHERE history.`eventType` = 'DTC_REPAIR_CASE_ENSURED'
+                  AND history.`payloadJson` LIKE '%"dtcEventId":"' || event.`id` || '"%'
+            )
+        """)
+    }
+
+    private val MIGRATION_40_41 = object : Migration(40, 41) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 40→41: Restoring legacy Vanguard data and ensuring DTC repair cases/events")
+            migrateLegacyVanguardTelemetry(db)
+            ensureRepairCasesAndEventsForDtcEvents(db)
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -2555,7 +2928,8 @@ object AppModule {
             MIGRATION_36_37,
             MIGRATION_37_38,
             MIGRATION_38_39,
-            MIGRATION_39_40
+            MIGRATION_39_40,
+            MIGRATION_40_41
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
