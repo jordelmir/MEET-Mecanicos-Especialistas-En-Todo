@@ -1,0 +1,155 @@
+name: Mavis Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  detect:
+    name: Detect stack
+    runs-on: ubuntu-latest
+    outputs:
+      has_node: ${{ steps.detect.outputs.has_node }}
+      has_gradle: ${{ steps.detect.outputs.has_gradle }}
+      has_rust: ${{ steps.detect.outputs.has_rust }}
+      has_supabase: ${{ steps.detect.outputs.has_supabase }}
+      has_python: ${{ steps.detect.outputs.has_python }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        shell: bash
+        run: |
+          [ -f package.json ] && echo "has_node=true" >> "$GITHUB_OUTPUT" || echo "has_node=false" >> "$GITHUB_OUTPUT"
+          [ -f gradlew ] && echo "has_gradle=true" >> "$GITHUB_OUTPUT" || echo "has_gradle=false" >> "$GITHUB_OUTPUT"
+          [ -f Cargo.toml ] && echo "has_rust=true" >> "$GITHUB_OUTPUT" || echo "has_rust=false" >> "$GITHUB_OUTPUT"
+          [ -d supabase ] && echo "has_supabase=true" >> "$GITHUB_OUTPUT" || echo "has_supabase=false" >> "$GITHUB_OUTPUT"
+          [ -f requirements.txt ] || [ -f pyproject.toml ] && echo "has_python=true" >> "$GITHUB_OUTPUT" || echo "has_python=false" >> "$GITHUB_OUTPUT"
+
+  node:
+    name: Node/TypeScript checks
+    needs: detect
+    if: needs.detect.outputs.has_node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (only if script exists)
+        run: |
+          if pnpm run | grep -q "^  typecheck$"; then
+            pnpm typecheck
+          else
+            echo "typecheck script not defined — skipping (see known-risks RISK-003)"
+          fi
+      - name: Lint (only if script exists)
+        run: |
+          if pnpm run | grep -q "^  lint$"; then
+            pnpm lint
+          else
+            echo "lint script not defined — skipping"
+          fi
+      - name: Test (only if script exists)
+        run: |
+          if pnpm run | grep -q "^  test$"; then
+            pnpm test
+          else
+            echo "test script not defined — skipping"
+          fi
+      - name: Build
+        run: pnpm build
+
+  gradle:
+    name: Gradle checks
+    needs: detect
+    if: needs.detect.outputs.has_gradle == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: chmod +x ./gradlew
+      - run: ./gradlew test
+      - run: ./gradlew lint || true
+      - run: ./gradlew assembleDebug || ./gradlew build
+
+  rust:
+    name: Rust checks
+    needs: detect
+    if: needs.detect.outputs.has_rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test --all-features
+
+  python:
+    name: Python checks (ingest service)
+    needs: detect
+    if: needs.detect.outputs.has_python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install deps if requirements.txt
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+      - name: Install deps if pyproject.toml
+        run: |
+          if [ -f pyproject.toml ]; then
+            pip install -e . || true
+          fi
+      - name: Pytest
+        run: |
+          if [ -d tests ]; then
+            pytest --tb=short || true
+          else
+            echo "no tests directory — skipping"
+          fi
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          ignore-unfixed: true
+        continue-on-error: true
+      - name: Semgrep (if available)
+        run: |
+          if command -v semgrep >/dev/null 2>&1; then
+            semgrep scan . || true
+          else
+            echo "semgrep not installed — skipping (consider adding to dev deps)"
+          fi
+        continue-on-error: true
+
+# Regla: continue-on-error solo durante fase inicial.
+# Cuando el repo madure, security scans críticos deben bloquear PR.
+# Ver .mavis/memory/decision-log.md y runbooks/ai-loop-github-actions.md

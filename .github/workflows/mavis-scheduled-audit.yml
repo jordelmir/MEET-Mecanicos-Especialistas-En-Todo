@@ -1,0 +1,127 @@
+name: Mavis Scheduled Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Lunes 10:00 UTC (4:00 AM Costa Rica)
+    - cron: "0 10 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Weekly technical audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repo signals
+        shell: bash
+        run: |
+          mkdir -p .mavis/reports
+          {
+            echo "# Mavis Scheduled Audit"
+            echo
+            echo "## Commit"
+            git rev-parse HEAD
+            echo
+            echo "## Date"
+            date -u +"%Y-%m-%dT%H:%M:%SZ"
+            echo
+            echo "## TODO / FIXME / HACK / XXX"
+            grep -RInE "TODO|FIXME|HACK|XXX" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=.vercel \
+              --exclude-dir=dist \
+              || echo "(none)"
+            echo
+            echo "## Rust anti-patterns"
+            grep -RInE "unwrap\(|expect\(|panic!\(" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=.vercel \
+              --exclude-dir=dist \
+              --include="*.rs" \
+              --include="*.swift" \
+              || echo "(none)"
+            echo
+            echo "## Kotlin / Java anti-patterns"
+            grep -RInE "GlobalScope|catch \(Exception|!!|service_role" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=.vercel \
+              --exclude-dir=dist \
+              --include="*.kt" \
+              --include="*.kts" \
+              --include="*.java" \
+              || echo "(none)"
+            echo
+            echo "## TypeScript unsafe patterns"
+            grep -RInE ": any|SELECT \*|service_role" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=.vercel \
+              --exclude-dir=dist \
+              --include="*.ts" \
+              --include="*.tsx" \
+              --include="*.js" \
+              --include="*.jsx" \
+              || echo "(none)"
+            echo
+            echo "## Possible secrets (heuristic)"
+            grep -RInE "secret|password|token|api_key|api-key|apikey|sk_|pk_" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=build \
+              --exclude-dir=.gradle \
+              --exclude-dir=.vercel \
+              --exclude-dir=dist \
+              --exclude-dir=.mavis \
+              --exclude-dir=docs \
+              --exclude="*.md" \
+              --exclude="*.example" \
+              || echo "(none)"
+          } > .mavis/reports/scheduled-audit.md
+
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mavis-scheduled-audit
+          path: .mavis/reports/scheduled-audit.md
+          retention-days: 90
+
+      - name: Create issue if audit found signals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          # Si hay señales (no solo "(none)") crear issue
+          if grep -qE "TODO|FIXME|HACK|XXX|unwrap\(|expect\(|panic!\(|GlobalScope|catch \(Exception|!!|any|SELECT \*|service_role|secret|password|token|api_key|sk_|pk_" .mavis/reports/scheduled-audit.md; then
+            # Evitar duplicar issues si ya hay uno abierto esta semana
+            EXISTING=$(gh issue list --label "mavis,tech-debt" --state open --json number --jq 'length' 2>/dev/null || echo "0")
+            if [ "$EXISTING" -lt 1 ]; then
+              gh issue create \
+                --title "[Mavis] Weekly technical audit findings — $(date -u +%Y-%m-%d)" \
+                --body-file .mavis/reports/scheduled-audit.md \
+                --label "mavis,tech-debt" || true
+            else
+              echo "Issue mavis/tech-debt ya abierto esta semana — no duplico"
+            fi
+          else
+            echo "Sin hallazgos — no se crea issue"
+          fi
+
+# Regla: este workflow no debe auto-commit.
+# Solo crea issue. Auto-patches deben ejecutarse localmente
+# o en entorno controlado. Ver runbooks/ai-loop-github-actions.md

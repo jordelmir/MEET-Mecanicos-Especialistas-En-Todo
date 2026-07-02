@@ -1,0 +1,151 @@
+# RAG sources — MEET
+# Declarative list of paths Mavis is allowed to ingest for RAG.
+# Anything not listed here or matching forbidden patterns is excluded.
+
+version: 1
+
+sources:
+  code:
+    - path: src/
+      language: typescript
+      purpose: web app core
+    - path: components/
+      language: typescript
+      purpose: React UI components
+    - path: App.tsx
+      language: typescript
+      purpose: root component
+    - path: index.tsx
+      language: typescript
+      purpose: bootstrap
+    - path: lib/
+      language: typescript
+      purpose: shared libs (BrandModuleRegistry, vanguard)
+    - path: services/
+      language: typescript
+      purpose: web services
+    - path: android/app/src/main/
+      language: kotlin
+      purpose: Android app source
+    - path: supabase/migrations/
+      language: sql
+      purpose: database schema evolution
+    - path: supabase/functions/
+      language: typescript
+      purpose: edge functions
+    - path: meet-elite-ingest/src/
+      language: python
+      purpose: ingest service source
+    - path: meet-elite-ingest/tests/
+      language: python
+      purpose: ingest tests
+    - path: supabase_schema.sql
+      language: sql
+      purpose: current schema snapshot
+
+  docs:
+    - path: README.md
+      purpose: project readme
+    - path: DOCUMENTATION.md
+      purpose: extended docs
+    - path: CHANGELOG.md
+      purpose: change log (when present)
+    - path: docs/
+      purpose: project docs folder
+    - path: GUIA_FIRMA_APK.md
+      purpose: APK signing guide
+    - path: .mavis/memory/
+      purpose: Mavis project memory
+    - path: .mavis/adr/
+      purpose: architectural decision records
+    - path: .mavis/runbooks/
+      purpose: operational runbooks
+    - path: .mavis/loops/
+      purpose: loop specifications
+
+  ci:
+    - path: .github/workflows/
+      purpose: GitHub Actions
+
+  config:
+    - path: package.json
+      purpose: web deps + scripts
+    - path: package-lock.json
+      purpose: locked versions
+    - path: tsconfig.json
+      purpose: TS config
+    - path: vite.config.ts
+      purpose: Vite config
+    - path: tailwind.config.cjs
+      purpose: Tailwind config
+    - path: postcss.config.cjs
+      purpose: PostCSS config
+    - path: android/app/build.gradle.kts
+      purpose: Android app build
+    - path: android/build.gradle.kts
+      purpose: Android root build
+    - path: meet-elite-ingest/pyproject.toml
+      purpose: Python deps
+    - path: meet-elite-ingest/requirements.txt
+      purpose: Python locked deps
+    - path: meet-elite-ingest/alembic.ini
+      purpose: migrations config
+    - path: meet-elite-ingest/Dockerfile
+      purpose: container build
+    - path: meet-elite-ingest/docker-compose.yml
+      purpose: local stack
+    - path: .env.example
+      purpose: env var documentation (no values)
+
+# Explicit allowlist semantics:
+# - Anything matching `sources.code.path` is ingested with its language-specific chunker
+# - Anything matching `sources.docs.path` is ingested with heading-aware chunker
+# - Anything matching `sources.ci.path` is ingested as full files
+# - Anything matching `sources.config.path` is ingested as full files
+# - Anything NOT matched → ignored (not forbidden, just out of scope)
+
+forbidden_patterns:
+  # Glob patterns Mavis MUST skip even if path is allowlisted
+  - "**/.env"
+  - "**/.env.*"
+  - "**/secrets/**"
+  - "**/*.keystore"
+  - "**/*.jks"
+  - "**/*.p12"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/credentials*"
+  - "**/tokens*"
+  - "**/google-services.json"
+  - "**/service-account*.json"
+  - "**/production-dumps/**"
+  - "**/customer-data/**"
+  - "**/vin-logs/**"
+  - "**/gps-logs/**"
+  - "**/payment-logs/**"
+  - "**/PII/**"
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/build/**"
+  - "**/.gradle/**"
+  - "**/dist/**"
+  - "**/__pycache__/**"
+  - "**/.vercel/**"
+  - "**/.android/**"
+
+# Heuristic exclusion at ingest:
+#   - Any line matching /(token|api[_-]?key|secret|password|service_role)\s*[:=]/i
+#     is dropped from the chunk before embedding.
+#   - VIN regex (17 alphanum, no I/O/Q) dropped if found outside a test fixture.
+#   - GPS coords regex dropped outside test fixtures.
+#   - Email addresses dropped.
+#   - Stripe-style sk_* keys dropped.
+
+redaction_rules:
+  email: drop
+  vin: drop_unless_in_test
+  gps: drop_unless_in_test
+  api_key_heuristic: drop
+  stripe_key_heuristic: drop
+  jwt_heuristic: drop
+  private_key_block: drop

@@ -1,0 +1,81 @@
+name: Mavis RAG Freshness Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  rag-freshness:
+    name: RAG freshness check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check memory files
+        shell: bash
+        run: |
+          mkdir -p .mavis/reports
+          {
+            echo "# RAG Freshness Check"
+            echo
+            echo "## PR"
+            echo "${{ github.event.pull_request.html_url }}"
+            echo
+            echo "## Commit"
+            git rev-parse HEAD
+            echo
+            echo "## Changed files (vs origin/main)"
+            git diff --name-only origin/main...HEAD || echo "(no diff)"
+            echo
+            echo "## Memory / RAG / ADR files present"
+            find .mavis/memory .mavis/rag .mavis/adr -type f 2>/dev/null || echo "(none)"
+          } > .mavis/reports/rag-freshness.md
+
+      - name: Warn if critical files changed without memory update
+        shell: bash
+        run: |
+          CHANGED="$(git diff --name-only origin/main...HEAD || true)"
+          echo "$CHANGED" | grep -E "^(supabase/|migrations/|src/|app/|backend/|frontend/|android/|components/|lib/|services/|Cargo\.toml|build\.gradle|package\.json|tsconfig\.json)" >/tmp/critical_changed || true
+          echo "$CHANGED" | grep -E "^(\.mavis/memory/|\.mavis/rag/|\.mavis/adr/|docs/|README\.md|CHANGELOG\.md|DOCUMENTATION\.md)" >/tmp/memory_changed || true
+
+          echo "Critical files changed:"
+          cat /tmp/critical_changed || true
+          echo
+          echo "Memory / docs / RAG files changed:"
+          cat /tmp/memory_changed || true
+          echo
+
+          if [ -s /tmp/critical_changed ] && [ ! -s /tmp/memory_changed ]; then
+            echo "::error::Critical files changed without memory/docs/RAG update. Update .mavis/memory/ or add a justification."
+            exit 1
+          fi
+
+      - name: Comment on PR with summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('.mavis/reports/rag-freshness.md', 'utf8');
+            const body = `## Mavis RAG Freshness Check\n\n\`\`\`\n${report}\n\`\`\`\n\n_Failure means: critical files changed without memory/docs/RAG update. Add files under \`.mavis/memory/\`, \`.mavis/rag/\`, \`.mavis/adr/\`, \`docs/\`, or update README.md._`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mavis-rag-freshness
+          path: .mavis/reports/rag-freshness.md
+          retention-days: 90
