@@ -6,10 +6,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,38 +24,59 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
+ * Estado de rotación 3D: yaw (sobre Y) + pitch (sobre X).
+ *
+ * - yaw: rotación horizontal (drag gesture).
+ * - pitch: inclinación vertical (slider, evita conflicto con scroll vertical).
+ */
+data class RotationState(
+    val yaw: Float = 0f,
+    val pitch: Float = 0f
+)
+
+/**
  * Render 3D interactivo de una [CompiledMesh] sobre Compose Canvas.
  *
  * Capacidades:
  * - Proyección isométrica (ángulos 30°/30°).
- * - **Drag horizontal** para rotar la pieza en yaw (alrededor del eje Y).
- * - **Doble tap** para resetear la rotación a 0.
+ * - **Drag horizontal** dentro del canvas → actualiza `yaw` (state hoisted).
+ * - **Doble tap** dentro del canvas → `onReset()`.
  * - **Iluminación Lambertiana** usando las normales por vértice que ya trae
- *   [CompiledVertex]. Da sensación de volumen sin motor de PBR.
+ *   [CompiledVertex].
  * - Backface culling + painter's algorithm para ordenar back-to-front.
  * - Wireframe opcional superpuesto.
  *
+ * El control de `pitch` se hace externamente (slider, botón, etc.) ya que el
+ * drag vertical choca con el scroll del LazyColumn padre.
+ *
  * Limitaciones:
- * - Sin rotación de pitch (vertical scroll lo consume el LazyColumn padre).
- * - Sin materiales PBR (usa solo el color por vértice).
+ * - Sin materiales PBR (color por vértice).
  * - Si se requiere PBR + rotación libre, swap a Filament (ver ADR).
+ *
+ * @param yaw rotación horizontal en radianes.
+ * @param pitch rotación vertical (inclinación) en radianes.
+ * @param onYawChange callback cuando el usuario arrastra; rara vez lo necesitas
+ *   porque el `pitch` se controla fuera, pero así el estado hoisted se mantiene
+ *   desde un solo lugar.
  */
 @Composable
 fun IsometricMeshRenderer(
     mesh: CompiledMesh,
+    yaw: Float,
+    pitch: Float,
     modifier: Modifier = Modifier,
     backgroundColor: Color = Color(0xFF0A0E1A),
     wireframeColor: Color = Color(0xFF00E5FF).copy(alpha = 0.4f),
     showWireframe: Boolean = true,
     fillBackground: Boolean = true,
     enableInteraction: Boolean = true,
-    enableLighting: Boolean = true
+    enableLighting: Boolean = true,
+    onYawChange: (Float) -> Unit = {},
+    onReset: () -> Unit = {}
 ) {
-    var rotation by remember { mutableStateOf(0f) }
-
-    // Recalcular triángulos cuando la malla o la rotación cambian.
-    val triangles = remember(mesh, rotation, enableLighting) {
-        prepareTriangles(mesh, yaw = rotation, applyLighting = enableLighting)
+    // Recalcular triángulos cuando la malla o las rotaciones cambian.
+    val triangles = remember(mesh, yaw, pitch, enableLighting) {
+        prepareTriangles(mesh, yaw = yaw, pitch = pitch, applyLighting = enableLighting)
     }
 
     val interactionModifier = if (enableInteraction) {
@@ -66,12 +84,12 @@ fun IsometricMeshRenderer(
             .pointerInput(Unit) {
                 detectDragGestures { change, drag ->
                     // Consumir solo el delta horizontal para no chocar con el scroll vertical.
-                    rotation += drag.x * 0.008f
+                    onYawChange(yaw + drag.x * 0.008f)
                     change.consume()
                 }
             }
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { rotation = 0f })
+                detectTapGestures(onDoubleTap = { onReset() })
             }
     } else Modifier
 
@@ -117,21 +135,34 @@ private val LIGHT_DIR: Triple<Float, Float, Float> = run {
 }
 
 /**
- * Proyecta un punto 3D a 2D aplicando primero yaw (rotación sobre Y) y luego
+ * Aplica yaw (rotación sobre Y) seguido de pitch (rotación sobre X) y luego
  * la proyección isométrica fija.
+ *
+ * Convenciones:
+ * - yaw positivo = gira la pieza hacia la izquierda (counterclockwise visto
+ *   desde arriba). Coincide con drag hacia la derecha del usuario.
+ * - pitch positivo = inclina la pieza hacia abajo (muestra el "techo").
  */
 private fun projectRotated(
     x: Float, y: Float, z: Float,
-    yaw: Float
+    yaw: Float, pitch: Float
 ): Triple<Float, Float, Float> {
+    // Yaw (alrededor de Y)
     val cy = cos(yaw); val sy = sin(yaw)
     val xr = x * cy + z * sy
+    val yr = y
     val zr = -x * sy + z * cy
-    val sx = (xr - zr) * ISO_COS
-    val sy2 = y + (xr + zr) * ISO_SIN
-    // Profundidad lógica para painter's algorithm.
-    // Usamos Y (altura) ya que arriba = más al fondo en iso.
-    val depth = y + (xr + zr) * 0.5f
+
+    // Pitch (alrededor de X, sobre el eje xr ya rotado)
+    val cp = cos(pitch); val sp = sin(pitch)
+    val xr2 = xr
+    val yr2 = yr * cp - zr * sp
+    val zr2 = yr * sp + zr * cp
+
+    // Proyección isométrica
+    val sx = (xr2 - zr2) * ISO_COS
+    val sy2 = yr2 + (xr2 + zr2) * ISO_SIN
+    val depth = yr2 + (xr2 + zr2) * 0.5f
     return Triple(sx, sy2, depth)
 }
 
@@ -149,6 +180,7 @@ private fun lambert(normalX: Float, normalY: Float, normalZ: Float): Float {
 private fun prepareTriangles(
     mesh: CompiledMesh,
     yaw: Float,
+    pitch: Float,
     applyLighting: Boolean
 ): List<PreparedTriangle> {
     if (mesh.isEmpty) return emptyList()
@@ -162,7 +194,7 @@ private fun prepareTriangles(
         val tx = v.x - cx
         val ty = v.y - cy
         val tz = v.z - cz
-        val (sx, sy, depth) = projectRotated(tx, ty, tz, yaw)
+        val (sx, sy, depth) = projectRotated(tx, ty, tz, yaw, pitch)
         val litFactor = if (applyLighting) {
             lambert(v.nx, v.ny, v.nz)
         } else 1.0f

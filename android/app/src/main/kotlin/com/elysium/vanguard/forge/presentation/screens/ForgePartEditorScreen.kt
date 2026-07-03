@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -53,6 +55,7 @@ import com.elysium.vanguard.forge.domain.ParametricFeature
 import com.elysium.vanguard.forge.domain.SafetyClassification
 import com.elysium.vanguard.forge.presentation.components.IsometricMeshRenderer
 import com.elysium.vanguard.forge.presentation.components.NeonCard
+import com.elysium.vanguard.forge.presentation.components.RotationState
 import com.elysium.vanguard.forge.presentation.components.ProvenanceBadge
 import com.elysium.vanguard.forge.presentation.components.SectionHeader
 import com.elysium.vanguard.forge.presentation.components.SeverityBadge
@@ -237,23 +240,96 @@ private fun Viewport3D(part: ForgePart, materials: List<MaterialSpec>) {
     val compiler = remember { com.elysium.vanguard.forge.engine.ForgeGeometryCompiler() }
     val mesh = remember(part) { compiler.compilePart(part).mesh }
 
-    NeonCard(
-        modifier = Modifier.fillMaxWidth().height(280.dp),
-        accentColor = ForgeColors.Accent
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (mesh.isEmpty) {
-                Viewport3DPlaceholder(part = part, materials = materials)
-            } else {
-                IsometricMeshRenderer(mesh = mesh, modifier = Modifier.fillMaxSize())
-                Viewport3DOverlay(
-                    part = part,
-                    materials = materials,
-                    triangleCount = mesh.faces.size,
-                    vertexCount = mesh.vertices.size
-                )
+    // Estado de rotación elevado al composable padre para poder controlarlo
+    // desde el slider de pitch sin entrar en conflicto con el scroll vertical.
+    var rotation by remember { mutableStateOf(RotationState()) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        NeonCard(
+            modifier = Modifier.fillMaxWidth().height(280.dp),
+            accentColor = ForgeColors.Accent
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (mesh.isEmpty) {
+                    Viewport3DPlaceholder(part = part, materials = materials)
+                } else {
+                    IsometricMeshRenderer(
+                        mesh = mesh,
+                        yaw = rotation.yaw,
+                        pitch = rotation.pitch,
+                        modifier = Modifier.fillMaxSize(),
+                        onYawChange = { newYaw ->
+                            rotation = rotation.copy(yaw = newYaw)
+                        },
+                        onReset = {
+                            rotation = RotationState()
+                        }
+                    )
+                    Viewport3DOverlay(
+                        part = part,
+                        materials = materials,
+                        triangleCount = mesh.faces.size,
+                        vertexCount = mesh.vertices.size,
+                        rotation = rotation
+                    )
+                }
             }
         }
+        // Slider horizontal para pitch (rotación vertical). Evita el conflicto
+        // con el scroll vertical del LazyColumn padre.
+        if (!mesh.isEmpty) {
+            PitchSlider(
+                pitch = rotation.pitch,
+                onPitchChange = { rotation = rotation.copy(pitch = it) },
+                onReset = { rotation = RotationState() }
+            )
+        }
+    }
+}
+
+/**
+ * Slider de pitch (rotación vertical). Rango -60° a +60° (~±1.047 rad).
+ */
+@Composable
+private fun PitchSlider(
+    pitch: Float,
+    onPitchChange: (Float) -> Unit,
+    onReset: () -> Unit
+) {
+    val minPitch = -1.047f
+    val maxPitch = 1.047f
+    val degrees = Math.toDegrees(pitch.toDouble()).toInt()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TechLabel("PITCH")
+        Slider(
+            value = pitch,
+            onValueChange = onPitchChange,
+            valueRange = minPitch..maxPitch,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = ForgeColors.Accent,
+                activeTrackColor = ForgeColors.Accent.copy(alpha = 0.6f),
+                inactiveTrackColor = ForgeColors.OnSurface.copy(alpha = 0.2f)
+            )
+        )
+        // Botón reset compacto.
+        Button(
+            onClick = onReset,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = ForgeColors.OnSurface.copy(alpha = 0.6f)
+            ),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text("↺", fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(4.dp))
+        // Lectura compacta del valor en grados.
+        TechLabel("${degrees}°")
     }
 }
 
@@ -266,7 +342,8 @@ private fun Viewport3DOverlay(
     part: ForgePart,
     materials: List<MaterialSpec>,
     triangleCount: Int,
-    vertexCount: Int
+    vertexCount: Int,
+    rotation: RotationState
 ) {
     val featureBreakdown = part.featureTree
         .groupingBy { it.type }
@@ -309,7 +386,7 @@ private fun Viewport3DOverlay(
         }
         // Footer con metadata + hint
         Column {
-            TechLabel("↔ arrastra para rotar · doble tap para reset")
+            TechLabel("↔ arrastra (yaw) · slider PITCH abajo · doble tap reset")
             Spacer(Modifier.height(4.dp))
             TechLabel("BBox: $dimsLabel")
             TechLabel(materialName)
