@@ -1,11 +1,16 @@
 package com.elysium.vanguard.forge.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * Preset paramétrico: tipo + nombre display + descripción corta + parámetros por defecto.
  * Solo se incluyen las primitivas soportadas por V1 del compilador geométrico.
  *
- * Visibilidad `internal`: usado por ForgePartEditorScreen y por tests del módulo.
+ * `@Serializable` para que pueda ser referenciado por `FeaturePlan` (que también
+ * es serializable). Visibilidad `internal`: usado por ForgePartEditorScreen y
+ * por tests del módulo.
  */
+@Serializable
 internal data class FeaturePreset(
     val type: FeatureType,
     val displayName: String,
