@@ -533,7 +533,8 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
 
                     Button(
                         onClick = {
-                            if (currentGps == null) {
+                            val gps = currentGps
+                            if (gps == null) {
                                 Toast.makeText(context, "Espere a obtener coordenadas GPS válidas", Toast.LENGTH_LONG).show()
                                 return@Button
                             }
@@ -542,21 +543,30 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 return@Button
                             }
 
-                            // Calcular distancia estimada simple (Haversine)
-                            val distance = calculateDistance(
-                                currentGps!!.latitude, currentGps!!.longitude,
-                                if (destLatitude != 0.0) destLatitude else currentGps!!.latitude + 0.05,
-                                if (destLongitude != 0.0) destLongitude else currentGps!!.longitude + 0.05
-                            )
+                            // Sanitizar dirección: si el geocoder falló, rawAddressName llega
+                            // como "Ubicación GPS (lat, lng)" — eso filtra coords exactas al
+                            // backend. Si detectamos ese patrón, usamos genérico.
+                            // (RISK-3 GPS leak: lat/lon no debe ir en strings user-facing).
+                            val safePickupAddress = sanitizeGpsAddress(gps.addressName)
+
+                            // Calcular distancia estimada simple (Haversine).
+                            // Si el usuario no ingreso destino, distancia = 0 (no usamos
+                            // el truco "+0.05" que filtra coords raw).
+                            val distance = if (destLatitude != 0.0 && destLongitude != 0.0) {
+                                calculateDistance(
+                                    gps.latitude, gps.longitude,
+                                    destLatitude, destLongitude
+                                )
+                            } else 0.0
 
                             viewModel.createRideRequest(
                                 passengerId = passengerVer?.passengerId ?: "local_passenger_1",
                                 passengerName = passengerVer?.fullName ?: "Usuario MEET",
-                                passengerPhone = passengerVer?.phone ?: (currentGps!!.dialingPrefix + " 8888-8888"),
-                                pickupLat = currentGps!!.latitude,
-                                pickupLng = currentGps!!.longitude,
-                                pickupAddr = currentGps!!.addressName,
-                                pickupAcc = currentGps!!.accuracy,
+                                passengerPhone = passengerVer?.phone ?: (gps.dialingPrefix + " 8888-8888"),
+                                pickupLat = gps.latitude,
+                                pickupLng = gps.longitude,
+                                pickupAddr = safePickupAddress,
+                                pickupAcc = gps.accuracy,
                                 destLat = if (destLatitude != 0.0) destLatitude else currentGps!!.latitude + 0.05,
                                 destLng = if (destLongitude != 0.0) destLongitude else currentGps!!.longitude + 0.05,
                                 destAddr = destAddress,
@@ -1660,6 +1670,27 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
             Math.sin(dLon / 2) * Math.sin(dLon / 2)
     val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return r * c
+}
+
+/**
+ * Sanitiza un `addressName` para que no filtre lat/lon cuando el geocoder falló.
+ *
+ * Caso concreto: cuando `Geocoder.getFromLocation` devuelve null o lanza SecurityException,
+ * `ObdViewModel.resolveLocationDetails` setea `addressName = "Ubicación GPS (lat, lng)"`.
+ * Si eso se persiste en una Room row o se envía al backend, las coords exactas quedan
+ * expuestas en un canal que no debería tenerlas (las coordenadas ya están en
+ * `pickupLat`/`pickupLng` como columnas dedicadas y firmadas con consent).
+ *
+ * Detecta el patrón "Ubicación GPS (<number>, <number>)" y lo reemplaza por un label
+ * genérico. Si no coincide el patrón, devuelve la entrada sin modificar.
+ *
+ * `internal` para que SanitizeGpsAddressTest del mismo módulo pueda validar el regex.
+ *
+ * (RISK-3: GPS data leak via fallback address string)
+ */
+internal fun sanitizeGpsAddress(raw: String): String {
+    val regex = Regex("^Ubicación GPS \\(-?\\d+\\.?\\d*, -?\\d+\\.?\\d*\\)$")
+    return if (regex.matches(raw)) "Ubicación GPS detectada" else raw
 }
 
 // ─── Passenger Verification Dialog ───────────────────────────────────────────
