@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "documents": [
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "sand_casting",
       "process": {
@@ -10,17 +11,44 @@
         "displayName": "Fundición en arena",
         "category": "forming",
         "description": "Vertido de metal fundido en molde de arena compactada. Apto para series cortas y geometrías complejas.",
-        "compatibleMaterials": ["cast_iron", "aluminum_356", "copper", "brass"],
-        "machines": ["horno de fusión", "molde de arena", "mesa de moldeo"],
-        "steps": ["preparar molde de arena", "verter metal fundido", "enfriar", "desmoldear", "limpiar"],
-        "commonDefects": ["porosidad", "inclusiones de arena", "rechupe"],
-        "qualityControls": ["inspección visual", "control dimensional", "radiografía"],
-        "risks": ["manipulación de metal fundido", "exposición a polvo de sílice"],
+        "compatibleMaterials": [
+          "cast_iron",
+          "aluminum_356",
+          "copper",
+          "brass"
+        ],
+        "machines": [
+          "horno de fusión",
+          "molde de arena",
+          "mesa de moldeo"
+        ],
+        "steps": [
+          "preparar molde de arena",
+          "verter metal fundido",
+          "enfriar",
+          "desmoldear",
+          "limpiar"
+        ],
+        "commonDefects": [
+          "porosidad",
+          "inclusiones de arena",
+          "rechupe"
+        ],
+        "qualityControls": [
+          "inspección visual",
+          "control dimensional",
+          "radiografía"
+        ],
+        "risks": [
+          "manipulación de metal fundido",
+          "exposición a polvo de sílice"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 1.5
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "die_casting",
       "process": {
@@ -28,17 +56,43 @@
         "displayName": "Fundición a presión (die casting)",
         "category": "forming",
         "description": "Inyección de metal fundido a alta presión en molde metálico reusable.",
-        "compatibleMaterials": ["aluminum_356", "zinc", "magnesium"],
-        "machines": ["máquina de die casting", "horno", "robot de extracción"],
-        "steps": ["precalentar molde", "inyectar metal", "enfriar", "expulsar pieza", "recortar rebabas"],
-        "commonDefects": ["porosidad", "marcas de flujo", "alabeo"],
-        "qualityControls": ["rayos X", "presión de prueba", "dimensiones CMM"],
-        "risks": ["inyección a alta presión", "manipulación de metal caliente"],
+        "compatibleMaterials": [
+          "aluminum_356",
+          "zinc",
+          "magnesium"
+        ],
+        "machines": [
+          "máquina de die casting",
+          "horno",
+          "robot de extracción"
+        ],
+        "steps": [
+          "precalentar molde",
+          "inyectar metal",
+          "enfriar",
+          "expulsar pieza",
+          "recortar rebabas"
+        ],
+        "commonDefects": [
+          "porosidad",
+          "marcas de flujo",
+          "alabeo"
+        ],
+        "qualityControls": [
+          "rayos X",
+          "presión de prueba",
+          "dimensiones CMM"
+        ],
+        "risks": [
+          "inyección a alta presión",
+          "manipulación de metal caliente"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.2
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "forging",
       "process": {
@@ -46,17 +100,42 @@
         "displayName": "Forja",
         "category": "forming",
         "description": "Deformación plástica del metal por compresión. Mejora resistencia mecánica.",
-        "compatibleMaterials": ["mild_steel", "high_strength_steel", "aluminum_6061", "forged_aluminum"],
-        "machines": ["prensa de forja", "matrices"],
-        "steps": ["calentar tocho", "prensar en matriz", "recortar rebaba", "enfriar"],
-        "commonDefects": ["grietas", "pliegues", "underfill"],
-        "qualityControls": ["dimensional", "pruebas mecánicas", "metalografía"],
-        "risks": ["temperatura elevada", "manipulación de prensas pesadas"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "high_strength_steel",
+          "aluminum_6061",
+          "forged_aluminum"
+        ],
+        "machines": [
+          "prensa de forja",
+          "matrices"
+        ],
+        "steps": [
+          "calentar tocho",
+          "prensar en matriz",
+          "recortar rebaba",
+          "enfriar"
+        ],
+        "commonDefects": [
+          "grietas",
+          "pliegues",
+          "underfill"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "pruebas mecánicas",
+          "metalografía"
+        ],
+        "risks": [
+          "temperatura elevada",
+          "manipulación de prensas pesadas"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.5
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "stamping",
       "process": {
@@ -64,17 +143,41 @@
         "displayName": "Estampado",
         "category": "forming",
         "description": "Conformado de chapa metálica mediante prensa y matriz.",
-        "compatibleMaterials": ["mild_steel", "stainless_steel", "aluminum_6061"],
-        "machines": ["prensa mecánica/hidráulica", "matriz progresiva"],
-        "steps": ["alimentar chapa", "golpear matriz", "expulsar pieza", "control calidad"],
-        "commonDefects": ["grietas", "arrugas", "rebabas"],
-        "qualityControls": ["dimensional", "espesor de pared", "rugosidad"],
-        "risks": ["manipulación de prensas", "bordes cortantes"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "stainless_steel",
+          "aluminum_6061"
+        ],
+        "machines": [
+          "prensa mecánica/hidráulica",
+          "matriz progresiva"
+        ],
+        "steps": [
+          "alimentar chapa",
+          "golpear matriz",
+          "expulsar pieza",
+          "control calidad"
+        ],
+        "commonDefects": [
+          "grietas",
+          "arrugas",
+          "rebabas"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "espesor de pared",
+          "rugosidad"
+        ],
+        "risks": [
+          "manipulación de prensas",
+          "bordes cortantes"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.2
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "cnc_machining",
       "process": {
@@ -82,17 +185,44 @@
         "displayName": "Mecanizado CNC",
         "category": "machining",
         "description": "Arranque de viruta mediante máquina de control numérico.",
-        "compatibleMaterials": ["mild_steel", "aluminum_6061", "cast_iron", "brass", "copper"],
-        "machines": ["centro de mecanizado CNC", "torno CNC"],
-        "steps": ["fijar pieza", "programar trayectoria", "ejecutar corte", "medir", "acabado"],
-        "commonDefects": ["viruta atrapada", "tolerancia fuera de rango", "marcas de herramienta"],
-        "qualityControls": ["CMM", "calibrador", "rugosímetro"],
-        "risks": ["viruta caliente", "refrigerante"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "aluminum_6061",
+          "cast_iron",
+          "brass",
+          "copper"
+        ],
+        "machines": [
+          "centro de mecanizado CNC",
+          "torno CNC"
+        ],
+        "steps": [
+          "fijar pieza",
+          "programar trayectoria",
+          "ejecutar corte",
+          "medir",
+          "acabado"
+        ],
+        "commonDefects": [
+          "viruta atrapada",
+          "tolerancia fuera de rango",
+          "marcas de herramienta"
+        ],
+        "qualityControls": [
+          "CMM",
+          "calibrador",
+          "rugosímetro"
+        ],
+        "risks": [
+          "viruta caliente",
+          "refrigerante"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.05
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "turning",
       "process": {
@@ -100,17 +230,39 @@
         "displayName": "Torneado",
         "category": "machining",
         "description": "Arranque de viruta en piezas cilíndricas mediante torno.",
-        "compatibleMaterials": ["mild_steel", "aluminum_6061", "brass", "copper", "cast_iron"],
-        "machines": ["torno"],
-        "steps": ["fijar pieza", "refrigerar", "cortar", "medir"],
-        "commonDefects": ["vibración (chatter)", "conicidad"],
-        "qualityControls": ["medición diámetro", "rugosidad"],
-        "risks": ["viruta larga caliente"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "aluminum_6061",
+          "brass",
+          "copper",
+          "cast_iron"
+        ],
+        "machines": [
+          "torno"
+        ],
+        "steps": [
+          "fijar pieza",
+          "refrigerar",
+          "cortar",
+          "medir"
+        ],
+        "commonDefects": [
+          "vibración (chatter)",
+          "conicidad"
+        ],
+        "qualityControls": [
+          "medición diámetro",
+          "rugosidad"
+        ],
+        "risks": [
+          "viruta larga caliente"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.05
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "milling",
       "process": {
@@ -118,17 +270,39 @@
         "displayName": "Fresado",
         "category": "machining",
         "description": "Arranque de viruta con herramienta rotativa multi-filo.",
-        "compatibleMaterials": ["mild_steel", "aluminum_6061", "cast_iron", "brass"],
-        "machines": ["fresadora", "centro de mecanizado"],
-        "steps": ["fijar pieza", "seleccionar fresa", "ejecutar pasadas", "medir"],
-        "commonDefects": ["marcas de herramienta", "rebabas"],
-        "qualityControls": ["dimensional", "rugosidad"],
-        "risks": ["viruta proyectada"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "aluminum_6061",
+          "cast_iron",
+          "brass"
+        ],
+        "machines": [
+          "fresadora",
+          "centro de mecanizado"
+        ],
+        "steps": [
+          "fijar pieza",
+          "seleccionar fresa",
+          "ejecutar pasadas",
+          "medir"
+        ],
+        "commonDefects": [
+          "marcas de herramienta",
+          "rebabas"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "rugosidad"
+        ],
+        "risks": [
+          "viruta proyectada"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.1
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "drilling",
       "process": {
@@ -136,17 +310,42 @@
         "displayName": "Taladrado",
         "category": "machining",
         "description": "Perforación cilíndrica con broca.",
-        "compatibleMaterials": ["mild_steel", "aluminum_6061", "cast_iron", "brass", "plastics"],
-        "machines": ["taladro", "centro de mecanizado"],
-        "steps": ["marcar punto", "fijar", "taladrar con refrigerante", "limpieza"],
-        "commonDefects": ["desviación", "rebabas", "rotura de broca"],
-        "qualityControls": ["diámetro", "profundidad"],
-        "risks": ["viruta caliente", "broca atrapada"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "aluminum_6061",
+          "cast_iron",
+          "brass",
+          "plastics"
+        ],
+        "machines": [
+          "taladro",
+          "centro de mecanizado"
+        ],
+        "steps": [
+          "marcar punto",
+          "fijar",
+          "taladrar con refrigerante",
+          "limpieza"
+        ],
+        "commonDefects": [
+          "desviación",
+          "rebabas",
+          "rotura de broca"
+        ],
+        "qualityControls": [
+          "diámetro",
+          "profundidad"
+        ],
+        "risks": [
+          "viruta caliente",
+          "broca atrapada"
+        ],
         "costLevel": 1,
         "typicalPrecisionMm": 0.1
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "honing",
       "process": {
@@ -154,17 +353,36 @@
         "displayName": "Bruñido (honing)",
         "category": "finishing",
         "description": "Acabado superficial de cilindros con piedras abrasivas.",
-        "compatibleMaterials": ["cast_iron", "high_strength_steel"],
-        "machines": ["máquina de honing"],
-        "steps": ["montar pieza", "insertar piedras", "bruñir", "limpiar"],
-        "commonDefects": ["rayado", "conicidad"],
-        "qualityControls": ["rugosidad", "redondez"],
-        "risks": ["polvo abrasivo"],
+        "compatibleMaterials": [
+          "cast_iron",
+          "high_strength_steel"
+        ],
+        "machines": [
+          "máquina de honing"
+        ],
+        "steps": [
+          "montar pieza",
+          "insertar piedras",
+          "bruñir",
+          "limpiar"
+        ],
+        "commonDefects": [
+          "rayado",
+          "conicidad"
+        ],
+        "qualityControls": [
+          "rugosidad",
+          "redondez"
+        ],
+        "risks": [
+          "polvo abrasivo"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.01
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "grinding",
       "process": {
@@ -172,17 +390,38 @@
         "displayName": "Rectificado",
         "category": "finishing",
         "description": "Acabado dimensional con muela abrasiva.",
-        "compatibleMaterials": ["high_strength_steel", "stainless_steel", "ceramic_friction_material"],
-        "machines": ["rectificadora"],
-        "steps": ["montar", "refrigerar", "rectificar", "medir"],
-        "commonDefects": ["quemaduras superficiales", "vibración"],
-        "qualityControls": ["dimensiones finales", "rugosidad"],
-        "risks": ["refrigerante", "polvo"],
+        "compatibleMaterials": [
+          "high_strength_steel",
+          "stainless_steel",
+          "ceramic_friction_material"
+        ],
+        "machines": [
+          "rectificadora"
+        ],
+        "steps": [
+          "montar",
+          "refrigerar",
+          "rectificar",
+          "medir"
+        ],
+        "commonDefects": [
+          "quemaduras superficiales",
+          "vibración"
+        ],
+        "qualityControls": [
+          "dimensiones finales",
+          "rugosidad"
+        ],
+        "risks": [
+          "refrigerante",
+          "polvo"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.005
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "spot_welding",
       "process": {
@@ -190,17 +429,39 @@
         "displayName": "Soldadura por puntos",
         "category": "joining",
         "description": "Unión de chapas por resistencia eléctrica localizada.",
-        "compatibleMaterials": ["mild_steel", "stainless_steel"],
-        "machines": ["máquina de soldadura por puntos"],
-        "steps": ["posicionar chapas", "aplicar presión", "soldar punto", "verificar"],
-        "commonDefects": ["soldadura fría", "expulsión", "poros"],
-        "qualityControls": ["ensayo de arranque", "visual", "ultrasonido"],
-        "risks": ["chispas", "calor"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "stainless_steel"
+        ],
+        "machines": [
+          "máquina de soldadura por puntos"
+        ],
+        "steps": [
+          "posicionar chapas",
+          "aplicar presión",
+          "soldar punto",
+          "verificar"
+        ],
+        "commonDefects": [
+          "soldadura fría",
+          "expulsión",
+          "poros"
+        ],
+        "qualityControls": [
+          "ensayo de arranque",
+          "visual",
+          "ultrasonido"
+        ],
+        "risks": [
+          "chispas",
+          "calor"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.5
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "mig_welding",
       "process": {
@@ -208,17 +469,42 @@
         "displayName": "Soldadura MIG",
         "category": "joining",
         "description": "Soldadura por arco con gas protector y alimentación continua.",
-        "compatibleMaterials": ["mild_steel", "stainless_steel", "aluminum_6061"],
-        "machines": ["equipo MIG", "cilindro de gas"],
-        "steps": ["preparar junta", "parametrizar", "soldar", "limpiar escoria"],
-        "commonDefects": ["porosidad", "falta de fusión", "salpicaduras"],
-        "qualityControls": ["visual", "penetración", "radiografía"],
-        "risks": ["radiación UV", "humos", "arco eléctrico"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "stainless_steel",
+          "aluminum_6061"
+        ],
+        "machines": [
+          "equipo MIG",
+          "cilindro de gas"
+        ],
+        "steps": [
+          "preparar junta",
+          "parametrizar",
+          "soldar",
+          "limpiar escoria"
+        ],
+        "commonDefects": [
+          "porosidad",
+          "falta de fusión",
+          "salpicaduras"
+        ],
+        "qualityControls": [
+          "visual",
+          "penetración",
+          "radiografía"
+        ],
+        "risks": [
+          "radiación UV",
+          "humos",
+          "arco eléctrico"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 1.0
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "tig_welding",
       "process": {
@@ -226,17 +512,39 @@
         "displayName": "Soldadura TIG",
         "category": "joining",
         "description": "Soldadura por arco con electrodo de tungsteno y gas inerte.",
-        "compatibleMaterials": ["stainless_steel", "aluminum_6061", "titanium"],
-        "machines": ["equipo TIG", "cilindro argón"],
-        "steps": ["preparar junta", "parametrizar amperaje", "soldar con relleno", "limpiar"],
-        "commonDefects": ["porosidad", "falta de fusión"],
-        "qualityControls": ["visual", "líquidos penetrantes"],
-        "risks": ["radiación UV", "gas argón"],
+        "compatibleMaterials": [
+          "stainless_steel",
+          "aluminum_6061",
+          "titanium"
+        ],
+        "machines": [
+          "equipo TIG",
+          "cilindro argón"
+        ],
+        "steps": [
+          "preparar junta",
+          "parametrizar amperaje",
+          "soldar con relleno",
+          "limpiar"
+        ],
+        "commonDefects": [
+          "porosidad",
+          "falta de fusión"
+        ],
+        "qualityControls": [
+          "visual",
+          "líquidos penetrantes"
+        ],
+        "risks": [
+          "radiación UV",
+          "gas argón"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.5
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "heat_treatment",
       "process": {
@@ -244,17 +552,36 @@
         "displayName": "Tratamiento térmico",
         "category": "finishing",
         "description": "Modificación de propiedades mecánicas mediante ciclos térmicos controlados.",
-        "compatibleMaterials": ["high_strength_steel", "aluminum_6061", "forged_aluminum"],
-        "machines": ["horno de tratamiento térmico"],
-        "steps": ["calentar a temperatura", "mantener", "enfriar según ciclo"],
-        "commonDefects": ["deformación", "dureza fuera de rango"],
-        "qualityControls": ["dureza", "metalografía"],
-        "risks": ["temperatura elevada"],
+        "compatibleMaterials": [
+          "high_strength_steel",
+          "aluminum_6061",
+          "forged_aluminum"
+        ],
+        "machines": [
+          "horno de tratamiento térmico"
+        ],
+        "steps": [
+          "calentar a temperatura",
+          "mantener",
+          "enfriar según ciclo"
+        ],
+        "commonDefects": [
+          "deformación",
+          "dureza fuera de rango"
+        ],
+        "qualityControls": [
+          "dureza",
+          "metalografía"
+        ],
+        "risks": [
+          "temperatura elevada"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.1
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "injection_molding",
       "process": {
@@ -262,17 +589,41 @@
         "displayName": "Moldeo por inyección",
         "category": "forming",
         "description": "Inyección de polímero fundido en molde metálico.",
-        "compatibleMaterials": ["abs_plastic", "nylon", "polycarbonate", "epdm_rubber"],
-        "machines": ["inyectora"],
-        "steps": ["calentar polímero", "inyectar", "enfriar", "expulsar"],
-        "commonDefects": ["marcas de flujo", "rebabas", "burbujas"],
-        "qualityControls": ["dimensional", "peso", "aspecto"],
-        "risks": ["inyección a presión", "temperatura elevada"],
+        "compatibleMaterials": [
+          "abs_plastic",
+          "nylon",
+          "polycarbonate",
+          "epdm_rubber"
+        ],
+        "machines": [
+          "inyectora"
+        ],
+        "steps": [
+          "calentar polímero",
+          "inyectar",
+          "enfriar",
+          "expulsar"
+        ],
+        "commonDefects": [
+          "marcas de flujo",
+          "rebabas",
+          "burbujas"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "peso",
+          "aspecto"
+        ],
+        "risks": [
+          "inyección a presión",
+          "temperatura elevada"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.1
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "extrusion",
       "process": {
@@ -280,17 +631,38 @@
         "displayName": "Extrusión",
         "category": "forming",
         "description": "Empuje de material a través de matriz para crear perfiles continuos.",
-        "compatibleMaterials": ["aluminum_6061", "abs_plastic", "epdm_rubber"],
-        "machines": ["extrusora", "matriz"],
-        "steps": ["calentar material", "empujar", "enfriar", "cortar"],
-        "commonDefects": ["alabeo", "torsión"],
-        "qualityControls": ["dimensional", "peso por metro"],
-        "risks": ["temperatura elevada"],
+        "compatibleMaterials": [
+          "aluminum_6061",
+          "abs_plastic",
+          "epdm_rubber"
+        ],
+        "machines": [
+          "extrusora",
+          "matriz"
+        ],
+        "steps": [
+          "calentar material",
+          "empujar",
+          "enfriar",
+          "cortar"
+        ],
+        "commonDefects": [
+          "alabeo",
+          "torsión"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "peso por metro"
+        ],
+        "risks": [
+          "temperatura elevada"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.2
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "laser_cutting",
       "process": {
@@ -298,17 +670,38 @@
         "displayName": "Corte láser",
         "category": "machining",
         "description": "Corte térmico mediante haz láser de alta potencia.",
-        "compatibleMaterials": ["mild_steel", "stainless_steel", "aluminum_6061"],
-        "machines": ["máquina de corte láser"],
-        "steps": ["fijar chapa", "parametrizar", "cortar", "limpiar rebabas"],
-        "commonDefects": ["borde quemado", "escoria"],
-        "qualityControls": ["dimensional", "rugosidad"],
-        "risks": ["haz láser", "humos"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "stainless_steel",
+          "aluminum_6061"
+        ],
+        "machines": [
+          "máquina de corte láser"
+        ],
+        "steps": [
+          "fijar chapa",
+          "parametrizar",
+          "cortar",
+          "limpiar rebabas"
+        ],
+        "commonDefects": [
+          "borde quemado",
+          "escoria"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "rugosidad"
+        ],
+        "risks": [
+          "haz láser",
+          "humos"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.05
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "waterjet_cutting",
       "process": {
@@ -316,17 +709,40 @@
         "displayName": "Corte por chorro de agua",
         "category": "machining",
         "description": "Corte mediante agua a alta presión con abrasivo.",
-        "compatibleMaterials": ["mild_steel", "stainless_steel", "aluminum_6061", "tempered_glass", "ceramic_friction_material"],
-        "machines": ["máquina waterjet"],
-        "steps": ["fijar pieza", "parametrizar", "cortar", "secar"],
-        "commonDefects": ["conicidad", "delaminación"],
-        "qualityControls": ["dimensional", "rugosidad"],
-        "risks": ["agua a presión", "abrasivo"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "stainless_steel",
+          "aluminum_6061",
+          "tempered_glass",
+          "ceramic_friction_material"
+        ],
+        "machines": [
+          "máquina waterjet"
+        ],
+        "steps": [
+          "fijar pieza",
+          "parametrizar",
+          "cortar",
+          "secar"
+        ],
+        "commonDefects": [
+          "conicidad",
+          "delaminación"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "rugosidad"
+        ],
+        "risks": [
+          "agua a presión",
+          "abrasivo"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.1
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "additive_manufacturing",
       "process": {
@@ -334,17 +750,40 @@
         "displayName": "Manufactura aditiva (3D printing)",
         "category": "forming",
         "description": "Construcción por capas a partir de modelo digital. FDM/SLA/SLS según material.",
-        "compatibleMaterials": ["abs_plastic", "nylon", "polycarbonate", "carbon_fiber_composite"],
-        "machines": ["impresora 3D FDM/SLA/SLS"],
-        "steps": ["preparar archivo", "cargar material", "imprimir", "post-procesar"],
-        "commonDefects": ["warping", "delaminación", "porosidad"],
-        "qualityControls": ["dimensional", "mecánicas"],
-        "risks": ["polvo fino (SLS)", "resinas (SLA)"],
+        "compatibleMaterials": [
+          "abs_plastic",
+          "nylon",
+          "polycarbonate",
+          "carbon_fiber_composite"
+        ],
+        "machines": [
+          "impresora 3D FDM/SLA/SLS"
+        ],
+        "steps": [
+          "preparar archivo",
+          "cargar material",
+          "imprimir",
+          "post-procesar"
+        ],
+        "commonDefects": [
+          "warping",
+          "delaminación",
+          "porosidad"
+        ],
+        "qualityControls": [
+          "dimensional",
+          "mecánicas"
+        ],
+        "risks": [
+          "polvo fino (SLS)",
+          "resinas (SLA)"
+        ],
         "costLevel": 3,
         "typicalPrecisionMm": 0.2
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "balancing",
       "process": {
@@ -352,17 +791,35 @@
         "displayName": "Balanceo",
         "category": "finishing",
         "description": "Corrección de distribución de masa en piezas rotativas.",
-        "compatibleMaterials": ["cast_iron", "high_strength_steel", "forged_aluminum"],
-        "machines": ["máquina de balanceo"],
-        "steps": ["montar", "medir desbalance", "agregar/remover peso", "verificar"],
-        "commonDefects": ["vibración residual"],
-        "qualityControls": ["medición G"],
-        "risks": ["piezas rotativas a alta velocidad"],
+        "compatibleMaterials": [
+          "cast_iron",
+          "high_strength_steel",
+          "forged_aluminum"
+        ],
+        "machines": [
+          "máquina de balanceo"
+        ],
+        "steps": [
+          "montar",
+          "medir desbalance",
+          "agregar/remover peso",
+          "verificar"
+        ],
+        "commonDefects": [
+          "vibración residual"
+        ],
+        "qualityControls": [
+          "medición G"
+        ],
+        "risks": [
+          "piezas rotativas a alta velocidad"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.01
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "pressure_testing",
       "process": {
@@ -370,17 +827,38 @@
         "displayName": "Prueba de presión",
         "category": "inspection",
         "description": "Verificación de estanqueidad presurizando la pieza.",
-        "compatibleMaterials": ["mild_steel", "aluminum_356", "stainless_steel"],
-        "machines": ["banco de pruebas de presión"],
-        "steps": ["conectar pieza", "presurizar", "mantener", "inspeccionar fugas"],
-        "commonDefects": ["fugas", "deformación"],
-        "qualityControls": ["caída de presión", "burbujeo"],
-        "risks": ["energía almacenada", "fragmentos"],
+        "compatibleMaterials": [
+          "mild_steel",
+          "aluminum_356",
+          "stainless_steel"
+        ],
+        "machines": [
+          "banco de pruebas de presión"
+        ],
+        "steps": [
+          "conectar pieza",
+          "presurizar",
+          "mantener",
+          "inspeccionar fugas"
+        ],
+        "commonDefects": [
+          "fugas",
+          "deformación"
+        ],
+        "qualityControls": [
+          "caída de presión",
+          "burbujeo"
+        ],
+        "risks": [
+          "energía almacenada",
+          "fragmentos"
+        ],
         "costLevel": 2,
         "typicalPrecisionMm": 0.05
       }
     },
     {
+      "type": "MANUFACTURING_PROCESS",
       "schemaVersion": 1,
       "id": "cmm_inspection",
       "process": {
@@ -388,12 +866,27 @@
         "displayName": "Inspección CMM",
         "category": "inspection",
         "description": "Medición dimensional con máquina de coordenadas.",
-        "compatibleMaterials": ["*"],
-        "machines": ["máquina CMM"],
-        "steps": ["fijar pieza", "programar rutina", "ejecutar", "reporte"],
-        "commonDefects": ["falsa medida por fijación"],
-        "qualityControls": ["informe dimensional"],
-        "risks": ["manipulación de piezas"],
+        "compatibleMaterials": [
+          "*"
+        ],
+        "machines": [
+          "máquina CMM"
+        ],
+        "steps": [
+          "fijar pieza",
+          "programar rutina",
+          "ejecutar",
+          "reporte"
+        ],
+        "commonDefects": [
+          "falsa medida por fijación"
+        ],
+        "qualityControls": [
+          "informe dimensional"
+        ],
+        "risks": [
+          "manipulación de piezas"
+        ],
         "costLevel": 4,
         "typicalPrecisionMm": 0.005
       }

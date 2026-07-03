@@ -197,10 +197,10 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         Scaffold(
         containerColor = Color(0xFF060612),
         bottomBar = {
-            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
+            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/forge
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "forge")
             if (currentRoute !in hideNavRoutes && currentRoute != null) {
                 MeetBottomNavigation(navController)
             }
@@ -208,7 +208,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         topBar = {
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "forge")
             if (currentRoute !in hideBarRoutes && currentRoute != null) {
                 Box(modifier = Modifier.statusBarsPadding()) {
                     ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
@@ -219,7 +219,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         Box(modifier = Modifier.fillMaxSize()) {
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium", "forge")
             if (currentRoute !in hideBgRoutes && currentRoute != null) {
                 HolographicBackgroundShared()
             }
@@ -629,6 +629,13 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 com.elysium369.meet.ui.screens.RideServiceScreen(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("forge") {
+                com.elysium.vanguard.forge.presentation.navigation.ForgeEntryPoint(
+                    onClose = { navController.popBackStack() },
+                    forgeBuildVersion = "0.1.0",
+                    provenanceMode = com.elysium.vanguard.forge.presentation.screens.ForgeProvenanceMode.OFFLINE
                 )
             }
         }

@@ -1,13 +1,28 @@
 package com.elysium.vanguard.forge.domain
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.encoding.CompositeDecoder
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.sqrt
 
 /**
  * Vector 3D inmutable para Forge. Triple-precision (Double) en dominio, Float al compilar mesh.
  * Regla: nunca propagar NaN/Infinity. isFinite() se valida en init.
+ *
+ * Serialización: objeto `{"x":..,"y":..,"z":..}` por defecto.
+ * Acepta también la forma compacta `[x, y, z]` cuando el JSON la usa (común en seeds).
  */
-@Serializable
+@Serializable(with = Vector3DataSerializer::class)
 data class Vector3Data(
     val x: Double,
     val y: Double,
@@ -86,5 +101,74 @@ data class ValueRange(
         fun rpm(min: Double, max: Double) = ValueRange(min, max, "rpm")
         fun kpa(min: Double, max: Double) = ValueRange(min, max, "kPa")
         fun volts(min: Double, max: Double) = ValueRange(min, max, "V")
+    }
+}
+
+/**
+ * KSerializer para [Vector3Data] que acepta tanto el objeto `{"x":..,"y":..,"z":..}`
+ * como la forma compacta `[x, y, z]` (común en seeds y entradas del usuario).
+ *
+ * Al serializar, siempre emite la forma objeto canónica.
+ */
+@OptIn(kotlinx.serialization.InternalSerializationApi::class)
+object Vector3DataSerializer : KSerializer<Vector3Data> {
+    override val descriptor: SerialDescriptor =
+        buildSerialDescriptor("Vector3Data", SerialKind.CONTEXTUAL)
+
+    override fun serialize(encoder: Encoder, value: Vector3Data) {
+        val jsonEncoder = encoder as? kotlinx.serialization.json.JsonEncoder
+        if (jsonEncoder != null) {
+            val obj = JsonObject(mapOf(
+                "x" to JsonPrimitive(value.x),
+                "y" to JsonPrimitive(value.y),
+                "z" to JsonPrimitive(value.z)
+            ))
+            jsonEncoder.encodeJsonElement(obj)
+            return
+        }
+        // Fallback binario — serializa como 3 doubles en orden.
+        val composite = encoder.beginStructure(descriptor)
+        composite.encodeDoubleElement(descriptor, 0, value.x)
+        composite.encodeDoubleElement(descriptor, 1, value.y)
+        composite.encodeDoubleElement(descriptor, 2, value.z)
+        composite.endStructure(descriptor)
+    }
+
+    override fun deserialize(decoder: Decoder): Vector3Data {
+        val jsonDecoder = decoder as? JsonDecoder
+        if (jsonDecoder != null) {
+            val element = jsonDecoder.decodeJsonElement()
+            when (element) {
+                is kotlinx.serialization.json.JsonArray -> {
+                    require(element.size == 3) {
+                        "Vector3Data array form must have exactly 3 elements, got ${element.size}"
+                    }
+                    val x = element[0].jsonPrimitive.double
+                    val y = element[1].jsonPrimitive.double
+                    val z = element[2].jsonPrimitive.double
+                    return Vector3Data(x, y, z)
+                }
+                is JsonObject -> {
+                    val x = element["x"]?.jsonPrimitive?.double ?: 0.0
+                    val y = element["y"]?.jsonPrimitive?.double ?: 0.0
+                    val z = element["z"]?.jsonPrimitive?.double ?: 0.0
+                    return Vector3Data(x, y, z)
+                }
+                else -> error("Vector3Data must be a JSON object {x,y,z} or array [x,y,z], got: $element")
+            }
+        }
+        var x = 0.0; var y = 0.0; var z = 0.0
+        val composite = decoder.beginStructure(descriptor)
+        loop@ while (true) {
+            val n = composite.decodeElementIndex(descriptor)
+            if (n == CompositeDecoder.DECODE_DONE) break@loop
+            when (n) {
+                0 -> x = composite.decodeDoubleElement(descriptor, 0)
+                1 -> y = composite.decodeDoubleElement(descriptor, 1)
+                2 -> z = composite.decodeDoubleElement(descriptor, 2)
+            }
+        }
+        composite.endStructure(descriptor)
+        return Vector3Data(x, y, z)
     }
 }

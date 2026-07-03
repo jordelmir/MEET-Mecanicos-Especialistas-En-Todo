@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "documents": [
     {
+      "type": "ASSEMBLY",
       "schemaVersion": 1,
       "id": "simplified_inline_engine",
       "assembly": {
@@ -15,67 +16,328 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "EDUCATIONAL",
-          "tags": ["engine", "assembly", "educational"]
+          "tags": [
+            "engine",
+            "assembly",
+            "educational"
+          ]
         },
         "instances": [
-          { "id": "instance_block", "partId": "engine_block_generic", "transform": {"position": [0.0, 0.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_crankshaft", "partId": "crankshaft_simplified", "transform": {"position": [0.0, -100.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_piston_1", "partId": "piston_generic", "transform": {"position": [-150.0, 0.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_piston_2", "partId": "piston_generic", "transform": {"position": [-50.0, 0.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_piston_3", "partId": "piston_generic", "transform": {"position": [50.0, 0.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_piston_4", "partId": "piston_generic", "transform": {"position": [150.0, 0.0, 0.0], "rotationDeg": [0.0, 0.0, 0.0]} },
-          { "id": "instance_spark_1", "partId": "spark_plug_generic", "transform": {"position": [-150.0, 170.0, 0.0]} },
-          { "id": "instance_spark_2", "partId": "spark_plug_generic", "transform": {"position": [-50.0, 170.0, 0.0]} },
-          { "id": "instance_spark_3", "partId": "spark_plug_generic", "transform": {"position": [50.0, 170.0, 0.0]} },
-          { "id": "instance_spark_4", "partId": "spark_plug_generic", "transform": {"position": [150.0, 170.0, 0.0]} },
-          { "id": "instance_water_pump", "partId": "water_pump_generic", "transform": {"position": [250.0, -50.0, 0.0]} }
+          {
+            "id": "instance_block",
+            "partId": "engine_block_generic",
+            "transform": {
+              "position": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_crankshaft",
+            "partId": "crankshaft_simplified",
+            "transform": {
+              "position": [
+                0.0,
+                -100.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_piston_1",
+            "partId": "piston_generic",
+            "transform": {
+              "position": [
+                -150.0,
+                0.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_piston_2",
+            "partId": "piston_generic",
+            "transform": {
+              "position": [
+                -50.0,
+                0.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_piston_3",
+            "partId": "piston_generic",
+            "transform": {
+              "position": [
+                50.0,
+                0.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_piston_4",
+            "partId": "piston_generic",
+            "transform": {
+              "position": [
+                150.0,
+                0.0,
+                0.0
+              ],
+              "rotationDeg": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spark_1",
+            "partId": "spark_plug_generic",
+            "transform": {
+              "position": [
+                -150.0,
+                170.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spark_2",
+            "partId": "spark_plug_generic",
+            "transform": {
+              "position": [
+                -50.0,
+                170.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spark_3",
+            "partId": "spark_plug_generic",
+            "transform": {
+              "position": [
+                50.0,
+                170.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spark_4",
+            "partId": "spark_plug_generic",
+            "transform": {
+              "position": [
+                150.0,
+                170.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_water_pump",
+            "partId": "water_pump_generic",
+            "transform": {
+              "position": [
+                250.0,
+                -50.0,
+                0.0
+              ]
+            }
+          }
         ],
         "joints": [
-          { "id": "joint_crank_main", "name": "Crankshaft to block (main bearing)", "jointType": "REVOLUTE", "parentInstanceId": "instance_block", "childInstanceId": "instance_crankshaft", "parentPortId": "port_crank_main", "constraints": [] },
-          { "id": "joint_piston_1_pin", "name": "Piston 1 to crank", "jointType": "REVOLUTE", "parentInstanceId": "instance_crankshaft", "childInstanceId": "instance_piston_1" },
-          { "id": "joint_piston_2_pin", "name": "Piston 2 to crank", "jointType": "REVOLUTE", "parentInstanceId": "instance_crankshaft", "childInstanceId": "instance_piston_2" },
-          { "id": "joint_piston_3_pin", "name": "Piston 3 to crank", "jointType": "REVOLUTE", "parentInstanceId": "instance_crankshaft", "childInstanceId": "instance_piston_3" },
-          { "id": "joint_piston_4_pin", "name": "Piston 4 to crank", "jointType": "REVOLUTE", "parentInstanceId": "instance_crankshaft", "childInstanceId": "instance_piston_4" },
-          { "id": "joint_spark_1", "name": "Spark plug 1 to block", "jointType": "FIXED", "parentInstanceId": "instance_block", "childInstanceId": "instance_spark_1" },
-          { "id": "joint_spark_2", "name": "Spark plug 2 to block", "jointType": "FIXED", "parentInstanceId": "instance_block", "childInstanceId": "instance_spark_2" },
-          { "id": "joint_spark_3", "name": "Spark plug 3 to block", "jointType": "FIXED", "parentInstanceId": "instance_block", "childInstanceId": "instance_spark_3" },
-          { "id": "joint_spark_4", "name": "Spark plug 4 to block", "jointType": "FIXED", "parentInstanceId": "instance_block", "childInstanceId": "instance_spark_4" },
-          { "id": "joint_pump_block", "name": "Water pump to block", "jointType": "BELT", "parentInstanceId": "instance_crankshaft", "childInstanceId": "instance_water_pump" }
+          {
+            "id": "joint_crank_main",
+            "name": "Crankshaft to block (main bearing)",
+            "jointType": "REVOLUTE",
+            "parentInstanceId": "instance_block",
+            "childInstanceId": "instance_crankshaft",
+            "parentPortId": "port_crank_main",
+            "constraints": []
+          },
+          {
+            "id": "joint_piston_1_pin",
+            "name": "Piston 1 to crank",
+            "jointType": "REVOLUTE",
+            "parentInstanceId": "instance_crankshaft",
+            "childInstanceId": "instance_piston_1"
+          },
+          {
+            "id": "joint_piston_2_pin",
+            "name": "Piston 2 to crank",
+            "jointType": "REVOLUTE",
+            "parentInstanceId": "instance_crankshaft",
+            "childInstanceId": "instance_piston_2"
+          },
+          {
+            "id": "joint_piston_3_pin",
+            "name": "Piston 3 to crank",
+            "jointType": "REVOLUTE",
+            "parentInstanceId": "instance_crankshaft",
+            "childInstanceId": "instance_piston_3"
+          },
+          {
+            "id": "joint_piston_4_pin",
+            "name": "Piston 4 to crank",
+            "jointType": "REVOLUTE",
+            "parentInstanceId": "instance_crankshaft",
+            "childInstanceId": "instance_piston_4"
+          },
+          {
+            "id": "joint_spark_1",
+            "name": "Spark plug 1 to block",
+            "jointType": "FIXED",
+            "parentInstanceId": "instance_block",
+            "childInstanceId": "instance_spark_1"
+          },
+          {
+            "id": "joint_spark_2",
+            "name": "Spark plug 2 to block",
+            "jointType": "FIXED",
+            "parentInstanceId": "instance_block",
+            "childInstanceId": "instance_spark_2"
+          },
+          {
+            "id": "joint_spark_3",
+            "name": "Spark plug 3 to block",
+            "jointType": "FIXED",
+            "parentInstanceId": "instance_block",
+            "childInstanceId": "instance_spark_3"
+          },
+          {
+            "id": "joint_spark_4",
+            "name": "Spark plug 4 to block",
+            "jointType": "FIXED",
+            "parentInstanceId": "instance_block",
+            "childInstanceId": "instance_spark_4"
+          },
+          {
+            "id": "joint_pump_block",
+            "name": "Water pump to block",
+            "jointType": "BELT",
+            "parentInstanceId": "instance_crankshaft",
+            "childInstanceId": "instance_water_pump"
+          }
         ],
         "assemblyTree": {
           "id": "root_engine",
           "name": "Inline Engine",
           "children": [
-            { "id": "block_node", "name": "Engine Block", "partInstanceId": "instance_block" },
-            { "id": "crank_node", "name": "Crankshaft", "partInstanceId": "instance_crankshaft" },
+            {
+              "id": "block_node",
+              "name": "Engine Block",
+              "partInstanceId": "instance_block"
+            },
+            {
+              "id": "crank_node",
+              "name": "Crankshaft",
+              "partInstanceId": "instance_crankshaft"
+            },
             {
               "id": "pistons_node",
               "name": "Pistons",
               "children": [
-                { "id": "p1", "name": "Piston 1", "partInstanceId": "instance_piston_1" },
-                { "id": "p2", "name": "Piston 2", "partInstanceId": "instance_piston_2" },
-                { "id": "p3", "name": "Piston 3", "partInstanceId": "instance_piston_3" },
-                { "id": "p4", "name": "Piston 4", "partInstanceId": "instance_piston_4" }
+                {
+                  "id": "p1",
+                  "name": "Piston 1",
+                  "partInstanceId": "instance_piston_1"
+                },
+                {
+                  "id": "p2",
+                  "name": "Piston 2",
+                  "partInstanceId": "instance_piston_2"
+                },
+                {
+                  "id": "p3",
+                  "name": "Piston 3",
+                  "partInstanceId": "instance_piston_3"
+                },
+                {
+                  "id": "p4",
+                  "name": "Piston 4",
+                  "partInstanceId": "instance_piston_4"
+                }
               ]
             },
             {
               "id": "ignition_node",
               "name": "Ignition",
               "children": [
-                { "id": "sp1", "name": "Spark Plug 1", "partInstanceId": "instance_spark_1" },
-                { "id": "sp2", "name": "Spark Plug 2", "partInstanceId": "instance_spark_2" },
-                { "id": "sp3", "name": "Spark Plug 3", "partInstanceId": "instance_spark_3" },
-                { "id": "sp4", "name": "Spark Plug 4", "partInstanceId": "instance_spark_4" }
+                {
+                  "id": "sp1",
+                  "name": "Spark Plug 1",
+                  "partInstanceId": "instance_spark_1"
+                },
+                {
+                  "id": "sp2",
+                  "name": "Spark Plug 2",
+                  "partInstanceId": "instance_spark_2"
+                },
+                {
+                  "id": "sp3",
+                  "name": "Spark Plug 3",
+                  "partInstanceId": "instance_spark_3"
+                },
+                {
+                  "id": "sp4",
+                  "name": "Spark Plug 4",
+                  "partInstanceId": "instance_spark_4"
+                }
               ]
             },
-            { "id": "cooling_node", "name": "Cooling", "partInstanceId": "instance_water_pump" }
+            {
+              "id": "cooling_node",
+              "name": "Cooling",
+              "partInstanceId": "instance_water_pump"
+            }
           ]
         },
-        "simulationProfile": {"gravity": [0.0, -9.81, 0.0], "globalFriction": 0.4, "fixedStepSec": 0.0166666, "enableCollisions": false, "enableGravity": false},
+        "simulationProfile": {
+          "gravity": [
+            0.0,
+            -9.81,
+            0.0
+          ],
+          "globalFriction": 0.4,
+          "fixedStepSec": 0.0166666,
+          "enableCollisions": false,
+          "enableGravity": false
+        },
         "manualIds": []
       }
     },
     {
+      "type": "ASSEMBLY",
       "schemaVersion": 1,
       "id": "front_brake_assembly",
       "assembly": {
@@ -88,29 +350,95 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "SAFETY_CRITICAL_UNCERTIFIED",
-          "tags": ["brakes", "front"]
+          "tags": [
+            "brakes",
+            "front"
+          ]
         },
         "instances": [
-          { "id": "instance_disc", "partId": "brake_disc_generic", "transform": {"position": [0.0, 0.0, 0.0]} },
-          { "id": "instance_pad_inboard", "partId": "brake_pad_generic", "transform": {"position": [0.0, 30.0, -20.0]} },
-          { "id": "instance_pad_outboard", "partId": "brake_pad_generic", "transform": {"position": [0.0, 30.0, 20.0]} }
+          {
+            "id": "instance_disc",
+            "partId": "brake_disc_generic",
+            "transform": {
+              "position": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_pad_inboard",
+            "partId": "brake_pad_generic",
+            "transform": {
+              "position": [
+                0.0,
+                30.0,
+                -20.0
+              ]
+            }
+          },
+          {
+            "id": "instance_pad_outboard",
+            "partId": "brake_pad_generic",
+            "transform": {
+              "position": [
+                0.0,
+                30.0,
+                20.0
+              ]
+            }
+          }
         ],
         "joints": [
-          { "id": "joint_pad_inboard_slide", "name": "Inboard pad to caliper rail", "jointType": "SLIDER", "parentInstanceId": "instance_disc", "childInstanceId": "instance_pad_inboard", "limits": {"minTranslationMm": 0.0, "maxTranslationMm": 5.0} },
-          { "id": "joint_pad_outboard_slide", "name": "Outboard pad to caliper rail", "jointType": "SLIDER", "parentInstanceId": "instance_disc", "childInstanceId": "instance_pad_outboard", "limits": {"minTranslationMm": 0.0, "maxTranslationMm": 5.0} }
+          {
+            "id": "joint_pad_inboard_slide",
+            "name": "Inboard pad to caliper rail",
+            "jointType": "SLIDER",
+            "parentInstanceId": "instance_disc",
+            "childInstanceId": "instance_pad_inboard",
+            "limits": {
+              "minTranslationMm": 0.0,
+              "maxTranslationMm": 5.0
+            }
+          },
+          {
+            "id": "joint_pad_outboard_slide",
+            "name": "Outboard pad to caliper rail",
+            "jointType": "SLIDER",
+            "parentInstanceId": "instance_disc",
+            "childInstanceId": "instance_pad_outboard",
+            "limits": {
+              "minTranslationMm": 0.0,
+              "maxTranslationMm": 5.0
+            }
+          }
         ],
         "assemblyTree": {
           "id": "root_brake",
           "name": "Front Brake",
           "children": [
-            { "id": "disc_node", "name": "Disc", "partInstanceId": "instance_disc" },
-            { "id": "pad_in", "name": "Pad Inboard", "partInstanceId": "instance_pad_inboard" },
-            { "id": "pad_out", "name": "Pad Outboard", "partInstanceId": "instance_pad_outboard" }
+            {
+              "id": "disc_node",
+              "name": "Disc",
+              "partInstanceId": "instance_disc"
+            },
+            {
+              "id": "pad_in",
+              "name": "Pad Inboard",
+              "partInstanceId": "instance_pad_inboard"
+            },
+            {
+              "id": "pad_out",
+              "name": "Pad Outboard",
+              "partInstanceId": "instance_pad_outboard"
+            }
           ]
         }
       }
     },
     {
+      "type": "ASSEMBLY",
       "schemaVersion": 1,
       "id": "front_suspension_assembly",
       "assembly": {
@@ -123,27 +451,73 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "STRUCTURAL_UNCERTIFIED",
-          "tags": ["suspension", "front"]
+          "tags": [
+            "suspension",
+            "front"
+          ]
         },
         "instances": [
-          { "id": "instance_spring", "partId": "coil_spring_generic", "transform": {"position": [0.0, 0.0, 0.0]} },
-          { "id": "instance_bushing", "partId": "bushing_generic", "transform": {"position": [0.0, -50.0, 0.0]} }
+          {
+            "id": "instance_spring",
+            "partId": "coil_spring_generic",
+            "transform": {
+              "position": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_bushing",
+            "partId": "bushing_generic",
+            "transform": {
+              "position": [
+                0.0,
+                -50.0,
+                0.0
+              ]
+            }
+          }
         ],
         "joints": [
-          { "id": "joint_spring_top", "name": "Spring top mount", "jointType": "FIXED", "parentInstanceId": "instance_spring", "childInstanceId": "instance_bushing" },
-          { "id": "joint_bushing_slide", "name": "Bushing compress", "jointType": "SPRING_DAMPER", "parentInstanceId": "instance_bushing", "childInstanceId": "instance_spring", "stiffness": 25.0, "damping": 1.5 }
+          {
+            "id": "joint_spring_top",
+            "name": "Spring top mount",
+            "jointType": "FIXED",
+            "parentInstanceId": "instance_spring",
+            "childInstanceId": "instance_bushing"
+          },
+          {
+            "id": "joint_bushing_slide",
+            "name": "Bushing compress",
+            "jointType": "SPRING_DAMPER",
+            "parentInstanceId": "instance_bushing",
+            "childInstanceId": "instance_spring",
+            "stiffness": 25.0,
+            "damping": 1.5
+          }
         ],
         "assemblyTree": {
           "id": "root_susp",
           "name": "Front Suspension",
           "children": [
-            { "id": "spring_node", "name": "Spring", "partInstanceId": "instance_spring" },
-            { "id": "bushing_node", "name": "Bushing", "partInstanceId": "instance_bushing" }
+            {
+              "id": "spring_node",
+              "name": "Spring",
+              "partInstanceId": "instance_spring"
+            },
+            {
+              "id": "bushing_node",
+              "name": "Bushing",
+              "partInstanceId": "instance_bushing"
+            }
           ]
         }
       }
     },
     {
+      "type": "ASSEMBLY",
       "schemaVersion": 1,
       "id": "generic_vehicle_mvp",
       "assembly": {
@@ -156,25 +530,98 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "EDUCATIONAL",
-          "tags": ["vehicle", "mvp"]
+          "tags": [
+            "vehicle",
+            "mvp"
+          ]
         },
         "instances": [
-          { "id": "instance_engine_mvp", "partId": "engine_block_generic", "transform": {"position": [0.0, 0.0, 0.0]} },
-          { "id": "instance_brake_fl", "partId": "brake_disc_generic", "transform": {"position": [-700.0, 0.0, 800.0]} },
-          { "id": "instance_brake_fr", "partId": "brake_disc_generic", "transform": {"position": [700.0, 0.0, 800.0]} },
-          { "id": "instance_spring_fl", "partId": "coil_spring_generic", "transform": {"position": [-700.0, 200.0, 800.0]} },
-          { "id": "instance_spring_fr", "partId": "coil_spring_generic", "transform": {"position": [700.0, 200.0, 800.0]} }
+          {
+            "id": "instance_engine_mvp",
+            "partId": "engine_block_generic",
+            "transform": {
+              "position": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "id": "instance_brake_fl",
+            "partId": "brake_disc_generic",
+            "transform": {
+              "position": [
+                -700.0,
+                0.0,
+                800.0
+              ]
+            }
+          },
+          {
+            "id": "instance_brake_fr",
+            "partId": "brake_disc_generic",
+            "transform": {
+              "position": [
+                700.0,
+                0.0,
+                800.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spring_fl",
+            "partId": "coil_spring_generic",
+            "transform": {
+              "position": [
+                -700.0,
+                200.0,
+                800.0
+              ]
+            }
+          },
+          {
+            "id": "instance_spring_fr",
+            "partId": "coil_spring_generic",
+            "transform": {
+              "position": [
+                700.0,
+                200.0,
+                800.0
+              ]
+            }
+          }
         ],
         "joints": [],
         "assemblyTree": {
           "id": "root_vehicle",
           "name": "Generic Vehicle MVP",
           "children": [
-            { "id": "eng_node", "name": "Engine", "partInstanceId": "instance_engine_mvp" },
-            { "id": "brake_fl_node", "name": "Brake FL", "partInstanceId": "instance_brake_fl" },
-            { "id": "brake_fr_node", "name": "Brake FR", "partInstanceId": "instance_brake_fr" },
-            { "id": "spring_fl_node", "name": "Spring FL", "partInstanceId": "instance_spring_fl" },
-            { "id": "spring_fr_node", "name": "Spring FR", "partInstanceId": "instance_spring_fr" }
+            {
+              "id": "eng_node",
+              "name": "Engine",
+              "partInstanceId": "instance_engine_mvp"
+            },
+            {
+              "id": "brake_fl_node",
+              "name": "Brake FL",
+              "partInstanceId": "instance_brake_fl"
+            },
+            {
+              "id": "brake_fr_node",
+              "name": "Brake FR",
+              "partInstanceId": "instance_brake_fr"
+            },
+            {
+              "id": "spring_fl_node",
+              "name": "Spring FL",
+              "partInstanceId": "instance_spring_fl"
+            },
+            {
+              "id": "spring_fr_node",
+              "name": "Spring FR",
+              "partInstanceId": "instance_spring_fr"
+            }
           ]
         }
       }

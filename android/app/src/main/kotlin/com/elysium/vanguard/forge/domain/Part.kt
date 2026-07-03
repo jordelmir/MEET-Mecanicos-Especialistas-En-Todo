@@ -97,7 +97,19 @@ data class DimensionSet(
 @Serializable
 enum class ConnectionPortType {
     BOLT_HOLE, SHAFT, BEARING_SEAT, BUSHING, WELD_SURFACE, SLIDING_RAIL,
-    HINGE_AXIS, PIPE_PORT, ELECTRICAL_CONNECTOR, FLUID_PORT, BELT_PULLEY, GEAR_AXIS
+    HINGE_AXIS, PIPE_PORT, ELECTRICAL_CONNECTOR, FLUID_PORT, BELT_PULLEY, GEAR_AXIS,
+    /** Pasador cilíndrico alineado con un eje (e.g. pistón, pivote). */
+    PIN,
+    /** Chaveta plana — transferencia de par con desplazamiento axial restringido. */
+    KEY,
+    /** Ranura para cuña o prisionero. */
+    KEYWAY,
+    /** Anillo de sellado (O-ring, retén, etc.). */
+    SEAL_GROOVE,
+    /** Dentado interno/externo para engrane fijo (spline). */
+    SPLINE,
+    /** Collar/prisionero que se monta sobre un eje. */
+    COLLAR
 }
 
 @Serializable

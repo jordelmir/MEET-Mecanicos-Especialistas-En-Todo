@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -186,6 +187,13 @@ fun HomeScreen(
                     profile = userProfile,
                     state = commandState,
                     onPrimaryAction = { navController.navigate(commandState.primaryRoute) }
+                )
+            }
+
+            // ── VANGUARD FORGE Banner ──
+            AnimatedEntrance(1) {
+                ForgeCtaBanner(
+                    onOpen = { navController.navigate("forge") }
                 )
             }
 
@@ -611,3 +619,172 @@ private fun profileLabel(profile: String): String {
         else -> "USUARIO"
     }
 }
+
+/**
+ * Banner CTA que da entrada al módulo Vanguard Forge desde el HomeScreen de MEET.
+ *
+ * Decisiones de diseño:
+ *  - Card horizontal con gradiente teal→purple ELYSIUM en el borde.
+ *  - Tag "V0.1.0 · BETA" para señalar honestidad sobre el estado del módulo.
+ *  - Sub-label con provenance mode default (OFFLINE) para que el usuario sepa
+ *    que sin enlace OBD el módulo opera contra biblioteca local.
+ *  - Click → navega a la ruta "forge" del MainActivity.
+ */
+@Composable
+private fun ForgeCtaBanner(onOpen: () -> Unit) {
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .forgeGradientBorder(
+                colors = listOf(MeetColors.neonGreen, MeetColors.hotMagenta)
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(MeetColors.backgroundDeep)
+            .clickable(onClick = onOpen)
+            .padding(1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(15.dp))
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(
+                            MeetColors.neonGreen.copy(alpha = 0.05f),
+                            MeetColors.hotMagenta.copy(alpha = 0.05f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Logo mark
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(MeetColors.backgroundDeep)
+                    .forgeGradientBorder(
+                        colors = listOf(MeetColors.neonGreen, MeetColors.hotMagenta)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚒",
+                    fontSize = 24.sp
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "VANGUARD",
+                        color = MeetColors.neonGreen,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "FORGE",
+                        color = MeetColors.hotMagenta,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MeetColors.neonGreen.copy(alpha = 0.15f))
+                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "V0.1.0",
+                            color = MeetColors.neonGreen,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Diseña, simula y diagnostica partes y ensamblajes",
+                    color = MeetColors.textSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 2
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(MeetColors.cyberCyan)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "OFFLINE READY",
+                        color = MeetColors.cyberCyan,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "·",
+                        color = MeetColors.textMuted,
+                        fontSize = 9.sp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "BIBLIOTECA + FÍSICA + MANUALES",
+                        color = MeetColors.textMuted,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            // Arrow indicator
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MeetColors.neonGreen.copy(alpha = 0.15f))
+                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "→",
+                    color = MeetColors.neonGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Helper para borde con gradiente (API < Compose 1.5 no tiene Modifier.border(brush=)).
+ * Implementado manualmente usando Canvas para mantener compatibilidad.
+ */
+private fun Modifier.forgeGradientBorder(colors: List<Color>): Modifier =
+    this.then(
+        Modifier.drawBehind {
+            val brush = androidx.compose.ui.graphics.Brush.linearGradient(colors)
+            drawRoundRect(
+                brush = brush,
+                size = size,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx(), 16.dp.toPx()),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+            )
+        }
+    )

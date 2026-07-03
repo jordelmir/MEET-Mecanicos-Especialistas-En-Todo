@@ -130,7 +130,7 @@ class ForgeViewModelFactory(
     private val manualId: String? = null
 ) : ViewModelProvider.Factory {
 
-    private val repo: ForgeArtifactRepository = ForgeArtifactRepository()
+    private val repo: ForgeArtifactRepository = ForgeArtifactRepository.shared
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -520,7 +520,8 @@ fun ForgeNavGraph(navController: NavHostController) {
 
 /**
  * Punto de entrada del módulo Forge desde MEET MainActivity.
- * Crea un NavController anidado y monta el sub-grafo.
+ * Crea un NavController anidado y monta el sub-grafo dentro del
+ * ForgeEntryScreen (que provee chrome: header, back, provenance).
  *
  * Uso en MainActivity:
  *   composable("forge") {
@@ -528,11 +529,15 @@ fun ForgeNavGraph(navController: NavHostController) {
  *   }
  */
 @Composable
-fun ForgeEntryPoint(onClose: () -> Unit = {}) {
-    val nestedController = androidx.navigation.compose.rememberNavController()
-    ForgeNavGraph(navController = nestedController)
-    // onClose queda reservado para futuras versiones del módulo (botón back global).
-    // Se ignora en esta versión; no se permiten parámetros sin uso.
-    @Suppress("UNUSED_EXPRESSION")
-    onClose
+fun ForgeEntryPoint(
+    onClose: () -> Unit = {},
+    forgeBuildVersion: String = "0.1.0",
+    provenanceMode: com.elysium.vanguard.forge.presentation.screens.ForgeProvenanceMode =
+        com.elysium.vanguard.forge.presentation.screens.ForgeProvenanceMode.OFFLINE
+) {
+    com.elysium.vanguard.forge.presentation.screens.ForgeEntryScreen(
+        onClose = onClose,
+        forgeBuildVersion = forgeBuildVersion,
+        provenanceMode = provenanceMode
+    )
 }

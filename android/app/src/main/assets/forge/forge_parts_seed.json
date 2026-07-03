@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "documents": [
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "engine_block_generic",
       "part": {
@@ -15,21 +16,95 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "STRUCTURAL_UNCERTIFIED",
-          "tags": ["engine", "block", "generic"]
+          "tags": [
+            "engine",
+            "block",
+            "generic"
+          ]
         },
         "featureTree": [
-          { "id": "block_main", "type": "BOX", "name": "Block main body", "parameters": {"lengthMm": 500.0, "widthMm": 350.0, "heightMm": 300.0}, "operation": "ADD" },
-          { "id": "block_top", "type": "PLATE", "name": "Deck plate", "parameters": {"lengthMm": 500.0, "widthMm": 350.0, "thicknessMm": 15.0}, "position": [0.0, 160.0, 0.0], "operation": "ADD" }
+          {
+            "id": "block_main",
+            "type": "BOX",
+            "name": "Block main body",
+            "parameters": {
+              "lengthMm": 500.0,
+              "widthMm": 350.0,
+              "heightMm": 300.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "block_top",
+            "type": "PLATE",
+            "name": "Deck plate",
+            "parameters": {
+              "lengthMm": 500.0,
+              "widthMm": 350.0,
+              "thicknessMm": 15.0
+            },
+            "position": [
+              0.0,
+              160.0,
+              0.0
+            ],
+            "operation": "ADD"
+          }
         ],
         "materialId": "cast_iron",
-        "manufacturingProcessIds": ["sand_casting", "cnc_machining"],
-        "dimensions": {"lengthMm": 500.0, "widthMm": 350.0, "heightMm": 320.0},
+        "manufacturingProcessIds": [
+          "sand_casting",
+          "cnc_machining"
+        ],
+        "dimensions": {
+          "lengthMm": 500.0,
+          "widthMm": 350.0,
+          "heightMm": 320.0
+        },
         "massEstimateKg": 65.0,
         "connectionPorts": [
-          { "id": "port_crank_main", "name": "Crankcase main bearing", "portType": "BEARING_SEAT", "position": [0.0, 0.0, 0.0], "normal": [0.0, 1.0, 0.0], "diameterMm": 70.0, "compatibleJointTypes": ["REVOLUTE"] },
-          { "id": "port_head_bolt_1", "name": "Head bolt 1", "portType": "BOLT_HOLE", "position": [200.0, 160.0, 100.0], "diameterMm": 12.0, "compatibleJointTypes": ["FIXED", "BOLTED"] }
+          {
+            "id": "port_crank_main",
+            "name": "Crankcase main bearing",
+            "portType": "BEARING_SEAT",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "normal": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "diameterMm": 70.0,
+            "compatibleJointTypes": [
+              "REVOLUTE"
+            ]
+          },
+          {
+            "id": "port_head_bolt_1",
+            "name": "Head bolt 1",
+            "portType": "BOLT_HOLE",
+            "position": [
+              200.0,
+              160.0,
+              100.0
+            ],
+            "diameterMm": 12.0,
+            "compatibleJointTypes": [
+              "FIXED",
+              "BOLTED"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["CRACK", "WEAR"], "notes": "Bloque: revisar grietas entre cilindros y asientos de rodamiento." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "CRACK",
+            "WEAR"
+          ],
+          "notes": "Bloque: revisar grietas entre cilindros y asientos de rodamiento."
+        },
         "repairProcedures": [
           {
             "id": "repair_engine_block_001",
@@ -38,26 +113,75 @@
             "difficulty": "EXPERT_ONLY",
             "estimatedTimeMinutes": 480,
             "requiredTools": [
-              { "id": "tool_torque_wrench", "name": "Torquímetro", "purpose": "Apriete especificado" },
-              { "id": "tool_dye_check", "name": "Kit de líquidos penetrantes", "purpose": "Detección de grietas" }
+              {
+                "id": "tool_torque_wrench",
+                "name": "Torquímetro",
+                "purpose": "Apriete especificado"
+              },
+              {
+                "id": "tool_dye_check",
+                "name": "Kit de líquidos penetrantes",
+                "purpose": "Detección de grietas"
+              }
             ],
-            "requiredMaterials": ["tapón metálico", "Loctite 620"],
-            "safetyWarnings": ["Pieza crítica de seguridad. Requiere validación profesional antes de uso vehicular."],
+            "requiredMaterials": [
+              "tapón metálico",
+              "Loctite 620"
+            ],
+            "safetyWarnings": [
+              "Pieza crítica de seguridad. Requiere validación profesional antes de uso vehicular."
+            ],
             "steps": [
-              { "order": 1, "title": "Desmontar motor", "description": "Remover motor del vehículo.", "warnings": ["Desconectar batería antes."] },
-              { "order": 2, "title": "Limpieza", "description": "Limpiar bloque con solvente." },
-              { "order": 3, "title": "Inspección con líquidos penetrantes", "description": "Confirmar alcance de grieta." },
-              { "order": 4, "title": "Aplicar tapón", "description": "Perforar y roscar para tapón metálico." },
-              { "order": 5, "title": "Verificar presión", "description": "Realizar prueba de presión al bloque." }
+              {
+                "order": 1,
+                "title": "Desmontar motor",
+                "description": "Remover motor del vehículo.",
+                "warnings": [
+                  "Desconectar batería antes."
+                ]
+              },
+              {
+                "order": 2,
+                "title": "Limpieza",
+                "description": "Limpiar bloque con solvente."
+              },
+              {
+                "order": 3,
+                "title": "Inspección con líquidos penetrantes",
+                "description": "Confirmar alcance de grieta."
+              },
+              {
+                "order": 4,
+                "title": "Aplicar tapón",
+                "description": "Perforar y roscar para tapón metálico."
+              },
+              {
+                "order": 5,
+                "title": "Verificar presión",
+                "description": "Realizar prueba de presión al bloque."
+              }
             ],
-            "inspectionChecklist": ["Verificar ausencia de fugas", "Verificar planitud de superficie"],
-            "torqueSpecs": [{"fastenerName": "Head bolt", "torqueNm": 90.0, "sequenceOrder": 1}],
-            "finalValidationSteps": ["Prueba de presión 30 min", "Inspección visual"]
+            "inspectionChecklist": [
+              "Verificar ausencia de fugas",
+              "Verificar planitud de superficie"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Head bolt",
+                "torqueNm": 90.0,
+                "sequenceOrder": 1
+              }
+            ],
+            "finalValidationSteps": [
+              "Prueba de presión 30 min",
+              "Inspección visual"
+            ]
           }
         ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "piston_generic",
       "part": {
@@ -70,20 +194,78 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "SAFETY_CRITICAL_UNCERTIFIED",
-          "tags": ["engine", "piston"]
+          "tags": [
+            "engine",
+            "piston"
+          ]
         },
         "featureTree": [
-          { "id": "piston_body", "type": "CYLINDER", "name": "Piston body", "parameters": {"radiusMm": 43.0, "heightMm": 60.0}, "operation": "ADD" },
-          { "id": "pin_bore", "type": "CYLINDER", "name": "Wrist pin bore", "parameters": {"radiusMm": 9.0, "heightMm": 60.0}, "position": [0.0, 0.0, 0.0], "operation": "SUBTRACT" }
+          {
+            "id": "piston_body",
+            "type": "CYLINDER",
+            "name": "Piston body",
+            "parameters": {
+              "radiusMm": 43.0,
+              "heightMm": 60.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "pin_bore",
+            "type": "CYLINDER",
+            "name": "Wrist pin bore",
+            "parameters": {
+              "radiusMm": 9.0,
+              "heightMm": 60.0
+            },
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operation": "SUBTRACT"
+          }
         ],
         "materialId": "forged_aluminum",
-        "manufacturingProcessIds": ["forging", "cnc_machining"],
-        "dimensions": {"diameterMm": 86.0, "heightMm": 60.0, "innerDiameterMm": 18.0},
+        "manufacturingProcessIds": [
+          "forging",
+          "cnc_machining"
+        ],
+        "dimensions": {
+          "diameterMm": 86.0,
+          "heightMm": 60.0,
+          "innerDiameterMm": 18.0
+        },
         "massEstimateKg": 0.35,
         "connectionPorts": [
-          { "id": "port_pin", "name": "Wrist pin", "portType": "PIN", "position": [0.0, 0.0, 0.0], "normal": [1.0, 0.0, 0.0], "diameterMm": 18.0, "compatibleJointTypes": ["REVOLUTE"] }
+          {
+            "id": "port_pin",
+            "name": "Wrist pin",
+            "portType": "PIN",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "normal": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 18.0,
+            "compatibleJointTypes": [
+              "REVOLUTE"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "OVERHEATED", "CRACK"], "notes": "Inspeccionar corona y faldas por desgaste." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "OVERHEATED",
+            "CRACK"
+          ],
+          "notes": "Inspeccionar corona y faldas por desgaste."
+        },
         "repairProcedures": [
           {
             "id": "repair_piston_001",
@@ -92,25 +274,57 @@
             "difficulty": "HARD",
             "estimatedTimeMinutes": 240,
             "requiredTools": [
-              { "id": "tool_ring_expander", "name": "Expansor de anillos", "purpose": "Montaje de anillos" }
+              {
+                "id": "tool_ring_expander",
+                "name": "Expansor de anillos",
+                "purpose": "Montaje de anillos"
+              }
             ],
-            "requiredMaterials": ["juego de anillos 86mm"],
-            "safetyWarnings": ["Manipule los anillos con cuidado — son frágiles."],
+            "requiredMaterials": [
+              "juego de anillos 86mm"
+            ],
+            "safetyWarnings": [
+              "Manipule los anillos con cuidado — son frágiles."
+            ],
             "steps": [
-              { "order": 1, "title": "Desmontar pistón", "description": "Remover pistón del bloque." },
-              { "order": 2, "title": "Limpieza", "description": "Limpiar corona y ranuras." },
-              { "order": 3, "title": "Montar anillos nuevos", "description": "Usar expansor." },
-              { "order": 4, "title": "Verificar juego", "description": "Medir luz entre puntas." }
+              {
+                "order": 1,
+                "title": "Desmontar pistón",
+                "description": "Remover pistón del bloque."
+              },
+              {
+                "order": 2,
+                "title": "Limpieza",
+                "description": "Limpiar corona y ranuras."
+              },
+              {
+                "order": 3,
+                "title": "Montar anillos nuevos",
+                "description": "Usar expansor."
+              },
+              {
+                "order": 4,
+                "title": "Verificar juego",
+                "description": "Medir luz entre puntas."
+              }
             ],
-            "inspectionChecklist": ["Luz entre puntas < 0.5mm"],
+            "inspectionChecklist": [
+              "Luz entre puntas < 0.5mm"
+            ],
             "torqueSpecs": [],
-            "finalValidationSteps": ["Prueba de compresión"]
+            "finalValidationSteps": [
+              "Prueba de compresión"
+            ]
           }
         ],
-        "relatedDtcCodes": ["P0301", "P0300"]
+        "relatedDtcCodes": [
+          "P0301",
+          "P0300"
+        ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "crankshaft_simplified",
       "part": {
@@ -123,20 +337,72 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "SAFETY_CRITICAL_UNCERTIFIED",
-          "tags": ["engine", "crankshaft"]
+          "tags": [
+            "engine",
+            "crankshaft"
+          ]
         },
         "featureTree": [
-          { "id": "crank_axis", "type": "CYLINDER", "name": "Main shaft", "parameters": {"radiusMm": 25.0, "heightMm": 480.0}, "operation": "ADD" }
+          {
+            "id": "crank_axis",
+            "type": "CYLINDER",
+            "name": "Main shaft",
+            "parameters": {
+              "radiusMm": 25.0,
+              "heightMm": 480.0
+            },
+            "operation": "ADD"
+          }
         ],
         "materialId": "high_strength_steel",
-        "manufacturingProcessIds": ["forging", "cnc_machining", "grinding"],
-        "dimensions": {"diameterMm": 50.0, "lengthMm": 480.0},
+        "manufacturingProcessIds": [
+          "forging",
+          "cnc_machining",
+          "grinding"
+        ],
+        "dimensions": {
+          "diameterMm": 50.0,
+          "lengthMm": 480.0
+        },
         "massEstimateKg": 18.0,
         "connectionPorts": [
-          { "id": "port_main_bearing_1", "name": "Main bearing 1", "portType": "BEARING_SEAT", "position": [-180.0, 0.0, 0.0], "diameterMm": 60.0, "compatibleJointTypes": ["REVOLUTE"] },
-          { "id": "port_rod_journal_1", "name": "Rod journal 1", "portType": "BEARING_SEAT", "position": [-90.0, 0.0, 0.0], "diameterMm": 50.0, "compatibleJointTypes": ["REVOLUTE"] }
+          {
+            "id": "port_main_bearing_1",
+            "name": "Main bearing 1",
+            "portType": "BEARING_SEAT",
+            "position": [
+              -180.0,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 60.0,
+            "compatibleJointTypes": [
+              "REVOLUTE"
+            ]
+          },
+          {
+            "id": "port_rod_journal_1",
+            "name": "Rod journal 1",
+            "portType": "BEARING_SEAT",
+            "position": [
+              -90.0,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 50.0,
+            "compatibleJointTypes": [
+              "REVOLUTE"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "CRACK", "OVERHEATED"], "notes": "Inspeccionar muñones y cojinetes." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "CRACK",
+            "OVERHEATED"
+          ],
+          "notes": "Inspeccionar muñones y cojinetes."
+        },
         "repairProcedures": [
           {
             "id": "repair_crankshaft_001",
@@ -144,22 +410,54 @@
             "partId": "crankshaft_simplified",
             "difficulty": "EXPERT_ONLY",
             "estimatedTimeMinutes": 360,
-            "requiredTools": [{"id": "tool_grinder", "name": "Rectificadora", "purpose": "Rectificar muñones"}],
-            "requiredMaterials": ["cojinetes undersize"],
-            "safetyWarnings": ["Cigüeñal es pieza crítica. Rectificado solo por taller especializado."],
-            "steps": [
-              { "order": 1, "title": "Inspección", "description": "Medir desgaste de muñones." },
-              { "order": 2, "title": "Rectificado", "description": "Rectificar a undersize siguiente." },
-              { "order": 3, "title": "Pulido", "description": "Acabado superficial." }
+            "requiredTools": [
+              {
+                "id": "tool_grinder",
+                "name": "Rectificadora",
+                "purpose": "Rectificar muñones"
+              }
             ],
-            "inspectionChecklist": ["Rugosidad < 0.4 Ra"],
-            "torqueSpecs": [{"fastenerName": "Main bearing cap", "torqueNm": 110.0}],
-            "finalValidationSteps": ["Prueba de equilibrado"]
+            "requiredMaterials": [
+              "cojinetes undersize"
+            ],
+            "safetyWarnings": [
+              "Cigüeñal es pieza crítica. Rectificado solo por taller especializado."
+            ],
+            "steps": [
+              {
+                "order": 1,
+                "title": "Inspección",
+                "description": "Medir desgaste de muñones."
+              },
+              {
+                "order": 2,
+                "title": "Rectificado",
+                "description": "Rectificar a undersize siguiente."
+              },
+              {
+                "order": 3,
+                "title": "Pulido",
+                "description": "Acabado superficial."
+              }
+            ],
+            "inspectionChecklist": [
+              "Rugosidad < 0.4 Ra"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Main bearing cap",
+                "torqueNm": 110.0
+              }
+            ],
+            "finalValidationSteps": [
+              "Prueba de equilibrado"
+            ]
           }
         ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "spark_plug_generic",
       "part": {
@@ -172,20 +470,72 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "EDUCATIONAL",
-          "tags": ["engine", "ignition"]
+          "tags": [
+            "engine",
+            "ignition"
+          ]
         },
         "featureTree": [
-          { "id": "plug_body", "type": "CYLINDER", "name": "Plug body", "parameters": {"radiusMm": 6.0, "heightMm": 80.0}, "operation": "ADD" },
-          { "id": "thread", "type": "CYLINDER", "name": "Thread", "parameters": {"radiusMm": 5.5, "heightMm": 19.0}, "position": [0.0, -25.0, 0.0], "operation": "MODIFY" }
+          {
+            "id": "plug_body",
+            "type": "CYLINDER",
+            "name": "Plug body",
+            "parameters": {
+              "radiusMm": 6.0,
+              "heightMm": 80.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "thread",
+            "type": "CYLINDER",
+            "name": "Thread",
+            "parameters": {
+              "radiusMm": 5.5,
+              "heightMm": 19.0
+            },
+            "position": [
+              0.0,
+              -25.0,
+              0.0
+            ],
+            "operation": "MODIFY"
+          }
         ],
         "materialId": "stainless_steel",
-        "manufacturingProcessIds": ["stamping", "cnc_machining"],
-        "dimensions": {"diameterMm": 12.0, "heightMm": 80.0},
+        "manufacturingProcessIds": [
+          "stamping",
+          "cnc_machining"
+        ],
+        "dimensions": {
+          "diameterMm": 12.0,
+          "heightMm": 80.0
+        },
         "massEstimateKg": 0.05,
         "connectionPorts": [
-          { "id": "port_thread", "name": "Thread", "portType": "BOLT_HOLE", "position": [0.0, -25.0, 0.0], "diameterMm": 11.0, "compatibleJointTypes": ["BOLTED"], "torqueLimitNm": 25.0 }
+          {
+            "id": "port_thread",
+            "name": "Thread",
+            "portType": "BOLT_HOLE",
+            "position": [
+              0.0,
+              -25.0,
+              0.0
+            ],
+            "diameterMm": 11.0,
+            "compatibleJointTypes": [
+              "BOLTED"
+            ],
+            "torqueLimitNm": 25.0
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "ELECTRICAL_OPEN"], "notes": "Inspeccionar electrodo y aislante." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "ELECTRICAL_OPEN"
+          ],
+          "notes": "Inspeccionar electrodo y aislante."
+        },
         "repairProcedures": [
           {
             "id": "repair_spark_plug_001",
@@ -194,25 +544,66 @@
             "difficulty": "EASY",
             "estimatedTimeMinutes": 20,
             "requiredTools": [
-              { "id": "tool_spark_socket", "name": "Llave de bujía", "size": "16mm", "purpose": "Remover/instalar bujía" },
-              { "id": "tool_torque", "name": "Torquímetro", "purpose": "Apriete correcto" }
+              {
+                "id": "tool_spark_socket",
+                "name": "Llave de bujía",
+                "size": "16mm",
+                "purpose": "Remover/instalar bujía"
+              },
+              {
+                "id": "tool_torque",
+                "name": "Torquímetro",
+                "purpose": "Apriete correcto"
+              }
             ],
-            "requiredMaterials": ["bujía nueva"],
-            "safetyWarnings": ["Motor frío antes de manipular bujías."],
+            "requiredMaterials": [
+              "bujía nueva"
+            ],
+            "safetyWarnings": [
+              "Motor frío antes de manipular bujías."
+            ],
             "steps": [
-              { "order": 1, "title": "Desconectar cable", "description": "Tirar del capuchón." },
-              { "order": 2, "title": "Remover bujía", "description": "Girar en sentido antihorario." },
-              { "order": 3, "title": "Apretar nueva bujía", "description": "Torque 25 Nm." }
+              {
+                "order": 1,
+                "title": "Desconectar cable",
+                "description": "Tirar del capuchón."
+              },
+              {
+                "order": 2,
+                "title": "Remover bujía",
+                "description": "Girar en sentido antihorario."
+              },
+              {
+                "order": 3,
+                "title": "Apretar nueva bujía",
+                "description": "Torque 25 Nm."
+              }
             ],
-            "inspectionChecklist": ["Gap correcto"],
-            "torqueSpecs": [{"fastenerName": "Spark plug", "torqueNm": 25.0}],
-            "finalValidationSteps": ["Verificar encendido"]
+            "inspectionChecklist": [
+              "Gap correcto"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Spark plug",
+                "torqueNm": 25.0
+              }
+            ],
+            "finalValidationSteps": [
+              "Verificar encendido"
+            ]
           }
         ],
-        "relatedDtcCodes": ["P0300", "P0301", "P0302", "P0303", "P0304"]
+        "relatedDtcCodes": [
+          "P0300",
+          "P0301",
+          "P0302",
+          "P0303",
+          "P0304"
+        ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "water_pump_generic",
       "part": {
@@ -225,20 +616,74 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "STRUCTURAL_UNCERTIFIED",
-          "tags": ["cooling", "water_pump"]
+          "tags": [
+            "cooling",
+            "water_pump"
+          ]
         },
         "featureTree": [
-          { "id": "pump_housing", "type": "CYLINDER", "name": "Housing", "parameters": {"radiusMm": 60.0, "heightMm": 80.0}, "operation": "ADD" },
-          { "id": "impeller_shaft", "type": "CYLINDER", "name": "Impeller shaft", "parameters": {"radiusMm": 8.0, "heightMm": 90.0}, "operation": "ADD" }
+          {
+            "id": "pump_housing",
+            "type": "CYLINDER",
+            "name": "Housing",
+            "parameters": {
+              "radiusMm": 60.0,
+              "heightMm": 80.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "impeller_shaft",
+            "type": "CYLINDER",
+            "name": "Impeller shaft",
+            "parameters": {
+              "radiusMm": 8.0,
+              "heightMm": 90.0
+            },
+            "operation": "ADD"
+          }
         ],
         "materialId": "aluminum_356",
-        "manufacturingProcessIds": ["die_casting", "cnc_machining"],
-        "dimensions": {"diameterMm": 120.0, "heightMm": 90.0},
+        "manufacturingProcessIds": [
+          "die_casting",
+          "cnc_machining"
+        ],
+        "dimensions": {
+          "diameterMm": 120.0,
+          "heightMm": 90.0
+        },
         "massEstimateKg": 1.2,
         "connectionPorts": [
-          { "id": "port_pulley", "name": "Pulley", "portType": "BELT_PULLEY", "position": [0.0, 45.0, 0.0], "normal": [0.0, 1.0, 0.0], "diameterMm": 60.0, "compatibleJointTypes": ["BELT", "REVOLUTE"] }
+          {
+            "id": "port_pulley",
+            "name": "Pulley",
+            "portType": "BELT_PULLEY",
+            "position": [
+              0.0,
+              45.0,
+              0.0
+            ],
+            "normal": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "diameterMm": 60.0,
+            "compatibleJointTypes": [
+              "BELT",
+              "REVOLUTE"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["LEAK", "WEAR", "BROKEN", "CORROSION"], "notes": "Inspeccionar eje y sello mecánico." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "LEAK",
+            "WEAR",
+            "BROKEN",
+            "CORROSION"
+          ],
+          "notes": "Inspeccionar eje y sello mecánico."
+        },
         "repairProcedures": [
           {
             "id": "repair_water_pump_001",
@@ -247,27 +692,75 @@
             "difficulty": "MEDIUM",
             "estimatedTimeMinutes": 90,
             "requiredTools": [
-              { "id": "tool_socket_set", "name": "Juego de dados", "purpose": "Remover tornillos" },
-              { "id": "tool_drain_pan", "name": "Bandeja de drenado", "purpose": "Recoger refrigerante" }
+              {
+                "id": "tool_socket_set",
+                "name": "Juego de dados",
+                "purpose": "Remover tornillos"
+              },
+              {
+                "id": "tool_drain_pan",
+                "name": "Bandeja de drenado",
+                "purpose": "Recoger refrigerante"
+              }
             ],
-            "requiredMaterials": ["bomba de agua nueva", "junta", "refrigerante"],
-            "safetyWarnings": ["Sistema puede estar caliente. Drenar refrigerante antes de manipular."],
+            "requiredMaterials": [
+              "bomba de agua nueva",
+              "junta",
+              "refrigerante"
+            ],
+            "safetyWarnings": [
+              "Sistema puede estar caliente. Drenar refrigerante antes de manipular."
+            ],
             "steps": [
-              { "order": 1, "title": "Drenar refrigerante", "description": "Abrir drenaje y recoger en bandeja." },
-              { "order": 2, "title": "Remover correa", "description": "Aflojar tensor y sacar correa." },
-              { "order": 3, "title": "Desmontar bomba", "description": "Remover tornillos y bomba." },
-              { "order": 4, "title": "Limpiar superficie", "description": "Limpiar asiento de junta." },
-              { "order": 5, "title": "Instalar nueva bomba", "description": "Nueva junta y tornillos al torque." }
+              {
+                "order": 1,
+                "title": "Drenar refrigerante",
+                "description": "Abrir drenaje y recoger en bandeja."
+              },
+              {
+                "order": 2,
+                "title": "Remover correa",
+                "description": "Aflojar tensor y sacar correa."
+              },
+              {
+                "order": 3,
+                "title": "Desmontar bomba",
+                "description": "Remover tornillos y bomba."
+              },
+              {
+                "order": 4,
+                "title": "Limpiar superficie",
+                "description": "Limpiar asiento de junta."
+              },
+              {
+                "order": 5,
+                "title": "Instalar nueva bomba",
+                "description": "Nueva junta y tornillos al torque."
+              }
             ],
-            "inspectionChecklist": ["Superficie limpia", "Sin rebabas"],
-            "torqueSpecs": [{"fastenerName": "Pump bolts", "torqueNm": 18.0}],
-            "finalValidationSteps": ["Prueba de presión", "Purgar sistema"]
+            "inspectionChecklist": [
+              "Superficie limpia",
+              "Sin rebabas"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Pump bolts",
+                "torqueNm": 18.0
+              }
+            ],
+            "finalValidationSteps": [
+              "Prueba de presión",
+              "Purgar sistema"
+            ]
           }
         ],
-        "relatedDtcCodes": ["P0128"]
+        "relatedDtcCodes": [
+          "P0128"
+        ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "brake_disc_generic",
       "part": {
@@ -280,22 +773,96 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "SAFETY_CRITICAL_UNCERTIFIED",
-          "tags": ["brakes", "disc"]
+          "tags": [
+            "brakes",
+            "disc"
+          ]
         },
         "featureTree": [
-          { "id": "disc_body", "type": "CYLINDER", "name": "Disc body", "parameters": {"radiusMm": 140.0, "heightMm": 24.0}, "operation": "ADD" },
-          { "id": "center_bore", "type": "CYLINDER", "name": "Center bore", "parameters": {"radiusMm": 32.05, "heightMm": 24.0}, "operation": "SUBTRACT" },
-          { "id": "bolt_pattern", "type": "CIRCULAR_PATTERN", "name": "Bolt pattern 5x114.3", "parameters": {"count": 5, "boltCircleDiameterMm": 114.3, "holeDiameterMm": 12.5}, "operation": "SUBTRACT" }
+          {
+            "id": "disc_body",
+            "type": "CYLINDER",
+            "name": "Disc body",
+            "parameters": {
+              "radiusMm": 140.0,
+              "heightMm": 24.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "center_bore",
+            "type": "CYLINDER",
+            "name": "Center bore",
+            "parameters": {
+              "radiusMm": 32.05,
+              "heightMm": 24.0
+            },
+            "operation": "SUBTRACT"
+          },
+          {
+            "id": "bolt_pattern",
+            "type": "CIRCULAR_PATTERN",
+            "name": "Bolt pattern 5x114.3",
+            "parameters": {
+              "count": 5,
+              "boltCircleDiameterMm": 114.3,
+              "holeDiameterMm": 12.5
+            },
+            "operation": "SUBTRACT"
+          }
         ],
         "materialId": "cast_iron",
-        "manufacturingProcessIds": ["sand_casting", "cnc_machining", "balancing"],
-        "dimensions": {"diameterMm": 280.0, "thicknessMm": 24.0, "innerDiameterMm": 64.1},
+        "manufacturingProcessIds": [
+          "sand_casting",
+          "cnc_machining",
+          "balancing"
+        ],
+        "dimensions": {
+          "diameterMm": 280.0,
+          "thicknessMm": 24.0,
+          "innerDiameterMm": 64.1
+        },
         "massEstimateKg": 6.5,
         "connectionPorts": [
-          { "id": "port_hub", "name": "Hub center", "portType": "BEARING_SEAT", "position": [0.0, 0.0, 0.0], "diameterMm": 64.1, "compatibleJointTypes": ["CONCENTRIC", "REVOLUTE"] },
-          { "id": "port_wheel_bolt_1", "name": "Wheel bolt 1", "portType": "BOLT_HOLE", "position": [57.15, 0.0, 0.0], "diameterMm": 12.5, "compatibleJointTypes": ["BOLTED"] }
+          {
+            "id": "port_hub",
+            "name": "Hub center",
+            "portType": "BEARING_SEAT",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 64.1,
+            "compatibleJointTypes": [
+              "CONCENTRIC",
+              "REVOLUTE"
+            ]
+          },
+          {
+            "id": "port_wheel_bolt_1",
+            "name": "Wheel bolt 1",
+            "portType": "BOLT_HOLE",
+            "position": [
+              57.15,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 12.5,
+            "compatibleJointTypes": [
+              "BOLTED"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "BENT", "OVERHEATED", "CRACK"], "notes": "Medir espesor; inspeccionar alabeo." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "BENT",
+            "OVERHEATED",
+            "CRACK"
+          ],
+          "notes": "Medir espesor; inspeccionar alabeo."
+        },
         "repairProcedures": [
           {
             "id": "repair_brake_disc_001",
@@ -304,31 +871,85 @@
             "difficulty": "MEDIUM",
             "estimatedTimeMinutes": 60,
             "requiredTools": [
-              { "id": "tool_jack", "name": "Gato hidráulico", "purpose": "Levantar vehículo" },
-              { "id": "tool_socket", "name": "Dado de rueda", "purpose": "Remover rueda" },
-              { "id": "tool_caliper_tool", "name": "Herramienta caliper", "purpose": "Comprimir pistón" }
+              {
+                "id": "tool_jack",
+                "name": "Gato hidráulico",
+                "purpose": "Levantar vehículo"
+              },
+              {
+                "id": "tool_socket",
+                "name": "Dado de rueda",
+                "purpose": "Remover rueda"
+              },
+              {
+                "id": "tool_caliper_tool",
+                "name": "Herramienta caliper",
+                "purpose": "Comprimir pistón"
+              }
             ],
-            "requiredMaterials": ["disco nuevo", "tornillos"],
-            "safetyWarnings": ["Pieza crítica de seguridad. No reutilizar discos fuera de spec."],
+            "requiredMaterials": [
+              "disco nuevo",
+              "tornillos"
+            ],
+            "safetyWarnings": [
+              "Pieza crítica de seguridad. No reutilizar discos fuera de spec."
+            ],
             "steps": [
-              { "order": 1, "title": "Aflojar ruedas", "description": "Aflojar tuercas con vehículo en suelo." },
-              { "order": 2, "title": "Levantar vehículo", "description": "Gato y soportes de seguridad." },
-              { "order": 3, "title": "Remover rueda", "description": "Sacar rueda." },
-              { "order": 4, "title": "Remover caliper", "description": "Soportar caliper con alambre." },
-              { "order": 5, "title": "Remover disco", "description": "Sacar disco del cubo." },
-              { "order": 6, "title": "Instalar disco nuevo", "description": "Asentar y apretar tornillo de fijación." }
+              {
+                "order": 1,
+                "title": "Aflojar ruedas",
+                "description": "Aflojar tuercas con vehículo en suelo."
+              },
+              {
+                "order": 2,
+                "title": "Levantar vehículo",
+                "description": "Gato y soportes de seguridad."
+              },
+              {
+                "order": 3,
+                "title": "Remover rueda",
+                "description": "Sacar rueda."
+              },
+              {
+                "order": 4,
+                "title": "Remover caliper",
+                "description": "Soportar caliper con alambre."
+              },
+              {
+                "order": 5,
+                "title": "Remover disco",
+                "description": "Sacar disco del cubo."
+              },
+              {
+                "order": 6,
+                "title": "Instalar disco nuevo",
+                "description": "Asentar y apretar tornillo de fijación."
+              }
             ],
-            "inspectionChecklist": ["Espesor dentro de spec", "Alabeo < 0.05mm"],
+            "inspectionChecklist": [
+              "Espesor dentro de spec",
+              "Alabeo < 0.05mm"
+            ],
             "torqueSpecs": [
-              {"fastenerName": "Wheel bolt", "torqueNm": 120.0, "sequenceOrder": 1},
-              {"fastenerName": "Caliper bolt", "torqueNm": 95.0}
+              {
+                "fastenerName": "Wheel bolt",
+                "torqueNm": 120.0,
+                "sequenceOrder": 1
+              },
+              {
+                "fastenerName": "Caliper bolt",
+                "torqueNm": 95.0
+              }
             ],
-            "finalValidationSteps": ["Prueba de frenado a baja velocidad"]
+            "finalValidationSteps": [
+              "Prueba de frenado a baja velocidad"
+            ]
           }
         ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "brake_pad_generic",
       "part": {
@@ -341,20 +962,75 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "SAFETY_CRITICAL_UNCERTIFIED",
-          "tags": ["brakes", "pad"]
+          "tags": [
+            "brakes",
+            "pad"
+          ]
         },
         "featureTree": [
-          { "id": "pad_plate", "type": "PLATE", "name": "Backing plate", "parameters": {"lengthMm": 120.0, "widthMm": 50.0, "thicknessMm": 8.0}, "operation": "ADD" },
-          { "id": "friction_layer", "type": "PLATE", "name": "Friction material", "parameters": {"lengthMm": 100.0, "widthMm": 40.0, "thicknessMm": 10.0}, "position": [0.0, 5.0, 0.0], "operation": "ADD" }
+          {
+            "id": "pad_plate",
+            "type": "PLATE",
+            "name": "Backing plate",
+            "parameters": {
+              "lengthMm": 120.0,
+              "widthMm": 50.0,
+              "thicknessMm": 8.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "friction_layer",
+            "type": "PLATE",
+            "name": "Friction material",
+            "parameters": {
+              "lengthMm": 100.0,
+              "widthMm": 40.0,
+              "thicknessMm": 10.0
+            },
+            "position": [
+              0.0,
+              5.0,
+              0.0
+            ],
+            "operation": "ADD"
+          }
         ],
         "materialId": "ceramic_friction_material",
-        "manufacturingProcessIds": ["pressure_testing", "cnc_machining"],
-        "dimensions": {"lengthMm": 120.0, "widthMm": 50.0, "thicknessMm": 18.0},
+        "manufacturingProcessIds": [
+          "pressure_testing",
+          "cnc_machining"
+        ],
+        "dimensions": {
+          "lengthMm": 120.0,
+          "widthMm": 50.0,
+          "thicknessMm": 18.0
+        },
         "massEstimateKg": 0.4,
         "connectionPorts": [
-          { "id": "port_caliper_pin", "name": "Caliper pin slot", "portType": "SLIDING_RAIL", "position": [0.0, -25.0, 0.0], "diameterMm": 6.0, "compatibleJointTypes": ["SLIDER"] }
+          {
+            "id": "port_caliper_pin",
+            "name": "Caliper pin slot",
+            "portType": "SLIDING_RAIL",
+            "position": [
+              0.0,
+              -25.0,
+              0.0
+            ],
+            "diameterMm": 6.0,
+            "compatibleJointTypes": [
+              "SLIDER"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "OVERHEATED", "CONTAMINATED"], "notes": "Medir espesor residual." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "OVERHEATED",
+            "CONTAMINATED"
+          ],
+          "notes": "Medir espesor residual."
+        },
         "repairProcedures": [
           {
             "id": "repair_brake_pad_001",
@@ -363,24 +1039,58 @@
             "difficulty": "MEDIUM",
             "estimatedTimeMinutes": 45,
             "requiredTools": [
-              { "id": "tool_caliper_compressor", "name": "Compresor de caliper", "purpose": "Empujar pistón" }
+              {
+                "id": "tool_caliper_compressor",
+                "name": "Compresor de caliper",
+                "purpose": "Empujar pistón"
+              }
             ],
-            "requiredMaterials": ["juego de pastillas nuevas"],
-            "safetyWarnings": ["Nunca permita que el caliper cuelgue de la manguera."],
+            "requiredMaterials": [
+              "juego de pastillas nuevas"
+            ],
+            "safetyWarnings": [
+              "Nunca permita que el caliper cuelgue de la manguera."
+            ],
             "steps": [
-              { "order": 1, "title": "Remover caliper", "description": "Soportar con alambre." },
-              { "order": 2, "title": "Cambiar pastillas", "description": "Sacar y reemplazar." },
-              { "order": 3, "title": "Comprimir pistón", "description": "Con compresor." },
-              { "order": 4, "title": "Reinstalar", "description": "Apretar pernos al torque." }
+              {
+                "order": 1,
+                "title": "Remover caliper",
+                "description": "Soportar con alambre."
+              },
+              {
+                "order": 2,
+                "title": "Cambiar pastillas",
+                "description": "Sacar y reemplazar."
+              },
+              {
+                "order": 3,
+                "title": "Comprimir pistón",
+                "description": "Con compresor."
+              },
+              {
+                "order": 4,
+                "title": "Reinstalar",
+                "description": "Apretar pernos al torque."
+              }
             ],
-            "inspectionChecklist": ["Espesor nuevo"],
-            "torqueSpecs": [{"fastenerName": "Caliper slide pin", "torqueNm": 30.0}],
-            "finalValidationSteps": ["Pisar freno varias veces antes de mover"]
+            "inspectionChecklist": [
+              "Espesor nuevo"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Caliper slide pin",
+                "torqueNm": 30.0
+              }
+            ],
+            "finalValidationSteps": [
+              "Pisar freno varias veces antes de mover"
+            ]
           }
         ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "coil_spring_generic",
       "part": {
@@ -393,20 +1103,71 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "STRUCTURAL_UNCERTIFIED",
-          "tags": ["suspension", "spring"]
+          "tags": [
+            "suspension",
+            "spring"
+          ]
         },
         "featureTree": [
-          { "id": "spring_coil", "type": "TUBE", "name": "Helix tube", "parameters": {"outerRadiusMm": 60.0, "innerRadiusMm": 5.0, "heightMm": 280.0}, "operation": "ADD" }
+          {
+            "id": "spring_coil",
+            "type": "TUBE",
+            "name": "Helix tube",
+            "parameters": {
+              "outerRadiusMm": 60.0,
+              "innerRadiusMm": 5.0,
+              "heightMm": 280.0
+            },
+            "operation": "ADD"
+          }
         ],
         "materialId": "high_strength_steel",
-        "manufacturingProcessIds": ["forging", "heat_treatment"],
-        "dimensions": {"outerDiameterMm": 120.0, "innerDiameterMm": 10.0, "heightMm": 280.0},
+        "manufacturingProcessIds": [
+          "forging",
+          "heat_treatment"
+        ],
+        "dimensions": {
+          "outerDiameterMm": 120.0,
+          "innerDiameterMm": 10.0,
+          "heightMm": 280.0
+        },
         "massEstimateKg": 2.0,
         "connectionPorts": [
-          { "id": "port_top", "name": "Top seat", "portType": "WELD_SURFACE", "position": [0.0, 140.0, 0.0], "compatibleJointTypes": ["FIXED"] },
-          { "id": "port_bottom", "name": "Bottom seat", "portType": "WELD_SURFACE", "position": [0.0, -140.0, 0.0], "compatibleJointTypes": ["FIXED"] }
+          {
+            "id": "port_top",
+            "name": "Top seat",
+            "portType": "WELD_SURFACE",
+            "position": [
+              0.0,
+              140.0,
+              0.0
+            ],
+            "compatibleJointTypes": [
+              "FIXED"
+            ]
+          },
+          {
+            "id": "port_bottom",
+            "name": "Bottom seat",
+            "portType": "WELD_SURFACE",
+            "position": [
+              0.0,
+              -140.0,
+              0.0
+            ],
+            "compatibleJointTypes": [
+              "FIXED"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["FATIGUE", "BROKEN", "WEAR"], "notes": "Inspeccionar pandeo o fracturas." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "FATIGUE",
+            "BROKEN",
+            "WEAR"
+          ],
+          "notes": "Inspeccionar pandeo o fracturas."
+        },
         "repairProcedures": [
           {
             "id": "repair_coil_spring_001",
@@ -415,23 +1176,53 @@
             "difficulty": "HARD",
             "estimatedTimeMinutes": 180,
             "requiredTools": [
-              { "id": "tool_spring_compressor", "name": "Compresor de resorte", "purpose": "Destensar resorte" }
+              {
+                "id": "tool_spring_compressor",
+                "name": "Compresor de resorte",
+                "purpose": "Destensar resorte"
+              }
             ],
-            "requiredMaterials": ["resorte nuevo"],
-            "safetyWarnings": ["Los resortes almacenan energía. Use compresor adecuado."],
+            "requiredMaterials": [
+              "resorte nuevo"
+            ],
+            "safetyWarnings": [
+              "Los resortes almacenan energía. Use compresor adecuado."
+            ],
             "steps": [
-              { "order": 1, "title": "Comprimir resorte", "description": "Usar compresor." },
-              { "order": 2, "title": "Destensar y remover", "description": "Sacar resorte viejo." },
-              { "order": 3, "title": "Instalar nuevo", "description": "Asentar en top y bottom." }
+              {
+                "order": 1,
+                "title": "Comprimir resorte",
+                "description": "Usar compresor."
+              },
+              {
+                "order": 2,
+                "title": "Destensar y remover",
+                "description": "Sacar resorte viejo."
+              },
+              {
+                "order": 3,
+                "title": "Instalar nuevo",
+                "description": "Asentar en top y bottom."
+              }
             ],
-            "inspectionChecklist": ["Sin deformación"],
-            "torqueSpecs": [{"fastenerName": "Strut mount", "torqueNm": 60.0}],
-            "finalValidationSteps": ["Compresión y rebote"]
+            "inspectionChecklist": [
+              "Sin deformación"
+            ],
+            "torqueSpecs": [
+              {
+                "fastenerName": "Strut mount",
+                "torqueNm": 60.0
+              }
+            ],
+            "finalValidationSteps": [
+              "Compresión y rebote"
+            ]
           }
         ]
       }
     },
     {
+      "type": "PART",
       "schemaVersion": 1,
       "id": "bushing_generic",
       "part": {
@@ -444,20 +1235,69 @@
           "unit": "MM",
           "version": 1,
           "safetyClassification": "STRUCTURAL_UNCERTIFIED",
-          "tags": ["suspension", "bushing"]
+          "tags": [
+            "suspension",
+            "bushing"
+          ]
         },
         "featureTree": [
-          { "id": "bushing_outer", "type": "CYLINDER", "name": "Outer metal sleeve", "parameters": {"radiusMm": 18.0, "heightMm": 35.0}, "operation": "ADD" },
-          { "id": "bushing_rubber", "type": "TUBE", "name": "Rubber body", "parameters": {"outerRadiusMm": 15.0, "innerRadiusMm": 6.0, "heightMm": 30.0}, "operation": "ADD" }
+          {
+            "id": "bushing_outer",
+            "type": "CYLINDER",
+            "name": "Outer metal sleeve",
+            "parameters": {
+              "radiusMm": 18.0,
+              "heightMm": 35.0
+            },
+            "operation": "ADD"
+          },
+          {
+            "id": "bushing_rubber",
+            "type": "TUBE",
+            "name": "Rubber body",
+            "parameters": {
+              "outerRadiusMm": 15.0,
+              "innerRadiusMm": 6.0,
+              "heightMm": 30.0
+            },
+            "operation": "ADD"
+          }
         ],
         "materialId": "epdm_rubber",
-        "manufacturingProcessIds": ["injection_molding", "stamping"],
-        "dimensions": {"outerDiameterMm": 36.0, "innerDiameterMm": 12.0, "heightMm": 35.0},
+        "manufacturingProcessIds": [
+          "injection_molding",
+          "stamping"
+        ],
+        "dimensions": {
+          "outerDiameterMm": 36.0,
+          "innerDiameterMm": 12.0,
+          "heightMm": 35.0
+        },
         "massEstimateKg": 0.08,
         "connectionPorts": [
-          { "id": "port_inner", "name": "Inner sleeve", "portType": "BUSHING", "position": [0.0, 0.0, 0.0], "diameterMm": 12.0, "compatibleJointTypes": ["BUSHING"] }
+          {
+            "id": "port_inner",
+            "name": "Inner sleeve",
+            "portType": "BUSHING",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "diameterMm": 12.0,
+            "compatibleJointTypes": [
+              "BUSHING"
+            ]
+          }
         ],
-        "damageModel": { "possibleDamageTypes": ["WEAR", "CRACK", "FATIGUE"], "notes": "Inspeccionar grietas y juego." },
+        "damageModel": {
+          "possibleDamageTypes": [
+            "WEAR",
+            "CRACK",
+            "FATIGUE"
+          ],
+          "notes": "Inspeccionar grietas y juego."
+        },
         "repairProcedures": [
           {
             "id": "repair_bushing_001",
@@ -465,17 +1305,43 @@
             "partId": "bushing_generic",
             "difficulty": "MEDIUM",
             "estimatedTimeMinutes": 90,
-            "requiredTools": [{"id": "tool_bushing_press", "name": "Prensa de bujes", "purpose": "Prensar buje"}],
-            "requiredMaterials": ["buje nuevo"],
-            "safetyWarnings": ["Usar prensa; no martillar."],
-            "steps": [
-              { "order": 1, "title": "Remover buje viejo", "description": "Con prensa." },
-              { "order": 2, "title": "Limpiar alojamiento", "description": "Sin rebabas." },
-              { "order": 3, "title": "Prensar buje nuevo", "description": "Con prensa, alineado." }
+            "requiredTools": [
+              {
+                "id": "tool_bushing_press",
+                "name": "Prensa de bujes",
+                "purpose": "Prensar buje"
+              }
             ],
-            "inspectionChecklist": ["Alineación correcta"],
+            "requiredMaterials": [
+              "buje nuevo"
+            ],
+            "safetyWarnings": [
+              "Usar prensa; no martillar."
+            ],
+            "steps": [
+              {
+                "order": 1,
+                "title": "Remover buje viejo",
+                "description": "Con prensa."
+              },
+              {
+                "order": 2,
+                "title": "Limpiar alojamiento",
+                "description": "Sin rebabas."
+              },
+              {
+                "order": 3,
+                "title": "Prensar buje nuevo",
+                "description": "Con prensa, alineado."
+              }
+            ],
+            "inspectionChecklist": [
+              "Alineación correcta"
+            ],
             "torqueSpecs": [],
-            "finalValidationSteps": ["Juego libre medido"]
+            "finalValidationSteps": [
+              "Juego libre medido"
+            ]
           }
         ]
       }

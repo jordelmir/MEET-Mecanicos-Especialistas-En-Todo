@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "documents": [
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "mild_steel",
       "material": {
@@ -13,18 +14,24 @@
         "youngModulusGPa": 200.0,
         "yieldStrengthMPa": 250.0,
         "tensileStrengthMPa": 410.0,
-        "thermalExpansion": 1.2e-5,
+        "thermalExpansion": 1.2e-05,
         "thermalConductivity": 50.0,
         "maxOperatingTempC": 450.0,
         "corrosionResistance": "low",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["stamping", "welding", "cnc_machining", "forging"],
+        "compatibleProcesses": [
+          "stamping",
+          "welding",
+          "cnc_machining",
+          "forging"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "high_strength_steel",
       "material": {
@@ -35,18 +42,25 @@
         "youngModulusGPa": 210.0,
         "yieldStrengthMPa": 550.0,
         "tensileStrengthMPa": 700.0,
-        "thermalExpansion": 1.2e-5,
+        "thermalExpansion": 1.2e-05,
         "thermalConductivity": 45.0,
         "maxOperatingTempC": 500.0,
         "corrosionResistance": "low",
         "fatigueResistance": "high",
         "manufacturability": "medium",
         "costLevel": 2,
-        "compatibleProcesses": ["forging", "cnc_machining", "heat_treatment"],
-        "warnings": ["Requiere tratamiento térmico para piezas críticas"]
+        "compatibleProcesses": [
+          "forging",
+          "cnc_machining",
+          "heat_treatment"
+        ],
+        "warnings": [
+          "Requiere tratamiento térmico para piezas críticas"
+        ]
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "stainless_steel",
       "material": {
@@ -57,18 +71,23 @@
         "youngModulusGPa": 200.0,
         "yieldStrengthMPa": 215.0,
         "tensileStrengthMPa": 505.0,
-        "thermalExpansion": 1.7e-5,
+        "thermalExpansion": 1.7e-05,
         "thermalConductivity": 16.0,
         "maxOperatingTempC": 800.0,
         "corrosionResistance": "high",
         "fatigueResistance": "high",
         "manufacturability": "medium",
         "costLevel": 3,
-        "compatibleProcesses": ["stamping", "welding", "cnc_machining"],
+        "compatibleProcesses": [
+          "stamping",
+          "welding",
+          "cnc_machining"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "cast_iron",
       "material": {
@@ -79,18 +98,25 @@
         "youngModulusGPa": 100.0,
         "yieldStrengthMPa": 130.0,
         "tensileStrengthMPa": 200.0,
-        "thermalExpansion": 1.1e-5,
+        "thermalExpansion": 1.1e-05,
         "thermalConductivity": 46.0,
         "maxOperatingTempC": 600.0,
         "corrosionResistance": "low",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["sand_casting", "cnc_machining", "balancing"],
-        "warnings": ["Frágil bajo impacto"]
+        "compatibleProcesses": [
+          "sand_casting",
+          "cnc_machining",
+          "balancing"
+        ],
+        "warnings": [
+          "Frágil bajo impacto"
+        ]
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "aluminum_356",
       "material": {
@@ -101,18 +127,23 @@
         "youngModulusGPa": 72.0,
         "yieldStrengthMPa": 165.0,
         "tensileStrengthMPa": 240.0,
-        "thermalExpansion": 2.1e-5,
+        "thermalExpansion": 2.1e-05,
         "thermalConductivity": 150.0,
         "maxOperatingTempC": 200.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 2,
-        "compatibleProcesses": ["sand_casting", "die_casting", "cnc_machining"],
+        "compatibleProcesses": [
+          "sand_casting",
+          "die_casting",
+          "cnc_machining"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "aluminum_6061",
       "material": {
@@ -123,18 +154,23 @@
         "youngModulusGPa": 69.0,
         "yieldStrengthMPa": 240.0,
         "tensileStrengthMPa": 290.0,
-        "thermalExpansion": 2.4e-5,
+        "thermalExpansion": 2.4e-05,
         "thermalConductivity": 167.0,
         "maxOperatingTempC": 200.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 2,
-        "compatibleProcesses": ["extrusion", "cnc_machining", "forging"],
+        "compatibleProcesses": [
+          "extrusion",
+          "cnc_machining",
+          "forging"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "epdm_rubber",
       "material": {
@@ -145,18 +181,22 @@
         "youngModulusGPa": 0.005,
         "yieldStrengthMPa": 8.0,
         "tensileStrengthMPa": 12.0,
-        "thermalExpansion": 1.6e-4,
+        "thermalExpansion": 0.00016,
         "thermalConductivity": 0.25,
         "maxOperatingTempC": 150.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["injection_molding", "extrusion"],
+        "compatibleProcesses": [
+          "injection_molding",
+          "extrusion"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "nitrile_rubber",
       "material": {
@@ -167,18 +207,21 @@
         "youngModulusGPa": 0.008,
         "yieldStrengthMPa": 7.0,
         "tensileStrengthMPa": 15.0,
-        "thermalExpansion": 1.5e-4,
+        "thermalExpansion": 0.00015,
         "thermalConductivity": 0.25,
         "maxOperatingTempC": 110.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["injection_molding"],
+        "compatibleProcesses": [
+          "injection_molding"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "abs_plastic",
       "material": {
@@ -189,18 +232,22 @@
         "youngModulusGPa": 2.3,
         "yieldStrengthMPa": 40.0,
         "tensileStrengthMPa": 45.0,
-        "thermalExpansion": 9.0e-5,
+        "thermalExpansion": 9e-05,
         "thermalConductivity": 0.2,
         "maxOperatingTempC": 90.0,
         "corrosionResistance": "high",
         "fatigueResistance": "low",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["injection_molding", "additive_manufacturing"],
+        "compatibleProcesses": [
+          "injection_molding",
+          "additive_manufacturing"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "ceramic_friction_material",
       "material": {
@@ -211,18 +258,24 @@
         "youngModulusGPa": 30.0,
         "yieldStrengthMPa": 90.0,
         "tensileStrengthMPa": 100.0,
-        "thermalExpansion": 5.0e-6,
+        "thermalExpansion": 5e-06,
         "thermalConductivity": 1.5,
         "maxOperatingTempC": 700.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "medium",
         "costLevel": 3,
-        "compatibleProcesses": ["pressure_testing", "cnc_machining"],
-        "warnings": ["Salud: polvo de cerámico puede irritar vías respiratorias"]
+        "compatibleProcesses": [
+          "pressure_testing",
+          "cnc_machining"
+        ],
+        "warnings": [
+          "Salud: polvo de cerámico puede irritar vías respiratorias"
+        ]
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "tempered_glass",
       "material": {
@@ -233,18 +286,24 @@
         "youngModulusGPa": 70.0,
         "yieldStrengthMPa": 700.0,
         "tensileStrengthMPa": 1000.0,
-        "thermalExpansion": 9.0e-6,
+        "thermalExpansion": 9e-06,
         "thermalConductivity": 1.0,
         "maxOperatingTempC": 250.0,
         "corrosionResistance": "high",
         "fatigueResistance": "low",
         "manufacturability": "medium",
         "costLevel": 2,
-        "compatibleProcesses": ["laser_cutting", "waterjet_cutting"],
-        "warnings": ["Frágil bajo impacto puntual"]
+        "compatibleProcesses": [
+          "laser_cutting",
+          "waterjet_cutting"
+        ],
+        "warnings": [
+          "Frágil bajo impacto puntual"
+        ]
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "carbon_fiber_composite",
       "material": {
@@ -255,18 +314,23 @@
         "youngModulusGPa": 130.0,
         "yieldStrengthMPa": 600.0,
         "tensileStrengthMPa": 800.0,
-        "thermalExpansion": 1.0e-6,
+        "thermalExpansion": 1e-06,
         "thermalConductivity": 5.0,
         "maxOperatingTempC": 180.0,
         "corrosionResistance": "high",
         "fatigueResistance": "high",
         "manufacturability": "low",
         "costLevel": 5,
-        "compatibleProcesses": ["additive_manufacturing"],
-        "warnings": ["Anisotrópico — dirección de fibra afecta propiedades"]
+        "compatibleProcesses": [
+          "additive_manufacturing"
+        ],
+        "warnings": [
+          "Anisotrópico — dirección de fibra afecta propiedades"
+        ]
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "copper",
       "material": {
@@ -277,18 +341,23 @@
         "youngModulusGPa": 110.0,
         "yieldStrengthMPa": 70.0,
         "tensileStrengthMPa": 220.0,
-        "thermalExpansion": 1.7e-5,
+        "thermalExpansion": 1.7e-05,
         "thermalConductivity": 385.0,
         "maxOperatingTempC": 350.0,
         "corrosionResistance": "medium",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 3,
-        "compatibleProcesses": ["stamping", "cnc_machining", "forging"],
+        "compatibleProcesses": [
+          "stamping",
+          "cnc_machining",
+          "forging"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "brass",
       "material": {
@@ -299,18 +368,23 @@
         "youngModulusGPa": 100.0,
         "yieldStrengthMPa": 200.0,
         "tensileStrengthMPa": 400.0,
-        "thermalExpansion": 1.9e-5,
+        "thermalExpansion": 1.9e-05,
         "thermalConductivity": 110.0,
         "maxOperatingTempC": 400.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 2,
-        "compatibleProcesses": ["stamping", "cnc_machining", "forging"],
+        "compatibleProcesses": [
+          "stamping",
+          "cnc_machining",
+          "forging"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "forged_aluminum",
       "material": {
@@ -321,18 +395,23 @@
         "youngModulusGPa": 75.0,
         "yieldStrengthMPa": 280.0,
         "tensileStrengthMPa": 350.0,
-        "thermalExpansion": 2.3e-5,
+        "thermalExpansion": 2.3e-05,
         "thermalConductivity": 160.0,
         "maxOperatingTempC": 220.0,
         "corrosionResistance": "high",
         "fatigueResistance": "high",
         "manufacturability": "medium",
         "costLevel": 3,
-        "compatibleProcesses": ["forging", "cnc_machining", "heat_treatment"],
+        "compatibleProcesses": [
+          "forging",
+          "cnc_machining",
+          "heat_treatment"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "nylon",
       "material": {
@@ -343,18 +422,22 @@
         "youngModulusGPa": 2.5,
         "yieldStrengthMPa": 70.0,
         "tensileStrengthMPa": 80.0,
-        "thermalExpansion": 8.0e-5,
+        "thermalExpansion": 8e-05,
         "thermalConductivity": 0.25,
         "maxOperatingTempC": 120.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 1,
-        "compatibleProcesses": ["injection_molding", "additive_manufacturing"],
+        "compatibleProcesses": [
+          "injection_molding",
+          "additive_manufacturing"
+        ],
         "warnings": []
       }
     },
     {
+      "type": "MATERIAL",
       "schemaVersion": 1,
       "id": "polycarbonate",
       "material": {
@@ -365,14 +448,16 @@
         "youngModulusGPa": 2.4,
         "yieldStrengthMPa": 60.0,
         "tensileStrengthMPa": 70.0,
-        "thermalExpansion": 7.0e-5,
+        "thermalExpansion": 7e-05,
         "thermalConductivity": 0.2,
         "maxOperatingTempC": 130.0,
         "corrosionResistance": "high",
         "fatigueResistance": "medium",
         "manufacturability": "high",
         "costLevel": 2,
-        "compatibleProcesses": ["injection_molding"],
+        "compatibleProcesses": [
+          "injection_molding"
+        ],
         "warnings": []
       }
     }
