@@ -74,6 +74,23 @@ class ForgePartEditorViewModel(
     private val _saveStatus = MutableStateFlow(SaveStatus.IDLE)
     val saveStatus: StateFlow<SaveStatus> = _saveStatus.asStateFlow()
 
+    /**
+     * Historial de snapshots de la parte para undo/redo. Cada mutacion
+     * (rename, setSafety, updateDimension, assignMaterial, addFeature) empuja
+     * el snapshot PREVIO al undoStack.
+     *
+     * Limite: 50 entradas (FIFO si excede). Suficiente para sesiones tipicas
+     * sin consumir memoria excesiva.
+     */
+    private val undoStack: ArrayDeque<ForgePart> = ArrayDeque()
+    private val redoStack: ArrayDeque<ForgePart> = ArrayDeque()
+
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
     private var currentPart: ForgePart? = null
 
     // Job del auto-save en vuelo. Se cancela y reemplaza en cada cambio
@@ -87,6 +104,9 @@ class ForgePartEditorViewModel(
     private companion object {
         /** Espera entre el último cambio y el guardado automático. */
         const val AUTOSAVE_DELAY_MS = 1500L
+
+        /** Tamaño máximo del historial undo/redo. FIFO si excede. */
+        const val MAX_UNDO = 50
     }
 
     init {
@@ -126,8 +146,65 @@ class ForgePartEditorViewModel(
         }
     }
 
+    /**
+     * Captura el snapshot actual en el undoStack antes de una mutación.
+     * Llamar desde cada mutator (rename, setSafety, etc).
+     * Limpia el redoStack (cualquier redo pendiente ya no aplica).
+     */
+    private fun pushUndoSnapshot() {
+        val current = currentPart ?: return
+        undoStack.addLast(current)
+        // Limitar tamaño. FIFO si excede.
+        while (undoStack.size > MAX_UNDO) undoStack.removeFirst()
+        redoStack.clear()
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = false
+    }
+
+    /**
+     * Deshace el último cambio, restaurando el snapshot anterior de `currentPart`.
+     * El estado actual va al redoStack para permitir redo().
+     */
+    fun undo() {
+        if (undoStack.isEmpty()) return
+        val previous = undoStack.removeLast()
+        currentPart?.let { current ->
+            redoStack.addLast(current)
+            // Limitar redoStack.
+            while (redoStack.size > MAX_UNDO) redoStack.removeFirst()
+        }
+        currentPart = previous
+        viewModelScope.launch {
+            _uiState.value = UiState.Ready(previous)
+            // Re-trigger autosave con el snapshot restaurado.
+            scheduleAutoSave()
+        }
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = redoStack.isNotEmpty()
+    }
+
+    /**
+     * Rehace un cambio previamente deshecho.
+     */
+    fun redo() {
+        if (redoStack.isEmpty()) return
+        val next = redoStack.removeLast()
+        currentPart?.let { current ->
+            undoStack.addLast(current)
+            while (undoStack.size > MAX_UNDO) undoStack.removeFirst()
+        }
+        currentPart = next
+        viewModelScope.launch {
+            _uiState.value = UiState.Ready(next)
+            scheduleAutoSave()
+        }
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = redoStack.isNotEmpty()
+    }
+
     private fun rename(name: String) {
         val current = currentPart ?: return
+        pushUndoSnapshot()
         val updated = current.copy(
             artifact = current.artifact.copy(name = name, updatedAt = System.currentTimeMillis())
         )
@@ -138,6 +215,7 @@ class ForgePartEditorViewModel(
 
     private fun setSafety(classification: SafetyClassification) {
         val current = currentPart ?: return
+        pushUndoSnapshot()
         val updated = current.copy(
             artifact = current.artifact.copy(
                 safetyClassification = classification,
@@ -152,6 +230,7 @@ class ForgePartEditorViewModel(
     private fun updateDimension(field: DimensionField, value: Double) {
         val current = currentPart ?: return
         if (!value.isFinite() || value < 0.0) return
+        pushUndoSnapshot()
         val currentDims = current.dimensions
         val newDims = when (field) {
             DimensionField.LENGTH -> currentDims.copy(lengthMm = value)
@@ -174,6 +253,7 @@ class ForgePartEditorViewModel(
 
     private fun assignMaterial(materialId: String) {
         val current = currentPart ?: return
+        pushUndoSnapshot()
         val updated = current.copy(
             artifact = current.artifact.copy(updatedAt = System.currentTimeMillis()),
             materialId = materialId
@@ -185,6 +265,7 @@ class ForgePartEditorViewModel(
 
     private fun addFeature(feature: ParametricFeature) {
         val current = currentPart ?: return
+        pushUndoSnapshot()
         val updated = current.copy(
             artifact = current.artifact.copy(updatedAt = System.currentTimeMillis()),
             featureTree = current.featureTree + feature

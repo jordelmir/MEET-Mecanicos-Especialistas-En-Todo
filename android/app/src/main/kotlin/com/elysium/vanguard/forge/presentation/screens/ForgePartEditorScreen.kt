@@ -90,6 +90,8 @@ fun ForgePartEditorScreen(
     val materials by viewModel.materials.collectAsState()
     val safetyClassification by viewModel.safetyClassification.collectAsState()
     val saveStatus by viewModel.saveStatus.collectAsState()
+    val canUndo by viewModel.canUndo.collectAsState()
+    val canRedo by viewModel.canRedo.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
@@ -122,7 +124,11 @@ fun ForgePartEditorScreen(
                 materials = materials,
                 safetyClassification = safetyClassification,
                 saveStatus = saveStatus,
+                canUndo = canUndo,
+                canRedo = canRedo,
                 onEvent = viewModel::onEvent,
+                onUndo = { viewModel.undo() },
+                onRedo = { viewModel.redo() },
                 onBack = onBack
             )
         }
@@ -132,6 +138,10 @@ fun ForgePartEditorScreen(
 @Composable
 private fun EditorContent(
     part: ForgePart,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     materials: List<MaterialSpec>,
     safetyClassification: SafetyClassification,
     saveStatus: SaveStatus,
@@ -213,7 +223,14 @@ private fun EditorContent(
             Spacer(Modifier.height(16.dp))
         }
         item {
-            ActionButtons(onEvent = onEvent, saveStatus = saveStatus)
+            ActionButtons(
+                onEvent = onEvent,
+                saveStatus = saveStatus,
+                canUndo = canUndo,
+                canRedo = canRedo,
+                onUndo = onUndo,
+                onRedo = onRedo
+            )
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -684,12 +701,44 @@ private fun AddFeatureButton(onAdd: (FeatureType) -> Unit) {
 }
 
 @Composable
-private fun ActionButtons(onEvent: (ForgePartEditorEvent) -> Unit, saveStatus: SaveStatus) {
+private fun ActionButtons(
+    onEvent: (ForgePartEditorEvent) -> Unit,
+    saveStatus: SaveStatus,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Indicador de estado de guardado automático.
         SaveStatusBadge(saveStatus)
         Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Botones Undo/Redo (compacto, en línea con Validar/Guardar).
+            Button(
+                onClick = onUndo,
+                enabled = canUndo,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (canUndo) ForgeColors.OnSurface.copy(alpha = 0.15f) else Color.Transparent,
+                    contentColor = if (canUndo) ForgeColors.OnSurface else ForgeColors.OnSurface.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                Text("↶ Undo", fontSize = 12.sp)
+            }
+            Button(
+                onClick = onRedo,
+                enabled = canRedo,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (canRedo) ForgeColors.OnSurface.copy(alpha = 0.15f) else Color.Transparent,
+                    contentColor = if (canRedo) ForgeColors.OnSurface else ForgeColors.OnSurface.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                Text("↷ Redo", fontSize = 12.sp)
+            }
             Button(
                 onClick = { onEvent(ForgePartEditorEvent.OnValidatePart) },
                 colors = ButtonDefaults.buttonColors(
