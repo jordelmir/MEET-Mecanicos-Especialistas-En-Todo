@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1-forge-improvements] - 2026-07-02
+
+### Added — Persistencia, export y privacidad
+
+- **Disk persistence de partes de usuario** (`data/JsonFileStore.kt`):
+  - `JsonFileStore<T>` genérico con escritura atómica (write-to-temp + rename) y `Mutex` para evitar condiciones de carrera entre coroutines.
+  - `JsonFileStoreBridge` para `Map<String, ForgePart>` con `MapSerializer` polimórfico.
+  - `ForgeArtifactRepository.loadUserPartsFromDisk(context)` / `saveUserPartsToDisk(context)` como API pública.
+  - `ForgeEntryScreen` carga desde disco en `LaunchedEffect` y guarda en `DisposableEffect(ON_STOP)` con `runBlocking(IO)` para garantizar flush antes de destruir el proceso.
+
+- **STL exporter** (`domain/StlExporter.kt`):
+  - `toBinaryStl(mesh: CompiledMesh): ByteArray` — formato binario estándar (80 bytes header + uint32 triangle count + per-triangle float32×12 normal+vertices + uint16 attribute).
+  - `toAsciiStl(mesh: CompiledMesh): String` — formato texto ASCII (sólido + facet + normal + vertex loops).
+  - Apto para slicers (Cura, PrusaSlicer) y re-importación en CAD.
+
+- **Slider throttle**: pitch slider solo se actualiza si han pasado ≥62 ms o el delta acumulado es ≥0.02 rad — limita re-cálculos a ~16 FPS durante drag.
+
+- **Undo/Redo snapshot-based en el editor**:
+  - `undoStack` / `redoStack` como `ArrayDeque<ForgePart>` en `ForgePartEditorViewModel`.
+  - `pushUndoSnapshot()` invocado por todos los mutadores (`rename`, `setSafety`, `updateDimension`, `assignMaterial`, `addFeature`).
+  - `undo()` / `redo()` restauran el snapshot y re-disparan el auto-save.
+  - `canUndo` / `canRedo` como `StateFlow<Boolean>` para reflejar el estado del stack en la UI.
+  - `MAX_UNDO = 50` (FIFO si excede).
+  - Botones `↶ Undo` / `↷ Redo` en la `ActionButtons` row del editor, deshabilitados cuando el stack está vacío.
+
+### Changed
+
+- `ForgePartEditorScreen`: editor con botones Undo/Redo en la action row.
+
+### Fixed
+
+- **RISK-3 GPS leak** en `RideServiceScreen.kt`:
+  - Eliminado el patrón `currentGps!!.latitude/longitude` que lanzaba `NullPointerException` o entregaba coordenadas crudas si la geocodificación reversa fallaba.
+  - Añadido `sanitizeGpsAddress(raw: String?, fallback: String): String` con regex `^Ubicación GPS \(-?\d+\.?\d*, -?\d+\.?\d*\)$` que limpia strings del geocoder que incluyen coordenadas en plano.
+  - Eliminado el truco `+0.05` para forzar un destino ficticio: ahora `destination` es estrictamente la dirección solicitada por el cliente; si no hay destino, distancia = 0.
+  - 7 tests en `SanitizeGpsAddressTest` (incluye casos en español, inglés, coordenadas negativas, direcciones reales).
+
+### Tests
+
+- 307 → **336 tests** (+29).
+- 0 failures, 0 errors.
+- Tests nuevos: `StlExporterTest` (10), `JsonFileStoreTest` (8), `ForgeArtifactRepositoryConcurrencyTest` (4, con 50 coroutines paralelas validando el mutex), `SanitizeGpsAddressTest` (7).
+
+### Not changed
+
+- Versión de la app: `versionCode 16` / `versionName "4.0.0"`. Sin bump.
+- Sin nuevas dependencies.
+- Sin migraciones de base de datos.
+
 ## [0.5.0-forge-improvements] - 2026-07-02
 
 ### Added — Forge editor multi-feature por composición
