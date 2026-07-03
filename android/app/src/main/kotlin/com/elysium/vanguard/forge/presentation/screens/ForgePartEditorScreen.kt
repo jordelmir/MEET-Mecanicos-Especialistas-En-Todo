@@ -37,6 +37,9 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -329,6 +332,13 @@ private fun PitchSlider(
     val minPitch = -1.047f
     val maxPitch = 1.047f
     val degrees = Math.toDegrees(pitch.toDouble()).toInt()
+
+    // Throttle: limita recomposiciones a ~16 FPS durante drag del slider.
+    // Sin esto, drag pixel-a-pixel recalcularía la malla isométrica cientos
+    // de veces por segundo. Con throttle, máximo 16 updates/seg.
+    val lastEmitMs = remember { mutableLongStateOf(0L) }
+    var lastEmittedValue by remember { mutableFloatStateOf(pitch) }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -336,7 +346,17 @@ private fun PitchSlider(
         TechLabel("PITCH")
         Slider(
             value = pitch,
-            onValueChange = onPitchChange,
+            onValueChange = { newValue ->
+                val now = System.currentTimeMillis()
+                val deltaFromLast = kotlin.math.abs(newValue - lastEmittedValue)
+                val timeDelta = now - lastEmitMs.longValue
+                // Emit si han pasado >=62ms (~16 FPS) O si delta >=0.02 rad (~1.1°).
+                if (timeDelta >= 62L || deltaFromLast >= 0.02f) {
+                    lastEmitMs.longValue = now
+                    lastEmittedValue = newValue
+                    onPitchChange(newValue)
+                }
+            },
             valueRange = minPitch..maxPitch,
             modifier = Modifier
                 .weight(1f)
@@ -350,7 +370,6 @@ private fun PitchSlider(
                 inactiveTrackColor = ForgeColors.OnSurface.copy(alpha = 0.2f)
             )
         )
-        // Botón reset compacto.
         Button(
             onClick = onReset,
             colors = ButtonDefaults.buttonColors(
@@ -365,7 +384,6 @@ private fun PitchSlider(
             Text("↺", fontSize = 14.sp)
         }
         Spacer(Modifier.width(4.dp))
-        // Lectura compacta del valor en grados.
         TechLabel("${degrees}°")
     }
 }
