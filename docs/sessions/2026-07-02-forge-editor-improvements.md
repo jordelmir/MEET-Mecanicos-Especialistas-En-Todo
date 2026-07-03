@@ -349,5 +349,69 @@ Body sugerido:
 | 21:40 | Jor: "Sigue" → O (5 nuevos engines) |
 | 21:49 | Jor: "Sigue" → P (JSON serialization test) |
 | 21:53 | Reporte final |
+| 22:10 | Jor: "sigamos con mas cosas" → L1 docs |
+| 22:30 | Jor: "SIGAMOS SIGAMOS" → L3 ADRs 0002/0003 |
+| 22:50 | Jor: "faltan cosas" → L5 disk persistence |
+| 23:05 | Jor: "ahora..." → L9 RISK-3 GPS fix |
+| 23:15 | L6 slider throttle + STL exporter |
+| 23:25 | L8 concurrency tests |
+| 23:35 | L7 undo/redo + CHANGELOG 0.5.1 + re-tag v0.5.2 |
+
+---
+
+## Patch 0.5.1 — Resumen ejecutivo
+
+Luego del PR inicial (0.5.0), Jor pidió más trabajo (L1-L9). El branch se mantuvo
+abierto y se agregaron **6 commits adicionales** sin abrir PR nuevo.
+
+### Commits añadidos (v0.5.0 → v0.5.2)
+
+| Commit | Mensaje | Categoría |
+|--------|---------|-----------|
+| `25ab5552` | fix(privacy): RISK-3 GPS leak via sanitized pickupAddress | Privacy fix |
+| `8dd48f14` | feat(forge): STL exporter (binary + ASCII) + slider throttle | Export + perf |
+| `863de603` | feat(forge): disk persistence for user parts (JsonFileStore) | Persistence |
+| `5dc603d1` | test(forge): concurrency tests for ForgeArtifactRepository (mutex validation) | Tests |
+| `20d7374d` | feat(forge): undo/redo en el editor de partes (snapshot-based) | UX |
+| `068d8f31` | docs(changelog): 0.5.1-forge-improvements — disk persistence, STL, undo/redo, GPS fix | Docs |
+
+### Tests
+
+- **225 → 336 tests** (+111, +49%).
+- 0 failures, 0 errors.
+- 7 archivos de test nuevos (StlExporter, JsonFileStore, ForgeArtifactRepositoryConcurrency,
+  SanitizeGpsAddress, FeaturePlanSerialization, EngineCatalog, FeaturePresets).
+
+### Tags publicados
+
+| Tag | Apunta a | Notas |
+|-----|----------|-------|
+| `v0.5.0-forge-improvements` | `824773f1` | Bundle inicial (Knowledge OS no incluido) |
+| `v0.5.1-forge-improvements` | `c68f355` | Disk persistence commit (intermedio) |
+| `v0.5.2-forge-improvements` | `068d8f31` | **Final** — incluye undo/redo + CHANGELOG |
+
+### Riesgos resueltos
+
+- **RISK-3 GPS leak** (cerrado): `currentGps!!` reemplazado por captura local nula
+  + `sanitizeGpsAddress()` regex para limpiar coordenadas en string.
+- **Pérdida de cambios al cerrar app**: `JsonFileStore` con `Mutex` + flush en
+  `Lifecycle.Event.ON_STOP` + `onCleared` del VM con `runBlocking(IO)`.
+- **Race conditions en savePart/deleteArtifact**: 4 tests con 50 coroutines
+  paralelas validan el `Mutex`.
+
+### Conocidos sin resolver
+
+- Si el SO mata el proceso (force-stop, low memory) sin dar `ON_STOP`, los
+  cambios en vuelo durante el debounce de 1500ms se pierden. Solución
+  adecuada: `Application.onTerminate()` o un watchdog service. Documentado
+  en la sección "Known gaps" del CHANGELOG.
+
+### URL del PR
+
+Sigue siendo la misma que 0.5.0:
+
+https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/pull/new/feature/forge-editor-improvements-2026-07-02
+
+(gh CLI no está autenticado en esta Mac; abrir desde el navegador.)
 
 **Tiempo total**: ~5 horas, **10 commits, 307 tests, 0 deps**.
