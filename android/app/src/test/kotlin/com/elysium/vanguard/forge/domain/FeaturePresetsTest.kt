@@ -17,13 +17,13 @@ import org.junit.Test
 class FeaturePresetsTest {
 
     @Test
-    fun `catalog has at least 20 presets (8 generic + automotive)`() {
-        // 8 genéricos + 15 automotriz = 23 al momento de este test.
+    fun `catalog has at least 30 presets (8 generic + automotive)`() {
+        // 8 genéricos + 25 automotriz = 33 al momento de este test.
         // Ajustar floor según campañas de adición; este test es anti-regresión
         // para que nadie borre presets accidentalmente.
         assertTrue(
-            "Catálogo demasiado pequeño: ${featurePresets.size} presets (esperado >= 20)",
-            featurePresets.size >= 20
+            "Catálogo demasiado pequeño: ${featurePresets.size} presets (esperado >= 30)",
+            featurePresets.size >= 30
         )
     }
 

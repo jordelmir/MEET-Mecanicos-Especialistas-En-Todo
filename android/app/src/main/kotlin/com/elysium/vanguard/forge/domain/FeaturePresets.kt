@@ -134,4 +134,59 @@ internal val featurePresets: List<FeaturePreset> = buildList {
         FeatureType.PROFILE_L, "Brake pedal arm", "120×30×8",
         mapOf("leg1" to 120.0, "leg2" to 30.0, "thickness" to 8.0)
     ))
+
+    // ─────────── AUTOMOTIVE · SUSPENSIÓN (3) ───────────
+
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Cuerpo de amortiguador", "Ø50×400",
+        mapOf("diameter" to 50.0, "height" to 400.0)
+    ))
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Muelle helicoidal (aprox)", "Ø100×300",
+        mapOf("diameter" to 100.0, "height" to 300.0)
+    ))
+    add(FeaturePreset(
+        FeatureType.PROFILE_L, "Brazo de control", "400×80×15",
+        mapOf("leg1" to 400.0, "leg2" to 80.0, "thickness" to 15.0)
+    ))
+
+    // ─────────── AUTOMOTIVE · FRENOS (2) ───────────
+
+    add(FeaturePreset(
+        FeatureType.PLATE, "Pastilla de freno", "150×60×15",
+        mapOf("length" to 150.0, "width" to 60.0, "thickness" to 15.0)
+    ))
+    add(FeaturePreset(
+        FeatureType.BOX, "Mordaza de freno", "200×150×100",
+        mapOf("length" to 200.0, "width" to 150.0, "height" to 100.0)
+    ))
+
+    // ─────────── AUTOMOTIVE · DIRECCIÓN (2) ───────────
+
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Columna de dirección", "Ø40×600",
+        mapOf("diameter" to 40.0, "height" to 600.0)
+    ))
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Barra de dirección", "Ø20×800",
+        mapOf("diameter" to 20.0, "height" to 800.0)
+    ))
+
+    // ─────────── AUTOMOTIVE · CARROCERÍA (1) ───────────
+
+    add(FeaturePreset(
+        FeatureType.PLATE, "Guardafango", "1500×800×2",
+        mapOf("length" to 1500.0, "width" to 800.0, "thickness" to 2.0)
+    ))
+
+    // ─────────── AUTOMOTIVE · ELÉCTRICO (2) ───────────
+
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Terminal de batería", "Ø18×30",
+        mapOf("diameter" to 18.0, "height" to 30.0)
+    ))
+    add(FeaturePreset(
+        FeatureType.CYLINDER, "Polea de alternador", "Ø80×25",
+        mapOf("diameter" to 80.0, "height" to 25.0)
+    ))
 }
