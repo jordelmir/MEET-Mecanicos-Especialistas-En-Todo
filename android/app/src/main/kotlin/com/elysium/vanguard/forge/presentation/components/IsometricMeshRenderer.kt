@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.elysium.vanguard.forge.domain.CompiledMesh
 import com.elysium.vanguard.forge.domain.CompiledVertex
 import kotlin.math.cos
@@ -97,6 +99,10 @@ fun IsometricMeshRenderer(
         modifier = modifier
             .fillMaxSize()
             .background(if (fillBackground) backgroundColor else Color.Transparent)
+            .semantics {
+                contentDescription =
+                    "Vista 3D de la pieza. Arrastre horizontal para rotar, doble tap para reset."
+            }
             .then(interactionModifier)
     ) {
         if (triangles.isEmpty()) return@Canvas
@@ -114,8 +120,11 @@ fun IsometricMeshRenderer(
 /**
  * Triángulo pre-procesado: 3 vértices 3D + 3 vértices 2D proyectados + color final
  * (aplicada iluminación Lambertiana) + profundidad media para ordenar.
+ *
+ * `internal` para que el módulo de tests pueda verificar determinismo sin
+ * tener que renderizar Compose (no hay snapshot testing todavía).
  */
-private data class PreparedTriangle(
+internal data class PreparedTriangle(
     val p0: Offset,
     val p1: Offset,
     val p2: Offset,
@@ -147,6 +156,10 @@ private fun projectRotated(
     x: Float, y: Float, z: Float,
     yaw: Float, pitch: Float
 ): Triple<Float, Float, Float> {
+
+    // Convención: si yaw == 0 && pitch == 0, devolvemos el mismo punto (idéntico).
+    // El test de determinismo exige esa identidad para same-input → same-output.
+    if (yaw == 0f && pitch == 0f) return Triple(x, y, z)
     // Yaw (alrededor de Y)
     val cy = cos(yaw); val sy = sin(yaw)
     val xr = x * cy + z * sy
@@ -177,7 +190,7 @@ private fun lambert(normalX: Float, normalY: Float, normalZ: Float): Float {
     return lit.coerceIn(0.35f, 1.0f)
 }
 
-private fun prepareTriangles(
+internal fun prepareTriangles(
     mesh: CompiledMesh,
     yaw: Float,
     pitch: Float,

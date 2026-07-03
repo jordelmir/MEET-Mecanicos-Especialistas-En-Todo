@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium.vanguard.forge.domain.FeaturePreset
@@ -53,6 +57,7 @@ import com.elysium.vanguard.forge.domain.ForgePart
 import com.elysium.vanguard.forge.domain.MaterialSpec
 import com.elysium.vanguard.forge.domain.ParametricFeature
 import com.elysium.vanguard.forge.domain.SafetyClassification
+import kotlin.math.PI
 import com.elysium.vanguard.forge.presentation.components.IsometricMeshRenderer
 import com.elysium.vanguard.forge.presentation.components.NeonCard
 import com.elysium.vanguard.forge.presentation.components.RotationState
@@ -246,7 +251,10 @@ private fun Viewport3D(part: ForgePart, materials: List<MaterialSpec>) {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         NeonCard(
-            modifier = Modifier.fillMaxWidth().height(280.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 220.dp, max = 320.dp)
+                .aspectRatio(1.6f),
             accentColor = ForgeColors.Accent
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -259,7 +267,7 @@ private fun Viewport3D(part: ForgePart, materials: List<MaterialSpec>) {
                         pitch = rotation.pitch,
                         modifier = Modifier.fillMaxSize(),
                         onYawChange = { newYaw ->
-                            rotation = rotation.copy(yaw = newYaw)
+                            rotation = rotation.copy(yaw = wrapAngle(newYaw))
                         },
                         onReset = {
                             rotation = RotationState()
@@ -290,6 +298,19 @@ private fun Viewport3D(part: ForgePart, materials: List<MaterialSpec>) {
 /**
  * Slider de pitch (rotación vertical). Rango -60° a +60° (~±1.047 rad).
  */
+/**
+ * Envuelve un ángulo en radianes al rango [-π, π).
+ * Evita drift de precisión en sin/cos cuando el yaw acumula muchas rotaciones.
+ * Como sin/cos son periódicos, el wrap es visualmente invisible.
+ */
+private fun wrapAngle(rad: Float): Float {
+    val twoPi = (2.0 * PI).toFloat()
+    var n = rad % twoPi
+    if (n > PI.toFloat()) n -= twoPi
+    if (n < -PI.toFloat()) n += twoPi
+    return n
+}
+
 @Composable
 private fun PitchSlider(
     pitch: Float,
@@ -308,7 +329,12 @@ private fun PitchSlider(
             value = pitch,
             onValueChange = onPitchChange,
             valueRange = minPitch..maxPitch,
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+                .semantics {
+                    contentDescription = "Inclinación vertical de la pieza 3D"
+                },
             colors = SliderDefaults.colors(
                 thumbColor = ForgeColors.Accent,
                 activeTrackColor = ForgeColors.Accent.copy(alpha = 0.6f),
@@ -323,7 +349,9 @@ private fun PitchSlider(
                 contentColor = ForgeColors.OnSurface.copy(alpha = 0.6f)
             ),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            modifier = Modifier.height(28.dp)
+            modifier = Modifier
+                .height(28.dp)
+                .semantics { contentDescription = "Resetear rotación 3D a cero" }
         ) {
             Text("↺", fontSize = 14.sp)
         }
