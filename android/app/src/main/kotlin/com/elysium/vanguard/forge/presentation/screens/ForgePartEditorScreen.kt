@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium.vanguard.forge.domain.EngineCatalog
 import com.elysium.vanguard.forge.domain.FeaturePreset
 import com.elysium.vanguard.forge.domain.FeatureType
 import com.elysium.vanguard.forge.domain.featurePresets
@@ -183,6 +184,14 @@ private fun EditorContent(
                     parameters = preset.defaultParameters
                 )
                 onEvent(ForgePartEditorEvent.OnAddFeature(newFeature))
+            })
+            Spacer(Modifier.height(8.dp))
+            EnginesRow(onEngineSelected = { engine ->
+                // Aplicar el plan: genera todas las features y las agrega
+                // secuencialmente. Cada OnAddFeature dispara scheduleAutoSave.
+                engine.instantiate().forEach { newFeature ->
+                    onEvent(ForgePartEditorEvent.OnAddFeature(newFeature))
+                }
             })
             Spacer(Modifier.height(8.dp))
         }
@@ -807,6 +816,74 @@ private fun FeaturePresetTile(preset: FeaturePreset, onClick: () -> Unit) {
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
                 letterSpacing = 1.sp
+            )
+        }
+    }
+}
+/**
+ * Fila horizontal de "engines" pre-compuestos del [EngineCatalog]. Cada tile
+ * es un motor (V6, V8, inline-4, etc.) que al taparlo aplica `engine.instantiate()`
+ * y agrega N features a la pieza vía [ForgePartEditorEvent.OnAddFeature].
+ *
+ * El conteo de features se muestra en el tile para que el usuario sepa cuántas
+ * recibirá antes de tapear. Los engines con `centerOrigin=true` centran las
+ * features resultantes.
+ */
+@Composable
+private fun EnginesRow(
+    onEngineSelected: (com.elysium.vanguard.forge.domain.CompositePlan) -> Unit
+) {
+    Column {
+        Text(
+            text = "ENGINES · planes pre-compuestos (1 toque → N features)",
+            color = ForgeColors.OnSurface.copy(alpha = 0.6f),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+        )
+        val engines = remember { EngineCatalog.allEngines }
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            items(engines) { engine ->
+                EngineTile(engine = engine, onClick = { onEngineSelected(engine) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun EngineTile(
+    engine: com.elysium.vanguard.forge.domain.CompositePlan,
+    onClick: () -> Unit
+) {
+    val featureCount = remember(engine) { engine.instantiate().size }
+    NeonCard(
+        modifier = Modifier.width(150.dp).height(80.dp),
+        accentColor = ForgeColors.Primary,
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = engine.name,
+                color = ForgeColors.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                maxLines = 2
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "+$featureCount features",
+                color = ForgeColors.Primary.copy(alpha = 0.9f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
