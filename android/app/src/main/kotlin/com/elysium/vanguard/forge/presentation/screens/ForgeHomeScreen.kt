@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import com.elysium.vanguard.forge.presentation.components.NeonCard
 import com.elysium.vanguard.forge.presentation.components.SectionHeader
+import com.elysium.vanguard.forge.presentation.components.StatusLed
 import com.elysium.vanguard.forge.presentation.components.TechLabel
 import com.elysium.vanguard.forge.presentation.state.ForgeHomeEvent
 import com.elysium.vanguard.forge.presentation.state.ForgeUiState
@@ -72,10 +73,13 @@ fun ForgeHomeScreen(
     Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         when (val state = uiState) {
             is ForgeUiState.Loading -> LoadingState()
-            is ForgeUiState.Empty -> EmptyState(onEvent = viewModel::onEvent)
+            is ForgeUiState.Empty -> EmptyState(
+                onCreatePart = { onNavigate("forge/part-editor") }
+            )
             is ForgeUiState.Error -> ErrorState(state.message)
             is ForgeUiState.Ready -> ReadyContent(
                 library = state.library,
+                bootstrapReport = state.bootstrapReport,
                 onEvent = viewModel::onEvent,
                 onNavigate = onNavigate
             )
@@ -103,7 +107,7 @@ private fun LoadingState() {
 }
 
 @Composable
-private fun EmptyState(onEvent: (ForgeHomeEvent) -> Unit) {
+private fun EmptyState(onCreatePart: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -127,7 +131,7 @@ private fun EmptyState(onEvent: (ForgeHomeEvent) -> Unit) {
         NeonCard(
             modifier = Modifier.fillMaxWidth(),
             accentColor = ForgeColors.Primary,
-            onClick = { onEvent(ForgeHomeEvent.OnCreatePart) }
+            onClick = onCreatePart
         ) {
             HomeActionRow(
                 icon = Icons.Default.Build,
@@ -164,12 +168,13 @@ private fun ErrorState(message: String) {
 @Composable
 private fun ReadyContent(
     library: ForgeUiState.ForgeLibrary,
+    bootstrapReport: com.elysium.vanguard.forge.data.ForgeArtifactRepository.BootstrapReport?,
     onEvent: (ForgeHomeEvent) -> Unit,
     onNavigate: (String) -> Unit
 ) {
     val scroll = rememberScrollState()
     Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll)) {
-        Header(library = library)
+        Header(library = library, bootstrapReport = bootstrapReport)
 
         Spacer(Modifier.height(16.dp))
         SectionHeader("CREAR")
@@ -200,7 +205,35 @@ private fun ReadyContent(
 }
 
 @Composable
-private fun Header(library: ForgeUiState.ForgeLibrary) {
+private fun Header(
+    library: ForgeUiState.ForgeLibrary,
+    bootstrapReport: com.elysium.vanguard.forge.data.ForgeArtifactRepository.BootstrapReport?
+) {
+    val failures = bootstrapReport?.failures.orEmpty()
+    val hasFailures = failures.isNotEmpty()
+    val isLoaded = library.totalArtifacts > 0
+
+    val ledLabel: String
+    val ledColor: Color
+    when {
+        hasFailures && isLoaded -> {
+            ledLabel = "CARGA PARCIAL · ${failures.size} ERROR"
+            ledColor = ForgeColors.Warning
+        }
+        hasFailures && !isLoaded -> {
+            ledLabel = "ERROR DE ASSETS · ${failures.size}"
+            ledColor = ForgeColors.Error
+        }
+        isLoaded -> {
+            ledLabel = "BIBLIOTECA CARGADA"
+            ledColor = ForgeColors.Success
+        }
+        else -> {
+            ledLabel = "SIN DATOS"
+            ledColor = ForgeColors.Warning
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(
             text = "VANGUARD FORGE",
@@ -218,11 +251,23 @@ private fun Header(library: ForgeUiState.ForgeLibrary) {
         )
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusLed(label = ledLabel, color = ledColor)
+            Spacer(Modifier.width(12.dp))
             TechLabel("PIEZAS: ${library.partCount}")
             Spacer(Modifier.width(12.dp))
             TechLabel("ENSAMBLES: ${library.assemblyCount}")
             Spacer(Modifier.width(12.dp))
             TechLabel("VEHÍCULOS: ${library.vehicleCount}")
+        }
+        if (hasFailures) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = failures.joinToString(separator = " · ") { it.take(60) },
+                color = ForgeColors.Error.copy(alpha = 0.85f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                letterSpacing = 0.5.sp
+            )
         }
     }
 }

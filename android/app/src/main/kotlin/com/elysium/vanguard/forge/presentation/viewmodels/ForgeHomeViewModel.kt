@@ -42,25 +42,40 @@ class ForgeHomeViewModel(
     }
 
     private fun observeRepository() {
+        // combine() tiene overload hasta 5 flows typed; con 6 usamos vararg.
         combine(
             repository.parts,
             repository.assemblies,
             repository.vehicles,
             repository.materials,
-            repository.processes
-        ) { parts, assemblies, vehicles, materials, processes ->
-            ForgeUiState.ForgeLibrary(
+            repository.processes,
+            repository.bootstrapReport
+        ) { array ->
+            @Suppress("UNCHECKED_CAST")
+            val parts = array[0] as Map<String, com.elysium.vanguard.forge.domain.ForgePart>
+            @Suppress("UNCHECKED_CAST")
+            val assemblies = array[1] as Map<String, com.elysium.vanguard.forge.domain.ForgeAssembly>
+            @Suppress("UNCHECKED_CAST")
+            val vehicles = array[2] as Map<String, com.elysium.vanguard.forge.domain.ForgeVehicle>
+            @Suppress("UNCHECKED_CAST")
+            val materials = array[3] as Map<String, com.elysium.vanguard.forge.domain.MaterialSpec>
+            @Suppress("UNCHECKED_CAST")
+            val processes = array[4] as Map<String, com.elysium.vanguard.forge.domain.ManufacturingProcess>
+            val bootstrapReport = array[5] as com.elysium.vanguard.forge.data.ForgeArtifactRepository.BootstrapReport?
+
+            val library = ForgeUiState.ForgeLibrary(
                 parts = parts.values.toList(),
                 assemblies = assemblies.values.toList(),
                 vehicles = vehicles.values.toList(),
                 materials = materials.values.toList(),
                 processes = processes.values.toList()
             )
-        }.onEach { library ->
+            library to bootstrapReport
+        }.onEach { (library, bootstrapReport) ->
             _uiState.value = if (library.isEmpty) {
                 ForgeUiState.Empty
             } else {
-                ForgeUiState.Ready(library)
+                ForgeUiState.Ready(library, bootstrapReport)
             }
         }.launchIn(viewModelScope)
     }

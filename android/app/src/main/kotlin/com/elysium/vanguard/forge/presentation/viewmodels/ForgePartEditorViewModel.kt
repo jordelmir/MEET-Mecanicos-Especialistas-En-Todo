@@ -13,11 +13,16 @@ import com.elysium.vanguard.forge.domain.SafetyClassification
 import com.elysium.vanguard.forge.engine.ForgeGeometryCompiler
 import com.elysium.vanguard.forge.presentation.components.UiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -38,13 +43,47 @@ class ForgePartEditorViewModel(
     private val _uiState = MutableStateFlow<UiState<ForgePart>>(UiState.Loading)
     val uiState: StateFlow<UiState<ForgePart>> = _uiState.asStateFlow()
 
+    /**
+     * StateFlow dedicado a la clasificación de seguridad.
+     * Derivado de uiState para mantener single-source-of-truth (la pieza siempre vive
+     * dentro del UiState; este flow es solo una proyección tipada).
+     *
+     * Default: EDUCATIONAL — equivalente al valor que `createBlankPart()` asigna.
+     */
+    val safetyClassification: StateFlow<SafetyClassification> = _uiState
+        .map { state ->
+            when (state) {
+                is UiState.Ready -> state.data.artifact.safetyClassification
+                is UiState.Empty -> SafetyClassification.EDUCATIONAL
+                is UiState.Error -> SafetyClassification.EDUCATIONAL
+                is UiState.Loading -> SafetyClassification.EDUCATIONAL
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = SafetyClassification.EDUCATIONAL
+        )
+
     private val _materials = MutableStateFlow<List<MaterialSpec>>(emptyList())
     val materials: StateFlow<List<MaterialSpec>> = _materials.asStateFlow()
 
     private val _events = MutableSharedFlow<ForgePartEditorEvent>(extraBufferCapacity = 16)
     val events = _events.asSharedFlow()
 
+    private val _saveStatus = MutableStateFlow(SaveStatus.IDLE)
+    val saveStatus: StateFlow<SaveStatus> = _saveStatus.asStateFlow()
+
     private var currentPart: ForgePart? = null
+
+    // Job del auto-save en vuelo. Se cancela y reemplaza en cada cambio
+    // (debounce) para evitar spamear el repo en pulsaciones rápidas.
+    private var saveJob: Job? = null
+
+    private companion object {
+        /** Espera entre el último cambio y el guardado automático. */
+        const val AUTOSAVE_DELAY_MS = 1500L
+    }
 
     init {
         loadPart()
@@ -90,6 +129,7 @@ class ForgePartEditorViewModel(
         )
         currentPart = updated
         _uiState.value = UiState.Ready(updated)
+        scheduleAutoSave()
     }
 
     private fun setSafety(classification: SafetyClassification) {
@@ -102,6 +142,7 @@ class ForgePartEditorViewModel(
         )
         currentPart = updated
         _uiState.value = UiState.Ready(updated)
+        scheduleAutoSave()
     }
 
     private fun updateDimension(field: DimensionField, value: Double) {
@@ -124,6 +165,7 @@ class ForgePartEditorViewModel(
         )
         currentPart = updated
         _uiState.value = UiState.Ready(updated)
+        scheduleAutoSave()
     }
 
     private fun assignMaterial(materialId: String) {
@@ -134,6 +176,7 @@ class ForgePartEditorViewModel(
         )
         currentPart = updated
         _uiState.value = UiState.Ready(updated)
+        scheduleAutoSave()
     }
 
     private fun addFeature(feature: ParametricFeature) {
@@ -144,6 +187,7 @@ class ForgePartEditorViewModel(
         )
         currentPart = updated
         _uiState.value = UiState.Ready(updated)
+        scheduleAutoSave()
     }
 
     private fun validate() {
@@ -165,9 +209,38 @@ class ForgePartEditorViewModel(
 
     private fun save() {
         val current = currentPart ?: return
+        // Cancelar cualquier auto-save pendiente — el usuario quiere forzar ya.
+        saveJob?.cancel()
         viewModelScope.launch {
-            repository.savePart(current)
-            _events.emit(ForgePartEditorEvent.OnSaved)
+            _saveStatus.value = SaveStatus.SAVING
+            try {
+                withContext(Dispatchers.IO) { repository.savePart(current) }
+                _saveStatus.value = SaveStatus.SAVED
+                _events.emit(ForgePartEditorEvent.OnSaved)
+            } catch (e: Exception) {
+                _saveStatus.value = SaveStatus.ERROR
+            }
+        }
+    }
+
+    /**
+     * Programa un guardado automático tras [AUTOSAVE_DELAY_MS] de inactividad.
+     * Cada llamada cancela la anterior, así pulsaciones rápidas solo disparan
+     * un único guardado al final.
+     */
+    private fun scheduleAutoSave() {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            _saveStatus.value = SaveStatus.SCHEDULED
+            delay(AUTOSAVE_DELAY_MS)
+            val part = currentPart ?: return@launch
+            _saveStatus.value = SaveStatus.SAVING
+            try {
+                withContext(Dispatchers.IO) { repository.savePart(part) }
+                _saveStatus.value = SaveStatus.SAVED
+            } catch (e: Exception) {
+                _saveStatus.value = SaveStatus.ERROR
+            }
         }
     }
 
@@ -205,3 +278,13 @@ sealed class ForgePartEditorEvent {
     data class OnValidationFailed(val errors: List<String>) : ForgePartEditorEvent()
     data object OnSaved : ForgePartEditorEvent()
 }
+
+/**
+ * Estado del guardado automático de la pieza.
+ * - IDLE: sin cambios pendientes.
+ * - SCHEDULED: hay cambios, esperando el fin del debounce para guardar.
+ * - SAVING: llamada activa a repository.savePart.
+ * - SAVED: persistencia confirmada.
+ * - ERROR: la persistencia falló (mutex, I/O, etc).
+ */
+enum class SaveStatus { IDLE, SCHEDULED, SAVING, SAVED, ERROR }

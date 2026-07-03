@@ -1,5 +1,6 @@
 package com.elysium.vanguard.forge.presentation.state
 
+import com.elysium.vanguard.forge.data.ForgeArtifactRepository
 import com.elysium.vanguard.forge.domain.ForgeArtifactType
 import com.elysium.vanguard.forge.domain.ForgePart
 import com.elysium.vanguard.forge.domain.ForgeAssembly
@@ -29,7 +30,10 @@ sealed class ForgeUiState {
 
     data object Loading : ForgeUiState()
 
-    data class Ready(val library: ForgeLibrary) : ForgeUiState()
+    data class Ready(
+    val library: ForgeLibrary,
+    val bootstrapReport: ForgeArtifactRepository.BootstrapReport? = null
+) : ForgeUiState()
 
     data object Empty : ForgeUiState()
 

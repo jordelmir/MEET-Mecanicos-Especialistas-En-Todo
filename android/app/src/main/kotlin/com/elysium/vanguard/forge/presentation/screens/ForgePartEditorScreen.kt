@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -42,11 +44,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium.vanguard.forge.domain.FeaturePreset
 import com.elysium.vanguard.forge.domain.FeatureType
+import com.elysium.vanguard.forge.domain.featurePresets
 import com.elysium.vanguard.forge.domain.ForgePart
 import com.elysium.vanguard.forge.domain.MaterialSpec
 import com.elysium.vanguard.forge.domain.ParametricFeature
 import com.elysium.vanguard.forge.domain.SafetyClassification
+import com.elysium.vanguard.forge.presentation.components.IsometricMeshRenderer
 import com.elysium.vanguard.forge.presentation.components.NeonCard
 import com.elysium.vanguard.forge.presentation.components.ProvenanceBadge
 import com.elysium.vanguard.forge.presentation.components.SectionHeader
@@ -57,6 +62,7 @@ import com.elysium.vanguard.forge.presentation.theme.ForgeColors
 import com.elysium.vanguard.forge.presentation.viewmodels.DimensionField
 import com.elysium.vanguard.forge.presentation.viewmodels.ForgePartEditorEvent
 import com.elysium.vanguard.forge.presentation.viewmodels.ForgePartEditorViewModel
+import com.elysium.vanguard.forge.presentation.viewmodels.SaveStatus
 
 /**
  * ForgePartEditorScreen — editor paramétrico de pieza.
@@ -70,6 +76,8 @@ fun ForgePartEditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val materials by viewModel.materials.collectAsState()
+    val safetyClassification by viewModel.safetyClassification.collectAsState()
+    val saveStatus by viewModel.saveStatus.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
@@ -100,6 +108,8 @@ fun ForgePartEditorScreen(
             is UiState.Ready -> EditorContent(
                 part = state.data,
                 materials = materials,
+                safetyClassification = safetyClassification,
+                saveStatus = saveStatus,
                 onEvent = viewModel::onEvent,
                 onBack = onBack
             )
@@ -111,6 +121,8 @@ fun ForgePartEditorScreen(
 private fun EditorContent(
     part: ForgePart,
     materials: List<MaterialSpec>,
+    safetyClassification: SafetyClassification,
+    saveStatus: SaveStatus,
     onEvent: (ForgePartEditorEvent) -> Unit,
     onBack: () -> Unit
 ) {
@@ -123,12 +135,12 @@ private fun EditorContent(
             Spacer(Modifier.height(16.dp))
         }
         item {
-            Viewport3DPlaceholder(part = part)
+            Viewport3D(part = part, materials = materials)
             Spacer(Modifier.height(16.dp))
         }
         item {
             SafetyClassificationPicker(
-                current = part.artifact.safetyClassification,
+                current = safetyClassification,
                 onChange = { sc -> onEvent(ForgePartEditorEvent.OnSetSafetyClassification(sc)) }
             )
             Spacer(Modifier.height(16.dp))
@@ -154,6 +166,17 @@ private fun EditorContent(
             )
             Spacer(Modifier.height(16.dp))
             SectionHeader("FEATURES")
+            Spacer(Modifier.height(8.dp))
+            FeaturePresetsRow(onPresetSelected = { preset ->
+                val newFeature = ParametricFeature(
+                    id = "f_${System.currentTimeMillis()}",
+                    type = preset.type,
+                    name = preset.displayName,
+                    parameters = preset.defaultParameters
+                )
+                onEvent(ForgePartEditorEvent.OnAddFeature(newFeature))
+            })
+            Spacer(Modifier.height(8.dp))
         }
         items(count = part.featureTree.size) { index ->
             FeatureRow(feature = part.featureTree[index])
@@ -170,7 +193,7 @@ private fun EditorContent(
             Spacer(Modifier.height(16.dp))
         }
         item {
-            ActionButtons(onEvent = onEvent)
+            ActionButtons(onEvent = onEvent, saveStatus = saveStatus)
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -208,7 +231,114 @@ private fun HeaderBar(part: ForgePart, onBack: () -> Unit, onEvent: (ForgePartEd
 }
 
 @Composable
-private fun Viewport3DPlaceholder(part: ForgePart) {
+private fun Viewport3D(part: ForgePart, materials: List<MaterialSpec>) {
+    // El compilador es puro y barato para piezas pequeñas (1-10 features).
+    // remember(part) recompila solo cuando el part cambia de identidad.
+    val compiler = remember { com.elysium.vanguard.forge.engine.ForgeGeometryCompiler() }
+    val mesh = remember(part) { compiler.compilePart(part).mesh }
+
+    NeonCard(
+        modifier = Modifier.fillMaxWidth().height(280.dp),
+        accentColor = ForgeColors.Accent
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (mesh.isEmpty) {
+                Viewport3DPlaceholder(part = part, materials = materials)
+            } else {
+                IsometricMeshRenderer(mesh = mesh, modifier = Modifier.fillMaxSize())
+                Viewport3DOverlay(
+                    part = part,
+                    materials = materials,
+                    triangleCount = mesh.faces.size,
+                    vertexCount = mesh.vertices.size
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Overlay textual sobre el renderer 3D real. Mantiene la información que
+ * mostraba el placeholder (dimensiones, material, desglose) sin tapar la malla.
+ */
+@Composable
+private fun Viewport3DOverlay(
+    part: ForgePart,
+    materials: List<MaterialSpec>,
+    triangleCount: Int,
+    vertexCount: Int
+) {
+    val featureBreakdown = part.featureTree
+        .groupingBy { it.type }
+        .eachCount()
+        .entries
+        .sortedByDescending { it.value }
+        .joinToString(separator = " · ") { (type, count) -> "$count $type" }
+        .ifBlank { "—" }
+
+    val materialName = materials
+        .firstOrNull { it.id == part.materialId }
+        ?.displayName
+        ?.let { "Material: $it" }
+        ?: "Material: sin asignar"
+
+    val dimsLabel = "${part.dimensions.lengthMm?.toInt() ?: 0}×" +
+        "${part.dimensions.widthMm?.toInt() ?: 0}×" +
+        "${part.dimensions.heightMm?.toInt() ?: 0} mm"
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Header superior
+        Column {
+            Text(
+                text = "3D VIEWPORT · ISOMETRIC · INTERACTIVE",
+                color = ForgeColors.Accent,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 2.sp
+            )
+            Text(
+                text = "$triangleCount triángulos · $vertexCount vértices",
+                color = ForgeColors.OnSurface.copy(alpha = 0.7f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp
+            )
+        }
+        // Footer con metadata + hint
+        Column {
+            TechLabel("↔ arrastra para rotar · doble tap para reset")
+            Spacer(Modifier.height(4.dp))
+            TechLabel("BBox: $dimsLabel")
+            TechLabel(materialName)
+            TechLabel("Features (${part.featureTree.size}): $featureBreakdown")
+        }
+    }
+}
+
+@Composable
+private fun Viewport3DPlaceholder(part: ForgePart, materials: List<MaterialSpec>) {
+    // Desglose de features por tipo (e.g. "2 BOX · 1 CYLINDER").
+    val featureBreakdown = part.featureTree
+        .groupingBy { it.type }
+        .eachCount()
+        .entries
+        .sortedByDescending { it.value }
+        .joinToString(separator = " · ") { (type, count) -> "$count $type" }
+        .ifBlank { "—" }
+
+    val materialName = materials
+        .firstOrNull { it.id == part.materialId }
+        ?.displayName
+        ?.let { "Material: $it" }
+        ?: "Material: sin asignar"
+
+    val dimsLabel = "${part.dimensions.lengthMm?.toInt() ?: 0}×" +
+        "${part.dimensions.widthMm?.toInt() ?: 0}×" +
+        "${part.dimensions.heightMm?.toInt() ?: 0} mm"
+
     NeonCard(modifier = Modifier.fillMaxWidth().height(220.dp), accentColor = ForgeColors.Accent) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -220,13 +350,12 @@ private fun Viewport3DPlaceholder(part: ForgePart) {
                     fontSize = 14.sp,
                     letterSpacing = 3.sp
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "${part.featureTree.size} features · ${part.dimensions.lengthMm?.toInt() ?: 0}x${part.dimensions.widthMm?.toInt() ?: 0}x${part.dimensions.heightMm?.toInt() ?: 0}mm",
-                    color = ForgeColors.OnSurface.copy(alpha = 0.5f),
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+                Spacer(Modifier.height(6.dp))
+                TechLabel("BBox: $dimsLabel")
+                Spacer(Modifier.height(2.dp))
+                TechLabel(materialName)
+                Spacer(Modifier.height(2.dp))
+                TechLabel("Features (${part.featureTree.size}): $featureBreakdown")
                 Spacer(Modifier.height(8.dp))
                 TechLabel("(MESH SE COMPONE EN FORGE GEOMETRY COMPILER · BACKEND)")
             }
@@ -423,32 +552,72 @@ private fun AddFeatureButton(onAdd: (FeatureType) -> Unit) {
 }
 
 @Composable
-private fun ActionButtons(onEvent: (ForgePartEditorEvent) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(
-            onClick = { onEvent(ForgePartEditorEvent.OnValidatePart) },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = ForgeColors.Accent.copy(alpha = 0.2f),
-                contentColor = ForgeColors.Accent
-            ),
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(Icons.Default.Verified, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Validar")
+private fun ActionButtons(onEvent: (ForgePartEditorEvent) -> Unit, saveStatus: SaveStatus) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Indicador de estado de guardado automático.
+        SaveStatusBadge(saveStatus)
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { onEvent(ForgePartEditorEvent.OnValidatePart) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ForgeColors.Accent.copy(alpha = 0.2f),
+                    contentColor = ForgeColors.Accent
+                ),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Verified, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Validar")
+            }
+            Button(
+                onClick = { onEvent(ForgePartEditorEvent.OnSavePart) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ForgeColors.Primary.copy(alpha = 0.2f),
+                    contentColor = ForgeColors.Primary
+                ),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Guardar")
+            }
         }
-        Button(
-            onClick = { onEvent(ForgePartEditorEvent.OnSavePart) },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = ForgeColors.Primary.copy(alpha = 0.2f),
-                contentColor = ForgeColors.Primary
-            ),
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(Icons.Default.Save, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Guardar")
-        }
+    }
+}
+
+/**
+ * Badge pequeño que muestra el estado de persistencia del editor.
+ * Mapea `SaveStatus` → (label, color).
+ */
+@Composable
+private fun SaveStatusBadge(status: SaveStatus) {
+    val (label, color) = when (status) {
+        SaveStatus.IDLE -> "SIN CAMBIOS" to ForgeColors.OnSurface.copy(alpha = 0.4f)
+        SaveStatus.SCHEDULED -> "GUARDANDO EN 1.5s…" to ForgeColors.Warning
+        SaveStatus.SAVING -> "GUARDANDO…" to ForgeColors.Primary
+        SaveStatus.SAVED -> "GUARDADO ✓" to ForgeColors.Success
+        SaveStatus.ERROR -> "ERROR AL GUARDAR" to ForgeColors.Error
+    }
+    if (status == SaveStatus.IDLE) return
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, androidx.compose.foundation.shape.CircleShape)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = color,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -467,4 +636,73 @@ private fun safetyColor(sc: SafetyClassification): Color = when {
     sc.isSafetyCritical -> ForgeColors.Error
     sc.displayName.contains("Educational") -> ForgeColors.ProvenanceOffline
     else -> ForgeColors.Warning
+}
+
+// ─────────── Feature presets (8 quick-add primitives) ───────────
+// `FeaturePreset` y `featurePresets` viven en `domain/FeaturePresets.kt` (internal).
+// Aquí solo se referencian para construir la fila y los tiles.
+
+@Composable
+private fun FeaturePresetsRow(onPresetSelected: (FeaturePreset) -> Unit) {
+    Column {
+        Text(
+            text = "PRESETS · un toque para agregar",
+            color = ForgeColors.OnSurface.copy(alpha = 0.6f),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+        )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            items(featurePresets) { preset ->
+                FeaturePresetTile(preset = preset, onClick = { onPresetSelected(preset) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturePresetTile(preset: FeaturePreset, onClick: () -> Unit) {
+    NeonCard(
+        modifier = Modifier
+            .width(120.dp)
+            .height(72.dp),
+        accentColor = if (preset.type.supportedV1) ForgeColors.Success else ForgeColors.Warning,
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = preset.displayName,
+                color = ForgeColors.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = preset.shortSpec,
+                color = ForgeColors.OnSurface.copy(alpha = 0.7f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = preset.type.name,
+                color = if (preset.type.supportedV1) {
+                    ForgeColors.Success.copy(alpha = 0.8f)
+                } else {
+                    ForgeColors.Warning.copy(alpha = 0.8f)
+                },
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp
+            )
+        }
+    }
 }

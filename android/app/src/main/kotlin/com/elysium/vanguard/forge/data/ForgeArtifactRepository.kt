@@ -1,5 +1,6 @@
 package com.elysium.vanguard.forge.data
 
+import android.content.Context
 import com.elysium.vanguard.forge.domain.ForgeArtifact
 import com.elysium.vanguard.forge.domain.ForgeArtifactType
 import com.elysium.vanguard.forge.domain.ForgePart
@@ -23,6 +24,18 @@ import kotlinx.serialization.json.Json
  */
 class ForgeArtifactRepository {
 
+    companion object {
+        /**
+         * Singleton de aplicación. Los ViewModels en producción consumen esta
+         * instancia para que el bootstrap desde assets (hecho en ForgeEntryScreen)
+         * sea visible para todos los VMs sin re-cargar.
+         *
+         * Tests crean sus propias instancias pasando repositorios falsos vía constructor
+         * de cada VM, por lo que este singleton no afecta tests.
+         */
+        val shared: ForgeArtifactRepository by lazy { ForgeArtifactRepository() }
+    }
+
     private val mutex = Mutex()
 
     private val _parts = MutableStateFlow<Map<String, ForgePart>>(emptyMap())
@@ -32,12 +45,71 @@ class ForgeArtifactRepository {
     private val _processes = MutableStateFlow<Map<String, ManufacturingProcess>>(emptyMap())
     private val _manuals = MutableStateFlow<Map<String, ForgeManual>>(emptyMap())
 
+    private val _bootstrapReport = MutableStateFlow<BootstrapReport?>(null)
+
     val parts: StateFlow<Map<String, ForgePart>> = _parts.asStateFlow()
     val assemblies: StateFlow<Map<String, ForgeAssembly>> = _assemblies.asStateFlow()
     val vehicles: StateFlow<Map<String, ForgeVehicle>> = _vehicles.asStateFlow()
     val materials: StateFlow<Map<String, MaterialSpec>> = _materials.asStateFlow()
     val processes: StateFlow<Map<String, ManufacturingProcess>> = _processes.asStateFlow()
     val manuals: StateFlow<Map<String, ForgeManual>> = _manuals.asStateFlow()
+
+    /**
+     * Último reporte de bootstrap. `null` si nunca se ha ejecutado.
+     * La UI usa esto para distinguir "biblioteca vacía" de "bootstrap falló".
+     */
+    val bootstrapReport: StateFlow<BootstrapReport?> = _bootstrapReport.asStateFlow()
+
+    /**
+     * Resultado del bootstrap desde assets. Estructura simple; no necesita data class.
+     */
+    @Suppress("MemberVisibilityCanBePrivate")
+    inner class BootstrapReport(
+        val materialsLoaded: Int,
+        val processesLoaded: Int,
+        val partsLoaded: Int,
+        val assembliesLoaded: Int,
+        val failures: List<String>
+    ) {
+        val isFullyLoaded: Boolean get() = failures.isEmpty()
+        val totalLoaded: Int get() = materialsLoaded + processesLoaded + partsLoaded + assembliesLoaded
+    }
+
+    /**
+     * Ingesta un lote de documentos, indexando cada uno por tipo.
+     * Si un id colisiona con uno existente del usuario, NO sobreescribe (modo seed).
+     */
+    suspend fun bootstrapFromAssets(context: Context): BootstrapReport {
+        val loader = ForgeSeedLoader(context)
+        val failures = mutableListOf<String>()
+        var mats = 0; var procs = 0; var partsLoaded = 0; var ass = 0
+
+        val seeds = listOf(
+            "forge/forge_materials_seed.json" to "materials",
+            "forge/forge_manufacturing_seed.json" to "processes",
+            "forge/forge_parts_seed.json" to "parts",
+            "forge/forge_assemblies_seed.json" to "assemblies"
+        )
+
+        for (seedEntry in seeds) {
+            val path = seedEntry.first
+            val label = seedEntry.second
+            val result = loader.loadBundle(path)
+            result.fold(
+                onSuccess = { docs ->
+                    if (label == "materials") mats = docs.size
+                    if (label == "processes") procs = docs.size
+                    if (label == "parts") partsLoaded = docs.size
+                    if (label == "assemblies") ass = docs.size
+                    ingestSeeds(docs)
+                },
+                onFailure = { e -> failures += "$label: ${e.message ?: "unknown"}" }
+            )
+        }
+        return BootstrapReport(mats, procs, partsLoaded, ass, failures).also { report ->
+            _bootstrapReport.value = report
+        }
+    }
 
     /**
      * Ingesta un lote de documentos, indexando cada uno por tipo.
