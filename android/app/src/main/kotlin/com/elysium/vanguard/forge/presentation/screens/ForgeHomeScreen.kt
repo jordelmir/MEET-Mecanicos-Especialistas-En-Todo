@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ import com.elysium.vanguard.forge.presentation.state.ForgeHomeEvent
 import com.elysium.vanguard.forge.presentation.state.ForgeUiState
 import com.elysium.vanguard.forge.presentation.theme.ForgeColors
 import com.elysium.vanguard.forge.presentation.viewmodels.ForgeHomeViewModel
+import com.elysium.vanguard.forge.presentation.navigation.routeForEvent
 
 /**
  * ForgeHomeScreen — punto de entrada del módulo Forge.
@@ -69,6 +71,15 @@ fun ForgeHomeScreen(
     onNavigate: (destination: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Bridge entre los eventos del VM (SharedFlow) y el callback de navegación.
+    // Sin este LaunchedEffect, los taps no harian nada porque nadie colecta el SharedFlow.
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            val route = routeForEvent(event)
+            if (route != null) onNavigate(route)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         when (val state = uiState) {

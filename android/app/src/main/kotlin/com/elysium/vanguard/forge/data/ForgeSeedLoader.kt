@@ -39,17 +39,18 @@ class ForgeSeedLoader(
                     "ForgeSeedLoader.loadBundle requiere Context; use parseBundleText para tests sin Context"
                 ))
                 val assetManager = ctx.assets
-                val descriptor = assetManager.openFd(assetPath)
-                val size = descriptor.length
-                descriptor.close()
-                if (size > maxBytes) {
+                // Usa `open()` en vez de `openFd()`: este ultimo falla con "This file can not be
+                // opened as a file descriptor" cuando AGP comprime el asset en el APK (default
+                // para .json). `open()` desempaca transparentemente.
+                val bytes = assetManager.open(assetPath).use { input ->
+                    input.readBytes()
+                }
+                if (bytes.size > maxBytes) {
                     return@withContext Result.failure(IOException(
-                        "Asset $assetPath exceeds max size ${maxBytes} bytes (got $size)"
+                        "Asset $assetPath exceeds max size ${maxBytes} bytes (got ${bytes.size})"
                     ))
                 }
-                val text = assetManager.open(assetPath).use { input ->
-                    input.bufferedReader(Charsets.UTF_8).readText()
-                }
+                val text = bytes.toString(Charsets.UTF_8)
                 if (text.isBlank()) {
                     return@withContext Result.failure(IOException("Empty asset: $assetPath"))
                 }
