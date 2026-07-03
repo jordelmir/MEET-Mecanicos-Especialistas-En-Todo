@@ -80,6 +80,10 @@ class ForgePartEditorViewModel(
     // (debounce) para evitar spamear el repo en pulsaciones rápidas.
     private var saveJob: Job? = null
 
+    // Hash del part la última vez que se persistió. Permite detectar cambios
+    // pendientes para el sync-save de onCleared().
+    private var lastSavedHash: Int = 0
+
     private companion object {
         /** Espera entre el último cambio y el guardado automático. */
         const val AUTOSAVE_DELAY_MS = 1500L
@@ -215,6 +219,7 @@ class ForgePartEditorViewModel(
             _saveStatus.value = SaveStatus.SAVING
             try {
                 withContext(Dispatchers.IO) { repository.savePart(current) }
+                lastSavedHash = current.hashCode()
                 _saveStatus.value = SaveStatus.SAVED
                 _events.emit(ForgePartEditorEvent.OnSaved)
             } catch (e: Exception) {
@@ -237,10 +242,50 @@ class ForgePartEditorViewModel(
             _saveStatus.value = SaveStatus.SAVING
             try {
                 withContext(Dispatchers.IO) { repository.savePart(part) }
+                lastSavedHash = part.hashCode()
                 _saveStatus.value = SaveStatus.SAVED
             } catch (e: Exception) {
                 _saveStatus.value = SaveStatus.ERROR
             }
+        }
+    }
+
+    /**
+     * Llamado por el framework cuando el VM se destruye (navegación, finish, etc).
+     * Delega a [flushPendingSaveSync] para que el comportamiento sea testeable
+     * sin necesidad de provocar la destrucción real del VM.
+     *
+     * `runBlocking` aquí es aceptable: el VM está destruyéndose, no hay UI
+     * thread activo que pueda deadlockear, y no hay alternativa suspendida ya
+     * que viewModelScope también está cancelándose.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        flushPendingSaveSync()
+    }
+
+    /**
+     * Persiste sincrónicamente cualquier cambio pendiente.
+     *
+     * Usado por:
+     *  - `onCleared()` cuando el VM se destruye.
+     *  - Tests que necesitan validar el comportamiento de "último momento"
+     *    sin tener que destruir el VM.
+     *
+     * No-op si no hay cambios desde el último guardado. No-op si no hay
+     * `currentPart` (estado de carga o vacío).
+     */
+    internal fun flushPendingSaveSync() {
+        val part = currentPart ?: return
+        if (part.hashCode() == lastSavedHash) return
+        try {
+            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                repository.savePart(part)
+            }
+            lastSavedHash = part.hashCode()
+        } catch (_: Exception) {
+            // No podemos notificar al usuario en onCleared. Trade-off:
+            // cambios críticos deberían pasar por el botón "Guardar".
         }
     }
 
