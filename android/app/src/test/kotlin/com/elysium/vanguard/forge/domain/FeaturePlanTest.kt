@@ -23,6 +23,7 @@ class FeaturePlanTest {
 
     /** Preset simple reutilizado por tests (cilindro Ø50×100). */
     private val cylPreset = FeaturePreset(
+        id = PresetId.CYLINDER,
         type = FeatureType.CYLINDER,
         displayName = "Cilindro Test",
         shortSpec = "Ø50×100",
@@ -291,15 +292,15 @@ class FeaturePlanTest {
         // presets distintos producen IDs distintos. Esto valida que la
         // composición no colapsa IDs de diferentes tipos.
         val presetA = FeaturePreset(
-            FeatureType.CYLINDER, "Pieza A", "spec A",
+            PresetId.CYLINDER, FeatureType.CYLINDER, "Pieza A", "spec A",
             mapOf("diameter" to 50.0)
         )
         val presetB = FeaturePreset(
-            FeatureType.BOX, "Pieza B", "spec B",
+            PresetId.BOX, FeatureType.BOX, "Pieza B", "spec B",
             mapOf("length" to 100.0)
         )
         val presetC = FeaturePreset(
-            FeatureType.PLATE, "Pieza C", "spec C",
+            PresetId.PLATE, FeatureType.PLATE, "Pieza C", "spec C",
             mapOf("length" to 80.0, "thickness" to 5.0)
         )
         val plan = CompositePlan(

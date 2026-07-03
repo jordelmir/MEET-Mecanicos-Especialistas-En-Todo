@@ -179,7 +179,7 @@ class FeaturePresetsTest {
 
     @Test
     fun `BOX preset has length width and height`() {
-        val preset = featurePresets.first { it.type == FeatureType.BOX }
+        val preset = presetsById[PresetId.BOX]!!
         assertTrue(preset.defaultParameters.containsKey("length"))
         assertTrue(preset.defaultParameters.containsKey("width"))
         assertTrue(preset.defaultParameters.containsKey("height"))
@@ -187,14 +187,14 @@ class FeaturePresetsTest {
 
     @Test
     fun `CYLINDER preset has diameter and height`() {
-        val preset = featurePresets.first { it.type == FeatureType.CYLINDER }
+        val preset = presetsById[PresetId.CYLINDER]!!
         assertTrue(preset.defaultParameters.containsKey("diameter"))
         assertTrue(preset.defaultParameters.containsKey("height"))
     }
 
     @Test
     fun `TUBE preset has inner and outer diameters`() {
-        val preset = featurePresets.first { it.type == FeatureType.TUBE }
+        val preset = presetsById[PresetId.TUBE]!!
         assertTrue(preset.defaultParameters.containsKey("innerDiameter"))
         assertTrue(preset.defaultParameters.containsKey("outerDiameter"))
         val inner = preset.defaultParameters["innerDiameter"]!!
