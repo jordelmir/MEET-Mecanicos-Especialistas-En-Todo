@@ -197,6 +197,41 @@ fun HomeScreen(
                 )
             }
 
+            // ── DIGITAL TWIN Banner ──
+            AnimatedEntrance(2) {
+                EliteCard(
+                    glowColor = MeetColors.cyberCyan,
+                    borderColor = MeetColors.cyberCyan.copy(alpha = 0.4f),
+                    backgroundColor = MeetColors.backgroundDeep,
+                    shape = RoundedCornerShape(14.dp),
+                    onClick = { navController.navigate("vehicle_twin") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "🧬 GEMELO DIGITAL",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.5.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Perfil matemático del vehículo con Kalman + Holt-Winters.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Toca para abrir →",
+                            color = MeetColors.cyberCyan.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
             // ── DTC Alert Banner ──
             if (activeDtcs.isNotEmpty()) {
                 AnimatedEntrance(2) {

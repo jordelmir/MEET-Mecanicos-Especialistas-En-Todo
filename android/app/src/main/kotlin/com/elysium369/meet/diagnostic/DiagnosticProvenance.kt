@@ -91,5 +91,8 @@ data class DiagnosticValue<T>(
 
         fun <T> noSoportado(reason: String, timestampMs: Long = System.currentTimeMillis()): DiagnosticValue<T?> =
             DiagnosticValue(null, DiagnosticProvenance.NoSoportado(reason), timestampMs)
+
+        fun <T> simulated(value: T, timestampMs: Long = System.currentTimeMillis()): DiagnosticValue<T> =
+            DiagnosticValue(value, DiagnosticProvenance.Simulated, timestampMs)
     }
 }

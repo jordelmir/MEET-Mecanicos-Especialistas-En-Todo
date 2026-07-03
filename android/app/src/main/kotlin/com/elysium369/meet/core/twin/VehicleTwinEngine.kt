@@ -252,4 +252,24 @@ class VehicleTwinEngine @Inject constructor(
     suspend fun clearLiveAnomalies() {
         _liveAnomalies.value = emptyList()
     }
+
+    /**
+     * Test helper: decodes the persisted baseline JSON of a profile.
+     * Exposed as `internal` so unit tests can verify mean/std math without
+     * re-implementing the JSON layout.
+     */
+    internal fun decodeBaselinesForTest(profile: VehicleTwinProfileEntity): Map<String, Float> = try {
+        json.decodeFromString<Map<String, Float>>(profile.baselineJson)
+    } catch (_: Exception) {
+        emptyMap()
+    }
+
+    /**
+     * Test helper: decodes the persisted variance JSON of a profile.
+     */
+    internal fun decodeVariancesForTest(profile: VehicleTwinProfileEntity): Map<String, Float> = try {
+        json.decodeFromString<Map<String, Float>>(profile.varianceJson)
+    } catch (_: Exception) {
+        emptyMap()
+    }
 }
