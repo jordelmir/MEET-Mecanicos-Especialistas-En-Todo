@@ -22,7 +22,13 @@ import kotlinx.serialization.Serializable
  *  - Serializabilidad: cada subclase es `@Serializable` para guardar/cargar
  *    plantillas en JSON.
  *  - Backward-compat: el `FeaturePreset` single sigue funcionando igual.
+ *
+ * `@Serializable` requerido en el sealed interface para que kotlinx.serialization
+ * pueda registrar automáticamente las subclases en el scope polimórfico.
+ * Sin esto, intentar serializar `FeaturePlan` (tipo base) falla con
+ * "Class 'X' is not registered for polymorphic serialization".
  */
+@Serializable
 internal sealed interface FeaturePlan {
 
     /**
