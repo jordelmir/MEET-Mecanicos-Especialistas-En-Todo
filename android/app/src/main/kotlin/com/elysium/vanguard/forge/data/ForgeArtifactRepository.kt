@@ -34,6 +34,52 @@ class ForgeArtifactRepository {
          * de cada VM, por lo que este singleton no afecta tests.
          */
         val shared: ForgeArtifactRepository by lazy { ForgeArtifactRepository() }
+
+        /**
+         * Carga los parts del usuario desde disco al repo `shared`.
+         * Llamar una sola vez al startup del módulo Forge en ForgeEntryScreen.
+         *
+         * Si el archivo no existe, retorna 0 (no es error).
+         * Si el archivo existe pero es inválido, loggea error y retorna 0.
+         */
+        suspend fun loadUserPartsFromDisk(context: android.content.Context): Int {
+            val store = JsonFileStore<Map<String, ForgePart>>(
+                file = java.io.File(context.filesDir, "forge_user_parts.json"),
+                serializer = { map ->
+                    com.elysium.vanguard.forge.data.JsonFileStoreBridge
+                        .encodePartsMap(map)
+                },
+                deserializer = { json ->
+                    com.elysium.vanguard.forge.data.JsonFileStoreBridge
+                        .decodePartsMap(json)
+                }
+            )
+            val stored = store.load() ?: return 0
+            // Merge en shared: user-created parts sobrescriben seeds con mismo ID.
+            val merged = HashMap(shared.parts.value)
+            stored.forEach { (id, part) -> merged[id] = part }
+            shared._parts.value = merged
+            return stored.size
+        }
+
+        /**
+         * Persiste los parts del usuario a disco. Llamado tras cada savePart
+         * (en producción).
+         */
+        suspend fun saveUserPartsToDisk(context: android.content.Context) {
+            val store = JsonFileStore<Map<String, ForgePart>>(
+                file = java.io.File(context.filesDir, "forge_user_parts.json"),
+                serializer = { map ->
+                    com.elysium.vanguard.forge.data.JsonFileStoreBridge
+                        .encodePartsMap(map)
+                },
+                deserializer = { json ->
+                    com.elysium.vanguard.forge.data.JsonFileStoreBridge
+                        .decodePartsMap(json)
+                }
+            )
+            store.persist(shared.parts.value)
+        }
     }
 
     private val mutex = Mutex()
@@ -155,6 +201,8 @@ class ForgeArtifactRepository {
         val map = HashMap(_parts.value)
         map[part.artifact.id] = part
         _parts.value = map
+        // Persistencia en disco es responsabilidad del caller vía
+        // `companion.saveUserPartsToDisk(context)`. Aquí solo actualizamos memoria.
     }
 
     suspend fun saveAssembly(assembly: ForgeAssembly) = mutex.withLock {
@@ -180,6 +228,7 @@ class ForgeArtifactRepository {
         _assemblies.value = _assemblies.value - id
         _vehicles.value = _vehicles.value - id
         _manuals.value = _manuals.value - id
+        // Persistencia en disco es responsabilidad del caller.
     }
 
     fun getPart(id: String): ForgePart? = _parts.value[id]
