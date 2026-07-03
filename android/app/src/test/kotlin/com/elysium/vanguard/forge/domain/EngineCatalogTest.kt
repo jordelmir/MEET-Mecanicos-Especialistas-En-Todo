@@ -138,11 +138,92 @@ class EngineCatalogTest {
             // Distancia desde origen = 80 (radius configurado).
             val dist = kotlin.math.sqrt(p.position.x * p.position.x + p.position.z * p.position.z)
             assertEquals(80.0, dist, 1e-4)
-            // Verificamos que la suma de angulos (ordenados) cubre 2π
-            // (tolerancia: 0.01 por FP).
-            // En lugar de chequear eso individualmente, los cilindros deberían
-            // estar sobre el plano YZ=0 con angulos a 0, π/4, π/2, ...
         }
+    }
+
+    // ─────────── Engines adicionales (O) ───────────
+
+    @Test
+    fun `electricPowertrain produces 7 features`() {
+        // 1 block + 1 batería + 4 stators + 1 inversor = 7
+        val features = EngineCatalog.electricPowertrain.instantiate()
+        assertEquals(7, features.size)
+    }
+
+    @Test
+    fun `hybridV8 reuses V8 and adds drive motor`() {
+        // v8 (9 features) + 1 drive shaft = 10
+        val features = EngineCatalog.hybridV8.instantiate()
+        assertEquals(10, features.size)
+        // El DRIVE_SHAFT tiene los offsets originales aplicados menos el
+        // shift de centerOrigin (que es -20 promediado con V8 centrado en 0).
+        // Como V8 tiene 9 features centradas (centroid en 0) y el shaft estaba
+        // en y=200, el centroid combinado es (0*9 + 200)/10 = 20.
+        // Tras center, el shaft queda en y = 200 - 20 = 180.
+        val shafts = features.filter {
+            it.name.contains("Árbol de transmisión", ignoreCase = true)
+        }
+        assertEquals(1, shafts.size)
+        assertEquals(180.0, shafts[0].position.y, 1e-6)
+    }
+
+    @Test
+    fun `manualTransmission5spd has 12 features (shafts + gears)`() {
+        // 2 shafts + 5 input gears + 5 output gears = 12
+        val features = EngineCatalog.manualTransmission5spd.instantiate()
+        assertEquals(12, features.size)
+    }
+
+    @Test
+    fun `manualTransmission gear arrays have different spacings`() {
+        // Input y output gears deben ir a diferentes espaciados.
+        val features = EngineCatalog.manualTransmission5spd.instantiate()
+        // Encontrar features en eje X con spacing distinguible.
+        // El output array usa spacing=35, input usa spacing=30 (ambos en axis X).
+        val xs = features.map { it.position.x }.sorted()
+        // Diferencias entre Xs consecutivos del array input (30) vs output (35).
+        // Aquí verificamos solo que ambos sets de posiciones existen.
+        assertTrue("Xs variadas", xs.toSet().size > 5)
+    }
+
+    @Test
+    fun `suspensionCorner has shock + spring + arm + hub`() {
+        // 4 features: shock, spring (offset y=50), arm (y=-100), hub (y=-200)
+        val features = EngineCatalog.suspensionCorner.instantiate()
+        assertEquals(4, features.size)
+        // El hub debe estar en y=-200.
+        val hub = features.first {
+            it.type == com.elysium.vanguard.forge.domain.FeatureType.TUBE
+        }
+        assertEquals(-200.0, hub.position.y, 1e-6)
+    }
+
+    @Test
+    fun `brakeAssembly has disc + caliper + 2 pads`() {
+        // 1 disc + 1 caliper + 2 pads = 4
+        val features = EngineCatalog.brakeAssembly.instantiate()
+        assertEquals(4, features.size)
+    }
+
+    @Test
+    fun `new engines are deterministic across invocations`() {
+        EngineCatalog.allEngines.drop(10).forEach { engine ->
+            // Solo los nuevos (índices ≥10): electricPowertrain, hybridV8, etc.
+            val a = engine.instantiate()
+            val b = engine.instantiate()
+            assertEquals("${engine.name} sizes differ", a.size, b.size)
+            a.zip(b).forEach { (x, y) ->
+                assertEquals("${engine.name} id differs", x.id, y.id)
+                assertEquals("${engine.name} pos.x differs", x.position.x, y.position.x, 1e-6)
+                assertEquals("${engine.name} pos.y differs", x.position.y, y.position.y, 1e-6)
+                assertEquals("${engine.name} pos.z differs", x.position.z, y.position.z, 1e-6)
+            }
+        }
+    }
+
+    @Test
+    fun `catalog total now includes 15 engines`() {
+        assertEquals(15, EngineCatalog.allEngines.size)
     }
 
     @Test

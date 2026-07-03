@@ -52,9 +52,17 @@ internal data class SingleFeaturePlan(
             y = position.y + positionOffset.y,
             z = position.z + positionOffset.z
         )
+        // ID incluye la posición efectiva para que dos SingleFeaturePlans
+        // con el mismo preset pero distinto offset produzcan IDs distintos.
+        // Mantiene el determinismo: misma entrada → mismo ID.
+        val posKey = "${combined.x.toInt()}_${combined.y.toInt()}_${combined.z.toInt()}"
+        val displayKey = preset.displayName.lowercase()
+            .replace(' ', '_')
+            .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+            .replace('ñ', 'n')
         return listOf(
             ParametricFeature(
-                id = "${preset.type.name.lowercase()}_${preset.displayName.lowercase().replace(' ', '_').replace('á', 'a')}_single",
+                id = "${preset.type.name.lowercase()}_${displayKey}_single_${posKey}",
                 type = preset.type,
                 name = preset.displayName,
                 parameters = preset.defaultParameters,
@@ -108,8 +116,16 @@ internal data class LinearArrayPlan(
                 y = position.y + offset.y,
                 z = position.z + offset.z
             )
+            // ID incluye eje + spacing + count + index para que arrays paralelos
+            // con distintos parámetros no colisionen incluso si sus primeras
+            // posiciones coinciden.
+            val posKey = "${total.x.toInt()}_${total.y.toInt()}_${total.z.toInt()}"
+            val displayKey = preset.displayName.lowercase()
+                .replace(' ', '_')
+                .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+                .replace('ñ', 'n')
             ParametricFeature(
-                id = "${preset.type.name.lowercase()}_${preset.displayName.lowercase().replace(' ', '_')}_$i",
+                id = "${preset.type.name.lowercase()}_${displayKey}_${axis.name}_s${spacing.toInt()}_n$count@$i@$posKey",
                 type = preset.type,
                 name = "${preset.displayName} #$i",
                 parameters = preset.defaultParameters,
@@ -154,10 +170,6 @@ internal data class CircularPatternPlan(
     override fun instantiate(position: Vector3Data): List<ParametricFeature> {
         if (count == 0 || radius == 0.0) return emptyList()
         return (0 until count).map { i ->
-            // Para motores V, los cilindros suelen venir en pares (2 bancadas
-            // opuestas). Si el usuario quiere N cilindros en V clásica con
-            // N par, las bancadas son cada π/count*N/2 rad. Lo dejamos genérico
-            // aquí — la posición angular es uniforme (2π / count por instancia).
             val angleRad = startAngleRad + (2.0 * Math.PI / count) * i
             val offset = when (axis) {
                 Axis.Y_PERPENDICULAR -> Vector3Data(
@@ -171,8 +183,15 @@ internal data class CircularPatternPlan(
                 y = position.y + offset.y,
                 z = position.z + offset.z
             )
+            // ID incluye radio para que dos círculos en el mismo centro con
+            // distinto radio no colisionen.
+            val posKey = "${total.x.toInt()}_${total.y.toInt()}_${total.z.toInt()}"
+            val displayKey = preset.displayName.lowercase()
+                .replace(' ', '_')
+                .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+                .replace('ñ', 'n')
             ParametricFeature(
-                id = "${preset.type.name.lowercase()}_${preset.displayName.lowercase().replace(' ', '_')}_$i",
+                id = "${preset.type.name.lowercase()}_${displayKey}_circ_r${radius.toInt()}_$i@$posKey",
                 type = preset.type,
                 name = "${preset.displayName} #$i",
                 parameters = preset.defaultParameters,

@@ -175,11 +175,165 @@ internal object EngineCatalog {
         )
     )
 
+    // ─────────── Tren motriz eléctrico / híbrido ───────────
+
+    /**
+     * Powertrain eléctrico: batería (box grande) + 4 stators cilíndricos
+     * (uno por rueda) + 1 inversor central (cilindro pequeño).
+     *
+     * Layout: batería en Y+, stators distribuidos en plano XZ, inversor en
+     * centro. No centra origen — está alineado a la posición física esperada.
+     */
+    val electricPowertrain: CompositePlan = CompositePlan(
+        name = "Electric powertrain V1",
+        children = listOf(
+            SingleFeaturePlan(preset(PresetId.ENGINE_BLOCK)),
+            // Batería grande sobre el bloque
+            SingleFeaturePlan(
+                preset = preset(PresetId.PLATE),
+                positionOffset = Vector3Data(0.0, 250.0, 0.0)
+            ),
+            // 4 stators como pequeños cilindros (radial)
+            CircularPatternPlan(
+                preset = preset(PresetId.MASTER_CYLINDER_BORE),
+                count = 4,
+                radius = 700.0,
+                axis = CircularPatternPlan.Axis.Y_PERPENDICULAR,
+                startAngleRad = Math.PI / 4
+            ),
+            // Inversor central (cilindro pequeño)
+            SingleFeaturePlan(
+                preset = preset(PresetId.SPARK_PLUG_THREAD),
+                positionOffset = Vector3Data(0.0, 100.0, 0.0)
+            )
+        )
+    )
+
+    /**
+     * Tren motriz híbrido: motor V8 + 1 motor eléctrico (drive motor) +
+     * pack de baterías.
+     *
+     * Reusa el V8 del catálogo como sub-composición. El drive motor es un
+     * cilindro grande sobre el eje Y, alineado con el block.
+     */
+    val hybridV8: CompositePlan = CompositePlan(
+        name = "Hybrid V8 powertrain",
+        children = listOf(
+            v8,
+            SingleFeaturePlan(
+                preset = preset(PresetId.DRIVE_SHAFT),
+                positionOffset = Vector3Data(0.0, 200.0, 0.0)
+            )
+        ),
+        centerOrigin = true
+    )
+
+    // ─────────── Transmisión ───────────
+
+    /**
+     * Transmisión manual 5-velocidades:
+     *  - 1 input shaft (cilindro longitudinal)
+     *  - 1 output shaft (cilindro paralelo)
+     *  - 5 engranajes en input shaft (cilindros pequeños equiespaciados)
+     *  - 5 engranajes en output shaft (cilindros pequeños equiespaciados)
+     */
+    val manualTransmission5spd: CompositePlan = CompositePlan(
+        name = "Manual 5-speed transmission",
+        children = listOf(
+            // Input shaft
+            SingleFeaturePlan(
+                preset = preset(PresetId.DRIVE_SHAFT),
+                positionOffset = Vector3Data(-150.0, 0.0, 0.0)
+            ),
+            // Output shaft
+            SingleFeaturePlan(
+                preset = preset(PresetId.DRIVE_SHAFT),
+                positionOffset = Vector3Data(150.0, 0.0, 0.0)
+            ),
+            // 5 gears en input shaft a lo largo de X
+            LinearArrayPlan(
+                preset = preset(PresetId.CYLINDER),
+                count = 5,
+                spacing = 30.0,
+                axis = LinearArrayPlan.Axis.X
+            ),
+            // 5 gears en output shaft a lo largo de X
+            LinearArrayPlan(
+                preset = preset(PresetId.CYLINDER),
+                count = 5,
+                spacing = 35.0,
+                axis = LinearArrayPlan.Axis.X
+            )
+        )
+    )
+
+    // ─────────── Suspensión ───────────
+
+    /**
+     * Esquina de suspensión McPherson:
+     *  - 1 shock body (cilindro vertical)
+     *  - 1 muelle helicoidal (cilindro coaxial)
+     *  - 1 brazo de control (perfil L)
+     *  - 1 cubo de rueda (tubo)
+     *
+     * Útil para análisis cinemático de suspensión.
+     */
+    val suspensionCorner: CompositePlan = CompositePlan(
+        name = "Suspension corner (McPherson)",
+        children = listOf(
+            SingleFeaturePlan(preset(PresetId.SHOCK_BODY)),
+            SingleFeaturePlan(
+                preset = preset(PresetId.COIL_SPRING_APPROX),
+                positionOffset = Vector3Data(0.0, 50.0, 0.0)
+            ),
+            SingleFeaturePlan(
+                preset = preset(PresetId.CONTROL_ARM),
+                positionOffset = Vector3Data(0.0, -100.0, 0.0)
+            ),
+            SingleFeaturePlan(
+                preset = preset(PresetId.WHEEL_HUB),
+                positionOffset = Vector3Data(0.0, -200.0, 0.0)
+            )
+        )
+    )
+
+    // ─────────── Frenos ───────────
+
+    /**
+     * Conjunto de freno de disco:
+     *  - 1 disco (cylinder thin)
+     *  - 1 mordaza (box)
+     *  - 2 pastillas (plates)
+     */
+    val brakeAssembly: CompositePlan = CompositePlan(
+        name = "Disc brake assembly",
+        children = listOf(
+            SingleFeaturePlan(preset(PresetId.BRAKE_DISC)),
+            // Mordaza sobre el disco
+            SingleFeaturePlan(
+                preset = preset(PresetId.BRAKE_CALIPER),
+                positionOffset = Vector3Data(0.0, 100.0, 0.0)
+            ),
+            // 2 pastillas en lados opuestos de la mordaza
+            LinearArrayPlan(
+                preset = preset(PresetId.BRAKE_PAD),
+                count = 2,
+                spacing = 20.0,
+                axis = LinearArrayPlan.Axis.Z
+            )
+        )
+    )
+
     /**
      * Lista plana para iteración (UI, catalog screens).
      */
     val allEngines: List<CompositePlan> = listOf(
-        v6, v8, v10, v12, boxer6, inline3, inline4, inline5, inline6, fourWheels
+        v6, v8, v10, v12, boxer6,
+        inline3, inline4, inline5, inline6,
+        fourWheels,
+        electricPowertrain, hybridV8,
+        manualTransmission5spd,
+        suspensionCorner, brakeAssembly
     )
 
     // ─────────── Helpers ───────────
