@@ -54,6 +54,7 @@ export const PART_POSITIONS = [
   'INTERIOR',
   'NOT_APPLICABLE',
   'FUSE_BOX',
+  'EXHAUST',
 ] as const;
 export type PartPosition = typeof PART_POSITIONS[number];
 

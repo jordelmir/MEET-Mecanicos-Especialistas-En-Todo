@@ -5,3 +5,6 @@
 
 export * from './types';
 export * from './compatibility';
+export * from './part-suggestion';
+export * from './ranking';
+

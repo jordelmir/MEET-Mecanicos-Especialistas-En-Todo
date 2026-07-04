@@ -15,8 +15,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CompatibilityContext,
   evaluateCompatibility,
-} from '../compatibility';
-import { isCriticalSafetyPart } from '../types';
+  isCriticalSafetyPart,
+} from '../index';
 
 const baseVehicle = {
   brand: 'Hyundai',
