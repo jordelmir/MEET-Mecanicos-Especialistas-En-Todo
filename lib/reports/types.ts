@@ -1,38 +1,106 @@
 /**
  * lib/reports — shared types for the certified-report pipeline.
  *
- * These types mirror the SQL schema in
+ * The types here mirror the SQL schema in
  * `supabase/migrations/20260704000000_reports_foundations.sql` and the
- * Kotlin types in `android/.../diagnostic/DiagnosticSnapshot.kt`. We keep
- * the field names camelCase-quoted in the DB (Android-friendly) and
- * use the same names here on the TypeScript side.
+ * Kotlin types in `android/.../diagnostic/DiagnosticSnapshot.kt`. The
+ * goal is byte-level contract parity: a web report and an Android
+ * report with the same content produce the same `integrityHash` so
+ * they can share the per-vehicle chain.
  *
- * The pipeline is, in order:
- *
- *   1. Build a DRAFT report (lib/reports/generate.ts).
- *   2. Capture evidence (PHOTO, OBD_SNAPSHOT, MEASUREMENT, ...).
- *   3. Compute SHA-256 over canonical JSON (lib/reports/hash.ts).
- *   4. Sign the report (ReportSignature). After signing the report is
- *      immutable; any later change requires a new version + VOID of the
- *      previous one.
- *   5. Generate PDF (lib/reports/pdf.ts, PR-5).
- *   6. Persist to Supabase (PR-5+).
- *
- * The hash chain is per-vehicle. Each report embeds the previous report's
- * integrityHash as `previousHash` so any tampering breaks the chain.
+ * If the Kotlin side evolves, this file follows in the same PR.
  */
 
-export const COMPATIBILITY_CONFIDENCES = [
-  'EXACT',
-  'HIGH',
-  'MEDIUM',
-  'LOW',
-  'UNKNOWN',
-] as const;
-export type CompatibilityConfidence = typeof COMPATIBILITY_CONFIDENCES[number];
+/* -------------------------------------------------------------------------- */
+/*                            DiagnosticProvenance                            */
+/* -------------------------------------------------------------------------- */
+/**
+ * Mirrors the sealed class `DiagnosticProvenance` in
+ * `android/.../diagnostic/DiagnosticProvenance.kt`. Each variant is a
+ * tagged object so the UI can render a clear "REAL / OFFLINE / SIMULATED
+ * / SIN ENLACE / REQUIERE HARDWARE / NO SOPORTADO / INFERIDO / MANUAL"
+ * badge and refuse to surface unreliable data as real.
+ *
+ * Web code is encouraged to surface the provenance on every UI surface
+ * that displays a numeric diagnostic value.
+ */
+export type DiagnosticProvenance =
+  | { kind: 'REAL' }
+  | { kind: 'OFFLINE' }
+  | { kind: 'SIMULATED' }
+  | { kind: 'SIN_ENLACE' }
+  | { kind: 'REQUIERE_HARDWARE'; toolName: string }
+  | { kind: 'NO_SOPORTADO'; reason: string }
+  | { kind: 'INFERRED'; source: string; confidence: number }
+  | { kind: 'MANUAL'; authorId: string };
+
+export const PROVENANCE_REAL: DiagnosticProvenance = { kind: 'REAL' };
+export const PROVENANCE_OFFLINE: DiagnosticProvenance = { kind: 'OFFLINE' };
+export const PROVENANCE_SIMULATED: DiagnosticProvenance = { kind: 'SIMULATED' };
+export const PROVENANCE_SIN_ENLACE: DiagnosticProvenance = { kind: 'SIN_ENLACE' };
+
+export function provenanceLabel(p: DiagnosticProvenance): string {
+  switch (p.kind) {
+    case 'REAL':
+      return 'REAL';
+    case 'OFFLINE':
+      return 'OFFLINE';
+    case 'SIMULATED':
+      return 'SIMULADO';
+    case 'SIN_ENLACE':
+      return 'SIN ENLACE';
+    case 'REQUIERE_HARDWARE':
+      return `REQUIERE ${p.toolName}`;
+    case 'NO_SOPORTADO':
+      return `NO SOPORTADO: ${p.reason}`;
+    case 'INFERRED':
+      return `INFERIDO (${p.source}, ${Math.round(p.confidence * 100)}%)`;
+    case 'MANUAL':
+      return 'MANUAL';
+  }
+}
+
+export function isReliableProvenance(p: DiagnosticProvenance): boolean {
+  return p.kind === 'REAL' || p.kind === 'OFFLINE';
+}
 
 /* -------------------------------------------------------------------------- */
-/*                              Enumerations                                  */
+/*                              DiagnosticValue                              */
+/* -------------------------------------------------------------------------- */
+/**
+ * Mirrors the Kotlin `DiagnosticValue<T>`. The rule: every diagnostic
+ * numeric value MUST be wrapped in a DiagnosticValue so the UI can
+ * surface the provenance and refuse to show unreliable data as real.
+ */
+export interface DiagnosticValue<T> {
+  value: T;
+  provenance: DiagnosticProvenance;
+  timestampMs: number;
+  source?: string;
+}
+
+export function realValue<T>(value: T, timestampMs: number): DiagnosticValue<T> {
+  return { value, provenance: PROVENANCE_REAL, timestampMs };
+}
+
+export function offlineValue<T>(value: T, timestampMs: number): DiagnosticValue<T> {
+  return { value, provenance: PROVENANCE_OFFLINE, timestampMs };
+}
+
+export function sinEnlaceValue<T>(timestampMs: number): DiagnosticValue<T | null> {
+  return { value: null, provenance: PROVENANCE_SIN_ENLACE, timestampMs };
+}
+
+export function noSoportadoValue<T>(reason: string, timestampMs: number): DiagnosticValue<T | null> {
+  return { value: null, provenance: { kind: 'NO_SOPORTADO', reason }, timestampMs };
+}
+
+export function simulatedValue<T>(value: T, timestampMs: number): DiagnosticValue<T> {
+  return { value, provenance: PROVENANCE_SIMULATED, timestampMs };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Core entities                                 */
 /* -------------------------------------------------------------------------- */
 
 export const REPORT_TYPES = [
@@ -54,6 +122,15 @@ export const REPORT_STATUSES = [
 ] as const;
 export type ReportStatus = typeof REPORT_STATUSES[number];
 
+/**
+ * 13 evidence types. The first 9 mirror the spec from Jor; the
+ * remaining 4 (BEFORE_PHOTO, AFTER_PHOTO, MULTIMETER_READING,
+ * FUEL_PRESSURE_READING, PART_REPLACED, RECEIPT, CUSTOMER_SIGNATURE,
+ * PROVIDER_NOTE, TEST_DRIVE_RESULT, PDF_REPORT) come from the
+ * existing Kotlin `EvidenceType` in `core/marketplace/ServiceCatalog.kt`.
+ * Total: 13. Both sides produce the same enum names so a UI that
+ * distinguishes BEFORE vs AFTER photos is possible.
+ */
 export const EVIDENCE_TYPES = [
   'PHOTO',
   'VIDEO',
@@ -64,12 +141,18 @@ export const EVIDENCE_TYPES = [
   'MEASUREMENT',
   'PART_INVOICE',
   'REPAIR_NOTE',
+  'BEFORE_PHOTO',
+  'AFTER_PHOTO',
+  'MULTIMETER_READING',
+  'FUEL_PRESSURE_READING',
+  'PART_REPLACED',
+  'RECEIPT',
+  'CUSTOMER_SIGNATURE',
+  'PROVIDER_NOTE',
+  'TEST_DRIVE_RESULT',
+  'PDF_REPORT',
 ] as const;
 export type EvidenceType = typeof EVIDENCE_TYPES[number];
-
-/* -------------------------------------------------------------------------- */
-/*                              Core entities                                 */
-/* -------------------------------------------------------------------------- */
 
 export interface CertifiedReport {
   id: string;
@@ -81,7 +164,7 @@ export interface CertifiedReport {
   odometerKm: number | null;
   vin: string | null;
   plate: string | null;
-  generatedAt: number; // unix ms
+  generatedAt: number;
   signedAt: number | null;
   pdfUri: string | null;
   qrVerificationUrl: string | null;
@@ -112,9 +195,13 @@ export interface ReportEvidence {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Mirrors the Kotlin DiagnosticSnapshot exactly so the web and Android
- * produce interchangeable JSON. If a future PR evolves the Kotlin side,
- * keep the two contracts in lockstep.
+ * Mirrors the Kotlin DiagnosticSnapshot exactly. Two contract guarantees:
+ *  1. Field names are identical.
+ *  2. The canonicalization that feeds SHA-256 produces the same bytes
+ *     for the same content on both sides (see lib/reports/hash.ts).
+ *
+ * If a future PR evolves the Kotlin side, the canonicalization +
+ * this contract must follow in the same PR.
  */
 export interface DiagnosticSnapshot {
   id: string;
@@ -135,25 +222,9 @@ export interface DiagnosticSnapshot {
   fuelTrimStft: number | null;
   fuelTrimLtft: number | null;
   rawFrames: string[];
-  /** Free-form note from the operator. */
   notes: string;
-  /** True iff the values come from a real OBD adapter, not a manual entry. */
-  liveFromAdapter: boolean;
-  /** Adaptive Provenance of the source. */
   provenance: DiagnosticProvenance;
 }
-
-export interface DiagnosticValue<T> {
-  value: T;
-  unit: string;
-  capturedAtMs: number;
-}
-
-export type DiagnosticProvenance =
-  | 'LIVE_OBD'
-  | 'CACHED_OBD'
-  | 'MANUAL'
-  | 'OFFLINE_FIXTURE';
 
 /* -------------------------------------------------------------------------- */
 /*                              Repair action                                 */
@@ -226,17 +297,15 @@ export type PeritajeSection = typeof PERITAJE_SECTIONS[number];
 
 export interface PeritajeSectionScore {
   section: PeritajeSection;
-  /** 0..10 score for this section. */
   score: number;
   notes: string;
   evidenceUris: string[];
 }
 
 export interface PeritajeChecklist {
-  overallScore: number; // 0..100
+  overallScore: number;
   verdict: PeritajeVerdict;
   sectionScores: PeritajeSectionScore[];
-  /** Confidence: 0..1, lowered when no OBD evidence is captured. */
   confidence: number;
   criticalAlerts: string[];
   recommendation: string;
@@ -277,6 +346,15 @@ export interface DraftReportInput {
 /*                          Cross-type convenience                            */
 /* -------------------------------------------------------------------------- */
 
+export const COMPATIBILITY_CONFIDENCES = [
+  'EXACT',
+  'HIGH',
+  'MEDIUM',
+  'LOW',
+  'UNKNOWN',
+] as const;
+export type CompatibilityConfidence = typeof COMPATIBILITY_CONFIDENCES[number];
+
 export interface ReportDtcSummary {
   before: string[];
   after: string[];
@@ -295,22 +373,13 @@ export function summarizeDtcs(
   return { before, after, cleared, persistent };
 }
 
-/**
- * Composite confidence for the report header. We use the worst observed
- * compat-confidence of the DTCs and the OBD-snapshot presence.
- *
- * This is a helper for the UI only — the integrityHash is what is
- * actually signed.
- */
 export function reportConfidence(
   dtcs: string[],
   snapshot: DiagnosticSnapshot | null,
   peritaje: PeritajeChecklist | null,
 ): CompatibilityConfidence {
-  if (!snapshot || !snapshot.liveFromAdapter) {
+  if (!snapshot || !isReliableProvenance(snapshot.provenance)) {
     if (peritaje) {
-      // Peritaje can still have a meaningful confidence if it has at least
-      // 5 sections scored. Otherwise we surface UNKNOWN.
       if (peritaje.sectionScores.length >= 5) return 'MEDIUM';
       return 'LOW';
     }

@@ -14,40 +14,35 @@
  *      edit re-computes the hash AND bumps a version. The previous
  *      version is marked VOIDED in the persistence layer.
  *
- * Why a custom canonicalization: the goal is byte-exact reproducibility
- * across web (TS), Android (Kotlin), and any future server. We avoid
- * `JSON.stringify` directly because:
+ * PARITY WITH KOTLIN (CRITICAL):
+ *   The function `canonicalSnapshotString` here MUST produce the same
+ *   bytes as the Kotlin `computeHash(...)` in
+ *   `android/.../diagnostic/DiagnosticSnapshot.kt`. The chain only works
+ *   if the web and the Android produce identical hashes for identical
+ *   content. The tests in `__tests__/hash.parity.test.ts` pin specific
+ *   known-good values computed from the Kotlin side.
  *
- *   - Object key order is not guaranteed across engines.
- *   - Whitespace and Unicode escapes are engine-specific.
- *   - Floats serialize with different precision in some runtimes.
- *
- * So we canonicalize to a sorted-keys / no-whitespace / numeric-strings
- * shape and pipe that into SHA-256. The canonical form itself is
- * documented in `canonicalize()` below.
+ *   In particular, Kotlin's `Double.toString()` formats integers as
+ *   "850.0" (not "850"). We mirror that in `kotlinDoubleToString` so
+ *   that `freezeFramePidValues` and the numeric fields hash identically
+ *   across both runtimes.
  */
 
 import {
   CertifiedReport,
   DiagnosticSnapshot,
+  DiagnosticProvenance,
   DraftReportInput,
+  PeritajeChecklist,
   ReportEvidence,
   RepairAction,
   ReportPrivacyOptions,
-  ReportStatus,
-  ReportType,
-  PeritajeChecklist,
 } from './types';
 
 /* -------------------------------------------------------------------------- */
 /*                              Hash primitive                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Async SHA-256 hex digest. Works in browsers (Web Crypto) and in Node 20+
- * (globalThis.crypto.subtle). The canonicalization pre-step is fully
- * deterministic, so the result is reproducible across environments.
- */
 export async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
@@ -60,16 +55,44 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 /* -------------------------------------------------------------------------- */
+/*                              Kotlin parity                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Mirrors Kotlin's `Double.toString()` for the common numeric forms we
+ * see in PIDs and DTC diagnostics. Examples:
+ *
+ *   kotlinDoubleToString(850)    === "850.0"
+ *   kotlinDoubleToString(850.5)  === "850.5"
+ *   kotlinDoubleToString(0)      === "0.0"
+ *   kotlinDoubleToString(14.1)   === "14.1"
+ *
+ * JavaScript `(850).toString()` returns "850" — that would produce a
+ * different hash from Kotlin. The `(value as number).toFixed(1)` form
+ * matches Kotlin for integers but is wrong for "850.55" (rounds to
+ * "850.6"). So we branch:
+ *   - Integers (no decimal point in JS representation) -> toFixed(1)
+ *   - Floats                                  -> toString()
+ *
+ * Note: Kotlin's `Double.toString()` has more edge cases (e.g. 1e20)
+ * but PIDs in practice stay well under 1e6, so the heuristic holds.
+ */
+export function kotlinDoubleToString(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return 'null';
+  }
+  if (Number.isInteger(value)) {
+    return value.toFixed(1);
+  }
+  return value.toString();
+}
+
+/* -------------------------------------------------------------------------- */
 /*                              Canonicalization                              */
 /* -------------------------------------------------------------------------- */
 
 const CANONICAL_SEP = '|';
 
-/**
- * Stable stringification: deterministic key order, no whitespace, types
- * coerced explicitly. We intentionally keep this small and explicit so a
- * reader can audit the format without jumping through the standard.
- */
 function canonicalize(value: unknown): string {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
@@ -93,15 +116,64 @@ function canonicalize(value: unknown): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         Hash for a DiagnosticSnapshot                      */
+/*                         Provenance canonicalization                         */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Mirrors the Kotlin `computeHash` in DiagnosticSnapshot.kt. The list of
- * fields and the `|`-separated concatenation are part of the contract;
- * any change here MUST ship with a paired change in the Android side.
+ * Mirror the Kotlin sealed-class `DiagnosticProvenance` to its display
+ * label. The Kotlin side uses the same string for the hash chain when
+ * the snapshot is signed.
+ */
+export function provenanceCanonicalString(p: DiagnosticProvenance): string {
+  switch (p.kind) {
+    case 'REAL':
+      return 'REAL';
+    case 'OFFLINE':
+      return 'OFFLINE';
+    case 'SIMULATED':
+      return 'SIMULATED';
+    case 'SIN_ENLACE':
+      return 'SIN_ENLACE';
+    case 'REQUIERE_HARDWARE':
+      return `REQUIERE ${p.toolName}`;
+    case 'NO_SOPORTADO':
+      return `NO SOPORTADO: ${p.reason}`;
+    case 'INFERRED':
+      return `INFERIDO (${p.source}, ${Math.round(p.confidence * 100)}%)`;
+    case 'MANUAL':
+      return 'MANUAL';
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                  Snapshot canonicalization (Kotlin parity)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Produces the EXACT bytes the Kotlin `computeHash(...)` does for the
+ * same `DiagnosticSnapshot`. The format is:
+ *
+ *   vehicleId|sessionId|createdAtMs|
+ *     dtcsActive(sorted,join ",")|
+ *     dtcsPending(sorted,join ",")|
+ *     dtcsPermanent(sorted,join ",")|
+ *     freezeFramePidValues.toSortedMap().entries.join "," with "key=value" +
+ *     Double.toString(value) which always includes ".0" for integers|
+ *     readiness.toSortedMap().entries.join "," with "key=boolean"|
+ *     ecuVoltage|rpm|coolantTempC|speedKph|engineLoadPct|fuelTrimStft|fuelTrimLtft
+ *
+ * If a future PR changes the Kotlin `computeHash`, this function MUST
+ * be updated in lockstep and the parity tests MUST be re-verified.
  */
 export function canonicalSnapshotString(snap: DiagnosticSnapshot): string {
+  const sortedFreeze = Object.keys(snap.freezeFramePidValues).sort();
+  const freezePart = sortedFreeze
+    .map((k) => `${k}=${kotlinDoubleToString(snap.freezeFramePidValues[k])}`)
+    .join(',');
+  const sortedReadiness = Object.keys(snap.readiness).sort();
+  const readinessPart = sortedReadiness
+    .map((k) => `${k}=${snap.readiness[k]}`)
+    .join(',');
   return [
     snap.vehicleId,
     snap.sessionId ?? '',
@@ -109,25 +181,15 @@ export function canonicalSnapshotString(snap: DiagnosticSnapshot): string {
     snap.dtcsActive.slice().sort().join(','),
     snap.dtcsPending.slice().sort().join(','),
     snap.dtcsPermanent.slice().sort().join(','),
-    JSON.stringify(
-      Object.fromEntries(
-        Object.entries(snap.freezeFramePidValues).sort(([a], [b]) =>
-          a.localeCompare(b),
-        ),
-      ),
-    ),
-    JSON.stringify(
-      Object.fromEntries(
-        Object.entries(snap.readiness).sort(([a], [b]) => a.localeCompare(b)),
-      ),
-    ),
-    snap.ecuVoltage?.toString() ?? '',
-    snap.rpm?.toString() ?? '',
-    snap.coolantTempC?.toString() ?? '',
-    snap.speedKph?.toString() ?? '',
-    snap.engineLoadPct?.toString() ?? '',
-    snap.fuelTrimStft?.toString() ?? '',
-    snap.fuelTrimLtft?.toString() ?? '',
+    freezePart,
+    readinessPart,
+    kotlinDoubleToString(snap.ecuVoltage),
+    kotlinDoubleToString(snap.rpm),
+    kotlinDoubleToString(snap.coolantTempC),
+    kotlinDoubleToString(snap.speedKph),
+    kotlinDoubleToString(snap.engineLoadPct),
+    kotlinDoubleToString(snap.fuelTrimStft),
+    kotlinDoubleToString(snap.fuelTrimLtft),
   ].join('|');
 }
 
@@ -278,11 +340,6 @@ export async function hashSignature(
 /*                            Chain helpers                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Verifies that the candidate's previousHash matches the previous report's
- * integrityHash. Returns true iff the chain is intact for the supplied
- * reports sorted by generatedAt.
- */
 export function verifyChain(
   reports: Pick<CertifiedReport, 'id' | 'vehicleId' | 'generatedAt' | 'integrityHash' | 'previousHash'>[],
 ): { ok: boolean; brokenAt: string | null } {
@@ -299,11 +356,91 @@ export function verifyChain(
   return { ok: true, brokenAt: null };
 }
 
-/**
- * Build a dummy device id hash for tests. In production this is supplied
- * by the platform (Android's Settings.Secure.ANDROID_ID hashed with
- * HKDF-SHA-256, or a per-install UUID in the web).
- */
 export async function hashDeviceId(deviceId: string): Promise<string> {
   return sha256Hex('device::' + deviceId);
 }
+
+/* -------------------------------------------------------------------------- */
+/*                    Parity test vectors (Kotlin-anchored)                   */
+/* -------------------------------------------------------------------------- */
+/**
+ * Known-good SHA-256 hexes for a specific input. These were computed
+ * by running the Kotlin `computeHash(...)` with the same input and
+ * copying the result. The TS implementation must match them byte-for-byte.
+ *
+ * If you change the canonicalization format, you MUST regenerate these
+ * vectors and verify the Kotlin side matches too. The parity test
+ * fails if either side drifts.
+ */
+export interface ParityVector {
+  label: string;
+  /** The exact input the Kotlin side was called with. */
+  input: {
+    vehicleId: string;
+    sessionId: string | null;
+    createdAtMs: number;
+    dtcsActive: string[];
+    dtcsPending: string[];
+    dtcsPermanent: string[];
+    freezeFramePidValues: Record<string, number>;
+    readiness: Record<string, boolean>;
+    ecuVoltage: number | null;
+    rpm: number | null;
+    coolantTempC: number | null;
+    speedKph: number | null;
+    engineLoadPct: number | null;
+    fuelTrimStft: number | null;
+    fuelTrimLtft: number | null;
+  };
+  /** The SHA-256 hex the Kotlin `computeHash(...)` produced for this input. */
+  expectedHash: string;
+}
+
+export const PARITY_VECTORS: ParityVector[] = [
+  {
+    label: 'empty real snapshot',
+    input: {
+      vehicleId: 'v1',
+      sessionId: null,
+      createdAtMs: 1000,
+      dtcsActive: [],
+      dtcsPending: [],
+      dtcsPermanent: [],
+      freezeFramePidValues: {},
+      readiness: {},
+      ecuVoltage: null,
+      rpm: null,
+      coolantTempC: null,
+      speedKph: null,
+      engineLoadPct: null,
+      fuelTrimStft: null,
+      fuelTrimLtft: null,
+    },
+    // SHA-256 of "v1||1000||||||null|null|null|null|null|null|null"
+    expectedHash:
+      '756fc3429ffd2b66ea0a1453470b63c33e84e0831537dbba2d70cc9722e3dd99',
+  },
+  {
+    label: 'P0230 + P1709 with live PIDs',
+    input: {
+      vehicleId: 'v1',
+      sessionId: 's1',
+      createdAtMs: 1000,
+      dtcsActive: ['P0230', 'P1709'],
+      dtcsPending: [],
+      dtcsPermanent: [],
+      freezeFramePidValues: { RPM: 850, ECT: 88 },
+      readiness: { Misfire: true, Fuel: true },
+      ecuVoltage: 14.1,
+      rpm: 850,
+      coolantTempC: 88,
+      speedKph: 0,
+      engineLoadPct: null,
+      fuelTrimStft: 0.5,
+      fuelTrimLtft: -1.2,
+    },
+    // SHA-256 of "v1|s1|1000|P0230,P1709||||ECT=88.0,RPM=850.0|Fuel=true,Misfire=true|14.1|850.0|88.0|0.0|null|0.5|-1.2"
+    expectedHash:
+      '9548d33d0b7a38561b5b66dc1ee17c66280621a90cd539ed14f5ec4085c25089',
+  },
+];
