@@ -1,0 +1,20 @@
+{
+  "label": "P0230 fuel-pump request (Hyundai Accent Verna 2005)",
+  "vehicleId": "v-accent-verna-2005",
+  "sessionId": "s-2026-07-04-001",
+  "createdAtMs": 1700000000000,
+  "dtcsActive": ["P0230", "P1709"],
+  "dtcsPending": [],
+  "dtcsPermanent": [],
+  "freezeFramePidValues": { "RPM": 850, "ECT": 88 },
+  "readiness": { "Misfire": true, "Fuel": true },
+  "ecuVoltage": 14.1,
+  "rpm": 850,
+  "coolantTempC": 88,
+  "speedKph": 0,
+  "engineLoadPct": null,
+  "fuelTrimStft": 0.5,
+  "fuelTrimLtft": -1.2,
+  "provenance": "LIVE_OBD",
+  "expectedHash": "71b393aeb4ddbb23dc4fdeb3720450a91734ebf567a0698620b273f4b545072e"
+}

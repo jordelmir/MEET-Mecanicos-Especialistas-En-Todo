@@ -1,0 +1,46 @@
+name: cross-runtime-parity
+
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ts-parity:
+    name: TypeScript parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: npm ci
+      - name: Run TS tests
+        run: npx vitest run
+      - name: Verify fixture parity
+        run: npx tsx tests/parity/hash-parity.ts tests/parity/fixtures/snapshot-p0230.json
+
+  kotlin-parity:
+    name: Kotlin parity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      - name: Run HashEngineParityTest
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.core.reports.HashEngineParityTest'
+      - name: Upload parity artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-output
+          path: app/build/reports/parity/
