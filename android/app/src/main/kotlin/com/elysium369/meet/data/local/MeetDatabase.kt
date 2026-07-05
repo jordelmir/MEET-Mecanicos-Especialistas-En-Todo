@@ -109,9 +109,16 @@ import com.elysium369.meet.data.local.entities.*
         // ELYSIUM VANGUARD COMMERCE TRUST CORE
         VanguardEventEntity::class,
         MarketplaceLedgerEntryEntity::class,
-        VanguardOutboxEntity::class
+        VanguardOutboxEntity::class,
+
+        // CERTIFIED REPORTS V2 (see docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md)
+        CertifiedReportEntity::class,
+        ReportEvidenceEntity::class,
+        RepairActionEntity::class,
+        ReportSignatureEntity::class,
+        DiagnosticSnapshotEntity::class,
     ],
-    version = 41,
+    version = 42,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -162,4 +169,11 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // ELYSIUM VANGUARD COMMERCE DAO
     abstract fun vanguardCommerceDao(): VanguardCommerceDao
+
+    // CERTIFIED REPORTS V2 DAOs (see docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md)
+    abstract fun certifiedReportDao(): CertifiedReportDao
+    abstract fun reportEvidenceDao(): ReportEvidenceDao
+    abstract fun repairActionDao(): RepairActionDao
+    abstract fun reportSignatureDao(): ReportSignatureDao
+    abstract fun diagnosticSnapshotDao(): DiagnosticSnapshotDao
 }

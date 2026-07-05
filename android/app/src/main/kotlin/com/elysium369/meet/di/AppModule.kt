@@ -2901,6 +2901,143 @@ object AppModule {
         }
     }
 
+    /**
+     * V2 Certified Reports — adds the 5 tables introduced for the
+     * Reports PDF Certificados + Vehicle Technical History round.
+     *
+     * Mirrors the Postgres schema in
+     *   supabase/migrations/20260704000000_reports_foundations.sql
+     *   supabase/migrations/20260705000000_reports_sync_and_evidence_extend.sql
+     *
+     * Indexes + FKs are created with `IF NOT EXISTS` so re-running the
+     * migration on a partially-upgraded device is safe.
+     */
+    private val MIGRATION_41_42 = object : Migration(41, 42) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 41→42: Certified Reports V2 (certified_reports, report_evidence, repair_actions, report_signatures, diagnostic_snapshots)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `certified_reports` (
+                  `reportId` TEXT NOT NULL,
+                  `vehicleId` TEXT NOT NULL,
+                  `userId` TEXT NOT NULL,
+                  `reportType` TEXT NOT NULL,
+                  `title` TEXT NOT NULL,
+                  `status` TEXT NOT NULL,
+                  `odometerKm` INTEGER,
+                  `vin` TEXT,
+                  `plate` TEXT,
+                  `generatedAt` INTEGER NOT NULL,
+                  `signedAt` INTEGER,
+                  `pdfUri` TEXT,
+                  `qrVerificationUrl` TEXT,
+                  `integrityHash` TEXT NOT NULL,
+                  `previousHash` TEXT,
+                  `createdAt` INTEGER NOT NULL,
+                  `updatedAt` INTEGER NOT NULL,
+                  PRIMARY KEY(`reportId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_vehicleId_generatedAt` ON `certified_reports` (`vehicleId`, `generatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_userId_generatedAt` ON `certified_reports` (`userId`, `generatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_vehicleId_integrityHash` ON `certified_reports` (`vehicleId`, `integrityHash`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_status` ON `certified_reports` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_reportType` ON `certified_reports` (`reportType`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `report_evidence` (
+                  `evidenceId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `evidenceType` TEXT NOT NULL,
+                  `label` TEXT NOT NULL,
+                  `description` TEXT NOT NULL,
+                  `uri` TEXT NOT NULL,
+                  `hash` TEXT,
+                  `capturedAt` INTEGER NOT NULL,
+                  `lat` REAL,
+                  `lng` REAL,
+                  PRIMARY KEY(`evidenceId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_evidence_reportId_capturedAt` ON `report_evidence` (`reportId`, `capturedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_evidence_evidenceType` ON `report_evidence` (`evidenceType`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_actions` (
+                  `actionId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `actionType` TEXT NOT NULL,
+                  `component` TEXT NOT NULL,
+                  `dtcRelated` TEXT,
+                  `description` TEXT NOT NULL,
+                  `partUsed` TEXT,
+                  `supplier` TEXT,
+                  `mechanic` TEXT,
+                  `cost` REAL,
+                  `currency` TEXT NOT NULL,
+                  `warrantyDays` INTEGER,
+                  `createdAt` INTEGER NOT NULL,
+                  PRIMARY KEY(`actionId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_reportId` ON `repair_actions` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_dtcRelated` ON `repair_actions` (`dtcRelated`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_supplier` ON `repair_actions` (`supplier`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `report_signatures` (
+                  `signatureId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `signerName` TEXT NOT NULL,
+                  `signerRole` TEXT NOT NULL,
+                  `signatureImageUri` TEXT NOT NULL,
+                  `signedAt` INTEGER NOT NULL,
+                  `deviceIdHash` TEXT NOT NULL,
+                  `integrityHash` TEXT NOT NULL,
+                  PRIMARY KEY(`signatureId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_report_signatures_reportId` ON `report_signatures` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_signatures_signerName` ON `report_signatures` (`signerName`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `diagnostic_snapshots` (
+                  `snapshotId` TEXT NOT NULL,
+                  `vehicleId` TEXT NOT NULL,
+                  `sessionId` TEXT,
+                  `createdAtMs` INTEGER NOT NULL,
+                  `dtcsActiveJson` TEXT NOT NULL,
+                  `dtcsPendingJson` TEXT NOT NULL,
+                  `dtcsPermanentJson` TEXT NOT NULL,
+                  `freezeFramePidValuesJson` TEXT NOT NULL,
+                  `livePidsJson` TEXT NOT NULL,
+                  `readinessJson` TEXT NOT NULL,
+                  `ecuVoltage` REAL,
+                  `rpm` REAL,
+                  `coolantTempC` REAL,
+                  `speedKph` REAL,
+                  `engineLoadPct` REAL,
+                  `fuelTrimStft` REAL,
+                  `fuelTrimLtft` REAL,
+                  `rawFramesJson` TEXT NOT NULL,
+                  `notes` TEXT NOT NULL,
+                  `liveFromAdapter` INTEGER NOT NULL,
+                  `provenanceLabel` TEXT NOT NULL,
+                  `hashSha256` TEXT NOT NULL,
+                  `reportId` TEXT,
+                  PRIMARY KEY(`snapshotId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE SET NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_vehicleId_createdAtMs` ON `diagnostic_snapshots` (`vehicleId`, `createdAtMs`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_reportId` ON `diagnostic_snapshots` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_hashSha256` ON `diagnostic_snapshots` (`hashSha256`)")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -2929,7 +3066,8 @@ object AppModule {
             MIGRATION_37_38,
             MIGRATION_38_39,
             MIGRATION_39_40,
-            MIGRATION_40_41
+            MIGRATION_40_41,
+            MIGRATION_41_42
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
