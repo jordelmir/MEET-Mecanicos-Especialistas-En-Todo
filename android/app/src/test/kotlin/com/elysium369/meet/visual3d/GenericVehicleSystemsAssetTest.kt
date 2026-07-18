@@ -14,6 +14,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GenericVehicleSystemsAssetTest {
+    private val minimumD3MeshCounts = mapOf(
+        "intake_boost" to 150,
+        "transmission_drivetrain" to 230,
+        "suspension" to 120,
+        "steering_brakes_wheels" to 260,
+        "electrical_control" to 285
+    )
+
     private fun asset(path: String): File = listOf(
         File("src/main/assets/$path"),
         File("app/src/main/assets/$path"),
@@ -33,7 +41,7 @@ class GenericVehicleSystemsAssetTest {
             assertEquals(2, header.getInt(4))
             assertEquals(model.length(), header.getInt(8).toLong())
             assertTrue("${definition.id} must contain real mesh data", model.length() > 250_000L)
-            assertTrue("${definition.id} must remain mobile-sized", model.length() < 6_000_000L)
+            assertTrue("${definition.id} must remain mobile-sized", model.length() < 12_000_000L)
             aggregateBytes += model.length()
 
             val jsonLength = header.getInt(12)
@@ -47,6 +55,7 @@ class GenericVehicleSystemsAssetTest {
             }
 
             val manifest = asset(definition.manifestPath).readText()
+            val manifestJson = Json.parseToJsonElement(manifest).jsonObject
             val expectedHash = Regex("\\\"sha256\\\"\\s*:\\s*\\\"([a-f0-9]{64})\\\"")
                 .find(manifest)?.groupValues?.get(1)
                 ?: error("${definition.id} manifest is missing sha256")
@@ -55,13 +64,19 @@ class GenericVehicleSystemsAssetTest {
                 .joinToString("") { "%02x".format(it) }
 
             assertEquals(expectedHash, actualHash)
-            assertTrue(manifest.contains("L2_GENERIC_ASSEMBLY"))
+            assertTrue(manifest.contains(GenericVehicleSystemsAssetContract.AUTHORITY))
+            assertTrue(manifest.contains("D3_RECOGNIZABLE_INTERNALS"))
+            assertTrue(
+                "${definition.id} lost its D3 mechanical detail budget",
+                manifestJson.getValue("meshCount").jsonPrimitive.content.toInt() >=
+                    minimumD3MeshCounts.getValue(definition.id)
+            )
             assertTrue(manifest.contains("ILLUSTRATIVE_PROPORTIONS_ONLY"))
             assertTrue(manifest.contains("\"oemClaim\": false"))
             assertTrue(manifest.contains("\"vehicleSpecificClaim\": false"))
         }
 
-        assertTrue("The complete staged atlas must remain below 16 MB", aggregateBytes < 16_000_000L)
+        assertTrue("The complete staged atlas must remain below 36 MB", aggregateBytes < 36_000_000L)
     }
 
     @Test

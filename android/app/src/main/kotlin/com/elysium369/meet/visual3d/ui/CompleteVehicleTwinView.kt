@@ -1155,7 +1155,7 @@ private fun FilamentVehicleScene(
                     scaleToUnits = systemAsset.scaleToUnits,
                     centerOrigin = Position(0f, 0f, 0f),
                     apply = {
-                        name = "meet_generic_${systemAsset.id}_l2"
+                        name = "meet_generic_${systemAsset.id}_d3"
                         isVisible = viewportState.xRayEnabled &&
                             selectedSystemId in systemAsset.supportedSystemIds
                         // Precise selection is resolved through Filament View.pick on child meshes.

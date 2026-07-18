@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "assetId": "meet.generic.intake_boost.l2",
+  "assetId": "meet.generic.intake_boost.d3",
   "assetFile": "generic_intake_boost.glb",
   "displayName": "intake boost",
-  "geometryAuthority": "L2_GENERIC_ASSEMBLY",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
   "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-systems.mjs",
-  "generatorVersion": "1.0.0",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "2.0.0",
   "threeVersion": "185",
   "meshNodePrefix": "system_mesh__",
-  "meshCount": 76,
-  "triangleCount": 28304,
+  "meshCount": 157,
+  "triangleCount": 70864,
   "partKeys": [
     "air_box_lid",
     "air_filter",
@@ -45,7 +46,7 @@
     "variable_intake_solenoid",
     "wastegate_actuator"
   ],
-  "sha256": "c4bbae8a208de48695e7715a607451524651bf4df0c34e06ff010789ed5ee9d9",
+  "sha256": "fe8ca560dfaf140278a15ef3b441cca2642f3c896a5a704ac1dba841e2e4362c",
   "license": "Original procedural asset generated for MEET; project-owned source generator",
   "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
 }

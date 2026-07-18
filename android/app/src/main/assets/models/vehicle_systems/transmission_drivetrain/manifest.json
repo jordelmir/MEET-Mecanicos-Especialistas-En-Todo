@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "assetId": "meet.generic.transmission_drivetrain.l2",
+  "assetId": "meet.generic.transmission_drivetrain.d3",
   "assetFile": "generic_transmission_drivetrain.glb",
   "displayName": "transmission drivetrain",
-  "geometryAuthority": "L2_GENERIC_ASSEMBLY",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
   "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-systems.mjs",
-  "generatorVersion": "1.0.0",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "2.0.0",
   "threeVersion": "185",
   "meshNodePrefix": "system_mesh__",
-  "meshCount": 109,
-  "triangleCount": 45548,
+  "meshCount": 242,
+  "triangleCount": 75868,
   "partKeys": [
     "atf_cooler_lines",
     "atf_temperature_sensor",
@@ -42,7 +43,7 @@
     "transmission_pan",
     "valve_body"
   ],
-  "sha256": "38e5496f2d01c1606dca9327e33637b499ecf61a3a0e3fe285ce43e3a443954c",
+  "sha256": "b283c47d7fe8af45292e53aec3d19068b09a69f860dac5ae1769a6503688efb7",
   "license": "Original procedural asset generated for MEET; project-owned source generator",
   "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
 }

@@ -30,15 +30,16 @@ data class GenericSystemAssetDefinition(
 }
 
 /**
- * Stable source-to-mesh contract for the project-owned L2 vehicle-system atlas.
+ * Stable source-to-mesh contract for the project-owned D3-detail vehicle-system atlas.
  *
- * The models are recognizable generic service assemblies. Their proportions and service offsets
- * are illustrative renderer units, never measurements or proof that a component is installed on
- * the active vehicle. Selection is only enabled when a literal proprietary source record exists.
+ * The models are recognizable generic cutaway assemblies with service internals. Their proportions
+ * and service offsets are illustrative renderer units, never measurements or proof that a component
+ * is installed on the active vehicle. Selection is only enabled when a literal proprietary source
+ * record exists.
  */
 object GenericVehicleSystemsAssetContract {
     const val MESH_NODE_PREFIX = "system_mesh__"
-    const val AUTHORITY = "L2_GENERIC_ASSEMBLY"
+    const val AUTHORITY = "L2_GENERIC_CUTAWAY"
     private const val SERVICE_OFFSET_HORIZONTAL_SCALE = 0.20f
     private const val SERVICE_OFFSET_VERTICAL_SCALE = 0.17f
     private const val SERVICE_OFFSET_DEPTH_SCALE = 0.08f

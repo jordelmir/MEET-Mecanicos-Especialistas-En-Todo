@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "assetId": "meet.generic.steering_brakes_wheels.l2",
+  "assetId": "meet.generic.steering_brakes_wheels.d3",
   "assetFile": "generic_steering_brakes_wheels.glb",
   "displayName": "steering brakes wheels",
-  "geometryAuthority": "L2_GENERIC_ASSEMBLY",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
   "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-systems.mjs",
-  "generatorVersion": "1.0.0",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "2.0.0",
   "threeVersion": "185",
   "meshNodePrefix": "system_mesh__",
-  "meshCount": 145,
-  "triangleCount": 52668,
+  "meshCount": 269,
+  "triangleCount": 120064,
   "partKeys": [
     "abs_module",
     "abs_pump",
@@ -42,7 +43,7 @@
     "wheel_center_caps",
     "wheels_tires"
   ],
-  "sha256": "a0321724ed261a7a3aec70c645b8b58e387ff7856d7e0b430337d0126001e484",
+  "sha256": "1d6734460e83045376d58efb4e360ad0f4052ae5712f3f05da2d9ff7a3f69b21",
   "license": "Original procedural asset generated for MEET; project-owned source generator",
   "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
 }

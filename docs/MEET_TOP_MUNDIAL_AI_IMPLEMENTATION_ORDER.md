@@ -1209,6 +1209,7 @@ Toda pieza debe declarar uno de estos niveles y la UI debe mostrarlo:
 | `L0_CATALOG_ONLY` | registro textual sin forma | existe en la base; requiere ubicación física |
 | `L1_SEMANTIC_PRIMITIVE` | silueta procedimental | familia y relación conceptual |
 | `L2_GENERIC_ASSEMBLY` | conjunto mecánico genérico | ubicación probable y secuencia didáctica |
+| `L2_GENERIC_CUTAWAY` | conjunto genérico con internos reconocibles | inspección y secuencia didáctica, nunca medidas |
 | `L3_MEASURED_PARAMETRIC` | geometría con medidas trazables | dimensiones capturadas y tolerancias declaradas |
 | `L4_OEM_VALIDATED` | evidencia OEM/VIN o medición validada | correspondencia para la variante demostrada |
 | `L5_MANUFACTURING_RELEASE` | revisión de ingeniería y paquete liberado | listo para proceso específico, no homologación vehicular automática |
@@ -1792,7 +1793,7 @@ La cifra mostrada es `participación contractual calculada`, nunca `ganancia gar
 
 | Fase | Entregable verificable |
 |---|---|
-| F0 | atlas L2 mecánico compuesto, selección literal y despiece didáctico |
+| F0 | atlas D3 visual de corte mecánico con autoridad L2, selección literal y despiece didáctico |
 | F1 | contratos de unidades, medición, material, evidencia y hash |
 | F2 | proyecto paramétrico, datums, restricciones y versiones |
 | F3 | ensamblajes, BOM, masa, CG, inercias e interferencias |
@@ -1814,7 +1815,7 @@ La cifra mostrada es `participación contractual calculada`, nunca `ganancia gar
 - Cada ecuación muestra hipótesis y rechaza entradas fuera de dominio.
 - Cada simulación es reproducible desde un manifiesto inmutable.
 - Despiece 3D sigue orden de servicio y vuelve sin drift al ensamble.
-- El atlas L2 usa siluetas compuestas; una pieza conocida no vuelve a ser una caja aleatoria.
+- El atlas D3 visual usa internos reconocibles sin elevar autoridad L2; una pieza conocida no vuelve a ser una caja aleatoria.
 - Las cinco plantillas son distintas, incompletas y honestamente `CONCEPTUAL`.
 - `FABRICAR`, `HOMOLOGAR` y regalías permanecen bloqueados sin sus gates.
 - El rendimiento se mide en Android real; calidad visual puede degradar, integridad de ingeniería no.
@@ -1841,12 +1842,21 @@ La fase F0 ya tiene una implementación Android funcional y verificable:
 - alias validados literalmente contra `entity_index.json` sin modificar los
   documentos propietarios;
 - manifiesto y SHA-256 por activo, con autoridad
-  `L2_GENERIC_ASSEMBLY` y proporciones ilustrativas.
+  `L2_GENERIC_CUTAWAY`, detalle `D3_RECOGNIZABLE_INTERNALS` y proporciones ilustrativas;
+- 157 mallas para admisión/sobrealimentación, 242 para transmisión/tren
+  motriz, 126 para suspensión, 269 para dirección/frenos/ruedas y 295 para
+  eléctrico/ECU/actuadores;
+- internos de servicio añadidos: impulsores de turbo, eje y rodamientos,
+  estrías y CV, asientos y fijaciones de suspensión, pistones y superficies de
+  fricción, celdas de batería, contactos de fusibles/relés, placas ECU,
+  terminales multipin y ramales de arnés.
 
 Este estado completa la arquitectura de inspección F0, no el gemelo dimensional
-L3/L4 de fabricación. Las mallas actuales son originales y reconocibles, pero
+de fabricación. `D3_RECOGNIZABLE_INTERNALS` es un nivel de detalle visual
+independiente de la autoridad geométrica L0-L5. Las mallas actuales son
+originales y reconocibles, pero
 no autorizan tolerancias, cálculos estructurales, manufactura ni afirmaciones
-OEM. La evolución siguiente conserva estos contratos y sustituye familias L2
+OEM. La evolución siguiente conserva estos contratos y sustituye familias genéricas
 por geometría medida sólo cuando exista evidencia suficiente.
 
 ### 17.12 Referencias técnicas primarias para la implementación
