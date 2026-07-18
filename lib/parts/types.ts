@@ -132,7 +132,7 @@ export interface VehicleFingerprint {
   transmission?: string;
   /** "GASOLINE" | "DIESEL" | "HYBRID" | free form. */
   fuel?: string;
-  /** VIN (17 chars preferred). Decisive for EXACT verdicts. */
+  /** VIN valido: exactamente 17 caracteres, sin I, O ni Q. */
   vin?: string;
   /** OEM part number explicitly provided by user. Decisive for EXACT verdicts. */
   oemNumber?: string;
@@ -164,6 +164,7 @@ export interface CompatibilityWarning {
   /** Stable code so the UI can act on it (e.g. collapse / pin / color). */
   code:
     | 'DTC_P0230_PUMP_REQUIRES_CONFIRMATION'
+    | 'INVALID_VIN'
     | 'NO_VIN'
     | 'NO_OEM'
     | 'CRITICAL_SAFETY_PART'
@@ -177,6 +178,13 @@ export interface CompatibilityWarning {
   message: string;
   /** Severity we expose to UI. */
   severity: 'INFO' | 'WARN' | 'BLOCK';
+}
+
+const VALID_VIN_PATTERN = /^(?=.*[0-9])[A-HJ-NPR-Z0-9]{17}$/i;
+
+/** Valida la forma estructural del VIN; no afirma autenticidad ni pertenencia. */
+export function isValidVin(value?: string | null): boolean {
+  return typeof value === 'string' && VALID_VIN_PATTERN.test(value.trim());
 }
 
 export interface CompatibilityResult {

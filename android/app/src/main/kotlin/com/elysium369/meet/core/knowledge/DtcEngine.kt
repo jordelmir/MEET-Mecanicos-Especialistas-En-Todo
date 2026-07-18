@@ -77,6 +77,12 @@ class DtcEngine(
  * Built from knowledge packs at import time, not hardcoded.
  */
 @Serializable
+data class RankedCauseDefinition(
+    val id: String,
+    val probability: Double
+)
+
+@Serializable
 data class DtcProfile(
     val code: String,
     val system: String,
@@ -84,6 +90,7 @@ data class DtcProfile(
     val description: String,
     val relatedSystems: List<String> = emptyList(),
     val likelyComponents: List<String> = emptyList(),
+    val rankedCauses: List<RankedCauseDefinition> = emptyList(),
     val diagnosticSteps: List<String> = emptyList(),
     val pidsToCheck: List<String> = emptyList(),
     val riskLevel: String = "MEDIUM",

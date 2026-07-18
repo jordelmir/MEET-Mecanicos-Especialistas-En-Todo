@@ -321,7 +321,8 @@ There is an in-progress WIP on `main` (uncommitted, see `git status`):
 These will land first. Do NOT clobber them. Use `git diff` before each
 push to confirm you are only adding files. The skill
 `~/.mavis/skills/codex-mavis-sync/scripts/sync.sh --auto` will merge
-both sides into `sync/codex-mavis-<timestamp>` before the APK ships.
+all pending active Codex, Mavis and Google Antigravity worktree branches
+into `sync/codex-mavis-antigravity-<timestamp>` before the APK ships.
 
 ---
 

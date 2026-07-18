@@ -8,6 +8,21 @@ import dtcDatabaseUrl from '../dtc_database.json?url';
 import { OscilloscopeCanvas } from './OscilloscopeCanvas';
 import { SignalGenerator, SignalAnalyzer, SIGNAL_LIBRARY, type SignalDiagnosis, type SignalDefinition } from '../services/signalAnalysis';
 import type { OscilloscopeMeasurement, WorkOrder, Client } from '../types';
+import { DiagnosticSnapshot } from '../lib/reports/types';
+import {
+  SafetyPreconditionEngine,
+  ObdSnapshotEngine,
+  BidirectionalExecutor,
+  MOCK_CAPABILITIES,
+  MOCK_COMMAND_PROFILES,
+  DEFAULT_PROCEDURES,
+  type BidirectionalCapability,
+  type BidirectionalAction,
+  type CommandProfile,
+  type LiveTelemetry,
+  type ExecutionResult,
+  type ActionStatus
+} from '../lib/bidirectional';
 
 interface OBD2ScannerProps {
   onClose: () => void;
@@ -15,9 +30,11 @@ interface OBD2ScannerProps {
   workOrders?: WorkOrder[];
   onSaveMeasurement?: (measurement: OscilloscopeMeasurement) => void;
   onUpdateWorkOrder?: (id: string, updates: Partial<WorkOrder>) => void;
+  onAddTimelineEvent?: (ev: any) => void;
+  onNavigateToManuals?: (dtcCode?: string) => void;
 }
 
-type TabMode = 'dtc' | 'oscilloscope';
+type TabMode = 'dtc' | 'oscilloscope' | 'activeTests' | 'serviceResets';
 
 interface DtcDatabaseItem {
   code: string;
@@ -43,7 +60,15 @@ const loadDtcDatabase = () => {
   return dtcDatabasePromise;
 };
 
-export function OBD2Scanner({ onClose, currentUser, workOrders, onSaveMeasurement, onUpdateWorkOrder }: OBD2ScannerProps) {
+export function OBD2Scanner({ 
+  onClose, 
+  currentUser, 
+  workOrders, 
+  onSaveMeasurement, 
+  onUpdateWorkOrder, 
+  onAddTimelineEvent,
+  onNavigateToManuals 
+}: OBD2ScannerProps) {
   const [activeTab, setActiveTab] = useState<TabMode>('oscilloscope');
 
   return (
@@ -69,15 +94,27 @@ export function OBD2Scanner({ onClose, currentUser, workOrders, onSaveMeasuremen
             <div className="flex bg-steel-950 p-1 rounded-xl border border-white/5 overflow-hidden">
               <button 
                 onClick={() => setActiveTab('oscilloscope')} 
-                className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1.5 ${activeTab === 'oscilloscope' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1 ${activeTab === 'oscilloscope' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
               >
-                <Activity size={12} /> Osciloscopio
+                <Activity size={10} /> Osciloscopio
               </button>
               <button 
                 onClick={() => setActiveTab('dtc')} 
-                className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1.5 ${activeTab === 'dtc' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1 ${activeTab === 'dtc' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
               >
-                <Search size={12} /> Analizador DTC
+                <Search size={10} /> Analizador DTC
+              </button>
+              <button 
+                onClick={() => setActiveTab('activeTests')} 
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1 ${activeTab === 'activeTests' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
+              >
+                <Zap size={10} /> Pruebas Activas
+              </button>
+              <button 
+                onClick={() => setActiveTab('serviceResets')} 
+                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg flex items-center gap-1 ${activeTab === 'serviceResets' ? 'bg-forge-500 text-black shadow-md' : 'text-steel-400 hover:text-white'}`}
+              >
+                <Wrench size={10} /> Resets Servicio
               </button>
             </div>
             <button onClick={onClose} className="p-2 text-steel-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5">
@@ -88,14 +125,30 @@ export function OBD2Scanner({ onClose, currentUser, workOrders, onSaveMeasuremen
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto bg-gradient-to-b from-steel-900 via-steel-900 to-steel-950">
-          {activeTab === 'dtc' ? (
+          {activeTab === 'dtc' && (
             <DTCAnalyzerTab 
               currentUser={currentUser} 
               workOrders={workOrders} 
               onUpdateWorkOrder={onUpdateWorkOrder} 
+              onNavigateToManuals={onNavigateToManuals}
             />
-          ) : (
+          )}
+          {activeTab === 'oscilloscope' && (
             <OscilloscopeTab currentUser={currentUser} workOrders={workOrders} onSaveMeasurement={onSaveMeasurement} />
+          )}
+          {activeTab === 'activeTests' && (
+            <ActiveTestsTab 
+              currentUser={currentUser} 
+              workOrders={workOrders} 
+              onAddTimelineEvent={onAddTimelineEvent} 
+            />
+          )}
+          {activeTab === 'serviceResets' && (
+            <ServiceResetsTab 
+              currentUser={currentUser} 
+              workOrders={workOrders} 
+              onAddTimelineEvent={onAddTimelineEvent} 
+            />
           )}
         </div>
 
@@ -117,9 +170,10 @@ interface DTCAnalyzerTabProps {
   currentUser?: Client;
   workOrders?: WorkOrder[];
   onUpdateWorkOrder?: (id: string, updates: Partial<WorkOrder>) => void;
+  onNavigateToManuals?: (dtcCode?: string) => void;
 }
 
-function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnalyzerTabProps) {
+function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder, onNavigateToManuals }: DTCAnalyzerTabProps) {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<any>(null);
   const [searched, setSearched] = useState(false);
@@ -607,6 +661,14 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
                           <span className="text-[9px] text-steel-500 font-mono mt-2 flex items-center gap-1">
                             Ver detalles & soluciones &rarr;
                           </span>
+                          {onNavigateToManuals && (
+                            <span
+                              className="text-[9px] text-indigo-400 font-mono mt-1.5 flex items-center gap-1 hover:text-indigo-300 transition-colors"
+                              onClick={(e) => { e.stopPropagation(); onNavigateToManuals(c); }}
+                            >
+                              📖 Consultar Manual Técnico
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -639,6 +701,14 @@ function DTCAnalyzerTab({ currentUser, workOrders, onUpdateWorkOrder }: DTCAnaly
                       <div>
                         <h3 className="text-2xl font-black text-white font-mono tracking-wider">{result.code}</h3>
                         <p className="text-[9px] text-steel-400 font-mono uppercase mt-0.5">Sistema: {result.system} • Fabricante: {result.manufacturer || 'Estándar Genérico'}</p>
+                        {onNavigateToManuals && (
+                          <button
+                            onClick={() => onNavigateToManuals(result.code)}
+                            className="mt-2 flex items-center gap-1.5 text-[10px] font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 rounded-lg px-3 py-1.5 transition-all"
+                          >
+                            📖 Consultar en Centro de Manuales Técnicos
+                          </button>
+                        )}
                       </div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
@@ -1069,3 +1139,1128 @@ function OscilloscopeTab({ currentUser, workOrders, onSaveMeasurement }: {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 3: PRUEBAS ACTIVAS (Bidirectional Controls)
+// ═══════════════════════════════════════════════════════════════
+
+interface ActiveTestsTabProps {
+  currentUser?: Client;
+  workOrders?: WorkOrder[];
+  onAddTimelineEvent?: (ev: any) => void;
+}
+
+export function ActiveTestsTab({ currentUser, workOrders, onAddTimelineEvent }: ActiveTestsTabProps) {
+  const [selectedCap, setSelectedCap] = useState<BidirectionalCapability | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [understandRisk, setUnderstandRisk] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
+  const [actionStatus, setActionStatus] = useState<ActionStatus>('CREATED');
+  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
+  const [ecuErrorMessage, setEcuErrorMessage] = useState<string | null>(null);
+  
+  // Simulated Manual Inputs
+  const [pressureValue, setPressureValue] = useState('');
+  const [manualResult, setManualResult] = useState<'PASS' | 'FAIL' | 'INCONCLUSIVE'>('PASS');
+  const [manualNotes, setManualNotes] = useState('');
+
+  // Local Telemetry Controls (for testing Safety Gates)
+  const [telemetry, setTelemetry] = useState<LiveTelemetry>({
+    rpm: 0,
+    speed: 0,
+    temp: 85,
+    voltage: 12.2,
+    load: 0,
+    maf: 0,
+    parkingBrakeOn: true,
+    brakePedalPressed: false,
+    transmissionParkOrNeutral: true,
+    doorsClosed: true,
+    fuelLevel: 45,
+    adapterQuality: 85,
+  });
+
+  const [activeDtcCodes, setActiveDtcCodes] = useState<string[]>(['P0230']); // Default mock active DTC (fuel pump circuit)
+
+  const holdIntervalRef = useRef<any>(null);
+
+  // Preconditions Check
+  const precheck = selectedCap 
+    ? SafetyPreconditionEngine.evaluatePreconditions(selectedCap, telemetry, activeDtcCodes)
+    : { passed: false, failedConditions: [], reason: 'Ninguna prueba seleccionada.', alternativeSuggestion: '' };
+
+  // Trigger holding button simulation
+  useEffect(() => {
+    if (isHolding) {
+      holdIntervalRef.current = setInterval(() => {
+        setHoldProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(holdIntervalRef.current);
+            setIsHolding(false);
+            handleExecuteAction();
+            return 100;
+          }
+          return prev + 5; // Takes 2 seconds (20 steps * 100ms)
+        });
+      }, 100);
+    } else {
+      if (holdIntervalRef.current) {
+        clearInterval(holdIntervalRef.current);
+      }
+      setHoldProgress(0);
+    }
+
+    return () => {
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+    };
+  }, [isHolding]);
+
+  const handleStartHold = () => {
+    if (!understandRisk && (selectedCap?.riskLevel === 'HIGH' || selectedCap?.riskLevel === 'CRITICAL')) return;
+    if (!precheck.passed) return;
+    setIsHolding(true);
+  };
+
+  const handleEndHold = () => {
+    setIsHolding(false);
+  };
+
+  // Execution Flow
+  const handleExecuteAction = async () => {
+    if (!selectedCap) return;
+
+    setCurrentStep(4);
+    setActionStatus('PRECHECK_RUNNING');
+    setExecutionLogs([]);
+    setEcuErrorMessage(null);
+    setExecutionResult(null);
+
+    // Step 1: Capture Pre-Snapshot
+    const preSnapshot = ObdSnapshotEngine.capture(
+      currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      telemetry,
+      activeDtcCodes,
+      `Pre-scan: Prueba activa de ${selectedCap.displayName}`
+    );
+    
+    setActionStatus('WAITING_CONFIRMATION');
+    await new Promise(r => setTimeout(r, 600));
+
+    setActionStatus('EXECUTING');
+    
+    // Command profile lookup
+    const profile = MOCK_COMMAND_PROFILES[selectedCap.commandProfileId || ''] || {
+      id: 'custom',
+      actionKey: selectedCap.actionKey,
+      protocol: selectedCap.protocol,
+      requestBytes: '30 01 00 00',
+      positiveResponsePattern: '70',
+      negativeResponsePatterns: [],
+      timeoutMs: 1000,
+      retries: 2,
+      requiresSecurityAccess: false
+    };
+
+    const actionRecord: BidirectionalAction = {
+      id: `act_${Date.now()}`,
+      capabilityId: selectedCap.id,
+      vehicleId: currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      userId: currentUser?.id || 'mecanico_1',
+      status: 'EXECUTING',
+      requestedAt: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      failedAt: null,
+      preSnapshotId: preSnapshot.id,
+      postSnapshotId: null,
+      result: null,
+      errorMessage: null,
+      auditHash: `audit_${Math.random().toString(16).substring(2, 8)}`,
+    };
+
+    // Execute UDS Command Profile serial queue
+    const res = await BidirectionalExecutor.executeAction(actionRecord, profile, (log) => {
+      setExecutionLogs(prev => [...prev, log]);
+    });
+
+    setActionStatus('VERIFYING');
+    await new Promise(r => setTimeout(r, 800));
+
+    const postSnapshot = ObdSnapshotEngine.capture(
+      currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      {
+        ...telemetry,
+        ...(res.postTelemetryChanges || {})
+      },
+      activeDtcCodes,
+      `Post-scan: Prueba activa de ${selectedCap.displayName}`
+    );
+
+    // Check results
+    const isCompleted = res.result === 'SUCCESS';
+    setActionStatus(isCompleted ? 'COMPLETED' : 'FAILED');
+    setExecutionResult(res.result);
+    setEcuErrorMessage(res.ecuError || null);
+
+    // Save Timeline Event & Report
+    if (onAddTimelineEvent) {
+      onAddTimelineEvent({
+        id: `ev_${Date.now()}`,
+        vehicle_id: currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+        event_type: isCompleted ? 'ACTIVE_TEST_EXECUTED' : 'ACTION_FAILED',
+        title: `${isCompleted ? 'Prueba Activa Completada' : 'Prueba Activa Fallida'} — ${selectedCap.displayName}`,
+        description: `Resultado ECU: ${res.result}. ${res.ecuError || ''}. Snapshot pre/post guardado de manera íntegra.`,
+        severity: isCompleted ? 'low' : 'high',
+        source: 'OBD',
+        created_at: new Date().toISOString(),
+        payload_json: JSON.stringify({
+          actionId: actionRecord.id,
+          capabilityKey: selectedCap.actionKey,
+          result: res.result,
+          logs: res.logs,
+          preSnapshotHash: preSnapshot.id,
+          postSnapshotHash: postSnapshot.id,
+        })
+      });
+    }
+
+    // Progression
+    setCurrentStep(5);
+  };
+
+  const handleSaveManualEvidence = () => {
+    if (!selectedCap) return;
+    
+    // Clear code if pump test is successful and manual confirmation works
+    let updatedCodes = [...activeDtcCodes];
+    if (selectedCap.actionKey === 'fuel_pump' && manualResult === 'PASS') {
+      updatedCodes = activeDtcCodes.filter(c => c !== 'P0230');
+      setActiveDtcCodes(updatedCodes);
+    }
+
+    if (onAddTimelineEvent) {
+      onAddTimelineEvent({
+        id: `ev_${Date.now()}_man`,
+        vehicle_id: currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+        event_type: 'REPAIR_COMPLETED',
+        title: `Evidencia Manual: ${selectedCap.displayName}`,
+        description: `Resultado manual ingresado: ${manualResult}. Medición de presión: ${pressureValue || 'N/A'} PSI. Notas: ${manualNotes}`,
+        severity: manualResult === 'PASS' ? 'low' : 'medium',
+        source: 'Manual',
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    alert('✅ Evidencia y notas técnicas guardadas. Los resultados se han vinculado al historial del Garage Digital y reporte final.');
+    
+    // Reset wizard
+    setSelectedCap(null);
+    setCurrentStep(1);
+    setUnderstandRisk(false);
+    setHoldProgress(0);
+    setPressureValue('');
+    setManualNotes('');
+  };
+
+  return (
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      
+      {/* CONTROL DE SIMULACIÓN DE CONDICIONES (Para Auditoría / Test de Safety Gates) */}
+      <div className="bg-steel-950/60 rounded-2xl p-4 border border-forge-500/20">
+        <h4 className="text-xs font-mono font-black text-forge-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <Activity size={14} className="animate-pulse" />
+          Consola del Vehículo (Simulador OBD-II)
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Velocidad</label>
+            <select 
+              value={telemetry.speed}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, speed: parseInt(e.target.value) }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="0">0 km/h (Estacionario)</option>
+              <option value="15">15 km/h (En Marcha)</option>
+              <option value="50">50 km/h (En Marcha)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Voltaje Batería</label>
+            <select 
+              value={telemetry.voltage}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, voltage: parseFloat(e.target.value) }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="12.2">12.2 V (Estable)</option>
+              <option value="14.2">14.2 V (Alternador)</option>
+              <option value="10.8">10.8 V (Batería Baja)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Estado Motor</label>
+            <select 
+              value={telemetry.rpm === 0 ? 'off' : 'running'}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, rpm: e.target.value === 'off' ? 0 : 800 }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="off">Apagado (0 RPM)</option>
+              <option value="running">Ralentí (800 RPM)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Temperatura Refrig.</label>
+            <select 
+              value={telemetry.temp}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, temp: parseInt(e.target.value) }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="85">85 °C (Nominal)</option>
+              <option value="118">118 °C (Sobrecalentado)</option>
+              <option value="50">50 °C (Frío)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Frenos / Caja</label>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setTelemetry(prev => ({ ...prev, parkingBrakeOn: !prev.parkingBrakeOn }))}
+                className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border font-mono transition-colors ${telemetry.parkingBrakeOn ? 'bg-forge-500/20 text-forge-400 border-forge-500/30' : 'bg-steel-900 text-steel-500 border-steel-700'}`}
+              >
+                F.MANO
+              </button>
+              <button 
+                onClick={() => setTelemetry(prev => ({ ...prev, brakePedalPressed: !prev.brakePedalPressed }))}
+                className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border font-mono transition-colors ${telemetry.brakePedalPressed ? 'bg-forge-500/20 text-forge-400 border-forge-500/30' : 'bg-steel-900 text-steel-500 border-steel-700'}`}
+              >
+                FRENO
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {activeDtcCodes.includes('P0230') && (
+          <div className="mt-3 bg-red-500/10 border border-red-500/25 rounded-xl p-3 flex gap-2 items-center">
+            <AlertTriangle className="text-red-400 shrink-0" size={16} />
+            <p className="text-[11px] text-red-200">
+              <span className="font-bold">IA Diagnóstica MEET:</span> Se detectó código <span className="font-mono font-bold bg-black/40 px-1 py-0.5 rounded text-white">P0230</span> (Bomba Combustible). 
+              Se recomienda encarecidamente ejecutar la <span className="font-bold">Prueba Activa de Bomba de Gasolina</span> para descartar si el fallo es eléctrico (relé/fusible) o mecánico (bomba).
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* COLUMNA IZQUIERDA: LISTA DE CAPACIDADES */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="glass rounded-2xl p-4 border border-white/10 shadow-lg bg-steel-950/40">
+            <h3 className="text-xs font-black text-white uppercase tracking-widest font-mono mb-4 flex items-center gap-1.5">
+              <Zap size={14} className="text-forge-500" />
+              Acciones de Control Bidireccional
+            </h3>
+            
+            <div className="space-y-2">
+              {MOCK_CAPABILITIES.filter(c => c.actionType === 'ACTIVE_TEST' || c.actionType === 'RESTRICTED').map(cap => {
+                const isSelected = selectedCap?.id === cap.id;
+                const isBlocked = cap.actionType === 'RESTRICTED';
+                
+                return (
+                  <button
+                    key={cap.id}
+                    onClick={() => {
+                      setSelectedCap(cap);
+                      setCurrentStep(1);
+                      setHoldProgress(0);
+                      setUnderstandRisk(false);
+                      setExecutionLogs([]);
+                    }}
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex justify-between items-start ${
+                      isSelected 
+                        ? 'bg-forge-500/15 border-forge-500/50 shadow-[0_0_15px_rgba(0,240,255,0.08)]' 
+                        : isBlocked
+                          ? 'bg-steel-950/30 border-red-500/20 opacity-60 hover:opacity-80'
+                          : 'bg-steel-900/60 hover:bg-steel-900 border-white/5 hover:border-white/15'
+                    }`}
+                  >
+                    <div className="space-y-1 pr-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-white text-xs leading-snug">{cap.displayName}</span>
+                        {isBlocked && (
+                          <span className="bg-red-500/20 text-red-400 border border-red-500/30 rounded px-1.5 py-0.5 text-[7px] uppercase tracking-wider font-mono">
+                            Bloqueado
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-steel-400 line-clamp-2 leading-relaxed">{cap.description}</p>
+                    </div>
+                    
+                    <div className="text-right shrink-0">
+                      <span className={`text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        cap.riskLevel === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                        cap.riskLevel === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                        'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                      }`}>
+                        {cap.riskLevel}
+                      </span>
+                      <div className="text-[8px] text-steel-500 font-mono mt-2">{cap.system.split(' ')[0]}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMNA DERECHA: FLUJO GUIADO */}
+        <div className="lg:col-span-7">
+          {selectedCap ? (
+            <div className="glass rounded-3xl p-5 border border-white/10 shadow-lg space-y-5 relative bg-steel-950/30">
+              
+              {/* Wizard Steps indicator */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="bg-forge-500/10 text-forge-400 border border-forge-500/30 rounded-lg p-1.5">
+                    <Wrench size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-mono font-bold text-steel-500 uppercase tracking-widest">Procedimiento Guiado</h4>
+                    <span className="text-xs font-black text-white">{selectedCap.displayName}</span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map(step => (
+                    <span 
+                      key={step} 
+                      className={`w-2.5 h-2.5 rounded-full border transition-all ${
+                        currentStep === step 
+                          ? 'bg-forge-500 border-forge-400 shadow-[0_0_8px_rgba(0,240,255,0.4)]'
+                          : currentStep > step
+                            ? 'bg-forge-500/50 border-forge-500/30'
+                            : 'bg-steel-950 border-steel-700'
+                      }`}
+                    ></span>
+                  ))}
+                </div>
+              </div>
+
+              {/* STEP 1: INFORMACIÓN */}
+              {currentStep === 1 && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="space-y-1.5">
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Paso 1: Medidas de Seguridad y Preparación</h5>
+                    <p className="text-xs text-steel-400 leading-relaxed font-medium">
+                      Antes de enviar señales electrónicas directas a la ECU, verifique manualmente las siguientes condiciones mecánicas básicas para evitar cortocircuitos o daños colaterales.
+                    </p>
+                  </div>
+
+                  <div className="bg-steel-950/60 border border-white/5 rounded-2xl p-4 divide-y divide-white/5 text-xs text-steel-300 space-y-3 font-medium">
+                    <div className="flex gap-2 items-start pt-1">
+                      <span className="bg-forge-500/10 border border-forge-500/30 text-forge-400 font-bold px-1.5 rounded font-mono">1</span>
+                      <p>Inspeccione visualmente el componente afectado para asegurar que no haya cables expuestos o conectores sulfatados.</p>
+                    </div>
+                    <div className="flex gap-2 items-start pt-3">
+                      <span className="bg-forge-500/10 border border-forge-500/30 text-forge-400 font-bold px-1.5 rounded font-mono">2</span>
+                      <p>Para pruebas de presión de combustible, conecte un manómetro físico seguro en el puerto Schrader del riel.</p>
+                    </div>
+                    <div className="flex gap-2 items-start pt-3">
+                      <span className="bg-forge-500/10 border border-forge-500/30 text-forge-400 font-bold px-1.5 rounded font-mono">3</span>
+                      <p>Mantenga un extintor clase B/C en la cercanía de la bahía si evalúa circuitos de combustible.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentStep(2)}
+                    className="w-full bg-forge-500 hover:bg-forge-400 text-black font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all"
+                  >
+                    Medidas Completadas. Continuar &rarr;
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 2: PRECONDICIONES (Safety Gates) */}
+              {currentStep === 2 && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="space-y-1">
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Paso 2: Validación de Compuerta de Seguridad (Safety Gate)</h5>
+                    <p className="text-xs text-steel-400 leading-relaxed font-medium">
+                      El sistema MEET interroga la telemetría en tiempo real de la ECU para garantizar que el vehículo está detenido y bajo parámetros térmicos y eléctricos seguros.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedCap.requiredConditions.map(cond => {
+                      const failed = precheck.failedConditions.includes(cond);
+                      
+                      const labelMap: Record<string, string> = {
+                        vehicle_stationary: 'Vehículo Estacionario (Velocidad = 0 km/h)',
+                        battery_voltage_min: 'Voltaje Batería >= 11.8V (Batería Estable)',
+                        engine_off: 'Motor Apagado (RPM = 0)',
+                        engine_running: 'Motor Encendido (RPM >= 500)',
+                        ignition_on: 'Ignición en posición ON (Contacto colocado)',
+                        coolant_temp_max: 'Temperatura de motor segura (< 115°C)',
+                        coolant_temp_min: 'Temperatura de motor de servicio (>= 70°C)',
+                        parking_brake_on: 'Freno de mano aplicado',
+                      };
+
+                      return (
+                        <div 
+                          key={cond}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                            failed 
+                              ? 'bg-red-500/5 border-red-500/25 text-red-200' 
+                              : 'bg-green-500/5 border-green-500/25 text-green-200'
+                          }`}
+                        >
+                          <span className="text-xs font-bold font-mono">{labelMap[cond] || cond}</span>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                            failed ? 'bg-red-500/25 text-red-400' : 'bg-green-500/25 text-green-400'
+                          }`}>
+                            {failed ? 'BLOQUEADO' : 'OK'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {!precheck.passed ? (
+                    <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl space-y-2">
+                      <h6 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldAlert size={14} /> ACCIÓN BLOQUEADA POR SEGURIDAD
+                      </h6>
+                      <p className="text-[11px] text-red-200 leading-relaxed font-mono">
+                        {precheck.reason}
+                      </p>
+                      <div className="text-[10px] font-bold text-steel-400 mt-2 bg-black/35 p-2.5 rounded-lg border border-white/5 leading-relaxed">
+                        <span className="text-forge-400">Acción Sugerida:</span> {precheck.alternativeSuggestion}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-xl flex items-center gap-2 text-[11px] text-green-200 font-mono">
+                      <CheckCircle2 size={16} className="text-green-400 shrink-0" />
+                      <span>Compuerta de seguridad superada. Todos los sensores están listos.</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setCurrentStep(1)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-2.5 rounded-xl text-xs transition-all"
+                    >
+                      &larr; Volver
+                    </button>
+                    <button
+                      onClick={() => setCurrentStep(3)}
+                      disabled={!precheck.passed}
+                      className="flex-1 bg-forge-500 hover:bg-forge-400 disabled:opacity-40 text-black font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all"
+                    >
+                      Continuar &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: ADVERTENCIA */}
+              {currentStep === 3 && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-orange-500/10 border border-orange-500/35 p-4 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 text-orange-400 border-b border-orange-500/15 pb-2">
+                      <ShieldAlert size={20} />
+                      <span className="font-black text-sm uppercase tracking-wider">ADVERTENCIA DE RESPONSABILIDAD</span>
+                    </div>
+                    
+                    <p className="text-xs text-orange-200 leading-relaxed font-medium">
+                      Esta es una <span className="font-bold text-white">acción bidireccional activa</span>. MEET enviará comandos de diagnóstico UDS que ignorarán el control automático del motor. 
+                      Al proceder, usted asume total responsabilidad de cualquier anomalía física.
+                    </p>
+
+                    <div className="space-y-1.5 text-[11px] text-orange-300 font-mono">
+                      <div>• Nivel de riesgo de la prueba: <span className="text-white font-bold">{selectedCap.riskLevel}</span></div>
+                      <div>• Impacto del sistema: <span className="text-white font-bold">{selectedCap.system}</span></div>
+                      <div>• Protocolo utilizado: <span className="text-white font-bold">{selectedCap.protocol}</span></div>
+                    </div>
+                  </div>
+
+                  {(selectedCap.riskLevel === 'HIGH' || selectedCap.riskLevel === 'CRITICAL' || selectedCap.riskLevel === 'MEDIUM') && (
+                    <label className="flex items-start gap-3 bg-black/35 p-3 rounded-xl border border-white/5 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={understandRisk}
+                        onChange={(e) => setUnderstandRisk(e.target.checked)}
+                        className="mt-0.5 accent-forge-500"
+                      />
+                      <span className="text-xs text-steel-200 font-medium">
+                        Entiendo el riesgo y he conectado manómetros / elementos de seguridad física en el vehículo.
+                      </span>
+                    </label>
+                  )}
+
+                  <div className="space-y-2">
+                    {(selectedCap.riskLevel === 'HIGH' || selectedCap.riskLevel === 'CRITICAL' || selectedCap.riskLevel === 'MEDIUM') ? (
+                      <div className="relative">
+                        <button
+                          onMouseDown={handleStartHold}
+                          onMouseUp={handleEndHold}
+                          onMouseLeave={handleEndHold}
+                          onTouchStart={handleStartHold}
+                          onTouchEnd={handleEndHold}
+                          disabled={!understandRisk}
+                          className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-black font-black py-3 rounded-xl text-xs uppercase tracking-widest relative overflow-hidden transition-all select-none"
+                        >
+                          <span className="relative z-10">Mantenga presionado 2 segundos para confirmar</span>
+                          <div 
+                            className="absolute top-0 left-0 bottom-0 bg-white/20 transition-all duration-100"
+                            style={{ width: `${holdProgress}%` }}
+                          ></div>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleExecuteAction}
+                        className="w-full bg-forge-500 hover:bg-forge-400 text-black font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all"
+                      >
+                        Confirmar y Ejecutar Prueba Activa
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setCurrentStep(2)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-2.5 rounded-xl text-xs transition-all"
+                    >
+                      &larr; Volver
+                    </button>
+                    <button
+                      onClick={() => { setSelectedCap(null); setCurrentStep(1); }}
+                      className="flex-1 bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 font-bold py-2.5 rounded-xl text-xs transition-all"
+                    >
+                      Cancelar Todo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: EJECUCIÓN */}
+              {currentStep === 4 && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="flex justify-between items-center">
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Paso 4: Transmisión Serial en Canal CAN</h5>
+                    <span className="text-[10px] text-forge-400 font-mono animate-pulse font-bold uppercase">
+                      {actionStatus === 'PRECHECK_RUNNING' ? 'Inicializando...' :
+                       actionStatus === 'EXECUTING' ? 'Transmitiendo...' :
+                       actionStatus === 'VERIFYING' ? 'Validando ECU...' : 'Listo'}
+                    </span>
+                  </div>
+
+                  <div className="h-1.5 w-full bg-steel-950 rounded-full overflow-hidden border border-white/5">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        actionStatus === 'FAILED' ? 'bg-red-500' : 'bg-forge-500'
+                      }`}
+                      style={{ 
+                        width: actionStatus === 'PRECHECK_RUNNING' ? '15%' :
+                               actionStatus === 'EXECUTING' ? '60%' :
+                               actionStatus === 'VERIFYING' ? '90%' : '100%' 
+                      }}
+                    ></div>
+                  </div>
+
+                  {/* Terminal Logger Output */}
+                  <div className="bg-black/95 border border-steel-800 rounded-2xl p-4 font-mono text-[10px] text-emerald-400 space-y-1.5 h-44 overflow-y-auto select-none shadow-inner">
+                    {executionLogs.map((log, i) => (
+                      <div key={i} className="flex items-start gap-1">
+                        <span className="text-emerald-700 shrink-0">&gt;</span>
+                        <span>{log}</span>
+                      </div>
+                    ))}
+                    {(actionStatus === 'EXECUTING' || actionStatus === 'VERIFYING') && (
+                      <div className="w-1.5 h-3 bg-emerald-400 inline-block animate-pulse ml-1"></div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 5: REGISTRO */}
+              {currentStep === 5 && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 rounded-2xl border flex gap-3 items-start bg-black/40 border-white/5">
+                    <div className="shrink-0 p-2.5 rounded-xl bg-steel-900 border border-white/10">
+                      {executionResult === 'SUCCESS' ? (
+                        <CheckCircle2 className="text-green-400" size={24} />
+                      ) : (
+                        <ShieldAlert className="text-red-400" size={24} />
+                      )}
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-white uppercase tracking-wider">
+                        Resultado del Comando: {executionResult === 'SUCCESS' ? 'Éxito Electrónico' : 'Fallo de ECU / Adaptador'}
+                      </h5>
+                      <p className="text-[11px] text-steel-400 leading-relaxed mt-1 font-medium">
+                        {executionResult === 'SUCCESS' 
+                          ? 'La ECU del vehículo respondió positivamente al comando UDS. El actuador eléctrico se ha forzado temporalmente.'
+                          : ecuErrorMessage || 'El comando no pudo completarse debido a un timeout o error del bus de comunicación.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 4 Fuel Pump Test manual registry */}
+                  {selectedCap.actionKey === 'fuel_pump' && (
+                    <div className="bg-steel-950/60 p-4 rounded-xl border border-forge-500/10 space-y-3">
+                      <h6 className="text-[10px] text-forge-500 font-mono uppercase tracking-widest">Anotaciones de Presión y Evidencia</h6>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Presión Registrada (PSI)</label>
+                          <input
+                            type="text"
+                            value={pressureValue}
+                            onChange={(e) => setPressureValue(e.target.value)}
+                            placeholder="Ej. 45"
+                            className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Diagnóstico Físico</label>
+                          <select
+                            value={manualResult}
+                            onChange={(e) => setManualResult(e.target.value as any)}
+                            className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                          >
+                            <option value="PASS">PASS (Bomba genera presión y suena)</option>
+                            <option value="FAIL">FAIL (Bomba no suena o no genera presión)</option>
+                            <option value="INCONCLUSIVE">Inconcluso (Verificar cableado)</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Notas Técnicas Adicionales</label>
+                        <textarea
+                          rows={2}
+                          value={manualNotes}
+                          onChange={(e) => setManualNotes(e.target.value)}
+                          placeholder="Ingrese observaciones..."
+                          className="w-full bg-steel-900 border border-steel-700 rounded-lg p-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Reset Confirm for general components */}
+                  {selectedCap.actionKey !== 'fuel_pump' && (
+                    <div className="bg-steel-950/60 p-4 rounded-xl border border-white/5 space-y-3">
+                      <h6 className="text-[10px] text-steel-400 font-mono uppercase tracking-widest font-bold">Resultado Físico Observado</h6>
+                      <div className="flex gap-2">
+                        {['PASS', 'FAIL', 'INCONCLUSIVE'].map(r => (
+                          <button
+                            key={r}
+                            onClick={() => setManualResult(r as any)}
+                            className={`flex-1 text-[10px] font-bold py-2 rounded-lg border transition-all ${
+                              manualResult === r 
+                                ? 'bg-forge-500/20 text-forge-400 border-forge-500/40 shadow-inner' 
+                                : 'bg-steel-900 text-steel-400 border-steel-700'
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSaveManualEvidence}
+                    className="w-full bg-forge-500 hover:bg-forge-400 text-black font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all"
+                  >
+                    Guardar Evidencia & Finalizar
+                  </button>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="glass rounded-3xl p-10 border border-white/5 shadow-lg flex flex-col items-center justify-center text-center min-h-[380px] relative overflow-hidden bg-gradient-to-b from-steel-900/50 to-transparent">
+              <div className="relative w-28 h-28 mb-6 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-forge-500/10 animate-ping"></div>
+                <div className="w-16 h-16 rounded-full bg-forge-500/5 border border-forge-500/20 flex items-center justify-center text-forge-500 shadow-[0_0_15px_rgba(0,240,255,0.05)]">
+                  <Zap size={24} className="animate-pulse" />
+                </div>
+              </div>
+
+              <h3 className="text-lg font-bold text-white tracking-wide">Panel de Pruebas Activas Bidireccionales</h3>
+              <p className="text-xs text-steel-400 mt-2 max-w-sm leading-relaxed">
+                Seleccione una de las capacidades de actuadores disponibles a la izquierda para iniciar el flujo guiado. Recuerde validar el manual del fabricante.
+              </p>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 4: SERVICE RESETS (Electronic and Manual procedures)
+// ═══════════════════════════════════════════════════════════════
+
+interface ServiceResetsTabProps {
+  currentUser?: Client;
+  workOrders?: WorkOrder[];
+  onAddTimelineEvent?: (ev: any) => void;
+}
+
+export function ServiceResetsTab({ currentUser, workOrders, onAddTimelineEvent }: ServiceResetsTabProps) {
+  const [selectedCap, setSelectedCap] = useState<BidirectionalCapability | null>(null);
+  const [resetLogs, setResetLogs] = useState<string[]>([]);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [resetCompleted, setResetCompleted] = useState(false);
+  const [snapshotPre, setSnapshotPre] = useState<DiagnosticSnapshot | null>(null);
+  const [snapshotPost, setSnapshotPost] = useState<DiagnosticSnapshot | null>(null);
+  const [comparison, setComparison] = useState<any>(null);
+
+  // Local Telemetry Controls (for testing Safety Gates)
+  const [telemetry, setTelemetry] = useState<LiveTelemetry>({
+    rpm: 0,
+    speed: 0,
+    temp: 82,
+    voltage: 12.3,
+    load: 0,
+    maf: 0,
+    parkingBrakeOn: true,
+    brakePedalPressed: false,
+    transmissionParkOrNeutral: true,
+    doorsClosed: true,
+    fuelLevel: 45,
+    adapterQuality: 90,
+  });
+
+  const activeDtcCodes = ['P0230']; // Default mock active DTCs
+
+  // Procedure lookup
+  const currentProcedure = selectedCap 
+    ? DEFAULT_PROCEDURES.find(p => p.actionKey === selectedCap.actionKey)
+    : null;
+
+  const precheck = selectedCap
+    ? SafetyPreconditionEngine.evaluatePreconditions(selectedCap, telemetry, activeDtcCodes)
+    : { passed: false, failedConditions: [], reason: 'Ninguno seleccionado.' };
+
+  const handleRunElectronicReset = async () => {
+    if (!selectedCap || !precheck.passed) return;
+
+    setIsExecuting(true);
+    setResetLogs([]);
+    setResetCompleted(false);
+
+    // Capture pre snapshot
+    const preSnap = ObdSnapshotEngine.capture(
+      currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      telemetry,
+      activeDtcCodes,
+      `Pre-scan: Reset de Servicio Electrónico de ${selectedCap.displayName}`
+    );
+    setSnapshotPre(preSnap);
+
+    const profile = MOCK_COMMAND_PROFILES[selectedCap.commandProfileId || ''] || {
+      id: 'custom_reset',
+      actionKey: selectedCap.actionKey,
+      protocol: selectedCap.protocol,
+      requestBytes: '2E AA 00',
+      positiveResponsePattern: '6E',
+      negativeResponsePatterns: [],
+      timeoutMs: 1000,
+      retries: 2,
+      requiresSecurityAccess: true
+    };
+
+    const actionRecord: BidirectionalAction = {
+      id: `reset_${Date.now()}`,
+      capabilityId: selectedCap.id,
+      vehicleId: currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      userId: currentUser?.id || 'mecanico_1',
+      status: 'EXECUTING',
+      requestedAt: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      failedAt: null,
+      preSnapshotId: preSnap.id,
+      postSnapshotId: null,
+      result: null,
+      errorMessage: null,
+      auditHash: `audit_${Math.random().toString(16).substring(2, 8)}`,
+    };
+
+    const res = await BidirectionalExecutor.executeAction(actionRecord, profile, (log) => {
+      setResetLogs(prev => [...prev, log]);
+    });
+
+    const isSuccess = res.result === 'SUCCESS';
+    setIsExecuting(false);
+    setResetCompleted(true);
+
+    const postSnap = ObdSnapshotEngine.capture(
+      currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+      {
+        ...telemetry,
+        ...(res.postTelemetryChanges || {})
+      },
+      [], // Cleared DTC codes during reset simulations
+      `Post-scan: Reset de Servicio Electrónico de ${selectedCap.displayName}`
+    );
+    setSnapshotPost(postSnap);
+
+    const diff = ObdSnapshotEngine.compare(preSnap, postSnap);
+    setComparison(diff);
+
+    // Save Timeline Event & Report
+    if (onAddTimelineEvent) {
+      onAddTimelineEvent({
+        id: `ev_${Date.now()}`,
+        vehicle_id: currentUser?.vehicles?.[0]?.plate || 'TEST-PLATE',
+        event_type: isSuccess ? 'SERVICE_RESET_EXECUTED' : 'ACTION_FAILED',
+        title: `${isSuccess ? 'Reset de Servicio Completado' : 'Reset de Servicio Fallido'} — ${selectedCap.displayName}`,
+        description: `Resultado: ${res.result}. ${res.ecuError || ''}. Comparativa de snapshot disponible en Garage Digital.`,
+        severity: isSuccess ? 'low' : 'high',
+        source: 'OBD',
+        created_at: new Date().toISOString(),
+        payload_json: JSON.stringify({
+          actionId: actionRecord.id,
+          capabilityKey: selectedCap.actionKey,
+          result: res.result,
+          preSnapshotHash: preSnap.id,
+          postSnapshotHash: postSnap.id,
+          clearedDtcsCount: diff.clearedDtcs.length
+        })
+      });
+    }
+  };
+
+  return (
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      
+      {/* SIMULATOR CONTROLS */}
+      <div className="bg-steel-950/60 rounded-2xl p-4 border border-forge-500/20">
+        <h4 className="text-xs font-mono font-black text-forge-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <Activity size={14} className="animate-pulse" />
+          Simulación de Precondiciones de Mantenimiento
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Voltaje Batería</label>
+            <select 
+              value={telemetry.voltage}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, voltage: parseFloat(e.target.value) }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="12.3">12.3 V (Contacto ON)</option>
+              <option value="10.5">10.5 V (Batería Baja)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Marcha Seleccionada</label>
+            <select 
+              value={telemetry.transmissionParkOrNeutral ? 'P' : 'D'}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, transmissionParkOrNeutral: e.target.value === 'P' }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="P">Park/Neutral (Estacionario)</option>
+              <option value="D">Drive (Caja Engranada)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Freno Estacionamiento</label>
+            <select 
+              value={telemetry.parkingBrakeOn ? 'on' : 'off'}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, parkingBrakeOn: e.target.value === 'on' }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="on">Freno Puesto (ON)</option>
+              <option value="off">Freno Suelto (OFF)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] text-steel-400 block uppercase font-mono mb-1">Calidad de Enlace OBD2</label>
+            <select 
+              value={telemetry.adapterQuality}
+              onChange={(e) => setTelemetry(prev => ({ ...prev, adapterQuality: parseInt(e.target.value) }))}
+              className="w-full bg-steel-900 border border-steel-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
+            >
+              <option value="90">90% (Excelente)</option>
+              <option value="40">40% (Glitch / Señal Débil)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* COLUMNA IZQUIERDA: LISTA DE RESETS */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="glass rounded-2xl p-4 border border-white/10 shadow-lg bg-steel-950/40">
+            <h3 className="text-xs font-black text-white uppercase tracking-widest font-mono mb-4 flex items-center gap-1.5">
+              <Wrench size={14} className="text-forge-500" />
+              Resets de Mantenimiento / Servicio
+            </h3>
+
+            <div className="space-y-2">
+              {MOCK_CAPABILITIES.filter(c => c.actionType === 'SERVICE_RESET' || c.actionType === 'ADAPTATION').map(cap => {
+                const isSelected = selectedCap?.id === cap.id;
+                
+                return (
+                  <button
+                    key={cap.id}
+                    onClick={() => {
+                      setSelectedCap(cap);
+                      setResetCompleted(false);
+                      setResetLogs([]);
+                      setSnapshotPre(null);
+                      setSnapshotPost(null);
+                      setComparison(null);
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${
+                      isSelected 
+                        ? 'bg-forge-500/15 border-forge-500/50 shadow-[0_0_15px_rgba(0,240,255,0.08)]' 
+                        : 'bg-steel-900/60 hover:bg-steel-900 border-white/5 hover:border-white/15'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold text-white text-xs leading-snug">{cap.displayName}</div>
+                      <p className="text-[10px] text-steel-400 mt-1 leading-relaxed">{cap.description}</p>
+                    </div>
+                    
+                    <span className="bg-steel-950 border border-white/5 text-steel-400 rounded px-1.5 py-0.5 text-[8px] uppercase font-mono tracking-wider shrink-0 ml-2">
+                      {cap.supportConfidence === 'CONFIRMED' ? 'Confirmado' : 'Probable'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMNA DERECHA: PROCEDIMIENTO MANUAL Y BOTÓN */}
+        <div className="lg:col-span-7">
+          {selectedCap ? (
+            <div className="glass rounded-3xl p-5 border border-white/10 shadow-lg space-y-5 bg-steel-950/30">
+              
+              <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                <div>
+                  <h4 className="text-xs font-mono font-bold text-forge-500 uppercase tracking-widest">{selectedCap.system}</h4>
+                  <h3 className="text-base font-black text-white">{selectedCap.displayName}</h3>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                  selectedCap.riskLevel === 'LOW' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  Riesgo {selectedCap.riskLevel}
+                </span>
+              </div>
+
+              {/* OPCIÓN A: RESET ELECTRÓNICO */}
+              <div className="bg-steel-950/60 border border-white/5 p-4 rounded-2xl space-y-4">
+                <h5 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Cpu size={14} className="text-forge-500" />
+                  Método 1: Comando Electrónico OBD
+                </h5>
+                <p className="text-[11px] text-steel-400 leading-relaxed font-medium">
+                  MEET transmitirá un comando directo sobre el bus CAN para limpiar el buffer de memoria no volátil de la ECU.
+                </p>
+
+                {/* Precheck Warnings */}
+                {!precheck.passed && (
+                  <div className="bg-red-500/10 border border-red-500/25 p-3 rounded-xl text-[10px] text-red-200 leading-relaxed font-mono font-medium">
+                    ⚠️ Comando bloqueado: {precheck.reason}
+                  </div>
+                )}
+
+                {!resetCompleted ? (
+                  <button
+                    onClick={handleRunElectronicReset}
+                    disabled={isExecuting || !precheck.passed}
+                    className="w-full bg-forge-500 hover:bg-forge-400 disabled:opacity-40 text-black font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all"
+                  >
+                    {isExecuting ? 'Ejecutando Reset OBD...' : 'Ejecutar Restablecimiento Electrónico'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-green-500/10 border border-green-500/25 rounded-xl text-green-200 text-xs font-mono">
+                      ✅ Restablecimiento electrónico finalizado con éxito.
+                    </div>
+
+                    {comparison && (
+                      <div className="bg-black/35 rounded-xl p-3 border border-white/5 space-y-2 text-[10px] font-mono">
+                        <div className="text-forge-500 uppercase tracking-widest font-black text-[9px]">Resultado de Verificación de Snapshots</div>
+                        <div>• Códigos de falla borrados: <span className="text-green-400 font-bold">{comparison.clearedDtcs.length > 0 ? comparison.clearedDtcs.join(', ') : 'Ninguno'}</span></div>
+                        <div>• Cambios en voltaje: <span className="text-white">{comparison.voltageDelta.toFixed(2)}V</span></div>
+                        <div>• Variación RPM ralentí: <span className="text-white">{comparison.rpmDelta} RPM</span></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Logs Output */}
+                {resetLogs.length > 0 && (
+                  <div className="bg-black border border-steel-800 rounded-xl p-3 font-mono text-[9px] text-emerald-400 h-24 overflow-y-auto">
+                    {resetLogs.map((log, idx) => (
+                      <div key={idx} className="flex gap-1">
+                        <span className="text-emerald-700">&gt;</span>
+                        <span>{log}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* OPCIÓN B: PROCEDIMIENTO MANUAL */}
+              {currentProcedure && (
+                <div className="border border-white/5 p-4 rounded-2xl space-y-3 bg-steel-900/50">
+                  <h5 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <BookOpen size={14} className="text-forge-500" />
+                    Método 2: Procedimiento Manual de Tablero (Reserva de Taller)
+                  </h5>
+                  <p className="text-[11px] text-steel-400 leading-relaxed font-medium">
+                    Si el módulo electrónico no responde o el adaptador OBD no es compatible, complete el ciclo manual usando los controles del tablero:
+                  </p>
+
+                  <div className="space-y-2 bg-black/35 p-3 rounded-xl border border-white/5">
+                    {currentProcedure.steps.map((step, idx) => (
+                      <div key={idx} className="flex gap-2 items-start text-xs text-steel-300">
+                        <span className="bg-white/5 border border-white/10 text-forge-400 rounded px-1.5 font-bold font-mono text-[10px]">{idx + 1}</span>
+                        <p className="leading-relaxed font-medium">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-xl text-[10px] text-yellow-300 font-mono leading-relaxed font-medium">
+                    <span className="font-bold">Advertencias:</span> {currentProcedure.warnings.join(' ')}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="glass rounded-3xl p-10 border border-white/5 shadow-lg flex flex-col items-center justify-center text-center min-h-[380px] relative overflow-hidden bg-gradient-to-b from-steel-900/50 to-transparent">
+              <div className="relative w-28 h-28 mb-6 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-forge-500/10 animate-ping"></div>
+                <div className="w-16 h-16 rounded-full bg-forge-500/5 border border-forge-500/20 flex items-center justify-center text-forge-500 shadow-[0_0_15px_rgba(0,240,255,0.05)]">
+                  <Wrench size={22} className="animate-pulse" />
+                </div>
+              </div>
+
+              <h3 className="text-lg font-bold text-white tracking-wide">Panel de Resets de Servicio y Calibración</h3>
+              <p className="text-xs text-steel-400 mt-2 max-w-sm leading-relaxed">
+                Seleccione una tarea de mantenimiento a la izquierda para ver el procedimiento manual paso a paso o realizar el reset electrónico mediante comandos UDS directos.
+              </p>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+

@@ -474,3 +474,263 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_transaction ON marketplace_led
 CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_order ON marketplace_ledger_entries (order_type, order_id);
 CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_event ON marketplace_ledger_entries (related_event_id);
 CREATE INDEX IF NOT EXISTS idx_marketplace_ledger_status ON marketplace_ledger_entries (status, created_at_ms);
+
+-- ─── B2B FLEET & DVIR SUBSYSTEM ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS fleet_organizations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  owner_user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  legal_name TEXT,
+  tax_id TEXT,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL,
+  country TEXT NOT NULL,
+  province TEXT,
+  address TEXT,
+  plan TEXT NOT NULL DEFAULT 'FREE_FLEET',
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_branches (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  location TEXT,
+  manager_user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_vehicles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  branch_id UUID REFERENCES fleet_branches(id) ON DELETE SET NULL,
+  vehicle_profile_id TEXT NOT NULL,
+  internal_code TEXT NOT NULL,
+  assigned_driver_id UUID,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  odometer_km INT NOT NULL DEFAULT 0,
+  last_dvir_id UUID,
+  last_health_score INT DEFAULT 100,
+  last_scan_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_drivers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  user_id TEXT,
+  full_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  license_number TEXT,
+  license_expiration TIMESTAMPTZ,
+  assigned_vehicle_id UUID REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE fleet_vehicles ADD CONSTRAINT fk_assigned_driver FOREIGN KEY (assigned_driver_id) REFERENCES fleet_drivers(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS dvir_inspections (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  driver_id UUID NOT NULL REFERENCES fleet_drivers(id) ON DELETE CASCADE,
+  inspection_type TEXT NOT NULL DEFAULT 'DAILY',
+  status TEXT NOT NULL DEFAULT 'SUBMITTED',
+  odometer_km INT NOT NULL DEFAULT 0,
+  location_lat FLOAT,
+  location_lng FLOAT,
+  started_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  signed_at TIMESTAMPTZ,
+  overall_result TEXT NOT NULL DEFAULT 'PASS',
+  report_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS dvir_checklist_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  inspection_id UUID NOT NULL REFERENCES dvir_inspections(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  item_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OK',
+  severity TEXT NOT NULL DEFAULT 'LOW',
+  notes TEXT,
+  photo_required BOOLEAN DEFAULT false,
+  photo_uri TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS dvir_obd_snapshots (
+  inspection_id UUID PRIMARY KEY REFERENCES dvir_inspections(id) ON DELETE CASCADE,
+  connection_state TEXT NOT NULL,
+  adapter_quality TEXT NOT NULL,
+  dtcs_active TEXT[] DEFAULT '{}',
+  dtcs_pending TEXT[] DEFAULT '{}',
+  dtcs_permanent TEXT[] DEFAULT '{}',
+  readiness JSONB DEFAULT '{}',
+  voltage FLOAT NOT NULL,
+  rpm FLOAT,
+  coolant_temp FLOAT,
+  odometer INT,
+  raw_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_evidence (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  related_entity_type TEXT NOT NULL,
+  related_entity_id UUID NOT NULL,
+  evidence_type TEXT NOT NULL,
+  uri TEXT NOT NULL,
+  hash_sha256 TEXT NOT NULL,
+  notes TEXT,
+  captured_by_user_id TEXT NOT NULL,
+  captured_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS dvir_signatures (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  inspection_id UUID NOT NULL REFERENCES dvir_inspections(id) ON DELETE CASCADE,
+  signer_user_id TEXT NOT NULL,
+  signer_name TEXT NOT NULL,
+  signer_role TEXT NOT NULL,
+  signature_uri TEXT NOT NULL,
+  signed_at TIMESTAMPTZ DEFAULT now(),
+  hash_sha256 TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fleet_alerts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  driver_id UUID REFERENCES fleet_drivers(id) ON DELETE SET NULL,
+  alert_type TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'LOW',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  source TEXT NOT NULL DEFAULT 'DVIR',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS fleet_maintenance_tasks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  maintenance_type TEXT NOT NULL,
+  due_km INT,
+  due_date TIMESTAMPTZ,
+  priority TEXT NOT NULL DEFAULT 'NORMAL',
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  assigned_provider_id TEXT,
+  cost_estimate FLOAT,
+  report_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_work_orders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  created_by_user_id TEXT NOT NULL,
+  assigned_provider_id TEXT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'MANUAL',
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  priority TEXT NOT NULL DEFAULT 'NORMAL',
+  estimated_cost FLOAT,
+  final_cost FLOAT,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  report_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS fleet_cost_entries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  amount FLOAT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'CRC',
+  provider_id TEXT,
+  description TEXT,
+  receipt_uri TEXT,
+  related_work_order_id UUID REFERENCES fleet_work_orders(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fleet_trips (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  fleet_id UUID NOT NULL REFERENCES fleet_organizations(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+  driver_id UUID NOT NULL REFERENCES fleet_drivers(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  distance_km FLOAT NOT NULL DEFAULT 0,
+  eco_score INT NOT NULL DEFAULT 100,
+  harsh_brakes INT NOT NULL DEFAULT 0,
+  harsh_accels INT NOT NULL DEFAULT 0,
+  fuel_used_estimated FLOAT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE fleet_organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_branches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_vehicles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_drivers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dvir_inspections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dvir_checklist_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dvir_obd_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_evidence ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dvir_signatures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_maintenance_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_work_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_cost_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_trips ENABLE ROW LEVEL SECURITY;
+
+-- Select/All policies
+CREATE POLICY "Public select fleet_organizations" ON fleet_organizations FOR ALL USING (true);
+CREATE POLICY "Public select fleet_branches" ON fleet_branches FOR ALL USING (true);
+CREATE POLICY "Public select fleet_vehicles" ON fleet_vehicles FOR ALL USING (true);
+CREATE POLICY "Public select fleet_drivers" ON fleet_drivers FOR ALL USING (true);
+CREATE POLICY "Public select dvir_inspections" ON dvir_inspections FOR ALL USING (true);
+CREATE POLICY "Public select dvir_checklist_items" ON dvir_checklist_items FOR ALL USING (true);
+CREATE POLICY "Public select dvir_obd_snapshots" ON dvir_obd_snapshots FOR ALL USING (true);
+CREATE POLICY "Public select fleet_evidence" ON fleet_evidence FOR ALL USING (true);
+CREATE POLICY "Public select dvir_signatures" ON dvir_signatures FOR ALL USING (true);
+CREATE POLICY "Public select fleet_alerts" ON fleet_alerts FOR ALL USING (true);
+CREATE POLICY "Public select fleet_maintenance_tasks" ON fleet_maintenance_tasks FOR ALL USING (true);
+CREATE POLICY "Public select fleet_work_orders" ON fleet_work_orders FOR ALL USING (true);
+CREATE POLICY "Public select fleet_cost_entries" ON fleet_cost_entries FOR ALL USING (true);
+CREATE POLICY "Public select fleet_trips" ON fleet_trips FOR ALL USING (true);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_fleet_organizations_owner ON fleet_organizations (owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_branches_fleet ON fleet_branches (fleet_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_fleet ON fleet_vehicles (fleet_id, status);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_driver ON fleet_vehicles (assigned_driver_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_drivers_fleet ON fleet_drivers (fleet_id, status);
+CREATE INDEX IF NOT EXISTS idx_dvir_inspections_vehicle ON dvir_inspections (vehicle_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dvir_inspections_driver ON dvir_inspections (driver_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dvir_checklist_inspection ON dvir_checklist_items (inspection_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_evidence_vehicle ON fleet_evidence (vehicle_id, evidence_type);
+CREATE INDEX IF NOT EXISTS idx_fleet_alerts_fleet ON fleet_alerts (fleet_id, status, severity);
+CREATE INDEX IF NOT EXISTS idx_fleet_maintenance_vehicle ON fleet_maintenance_tasks (vehicle_id, status);
+CREATE INDEX IF NOT EXISTS idx_fleet_work_orders_vehicle ON fleet_work_orders (vehicle_id, status);
+CREATE INDEX IF NOT EXISTS idx_fleet_cost_entries_vehicle ON fleet_cost_entries (vehicle_id, type);
+CREATE INDEX IF NOT EXISTS idx_fleet_trips_driver ON fleet_trips (driver_id, started_at DESC);
+

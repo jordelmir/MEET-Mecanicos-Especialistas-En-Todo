@@ -39,6 +39,10 @@ const baseForm: SupplierQuoteFormInput = {
   compatibilityConfidence: 'EXACT',
   compatibilityNotes: 'Verificado contra Hyundai Accent Verna 2005 1.6 G4FC',
   expiresInHours: 48,
+  vehicleBrand: 'Hyundai',
+  vehicleModel: 'Accent Verna',
+  vehicleYear: 2005,
+  vehicleEngine: '1.6 G4FC',
 };
 
 describe('buildQuoteFromForm', () => {
@@ -126,6 +130,49 @@ describe('validateQuote — anti-fraud rules', () => {
     );
     expect(v.level).toBe('BLOCK');
     expect(v.errors.join(' ')).toContain('EXACTA');
+  });
+
+  it('BLOCKS EXACT when OEM and free-form notes lack structured vehicle evidence', () => {
+    const v = validateQuote(
+      buildQuoteFromForm({
+        ...baseForm,
+        vehicleBrand: '',
+        vehicleModel: '',
+        vehicleYear: undefined,
+        vehicleEngine: '',
+        vehicleVin: '',
+      }),
+    );
+
+    expect(v.level).toBe('BLOCK');
+    expect(v.errors.join(' ')).toContain('tupla cerrada');
+  });
+
+  it('accepts VIN plus part identity as structured EXACT evidence', () => {
+    const v = validateQuote(
+      buildQuoteFromForm({
+        ...baseForm,
+        vehicleBrand: '',
+        vehicleModel: '',
+        vehicleYear: undefined,
+        vehicleEngine: '',
+        vehicleVin: 'KMHCN46C18U123456',
+      }),
+    );
+
+    expect(v.level).toBe('OK');
+  });
+
+  it('BLOCKS an invalid VIN even when the closed tuple is complete', () => {
+    const v = validateQuote(
+      buildQuoteFromForm({
+        ...baseForm,
+        vehicleVin: 'KMHCN46C18O123456',
+      }),
+    );
+
+    expect(v.level).toBe('BLOCK');
+    expect(v.errors.join(' ')).toContain('no es válido');
   });
 
   it('WARNS an EXACT-compat quote that has no notes', () => {

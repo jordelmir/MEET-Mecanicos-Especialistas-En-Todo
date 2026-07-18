@@ -41,6 +41,8 @@ class P0230EndToEndTest {
         val p0230 = pack.profiles.firstOrNull { it.code == "P0230" }
         assertNotNull("P0230 profile should be in pack", p0230)
         val profile = p0230!!
+        assertTrue("Accent/Verna control path must not invent a MAF PID", "MAF" !in profile.pidsToCheck)
+        assertTrue("P0230 pack must carry ranked causes", profile.rankedCauses.isNotEmpty())
 
         // Run priority engine with Hyundai Accent 2005 context.
         val ctx = PriorityEngine.DiagnosticContext(
@@ -63,14 +65,7 @@ class P0230EndToEndTest {
 
         val ranked = PriorityEngine().rank(
             profile = profile,
-            rankedCauses = listOf(
-                "cause_battery_ground" to 0.32,
-                "cause_relay"         to 0.24,
-                "cause_fuse_feed"     to 0.18,
-                "cause_connector"     to 0.12,
-                "cause_pump_motor"    to 0.10,
-                "cause_pcm_driver"    to 0.04
-            ),
+            rankedCauses = profile.rankedCauses.map { it.id to it.probability },
             ctx = ctx
         )
 
@@ -106,14 +101,7 @@ class P0230EndToEndTest {
         )
         val ranked = PriorityEngine().rank(
             profile = profile,
-            rankedCauses = listOf(
-                "cause_battery_ground" to 0.32,
-                "cause_relay"         to 0.24,
-                "cause_fuse_feed"     to 0.18,
-                "cause_connector"     to 0.12,
-                "cause_pump_motor"    to 0.10,
-                "cause_pcm_driver"    to 0.04
-            ),
+            rankedCauses = profile.rankedCauses.map { it.id to it.probability },
             ctx = ctx
         )
         // Confidence is low because no scanner.
@@ -121,6 +109,24 @@ class P0230EndToEndTest {
             ranked.first().confidence < 0.6)
         // Battery ground is still first.
         assertEquals("cause_battery_ground", ranked.first().causeId)
+    }
+
+    @Test
+    fun `P0230 pump offer stays blocked until electrical pressure and current evidence exist`() {
+        val offer = MarketplaceGating.pumpOfferExample(
+            dtcCode = "P0230",
+            vehicle = "Hyundai Accent Verna 2005 1.6 AT"
+        )
+        val incomplete = MarketplaceGating().gate(
+            offers = listOf(offer),
+            completedTests = listOf("battery_check", "fuse_check", "relay_check")
+        )
+
+        assertTrue(incomplete.offers.isEmpty())
+        assertEquals(1, incomplete.blockedOffers.size)
+        assertTrue(offer.requiredTests.contains("ground_check"))
+        assertTrue(offer.requiredTests.contains("fuel_pressure_check"))
+        assertTrue(offer.requiredTests.contains("pump_current_check"))
     }
 
     private fun loadAsset(filename: String): String {

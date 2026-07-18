@@ -57,9 +57,9 @@ scanner bonito.
      cerrado.
 
 2. **Siempre a más.** Cuando llegue una nueva sección, no se reemplaza
-   una vieja. Se suma, se integra, se hace coherente. Las dos IAs
-   (Codex + Mavis) **agregan al mismo árbol**, no compiten por el
-   mismo slot.
+   una vieja. Se suma, se integra, se hace coherente. Los agentes
+   (Codex + Mavis + Google Antigravity) **agregan al mismo árbol**, no
+   compiten por el mismo slot.
 
 3. **Nunca a menos.** Cuando algo ya funciona (e.g. `ReportIntegrityCard`
    mostrando MATCH byte-exact), no se quita. Se amplía. Si la nueva
@@ -77,7 +77,7 @@ scanner bonito.
 
 | Situación | Qué hacer |
 |---|---|
-| Codex trae cambios a Reports, yo traigo cambios a Parts | Ambos advances se mergean en `sync/codex-mavis-*` antes de APK. Nunca se descarta uno. |
+| Codex, Mavis o Antigravity traen cambios en paralelo | Todos los avances se auditan y, si hay unión real pendiente, se integran en `sync/codex-mavis-antigravity-*` antes de APK. Nunca se descarta uno. |
 | Una sección parece "más importante" que otra | Falso. Son parte del mismo flujo comercial. Ver el diagrama arriba. |
 | Hay que elegir entre specs (A o B) | Mal planteada. La pregunta correcta es "¿cómo viven A y B juntas?" |
 | Hay que reducir scope para llegar a release | Solo reducir features nuevas, nunca quitar las ya integradas. |
@@ -94,7 +94,7 @@ scanner bonito.
 | ReportIntegrityCard visible en ReportScreen | `e1076723` | ✅ local commit |
 | ci-verify.sh green end-to-end | `91662aa2` | ✅ local commit |
 | Tag `v0.6.0-report-hashing` con paridad verificada | tag anotado | ✅ local tag |
-| Skill `codex-mavis-sync` para merges paralelos | `~/.mavis/skills/` | ✅ instalado |
+| Skill `codex-mavis-sync` para Codex, Mavis y Antigravity | `~/.mavis/skills/` + `~/.gemini/config/skills/` | ✅ instalado y validado |
 | Spec V2 Reportes Certificados + Historial | `896eea09` | ✅ local commit |
 | Spec V2 Parts Marketplace | `b6bb99f2` | ✅ local commit |
 
@@ -130,3 +130,5 @@ Eso es el techo. Cualquier feature nueva se mide contra eso.
 - `docs/parts-marketplace/V2-TECHNICAL-MARKETPLACE.md`
 - `docs/adr/0004-report-hashing-service.md`
 - `~/.mavis/skills/codex-mavis-sync/SKILL.md`
+- `~/.gemini/config/skills/codex-mavis-sync` (Google Antigravity,
+  enlace a la implementacion canonica)

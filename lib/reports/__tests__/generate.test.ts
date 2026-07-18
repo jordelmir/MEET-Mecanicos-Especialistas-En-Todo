@@ -45,8 +45,7 @@ const baseSnapshot: DiagnosticSnapshot = {
   fuelTrimLtft: 0,
   rawFrames: [],
   notes: '',
-  liveFromAdapter: true,
-  provenance: 'LIVE_OBD',
+  provenance: { kind: 'REAL' },
 };
 
 const peritajeOk: PeritajeChecklist = {

@@ -100,6 +100,7 @@ export function RepuesteraPanel({
       <SupplierQuoteForm
         requestId={quoting.id}
         partName={quoting.partName}
+        vehicle={quoting.vehicle}
         onCancel={() => setQuoting(null)}
         onSubmit={(quote) => {
           onSubmitQuote({ requestId: quoting.id, quote });

@@ -1,0 +1,3147 @@
+{
+  "autoPublishAllowed": false,
+  "contentSha256": "9510dba509859816b0f3f61154e90ea49604acd85967f827d743cbbb02854a4e",
+  "disclaimer": "Contenido de entrenamiento y revision. Confirme VIN, OEM y manual aplicable antes de intervenir.",
+  "packId": "pilot_hyundai_accent_verna_2005_front_end",
+  "packVersion": "1.0.0",
+  "parts": [
+    {
+      "aliases": [
+        "cuna de motor",
+        "subframe delantero",
+        "crossmember delantero"
+      ],
+      "assembly": "Tren delantero",
+      "category": "Estructura",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_subframe",
+      "nameEn": "Front subframe",
+      "nameEs": "Bastidor auxiliar delantero",
+      "position": "CENTER",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000005_8c94135a13",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "8c94135a135ab27b23e9ed1084c08c599144b85aa65b92cd5ac250c5105eba83"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Subchasis",
+      "system": "Suspension / Chasis",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_subframe",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "tornillos de cuna",
+        "subframe bolts"
+      ],
+      "assembly": "Subchasis",
+      "category": "Fijacion",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "subframe_bolts",
+      "nameEn": "Subframe bolts",
+      "nameEs": "Pernos del bastidor auxiliar",
+      "position": "CENTER",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000005_8c94135a13",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "8c94135a135ab27b23e9ed1084c08c599144b85aa65b92cd5ac250c5105eba83"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Fijaciones",
+      "system": "Suspension / Chasis",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "subframe_bolts",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "soporte frontal de motor",
+        "front mount"
+      ],
+      "assembly": "Vano motor",
+      "category": "Soportes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "engine_mount_front",
+      "nameEn": "Front engine mount",
+      "nameEs": "Soporte de motor delantero",
+      "position": "FRONT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000327_99583ac310",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "99583ac31060553f0f7756f76c2c3e697a4f54523078486a7bdfb2c02b77678e"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Monturas",
+      "system": "Motor",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "engine_mount_front",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "balinera delantera izquierda",
+        "wheel bearing left"
+      ],
+      "assembly": "Mangueta",
+      "category": "Rodamientos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_wheel_bearing",
+      "nameEn": "Front left wheel bearing",
+      "nameEs": "Rodamiento de rueda delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Transferencia, AWD y 4x4"
+          ],
+          "sourceBlockId": "block_017750_0e987589f8",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "0e987589f8c30ecf807c8b8ac0dfa6063b1594b9fb909b0e8f357e239260ae39"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Conjunto de rueda",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_wheel_bearing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "balinera delantera derecha",
+        "wheel bearing right"
+      ],
+      "assembly": "Mangueta",
+      "category": "Rodamientos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_wheel_bearing",
+      "nameEn": "Front right wheel bearing",
+      "nameEs": "Rodamiento de rueda delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Transferencia, AWD y 4x4"
+          ],
+          "sourceBlockId": "block_017750_0e987589f8",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "0e987589f8c30ecf807c8b8ac0dfa6063b1594b9fb909b0e8f357e239260ae39"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Conjunto de rueda",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_wheel_bearing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "tijereta izquierda",
+        "tijera izquierda",
+        "trapecio izquierdo",
+        "brazo inferior izquierdo",
+        "control arm left"
+      ],
+      "assembly": "Subchasis",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_lower_control_arm",
+      "nameEn": "Front left lower control arm",
+      "nameEs": "Brazo de control inferior delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión trasera"
+          ],
+          "sourceBlockId": "block_019946_e1cea0fe31",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e1cea0fe31518559dfacccfb81bdb653faccd7e738add88821a605e328b20a2d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Brazos",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_lower_control_arm",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "tijereta derecha",
+        "tijera derecha",
+        "trapecio derecho",
+        "brazo inferior derecho",
+        "control arm right"
+      ],
+      "assembly": "Subchasis",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_lower_control_arm",
+      "nameEn": "Front right lower control arm",
+      "nameEs": "Brazo de control inferior delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión trasera"
+          ],
+          "sourceBlockId": "block_019946_e1cea0fe31",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e1cea0fe31518559dfacccfb81bdb653faccd7e738add88821a605e328b20a2d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Brazos",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_lower_control_arm",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing pequeno izquierdo",
+        "silentblock delantero izquierdo"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_arm_front_bushing",
+      "nameEn": "Front left control arm front bushing",
+      "nameEs": "Buje delantero del brazo izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019073_e0b2fef68a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e0b2fef68ae9fa6cbcf85a0dcc589c3da44cea7628c5cd2ec173dee0d4461fee"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de brazo",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_arm_front_bushing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing grande izquierdo",
+        "casquillo trasero izquierdo"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_arm_rear_bushing",
+      "nameEn": "Front left control arm rear bushing",
+      "nameEs": "Buje trasero del brazo izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019073_e0b2fef68a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e0b2fef68ae9fa6cbcf85a0dcc589c3da44cea7628c5cd2ec173dee0d4461fee"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de brazo",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_arm_rear_bushing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing pequeno derecho",
+        "silentblock delantero derecho"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_arm_front_bushing",
+      "nameEn": "Front right control arm front bushing",
+      "nameEs": "Buje delantero del brazo derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019073_e0b2fef68a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e0b2fef68ae9fa6cbcf85a0dcc589c3da44cea7628c5cd2ec173dee0d4461fee"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de brazo",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_arm_front_bushing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing grande derecho",
+        "casquillo trasero derecho"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_arm_rear_bushing",
+      "nameEn": "Front right control arm rear bushing",
+      "nameEs": "Buje trasero del brazo derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019073_e0b2fef68a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e0b2fef68ae9fa6cbcf85a0dcc589c3da44cea7628c5cd2ec173dee0d4461fee"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de brazo",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_arm_rear_bushing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "rotula izquierda",
+        "ball joint left"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_ball_joint",
+      "nameEn": "Front left lower ball joint",
+      "nameEs": "Rotula inferior delantera izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Ejes y semiejes"
+          ],
+          "sourceBlockId": "block_018238_a233e5beaf",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a233e5beaf753b58f2a685d3229fd70489172e12091984c09c03ed004b5e8b6d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Rotulas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_ball_joint",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "rotula derecha",
+        "ball joint right"
+      ],
+      "assembly": "Brazo de control",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_ball_joint",
+      "nameEn": "Front right lower ball joint",
+      "nameEs": "Rotula inferior delantera derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Ejes y semiejes"
+          ],
+          "sourceBlockId": "block_018238_a233e5beaf",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a233e5beaf753b58f2a685d3229fd70489172e12091984c09c03ed004b5e8b6d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Rotulas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_ball_joint",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "strut izquierdo",
+        "amortiguador izquierdo"
+      ],
+      "assembly": "Torre de suspension",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_strut",
+      "nameEn": "Front left strut",
+      "nameEs": "Amortiguador delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018936_514f768f43",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "514f768f435241db2f6b0478e806a3f17da715105214b26c3c5be7ee2103d93d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_strut",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "strut derecho",
+        "amortiguador derecho"
+      ],
+      "assembly": "Torre de suspension",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_strut",
+      "nameEn": "Front right strut",
+      "nameEs": "Amortiguador delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018936_514f768f43",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "514f768f435241db2f6b0478e806a3f17da715105214b26c3c5be7ee2103d93d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_strut",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "espiral izquierdo",
+        "spring left"
+      ],
+      "assembly": "Amortiguador",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_spring",
+      "nameEn": "Front left coil spring",
+      "nameEs": "Resorte helicoidal delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018938_a0ba9a27fc",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a0ba9a27fc1791a2ecf1127d869ff2712d127b9d83ba24fd8d790990ea8381bc"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Resortes",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_spring",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "espiral derecho",
+        "spring right"
+      ],
+      "assembly": "Amortiguador",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_spring",
+      "nameEn": "Front right coil spring",
+      "nameEs": "Resorte helicoidal delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018938_a0ba9a27fc",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a0ba9a27fc1791a2ecf1127d869ff2712d127b9d83ba24fd8d790990ea8381bc"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Resortes",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_spring",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "base de amortiguador izquierda",
+        "strut mount left"
+      ],
+      "assembly": "Carroceria",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_strut_mount",
+      "nameEn": "Front left strut mount",
+      "nameEs": "Copela superior delantera izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000338_c805b3be99",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "c805b3be9952c5b310c43b3014dfe3bc75f704a49cfe9036fbc34fead1f212ca"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Copelas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_strut_mount",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "base de amortiguador derecha",
+        "strut mount right"
+      ],
+      "assembly": "Carroceria",
+      "category": "Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_strut_mount",
+      "nameEn": "Front right strut mount",
+      "nameEs": "Copela superior delantera derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000338_c805b3be99",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "c805b3be9952c5b310c43b3014dfe3bc75f704a49cfe9036fbc34fead1f212ca"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Copelas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_strut_mount",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "balinera de copela izquierda",
+        "strut bearing left"
+      ],
+      "assembly": "Copela superior",
+      "category": "Rodamientos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_strut_bearing",
+      "nameEn": "Front left strut bearing",
+      "nameEs": "Rodamiento de copela delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018941_6639f73489",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "6639f734894ca7f11b9c286936cfc9fb7652869e0e96978f4f8f04de14778848"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Copelas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_strut_bearing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "balinera de copela derecha",
+        "strut bearing right"
+      ],
+      "assembly": "Copela superior",
+      "category": "Rodamientos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_strut_bearing",
+      "nameEn": "Front right strut bearing",
+      "nameEs": "Rodamiento de copela delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018941_6639f73489",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "6639f734894ca7f11b9c286936cfc9fb7652869e0e96978f4f8f04de14778848"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Copelas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_strut_bearing",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "tope de goma izquierdo",
+        "bump stop left"
+      ],
+      "assembly": "Vastago de amortiguador",
+      "category": "Topes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_bump_stop",
+      "nameEn": "Front left bump stop",
+      "nameEs": "Tope de amortiguador izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018942_f9776d98e0",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "f9776d98e094ff11d273892b33b68e3a7a058a38647b32e269c50adfe2ec63c5"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_bump_stop",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "tope de goma derecho",
+        "bump stop right"
+      ],
+      "assembly": "Vastago de amortiguador",
+      "category": "Topes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_bump_stop",
+      "nameEn": "Front right bump stop",
+      "nameEs": "Tope de amortiguador derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018942_f9776d98e0",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "f9776d98e094ff11d273892b33b68e3a7a058a38647b32e269c50adfe2ec63c5"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_bump_stop",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bota protectora izquierda",
+        "dust boot left"
+      ],
+      "assembly": "Vastago de amortiguador",
+      "category": "Guardapolvos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_dust_boot",
+      "nameEn": "Front left strut dust boot",
+      "nameEs": "Guardapolvo de amortiguador izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Embrague manual"
+          ],
+          "sourceBlockId": "block_012873_028257f972",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "028257f9725bed9a02ccf74ad89617210ff993c107a0e6cc2b164964a85891a7"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_dust_boot",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bota protectora derecha",
+        "dust boot right"
+      ],
+      "assembly": "Vastago de amortiguador",
+      "category": "Guardapolvos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_dust_boot",
+      "nameEn": "Front right strut dust boot",
+      "nameEs": "Guardapolvo de amortiguador derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Embrague manual"
+          ],
+          "sourceBlockId": "block_012873_028257f972",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "028257f9725bed9a02ccf74ad89617210ff993c107a0e6cc2b164964a85891a7"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Amortiguadores",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_dust_boot",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "barra estabilizadora",
+        "sway bar"
+      ],
+      "assembly": "Subchasis",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "stabilizer_bar",
+      "nameEn": "Front stabilizer bar",
+      "nameEs": "Barra estabilizadora delantera",
+      "position": "CENTER",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000138_dc6109bae7",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "dc6109bae7000f3a903d35d6fdb4dbcf438807bc8d1ba6711d60074276342828"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Barras",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "stabilizer_bar",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "link kit izquierdo",
+        "bieleta izquierda",
+        "stabilizer link left"
+      ],
+      "assembly": "Mangueta",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "left_stabilizer_link",
+      "nameEn": "Left stabilizer link",
+      "nameEs": "Bieleta estabilizadora izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018954_bb3f0b89b1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "bb3f0b89b11dc27c0fcabd770ab573d91f670885e37ca904967d92a2cb1d8161"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bieletas estabilizadoras",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "left_stabilizer_link",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "link kit derecho",
+        "bieleta derecha",
+        "stabilizer link right"
+      ],
+      "assembly": "Mangueta",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "right_stabilizer_link",
+      "nameEn": "Right stabilizer link",
+      "nameEs": "Bieleta estabilizadora derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018954_bb3f0b89b1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "bb3f0b89b11dc27c0fcabd770ab573d91f670885e37ca904967d92a2cb1d8161"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bieletas estabilizadoras",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "right_stabilizer_link",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing de barra izquierdo",
+        "buje estabilizador izquierdo"
+      ],
+      "assembly": "Soporte de barra",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "stabilizer_bushing_left",
+      "nameEn": "Left stabilizer bar bushing",
+      "nameEs": "Buje de barra estabilizadora izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018952_762d5c1438",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "762d5c143865128116e4a742b04dd8696c2de57dc8168d1bb0056295a4b400ff"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de barra",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "stabilizer_bushing_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "bushing de barra derecho",
+        "buje estabilizador derecho"
+      ],
+      "assembly": "Soporte de barra",
+      "category": "Bujes",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "stabilizer_bushing_right",
+      "nameEn": "Right stabilizer bar bushing",
+      "nameEs": "Buje de barra estabilizadora derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_018952_762d5c1438",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "762d5c143865128116e4a742b04dd8696c2de57dc8168d1bb0056295a4b400ff"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bujes de barra",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "stabilizer_bushing_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "portamasa izquierdo",
+        "munon izquierdo",
+        "knuckle left"
+      ],
+      "assembly": "Conjunto de rueda",
+      "category": "Estructura",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_knuckle",
+      "nameEn": "Front left steering knuckle",
+      "nameEs": "Mangueta de rueda delantera izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019495_86b15d4185",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "86b15d4185ad3d17772346a2c91581e181132d8bff0e3eda5bead34d8d0c2461"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Manguetas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_knuckle",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "portamasa derecho",
+        "munon derecho",
+        "knuckle right"
+      ],
+      "assembly": "Conjunto de rueda",
+      "category": "Estructura",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_knuckle",
+      "nameEn": "Front right steering knuckle",
+      "nameEs": "Mangueta de rueda delantera derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019495_86b15d4185",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "86b15d4185ad3d17772346a2c91581e181132d8bff0e3eda5bead34d8d0c2461"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Manguetas",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_knuckle",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "manzana de rueda izquierda",
+        "wheel hub left"
+      ],
+      "assembly": "Mangueta",
+      "category": "Estructura",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_wheel_hub",
+      "nameEn": "Front left wheel hub",
+      "nameEs": "Cubo de rueda delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Ejes y semiejes"
+          ],
+          "sourceBlockId": "block_018113_6170cc08f1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "6170cc08f1541cfaaf0e12db005cebef9a51df415265e36002c18c7aeaf35011"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Cubo de rueda",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_wheel_hub",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "manzana de rueda derecha",
+        "wheel hub right"
+      ],
+      "assembly": "Mangueta",
+      "category": "Estructura",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_wheel_hub",
+      "nameEn": "Front right wheel hub",
+      "nameEs": "Cubo de rueda delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Ejes y semiejes"
+          ],
+          "sourceBlockId": "block_018113_6170cc08f1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "6170cc08f1541cfaaf0e12db005cebef9a51df415265e36002c18c7aeaf35011"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Cubo de rueda",
+      "system": "Suspension",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_wheel_hub",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "pernos de rueda izquierdos",
+        "wheel nuts front left"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Fijacion",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "wheel_nuts_front_left",
+      "nameEn": "Front left wheel nuts",
+      "nameEs": "Tuercas de rueda delanteras izquierdas",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019748_abd5a461b1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "abd5a461b181de3c150c896a3c75151817c68150c3dce92dbeedc270cd62ccab"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Fijaciones",
+      "system": "Frenos / Ruedas",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "wheel_nuts_front_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "pernos de rueda derechos",
+        "wheel nuts front right"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Fijacion",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "wheel_nuts_front_right",
+      "nameEn": "Front right wheel nuts",
+      "nameEs": "Tuercas de rueda delanteras derechas",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019748_abd5a461b1",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "abd5a461b181de3c150c896a3c75151817c68150c3dce92dbeedc270cd62ccab"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Fijaciones",
+      "system": "Frenos / Ruedas",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "wheel_nuts_front_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "caja de direccion",
+        "steering gear"
+      ],
+      "assembly": "Subchasis",
+      "category": "Direccion",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "steering_rack",
+      "nameEn": "Power steering rack",
+      "nameEs": "Cremallera de direccion asistida",
+      "position": "CENTER",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000137_7aa5cc9d2c",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "7aa5cc9d2c8ae11f5b0c7d834593e95c90d1b48e5bfe0c2483a5f6617fea8327"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Cremallera",
+      "system": "Direccion",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "steering_rack",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "terminal de direccion izquierdo",
+        "tie rod end left"
+      ],
+      "assembly": "Mangueta",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "tie_rod_end_left",
+      "nameEn": "Left outer tie rod end",
+      "nameEs": "Terminal de direccion exterior izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Caja manual"
+          ],
+          "sourceBlockId": "block_013382_a1993ca610",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a1993ca610bcf9edbf65d4587dca569aafbfd6b6f54bf1dc21e5a99d579d6164"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Terminales",
+      "system": "Direccion",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "tie_rod_end_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "terminal de direccion derecho",
+        "tie rod end right"
+      ],
+      "assembly": "Mangueta",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "tie_rod_end_right",
+      "nameEn": "Right outer tie rod end",
+      "nameEs": "Terminal de direccion exterior derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "2. Transmisión y tren motriz",
+            "Caja manual"
+          ],
+          "sourceBlockId": "block_013382_a1993ca610",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "a1993ca610bcf9edbf65d4587dca569aafbfd6b6f54bf1dc21e5a99d579d6164"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Terminales",
+      "system": "Direccion",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "tie_rod_end_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "axial de direccion izquierda",
+        "inner tie rod left"
+      ],
+      "assembly": "Cremallera",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "tie_rod_inner_left",
+      "nameEn": "Left inner tie rod",
+      "nameEs": "Bieleta de direccion interior izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "4. Dirección",
+            "Dirección mecánica/hidráulica"
+          ],
+          "sourceBlockId": "block_021965_856885447c",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "856885447c21b3e9fc57c84feb942455d4acad88d49b9d34130842a3ddd63b5a"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bieletas de direccion",
+      "system": "Direccion",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "tie_rod_inner_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "axial de direccion derecha",
+        "inner tie rod right"
+      ],
+      "assembly": "Cremallera",
+      "category": "Direccion / Suspension",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "tie_rod_inner_right",
+      "nameEn": "Right inner tie rod",
+      "nameEs": "Bieleta de direccion interior derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "4. Dirección",
+            "Dirección mecánica/hidráulica"
+          ],
+          "sourceBlockId": "block_021965_856885447c",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "856885447c21b3e9fc57c84feb942455d4acad88d49b9d34130842a3ddd63b5a"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Bieletas de direccion",
+      "system": "Direccion",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "tie_rod_inner_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "eje delantero izquierdo",
+        "cv shaft left"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Transmision / Tren motriz",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "drive_shaft_left",
+      "nameEn": "Front left drive shaft",
+      "nameEs": "Semieje delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000562_56181b9f99",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "56181b9f99f9a28387fbc0c0afd5e195c356b8081ad2aab113e5a2eac950bf00"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Semiejes",
+      "system": "Transmision",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "drive_shaft_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "eje delantero derecho",
+        "cv shaft right"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Transmision / Tren motriz",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "drive_shaft_right",
+      "nameEn": "Front right drive shaft",
+      "nameEs": "Semieje delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "0. Núcleo del vehículo",
+            "Estructura base"
+          ],
+          "sourceBlockId": "block_000562_56181b9f99",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "56181b9f99f9a28387fbc0c0afd5e195c356b8081ad2aab113e5a2eac950bf00"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Semiejes",
+      "system": "Transmision",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "drive_shaft_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "disco izquierdo",
+        "brake rotor left"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Frenos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "brake_disc_left",
+      "nameEn": "Front left brake disc",
+      "nameEs": "Disco de freno delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019464_787e81566a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "787e81566aede37a58a515c843390aa2c088a23b1c8e9543336579dc7ad8477d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Discos",
+      "system": "Frenos",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "brake_disc_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "disco derecho",
+        "brake rotor right"
+      ],
+      "assembly": "Cubo de rueda",
+      "category": "Frenos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "brake_disc_right",
+      "nameEn": "Front right brake disc",
+      "nameEs": "Disco de freno delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019464_787e81566a",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "787e81566aede37a58a515c843390aa2c088a23b1c8e9543336579dc7ad8477d"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Discos",
+      "system": "Frenos",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "brake_disc_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "caliper izquierdo",
+        "pinza izquierda"
+      ],
+      "assembly": "Mangueta",
+      "category": "Frenos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "brake_caliper_left",
+      "nameEn": "Front left brake caliper",
+      "nameEs": "Mordaza de freno delantera izquierda",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019041_65dfcb2337",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "65dfcb23377b713dedfce9e41d8662ac5ea3ec3545afb0516a71e6ed90610bfe"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Mordazas",
+      "system": "Frenos",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "brake_caliper_left",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "caliper derecho",
+        "pinza derecha"
+      ],
+      "assembly": "Mangueta",
+      "category": "Frenos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "brake_caliper_right",
+      "nameEn": "Front right brake caliper",
+      "nameEs": "Mordaza de freno delantera derecha",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión delantera"
+          ],
+          "sourceBlockId": "block_019041_65dfcb2337",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "65dfcb23377b713dedfce9e41d8662ac5ea3ec3545afb0516a71e6ed90610bfe"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Mordazas",
+      "system": "Frenos",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "brake_caliper_right",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "fricciones delanteras",
+        "pastillas de freno"
+      ],
+      "assembly": "Mordaza",
+      "category": "Frenos",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "brake_pads_front",
+      "nameEn": "Front brake pads",
+      "nameEs": "Pastillas de freno delanteras",
+      "position": "CENTER",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "5. Frenos",
+            "Hidráulico base"
+          ],
+          "sourceBlockId": "block_024091_fa7e2ac1f7",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "fa7e2ac1f705aee19cba95ce2ecff375a11cbaeb85be4c25040a3bb09bbb1432"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Pastillas",
+      "system": "Frenos",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "brake_pads_front",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "sensor de velocidad izquierdo",
+        "wheel speed sensor left"
+      ],
+      "assembly": "Mangueta",
+      "category": "Sensores",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_left_abs_sensor",
+      "nameEn": "Front left ABS sensor",
+      "nameEs": "Sensor ABS delantero izquierdo",
+      "position": "LEFT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "5. Frenos",
+            "ABS / ESC / TCS"
+          ],
+          "sourceBlockId": "block_025382_d07bdc9fb7",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "d07bdc9fb746a1f7350e73f070bb76b23d70e6415f7fdc99f5f7679a52a83220"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Sensores ABS",
+      "system": "Electrico",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_left_abs_sensor",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    },
+    {
+      "aliases": [
+        "sensor de velocidad derecho",
+        "wheel speed sensor right"
+      ],
+      "assembly": "Mangueta",
+      "category": "Sensores",
+      "compatibilityMessage": "Compatibilidad probable; requiere confirmar por VIN/OEM/foto/conector/medidas y mercado.",
+      "compatibilityState": "REQUIRES_VERIFICATION",
+      "confidence": "UNVERIFIED",
+      "description": "Entidad de catalogo encontrada en las fuentes. Sus datos tecnicos y su aplicabilidad a la variante requieren revision.",
+      "id": "front_right_abs_sensor",
+      "nameEn": "Front right ABS sensor",
+      "nameEs": "Sensor ABS delantero derecho",
+      "position": "RIGHT",
+      "publicationState": "REVIEW_REQUIRED",
+      "requiredCompatibilityEvidence": [
+        "VIN",
+        "OEM_REFERENCE",
+        "PART_PHOTO",
+        "CONNECTOR_OR_DIMENSIONS",
+        "MARKET"
+      ],
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "5. Frenos",
+            "ABS / ESC / TCS"
+          ],
+          "sourceBlockId": "block_025382_d07bdc9fb7",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "d07bdc9fb746a1f7350e73f070bb76b23d70e6415f7fdc99f5f7679a52a83220"
+        }
+      ],
+      "subassembly": null,
+      "subsystem": "Sensores ABS",
+      "system": "Electrico",
+      "technicalSpecifications": {
+        "dimensions": null,
+        "material": null,
+        "oemNumber": null,
+        "pinout": null,
+        "torque": null
+      },
+      "threeDimensionalBinding": {
+        "isDimensionalModel": false,
+        "nodeId": "front_right_abs_sensor",
+        "sceneId": "front_suspension_generic",
+        "visualAuthority": "GENERIC_SCHEMATIC"
+      }
+    }
+  ],
+  "procedures": [
+    {
+      "difficulty": "INTERMEDIATE",
+      "executionPolicy": "TRAINING_ONLY_REVIEW_REQUIRED",
+      "id": "inspect_front_left_lower_control_arm",
+      "publicationState": "REVIEW_REQUIRED",
+      "safetyLevel": "CAUTION",
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión trasera"
+          ],
+          "sourceBlockId": "block_019946_e1cea0fe31",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e1cea0fe31518559dfacccfb81bdb653faccd7e738add88821a605e328b20a2d"
+        }
+      ],
+      "steps": [
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "inspect_front_left_lower_control_arm_step_01",
+          "instruction": "Inmovilice el vehiculo y use puntos de elevacion confirmados para la variante.",
+          "order": 1,
+          "requiredEvidence": [
+            "vehicle_supported_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Preparar el vehiculo",
+          "tools": [
+            "soportes certificados"
+          ],
+          "warning": "No trabaje bajo un vehiculo sostenido solo por un gato."
+        },
+        {
+          "animationAction": "ISOLATE",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "inspect_front_left_lower_control_arm_step_02",
+          "instruction": "Identifique visualmente el brazo inferior izquierdo, sus dos bujes y la rotula.",
+          "order": 2,
+          "requiredEvidence": [
+            "part_location_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Localizar la tijereta",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "inspect_front_left_lower_control_arm_step_03",
+          "instruction": "Busque grietas, separacion, deformacion o contacto metal-metal sin asumir falla por apariencia aislada.",
+          "order": 3,
+          "requiredEvidence": [
+            "bushing_condition_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Inspeccionar bujes",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "inspect_front_left_lower_control_arm_step_04",
+          "instruction": "Compruebe holgura con un metodo seguro y compare con una fuente tecnica aprobada antes de condenar la pieza.",
+          "order": 4,
+          "requiredEvidence": [
+            "inspection_note"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Evaluar holgura",
+          "tools": [],
+          "warning": "No coloque manos en puntos de atrapamiento."
+        },
+        {
+          "animationAction": "RESET",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "inspect_front_left_lower_control_arm_step_05",
+          "instruction": "Registre hallazgos, incertidumbre y pruebas faltantes; no marque compatibilidad exacta ni reemplazo obligatorio sin evidencia.",
+          "order": 5,
+          "requiredEvidence": [
+            "inspection_result"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Registrar conclusion",
+          "tools": [],
+          "warning": null
+        }
+      ],
+      "targetPartIds": [
+        "front_left_lower_control_arm"
+      ],
+      "title": "Inspeccion conservadora del brazo inferior izquierdo"
+    },
+    {
+      "difficulty": "ADVANCED",
+      "executionPolicy": "TRAINING_ONLY_REVIEW_REQUIRED",
+      "id": "replace_front_left_lower_control_arm_training",
+      "publicationState": "REVIEW_REQUIRED",
+      "safetyLevel": "DANGER",
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión trasera"
+          ],
+          "sourceBlockId": "block_019946_e1cea0fe31",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e1cea0fe31518559dfacccfb81bdb653faccd7e738add88821a605e328b20a2d"
+        }
+      ],
+      "steps": [
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "COMPATIBILITY_EVIDENCE_REQUIRED",
+          "id": "replace_front_left_lower_control_arm_training_step_01",
+          "instruction": "Confirme VIN, referencia OEM o equivalencia dimensional, mercado y manual aplicable antes de desmontar.",
+          "order": 1,
+          "requiredEvidence": [
+            "vin_or_vehicle_scope",
+            "replacement_part_evidence"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Validar repuesto y procedimiento",
+          "tools": [],
+          "warning": "Este flujo es de entrenamiento hasta completar revision tecnica."
+        },
+        {
+          "animationAction": "ISOLATE",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_02",
+          "instruction": "Asegure el vehiculo y controle la carga del conjunto de suspension con herramientas adecuadas.",
+          "order": 2,
+          "requiredEvidence": [
+            "safe_setup_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Asegurar y descargar el conjunto",
+          "tools": [],
+          "warning": "Riesgo de caida, atrapamiento y energia almacenada."
+        },
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_03",
+          "instruction": "Fotografie orientacion, fijaciones, arneses y posicion antes de aflojar.",
+          "order": 3,
+          "requiredEvidence": [
+            "before_disassembly_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Documentar montaje original",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "REMOVE",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_04",
+          "instruction": "Separe solo las conexiones confirmadas por el manual aplicable, protegiendo mangueras, arnes ABS y guardapolvos.",
+          "order": 4,
+          "requiredEvidence": [
+            "connections_released_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Separar conexiones",
+          "tools": [],
+          "warning": "No golpee ni estire el arnes ABS o la manguera de freno."
+        },
+        {
+          "animationAction": "REMOVE",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_05",
+          "instruction": "Retire las fijaciones y el brazo manteniendo control del conjunto. Conserve la orientacion para comparacion.",
+          "order": 5,
+          "requiredEvidence": [
+            "removed_part_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Retirar el brazo",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "ISOLATE",
+          "completionGate": "COMPATIBILITY_EVIDENCE_REQUIRED",
+          "id": "replace_front_left_lower_control_arm_training_step_06",
+          "instruction": "Compare forma, puntos de montaje, bujes, rotula y dimensiones funcionales antes de instalar.",
+          "order": 6,
+          "requiredEvidence": [
+            "old_new_comparison_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Comparar la pieza",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "INSTALL",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_07",
+          "instruction": "Posicione la pieza sin forzar y presente todas las fijaciones segun el procedimiento aprobado.",
+          "order": 7,
+          "requiredEvidence": [
+            "installed_before_torque_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Instalar y presentar fijaciones",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "VERIFIED_TORQUE_REQUIRED",
+          "id": "replace_front_left_lower_control_arm_training_step_08",
+          "instruction": "Use exclusivamente el valor, secuencia y condicion de carga de una fuente verificada para esta variante.",
+          "order": 8,
+          "requiredEvidence": [
+            "verified_torque_source",
+            "torque_evidence"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": "No confirmado para esta variante",
+          "title": "Aplicar torque final",
+          "tools": [
+            "torquimetro calibrado"
+          ],
+          "warning": "No use un valor generico ni el valor de otra variante."
+        },
+        {
+          "animationAction": "RESET",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "replace_front_left_lower_control_arm_training_step_09",
+          "instruction": "Compruebe recorrido, arneses, mangueras, guardapolvos y fijaciones antes de apoyar el vehiculo.",
+          "order": 9,
+          "requiredEvidence": [
+            "post_install_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Revisar interferencias",
+          "tools": [],
+          "warning": null
+        }
+      ],
+      "targetPartIds": [
+        "front_left_lower_control_arm"
+      ],
+      "title": "Sustitucion guiada de tijereta izquierda"
+    },
+    {
+      "difficulty": "INTERMEDIATE",
+      "executionPolicy": "TRAINING_ONLY_REVIEW_REQUIRED",
+      "id": "verify_front_left_lower_control_arm_service",
+      "publicationState": "REVIEW_REQUIRED",
+      "safetyLevel": "CAUTION",
+      "sourceRefs": [
+        {
+          "reviewStatus": "PENDING_TECHNICAL_REVIEW",
+          "sectionPath": [
+            "3. Suspensión",
+            "Suspensión trasera"
+          ],
+          "sourceBlockId": "block_019946_e1cea0fe31",
+          "sourceDocumentSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7",
+          "sourceFileName": "Document (16).docx",
+          "sourceKind": "paragraph",
+          "sourceTextHash": "e1cea0fe31518559dfacccfb81bdb653faccd7e738add88821a605e328b20a2d"
+        }
+      ],
+      "steps": [
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "verify_front_left_lower_control_arm_service_step_01",
+          "instruction": "Revise posicion, fijaciones, guardapolvos, mangueras y arneses con el vehiculo en condicion segura.",
+          "order": 1,
+          "requiredEvidence": [
+            "static_inspection_photo"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Inspeccion estatica",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "ISOLATE",
+          "completionGate": "ALIGNMENT_EVIDENCE_REQUIRED",
+          "id": "verify_front_left_lower_control_arm_service_step_02",
+          "instruction": "Realice o programe alineacion y conserve el resultado medido.",
+          "order": 2,
+          "requiredEvidence": [
+            "alignment_report"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Alinear el vehiculo",
+          "tools": [],
+          "warning": null
+        },
+        {
+          "animationAction": "RESET",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "verify_front_left_lower_control_arm_service_step_03",
+          "instruction": "Efectue una prueba a baja velocidad en un area segura, verificando ruidos, direccion, frenado y estabilidad.",
+          "order": 3,
+          "requiredEvidence": [
+            "road_test_result"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Prueba funcional controlada",
+          "tools": [],
+          "warning": "Detenga la prueba ante ruido, juego, tiron o comportamiento inseguro."
+        },
+        {
+          "animationAction": "HIGHLIGHT",
+          "completionGate": "MANUAL_CONFIRMATION",
+          "id": "verify_front_left_lower_control_arm_service_step_04",
+          "instruction": "Reinspeccione el conjunto y registre cualquier condicion pendiente antes de cerrar el trabajo.",
+          "order": 4,
+          "requiredEvidence": [
+            "final_inspection_photo",
+            "final_result"
+          ],
+          "targetNodeId": "front_left_lower_control_arm",
+          "targetPartId": "front_left_lower_control_arm",
+          "technicalValue": null,
+          "technicalValueMessage": null,
+          "title": "Reinspeccion final",
+          "tools": [],
+          "warning": null
+        }
+      ],
+      "targetPartIds": [
+        "front_left_lower_control_arm"
+      ],
+      "title": "Verificacion posterior, alineacion y prueba"
+    }
+  ],
+  "publicationState": "REVIEW_REQUIRED",
+  "schemaVersion": 1,
+  "sourceDocuments": [
+    {
+      "sourceFileName": "Document (16).docx",
+      "sourceSha256": "09f2926a22542a4e7be24e50f2a4f4c42674f32958e8e541683fbb0cf76352d7"
+    },
+    {
+      "sourceFileName": "Document (17).docx",
+      "sourceSha256": "baf4add3f22202fc7d66f7b7f4aee549d90780f1891da6fa66ffbc2db1820824"
+    }
+  ],
+  "statistics": {
+    "automaticallyPublishableCount": 0,
+    "partCount": 50,
+    "procedureCount": 3,
+    "verifiedTechnicalSpecificationCount": 0
+  },
+  "title": "MEET Pilot: tren delantero fuente-a-UI",
+  "vehicleScope": {
+    "bindingState": "TARGET_PROFILE_NOT_EXACT_COMPATIBILITY",
+    "engineDisplacementLiters": 1.6,
+    "make": "Hyundai",
+    "models": [
+      "Accent",
+      "Verna"
+    ],
+    "transmission": "AUTOMATIC",
+    "vehicleProfileId": "hyundai_accent_verna_2005_1_6_at",
+    "year": 2005
+  }
+}

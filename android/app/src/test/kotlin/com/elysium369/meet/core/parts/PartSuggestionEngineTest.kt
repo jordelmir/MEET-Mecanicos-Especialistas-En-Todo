@@ -38,6 +38,24 @@ class PartSuggestionEngineTest {
     }
 
     @Test
+    fun `P0230 does not invent a fuel pressure sensor candidate`() {
+        val suggestions = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0230")),
+        )
+
+        assertTrue(suggestions.none { it.partName.contains("sensor de presión", ignoreCase = true) })
+    }
+
+    @Test
+    fun `P0230 rationales avoid unsourced frequency and price claims`() {
+        val rationale = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0230")),
+        ).joinToString(" ") { it.rationale.lowercase() }
+
+        assertTrue(listOf("commonly", "most common", "meaningful slice", "cheap").none(rationale::contains))
+    }
+
+    @Test
     fun `unknown DTC emits a single generic diagnostic suggestion`() {
         val s = PartSuggestionEngine.suggestParts(
             PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P9999"))
@@ -61,6 +79,15 @@ class PartSuggestionEngineTest {
             PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0300"))
         )
         assertTrue(s.first().partName.lowercase().contains("bujía"))
+    }
+
+    @Test
+    fun `P0171 does not suggest a fuel cap replacement`() {
+        val suggestions = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0171")),
+        )
+
+        assertTrue(suggestions.none { it.partName.contains("tapa", ignoreCase = true) })
     }
 
     @Test

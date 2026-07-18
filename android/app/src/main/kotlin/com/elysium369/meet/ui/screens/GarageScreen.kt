@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -126,6 +128,8 @@ fun GarageScreen(
                             isActive = vehicle.id == activeVehicle?.id,
                             onSelect = { viewModel.startDiagnosticSession(vehicle) },
                             onDetails = { navController.navigate("vehicle_detail/${vehicle.id}") },
+                            onReports = { navController.navigate("inspection_session/${vehicle.id}") },
+                            onHistory = { navController.navigate("vehicle_history/${vehicle.id}") },
                             onDelete = { vehicleToDelete = vehicle }
                         )
                     }
@@ -190,6 +194,8 @@ private fun AnimatedVehicleCard(
     isActive: Boolean,
     onSelect: () -> Unit,
     onDetails: () -> Unit,
+    onReports: () -> Unit,
+    onHistory: () -> Unit,
     onDelete: () -> Unit
 ) {
     // Entry animation
@@ -331,6 +337,34 @@ private fun AnimatedVehicleCard(
                 AnimatedNeonIcon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("HISTORIAL DE SERVICIO", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onReports,
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    AnimatedNeonIcon(Icons.Default.List, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("REPORTES V2", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
+                }
+                OutlinedButton(
+                    onClick = onHistory,
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.electricBlue),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.electricBlue.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    AnimatedNeonIcon(Icons.Default.History, contentDescription = null, tint = MeetColors.electricBlue, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("CERTIFICADOS", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
+                }
             }
         }
     }

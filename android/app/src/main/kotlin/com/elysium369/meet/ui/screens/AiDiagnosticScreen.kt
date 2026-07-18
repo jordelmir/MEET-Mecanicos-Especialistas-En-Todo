@@ -1,6 +1,11 @@
 package com.elysium369.meet.ui.screens
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
+import com.elysium369.meet.core.diagnostics.DiagnosticReasoningEngine
+import com.elysium369.meet.core.diagnostics.DiagnosticReasoningInput
+import com.elysium369.meet.core.diagnostics.DiagnosticReasoningResult
+import com.elysium369.meet.core.diagnostics.PartRecommendationState
+import com.elysium369.meet.core.diagnostics.TestStatus
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -46,43 +51,63 @@ import com.elysium369.meet.ui.components.eliteScrollbar
 fun AiDiagnosticScreen(
     dtcCode: String,
     onBack: () -> Unit,
-    viewModel: com.elysium369.meet.ui.ObdViewModel
+    viewModel: com.elysium369.meet.ui.ObdViewModel,
+    onNavigateToSettings: () -> Unit = {},
+    onRequestMechanic: (String) -> Unit = {},
+    onRequestPart: (String) -> Unit = {},
+    onOpenComponent3d: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val sharedPrefs = context.getSharedPreferences("meet_prefs", android.content.Context.MODE_PRIVATE)
-    
-    fun normalizeAiProvider(value: String): String {
-        val clean = value.trim().lowercase()
-        return when {
-            clean.contains("gemini") -> "gemini"
-            clean.contains("openai") || clean.contains("gpt") -> "openai"
-            clean.contains("anthropic") || clean.contains("claude") -> "anthropic"
-            clean.contains("ollama") || clean.contains("local") -> "ollama"
-            clean.contains("mavis") -> "mavis"
-            clean.contains("custom") -> "custom"
-            else -> "gemini"
-        }
-    }
-
-    val providers = listOf(
-        "gemini" to "Google Gemini",
-        "openai" to "OpenAI (GPT)",
-        "anthropic" to "Anthropic (Claude)",
-        "ollama" to "Ollama (Local)",
-        "mavis" to "Mavis / OpenAI-compatible",
-        "custom" to "Custom Endpoint"
-    )
-    var provider by remember { mutableStateOf(normalizeAiProvider(sharedPrefs.getString("ai_provider", "gemini") ?: "gemini")) }
-    var apiKey by remember { mutableStateOf(sharedPrefs.getString("ai_api_key", "") ?: "") }
-    var baseUrl by remember { mutableStateOf(sharedPrefs.getString("ai_base_url", "") ?: "") }
-    var modelName by remember { mutableStateOf(sharedPrefs.getString("ai_model_name", "") ?: "") }
-    var isConfigOpen by remember { mutableStateOf(false) }
+    // Read AI config from the global secure settings (same store as AiSettingsScreen)
+    val globalPrefs = remember { context.getSharedPreferences("meet_ai_settings_prefs", android.content.Context.MODE_PRIVATE) }
+    val provider by remember { derivedStateOf { globalPrefs.getString("selected_provider_id", "minimax") ?: "minimax" } }
+    val modelName by remember { derivedStateOf { globalPrefs.getString("model_$provider", "") ?: "" } }
+    val baseUrl by remember { derivedStateOf { globalPrefs.getString("base_url_$provider", "") ?: "" } }
 
     var aiResponse by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     val anomalousPids by viewModel.anomalousPids.collectAsState()
+    val activeDtcs by viewModel.activeDtcs.collectAsState()
+    val telemetrySamples by viewModel.telemetrySamples.collectAsState()
+    val freezeFrameData by viewModel.freezeFrameData.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val reasoningEngine = remember { DiagnosticReasoningEngine() }
+    var completedLocalTests by remember(dtcCode) { mutableStateOf<Set<String>>(emptySet()) }
+    val localReasoning = remember(
+        dtcCode,
+        activeDtcs,
+        telemetrySamples,
+        freezeFrameData,
+        selectedVehicle,
+        completedLocalTests
+    ) {
+        val selectedCode = dtcCode.trim().uppercase().takeIf { it.isNotBlank() }
+        val dtcsForCase = (listOfNotNull(selectedCode) + activeDtcs)
+            .map { it.trim().uppercase() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        val vehicleLabel = selectedVehicle?.let { vehicle ->
+            listOf(vehicle.make, vehicle.model, vehicle.year.toString(), vehicle.engine)
+                .filter { it.isNotBlank() && it != "0" }
+                .joinToString(" ")
+        }
+        val hasRealObd = telemetrySamples.values.any { it.hasRealValue }
+        reasoningEngine.analyze(
+            DiagnosticReasoningInput(
+                vehicleId = selectedVehicle?.id,
+                vehicleLabel = vehicleLabel,
+                primaryComplaint = selectedCode?.let { "Analisis tecnico para $it" },
+                dtcCodes = dtcsForCase,
+                obdConnected = hasRealObd || dtcsForCase.any { it in activeDtcs },
+                freezeFrame = freezeFrameData,
+                livePids = telemetrySamples,
+                completedTests = completedLocalTests.toList()
+            )
+        )
+    }
+    val hasLocalCase = localReasoning.case.hypotheses.isNotEmpty()
 
     val severity = remember(dtcCode) {
         when {
@@ -102,14 +127,15 @@ fun AiDiagnosticScreen(
     }
 
     LaunchedEffect(dtcCode) {
-        if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "ollama")) {
+        if (dtcCode.isNotEmpty()) {
             isLoading = true
+            // Use null for apiKey/baseUrl so consultAi falls through to global config
             aiResponse = viewModel.consultAi(
-                apiKey.takeIf { it.isNotBlank() },
-                baseUrl.takeIf { it.isNotBlank() },
+                null,
+                null,
                 listOf(dtcCode),
-                provider,
-                modelName
+                provider.takeIf { it != "minimax" },
+                modelName.takeIf { it.isNotBlank() }
             )
             isLoading = false
         }
@@ -124,7 +150,7 @@ fun AiDiagnosticScreen(
                 actions = {
                     EliteIconButton(
                         icon = { AnimatedNeonIcon(Icons.Default.Settings, contentDescription = "Configuración", tint = MeetColors.electricBlue) },
-                        onClick = { isConfigOpen = !isConfigOpen }
+                        onClick = onNavigateToSettings
                     )
                 }
             )
@@ -138,158 +164,8 @@ fun AiDiagnosticScreen(
                 .background(MeetColors.carbonGradient)
                 .padding(horizontal = 16.dp)
         ) {
-            // Configuration panel
-            AnimatedVisibility(visible = isConfigOpen) {
-                EliteCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "CONFIGURACIÓN DE MOTOR IA", 
-                            color = MeetColors.electricBlue, 
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        var expanded by remember { mutableStateOf(false) }
-                        
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            OutlinedTextField(
-                                value = providers.find { it.first == provider }?.second ?: provider,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Proveedor de IA", color = MeetColors.textSecondary) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = MeetColors.electricBlue,
-                                    unfocusedBorderColor = MeetColors.borderSubtle
-                                )
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                providers.forEach { (key, label) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label, color = Color.White) },
-                                        onClick = {
-                                            provider = key
-                                            when (key) {
-                                                "openai" -> if (baseUrl.isBlank()) baseUrl = "https://api.openai.com/v1/chat/completions"
-                                                "anthropic" -> if (baseUrl.isBlank()) baseUrl = "https://api.anthropic.com/v1/messages"
-                                                "ollama" -> if (baseUrl.isBlank()) baseUrl = "http://localhost:11434/v1/chat/completions"
-                                                "mavis" -> if (baseUrl.isBlank()) baseUrl = "https://api.tu-proveedor-mavis.com/v1/chat/completions"
-                                                "gemini" -> baseUrl = ""
-                                            }
-                                            expanded = false
-                                        },
-                                        modifier = Modifier.background(MeetColors.backgroundDark)
-                                    )
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        OutlinedTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            label = { Text("API Key (En blanco para Local)", color = MeetColors.textSecondary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = MeetColors.electricBlue,
-                                unfocusedBorderColor = MeetColors.borderSubtle
-                            )
-                        )
-                        
-                        if (provider != "gemini") {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = baseUrl,
-                                onValueChange = { baseUrl = it },
-                                label = { Text("URL Base Customizada (Ollama/Custom)", color = MeetColors.textSecondary) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = MeetColors.electricBlue,
-                                    unfocusedBorderColor = MeetColors.borderSubtle
-                                )
-                            )
-                        }
-
-                        if (provider in listOf("openai", "ollama", "mavis", "custom")) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = modelName,
-                                onValueChange = { modelName = it },
-                                label = { Text("Modelo (opcional)", color = MeetColors.textSecondary) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = MeetColors.electricBlue,
-                                    unfocusedBorderColor = MeetColors.borderSubtle
-                                )
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                            TextButton(onClick = { 
-                                apiKey = ""
-                                baseUrl = ""
-                                modelName = ""
-                                sharedPrefs.edit()
-                                    .remove("ai_api_key")
-                                    .remove("ai_base_url")
-                                    .remove("ai_model_name")
-                                    .apply()
-                            }) {
-                                Text("Limpiar", color = MeetColors.error)
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = { 
-                                    viewModel.saveAiConfig(provider, apiKey, baseUrl, modelName)
-                                    isConfigOpen = false
-                                    if (dtcCode.isNotEmpty() && (apiKey.isNotEmpty() || provider == "ollama")) {
-                                        coroutineScope.launch {
-                                            isLoading = true
-                                            aiResponse = viewModel.consultAi(
-                                                apiKey.takeIf { it.isNotBlank() },
-                                                baseUrl.takeIf { it.isNotBlank() },
-                                                listOf(dtcCode),
-                                                provider,
-                                                modelName
-                                            )
-                                            isLoading = false
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue)
-                            ) {
-                                Text("Guardar", color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
+            // AI Config is now managed globally via AiSettingsScreen
+            // Tap the gear icon in the top bar to navigate there
 
             val scrollState = rememberScrollState()
 
@@ -398,6 +274,24 @@ fun AiDiagnosticScreen(
                                     }
                                 }
 
+                                if (hasLocalCase) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    LocalDiagnosticReasoningPanel(
+                                        result = localReasoning,
+                                        completedTests = completedLocalTests,
+                                        onToggleTest = { testId ->
+                                            completedLocalTests = if (testId in completedLocalTests) {
+                                                completedLocalTests - testId
+                                            } else {
+                                                completedLocalTests + testId
+                                            }
+                                        },
+                                        onRequestMechanic = onRequestMechanic,
+                                        onRequestPart = onRequestPart,
+                                        onOpenComponent3d = onOpenComponent3d
+                                    )
+                                }
+
                                 Spacer(modifier = Modifier.height(20.dp))
                             }
 
@@ -433,10 +327,10 @@ fun AiDiagnosticScreen(
                                     
                                     Spacer(modifier = Modifier.height(16.dp))
                                     
-                                    if (apiKey.isEmpty() && provider != "Local/Ollama") {
+                                    if (provider == "minimax") {
                                         Text(
-                                            "⚠️ No has configurado tu API Key. Toca el engranaje superior para ingresar las credenciales de tu proveedor de IA.",
-                                            color = MeetColors.warning,
+                                            "💡 Usando motor de respaldo integrado (MiniMax) debido a que no has configurado tu propia API Key.",
+                                            color = MeetColors.neonGreen,
                                             fontSize = 13.sp,
                                             lineHeight = 18.sp
                                         )
@@ -466,7 +360,7 @@ fun AiDiagnosticScreen(
 
             // PDF Export button
             Button(
-                onClick = { viewModel.generateFullReport(aiResponse) },
+                onClick = { viewModel.generateFullReport(aiResponse ?: localReasoning.reportSummary) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.Transparent,
                     disabledContainerColor = Color.Transparent
@@ -476,15 +370,15 @@ fun AiDiagnosticScreen(
                     .height(52.dp)
                     .border(
                         1.dp,
-                        if (aiResponse != null) MeetColors.neonGreen else MeetColors.textSecondary.copy(alpha = 0.3f),
+                        if (aiResponse != null || hasLocalCase) MeetColors.neonGreen else MeetColors.textSecondary.copy(alpha = 0.3f),
                         RoundedCornerShape(12.dp)
                     ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = aiResponse != null
+                enabled = aiResponse != null || hasLocalCase
             ) {
                 Text(
                     "EXPORTAR REPORTE IA (PDF) 📄",
-                    color = if (aiResponse != null) MeetColors.neonGreen else MeetColors.textSecondary,
+                    color = if (aiResponse != null || hasLocalCase) MeetColors.neonGreen else MeetColors.textSecondary,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 12.sp,
                     letterSpacing = 1.sp
@@ -493,6 +387,296 @@ fun AiDiagnosticScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+@Composable
+private fun LocalDiagnosticReasoningPanel(
+    result: DiagnosticReasoningResult,
+    completedTests: Set<String>,
+    onToggleTest: (String) -> Unit,
+    onRequestMechanic: (String) -> Unit,
+    onRequestPart: (String) -> Unit,
+    onOpenComponent3d: () -> Unit
+) {
+    EliteCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "MOTOR LOCAL VANGUARD",
+                        color = MeetColors.neonGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        result.case.dtcCodes.joinToString().ifBlank { "Caso por sintomas" },
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(confidenceColor(result.confidenceScore.scorePercent).copy(alpha = 0.18f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        "${result.confidenceScore.scorePercent}% ${result.confidenceScore.band.label}",
+                        color = confidenceColor(result.confidenceScore.scorePercent),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                "Siguiente accion: ${result.nextBestAction}",
+                color = MeetColors.textPrimary,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            SectionLabel("HIPOTESIS PRIORIZADAS")
+            result.case.hypotheses.take(4).forEach { hypothesis ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.045f))
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                        .padding(12.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                "${hypothesis.probabilityPercent}%",
+                                color = confidenceColor(hypothesis.probabilityPercent),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.width(54.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    hypothesis.title,
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = 17.sp
+                                )
+                                Text(
+                                    hypothesis.reasoning,
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+                        if (hypothesis.contradictingEvidence.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Evidencia en contra: ${hypothesis.contradictingEvidence.joinToString()}",
+                                color = MeetColors.warning,
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        if (hypothesis.relatedComponents3d.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onOpenComponent3d,
+                                modifier = Modifier.height(34.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.electricBlue)
+                            ) {
+                                Text("Abrir pieza 3D", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            SectionLabel("PRUEBAS RECOMENDADAS")
+            result.case.recommendedTests.take(6).forEach { test ->
+                val done = test.id in completedTests || test.status == TestStatus.PASSED
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.035f))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(test.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${test.toolRequired} · Esperado: ${test.expectedResult}",
+                            color = MeetColors.textSecondary,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onToggleTest(test.id) },
+                        modifier = Modifier.height(34.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (done) MeetColors.neonGreen else MeetColors.electricBlue
+                        )
+                    ) {
+                        Text(
+                            if (done) "Agregada" else "Agregar",
+                            color = Color.Black,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+
+            if (result.missingData.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionLabel("DATOS FALTANTES CRITICOS")
+                Text(
+                    result.missingData.take(8).joinToString(separator = "\n") { "- $it" },
+                    color = MeetColors.warning,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            SectionLabel("ARBOL CAUSAL")
+            result.causalTree.children.take(3).forEach { system ->
+                Text(
+                    "• ${result.causalTree.title} > ${system.title}",
+                    color = MeetColors.textPrimary,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+                system.children.take(3).forEach { hypothesis ->
+                    Text(
+                        "   - ${hypothesis.probabilityPercent ?: 0}% ${hypothesis.title}",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+
+            if (result.serviceRecommendations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionLabel("SERVICIOS SUGERIDOS")
+                result.serviceRecommendations.take(3).forEach { service ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(service.serviceName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(service.reason, color = MeetColors.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                onRequestMechanic(
+                                    "${result.case.dtcCodes.joinToString()} | ${service.serviceName} | ${result.nextBestAction}"
+                                )
+                            },
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Pedir mecanico", fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+
+            if (result.partRecommendations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionLabel("REPUESTOS POSIBLES")
+                result.partRecommendations.take(5).forEach { part ->
+                    val blocked = part.state == PartRecommendationState.DO_NOT_BUY_YET
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.035f))
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(part.partName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                part.state.name.replace("_", " ") + " · " + part.requiredEvidence.firstOrNull().orEmpty(),
+                                color = partStateColor(part.state),
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                onRequestPart(
+                                    "${result.case.dtcCodes.joinToString()} | ${part.partName} | ${part.state.name}"
+                                )
+                            },
+                            enabled = !blocked,
+                            modifier = Modifier.height(34.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen)
+                        ) {
+                            Text("Pedir repuesto", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+            }
+
+            if (result.warnings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    result.warnings.joinToString(separator = "\n") { "- $it" },
+                    color = MeetColors.warning,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        color = MeetColors.electricBlue,
+        fontWeight = FontWeight.Black,
+        fontSize = 10.sp,
+        letterSpacing = 1.sp
+    )
+}
+
+private fun confidenceColor(value: Int): Color = when {
+    value >= 70 -> MeetColors.neonGreen
+    value >= 45 -> MeetColors.warning
+    else -> MeetColors.error
+}
+
+private fun partStateColor(state: PartRecommendationState): Color = when (state) {
+    PartRecommendationState.CONFIRMED_NEEDED -> MeetColors.neonGreen
+    PartRecommendationState.MAY_BE_NEEDED -> MeetColors.electricBlue
+    PartRecommendationState.INVESTIGATE_ONLY -> MeetColors.warning
+    PartRecommendationState.DO_NOT_BUY_YET -> MeetColors.error
 }
 
 @Composable

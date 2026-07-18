@@ -129,11 +129,11 @@
       ],
       "diagnosticSteps": [
         "Save DTC and freeze frame for record.",
-        "Measure battery voltage KOEO (key on, engine off): should be 12.4-12.7V.",
+        "Measure battery voltage KOEO (key on, engine off) and compare it with validated vehicle-specific criteria.",
         "Inspect fuel pump fuse for continuity and corrosion.",
         "Activate fuel pump via bidirectional control or key cycle; listen for prime.",
         "Measure voltage at relay control coil (PCM side) and relay output (pump side).",
-        "Measure voltage drop across the pump ground path (should be < 0.1V).",
+        "Measure voltage drop across the pump ground path and compare it with a validated vehicle-specific threshold.",
         "Inspect connector terminals for corrosion, spread, or backing-out.",
         "Only after all of the above check out, perform pump current draw test.",
         "PCM driver is the final hypothesis; do not replace PCM based on this code alone."
@@ -147,8 +147,7 @@
         "ENGINE_LOAD",
         "STFT_B1",
         "LTFT_B1",
-        "MAP",
-        "MAF"
+        "MAP"
       ],
       "riskLevel": "HIGH"
     }
@@ -184,10 +183,10 @@
     "nodes": [
       {
         "id": "n_battery_check",
-        "question": "Battery voltage KOEO >= 12.4V?",
+        "question": "Battery voltage KOEO meets validated vehicle-specific criteria?",
         "howToTest": "Multimeter on battery posts, key ON, engine OFF.",
         "tools": ["multimeter"],
-        "expectedValue": "12.4-12.7V",
+        "expectedValue": "Use a reviewed source for the exact vehicle, market and test condition.",
         "yes": "n_fuse_check",
         "no":  "n_charge_battery",
         "unknown": "n_fuse_check"
@@ -197,7 +196,7 @@
         "question": "Charge or replace battery, then retest.",
         "howToTest": "Battery charger or replacement per OEM.",
         "tools": ["battery charger"],
-        "expectedValue": "Voltage after charge >= 12.4V.",
+        "expectedValue": "Battery passes the validated test criteria for the installed battery type.",
         "yes": "n_fuse_check",
         "no":  "n_pcm_driver",
         "unknown": "n_fuse_check"
@@ -207,7 +206,7 @@
         "question": "Fuel pump fuse continuity OK?",
         "howToTest": "Pull fuse, multimeter continuity, inspect for corrosion.",
         "tools": ["multimeter"],
-        "expectedValue": "0 ohms, no discoloration.",
+        "expectedValue": "Continuity and physical condition pass the validated inspection criteria.",
         "yes": "n_relay_check",
         "no":  "n_replace_fuse",
         "unknown": "n_relay_check"
@@ -227,17 +226,17 @@
         "question": "Relay control coil receives PCM command?",
         "howToTest": "Back-probe relay coil terminals with PCM commanded ON.",
         "tools": ["multimeter", "back probes"],
-        "expectedValue": "Coil voltage drops to near 0V when PCM commands ON.",
+        "expectedValue": "The commanded state matches the reviewed vehicle-specific circuit behavior.",
         "yes": "n_relay_contact_check",
         "no":  "n_pcm_driver",
         "unknown": "n_wiring_check"
       },
       {
         "id": "n_relay_contact_check",
-        "question": "Relay output voltage to pump within 0.5V of battery?",
+        "question": "Relay output voltage to pump passes the validated loaded-circuit criteria?",
         "howToTest": "Measure output terminal with pump commanded ON.",
         "tools": ["multimeter"],
-        "expectedValue": "Within 0.5V of battery voltage.",
+        "expectedValue": "Use the reviewed vehicle-specific voltage-drop criterion.",
         "yes": "n_pump_connector",
         "no":  "n_replace_relay",
         "unknown": "n_wiring_check"
@@ -267,27 +266,27 @@
         "question": "Repair or replace connector.",
         "howToTest": "Replace terminal or pigtail, retest.",
         "tools": ["terminal kit", "crimper"],
-        "expectedValue": "Voltage drop < 0.1V across repaired connection.",
+        "expectedValue": "The repaired connection passes the reviewed loaded-circuit criterion.",
         "yes": "n_pump_voltage",
         "no":  "n_wiring_check",
         "unknown": "n_pump_voltage"
       },
       {
         "id": "n_pump_voltage",
-        "question": "Pump feed voltage within 0.5V of battery?",
+        "question": "Pump feed voltage passes the validated loaded-circuit criteria?",
         "howToTest": "Back-probe pump feed wire with pump commanded ON.",
         "tools": ["multimeter", "back probes"],
-        "expectedValue": "Within 0.5V of battery.",
+        "expectedValue": "Use the reviewed vehicle-specific voltage-drop criterion.",
         "yes": "n_pump_ground",
         "no":  "n_wiring_check",
         "unknown": "n_pump_ground"
       },
       {
         "id": "n_pump_ground",
-        "question": "Voltage drop across pump ground < 0.1V?",
+        "question": "Pump ground passes the validated loaded voltage-drop test?",
         "howToTest": "Measure pump ground terminal to chassis ground.",
         "tools": ["multimeter"],
-        "expectedValue": "< 0.1V drop.",
+        "expectedValue": "Use the reviewed vehicle-specific ground voltage-drop criterion.",
         "yes": "n_pump_current",
         "no":  "n_repair_ground",
         "unknown": "n_pump_current"
@@ -297,7 +296,7 @@
         "question": "Repair ground path (clean, tighten, add supplemental ground if OEM allows).",
         "howToTest": "Retest voltage drop after repair.",
         "tools": ["wire brush", "terminal grease"],
-        "expectedValue": "< 0.1V drop.",
+        "expectedValue": "The repaired ground passes the reviewed loaded-circuit criterion.",
         "yes": "n_pump_current",
         "no":  "n_wiring_check",
         "unknown": "n_pump_current"
@@ -307,7 +306,7 @@
         "question": "Pump current draw within OEM range?",
         "howToTest": "Clamp ammeter on pump feed wire, command pump ON.",
         "tools": ["clamp ammeter"],
-        "expectedValue": "Per OEM spec; typical 4-8A at idle prime.",
+        "expectedValue": "Use a reviewed source for this exact pump, vehicle and test condition.",
         "yes": "n_resolved",
         "no":  "n_replace_pump",
         "unknown": "n_pcm_driver"
@@ -327,7 +326,7 @@
         "question": "Harness and connectors between battery, fuse, relay, and pump all intact?",
         "howToTest": "Visual inspection + continuity test on each conductor.",
         "tools": ["multimeter", "wire tracer"],
-        "expectedValue": "< 1 ohm end-to-end on each conductor.",
+        "expectedValue": "Each conductor passes reviewed continuity and loaded voltage-drop criteria.",
         "yes": "n_resolved",
         "no":  "n_repair_wiring",
         "unknown": "n_pcm_driver"
@@ -337,7 +336,7 @@
         "question": "Repair or replace damaged wiring per OEM spec.",
         "howToTest": "Continuity retest after repair.",
         "tools": ["wire", "crimper", "heat shrink"],
-        "expectedValue": "< 1 ohm; no voltage drop under load.",
+        "expectedValue": "The repaired circuit passes reviewed continuity and loaded voltage-drop criteria.",
         "yes": "n_resolved",
         "no":  "n_pcm_driver",
         "unknown": "n_pcm_driver"

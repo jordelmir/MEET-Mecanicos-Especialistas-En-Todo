@@ -431,6 +431,139 @@ object VisualDiagnosticSeedData {
     // ═══════════════════════════════════════════════════════════
     //  HELPER FACTORIES (unchanged)
     // ═══════════════════════════════════════════════════════════
+    private fun derivePosition(id: String, category: ComponentCategory): ComponentPosition {
+        val h = java.lang.Math.abs(id.hashCode())
+        val f1 = (h % 1000) / 1000f
+        val f2 = ((h / 1000) % 1000) / 1000f
+        val f3 = ((h / 1000000) % 1000) / 1000f
+
+        fun lerp(min: Float, max: Float, f: Float): Float = min + (max - min) * f
+
+        var x = 0f
+        var y = 0f
+        var z = 0f
+
+        when (category) {
+            ComponentCategory.IGNITION -> {
+                val cyl = when {
+                    id.endsWith("2") || id.contains("cyl_2") -> 2
+                    id.endsWith("3") || id.contains("cyl_3") -> 3
+                    id.endsWith("4") || id.contains("cyl_4") -> 4
+                    id.endsWith("5") || id.contains("cyl_5") -> 5
+                    id.endsWith("6") || id.contains("cyl_6") -> 6
+                    id.endsWith("7") || id.contains("cyl_7") -> 7
+                    id.endsWith("8") || id.contains("cyl_8") -> 8
+                    id.endsWith("9") || id.contains("cyl_9") -> 9
+                    id.endsWith("10") || id.contains("cyl_10") -> 10
+                    else -> 1
+                }
+                x = -16f + (cyl - 1) * 4f
+                y = -26f + f1 * 2f
+                z = 28f + f2 * 2f
+            }
+            ComponentCategory.AIR_INTAKE -> {
+                x = lerp(-30f, -16f, f1)
+                y = lerp(-30f, -22f, f2)
+                z = lerp(18f, 26f, f3)
+            }
+            ComponentCategory.FUEL -> {
+                if (id.contains("injector")) {
+                    val cyl = when {
+                        id.endsWith("2") -> 2
+                        id.endsWith("3") -> 3
+                        id.endsWith("4") -> 4
+                        id.endsWith("5") -> 5
+                        id.endsWith("6") -> 6
+                        id.endsWith("7") -> 7
+                        id.endsWith("8") -> 8
+                        else -> 1
+                    }
+                    x = -16f + (cyl - 1) * 4f + 1f
+                    y = -24f + f1 * 1f
+                    z = 26f + f2 * 1f
+                } else if (id.contains("pump") || id.contains("filter") || id.contains("canister")) {
+                    x = lerp(-12f, 12f, f1)
+                    y = lerp(20f, 32f, f2)
+                    z = lerp(-25f, -15f, f3)
+                } else {
+                    x = lerp(-10f, 10f, f1)
+                    y = lerp(-25f, -15f, f2)
+                    z = lerp(15f, 25f, f3)
+                }
+            }
+            ComponentCategory.EXHAUST -> {
+                x = lerp(-6f, 6f, f1)
+                y = lerp(-20f, 32f, f2)
+                z = lerp(-32f, -24f, f3)
+            }
+            ComponentCategory.COOLING -> {
+                x = lerp(-25f, 25f, f1)
+                y = lerp(-35f, -32f, f2)
+                z = lerp(12f, 24f, f3)
+            }
+            ComponentCategory.LUBRICATION -> {
+                x = lerp(-8f, 8f, f1)
+                y = lerp(-24f, -14f, f2)
+                z = lerp(-28f, -18f, f3)
+            }
+            ComponentCategory.SENSOR -> {
+                x = lerp(-32f, 32f, f1)
+                y = lerp(-34f, -12f, f2)
+                z = lerp(12f, 28f, f3)
+            }
+            ComponentCategory.RELAY_FUSE -> {
+                x = lerp(-32f, -22f, f1)
+                y = lerp(-24f, -16f, f2)
+                z = lerp(24f, 30f, f3)
+            }
+            ComponentCategory.TRANSMISSION -> {
+                x = lerp(-6f, 6f, f1)
+                y = lerp(-4f, 12f, f2)
+                z = lerp(-8f, 8f, f3)
+            }
+            ComponentCategory.SUSPENSION, ComponentCategory.BRAKES -> {
+                val isLeft = id.contains("left") || id.contains("_l") || f1 < 0.5f
+                val isFront = id.contains("front") || id.contains("input") || f2 < 0.5f
+                x = if (isLeft) -44f else 44f
+                y = if (isFront) -22f else 22f
+                z = if (category == ComponentCategory.BRAKES) -12f else -10f
+                x += f3 * 3f - 1.5f
+                y += f1 * 3f - 1.5f
+            }
+            ComponentCategory.STEERING -> {
+                x = lerp(-22f, 22f, f1)
+                y = lerp(-24f, -18f, f2)
+                z = lerp(-12f, -8f, f3)
+            }
+            ComponentCategory.BODY_CONTROL -> {
+                x = lerp(-25f, 25f, f1)
+                y = lerp(-14f, 2f, f2)
+                z = lerp(14f, 24f, f3)
+            }
+            ComponentCategory.EV_HIGH_VOLTAGE -> {
+                x = lerp(-18f, 18f, f1)
+                y = lerp(-18f, 18f, f2)
+                z = lerp(-24f, -18f, f3)
+            }
+            ComponentCategory.TURBO_SUPERCHARGER -> {
+                x = lerp(14f, 24f, f1)
+                y = lerp(-24f, -14f, f2)
+                z = lerp(10f, 20f, f3)
+            }
+            ComponentCategory.DIESEL_EMISSIONS -> {
+                x = lerp(-8f, 8f, f1)
+                y = lerp(10f, 26f, f2)
+                z = lerp(-26f, -18f, f3)
+            }
+            else -> {
+                x = lerp(-30f, 30f, f1)
+                y = lerp(-32f, 15f, f2)
+                z = lerp(10f, 28f, f3)
+            }
+        }
+        return ComponentPosition(x, y, z, "MOTOR_3D")
+    }
+
     private fun ignitionComponent(id: String, name: String, mesh: String, dtcs: List<String>): DiagnosticComponent =
         DiagnosticComponent(
             id = id, engineType = EngineType.L4, name = name, category = ComponentCategory.IGNITION,
@@ -444,7 +577,7 @@ object VisualDiagnosticSeedData {
             safetyWarnings = listOf(SafetyWarning("WARNING", "Alto voltaje de encendido; no manipular bobinas energizadas.")),
             relatedPids = listOf(RelatedPid("010C", "RPM", "rpm", "estable en ralentí", "WARNING si cae con misfire")),
             relatedDtcs = dtcs.map { RelatedDtc(it, "Misfire/encendido relacionado", 0.7, "WARNING") },
-            position = ComponentPosition(0f, -35f, 0f, "MOTOR_3D"), meshKey = mesh
+            position = derivePosition(id, ComponentCategory.IGNITION), meshKey = mesh
         )
 
     private fun airComponent(id: String, name: String, mesh: String, dtcs: List<String>, pids: List<RelatedPid>): DiagnosticComponent =
@@ -481,6 +614,6 @@ object VisualDiagnosticSeedData {
             safetyWarnings = listOf(SafetyWarning("WARNING", "No reemplazar piezas sin confirmar alimentación, masa, señal y condición mecánica.")),
             relatedPids = pids,
             relatedDtcs = dtcs.map { RelatedDtc(it, "DTC relacionado a $name", 0.65, "WARNING") },
-            position = ComponentPosition(0f, 0f, 0f, "MOTOR_3D"), meshKey = mesh
+            position = derivePosition(id, category), meshKey = mesh
         )
 }

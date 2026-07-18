@@ -25,13 +25,18 @@ import com.elysium369.meet.core.engine3d.Face3D
 import com.elysium369.meet.core.engine3d.Mesh3D
 import com.elysium369.meet.core.engine3d.Vector3D
 import com.elysium369.meet.core.engine3d.EngineType
+import com.elysium369.meet.core.engine3d.UniversalCatalogSceneNode
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlin.math.*
 
 enum class SceneType {
     ENGINE_BLOCK,
     RELAY_FUSE_BOX,
-    WIRING_HARNESS
+    WIRING_HARNESS,
+    SUSPENSION,
+    TRANSMISSION,
+    BRAKES_STEERING,
+    UNIVERSAL_CATALOG
 }
 
 @Composable
@@ -41,6 +46,7 @@ fun Interactive3DDiagView(
     activeDtcs: List<String>,
     selectedComponentId: String?,
     onComponentSelected: (componentId: String, componentName: String) -> Unit,
+    catalogNodes: List<UniversalCatalogSceneNode> = emptyList(),
     explodedServiceView: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -50,11 +56,15 @@ fun Interactive3DDiagView(
     var panX by remember { mutableStateOf(0f) }
     var panY by remember { mutableStateOf(0f) }
 
-    val meshes = remember(sceneType, engineType, activeDtcs) {
+    val meshes = remember(sceneType, engineType, activeDtcs, catalogNodes, selectedComponentId) {
         when (sceneType) {
             SceneType.ENGINE_BLOCK -> ElysiumProceduralModels.buildEngineBlockScene(engineType, activeDtcs)
             SceneType.RELAY_FUSE_BOX -> ElysiumProceduralModels.buildRelayFuseBoxScene(engineType, activeDtcs)
             SceneType.WIRING_HARNESS -> ElysiumProceduralModels.buildWiringHarnessScene(engineType, activeDtcs)
+            SceneType.SUSPENSION -> ElysiumProceduralModels.buildFrontSuspensionScene()
+            SceneType.TRANSMISSION -> ElysiumProceduralModels.buildFrontSuspensionScene()
+            SceneType.BRAKES_STEERING -> ElysiumProceduralModels.buildFrontSuspensionScene()
+            SceneType.UNIVERSAL_CATALOG -> ElysiumProceduralModels.buildUniversalCatalogScene(catalogNodes, selectedComponentId)
         }
     }
 
@@ -67,7 +77,7 @@ fun Interactive3DDiagView(
             animTime = ((elapsed % 2600L) / 2600f) * 2f * PI.toFloat()
             val pulseWave = ((sin(((elapsed % 1200L) / 1200f) * 2f * PI.toFloat()) + 1f) / 2f)
             dtcPulse = if (activeDtcs.isNotEmpty()) 0.2f + (pulseWave * 0.8f) else 0.45f
-            kotlinx.coroutines.delay(if (sceneType == SceneType.ENGINE_BLOCK) 180L else 240L)
+            kotlinx.coroutines.delay(if (sceneType == SceneType.UNIVERSAL_CATALOG) 90L else if (sceneType == SceneType.ENGINE_BLOCK) 180L else 240L)
         }
     }
 
@@ -167,7 +177,11 @@ fun Interactive3DDiagView(
                 val isSparkTriggered = sparkIndex != null && (sin(animTime * 4 + sparkIndex) > 0.85f)
 
                 val serviceOffset = serviceExplodedOffset(mesh.id, explodedProgress)
-                val worldVertices = mesh.transformToWorld(pistonOffset, isSparkTriggered).map { it + serviceOffset }
+                val catalogFloat = if (sceneType == SceneType.UNIVERSAL_CATALOG) {
+                    sin(animTime + (mesh.id.hashCode() and 31) * 0.2f) * if (mesh.isHighlighted) 4f else 1.8f
+                } else 0f
+                val worldVertices = mesh.transformToWorld(pistonOffset, isSparkTriggered)
+                    .map { it + serviceOffset + Vector3D(0f, catalogFloat, 0f) }
 
                 val screenPoints = worldVertices.map { v ->
                     val rotatedCam = v.rotateY(yaw).rotateX(pitch)
@@ -431,6 +445,9 @@ private fun serviceExplodedOffset(meshId: String, progress: Float): Vector3D {
         meshId == "exhaust_manifold" || meshId.startsWith("exhaust_runner_") || meshId.contains("o2") || meshId == "catalytic_converter" -> Vector3D(0f, 8f, 34f)
         meshId == "alternator" || meshId == "serpentine_belt" || meshId == "water_pump" || meshId == "thermostat_housing" -> Vector3D(-28f, 0f, 0f)
         meshId == "oil_pan" || meshId == "oil_filter" -> Vector3D(0f, 26f, 0f)
+        meshId.contains("left") || meshId.endsWith("_left") -> Vector3D(-34f, 0f, 0f)
+        meshId.contains("right") || meshId.endsWith("_right") -> Vector3D(34f, 0f, 0f)
+        meshId == "front_subframe" || meshId == "steering_rack" || meshId == "stabilizer_bar" -> Vector3D(0f, 22f, -12f)
         else -> Vector3D(0f, 0f, 0f)
     }
     return direction * progress

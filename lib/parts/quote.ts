@@ -17,6 +17,7 @@ import {
   PartAvailability,
   CompatibilityConfidence,
   isCriticalSafetyPart,
+  isValidVin,
 } from './types';
 
 /* -------------------------------------------------------------------------- */
@@ -63,6 +64,11 @@ export interface SupplierQuoteFormInput {
   compatibilityConfidence: CompatibilityConfidence;
   compatibilityNotes: string;
   expiresInHours: number;
+  vehicleVin?: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleYear?: number;
+  vehicleEngine?: string;
 }
 
 export interface DraftSupplierQuote {
@@ -81,6 +87,11 @@ export interface DraftSupplierQuote {
   photoUrls: string[];
   compatibilityConfidence: CompatibilityConfidence;
   compatibilityNotes: string;
+  vehicleVin: string | null;
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: number | null;
+  vehicleEngine: string;
   expiresAt: number; // unix ms (bigint-shaped number)
 }
 
@@ -119,6 +130,11 @@ export function buildQuoteFromForm(
       .filter((u) => u.length > 0),
     compatibilityConfidence: form.compatibilityConfidence,
     compatibilityNotes: form.compatibilityNotes.trim(),
+    vehicleVin: form.vehicleVin?.trim() || null,
+    vehicleBrand: form.vehicleBrand?.trim() || '',
+    vehicleModel: form.vehicleModel?.trim() || '',
+    vehicleYear: Number.isInteger(form.vehicleYear) ? form.vehicleYear! : null,
+    vehicleEngine: form.vehicleEngine?.trim() || '',
     expiresAt: expiresAtFromNow(form.expiresInHours),
   };
 }
@@ -162,10 +178,35 @@ export function validateQuote(quote: DraftSupplierQuote): ValidationResult {
       );
     }
   }
+  const vinProvided = Boolean(quote.vehicleVin);
+  const validVin = isValidVin(quote.vehicleVin);
+  if (vinProvided && !validVin) {
+    errors.push(
+      'El VIN recibido no es válido: debe tener exactamente 17 caracteres y no incluir I, O ni Q.',
+    );
+  }
   if (quote.compatibilityConfidence === 'EXACT') {
-    if (!quote.oemNumber && !quote.partNumber) {
+    const hasPartIdentity = Boolean(quote.oemNumber || quote.partNumber);
+    const hasVinEvidence = hasPartIdentity && validVin;
+    const hasClosedTupleEvidence = Boolean(
+      quote.vehicleBrand &&
+        quote.vehicleModel &&
+        quote.vehicleYear !== null &&
+        quote.vehicleYear >= 1886 &&
+        quote.vehicleYear <= 2100 &&
+        quote.vehicleEngine &&
+        quote.oemNumber,
+    );
+
+    if (!hasPartIdentity) {
       errors.push(
         'Para una confianza EXACTA se requiere número OEM o número de parte.',
+      );
+    }
+    if (!hasVinEvidence && !hasClosedTupleEvidence) {
+      errors.push(
+        'EXACT requiere VIN válido + OEM/número de parte, o tupla cerrada ' +
+          'marca/modelo/año/motor/OEM.',
       );
     }
     if (quote.compatibilityNotes.trim().length === 0) {

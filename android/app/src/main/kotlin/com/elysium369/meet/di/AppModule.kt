@@ -11,6 +11,9 @@ import com.elysium369.meet.core.vanguard.SupabaseVanguardOutboxDispatcher
 import com.elysium369.meet.core.vanguard.VanguardOutboxDispatcher
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
+import com.elysium369.meet.core.reports.ReportVerifier
+import com.elysium369.meet.data.local.CertifiedReportRepository
+import io.github.jan.supabase.postgrest.postgrest
 
 import dagger.Module
 import dagger.Provides
@@ -3164,8 +3167,26 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGeminiDiagnostic(): GeminiDiagnostic {
-        return GeminiDiagnostic()
+    fun provideGeminiDiagnostic(
+        aiRepository: com.elysium369.meet.ai.data.AiRepository
+    ): GeminiDiagnostic {
+        return GeminiDiagnostic(aiRepository = aiRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAiSecureKeyStore(@ApplicationContext context: Context): com.elysium369.meet.ai.data.AiSecureKeyStore {
+        return com.elysium369.meet.ai.data.AiSecureKeyStoreImpl(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAiRepository(
+        registry: com.elysium369.meet.ai.data.AiProviderRegistry,
+        usageTracker: com.elysium369.meet.ai.data.AiUsageTracker,
+        promptStore: com.elysium369.meet.ai.data.AiPromptStore
+    ): com.elysium369.meet.ai.data.AiRepository {
+        return com.elysium369.meet.ai.data.AiRepositoryImpl(registry, usageTracker, promptStore)
     }
 
     @Provides
@@ -3238,8 +3259,57 @@ object AppModule {
     fun provideVanguardCommerceDao(db: MeetDatabase): VanguardCommerceDao = db.vanguardCommerceDao()
 
     @Provides
+    fun provideCertifiedReportDao(db: MeetDatabase): CertifiedReportDao = db.certifiedReportDao()
+
+    @Provides
+    fun provideReportEvidenceDao(db: MeetDatabase): ReportEvidenceDao = db.reportEvidenceDao()
+
+    @Provides
+    fun provideRepairActionDao(db: MeetDatabase): RepairActionDao = db.repairActionDao()
+
+    @Provides
+    fun provideReportSignatureDao(db: MeetDatabase): ReportSignatureDao = db.reportSignatureDao()
+
+    @Provides
+    fun provideDiagnosticSnapshotDao(db: MeetDatabase): DiagnosticSnapshotDao = db.diagnosticSnapshotDao()
+
+    @Provides
     @Singleton
     fun provideVanguardOutboxDispatcher(
         dispatcher: SupabaseVanguardOutboxDispatcher
     ): VanguardOutboxDispatcher = dispatcher
+
+    @Provides
+    @Singleton
+    fun provideReportVerifier(
+        repo: CertifiedReportRepository,
+        supabase: io.github.jan.supabase.SupabaseClient
+    ): ReportVerifier {
+        return ReportVerifier(
+            reportRepo = repo,
+            remoteProbe = { payload ->
+                runCatching {
+                    supabase.postgrest["certified_reports"]
+                        .select { filter { eq("reportId", payload.reportId) } }
+                        .decodeSingleOrNull<RemoteReportRow>()
+                        ?.integrityHash
+                        ?.equals(payload.integrityHash, ignoreCase = true)
+                }.getOrNull()
+            }
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideProcedureKnowledgeBase(
+        @ApplicationContext context: Context
+    ): com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase {
+        return com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase(context)
+    }
 }
+
+@kotlinx.serialization.Serializable
+data class RemoteReportRow(
+    val reportId: String,
+    val integrityHash: String
+)

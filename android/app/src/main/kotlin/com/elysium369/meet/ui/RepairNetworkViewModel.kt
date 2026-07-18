@@ -85,7 +85,7 @@ class RepairNetworkViewModel(
         combine(
             _searchQuery.debounce(300L), _makeFilter, _modelFilter, _yearFilter,
             _countryFilter, _dtcFilter, _sortByFilter, _onlyVerifiedFilter
-        ) { array ->
+        ) { array: Array<Any?> ->
             array
         }.onEach { array ->
             val search = array[0] as String

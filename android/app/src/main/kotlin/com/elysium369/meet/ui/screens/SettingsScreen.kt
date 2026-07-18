@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -587,6 +588,46 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 lineHeight = 14.sp
                             )
                         }
+                    }
+                }
+            }
+
+            // --- Botón de acceso al Motor IA Avanzado (Multi-Proveedor) ---
+            item {
+                EliteCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("ai_settings") },
+                    glowColor = MeetColors.electricBlue,
+                    backgroundColor = MeetColors.backgroundDeep,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "⚡ Motor IA Avanzado (Multi-Proveedor)",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                "Configura MiniMax, OpenAI, Gemini, Anthropic, Groq, DeepSeek, Ollama y más. BYOK seguro con cifrado Keystore.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        AnimatedNeonIcon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Ir a Motor IA Avanzado",
+                            tint = MeetColors.electricBlue
+                        )
                     }
                 }
             }

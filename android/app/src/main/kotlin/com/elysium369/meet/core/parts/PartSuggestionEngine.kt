@@ -4,10 +4,9 @@ package com.elysium369.meet.core.parts
  * Part Suggestion Engine — pure, no I/O.
  *
  * Speaks the same language as the TypeScript
- * `lib/parts/part-suggestion.ts`. P0230 specifically:
- *   1. relay / fuse / harness first
- *   2. fuel-pressure sensor next
- *   3. fuel pump LAST, marked riskPart with a verbatim disclaimer
+ * `lib/parts/part-suggestion.ts`. P0230 specifically verifies relay, fuse and
+ * harness before listing the fuel pump LAST with a verbatim disclaimer.
+ * Position never means a part is confirmed bad.
  *
  * Identical ordering to the web side.
  */
@@ -39,36 +38,29 @@ object PartSuggestionEngine {
             category = "ELECTRICAL",
             position = PartPosition.FUSE_BOX,
             priority = 1,
-            rationale = "P0230 commonly points to the relay circuit. Cheap to swap.",
+            rationale = "Verificar el relé y su zócalo antes de atribuir P0230 a la bomba.",
         ),
         PartSuggestion(
             partName = "Fusible circuito bomba",
             category = "ELECTRICAL",
             position = PartPosition.FUSE_BOX,
             priority = 2,
-            rationale = "Blown fuse accounts for a meaningful slice of P0230 cases.",
+            rationale = "Verificar continuidad del fusible y descartar un corto aguas abajo antes de reemplazarlo.",
         ),
         PartSuggestion(
             partName = "Arnés eléctrico / terminales de bomba",
             category = "ELECTRICAL",
             position = PartPosition.ENGINE,
             priority = 3,
-            rationale = "Corroded connectors or broken harness wires trigger P0230.",
-        ),
-        PartSuggestion(
-            partName = "Sensor de presión de combustible",
-            category = "ENGINE",
-            position = PartPosition.ENGINE,
-            priority = 4,
-            rationale = "Verify FTP sensor is reporting before condemning the pump.",
+            rationale = "Inspeccionar conector y arnés; documentar alimentación, tierra y caída de voltaje bajo carga.",
         ),
         PartSuggestion(
             partName = "Bomba de combustible",
             category = "ENGINE",
             position = PartPosition.ENGINE,
             priority = 99,
-            rationale = "Final-tier part. Replace only AFTER voltage, ground, relay and " +
-                "fuel pressure have been verified with a gauge.",
+            rationale = "Considerar reemplazo sólo después de verificar batería, fusible, relé, " +
+                "arnés, conector, alimentación, tierra, presión y corriente.",
             disclaimer = "No reemplazar la bomba sin confirmar antes: alimentación, " +
                 "tierra, relé/fusible y presión con manómetro.",
             riskPart = true,
@@ -81,22 +73,22 @@ object PartSuggestionEngine {
             category = "EXHAUST",
             position = PartPosition.EXHAUST,
             priority = 1,
-            rationale = "Downstream O2 sensor drift causes P0420 in older vehicles. Cheap " +
-                "first attempt.",
+            rationale = "Evaluar señal, calentador y cableado del sensor. No sustituirlo sólo por el DTC.",
         ),
         PartSuggestion(
             partName = "Junta de escape",
             category = "EXHAUST",
             position = PartPosition.EXHAUST,
             priority = 2,
-            rationale = "Exhaust leak ahead of the cat triggers the same code.",
+            rationale = "Inspeccionar fugas de escape antes del catalizador y confirmar con una prueba física.",
         ),
         PartSuggestion(
             partName = "Catalizador",
             category = "EXHAUST",
             position = PartPosition.CENTER,
             priority = 99,
-            rationale = "Last. Confirm wiring and O2 sensors first; cats are expensive.",
+            rationale = "Considerar reemplazo sólo tras descartar fugas, mezcla incorrecta, " +
+                "fallos de encendido y sensores.",
             disclaimer = "Pieza de alto costo; confirmar antes de reemplazar.",
             riskPart = true,
         ),
@@ -108,45 +100,45 @@ object PartSuggestionEngine {
             category = "ENGINE",
             position = PartPosition.ENGINE,
             priority = 1,
-            rationale = "Worn spark plugs are the most common P0300 cause.",
+            rationale = "Inspeccionar estado, luz y patrón de desgaste; P0300 no confirma una bujía defectuosa.",
         ),
         PartSuggestion(
             partName = "Bobina de encendido",
             category = "ENGINE",
             position = PartPosition.ENGINE,
             priority = 2,
-            rationale = "Failing coil triggers random misfires.",
+            rationale = "Confirmar la bobina mediante intercambio controlado, señal o prueba equivalente antes de reemplazar.",
         ),
         PartSuggestion(
             partName = "Inyector",
             category = "ENGINE",
             position = PartPosition.ENGINE,
             priority = 3,
-            rationale = "Last: clogged or leaking injector requires diagnostic time.",
+            rationale = "Confirmar balance, control eléctrico y estanqueidad del inyector antes de reemplazar.",
         ),
     )
 
     private val P0171_SUGGESTIONS: List<PartSuggestion> = listOf(
         PartSuggestion(
-            partName = "Tapa del depósito de gasolina",
-            category = "ENGINE",
-            position = PartPosition.NOT_APPLICABLE,
-            priority = 1,
-            rationale = "Loose / bad gas cap produces P0171 in many vehicles.",
-        ),
-        PartSuggestion(
             partName = "Manguera de vacío",
             category = "ENGINE",
             position = PartPosition.ENGINE,
-            priority = 2,
-            rationale = "Unmetered air from a cracked hose skews the fuel trim.",
+            priority = 1,
+            rationale = "Buscar entrada de aire no medida mediante inspección y prueba de humo cuando corresponda.",
         ),
         PartSuggestion(
-            partName = "Sensor MAF",
+            partName = "Ducto o junta de admisión",
+            category = "ENGINE",
+            position = PartPosition.ENGINE,
+            priority = 2,
+            rationale = "Inspeccionar grietas, uniones y sellos; no reemplazar sin localizar la fuga.",
+        ),
+        PartSuggestion(
+            partName = "Sensor de carga de motor (MAF o MAP según equipamiento)",
             category = "ENGINE",
             position = PartPosition.ENGINE,
             priority = 3,
-            rationale = "Dirty MAF reads low; clean before replacing.",
+            rationale = "Confirmar qué sensor equipa el vehículo y contrastar su señal antes de intervenir.",
         ),
     )
 

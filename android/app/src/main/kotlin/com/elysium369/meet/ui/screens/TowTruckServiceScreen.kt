@@ -454,7 +454,7 @@ private fun ClientWorkspaceView(
                         onClick = {
                             val lat = latText.toDoubleOrNull() ?: 9.9281
                             val lng = lngText.toDoubleOrNull() ?: -84.0907
-                            val loc = if (locationName.isBlank()) "Ubicación GPS ($lat, $lng)" else locationName
+                            val loc = if (locationName.isBlank()) "Ubicación GPS detectada" else locationName
                             val priceInUsd = (priceOfferCrc / 500.0f).toDouble()
                             viewModel.createTowTruckRequest(
                                 latitude = lat,

@@ -1,6 +1,7 @@
 # AGENTS.md — MEET project rules
 
-This file is read by every AI agent (Mavis, Codex, future) that works
+This file is read by every AI agent (Mavis, Codex, Google Antigravity,
+future) that works
 on the MEET / Elysium Vanguard repo. It captures the non-negotiable
 operating principles for this product.
 
@@ -44,14 +45,16 @@ Onboarding → Vehicle → OBD → DTCs → Repair guide → Mechanic
 
 ### Cross-agent coordination
 
-- Two agents work in parallel: **Codex (ChatGPT)** on its branches,
-  **Mavis (mE)** on its branches.
-- **Both advances ship together in one APK.** Never pick one side.
+- Three agents may work in parallel: **Codex (ChatGPT)**,
+  **Mavis (mE)** and **Google Antigravity**, each on its own branch or
+  worktree.
+- **All advances ship together in one APK.** Never pick one side.
 - The `~/.mavis/skills/codex-mavis-sync/scripts/sync.sh --auto`
-  script does the merge. Use it before any `assembleDebug` if the
-  worktree has dirty files or side branches.
-- Conflict resolution: **union, not pick-one**. If both agents
-  touched the same file, take the union of both sides' changes.
+  script audits active worktrees and merges only when a real union is
+  pending and the current tree is clean. Use it before any
+  `assembleDebug` if the worktree has dirty files or side branches.
+- Conflict resolution: **union, not pick-one**. If multiple agents
+  touched the same file, preserve the coherent union of their changes.
 
 ### Hard safety rules (apply to every commit)
 

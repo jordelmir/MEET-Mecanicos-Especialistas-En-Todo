@@ -29,6 +29,10 @@ class QuoteValidatorTest {
         compatibilityConfidence = CompatibilityConfidence.EXACT,
         compatibilityNotes = "Verificado contra Hyundai Accent Verna 2005 1.6 G4FC",
         expiresInHours = 48,
+        vehicleBrand = "Hyundai",
+        vehicleModel = "Accent Verna",
+        vehicleYear = 2005,
+        vehicleEngine = "1.6 G4FC",
     )
 
     @Test
@@ -60,6 +64,47 @@ class QuoteValidatorTest {
         )
         assertEquals(ValidationLevel.BLOCK, r.level)
         assertTrue(r.errors.any { it.code == "EXACT_REQUIRES_OEM" })
+    }
+
+    @Test
+    fun `EXACT with OEM and notes but no structured vehicle evidence is BLOCK`() {
+        val r = QuoteValidator.validate(
+            cleanDraft.copy(
+                vehicleBrand = "",
+                vehicleModel = "",
+                vehicleYear = null,
+                vehicleEngine = "",
+                vehicleVin = null,
+            ),
+        )
+
+        assertEquals(ValidationLevel.BLOCK, r.level)
+        assertTrue(r.errors.any { it.code == "EXACT_REQUIRES_VEHICLE_EVIDENCE" })
+    }
+
+    @Test
+    fun `EXACT with valid VIN and part identity is OK`() {
+        val r = QuoteValidator.validate(
+            cleanDraft.copy(
+                vehicleBrand = "",
+                vehicleModel = "",
+                vehicleYear = null,
+                vehicleEngine = "",
+                vehicleVin = "KMHCN46C18U123456",
+            ),
+        )
+
+        assertEquals(ValidationLevel.OK, r.level)
+    }
+
+    @Test
+    fun `invalid VIN blocks EXACT even when the closed tuple is complete`() {
+        val r = QuoteValidator.validate(
+            cleanDraft.copy(vehicleVin = "KMHCN46C18O123456"),
+        )
+
+        assertEquals(ValidationLevel.BLOCK, r.level)
+        assertTrue(r.errors.any { it.code == "INVALID_VIN" })
     }
 
     @Test

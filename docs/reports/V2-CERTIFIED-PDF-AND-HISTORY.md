@@ -327,7 +327,9 @@ Me (Mavis, 2026-07-04 night):
   `ui/screens/ReportScreen.kt` (4-line addition).
 
 The skill `~/.mavis/skills/codex-mavis-sync/scripts/sync.sh --auto`
-will merge both sides before the APK ships.
+will audit Codex, Mavis and Google Antigravity worktrees and merge every
+pending active branch before the APK ships, only when the integration tree
+is clean.
 
 ---
 

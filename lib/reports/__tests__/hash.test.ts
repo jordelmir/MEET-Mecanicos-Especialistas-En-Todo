@@ -47,8 +47,7 @@ const baseSnapshot: DiagnosticSnapshot = {
   fuelTrimLtft: -1.2,
   rawFrames: [],
   notes: '',
-  liveFromAdapter: true,
-  provenance: 'LIVE_OBD',
+  provenance: { kind: 'REAL' },
 };
 
 describe('sha256Hex', () => {

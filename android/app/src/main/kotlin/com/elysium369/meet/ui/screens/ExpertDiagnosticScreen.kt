@@ -240,6 +240,19 @@ fun ExpertDiagnosticScreen(
                     DiagnosticProcedureCard(procedure, navController)
                 }
             }
+
+            // General Copilot IA entry point at the bottom of the screen
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                EliteButton(
+                    text = "🤖 PREGUNTAR AL COPILOTO IA",
+                    onClick = {
+                        navController.navigate("support_chat")
+                    },
+                    color = MeetColors.electricBlue,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
@@ -336,14 +349,27 @@ fun DiagnosticProcedureCard(
 
             if (dtcCode != null) {
                 Spacer(modifier = Modifier.height(16.dp))
-                EliteButton(
-                    text = "🛠️ CÓMO REPARAR (PASO A PASO)",
-                    onClick = {
-                        navController.navigate("repair/$dtcCode")
-                    },
-                    color = MeetColors.neonGreen,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    EliteButton(
+                        text = "🛠️ REPARAR",
+                        onClick = {
+                            navController.navigate("repair/$dtcCode")
+                        },
+                        color = MeetColors.neonGreen,
+                        modifier = Modifier.weight(1f)
+                    )
+                    EliteButton(
+                        text = "🤖 DIALOGAR IA",
+                        onClick = {
+                            navController.navigate("ai/$dtcCode")
+                        },
+                        color = MeetColors.electricBlue,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }

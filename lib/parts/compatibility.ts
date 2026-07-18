@@ -24,6 +24,7 @@ import {
   CompatibilityResult,
   CompatibilityWarning,
   isCriticalSafetyPart,
+  isValidVin,
 } from './types';
 
 const SAFETY_INSTALL_WARNING: CompatibilityWarning = {
@@ -40,8 +41,8 @@ const P0230_PUMP_WARNING: CompatibilityWarning = {
   message:
     'No reemplazar bomba de combustible sin confirmar antes: alimentación ' +
     'eléctrica, tierra, integridad de relé y fusible, y presión de ' +
-    'combustible con manómetro. P0230 también se dispara por fallos en ' +
-    'cableado o relé, no solo por la bomba.',
+    'combustible con manómetro. P0230 identifica el circuito de control y ' +
+    'no confirma por sí solo que la bomba esté dañada.',
 };
 
 const NO_VIN_WARNING = (
@@ -62,6 +63,15 @@ const NO_OEM_WARNING: CompatibilityWarning = {
     'No se recibió número OEM ni número de parte. La app no puede confirmar ' +
     'compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del ' +
     'conector o de la caja de fusibles.',
+};
+
+const INVALID_VIN_WARNING: CompatibilityWarning = {
+  code: 'INVALID_VIN',
+  severity: 'BLOCK',
+  message:
+    'El VIN recibido no tiene el formato estructural válido. Debe contener ' +
+    'exactamente 17 caracteres y no puede incluir I, O ni Q. Corrígelo o ' +
+    'elimínalo antes de confirmar compatibilidad.',
 };
 
 const NO_PHOTO_WARNING: CompatibilityWarning = {
@@ -93,6 +103,7 @@ function looksLikeFuelPump(partName: string): boolean {
 }
 
 interface TierEvidence {
+  vinProvided: boolean;
   hasVin: boolean;
   hasOem: boolean;
   hasPartNumber: boolean;
@@ -108,12 +119,14 @@ interface TierEvidence {
 function collectEvidence(ctx: CompatibilityContext): TierEvidence {
   const v = ctx.vehicle;
   return {
-    hasVin: !!v.vin && v.vin.trim().length >= 11,
+    vinProvided: !!v.vin && v.vin.trim().length > 0,
+    hasVin: isValidVin(v.vin),
     hasOem: !!v.oemNumber && v.oemNumber.trim().length > 0,
     hasPartNumber: !!v.partNumber && v.partNumber.trim().length > 0,
     hasBrand: !!v.brand && v.brand.trim().length > 0,
     hasModel: !!v.model && v.model.trim().length > 0,
-    hasYear: !!v.year && Number.isFinite(v.year),
+    hasYear:
+      Number.isInteger(v.year) && (v.year as number) >= 1886 && (v.year as number) <= 2100,
     hasEngine: !!v.engine && v.engine.trim().length > 0,
     hasTransmission: !!v.transmission && v.transmission.trim().length > 0,
     hasPosition: !!ctx.position && ctx.position !== 'NOT_APPLICABLE',
@@ -289,8 +302,8 @@ function buildWarnings(
     out.push(P0230_PUMP_WARNING);
     recommendedQuestions.push(
       '¿Confirma que la pieza es específicamente la bomba de combustible y ' +
-        'no el relé o el fusible? P0230 suele ser del circuito, no de la ' +
-        'bomba.',
+        'no el relé o el fusible? P0230 identifica el circuito de control y ' +
+        'no confirma por sí solo una bomba dañada.',
     );
     recommendedQuestions.push(
       '¿Pueden verificar voltaje en el relé y en el conector de la bomba ' +
@@ -302,7 +315,9 @@ function buildWarnings(
   }
 
   // 3) Tier-driven prompts.
-  if (!e.hasVin) {
+  if (e.vinProvided && !e.hasVin) {
+    out.push(INVALID_VIN_WARNING);
+  } else if (!e.hasVin) {
     const whatWeHave =
       ctx.vehicle.brand && ctx.vehicle.model
         ? `${ctx.vehicle.brand} ${ctx.vehicle.model}`

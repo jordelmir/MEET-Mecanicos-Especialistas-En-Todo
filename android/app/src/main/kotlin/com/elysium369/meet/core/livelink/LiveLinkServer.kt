@@ -23,7 +23,6 @@ import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
-import java.security.SecureRandom
 import java.time.Duration
 import java.util.Collections
 
@@ -40,8 +39,6 @@ class LiveLinkServer {
 
     companion object {
         const val DEFAULT_PORT = 8765
-        private const val TOKEN_LENGTH = 18
-        private const val TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
         private const val TAG = "LiveLinkServer"
 
         private val sharedInstance by lazy { LiveLinkServer() }
@@ -60,8 +57,7 @@ class LiveLinkServer {
     val serverUrl = _serverUrl.asStateFlow()
 
     private val sessions = Collections.synchronizedSet(mutableSetOf<WebSocketServerSession>())
-    private val secureRandom = SecureRandom()
-    private var pairingToken: String? = null
+    private var pairingTokenHash: String? = null
 
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
@@ -77,8 +73,8 @@ class LiveLinkServer {
         }
 
         val localIp = getLocalIpAddress() ?: "0.0.0.0"
-        val token = generatePairingToken()
-        pairingToken = token
+        val token = LiveLinkTokenService.generateAccessToken(length = 24)
+        pairingTokenHash = LiveLinkTokenService.hashToken(token)
 
         val engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(WebSockets) {
@@ -98,7 +94,7 @@ class LiveLinkServer {
                 // Health check endpoint
                 get("/") {
                     call.respondText(
-                        """{"status":"online","app":"Elysium LiveLink","version":"1.0"}""",
+                        """{"status":"online","app":"Elysium LiveLink","version":"2.0","read_only":true}""",
                         ContentType.Application.Json
                     )
                 }
@@ -106,7 +102,8 @@ class LiveLinkServer {
                 // WebSocket telemetry stream
                 webSocket("/live") {
                     val suppliedToken = call.request.queryParameters["token"]
-                    if (suppliedToken == null || suppliedToken != pairingToken) {
+                    val expectedHash = pairingTokenHash
+                    if (suppliedToken == null || expectedHash == null || !LiveLinkTokenService.verifyToken(suppliedToken, expectedHash)) {
                         close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "LiveLink pairing token required"))
                         return@webSocket
                     }
@@ -117,7 +114,7 @@ class LiveLinkServer {
                     // Send welcome
                     send(Frame.Text(json.encodeToString(LiveLinkMessage(
                         type = "welcome",
-                        payload = """{"message":"Conectado a Elysium Vanguard LiveLink"}"""
+                        payload = """{"message":"Conectado a Elysium Vanguard LiveLink","mode":"READ_ONLY","critical_controls":false}"""
                     ))))
 
                     try {
@@ -147,7 +144,7 @@ class LiveLinkServer {
             Log.e(TAG, "Could not start LiveLink server on port $port", error)
             runCatching { engine.stop(200, 500) }
             server = null
-            pairingToken = null
+            pairingTokenHash = null
             _isRunning.value = false
             _serverUrl.value = null
         }
@@ -159,7 +156,7 @@ class LiveLinkServer {
         server?.stop(1000, 2000)
         server = null
         sessions.clear()
-        pairingToken = null
+        pairingTokenHash = null
         _isRunning.value = false
         _connectedClients.value = 0
         _serverUrl.value = null
@@ -175,8 +172,8 @@ class LiveLinkServer {
         }.getOrDefault(false)
     }
 
-    /** Broadcasts a telemetry snapshot to all connected browsers. */
-    suspend fun broadcastTelemetry(data: TelemetrySnapshot) {
+    /** Broadcasts quality-aware telemetry to all connected browsers. */
+    suspend fun broadcastTelemetry(data: LiveLinkTelemetryPacket) {
         if (!_isRunning.value) return
         val sessionsCopy = synchronized(sessions) {
             if (sessions.isEmpty()) return
@@ -218,13 +215,6 @@ class LiveLinkServer {
         } catch (_: Exception) { null }
     }
 
-    private fun generatePairingToken(): String {
-        return buildString(TOKEN_LENGTH) {
-            repeat(TOKEN_LENGTH) {
-                append(TOKEN_ALPHABET[secureRandom.nextInt(TOKEN_ALPHABET.length)])
-            }
-        }
-    }
 }
 
 @Serializable
@@ -232,23 +222,4 @@ data class LiveLinkMessage(
     val type: String,       // "welcome" | "telemetry" | "dtc_alert"
     val payload: String,    // JSON string of the payload
     val timestamp: Long = System.currentTimeMillis()
-)
-
-@Serializable
-data class TelemetrySnapshot(
-    val rpm: Int = 0,
-    val speed: Int = 0,
-    val coolantTemp: Int = 0,
-    val intakeTemp: Int = 0,
-    val throttlePos: Float = 0f,
-    val engineLoad: Float = 0f,
-    val fuelPressure: Int = 0,
-    val timingAdvance: Float = 0f,
-    val mafRate: Float = 0f,
-    val voltage: Float = 0f,
-    val fuelTrim1: Float = 0f,
-    val fuelTrim2: Float = 0f,
-    val healthScore: Int = -1,
-    val activeDtcs: List<String> = emptyList(),
-    val vehicleName: String = ""
 )

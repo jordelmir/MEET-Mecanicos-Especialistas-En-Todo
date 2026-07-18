@@ -547,7 +547,7 @@ export function validateDraftForSign(
       message: 'No hay snapshot post-reparación. El reporte no podrá afirmar "reparado".',
     });
   }
-  if (draft.snapshot && !draft.snapshot.liveFromAdapter) {
+  if (draft.snapshot && draft.snapshot.provenance.kind !== 'REAL') {
     issues.push({
       code: 'OBD_NOT_LIVE',
       severity: 'WARN',

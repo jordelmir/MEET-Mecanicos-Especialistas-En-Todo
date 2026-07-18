@@ -159,12 +159,14 @@ files in order:
 bash ~/.mavis/skills/codex-mavis-sync/scripts/sync.sh --auto
 ```
 
-This merges the Codex branch (with its own WIP on
+This audits every active Codex, Mavis and Google Antigravity worktree. When
+the current tree is clean, it merges pending branches, including the Codex
+branch (with its own WIP on
 `ui/screens/MechanicServiceScreen.kt`, `ui/ObdViewModel.kt`,
 `core/obd/ObdSession.kt`, `core/services/*`, `core/parts/*`,
-`core/diagnostics/*`) and the Mavis branch into a single
-`sync/codex-mavis` integration branch. Without this step the APK
-build will fail on one of the two sides. The skill is documented at
+`core/diagnostics/*`) and the Mavis branch, into a single
+`sync/codex-mavis-antigravity-*` integration branch. Without this step the
+APK can omit or break work from a parallel agent. The skill is documented at
 `~/.mavis/skills/codex-mavis-sync/SKILL.md`.
 
 ### Step 3 — Wire Hook 1 (Navigation)

@@ -25,7 +25,13 @@ import { createId } from './services/ids';
 import { ClientDashboard } from './components/ClientDashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TVDashboard } from './components/TVDashboard';
-import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle, Radio } from 'lucide-react';
+import { Wrench, User, Plus, Settings, Users, ChevronDown, LogOut, Gauge, BarChart3, Car, BookOpen, ClipboardList, Search, FileText, Monitor, AlertTriangle, Radio, Activity, Video } from 'lucide-react';
+import { GarageDashboard } from './components/GarageDashboard';
+import ManualsCenter from './components/ManualsCenter';
+import { VehicleProfile, VehicleDigitalTwin, VehicleTimelineEvent, PredictiveMaintenanceAlert, MaintenanceRecord, DashcamSession, DashcamClip, DrivingEvent } from './types';
+import { generatePredictiveAlerts } from './services/garageEngine';
+import { VisualDiagnosticsView } from './components/VisualDiagnosticsView';
+import { PartsRepairsCatalog } from './components/PartsRepairsCatalog';
 import { AnalyticsDebugPanel } from './components/analytics/AnalyticsDebugPanel';
 import { analytics } from './src/analytics/analyticsClient';
 import { AnalyticsConsentManager } from './src/analytics/analyticsConsent';
@@ -50,6 +56,9 @@ const AdCampaignConsole = React.lazy(() => import('./components/AdCampaignConsol
 const GDPRComplianceView = React.lazy(() => import('./components/GDPRComplianceView'));
 const SubscriptionCheckout = React.lazy(() => import('./components/SubscriptionCheckout'));
 const PayoutsView = React.lazy(() => import('./components/PayoutsView'));
+const DashcamHUDLazy = React.lazy(() =>
+  import('./components/DashcamHUD').then(module => ({ default: module.DashcamHUD }))
+);
 
 export default function App() {
   const { t } = useBrand();
@@ -102,6 +111,146 @@ export default function App() {
   useEffect(() => { saveState('timeSlice', timeSliceMinutes); }, [timeSliceMinutes]);
   useEffect(() => { saveState('freeWashThreshold', freeWashThreshold); }, [freeWashThreshold]);
 
+  // ── GARAGE STATE ──
+  const [vehicles, setVehicles] = useState<VehicleProfile[]>(() => {
+    const stored = loadState('vehicles', []);
+    if (stored.length > 0) return stored;
+    const migrated: VehicleProfile[] = [];
+    INITIAL_CLIENTS.forEach(c => {
+      c.vehicles.forEach((v, index) => {
+        migrated.push({
+          id: `veh_${c.id}_${index}`,
+          owner_user_id: c.id,
+          nickname: `${v.brand} ${v.model}`,
+          make: v.brand,
+          model: v.model,
+          year: v.year,
+          trim_nullable: null,
+          engine: '1.6L',
+          engine_code_nullable: null,
+          transmission: 'AUTOMATIC',
+          fuel_type: 'GASOLINE',
+          vin_nullable: v.vin || `VIN-${c.id}-${index}`,
+          plate_nullable: v.plate,
+          odometer_km: v.mileage,
+          country: 'Costa Rica',
+          province_nullable: null,
+          color_nullable: v.color,
+          photo_uri_nullable: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          plate: v.plate,
+          brand: v.brand,
+          color: v.color,
+          mileage: v.mileage
+        });
+      });
+    });
+    return migrated;
+  });
+
+  const [digitalTwins, setDigitalTwins] = useState<VehicleDigitalTwin[]>(() => {
+    const stored = loadState('digitalTwins', []);
+    if (stored.length > 0) return stored;
+    const initialTwins: VehicleDigitalTwin[] = [];
+    INITIAL_CLIENTS.forEach(c => {
+      c.vehicles.forEach((v, index) => {
+        initialTwins.push({
+          vehicle_id: `veh_${c.id}_${index}`,
+          baseline_created_at: new Date().toISOString(),
+          baseline_confidence: 90,
+          normal_idle_rpm_min: 750,
+          normal_idle_rpm_max: 820,
+          normal_voltage_min: 13.8,
+          normal_voltage_max: 14.4,
+          normal_ect_min: 88,
+          normal_ect_max: 96,
+          normal_fuel_trim_min: -3,
+          normal_fuel_trim_max: 3,
+          normal_maf_min: 3,
+          normal_maf_max: 6,
+          normal_map_min: 30,
+          normal_map_max: 42,
+          driving_profile: 'MIXED',
+          health_score: 100,
+          risk_score: 0,
+          last_updated_at: new Date().toISOString()
+        });
+      });
+    });
+    return initialTwins;
+  });
+
+  const [timelineEvents, setTimelineEvents] = useState<VehicleTimelineEvent[]>(() => {
+    const stored = loadState('timelineEvents', []);
+    if (stored.length > 0) return stored;
+    const initialEvents: VehicleTimelineEvent[] = [];
+    INITIAL_CLIENTS.forEach(c => {
+      c.vehicles.forEach((v, index) => {
+        const vId = `veh_${c.id}_${index}`;
+        initialEvents.push({
+          id: `ev_init_${vId}`,
+          vehicle_id: vId,
+          event_type: 'VEHICLE_CREATED',
+          title: 'Historial de Vehículo Creado',
+          description: `Se inicializó el expediente técnico de ${v.brand} ${v.model}.`,
+          severity: 'low',
+          source: 'System',
+          related_report_id_nullable: null,
+          related_work_order_id_nullable: null,
+          related_part_request_id_nullable: null,
+          related_livelink_id_nullable: null,
+          created_at: new Date().toISOString()
+        });
+      });
+    });
+    return initialEvents;
+  });
+
+  const [predictiveAlerts, setPredictiveAlerts] = useState<PredictiveMaintenanceAlert[]>(() => loadState('predictiveAlerts', []));
+  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() => {
+    const stored = loadState('maintenanceRecords', []);
+    if (stored.length > 0) return stored;
+    const initialRecords: MaintenanceRecord[] = [];
+    INITIAL_CLIENTS.forEach(c => {
+      c.vehicles.forEach((v, index) => {
+        const vId = `veh_${c.id}_${index}`;
+        initialRecords.push({
+          id: `maint_init_${vId}`,
+          vehicle_id: vId,
+          type: 'OIL_CHANGE',
+          title: 'Alineación y Cambio de Aceite Inicial',
+          odometer_km: v.mileage - 2000,
+          date: new Date().toISOString(),
+          provider_id_nullable: null,
+          provider_name: 'Taller MEET',
+          cost_nullable: 25000,
+          currency: 'CRC',
+          parts_used: ['Filtro de Aceite', 'Aceite Sintético Castrol'],
+          notes: 'Inspección de cortesía realizada.',
+          photos: [],
+          report_id_nullable: null,
+          created_at: new Date().toISOString()
+        });
+      });
+    });
+    return initialRecords;
+  });
+
+  useEffect(() => { saveState('vehicles', vehicles); }, [vehicles]);
+  useEffect(() => { saveState('digitalTwins', digitalTwins); }, [digitalTwins]);
+  useEffect(() => { saveState('timelineEvents', timelineEvents); }, [timelineEvents]);
+  useEffect(() => { saveState('predictiveAlerts', predictiveAlerts); }, [predictiveAlerts]);
+  useEffect(() => { saveState('maintenanceRecords', maintenanceRecords); }, [maintenanceRecords]);
+
+  // ── DASHCAM / CAJA NEGRA STATE ──
+  const [dashcamSessions, setDashcamSessions] = useState<DashcamSession[]>(() => loadState('dashcamSessions', []));
+  const [dashcamClips, setDashcamClips] = useState<DashcamClip[]>(() => loadState('dashcamClips', []));
+  const [drivingEvents, setDrivingEvents] = useState<DrivingEvent[]>(() => loadState('drivingEvents', []));
+  useEffect(() => { saveState('dashcamSessions', dashcamSessions); }, [dashcamSessions]);
+  useEffect(() => { saveState('dashcamClips', dashcamClips); }, [dashcamClips]);
+  useEffect(() => { saveState('drivingEvents', drivingEvents); }, [drivingEvents]);
+
   // ── UI STATE ──
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isServiceManagerOpen, setIsServiceManagerOpen] = useState(false);
@@ -111,7 +260,8 @@ export default function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [adminViewMode, setAdminViewMode] = useState<'DASHBOARD' | 'WORKSTATION'>('DASHBOARD');
-  const [vanguardTab, setVanguardTab] = useState<'DASHBOARD' | 'FLEET' | 'CRM' | 'VERIFIED' | 'CAMPAIGNS' | 'GDPR' | 'SUBSCRIPTIONS' | 'PAYOUTS'>('DASHBOARD');
+  const [vanguardTab, setVanguardTab] = useState<'DASHBOARD' | 'FLEET' | 'CRM' | 'VERIFIED' | 'CAMPAIGNS' | 'GDPR' | 'SUBSCRIPTIONS' | 'PAYOUTS' | 'GARAGE' | 'TOPOLOGY' | 'MANUALS' | 'HUD_DASHCAM' | 'PARTS'>('DASHBOARD');
+  const [activeDtcFocus, setActiveDtcFocus] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [receiptWorkOrder, setReceiptWorkOrder] = useState<WorkOrder | null>(null);
@@ -609,6 +759,104 @@ export default function App() {
       scans: [finalScan, ...(loggedInUser.scans || [])]
     };
     handleUpdateClient(updatedClient);
+
+    // Update garage ecosystem if vehicle exists
+    const matchingVeh = vehicles.find(v => v.plate === finalScan.vehiclePlate);
+    if (matchingVeh) {
+      setTimelineEvents(prev => [
+        {
+          id: `ev_obd_${Date.now()}`,
+          vehicle_id: matchingVeh.id,
+          event_type: 'OBD_CONNECTED',
+          title: 'Sesión OBD Sincronizada',
+          description: `Conexión exitosa con el adaptador. Parámetros de abordo leídos.`,
+          severity: 'low',
+          source: 'OBD',
+          related_report_id_nullable: null,
+          related_work_order_id_nullable: null,
+          related_part_request_id_nullable: null,
+          related_livelink_id_nullable: null,
+          created_at: new Date().toISOString()
+        },
+        ...prev
+      ]);
+
+      if (finalScan.dtcCodes && finalScan.dtcCodes.length > 0) {
+        setActiveDtcFocus(finalScan.dtcCodes[0]);
+        setTimelineEvents(prev => [
+          {
+            id: `ev_dtc_${Date.now()}`,
+            vehicle_id: matchingVeh.id,
+            event_type: 'DTC_DETECTED',
+            title: `DTC Detectado(s): ${finalScan.dtcCodes.join(', ')}`,
+            description: finalScan.notes || `Códigos de falla detectados en el sistema de autodiagnóstico.`,
+            severity: finalScan.severity === 'high' ? 'high' : 'medium',
+            source: 'OBD',
+            payload_json: JSON.stringify({ dtcCodes: finalScan.dtcCodes }),
+            related_report_id_nullable: null,
+            related_work_order_id_nullable: null,
+            related_part_request_id_nullable: null,
+            related_livelink_id_nullable: null,
+            created_at: new Date().toISOString()
+          },
+          ...prev
+        ]);
+
+        // Generate predictive alerts
+        const mockVoltages = [14.2, 13.8, finalScan.dtcCodes.includes('P0230') ? 13.1 : 14.1];
+        const mockEcts = [88, 92, finalScan.dtcCodes.includes('P0300') ? 104 : 90];
+        const newAlerts = generatePredictiveAlerts(matchingVeh.id, matchingVeh.odometer_km, finalScan.dtcCodes, mockVoltages, mockEcts);
+        setPredictiveAlerts(prev => {
+          const filtered = prev.filter(al => !newAlerts.some(na => na.component === al.component && al.status === 'active'));
+          return [...newAlerts, ...filtered];
+        });
+
+        // Lower health score on digital twin
+        setDigitalTwins(prev => prev.map(dt => {
+          if (dt.vehicle_id === matchingVeh.id) {
+            return {
+              ...dt,
+              health_score: 74,
+              risk_score: 65,
+              last_updated_at: new Date().toISOString()
+            };
+          }
+          return dt;
+        }));
+      } else {
+        setTimelineEvents(prev => [
+          {
+            id: `ev_dtc_clear_${Date.now()}`,
+            vehicle_id: matchingVeh.id,
+            event_type: 'DTC_CLEARED',
+            title: 'Códigos de Falla Limpios',
+            description: 'Autodiagnóstico completado exitosamente. Sin códigos DTC activos.',
+            severity: 'low',
+            source: 'OBD',
+            related_report_id_nullable: null,
+            related_work_order_id_nullable: null,
+            related_part_request_id_nullable: null,
+            related_livelink_id_nullable: null,
+            created_at: new Date().toISOString()
+          },
+          ...prev
+        ]);
+
+        // Restore health score on digital twin
+        setDigitalTwins(prev => prev.map(dt => {
+          if (dt.vehicle_id === matchingVeh.id) {
+            return {
+              ...dt,
+              health_score: 100,
+              risk_score: 0,
+              last_updated_at: new Date().toISOString()
+            };
+          }
+          return dt;
+        }));
+      }
+    }
+
     toast('success', 'Escaneo Recibido', t('Datos de OBD2 sincronizados desde la App MEET'));
   };
 
@@ -812,6 +1060,11 @@ export default function App() {
             </div>
             {[
               { id: 'DASHBOARD', label: 'Dashboard', icon: <BarChart3 size={15} />, activeColor: 'from-cyan-400 to-cyan-600', activeShadow: '0 0 30px rgba(0,240,255,0.6), 0 0 60px rgba(0,240,255,0.2)', hoverColor: 'hover:text-cyan-400 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(0,240,255,0.25)]' },
+              { id: 'GARAGE', label: 'Garage', icon: <Car size={15} />, activeColor: 'from-cyan-400 to-emerald-500', activeShadow: '0 0 30px rgba(6,182,212,0.6), 0 0 60px rgba(6,182,212,0.2)', hoverColor: 'hover:text-cyan-400 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.25)]' },
+              { id: 'MANUALS', label: 'Manuales RAG', icon: <BookOpen size={15} />, activeColor: 'from-cyan-400 to-indigo-600', activeShadow: '0 0 30px rgba(99,102,241,0.6), 0 0 60px rgba(99,102,241,0.2)', hoverColor: 'hover:text-cyan-400 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.25)]' },
+              { id: 'TOPOLOGY', label: 'Topología 3D', icon: <Activity size={15} />, activeColor: 'from-cyan-400 to-blue-500', activeShadow: '0 0 30px rgba(34,211,238,0.6), 0 0 60px rgba(34,211,238,0.2)', hoverColor: 'hover:text-cyan-400 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]' },
+              { id: 'PARTS', label: 'Piezas y Reparaciones', icon: <Wrench size={15} />, activeColor: 'from-orange-400 to-red-500', activeShadow: '0 0 30px rgba(251,146,60,0.6), 0 0 60px rgba(251,146,60,0.2)', hoverColor: 'hover:text-orange-400 hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(251,146,60,0.25)]' },
+              { id: 'HUD_DASHCAM', label: 'Cámara HUD', icon: <Video size={15} />, activeColor: 'from-rose-400 to-pink-600', activeShadow: '0 0 30px rgba(251,113,133,0.6), 0 0 60px rgba(251,113,133,0.2)', hoverColor: 'hover:text-rose-400 hover:border-rose-500/40 hover:shadow-[0_0_20px_rgba(251,113,133,0.25)]' },
               { id: 'CRM', label: 'Taller CRM', icon: <Users size={15} />, activeColor: 'from-blue-400 to-blue-600', activeShadow: '0 0 30px rgba(59,130,246,0.6), 0 0 60px rgba(59,130,246,0.2)', hoverColor: 'hover:text-blue-400 hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)]' },
               { id: 'FLEET', label: 'Vanguard Fleet', icon: <Car size={15} />, activeColor: 'from-green-400 to-emerald-600', activeShadow: '0 0 30px rgba(74,222,128,0.6), 0 0 60px rgba(74,222,128,0.2)', hoverColor: 'hover:text-green-400 hover:border-green-500/40 hover:shadow-[0_0_20px_rgba(74,222,128,0.25)]' },
               { id: 'VERIFIED', label: 'B2B Verified', icon: <Wrench size={15} />, activeColor: 'from-yellow-400 to-amber-600', activeShadow: '0 0 30px rgba(250,204,21,0.6), 0 0 60px rgba(250,204,21,0.2)', hoverColor: 'hover:text-yellow-400 hover:border-yellow-500/40 hover:shadow-[0_0_20px_rgba(250,204,21,0.25)]' },
@@ -840,6 +1093,145 @@ export default function App() {
           </div>
 
           {/* ── ECOSYSTEM VIEW SWITCHER ── */}
+          {vanguardTab === 'MANUALS' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+              <ManualsCenter
+                vehicle={vehicles.find(v => v.owner_user_id === loggedInUser.id) || vehicles[0] || null}
+                activeDtc={activeDtcFocus}
+                onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+                onSelectDtc={(dtc) => setActiveDtcFocus(dtc)}
+              />
+            </div>
+          )}
+
+          {vanguardTab === 'TOPOLOGY' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+              <VisualDiagnosticsView
+                vehicle={vehicles.find(v => v.owner_user_id === loggedInUser.id) || vehicles[0] || null}
+                activeDtc={activeDtcFocus || (loggedInUser.scans?.[0]?.dtcCodes?.[0]) || 'P0230'}
+                onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+                workOrders={workOrders}
+                onAddMaintenanceRecord={(rec) => setMaintenanceRecords(prev => [rec, ...prev])}
+                onAddPredictiveAlert={(al) => setPredictiveAlerts(prev => [al, ...prev])}
+                onUpdateDigitalTwin={(dt) => setDigitalTwins(prev => {
+                  if (prev.some(item => item.vehicle_id === dt.vehicle_id)) {
+                    return prev.map(item => item.vehicle_id === dt.vehicle_id ? dt : item);
+                  }
+                  return [...prev, dt];
+                })}
+              />
+            </div>
+          )}
+
+          {vanguardTab === 'PARTS' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-orange-500/25 shadow-[0_0_30px_rgba(251,146,60,0.1)]">
+              <PartsRepairsCatalog
+                vehicle={vehicles.find(v => v.owner_user_id === loggedInUser.id) || vehicles[0] || null}
+                onOpenIn3D={(partId, nodeId) => {
+                  setActiveDtcFocus(null);
+                  setVanguardTab('TOPOLOGY' as any);
+                }}
+                onStartRepair={(procedureId) => {
+                  setVanguardTab('TOPOLOGY' as any);
+                }}
+              />
+            </div>
+          )}
+
+          {vanguardTab === 'HUD_DASHCAM' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-rose-500/25 shadow-[0_0_30px_rgba(251,113,133,0.1)]">
+              <React.Suspense fallback={ecosystemFallback}>
+                <DashcamHUDLazy
+                  vehicles={vehicles}
+                  activeUserId={loggedInUser.id}
+                  role={role}
+                  onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+                  sessions={dashcamSessions}
+                  clips={dashcamClips}
+                  events={drivingEvents}
+                  onAddSession={(s) => setDashcamSessions(prev => [s, ...prev])}
+                  onAddClip={(c) => setDashcamClips(prev => [c, ...prev])}
+                  onAddEvent={(e) => setDrivingEvents(prev => [e, ...prev])}
+                  onDeleteClip={(id) => setDashcamClips(prev => prev.filter(c => c.id !== id))}
+                  onToggleLockClip={(id) => setDashcamClips(prev => prev.map(c => c.id === id ? { ...c, locked: !c.locked } : c))}
+                />
+              </React.Suspense>
+            </div>
+          )}
+
+          {vanguardTab === 'GARAGE' && (
+            <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+              <GarageDashboard
+                vehicles={vehicles}
+                activeUserId={loggedInUser.id}
+                role={role}
+                onUpdateVehicle={(v) => {
+                  setVehicles(prev => prev.map(item => item.id === v.id ? v : item));
+                  // Synchronize back to clients state if necessary
+                  setClients(prevClients => prevClients.map(c => {
+                    if (c.id === v.owner_user_id) {
+                      return {
+                        ...c,
+                        vehicles: c.vehicles.map(ov => ov.plate === v.plate ? v : ov)
+                      };
+                    }
+                    return c;
+                  }));
+                }}
+                onAddVehicle={(v) => {
+                  setVehicles(prev => [...prev, v]);
+                  // Also append to client's vehicles list to keep in sync
+                  setClients(prevClients => prevClients.map(c => {
+                    if (c.id === v.owner_user_id) {
+                      return {
+                        ...c,
+                        vehicles: [...c.vehicles, v]
+                      };
+                    }
+                    return c;
+                  }));
+                }}
+                onDeleteVehicle={(id) => {
+                  const toDelete = vehicles.find(item => item.id === id);
+                  setVehicles(prev => prev.filter(item => item.id !== id));
+                  if (toDelete) {
+                    setClients(prevClients => prevClients.map(c => {
+                      if (c.id === toDelete.owner_user_id) {
+                        return {
+                          ...c,
+                          vehicles: c.vehicles.filter(ov => ov.plate !== toDelete.plate)
+                        };
+                      }
+                      return c;
+                    }));
+                  }
+                }}
+                digitalTwins={digitalTwins}
+                onUpdateDigitalTwin={(dt) => setDigitalTwins(prev => {
+                  if (prev.some(item => item.vehicle_id === dt.vehicle_id)) {
+                    return prev.map(item => item.vehicle_id === dt.vehicle_id ? dt : item);
+                  }
+                  return [...prev, dt];
+                })}
+                timelineEvents={timelineEvents}
+                onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+                predictiveAlerts={predictiveAlerts}
+                onUpdatePredictiveAlert={(al) => setPredictiveAlerts(prev => prev.map(item => item.id === al.id ? al : item))}
+                onAddPredictiveAlert={(al) => setPredictiveAlerts(prev => {
+                  if (prev.some(item => item.id === al.id)) return prev;
+                  return [al, ...prev];
+                })}
+                maintenanceRecords={maintenanceRecords}
+                onAddMaintenanceRecord={(rec) => setMaintenanceRecords(prev => [rec, ...prev])}
+                workOrders={workOrders}
+                services={services}
+                mechanics={mechanics}
+                dashcamClips={dashcamClips}
+                drivingEvents={drivingEvents}
+              />
+            </div>
+          )}
+
           {vanguardTab === 'CRM' && (
             <div className="animate-slide-up glass p-6 rounded-2xl border border-cyan-500/25 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
               <React.Suspense fallback={ecosystemFallback}>
@@ -1166,6 +1558,63 @@ export default function App() {
                 onCancelOrder={(id) => handleCancelWorkOrder(id, 'Cancelada por el cliente')}
                 onUpdateUser={handleUpdateClient}
                 onSimulateAPKScan={handleSimulateAPKScan}
+                vehicles={vehicles}
+                onUpdateVehicle={(v) => {
+                  setVehicles(prev => prev.map(item => item.id === v.id ? v : item));
+                  setClients(prevClients => prevClients.map(c => {
+                    if (c.id === v.owner_user_id) {
+                      return {
+                        ...c,
+                        vehicles: c.vehicles.map(ov => ov.plate === v.plate ? v : ov)
+                      };
+                    }
+                    return c;
+                  }));
+                }}
+                onAddVehicle={(v) => {
+                  setVehicles(prev => [...prev, v]);
+                  setClients(prevClients => prevClients.map(c => {
+                    if (c.id === v.owner_user_id) {
+                      return {
+                        ...c,
+                        vehicles: [...c.vehicles, v]
+                      };
+                    }
+                    return c;
+                  }));
+                }}
+                onDeleteVehicle={(id) => {
+                  const toDelete = vehicles.find(item => item.id === id);
+                  setVehicles(prev => prev.filter(item => item.id !== id));
+                  if (toDelete) {
+                    setClients(prevClients => prevClients.map(c => {
+                      if (c.id === toDelete.owner_user_id) {
+                        return {
+                          ...c,
+                          vehicles: c.vehicles.filter(ov => ov.plate !== toDelete.plate)
+                        };
+                      }
+                      return c;
+                    }));
+                  }
+                }}
+                digitalTwins={digitalTwins}
+                onUpdateDigitalTwin={(dt) => setDigitalTwins(prev => {
+                  if (prev.some(item => item.vehicle_id === dt.vehicle_id)) {
+                    return prev.map(item => item.vehicle_id === dt.vehicle_id ? dt : item);
+                  }
+                  return [...prev, dt];
+                })}
+                timelineEvents={timelineEvents}
+                onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+                predictiveAlerts={predictiveAlerts}
+                onUpdatePredictiveAlert={(al) => setPredictiveAlerts(prev => prev.map(item => item.id === al.id ? al : item))}
+                onAddPredictiveAlert={(al) => setPredictiveAlerts(prev => {
+                  if (prev.some(item => item.id === al.id)) return prev;
+                  return [al, ...prev];
+                })}
+                maintenanceRecords={maintenanceRecords}
+                onAddMaintenanceRecord={(rec) => setMaintenanceRecords(prev => [rec, ...prev])}
               />
             )
           )}
@@ -1291,6 +1740,12 @@ export default function App() {
 	            workOrders={workOrders}
 	            onSaveMeasurement={handleSaveOscilloscopeMeasurement}
 	            onUpdateWorkOrder={handleUpdateWorkOrderDetails}
+	            onAddTimelineEvent={(ev) => setTimelineEvents(prev => [ev, ...prev])}
+	            onNavigateToManuals={(dtcCode) => {
+	              if (dtcCode) setActiveDtcFocus(dtcCode);
+	              setIsOBD2Open(false);
+	              setVanguardTab('MANUALS');
+	            }}
 	          />
 	        </React.Suspense>
 	      )}

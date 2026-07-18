@@ -43,6 +43,11 @@ class SanitizeGpsAddressTest {
     }
 
     @Test
+    fun `already safe gps label remains safe`() {
+        assertEquals("Ubicación GPS detectada", sanitizeGpsAddress("Ubicación GPS detectada"))
+    }
+
+    @Test
     fun `partial match is preserved (false positives avoided)`() {
         // "Ubicacion GPS" sin acento, o con texto adicional, NO debe matchear.
         val raw = "Ubicación GPS detectada pero offline"

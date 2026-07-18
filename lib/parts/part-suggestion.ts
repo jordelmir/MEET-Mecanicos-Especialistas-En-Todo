@@ -6,13 +6,11 @@
  * the "DTC -> diagnosis -> mechanic -> compatible part" chain.
  *
  * The ordering is intentional and explicit. For P0230 specifically, the engine
- * must:
- *   1. Prioritize the cheap / quick checks FIRST (relay, fuse, wiring, ground).
- *   2. Move the high-cost / wrong-install-risk part (the fuel pump) LAST, with
- *      an explicit warning if the user picks it anyway.
+ * must prioritize circuit verification before the fuel pump and keep the pump
+ * last with an explicit warning. Position never means a part is confirmed bad.
  *
  * Later: we will feed this from the Knowledge Pack (PR-4); for now the static
- * map below covers the most common OBD-II patterns seen in Costa Rica.
+ * map below covers the initial OBD-II rules supported by this engine.
  */
 
 import {
@@ -59,28 +57,24 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       category: 'ELECTRICAL',
       position: 'FUSE_BOX',
       priority: 1,
-      rationale: 'P0230 commonly points to the relay circuit. Cheap to swap.',
+      rationale:
+        'Verificar el relé y su zócalo antes de atribuir P0230 a la bomba.',
     },
     {
       partName: 'Fusible circuito bomba',
       category: 'ELECTRICAL',
       position: 'FUSE_BOX',
       priority: 2,
-      rationale: 'Blown fuse accounts for a meaningful slice of P0230 cases.',
+      rationale:
+        'Verificar continuidad del fusible y descartar un corto aguas abajo antes de reemplazarlo.',
     },
     {
       partName: 'Arnés eléctrico / terminales de bomba',
       category: 'ELECTRICAL',
       position: 'ENGINE',
       priority: 3,
-      rationale: 'Corroded connectors or broken harness wires trigger P0230.',
-    },
-    {
-      partName: 'Sensor de presión de combustible',
-      category: 'ENGINE',
-      position: 'ENGINE',
-      priority: 4,
-      rationale: 'Verify FTP sensor is reporting before condemning the pump.',
+      rationale:
+        'Inspeccionar conector y arnés; documentar alimentación, tierra y caída de voltaje bajo carga.',
     },
     {
       partName: 'Bomba de combustible',
@@ -88,8 +82,8 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       position: 'ENGINE',
       priority: 99,
       rationale:
-        'Final-tier part. Replace only AFTER voltage, ground, relay and ' +
-        'fuel pressure have been verified with a gauge.',
+        'Considerar reemplazo sólo después de verificar batería, fusible, relé, ' +
+        'arnés, conector, alimentación, tierra, presión y corriente.',
       disclaimer:
         'No reemplazar la bomba sin confirmar antes: alimentación, tierra, ' +
         'relé/fusible y presión con manómetro.',
@@ -104,22 +98,23 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       position: 'EXHAUST',
       priority: 1,
       rationale:
-        'Downstream O2 sensor drift causes P0420 in older vehicles. Cheap ' +
-        'first attempt.',
+        'Evaluar señal, calentador y cableado del sensor. No sustituirlo sólo por el DTC.',
     },
     {
       partName: 'Junta de escape',
       category: 'EXHAUST',
       position: 'EXHAUST',
       priority: 2,
-      rationale: 'Exhaust leak ahead of the cat triggers the same code.',
+      rationale:
+        'Inspeccionar fugas de escape antes del catalizador y confirmar con una prueba física.',
     },
     {
       partName: 'Catalizador',
       category: 'EXHAUST',
       position: 'CENTER',
       priority: 99,
-      rationale: 'Last. Confirm wiring and O2 sensors first; cats are expensive.',
+      rationale:
+        'Considerar reemplazo sólo tras descartar fugas, mezcla incorrecta, fallos de encendido y sensores.',
       disclaimer: 'Pieza de alto costo; confirmar antes de reemplazar.',
       riskPart: true,
     },
@@ -131,45 +126,51 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       category: 'ENGINE',
       position: 'ENGINE',
       priority: 1,
-      rationale: 'Worn spark plugs are the most common P0300 cause.',
+      rationale:
+        'Inspeccionar estado, luz y patrón de desgaste; P0300 no confirma una bujía defectuosa.',
     },
     {
       partName: 'Bobina de encendido',
       category: 'ENGINE',
       position: 'ENGINE',
       priority: 2,
-      rationale: 'Failing coil triggers random misfires.',
+      rationale:
+        'Confirmar la bobina mediante intercambio controlado, señal o prueba equivalente antes de reemplazar.',
     },
     {
       partName: 'Inyector',
       category: 'ENGINE',
       position: 'ENGINE',
       priority: 3,
-      rationale: 'Last: clogged or leaking injector requires diagnostic time.',
+      rationale:
+        'Confirmar balance, control eléctrico y estanqueidad del inyector antes de reemplazar.',
     },
   ],
 
   P0171: [
     {
-      partName: 'Tapa del depósito de gasolina',
-      category: 'ENGINE',
-      position: 'NOT_APPLICABLE',
-      priority: 1,
-      rationale: 'Loose / bad gas cap produces P0171 in many vehicles.',
-    },
-    {
       partName: 'Manguera de vacío',
       category: 'ENGINE',
       position: 'ENGINE',
-      priority: 2,
-      rationale: 'Unmetered air from a cracked hose skews the fuel trim.',
+      priority: 1,
+      rationale:
+        'Buscar entrada de aire no medida mediante inspección y prueba de humo cuando corresponda.',
     },
     {
-      partName: 'Sensor MAF',
+      partName: 'Ducto o junta de admisión',
+      category: 'ENGINE',
+      position: 'ENGINE',
+      priority: 2,
+      rationale:
+        'Inspeccionar grietas, uniones y sellos; no reemplazar sin localizar la fuga.',
+    },
+    {
+      partName: 'Sensor de carga de motor (MAF o MAP según equipamiento)',
       category: 'ENGINE',
       position: 'ENGINE',
       priority: 3,
-      rationale: 'Dirty MAF reads low; clean before replacing.',
+      rationale:
+        'Confirmar qué sensor equipa el vehículo y contrastar su señal antes de intervenir.',
     },
   ],
 };

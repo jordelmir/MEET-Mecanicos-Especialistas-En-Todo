@@ -28,9 +28,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.elysium369.meet.core.parts.CompatibilityConfidence
+import com.elysium369.meet.core.parts.CompatibilityContext
+import com.elysium369.meet.core.parts.CompatibilityEngine
+import com.elysium369.meet.core.parts.CompatibilityResult
+import com.elysium369.meet.core.parts.DraftQuote
+import com.elysium369.meet.core.parts.PartAvailability
+import com.elysium369.meet.core.parts.PartCondition
+import com.elysium369.meet.core.parts.PartPosition
+import com.elysium369.meet.core.parts.PartQuoteRanker
+import com.elysium369.meet.core.parts.PartSuggestionEngine
+import com.elysium369.meet.core.parts.PartSuggestionInput
+import com.elysium369.meet.core.parts.PartsMarketplaceContract
+import com.elysium369.meet.core.parts.QuotePrimaryTag
+import com.elysium369.meet.core.parts.QuoteValidator
+import com.elysium369.meet.core.parts.RankablePartQuote
+import com.elysium369.meet.core.parts.SuggestionSource
+import com.elysium369.meet.core.parts.ValidationLevel
+import com.elysium369.meet.core.parts.VehicleFingerprint
+import com.elysium369.meet.core.parts.WarningSeverity
 import com.elysium369.meet.data.local.entities.PartRequestEntity
 import com.elysium369.meet.data.local.entities.PartOfferEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
+import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ui.ObdViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -48,6 +68,221 @@ private object PartColors {
     val textPrimary = Color(0xFFFFFFFF)
     val textSecondary = Color(0xFF90A4AE)
     val borderSubtle = Color(0xFF1E293B)
+}
+
+private data class RankedOfferUi(
+    val offer: PartOfferEntity,
+    val confidence: CompatibilityConfidence,
+    val score: Double,
+    val tag: QuotePrimaryTag?
+)
+
+private fun Vehicle?.toPartsFingerprint(
+    partNumber: String? = null,
+    oemPreference: String? = null
+): VehicleFingerprint {
+    val vehicle = this ?: return VehicleFingerprint(
+        partNumber = partNumber?.takeIf { it.isNotBlank() },
+        oemNumber = partNumber?.takeIf { oemPreference.equals("OEM", ignoreCase = true) && it.isNotBlank() }
+    )
+    val engineDetails = listOf(
+        vehicle.engine,
+        vehicle.engine_tech,
+        vehicle.displacement_cc.takeIf { it > 0 }?.let { "${it}cc" }
+    ).filter { !it.isNullOrBlank() }.joinToString(" ").ifBlank { null }
+    val transmission = listOf(vehicle.transmission_type, vehicle.transmission_subtype)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .ifBlank { null }
+
+    return VehicleFingerprint(
+        brand = vehicle.make,
+        model = vehicle.model,
+        year = vehicle.year,
+        engine = engineDetails,
+        transmission = transmission,
+        fuel = vehicle.fuel_type.takeIf { it.isNotBlank() },
+        vin = vehicle.vin.takeIf { it.isNotBlank() },
+        oemNumber = partNumber?.takeIf { oemPreference.equals("OEM", ignoreCase = true) && it.isNotBlank() },
+        partNumber = partNumber?.takeIf { it.isNotBlank() }
+    )
+}
+
+private fun legacyPositionToPartPosition(position: String): PartPosition =
+    PartPosition.fromString(PartsMarketplaceContract.positionToV2(position))
+
+private fun requestCompatibilityContext(
+    request: PartRequestEntity,
+    offeredPartNumber: String? = null
+): CompatibilityContext = CompatibilityContext(
+    vehicle = VehicleFingerprint(
+        oemNumber = request.partNumber?.takeIf { request.oemPreference.equals("OEM", ignoreCase = true) },
+        partNumber = offeredPartNumber?.takeIf { it.isNotBlank() } ?: request.partNumber
+    ),
+    partName = request.partName,
+    position = legacyPositionToPartPosition(request.partPosition),
+    dtcCodes = listOfNotNull(request.dtcCode)
+)
+
+private fun inferOfferConfidence(request: PartRequestEntity, offer: PartOfferEntity): CompatibilityConfidence {
+    val requested = request.partNumber?.trim().orEmpty()
+    val offered = offer.partNumber.trim()
+    return when {
+        requested.isNotBlank() && requested.equals(offered, ignoreCase = true) -> CompatibilityConfidence.HIGH
+        offered.isNotBlank() && !offered.equals("Por confirmar", ignoreCase = true) -> CompatibilityConfidence.MEDIUM
+        else -> CompatibilityConfidence.UNKNOWN
+    }
+}
+
+private fun rankOffersForRequest(
+    request: PartRequestEntity,
+    offers: List<PartOfferEntity>
+): List<RankedOfferUi> {
+    val confidenceById = offers.associate { it.offerId to inferOfferConfidence(request, it) }
+    val offerById = offers.associateBy { it.offerId }
+    val ranked = PartQuoteRanker.rankQuotes(
+        offers.map { offer ->
+            RankablePartQuote(
+                id = offer.offerId,
+                price = offer.price,
+                warrantyDays = offer.warrantyDays,
+                estimatedDeliveryHours = ((offer.etaMinutes + 59) / 60).coerceAtLeast(1),
+                compatibilityConfidence = confidenceById[offer.offerId] ?: CompatibilityConfidence.UNKNOWN,
+                ratingAvg = 0.0
+            )
+        }
+    )
+
+    return ranked.mapNotNull { rankedQuote ->
+        offerById[rankedQuote.id]?.let { offer ->
+            RankedOfferUi(
+                offer = offer,
+                confidence = confidenceById[offer.offerId] ?: CompatibilityConfidence.UNKNOWN,
+                score = rankedQuote.compositeScore,
+                tag = rankedQuote.primaryTag
+            )
+        }
+    }
+}
+
+private fun quoteTagLabel(tag: QuotePrimaryTag?): String? = when (tag) {
+    QuotePrimaryTag.BEST_COMPAT -> "MEJOR COMPAT."
+    QuotePrimaryTag.CHEAPEST -> "MEJOR PRECIO"
+    QuotePrimaryTag.FASTEST -> "MAS RAPIDA"
+    QuotePrimaryTag.TOP_RATED -> "TOP REPUESTERA"
+    null -> null
+}
+
+private fun legacyConditionToPartCondition(condition: String): PartCondition = when (condition.uppercase()) {
+    "OEM" -> PartCondition.NEW_OEM
+    "USED", "USED_TESTED" -> PartCondition.USED
+    "REMAN" -> PartCondition.REFURBISHED
+    "REBUILT" -> PartCondition.REBUILT
+    "NEW" -> PartCondition.NEW_AFTERMARKET
+    else -> PartCondition.UNKNOWN
+}
+
+private fun compatibilityColor(confidence: CompatibilityConfidence): Color = when (confidence) {
+    CompatibilityConfidence.EXACT, CompatibilityConfidence.HIGH -> PartColors.greenAccent
+    CompatibilityConfidence.MEDIUM -> PartColors.cyanAccent
+    CompatibilityConfidence.LOW -> PartColors.orangeAccent
+    CompatibilityConfidence.UNKNOWN -> PartColors.textSecondary
+}
+
+private fun compatibilityNotesFor(result: CompatibilityResult): String = buildString {
+    append(CompatibilityEngine.describeVerdict(result))
+    result.warnings.take(3).forEach { warning ->
+        append(" [${warning.severity}: ${warning.message}]")
+    }
+    result.requiredConfirmations.take(2).forEach { confirmation ->
+        append(" [Confirmar: $confirmation]")
+    }
+}
+
+@Composable
+private fun CompatibilityResultPanel(
+    result: CompatibilityResult,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val hasBlock = result.warnings.any { it.severity == WarningSeverity.BLOCK }
+    val borderColor = if (hasBlock) PartColors.redAccent else accentColor
+    Surface(
+        color = Color(0xFF0F172A),
+        border = BorderStroke(1.dp, borderColor.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "Compatibilidad ${result.confidence}",
+                color = compatibilityColor(result.confidence),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                text = CompatibilityEngine.describeVerdict(result),
+                color = PartColors.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+            result.warnings.take(3).forEach { warning ->
+                Text(
+                    text = "${warning.severity}: ${warning.message}",
+                    color = if (warning.severity == WarningSeverity.BLOCK) PartColors.redAccent else Color.LightGray,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+            result.requiredConfirmations.take(2).forEach { confirmation ->
+                Text(
+                    text = "Confirmar: $confirmation",
+                    color = PartColors.orangeAccent,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuoteValidationPanel(
+    validation: com.elysium369.meet.core.parts.ValidationResult,
+    modifier: Modifier = Modifier
+) {
+    if (validation.level == ValidationLevel.OK) return
+
+    val color = if (validation.level == ValidationLevel.BLOCK) PartColors.redAccent else PartColors.orangeAccent
+    Surface(
+        color = Color(0xFF0F172A),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = if (validation.level == ValidationLevel.BLOCK) "Cotizacion bloqueada" else "Advertencias de cotizacion",
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black
+            )
+            (validation.errors + validation.warnings).take(4).forEach { issue ->
+                Text(
+                    text = issue.message,
+                    color = Color.LightGray,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -231,6 +466,8 @@ private fun ClientWorkspaceView(
 
     var partName by remember { mutableStateOf("") }
     var partNumber by remember { mutableStateOf("") }
+    var partCategory by remember { mutableStateOf("") }
+    var sourceContext by remember { mutableStateOf("MANUAL") }
     var quantity by remember { mutableStateOf(1) }
     var partPosition by remember { mutableStateOf("N/A") }
     var oemPreference by remember { mutableStateOf("ANY") }
@@ -242,6 +479,34 @@ private fun ClientWorkspaceView(
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val activeDtcCodes by viewModel.activeDtcs.collectAsState()
+    LaunchedEffect(activeDtcCodes.joinToString()) {
+        if (activeDtcCodes.isNotEmpty() && sourceContext == "MANUAL") {
+            sourceContext = "FROM_DTC"
+        }
+    }
+    val partSuggestions = remember(activeDtcCodes) {
+        PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(
+                source = SuggestionSource.DTC,
+                dtcCodes = activeDtcCodes
+            )
+        )
+    }
+    val compatibilityResult = remember(selectedVehicle, partName, partNumber, partPosition, oemPreference, activeDtcCodes) {
+        if (partName.isBlank()) {
+            null
+        } else {
+            CompatibilityEngine.evaluate(
+                CompatibilityContext(
+                    vehicle = selectedVehicle.toPartsFingerprint(partNumber, oemPreference),
+                    partName = partName,
+                    position = legacyPositionToPartPosition(partPosition),
+                    dtcCodes = activeDtcCodes
+                )
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.detectCurrentLocation(context)
@@ -290,6 +555,97 @@ private fun ClientWorkspaceView(
             }
         }
 
+        if (partSuggestions.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = PartColors.cardBackground),
+                    border = BorderStroke(1.dp, PartColors.cyanAccent.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "SUGERENCIAS POR DTC ACTIVO",
+                            color = PartColors.cyanAccent,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp
+                        )
+                        partSuggestions.take(5).forEach { suggestion ->
+                            Surface(
+                                color = if (suggestion.riskPart) {
+                                    PartColors.redAccent.copy(alpha = 0.08f)
+                                } else {
+                                    Color(0xFF1E293B)
+                                },
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (suggestion.riskPart) PartColors.redAccent.copy(alpha = 0.4f) else PartColors.borderSubtle
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        partName = suggestion.partName
+                                        partCategory = suggestion.category
+                                        sourceContext = "FROM_DTC"
+                                        partPosition = PartsMarketplaceContract.positionToLegacy(suggestion.position.name)
+                                        val extraNotes = listOfNotNull(
+                                            suggestion.rationale,
+                                            suggestion.disclaimer
+                                        ).joinToString(" ")
+                                        if (extraNotes.isNotBlank() && !customerNotes.contains(extraNotes)) {
+                                            customerNotes = listOf(customerNotes, extraNotes)
+                                                .filter { it.isNotBlank() }
+                                                .joinToString("\n")
+                                        }
+                                    }
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = suggestion.partName,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (suggestion.riskPart) {
+                                            Text(
+                                                text = "RIESGO",
+                                                color = PartColors.redAccent,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = suggestion.rationale,
+                                        color = PartColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                    suggestion.disclaimer?.let {
+                                        Text(
+                                            text = it,
+                                            color = PartColors.orangeAccent,
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = PartColors.cardBackground),
@@ -298,18 +654,71 @@ private fun ClientWorkspaceView(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "🧩 PEDIR REPUESTO A LA RED (INDRIVER INVERSO)",
+                        text = "🧩 PEDIR REPUESTO A LA RED TÉCNICA",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 16.sp
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    PartRequestStepHeader(
+                        step = 1,
+                        title = "Identificar pieza",
+                        subtitle = "Nombre, categoría, número opcional, DTC u origen 3D/mecánico"
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Origen de solicitud:",
+                        color = PartColors.textSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        listOf(
+                            "MANUAL" to "Manual",
+                            "FROM_DTC" to "DTC",
+                            "FROM_3D_COMPONENT" to "3D",
+                            "FROM_MECHANIC_WORK_ORDER" to "Mecánico"
+                        ).forEach { (value, label) ->
+                            FilterChip(
+                                selected = sourceContext == value,
+                                onClick = { sourceContext = value },
+                                label = { Text(label, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = PartColors.cyanAccent,
+                                    selectedLabelColor = Color.Black,
+                                    labelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = partName,
                         onValueChange = { partName = it },
                         label = { Text("Nombre de la pieza requerida") },
                         placeholder = { Text("Ej. Pastillas de freno delanteras / Sensor MAP") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = PartColors.cyanAccent,
+                            unfocusedBorderColor = PartColors.borderSubtle,
+                            focusedLabelColor = PartColors.cyanAccent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = partCategory,
+                        onValueChange = { partCategory = it },
+                        label = { Text("Categoría técnica") },
+                        placeholder = { Text("Ej. ELECTRICAL / ENGINE / BRAKES") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -375,6 +784,13 @@ private fun ClientWorkspaceView(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    PartRequestStepHeader(
+                        step = 2,
+                        title = "Compatibilidad",
+                        subtitle = "Vehículo activo, VIN si existe, posición, OEM y advertencias"
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Part position grid
                     Text(
                         text = "Posición de la pieza en el vehículo:",
@@ -433,6 +849,21 @@ private fun ClientWorkspaceView(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    compatibilityResult?.let {
+                        CompatibilityResultPanel(
+                            result = it,
+                            accentColor = PartColors.cyanAccent,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+
+                    PartRequestStepHeader(
+                        step = 3,
+                        title = "Entrega",
+                        subtitle = "Dirección aproximada, pickup o delivery, contacto y urgencia"
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedTextField(
@@ -496,6 +927,13 @@ private fun ClientWorkspaceView(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    PartRequestStepHeader(
+                        step = 4,
+                        title = "Publicar solicitud",
+                        subtitle = "Resumen, notas, advertencias y envío a repuesteras"
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = customerNotes,
                         onValueChange = { customerNotes = it },
@@ -511,6 +949,18 @@ private fun ClientWorkspaceView(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    PartRequestSummaryPanel(
+                        sourceContext = sourceContext,
+                        partCategory = partCategory,
+                        dtcCodes = activeDtcCodes,
+                        partName = partName,
+                        partNumber = partNumber,
+                        oemPreference = oemPreference,
+                        partPosition = partPosition,
+                        compatibilityResult = compatibilityResult
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
                         onClick = {
@@ -528,14 +978,23 @@ private fun ClientWorkspaceView(
                                 oemPreference = oemPreference,
                                 deliveryLocation = locationName,
                                 urgencyMinutes = 60, // Default hidden ETA
-                                customerNotes = "$customerNotes [Posición: $partPosition] [Tel: $phone]"
+                                customerNotes = buildPartRequestNotes(
+                                    sourceContext = sourceContext,
+                                    category = partCategory,
+                                    notes = customerNotes,
+                                    compatibilityResult = compatibilityResult,
+                                    dtcCodes = activeDtcCodes
+                                ),
+                                partPosition = partPosition,
+                                phone = phone,
+                                latitude = parsedLat,
+                                longitude = parsedLng
                             )
 
-                            // Note: Locally insert custom fields into the latest request via DAO if needed,
-                            // or append to customerNotes as we did above. Let's make sure it's updated.
                             Toast.makeText(context, "✅ Solicitud de repuesto publicada en la red", Toast.LENGTH_SHORT).show()
                             partName = ""
                             partNumber = ""
+                            partCategory = ""
                             customerNotes = ""
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = PartColors.cyanAccent),
@@ -578,6 +1037,145 @@ private fun ClientWorkspaceView(
 }
 
 @Composable
+private fun PartRequestStepHeader(
+    step: Int,
+    title: String,
+    subtitle: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            color = PartColors.cyanAccent.copy(alpha = 0.16f),
+            border = BorderStroke(1.dp, PartColors.cyanAccent.copy(alpha = 0.45f)),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Text(
+                text = step.toString(),
+                color = PartColors.cyanAccent,
+                fontWeight = FontWeight.Black,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title.uppercase(Locale.getDefault()),
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 12.sp
+            )
+            Text(
+                text = subtitle,
+                color = PartColors.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun PartRequestSummaryPanel(
+    sourceContext: String,
+    partCategory: String,
+    dtcCodes: List<String>,
+    partName: String,
+    partNumber: String,
+    oemPreference: String,
+    partPosition: String,
+    compatibilityResult: CompatibilityResult?
+) {
+    val hasBlock = compatibilityResult?.warnings?.any { it.severity == WarningSeverity.BLOCK } == true
+    Surface(
+        color = if (hasBlock) PartColors.redAccent.copy(alpha = 0.08f) else Color(0xFF0F172A),
+        border = BorderStroke(
+            1.dp,
+            if (hasBlock) PartColors.redAccent.copy(alpha = 0.45f) else PartColors.cyanAccent.copy(alpha = 0.25f)
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "RESUMEN ANTES DE PUBLICAR",
+                color = if (hasBlock) PartColors.redAccent else PartColors.cyanAccent,
+                fontWeight = FontWeight.Black,
+                fontSize = 12.sp
+            )
+            Text(
+                text = listOf(
+                    "Origen: ${sourceLabel(sourceContext)}",
+                    partCategory.takeIf { it.isNotBlank() }?.let { "Categoría: $it" },
+                    dtcCodes.takeIf { it.isNotEmpty() }?.joinToString(prefix = "DTC: "),
+                    partName.takeIf { it.isNotBlank() }?.let { "Pieza: $it" },
+                    partNumber.takeIf { it.isNotBlank() }?.let { "N/Parte: $it" },
+                    "Preferencia: $oemPreference",
+                    "Posición: $partPosition"
+                ).filterNotNull().joinToString("\n"),
+                color = Color.White,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+            compatibilityResult?.let { result ->
+                Text(
+                    text = "Confianza: ${result.confidence}. ${CompatibilityEngine.describeVerdict(result)}",
+                    color = compatibilityColor(result.confidence),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+                result.warnings.take(2).forEach { warning ->
+                    Text(
+                        text = "${warning.severity}: ${warning.message}",
+                        color = if (warning.severity == WarningSeverity.BLOCK) PartColors.redAccent else PartColors.orangeAccent,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun sourceLabel(sourceContext: String): String = when (sourceContext) {
+    "FROM_DTC" -> "DTC"
+    "FROM_3D_COMPONENT" -> "Pieza 3D"
+    "FROM_MECHANIC_WORK_ORDER" -> "Orden de mecánico"
+    "FROM_MAINTENANCE_ALERT" -> "Alerta mantenimiento"
+    "FROM_PREPURCHASE_INSPECTION" -> "Peritaje"
+    else -> "Manual"
+}
+
+private fun buildPartRequestNotes(
+    sourceContext: String,
+    category: String,
+    notes: String,
+    compatibilityResult: CompatibilityResult?,
+    dtcCodes: List<String>
+): String = buildString {
+    appendLine("[MEET_PART_MARKETPLACE]")
+    appendLine("source_context=$sourceContext")
+    if (category.isNotBlank()) appendLine("category=$category")
+    if (dtcCodes.isNotEmpty()) appendLine("dtc_codes=${dtcCodes.joinToString()}")
+    compatibilityResult?.let { result ->
+        appendLine("compatibility_confidence=${result.confidence}")
+        result.requiredConfirmations.take(3).forEach { appendLine("required_confirmation=$it") }
+        result.warnings.take(3).forEach { appendLine("warning=${it.severity}:${it.code}:${it.message}") }
+    }
+    appendLine("[/MEET_PART_MARKETPLACE]")
+    if (notes.isNotBlank()) {
+        appendLine()
+        append(notes.trim())
+    }
+}.trim()
+
+@Composable
 private fun ClientRequestCard(
     request: PartRequestEntity,
     viewModel: ObdViewModel,
@@ -586,6 +1184,7 @@ private fun ClientRequestCard(
 ) {
     val offersFlow = remember(request.requestId) { viewModel.getPartOffersForRequest(request.requestId) }
     val offers by offersFlow.collectAsState(initial = emptyList())
+    val rankedOffers = remember(request, offers) { rankOffersForRequest(request, offers) }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = PartColors.cardBackground),
@@ -630,7 +1229,10 @@ private fun ClientRequestCard(
             )
 
             val cleanNotes = request.customerNotes.substringBefore(" [Posición:")
-            val positionText = request.customerNotes.substringAfter("[Posición: ").substringBefore("]")
+            val embeddedPositionText = request.customerNotes.substringAfter("[Posición: ").substringBefore("]")
+            val positionText = request.partPosition
+                .takeIf { it.isNotBlank() && it != "N/A" }
+                ?: embeddedPositionText
 
             if (positionText.isNotBlank() && positionText != request.customerNotes) {
                 Text(
@@ -654,16 +1256,23 @@ private fun ClientRequestCard(
                     fontSize = 12.sp
                 )
             }
+            if (request.phone.isNotBlank()) {
+                Text(
+                    text = "Contacto: ${request.phone}",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "📥 Ofertas recibidas de repuesteras (${offers.size}):",
+                text = "📥 Ofertas recibidas de repuesteras (${rankedOffers.size}):",
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 fontSize = 13.sp
             )
 
-            if (offers.isEmpty()) {
+            if (rankedOffers.isEmpty()) {
                 Text(
                     text = "Esperando ofertas de repuestos locales...",
                     color = PartColors.textSecondary,
@@ -672,7 +1281,8 @@ private fun ClientRequestCard(
                 )
             } else {
                 Spacer(modifier = Modifier.height(6.dp))
-                offers.forEach { offer ->
+                rankedOffers.forEach { ranked ->
+                    val offer = ranked.offer
                     val isSelected = request.acceptedOfferId == offer.offerId
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
@@ -699,8 +1309,28 @@ private fun ClientRequestCard(
                                     fontSize = 14.sp
                                 )
                             }
+                            quoteTagLabel(ranked.tag)?.let { tag ->
+                                Surface(
+                                    color = compatibilityColor(ranked.confidence).copy(alpha = 0.14f),
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "$tag · ${ranked.confidence} · ${(ranked.score * 100).toInt()} pts",
+                                        color = compatibilityColor(ranked.confidence),
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
                             Text(
                                 text = "Marca: ${offer.brand} | Condición: ${offer.condition}",
+                                color = PartColors.textSecondary,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "ETA: ${offer.etaMinutes} min | Garantía: ${offer.warrantyDays} días",
                                 color = PartColors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -764,6 +1394,7 @@ private fun StoreWorkspaceView(
     var priceOfferCrc by remember { androidx.compose.runtime.mutableFloatStateOf(15000.0f) }
     var warrantyDays by remember { androidx.compose.runtime.mutableFloatStateOf(30.0f) }
     var offerMessage by remember { mutableStateOf("") }
+    var safetyInstallConfirmed by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -846,7 +1477,10 @@ private fun StoreWorkspaceView(
                 val isOffering = offeringRequestId == req.requestId
 
                 val cleanNotes = req.customerNotes.substringBefore(" [Posición:")
-                val positionText = req.customerNotes.substringAfter("[Posición: ").substringBefore("]")
+                val embeddedPositionText = req.customerNotes.substringAfter("[Posición: ").substringBefore("]")
+                val positionText = req.partPosition
+                    .takeIf { it.isNotBlank() && it != "N/A" }
+                    ?: embeddedPositionText
 
                 Card(
                     colors = CardDefaults.cardColors(containerColor = PartColors.cardBackground),
@@ -935,6 +1569,7 @@ private fun StoreWorkspaceView(
                                     priceOfferCrc = 15000.0f
                                     warrantyDays = 30f
                                     offerMessage = ""
+                                    safetyInstallConfirmed = false
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = PartColors.orangeAccent),
                                 shape = RoundedCornerShape(6.dp),
@@ -943,6 +1578,48 @@ private fun StoreWorkspaceView(
                                 Text("🙋‍♂️ OFERTA COMO REPUESTERA (INDRIVER)", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         } else {
+                            val compatibilityResult = remember(req, partNumberOffer) {
+                                CompatibilityEngine.evaluate(
+                                    requestCompatibilityContext(
+                                        request = req,
+                                        offeredPartNumber = partNumberOffer
+                                    )
+                                )
+                            }
+                            val compatibilityNotes = remember(compatibilityResult) {
+                                compatibilityNotesFor(compatibilityResult)
+                            }
+                            val quoteValidation = remember(req, brand, partNumberOffer, condition, priceOfferCrc, warrantyDays, compatibilityResult, compatibilityNotes) {
+                                QuoteValidator.validate(
+                                    QuoteValidator.buildQuote(
+                                        DraftQuote(
+                                            partName = req.partName,
+                                            brand = brand,
+                                            partNumber = partNumberOffer,
+                                            oemNumber = req.partNumber?.takeIf { req.oemPreference.equals("OEM", ignoreCase = true) },
+                                            condition = legacyConditionToPartCondition(condition),
+                                            availability = PartAvailability.SAME_DAY,
+                                            price = priceOfferCrc.toDouble(),
+                                            currency = "CRC",
+                                            includesDelivery = false,
+                                            deliveryFee = 0.0,
+                                            estimatedDeliveryHours = 1,
+                                            warrantyDays = warrantyDays.toInt(),
+                                            photoUrls = emptyList(),
+                                            compatibilityConfidence = compatibilityResult.confidence,
+                                            compatibilityNotes = compatibilityNotes,
+                                            expiresInHours = 24
+                                        )
+                                    )
+                                )
+                            }
+                            val requiresSafetyConfirmation = compatibilityResult.warnings.any {
+                                it.code == "CRITICAL_SAFETY_PART" || it.severity == WarningSeverity.BLOCK
+                            }
+                            val canSendQuote = brand.isNotBlank() &&
+                                quoteValidation.level != ValidationLevel.BLOCK &&
+                                (!requiresSafetyConfirmation || safetyInstallConfirmed)
+
                             Spacer(modifier = Modifier.height(16.dp))
                             Divider(color = PartColors.orangeAccent.copy(alpha = 0.4f))
                             Spacer(modifier = Modifier.height(12.dp))
@@ -1053,6 +1730,39 @@ private fun StoreWorkspaceView(
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
+                            CompatibilityResultPanel(
+                                result = compatibilityResult,
+                                accentColor = PartColors.orangeAccent
+                            )
+
+                            QuoteValidationPanel(
+                                validation = quoteValidation,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+
+                            if (requiresSafetyConfirmation) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = safetyInstallConfirmed,
+                                        onCheckedChange = { safetyInstallConfirmed = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = PartColors.orangeAccent)
+                                    )
+                                    Text(
+                                        text = "Confirmo que esta pieza requiere verificación e instalación por técnico calificado.",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
                                     onClick = { offeringRequestId = null },
@@ -1073,14 +1783,16 @@ private fun StoreWorkspaceView(
                                             deliveryFee = 0.0,
                                             etaMinutes = 60,
                                             warrantyDays = warrantyDays.toInt(),
-                                            message = offerMessage
+                                            message = offerMessage,
+                                            compatibilityConfidence = compatibilityResult.confidence.name,
+                                            compatibilityNotes = compatibilityNotes
                                         )
                                         Toast.makeText(context, "✅ Oferta enviada al cliente", Toast.LENGTH_SHORT).show()
                                         offeringRequestId = null
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = PartColors.orangeAccent),
                                     modifier = Modifier.weight(1f),
-                                    enabled = brand.isNotBlank()
+                                    enabled = canSendQuote
                                 ) {
                                     Text("Enviar", color = Color.White, fontWeight = FontWeight.Bold)
                                 }

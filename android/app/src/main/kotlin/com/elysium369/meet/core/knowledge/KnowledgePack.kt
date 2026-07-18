@@ -92,21 +92,31 @@ data class KnowledgePack(
     val disclaimer: String = "",
     val nodes: List<KnowledgeNode> = emptyList(),
     val edges: List<KnowledgeEdge> = emptyList(),
-    val validationRules: List<ValidationRule> = emptyList()
-) {
-    /** Optional inline profile list (DTC packs). Not required by all packs. */
-    val profiles: List<DtcProfile> = emptyList()
-}
+    val validationRules: List<ValidationRule> = emptyList(),
+    val profiles: List<DtcProfile> = emptyList(),
+    val vehicleProfiles: List<VehicleKnowledgeProfile> = emptyList(),
+    val sourceCitations: List<SourceCitation> = emptyList(),
+    val technicalClaims: List<TechnicalClaim> = emptyList(),
+    val measurementSpecifications: List<MeasurementSpecification> = emptyList(),
+    val knowledgeConflicts: List<KnowledgeConflict> = emptyList()
+)
 
 /**
  * Outcome of a pack import. Lists which nodes/edges were accepted,
  * which were rejected, and why.
  */
 sealed class PackImportResult {
+    enum class PublicationStatus {
+        ACTIVE,
+        REVIEW_REQUIRED,
+        EXTERNAL_ONLY
+    }
+
     data class Success(
         val packId: String,
         val nodesAccepted: Int,
         val edgesAccepted: Int,
+        val publicationStatus: PublicationStatus,
         val rejectedNodeIds: List<String> = emptyList(),
         val rejectedEdgeIds: List<String> = emptyList()
     ) : PackImportResult()

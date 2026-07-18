@@ -15,9 +15,12 @@ seal, or connector. Every selectable 3D node will link back to the proprietary
 catalog and, when available, to a repair procedure, diagnostic evidence,
 required tools, warnings, and completion gates.
 
-The production renderer will be SceneView 4.22.0 over Google Filament. The
-existing Compose Canvas renderer remains as a compatibility fallback and is no
-longer the visual authority for the primary experience.
+The production renderer will use SceneView 4.22.0 over Google Filament. The
+Android toolchain is migrated as one coherent, verified set to Kotlin 2.4.0,
+the Kotlin Compose compiler plugin 2.4.0, Compose BOM 2026.05.01, Android
+Gradle Plugin 9.2.1, and Gradle 9.4.1. The existing Compose Canvas renderer
+remains as a compatibility fallback and is no longer the visual authority for
+the primary experience.
 
 This is a hybrid asset strategy:
 
@@ -215,7 +218,8 @@ acceptable final fallback for a known component family.
 
 ### Primary Renderer
 
-- SceneView 4.22.0 integrated as a Jetpack Compose `SceneView`.
+- SceneView 4.22.0 integrated as a Jetpack Compose `Scene`, isolated behind the
+  renderer interface.
 - Google Filament for physically based rendering.
 - glTF/GLB 2.0 assets with stable node names.
 - KTX2/Basis textures and MeshOpt or Draco compression where supported.
@@ -224,6 +228,13 @@ acceptable final fallback for a known component family.
 - neutral automotive materials with neon diagnostic overlays;
 - level-of-detail variants for complete vehicle, system, and isolated part;
 - instancing for repeated hardware, clips, bolts, fuses, and connectors.
+
+The first complete-car overview asset is Khronos `CarConcept.glb`, distributed
+under CC BY 4.0. It provides PBR materials, logical mesh names, part
+hierarchies, and interaction pivots without the pedestal present in the earlier
+prototype. It is renamed and attributed in the repository, and the interface
+labels it `Vehículo 3D de referencia`. It is never presented as Hyundai CAD,
+OEM geometry, or dimensional evidence.
 
 ### Compatibility Fallback
 

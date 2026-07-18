@@ -1,0 +1,13 @@
+{
+  "name": "meet-engine-asset-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate-inline4-engine.mjs",
+    "generate:systems": "node generate-vehicle-systems.mjs"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  }
+}

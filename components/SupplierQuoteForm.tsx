@@ -16,7 +16,8 @@
  *   - expiresInHours
  *
  * The form enforces the same anti-fraud rules as the rest of the pipeline
- * (USED requires photo, EXACT requires OEM/PN + notes, etc.) via
+ * (USED requires photo; EXACT requires structured vehicle + part evidence)
+ * via
  * validateQuote() in lib/parts/quote.ts. Submit is BLOCKED while there is
  * any validation error.
  *
@@ -37,6 +38,7 @@ import {
   SUPPLIER_QUOTE_COMPAT,
   SUPPLIER_QUOTE_CONDITIONS,
   SupplierQuoteFormInput,
+  VehicleFingerprint,
   validateQuote,
 } from '../lib/parts';
 
@@ -44,6 +46,8 @@ interface SupplierQuoteFormProps {
   requestId: string;
   /** Pre-filled from the request; the form fills them as read-only. */
   partName: string;
+  /** Structured request evidence used to validate an EXACT declaration. */
+  vehicle?: VehicleFingerprint;
   defaultCurrency?: string;
   defaultExpiresInHours?: number;
   onCancel: () => void;
@@ -58,6 +62,7 @@ const labelClass =
 export function SupplierQuoteForm({
   requestId,
   partName,
+  vehicle,
   defaultCurrency = 'CRC',
   defaultExpiresInHours = 48,
   onCancel,
@@ -99,6 +104,11 @@ export function SupplierQuoteForm({
       compatibilityConfidence,
       compatibilityNotes,
       expiresInHours,
+      vehicleVin: vehicle?.vin,
+      vehicleBrand: vehicle?.brand,
+      vehicleModel: vehicle?.model,
+      vehicleYear: vehicle?.year,
+      vehicleEngine: vehicle?.engine,
     }),
     [
       partName,
@@ -117,6 +127,11 @@ export function SupplierQuoteForm({
       compatibilityConfidence,
       compatibilityNotes,
       expiresInHours,
+      vehicle?.vin,
+      vehicle?.brand,
+      vehicle?.model,
+      vehicle?.year,
+      vehicle?.engine,
     ],
   );
 
