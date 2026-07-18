@@ -30,6 +30,8 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -888,11 +890,23 @@ class LocalControlServer(
     private val obdSession: ObdSession,
     private val tripManager: TripManager
 ) {
+    private val serverScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
+            handleAsyncServerFailure(error)
+        }
+    )
     private var server: ApplicationEngine? = null
-    
+
+    @Synchronized
     fun start() {
+        if (server != null) return
+        if (!isPortAvailable(CONTROL_PORT)) {
+            Log.w("LocalControlServer", "Port $CONTROL_PORT is already in use; local control server disabled")
+            return
+        }
+
         try {
-            server = embeddedServer(CIO, port = 8082, host = "127.0.0.1") {
+            val engine = serverScope.embeddedServer(CIO, port = CONTROL_PORT, host = CONTROL_HOST) {
                 routing {
                     get("/api/telemetry") {
                         try {
@@ -1001,15 +1015,45 @@ class LocalControlServer(
                     }
                 }
             }
-            server?.start(wait = false)
-            Log.d("LocalControlServer", "Server started on http://127.0.0.1:8082")
+            server = engine
+            engine.start(wait = false)
+            Log.d("LocalControlServer", "Server starting on http://$CONTROL_HOST:$CONTROL_PORT")
         } catch (e: Exception) {
-            Log.e("LocalControlServer", "Error starting local server: ${e.message}")
+            handleServerFailure("Error starting local server", e)
         }
     }
-    
+
+    @Synchronized
     fun stop() {
-        server?.stop(1000, 2000)
+        runCatching { server?.stop(1000, 2000) }
+            .onFailure { Log.w("LocalControlServer", "Error stopping local server", it) }
         server = null
+        serverScope.cancel()
+    }
+
+    private fun handleAsyncServerFailure(error: Throwable) {
+        handleServerFailure("Local server stopped after asynchronous startup failure", error)
+    }
+
+    @Synchronized
+    private fun handleServerFailure(message: String, error: Throwable) {
+        Log.e("LocalControlServer", message, error)
+        runCatching { server?.stop(0, 250) }
+        server = null
+    }
+
+    private fun isPortAvailable(port: Int): Boolean {
+        return runCatching {
+            ServerSocket().use { socket ->
+                socket.reuseAddress = true
+                socket.bind(InetSocketAddress(CONTROL_HOST, port))
+            }
+            true
+        }.getOrDefault(false)
+    }
+
+    private companion object {
+        const val CONTROL_HOST = "127.0.0.1"
+        const val CONTROL_PORT = 8082
     }
 }
