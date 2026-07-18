@@ -61,6 +61,29 @@ class CompatibilityEngineTest {
     }
 
     @Test
+    fun `partial VIN evidence is rejected instead of promoted to EXACT`() {
+        val result = CompatibilityEngine.evaluate(
+            CompatibilityContext(
+                vehicle = VehicleFingerprint(
+                    vin = "KMHCN46C18U",
+                    oemNumber = "27301-2B100",
+                ),
+                partName = "Bobina de encendido",
+            ),
+        )
+
+        assertNotEquals(CompatibilityConfidence.EXACT, result.confidence)
+        assertTrue(result.warnings.any { it.code == "INVALID_VIN" })
+    }
+
+    @Test
+    fun `VIN validator requires 17 allowed characters`() {
+        assertTrue(isValidVin("KMHCN46C18U123456"))
+        assertTrue(!isValidVin("KMHCN46C18O123456"))
+        assertTrue(!isValidVin("KMHCN46C18U12345"))
+    }
+
+    @Test
     fun `produces MEDIUM for brand+model+year without OEM and surfaces safety for brakes`() {
         val result = CompatibilityEngine.evaluate(
             CompatibilityContext(vehicle = baseVehicle, partName = "Pastilla de freno delantero")

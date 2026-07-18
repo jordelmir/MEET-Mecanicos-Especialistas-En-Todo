@@ -31,7 +31,8 @@ class GeminiDiagnostic(
     private var apiKey: String? = null,
     private var customEndpointUrl: String? = null,
     private var provider: String = "gemini", // gemini, openai, anthropic, ollama, mavis, custom
-    private var modelName: String? = null
+    private var modelName: String? = null,
+    private val aiRepository: com.elysium369.meet.ai.data.AiRepository? = null
 ) {
     
     private val defaultEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
@@ -96,7 +97,7 @@ class GeminiDiagnostic(
             }
             
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext DiagnosticResult(runFallbackDiagnosis(dtcList))
@@ -172,7 +173,7 @@ class GeminiDiagnostic(
     suspend fun analyzeQuick(snapshot: String): String {
         return withContext(Dispatchers.IO) {
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             if (!hasValidKey && !isCustomEndpoint) return@withContext "SISTEMA STANDBY"
 
             val endpoint = if (isCustomEndpoint) (customEndpointUrl ?: return@withContext "SISTEMA STANDBY") else "$defaultEndpoint?key=$apiKey"
@@ -194,7 +195,7 @@ class GeminiDiagnostic(
     ): String {
         return withContext(Dispatchers.IO) {
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext "Error: API Key no configurada."
@@ -336,7 +337,7 @@ class GeminiDiagnostic(
             if (telemetryHistory.isEmpty()) return@withContext emptyList()
             
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) return@withContext emptyList()
 
@@ -408,7 +409,7 @@ class GeminiDiagnostic(
             }
 
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext DiagnosticResult("Modo Offline: Se requiere conexión a AI para análisis de osciloscopio.")
@@ -483,7 +484,7 @@ class GeminiDiagnostic(
             }
 
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext DiagnosticResult("Modo Offline: Se requiere conexión a AI para análisis de topología.")
@@ -551,7 +552,7 @@ class GeminiDiagnostic(
     ): DiagnosticResult {
         return withContext(Dispatchers.IO) {
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext DiagnosticResult(runFallbackActiveTestDiagnosis(testId, monitoredData))
@@ -635,6 +636,40 @@ class GeminiDiagnostic(
 
     private suspend fun callGemini(endpoint: String, prompt: String): String? {
         return withContext(Dispatchers.IO) {
+            if (!hasUsableRemoteConfig() && aiRepository != null) {
+                val request = com.elysium369.meet.ai.domain.AiRequest(
+                    feature = com.elysium369.meet.ai.domain.AiFeature.AI_COPILOT,
+                    providerId = "minimax",
+                    model = "MiniMax-M1",
+                    messages = listOf(
+                        com.elysium369.meet.ai.domain.AiMessage(
+                            com.elysium369.meet.ai.domain.AiRole.USER,
+                            prompt
+                        )
+                    ),
+                    temperature = 0.2,
+                    maxTokens = 4096,
+                    context = com.elysium369.meet.ai.domain.AiContext(
+                        vehicle = null,
+                        obd = null,
+                        dtcs = emptyList(),
+                        livePids = emptyList(),
+                        manualAvailability = null,
+                        appModule = "legacy_bridge",
+                        locale = "es-MX",
+                        userRole = com.elysium369.meet.ai.domain.UserRole.MECHANIC,
+                        safetyMode = true
+                    )
+                )
+                return@withContext aiRepository.complete(request).fold(
+                    onSuccess = { it.text },
+                    onFailure = { 
+                        Log.e("GeminiDiag", "Bridge fallback to AiRepository failed", it)
+                        null 
+                    }
+                )
+            }
+
             val useOpenAiFormat = isOpenAiFormat()
             val useAnthropicFormat = isAnthropicFormat()
             
@@ -823,7 +858,7 @@ class GeminiDiagnostic(
     ): DiagnosticResult {
         return withContext(Dispatchers.IO) {
             val isCustomEndpoint = !customEndpointUrl.isNullOrEmpty()
-            val hasValidKey = !apiKey.isNullOrEmpty()
+            val hasValidKey = !apiKey.isNullOrEmpty() || aiRepository != null
             
             if (!hasValidKey && !isCustomEndpoint) {
                 return@withContext DiagnosticResult(runFallbackServiceResetDiagnosis(resetId, manufacturer, isSuccess))

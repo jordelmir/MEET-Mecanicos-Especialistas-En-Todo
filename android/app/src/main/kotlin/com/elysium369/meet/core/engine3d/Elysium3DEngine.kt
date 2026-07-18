@@ -120,6 +120,15 @@ data class Mesh3D(
     }
 }
 
+/** Compact semantic input for the complete proprietary catalog scene. */
+data class UniversalCatalogSceneNode(
+    val id: String,
+    val name: String,
+    val systemId: String,
+    val seed: Long,
+    val sectionId: String = ""
+)
+
 /**
  * Generadores procedurales para componentes en 3D.
  */
@@ -1496,6 +1505,178 @@ object ElysiumProceduralModels {
             )
         )
 
+        return meshes
+    }
+
+    /**
+     * Builds a live semantic scene for any catalog system. A bounded page is rendered
+     * for frame stability; the selected entity is always injected and centered.
+     */
+    fun buildUniversalCatalogScene(
+        nodes: List<UniversalCatalogSceneNode>,
+        selectedNodeId: String? = null,
+        maxVisibleNodes: Int = 72
+    ): List<Mesh3D> {
+        if (nodes.isEmpty()) return emptyList()
+        val selected = selectedNodeId?.let { id -> nodes.firstOrNull { it.id == id } }
+        val visible = buildList {
+            selected?.let(::add)
+            nodes.asSequence()
+                .filterNot { it.id == selected?.id }
+                .take((maxVisibleNodes - size).coerceAtLeast(0))
+                .forEach(::add)
+        }.distinctBy { it.id }
+
+        return visible.mapIndexed { index, node ->
+            val seed = node.seed and 0xffffffffL
+            val selectedNode = node.id == selectedNodeId
+            val visualIndex = if (selectedNode) 0 else index
+            val ring = (visualIndex / 12).coerceAtMost(5)
+            val slot = visualIndex % 12
+            val angle = ((2.0 * PI * slot) / 12.0 + ring * 0.22).toFloat()
+            val radius = if (selectedNode) 0f else 30f + ring * 22f
+            val position = Vector3D(
+                x = cos(angle) * radius,
+                y = if (selectedNode) -18f else -8f + ((seed shr 5) % 6).toFloat() * 5f,
+                z = sin(angle) * radius
+            )
+            val base = catalogSystemColor(node.systemId)
+            val color = if (selectedNode) Color(0xFFA3E635) else base
+            val width = if (selectedNode) 27f else 9f + (seed % 9).toFloat()
+            val height = if (selectedNode) 34f else 11f + ((seed shr 8) % 17).toFloat()
+            val depth = if (selectedNode) 22f else 8f + ((seed shr 16) % 11).toFloat()
+            val mesh = when ((seed % 3).toInt()) {
+                0 -> createCylinder(
+                    id = node.id,
+                    name = node.name,
+                    radius = width * 0.55f,
+                    height = height,
+                    segments = 8,
+                    color = color,
+                    position = position,
+                    rotation = Vector3D(0f, angle * 0.4f, 0f),
+                    isTranslucent = !selectedNode,
+                    opacity = if (selectedNode) 1f else 0.82f
+                )
+                else -> createBox(
+                    id = node.id,
+                    name = node.name,
+                    width = width,
+                    height = height,
+                    depth = depth,
+                    color = color,
+                    position = position,
+                    rotation = Vector3D(angle * 0.08f, angle * 0.5f, angle * 0.04f),
+                    isTranslucent = !selectedNode,
+                    opacity = if (selectedNode) 1f else 0.84f
+                )
+            }
+            mesh.copy(isHighlighted = selectedNode)
+        }
+    }
+
+    private fun catalogSystemColor(systemId: String): Color = when (systemId) {
+        "structure" -> Color(0xFF38BDF8)
+        "engine" -> Color(0xFFF59E0B)
+        "intake" -> Color(0xFF22D3EE)
+        "forced_induction" -> Color(0xFFF97316)
+        "transmission" -> Color(0xFF10B981)
+        "suspension" -> Color(0xFFA3E635)
+        "steering" -> Color(0xFF8B5CF6)
+        "brakes" -> Color(0xFFFB7185)
+        "wheels" -> Color(0xFFEAB308)
+        "electrical" -> Color(0xFF60A5FA)
+        "control_modules" -> Color(0xFFC084FC)
+        "sensors" -> Color(0xFF2DD4BF)
+        "actuators" -> Color(0xFFF472B6)
+        "lighting" -> Color(0xFFFDE047)
+        "passive_safety" -> Color(0xFFEF4444)
+        "adas" -> Color(0xFF06B6D4)
+        "body" -> Color(0xFF94A3B8)
+        "wipers" -> Color(0xFF34D399)
+        "infotainment" -> Color(0xFF818CF8)
+        "access" -> Color(0xFFEC4899)
+        "hybrid_ev" -> Color(0xFFFACC15)
+        "hardware" -> Color(0xFFD1D5DB)
+        else -> Color(0xFF0EA5E9)
+    }
+
+    val FRONT_SUSPENSION_NODE_IDS: Set<String> = linkedSetOf(
+        "front_subframe", "subframe_bolts", "engine_mount_front",
+        "front_left_wheel_bearing", "front_right_wheel_bearing",
+        "front_left_lower_control_arm", "front_right_lower_control_arm",
+        "front_left_arm_front_bushing", "front_left_arm_rear_bushing",
+        "front_right_arm_front_bushing", "front_right_arm_rear_bushing",
+        "front_left_ball_joint", "front_right_ball_joint",
+        "front_left_strut", "front_right_strut", "front_left_spring", "front_right_spring",
+        "front_left_strut_mount", "front_right_strut_mount",
+        "front_left_strut_bearing", "front_right_strut_bearing",
+        "front_left_bump_stop", "front_right_bump_stop",
+        "front_left_dust_boot", "front_right_dust_boot",
+        "stabilizer_bar", "left_stabilizer_link", "right_stabilizer_link",
+        "stabilizer_bushing_left", "stabilizer_bushing_right",
+        "front_left_knuckle", "front_right_knuckle",
+        "front_left_wheel_hub", "front_right_wheel_hub",
+        "wheel_nuts_front_left", "wheel_nuts_front_right",
+        "steering_rack", "tie_rod_end_left", "tie_rod_end_right",
+        "tie_rod_inner_left", "tie_rod_inner_right",
+        "drive_shaft_left", "drive_shaft_right",
+        "brake_disc_left", "brake_disc_right", "brake_caliper_left", "brake_caliper_right",
+        "brake_pads_front", "front_left_abs_sensor", "front_right_abs_sensor"
+    )
+
+    /** Generic semantic front-suspension schematic. It is not an OEM or dimensional model. */
+    fun buildFrontSuspensionScene(): List<Mesh3D> {
+        val meshes = mutableListOf<Mesh3D>()
+        val steel = Color(0xFF455A64)
+        val cyan = Color(0xFF00B8D4)
+        val rubber = Color(0xFF20262A)
+        val brake = Color(0xFFD84315)
+
+        meshes += createBox("front_subframe", "Bastidor auxiliar", 135f, 12f, 58f, steel, Vector3D(0f, 23f, 8f))
+        meshes += createBox("steering_rack", "Cremallera de direccion", 118f, 9f, 11f, cyan, Vector3D(0f, 7f, -12f))
+        meshes += createBox("front_left_lower_control_arm", "Tijereta izquierda", 62f, 8f, 17f, Color(0xFF78909C), Vector3D(-43f, 27f, 28f), rotation = Vector3D(0f, -0.28f, 0f))
+        meshes += createBox("front_right_lower_control_arm", "Tijereta derecha", 62f, 8f, 17f, Color(0xFF78909C), Vector3D(43f, 27f, 28f), rotation = Vector3D(0f, 0.28f, 0f))
+        meshes += createSplineCable("stabilizer_bar", "Barra estabilizadora", listOf(Vector3D(-82f, 13f, 4f), Vector3D(-48f, 18f, 17f), Vector3D(0f, 18f, 24f), Vector3D(48f, 18f, 17f), Vector3D(82f, 13f, 4f)), 3.5f, color = Color(0xFF00C853))
+
+        listOf(-1f to "left", 1f to "right").forEach { (side, label) ->
+            val x = side * 82f
+            val prefix = if (label == "left") "front_left" else "front_right"
+            meshes += createCylinder("${prefix}_strut", "Amortiguador $label", 7f, 68f, color = Color(0xFF546E7A), position = Vector3D(x, -7f, 15f))
+            meshes += createCylinder("${prefix}_spring", "Resorte $label", 13f, 42f, color = Color(0xFF90A4AE), position = Vector3D(x, -9f, 15f), isTranslucent = true, opacity = 0.72f)
+            meshes += createBox("${prefix}_knuckle", "Mangueta $label", 15f, 34f, 19f, steel, Vector3D(x, 18f, 18f))
+            meshes += createCylinder("${prefix}_wheel_hub", "Cubo de rueda $label", 15f, 8f, color = cyan, position = Vector3D(x, 20f, 22f))
+            meshes += createCylinder("${prefix}_wheel_bearing", "Rodamiento de rueda $label", 10f, 10f, color = Color(0xFFB0BEC5), position = Vector3D(x, 20f, 22f))
+            meshes += createCylinder("${prefix}_ball_joint", "Rotula inferior $label", 5f, 12f, color = Color(0xFFFFB300), position = Vector3D(x, 29f, 25f))
+            meshes += createCylinder("brake_disc_$label", "Disco de freno $label", 18f, 4f, color = Color(0xFFB0BEC5), position = Vector3D(x, 20f, 25f))
+            meshes += createBox("brake_caliper_$label", "Mordaza de freno $label", 10f, 22f, 9f, brake, Vector3D(x + side * 17f, 19f, 25f))
+            meshes += createCylinder("drive_shaft_$label", "Semieje $label", 4f, 62f, color = steel, position = Vector3D(side * 42f, 15f, 17f), rotation = Vector3D(0f, 0f, PI.toFloat() / 2f))
+            meshes += createSplineCable("tie_rod_inner_$label", "Terminal interior $label", listOf(Vector3D(side * 18f, 7f, -12f), Vector3D(side * 55f, 13f, 5f)), 2.5f, color = cyan)
+            meshes += createSplineCable("tie_rod_end_$label", "Terminal exterior $label", listOf(Vector3D(side * 55f, 13f, 5f), Vector3D(x, 17f, 16f)), 3f, color = Color(0xFF26C6DA))
+            meshes += createCylinder("${label}_stabilizer_link", "Bieleta estabilizadora $label", 3f, 37f, color = Color(0xFF00C853), position = Vector3D(x, 5f, 7f))
+        }
+
+        val builtIds = meshes.mapTo(mutableSetOf()) { it.id }
+        FRONT_SUSPENSION_NODE_IDS.filterNot(builtIds::contains).forEachIndexed { index, id ->
+            val side = when {
+                id.contains("left") -> -1f
+                id.contains("right") -> 1f
+                else -> 0f
+            }
+            val column = (index % 5) - 2
+            val row = index / 5
+            val x = if (side == 0f) column * 17f else side * (54f + (index % 4) * 8f)
+            val y = 31f - row * 8f
+            val z = 42f + (index % 3) * 9f
+            val color = when {
+                id.contains("bushing") || id.contains("dust") || id.contains("bump") -> rubber
+                id.contains("brake") -> brake
+                id.contains("abs_sensor") -> Color(0xFFFFC400)
+                else -> Color(0xFF607D8B)
+            }
+            meshes += createBox(id, id.replace('_', ' '), 10f, 7f, 8f, color, Vector3D(x, y, z))
+        }
+        check(meshes.map { it.id }.toSet() == FRONT_SUSPENSION_NODE_IDS)
         return meshes
     }
 }

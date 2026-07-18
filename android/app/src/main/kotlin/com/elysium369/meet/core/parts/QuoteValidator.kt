@@ -45,6 +45,11 @@ data class DraftQuote(
     val compatibilityConfidence: CompatibilityConfidence,
     val compatibilityNotes: String,
     val expiresInHours: Int,
+    val vehicleVin: String? = null,
+    val vehicleBrand: String = "",
+    val vehicleModel: String = "",
+    val vehicleYear: Int? = null,
+    val vehicleEngine: String = "",
 )
 
 enum class ValidationLevel { OK, WARN, BLOCK }
@@ -66,6 +71,10 @@ object QuoteValidator {
         oemNumber = form.oemNumber?.trim()?.takeIf { it.isNotEmpty() },
         photoUrls = form.photoUrls.map { it.trim() }.filter { it.isNotEmpty() },
         compatibilityNotes = form.compatibilityNotes.trim(),
+        vehicleVin = form.vehicleVin?.trim()?.takeIf { it.isNotEmpty() },
+        vehicleBrand = form.vehicleBrand.trim(),
+        vehicleModel = form.vehicleModel.trim(),
+        vehicleEngine = form.vehicleEngine.trim(),
     )
 
     fun validate(quote: DraftQuote): ValidationResult {
@@ -123,11 +132,37 @@ object QuoteValidator {
                 )
             }
         }
+        val vinProvided = !quote.vehicleVin.isNullOrEmpty()
+        val validVin = isValidVin(quote.vehicleVin)
+        if (vinProvided && !validVin) {
+            errors += ValidationIssue(
+                code = "INVALID_VIN",
+                message = "El VIN recibido no es válido: debe tener exactamente 17 caracteres " +
+                    "y no incluir I, O ni Q.",
+                severity = ValidationLevel.BLOCK,
+            )
+        }
         if (quote.compatibilityConfidence == CompatibilityConfidence.EXACT) {
-            if (quote.oemNumber.isNullOrEmpty() && quote.partNumber.isEmpty()) {
+            val hasPartIdentity = !quote.oemNumber.isNullOrEmpty() || quote.partNumber.isNotEmpty()
+            val hasVinEvidence = hasPartIdentity && validVin
+            val hasClosedTupleEvidence = quote.vehicleBrand.isNotEmpty() &&
+                quote.vehicleModel.isNotEmpty() &&
+                quote.vehicleYear != null && quote.vehicleYear in 1886..2100 &&
+                quote.vehicleEngine.isNotEmpty() &&
+                !quote.oemNumber.isNullOrEmpty()
+
+            if (!hasPartIdentity) {
                 errors += ValidationIssue(
                     code = "EXACT_REQUIRES_OEM",
                     message = "Para una confianza EXACTA se requiere número OEM o número de parte.",
+                    severity = ValidationLevel.BLOCK,
+                )
+            }
+            if (!hasVinEvidence && !hasClosedTupleEvidence) {
+                errors += ValidationIssue(
+                    code = "EXACT_REQUIRES_VEHICLE_EVIDENCE",
+                    message = "EXACT requiere VIN válido + OEM/número de parte, o tupla cerrada " +
+                        "marca/modelo/año/motor/OEM.",
                     severity = ValidationLevel.BLOCK,
                 )
             }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus, VehicleInfo } from '../types';
+import { WorkOrder, Client, Service, Mechanic, WorkOrderStatus, VehicleInfo, Role, VehicleProfile, VehicleDigitalTwin, VehicleTimelineEvent, PredictiveMaintenanceAlert, MaintenanceRecord } from '../types';
 import { Calendar, Clock, MapPin, CheckCircle, Wrench, ChevronRight, XCircle, Search, AlertCircle, Plus, Edit2, Save, Gauge, Smartphone, Activity, ShieldAlert, Info } from 'lucide-react';
 import { formatDuration } from '../services/timeEngine';
+import { GarageDashboard } from './GarageDashboard';
 
 interface ClientDashboardProps {
   currentUser: Client;
@@ -13,13 +14,51 @@ interface ClientDashboardProps {
   onCancelOrder: (id: string) => void;
   onUpdateUser?: (client: Client) => void;
   onSimulateAPKScan?: (scanResult: any) => void;
+  // Garage additions:
+  vehicles?: VehicleProfile[];
+  onUpdateVehicle?: (vehicle: VehicleProfile) => void;
+  onAddVehicle?: (vehicle: VehicleProfile) => void;
+  onDeleteVehicle?: (id: string) => void;
+  digitalTwins?: VehicleDigitalTwin[];
+  onUpdateDigitalTwin?: (twin: VehicleDigitalTwin) => void;
+  timelineEvents?: VehicleTimelineEvent[];
+  onAddTimelineEvent?: (event: VehicleTimelineEvent) => void;
+  predictiveAlerts?: PredictiveMaintenanceAlert[];
+  onUpdatePredictiveAlert?: (alert: PredictiveMaintenanceAlert) => void;
+  onAddPredictiveAlert?: (alert: PredictiveMaintenanceAlert) => void;
+  maintenanceRecords?: MaintenanceRecord[];
+  onAddMaintenanceRecord?: (record: MaintenanceRecord) => void;
 }
 
-export function ClientDashboard({ currentUser, workOrders, services, mechanics, freeWashThreshold, onBookNew, onCancelOrder, onUpdateUser, onSimulateAPKScan }: ClientDashboardProps) {
+export function ClientDashboard({
+  currentUser,
+  workOrders,
+  services,
+  mechanics,
+  freeWashThreshold,
+  onBookNew,
+  onCancelOrder,
+  onUpdateUser,
+  onSimulateAPKScan,
+  vehicles,
+  onUpdateVehicle,
+  onAddVehicle,
+  onDeleteVehicle,
+  digitalTwins,
+  onUpdateDigitalTwin,
+  timelineEvents,
+  onAddTimelineEvent,
+  predictiveAlerts,
+  onUpdatePredictiveAlert,
+  onAddPredictiveAlert,
+  maintenanceRecords,
+  onAddMaintenanceRecord
+}: ClientDashboardProps) {
   const [editingMileage, setEditingMileage] = useState<number | null>(null);
   const [tempMileage, setTempMileage] = useState<number>(0);
   const [isAddingVehicle, setIsAddingVehicle] = useState(false);
   const [newVehicle, setNewVehicle] = useState<Partial<VehicleInfo>>({});
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
 
   const handleSaveMileage = (index: number) => {
     if (onUpdateUser && tempMileage >= 0) {
@@ -297,37 +336,52 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
                     <div className="text-xs text-steel-400 font-mono mt-0.5 truncate">Placa: {v.plate} · {v.year}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-                  {editingMileage === i ? (
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-[10px] text-steel-400 font-mono">KM:</span>
-                      <input 
-                        type="number" 
-                        value={tempMileage} 
-                        onChange={e => setTempMileage(+e.target.value)}
-                        className="bg-steel-900 border border-forge-500 rounded px-2 py-1 text-xs text-forge-500 font-mono outline-none flex-1"
-                        autoFocus
-                        onKeyDown={e => e.key === 'Enter' && handleSaveMileage(i)}
-                      />
-                      <button onClick={() => handleSaveMileage(i)} className="text-green-400 p-1 hover:bg-green-400/10 rounded">
-                        <CheckCircle size={14} />
-                      </button>
-                      <button onClick={() => setEditingMileage(null)} className="text-red-400 p-1 hover:bg-red-400/10 rounded">
-                        <XCircle size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="text-xs text-forge-500 font-mono flex items-center gap-1">
-                        <Gauge size={12} /> {v.mileage.toLocaleString()} km
+                <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    {editingMileage === i ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <span className="text-[10px] text-steel-400 font-mono">KM:</span>
+                        <input 
+                          type="number" 
+                          value={tempMileage} 
+                          onChange={e => setTempMileage(+e.target.value)}
+                          className="bg-steel-900 border border-forge-500 rounded px-2 py-1 text-xs text-forge-500 font-mono outline-none flex-1"
+                          autoFocus
+                          onKeyDown={e => e.key === 'Enter' && handleSaveMileage(i)}
+                        />
+                        <button onClick={() => handleSaveMileage(i)} className="text-green-400 p-1 hover:bg-green-400/10 rounded">
+                          <CheckCircle size={14} />
+                        </button>
+                        <button onClick={() => setEditingMileage(null)} className="text-red-400 p-1 hover:bg-red-400/10 rounded">
+                          <XCircle size={14} />
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => { setEditingMileage(i); setTempMileage(v.mileage); }}
-                        className="text-[10px] text-steel-400 hover:text-forge-400 flex items-center gap-1 transition-colors bg-white/5 px-2 py-1 rounded-md"
-                      >
-                        <Edit2 size={10} /> Actualizar KM
-                      </button>
-                    </>
+                    ) : (
+                      <>
+                        <div className="text-xs text-forge-500 font-mono flex items-center gap-1">
+                          <Gauge size={12} /> {v.mileage.toLocaleString()} km
+                        </div>
+                        <button 
+                          onClick={() => { setEditingMileage(i); setTempMileage(v.mileage); }}
+                          className="text-[10px] text-steel-400 hover:text-forge-400 flex items-center gap-1 transition-colors bg-white/5 px-2 py-1 rounded-md"
+                        >
+                          <Edit2 size={10} /> Actualizar KM
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {vehicles && (
+                    <button
+                      onClick={() => {
+                        const matchedVeh = vehicles.find(vh => vh.plate === v.plate);
+                        if (matchedVeh) {
+                          setSelectedVehicleId(matchedVeh.id);
+                        }
+                      }}
+                      className="w-full text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 transition-all bg-cyan-500/10 hover:bg-cyan-500/20 py-1.5 rounded-lg border border-cyan-500/20 font-mono uppercase font-bold"
+                    >
+                      <Activity size={10} /> Ver Expediente Técnico →
+                    </button>
                   )}
                 </div>
               </div>
@@ -592,6 +646,43 @@ export function ClientDashboard({ currentUser, workOrders, services, mechanics, 
               <button onClick={() => setViewingHistoryOrder(null)} className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg transition-colors">
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Garage Technical File Modal */}
+      {selectedVehicleId && vehicles && onUpdateVehicle && onUpdateDigitalTwin && onAddTimelineEvent && onUpdatePredictiveAlert && onAddPredictiveAlert && onAddMaintenanceRecord && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[60] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-5xl bg-steel-900 border border-cyan-500/20 p-6 rounded-2xl shadow-2xl relative my-8">
+            <button 
+              onClick={() => setSelectedVehicleId(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 hover:bg-white/5 rounded-lg transition-all z-10"
+            >
+              <XCircle size={24} />
+            </button>
+            <div className="mt-4">
+              <GarageDashboard
+                vehicles={vehicles}
+                activeUserId={currentUser.id}
+                role={Role.CLIENT}
+                onUpdateVehicle={onUpdateVehicle}
+                onAddVehicle={onAddVehicle}
+                onDeleteVehicle={onDeleteVehicle}
+                digitalTwins={digitalTwins || []}
+                onUpdateDigitalTwin={onUpdateDigitalTwin}
+                timelineEvents={timelineEvents || []}
+                onAddTimelineEvent={onAddTimelineEvent}
+                predictiveAlerts={predictiveAlerts || []}
+                onUpdatePredictiveAlert={onUpdatePredictiveAlert}
+                onAddPredictiveAlert={onAddPredictiveAlert}
+                maintenanceRecords={maintenanceRecords || []}
+                onAddMaintenanceRecord={onAddMaintenanceRecord}
+                workOrders={workOrders}
+                services={services}
+                mechanics={mechanics}
+                onClose={() => setSelectedVehicleId(null)}
+              />
             </div>
           </div>
         </div>

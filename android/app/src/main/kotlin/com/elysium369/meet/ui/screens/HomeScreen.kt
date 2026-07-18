@@ -233,6 +233,11 @@ fun HomeScreen(
                 }
             }
 
+            // ── Ad Banner ──
+            AnimatedEntrance(2) {
+                SimulatedAdBanner(viewModel = viewModel)
+            }
+
             // ── Vehicle Card ──
             AnimatedEntrance(3) {
                 EliteCard(
@@ -374,6 +379,7 @@ fun HomeScreen(
                 Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito",
                 Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna",
                 Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator",
+                Triple("🔩", "Piezas", MeetColors.neonGreen) to "parts_repairs",
                 Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
                 Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings",
                 Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage",

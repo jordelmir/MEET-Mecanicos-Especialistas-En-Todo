@@ -123,6 +123,9 @@ class ObdSession(
     private val _liveSensorStates = MutableStateFlow<Map<String, SensorValueState>>(emptyMap())
     val liveSensorStates: StateFlow<Map<String, SensorValueState>> = _liveSensorStates.asStateFlow()
 
+    private val _telemetrySamples = MutableStateFlow<Map<String, TelemetrySample>>(emptyMap())
+    val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = _telemetrySamples.asStateFlow()
+
     private val _freezeFrame = MutableStateFlow<Map<String, String>>(emptyMap())
     val freezeFrame: StateFlow<Map<String, String>> = _freezeFrame.asStateFlow()
 
@@ -298,7 +301,9 @@ class ObdSession(
         val networkAddress = normalizedAddress.removePrefix("tcp://")
         isDoIpMode = !isBluetoothMac && !isBleAddress && networkAddress.endsWith(":13400")
 
-        if (isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac)) {
+        if (normalizedAddress == "SIMULATOR") {
+            transport = com.elysium369.meet.core.transport.SimulatedTransport()
+        } else if (isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac)) {
             val device = bluetoothAdapter.getRemoteDevice(bleMac)
             transport = BleTransport(context, device)
         } else if (!isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":"))) {
@@ -892,6 +897,7 @@ class ObdSession(
         val unit = unitForPid(pid)
         val supportedState = SensorValueState.Supported(smoothedValue, unit)
         putSensorStateAliases(stateCurrent, pid, supportedState)
+        publishTelemetrySample(pid, supportedState, rawValue = null, valueOverride = smoothedValue)
         recordSensorStateIfDue(pid, null, supportedState, SensorSource.STANDARD_OBD)
 
         // ── Compute derived/calculated sensors ──
@@ -979,7 +985,112 @@ class ObdSession(
         val current = _liveSensorStates.value.toMutableMap()
         putSensorStateAliases(current, pid, state)
         _liveSensorStates.value = current
+        publishTelemetrySample(pid, state, rawValue = rawValue)
         recordSensorStateIfDue(pid, rawValue, state, source)
+    }
+
+    private fun publishTelemetrySample(
+        pid: String,
+        state: SensorValueState,
+        rawValue: String?,
+        valueOverride: Float? = null
+    ) {
+        val normalizedPid = pid.uppercase().replace(" ", "")
+        val corePid = normalizedPid.removePrefix("01")
+        val key = if (corePid.length == 2) "01$corePid" else normalizedPid
+        val quality = telemetryQualityFor(state)
+        val value = when {
+            valueOverride != null -> valueOverride.toDouble()
+            state is SensorValueState.Supported -> state.value.toDouble()
+            else -> null
+        }
+        val sample = TelemetrySample(
+            pid = key,
+            name = PidRegistry.getPid("01", corePid)?.name ?: pid,
+            value = value,
+            unit = unitForPid(pid).orEmpty(),
+            timestampMonotonicMs = System.nanoTime() / 1_000_000L,
+            source = if (quality == TelemetryQuality.VALID || quality == TelemetryQuality.OUT_OF_RANGE) {
+                ObdDataSource.REAL_OBD
+            } else {
+                ObdDataSource.NO_REAL_OBD
+            },
+            quality = quality,
+            latencyMs = _qosMetrics.value.latencyMs.toLong(),
+            rawResponse = rawValue.orEmpty()
+        )
+        val current = _telemetrySamples.value.toMutableMap()
+        putTelemetrySampleAliases(current, pid, sample)
+        _telemetrySamples.value = current
+    }
+
+    private fun putTelemetrySampleAliases(
+        data: MutableMap<String, TelemetrySample>,
+        pid: String,
+        sample: TelemetrySample
+    ) {
+        val rawKey = pid.trim()
+        val compactKey = rawKey.uppercase().replace(" ", "")
+        val coreKey = compactKey.removePrefix("01")
+        data[rawKey] = sample
+        data[compactKey] = sample
+        if (coreKey.isNotBlank()) data[coreKey] = sample
+        if (coreKey.length == 2) data["01$coreKey"] = sample
+
+        when (coreKey) {
+            "0C" -> {
+                data["RPM"] = sample
+                data["rpm"] = sample
+            }
+            "0D" -> {
+                data["SPEED"] = sample
+                data["speed"] = sample
+                data["VELOCIDAD"] = sample
+            }
+            "05" -> {
+                data["COOLANT"] = sample
+                data["coolant"] = sample
+                data["ECT"] = sample
+            }
+            "04" -> data["ENGINE_LOAD"] = sample
+            "0B" -> {
+                data["MAP"] = sample
+                data["map"] = sample
+            }
+            "10" -> {
+                data["MAF"] = sample
+                data["maf"] = sample
+            }
+            "11" -> {
+                data["THROTTLE"] = sample
+                data["throttle"] = sample
+            }
+            "0F" -> data["IAT"] = sample
+            "0E" -> data["TIMING_ADVANCE"] = sample
+            "2F" -> data["FUEL_LEVEL"] = sample
+            "42" -> {
+                data["VOLTAGE"] = sample
+                data["voltage"] = sample
+                data["CTRL_VOLTAGE"] = sample
+            }
+        }
+        if (compactKey == "ATRV") {
+            data["AT RV"] = sample
+            data["ELM_VOLTAGE"] = sample
+            data.putIfAbsent("VOLTAGE", sample)
+            data.putIfAbsent("voltage", sample)
+        }
+    }
+
+    private fun telemetryQualityFor(state: SensorValueState): TelemetryQuality = when (state) {
+        is SensorValueState.Supported -> TelemetryQuality.VALID
+        SensorValueState.Timeout -> TelemetryQuality.TIMEOUT
+        SensorValueState.AdapterError,
+        SensorValueState.EcuNoResponse,
+        SensorValueState.NotAvailable -> TelemetryQuality.TIMEOUT
+        is SensorValueState.Unsupported -> TelemetryQuality.UNSUPPORTED
+        is SensorValueState.InvalidFormula -> TelemetryQuality.PARSE_ERROR
+        SensorValueState.Pending -> TelemetryQuality.STALE
     }
 
     private fun stateForFailedResponse(raw: String): SensorValueState {

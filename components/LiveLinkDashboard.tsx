@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Wifi, WifiOff, Activity, Gauge, Thermometer, Zap, Fuel, AlertTriangle, X, Radio, Building2, Phone, User, Car, CheckCircle2, Clock, Send, ShieldAlert, Sparkles, Plus } from 'lucide-react';
+import { Wifi, WifiOff, Activity, Gauge, Thermometer, Zap, Fuel, AlertTriangle, X, Radio, Building2, Phone, User, Car, CheckCircle2, Clock, Send, ShieldAlert, Sparkles, Plus, Wrench, Lock, Unlock } from 'lucide-react';
+import {
+  MOCK_CAPABILITIES,
+  type BidirectionalCapability,
+  type RiskLevel,
+} from '../lib/bidirectional';
 
 // ═══════════════════════════════════════════════════════════════
 // LIVE LINK B2B DASHBOARD — Portal Multi-Tenant para Talleres VIP (GAM Costa Rica)
@@ -44,6 +49,27 @@ interface ClientDtcAlert {
   severity: 'high' | 'medium' | 'low';
   timestamp: Date;
   status: 'pending' | 'contacted' | 'scheduled' | 'dismissed';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REMOTE ACTION REQUESTS — Solicitudes remotas que requieren
+// aprobación local antes de ejecutarse. NUNCA ejecución directa.
+// ═══════════════════════════════════════════════════════════════
+
+type RemoteRequestStatus = 'PENDING_LOCAL_APPROVAL' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+
+interface RemoteActionRequest {
+  id: string;
+  capability: BidirectionalCapability;
+  requestedBy: string;       // nombre del taller/mecánico remoto
+  requestedByWorkshopId: string;
+  vehiclePlate: string;
+  reason: string;
+  requestedAt: Date;
+  expiresAt: Date;           // ventana de 5 minutos
+  status: RemoteRequestStatus;
+  localApprovedBy: string | null;
+  localApprovedAt: Date | null;
 }
 
 interface WorkshopTenant {
@@ -186,6 +212,11 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
   const [messageCount, setMessageCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // ── REMOTE ACTION REQUEST STATE ──
+  const [remoteRequests, setRemoteRequests] = useState<RemoteActionRequest[]>([]);
+  const [showApprovalModal, setShowApprovalModal] = useState<RemoteActionRequest | null>(null);
+  const [showRemoteTestPicker, setShowRemoteTestPicker] = useState(false);
+
   // Filtro de alertas por el taller activo
   const filteredAlerts = alerts.filter(a => a.workshopId === selectedWorkshop.id);
 
@@ -232,6 +263,46 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
 
   const handleUpdateAlertStatus = (id: string, newStatus: ClientDtcAlert['status']) => {
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
+  };
+
+  // ── REMOTE ACTION REQUEST HANDLERS ──
+
+  /** Simulate a remote workshop requesting an active test on the locally-connected vehicle */
+  const handleSimulateRemoteTestRequest = (cap: BidirectionalCapability) => {
+    playAlertSound();
+    const now = new Date();
+    const req: RemoteActionRequest = {
+      id: `rreq_${Date.now()}`,
+      capability: cap,
+      requestedBy: `Técnico de ${selectedWorkshop.name}`,
+      requestedByWorkshopId: selectedWorkshop.id,
+      vehiclePlate: telemetry?.vehicleName || 'VEH-CONECTADO',
+      reason: `Solicitud remota de prueba activa: ${cap.displayName}. Código activo detectado que requiere validación de actuador.`,
+      requestedAt: now,
+      expiresAt: new Date(now.getTime() + 5 * 60 * 1000), // 5 min window
+      status: 'PENDING_LOCAL_APPROVAL',
+      localApprovedBy: null,
+      localApprovedAt: null,
+    };
+    setRemoteRequests(prev => [req, ...prev]);
+    setShowApprovalModal(req);
+    setShowRemoteTestPicker(false);
+  };
+
+  const handleApproveRemoteRequest = (id: string) => {
+    setRemoteRequests(prev => prev.map(r =>
+      r.id === id
+        ? { ...r, status: 'APPROVED' as RemoteRequestStatus, localApprovedBy: 'Dueño Local', localApprovedAt: new Date() }
+        : r
+    ));
+    setShowApprovalModal(null);
+  };
+
+  const handleRejectRemoteRequest = (id: string) => {
+    setRemoteRequests(prev => prev.map(r =>
+      r.id === id ? { ...r, status: 'REJECTED' as RemoteRequestStatus } : r
+    ));
+    setShowApprovalModal(null);
   };
 
   // Conexión WebSocket Local
@@ -680,12 +751,210 @@ export const LiveLinkDashboard: React.FC<Props> = ({ onClose }) => {
                     </div>
                   </div>
                 )}
+
+                {/* ══ REMOTE BIDIRECTIONAL REQUEST PANEL ══ */}
+                <div className="glass rounded-2xl p-5 border border-forge-500/20 bg-forge-500/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-forge-500/20 text-forge-400 rounded-xl border border-forge-500/30">
+                        <Wrench size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-white">Solicitar Prueba Activa Remota</h4>
+                        <p className="text-[10px] text-steel-400 font-medium">Requiere aprobación del dispositivo conectado al vehículo</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowRemoteTestPicker(!showRemoteTestPicker)}
+                      className="flex items-center gap-2 px-4 py-2 bg-forge-500 text-black font-black text-xs rounded-xl hover:bg-forge-400 transition-all shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+                    >
+                      <Plus size={14} />
+                      <span>Nueva Solicitud</span>
+                    </button>
+                  </div>
+
+                  {/* Capability Picker (only shown when toggled) */}
+                  {showRemoteTestPicker && (
+                    <div className="bg-black/50 border border-white/10 rounded-2xl p-4 space-y-2 animate-fade-in">
+                      <div className="text-[10px] text-steel-400 font-mono uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                        <Lock size={10} /> Seleccione la prueba a solicitar — se enviará como petición pendiente
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {MOCK_CAPABILITIES.filter(c => c.actionType === 'ACTIVE_TEST' || c.actionType === 'SERVICE_RESET').map(cap => (
+                          <button
+                            key={cap.id}
+                            onClick={() => handleSimulateRemoteTestRequest(cap)}
+                            className="text-left p-3 rounded-xl border border-white/5 bg-steel-900/60 hover:bg-steel-900 hover:border-white/15 transition-all"
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className="font-bold text-white text-xs">{cap.displayName}</span>
+                              <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                cap.riskLevel === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                cap.riskLevel === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                cap.riskLevel === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                                'bg-green-500/20 text-green-400 border border-green-500/30'
+                              }`}>{cap.riskLevel}</span>
+                            </div>
+                            <p className="text-[9px] text-steel-400 mt-1 line-clamp-1">{cap.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending/Resolved Remote Requests Log */}
+                  {remoteRequests.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] text-steel-400 font-mono uppercase tracking-widest font-bold">Historial de Solicitudes Remotas</div>
+                      {remoteRequests.map(req => (
+                        <div key={req.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                          req.status === 'PENDING_LOCAL_APPROVAL' ? 'bg-orange-500/5 border-orange-500/30 animate-pulse' :
+                          req.status === 'APPROVED' ? 'bg-green-500/5 border-green-500/20' :
+                          'bg-red-500/5 border-red-500/20 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            {req.status === 'PENDING_LOCAL_APPROVAL' ? (
+                              <Lock size={14} className="text-orange-400" />
+                            ) : req.status === 'APPROVED' ? (
+                              <Unlock size={14} className="text-green-400" />
+                            ) : (
+                              <X size={14} className="text-red-400" />
+                            )}
+                            <div>
+                              <span className="text-xs font-bold text-white">{req.capability.displayName}</span>
+                              <div className="text-[9px] text-steel-400 font-mono">{req.requestedBy} • {req.requestedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
+                              req.status === 'PENDING_LOCAL_APPROVAL' ? 'bg-orange-500/20 text-orange-400' :
+                              req.status === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {req.status === 'PENDING_LOCAL_APPROVAL' ? 'Pendiente' :
+                               req.status === 'APPROVED' ? 'Aprobado' : 'Rechazado'}
+                            </span>
+                            {req.status === 'PENDING_LOCAL_APPROVAL' && (
+                              <button
+                                onClick={() => setShowApprovalModal(req)}
+                                className="px-2 py-1 bg-forge-500 text-black text-[9px] font-black rounded-lg hover:bg-forge-400 transition-all"
+                              >
+                                Revisar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </>
             )}
           </div>
         )}
 
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+         LOCAL APPROVAL MODAL — Bloquea ejecución remota sin consentimiento
+         ═══════════════════════════════════════════════════════════════ */}
+      {showApprovalModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in">
+          <div className="glass rounded-3xl border border-orange-500/40 shadow-[0_0_60px_rgba(255,165,0,0.15)] max-w-lg w-full overflow-hidden">
+
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500/20 to-transparent p-5 border-b border-orange-500/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-orange-500/20 border border-orange-500/40 rounded-xl text-orange-400">
+                  <ShieldAlert size={22} />
+                </div>
+                <div>
+                  <div className="text-[10px] font-mono font-bold text-orange-400 uppercase tracking-widest">Solicitud Remota de Control Bidireccional</div>
+                  <h3 className="text-lg font-black text-white tracking-tight">{showApprovalModal.capability.displayName}</h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+
+              {/* Who is requesting */}
+              <div className="bg-steel-950/60 p-3 rounded-xl border border-white/5 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-steel-400 font-mono">Solicitado por:</span>
+                  <span className="text-white font-bold">{showApprovalModal.requestedBy}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-steel-400 font-mono">Vehículo:</span>
+                  <span className="text-white font-bold">{showApprovalModal.vehiclePlate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-steel-400 font-mono">Hora de solicitud:</span>
+                  <span className="text-white font-mono">{showApprovalModal.requestedAt.toLocaleTimeString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-steel-400 font-mono">Expira en:</span>
+                  <span className="text-orange-400 font-bold font-mono">5 minutos</span>
+                </div>
+              </div>
+
+              {/* Risk Warning */}
+              <div className={`p-4 rounded-xl border space-y-2 ${
+                showApprovalModal.capability.riskLevel === 'HIGH' || showApprovalModal.capability.riskLevel === 'CRITICAL'
+                  ? 'bg-red-500/10 border-red-500/25'
+                  : 'bg-orange-500/10 border-orange-500/25'
+              }`}>
+                <div className="flex items-center gap-2 text-xs">
+                  <AlertTriangle size={14} className={showApprovalModal.capability.riskLevel === 'HIGH' || showApprovalModal.capability.riskLevel === 'CRITICAL' ? 'text-red-400' : 'text-orange-400'} />
+                  <span className="font-bold text-white uppercase tracking-wider">Advertencia de Seguridad</span>
+                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                    showApprovalModal.capability.riskLevel === 'CRITICAL' ? 'bg-red-500/30 text-red-400' :
+                    showApprovalModal.capability.riskLevel === 'HIGH' ? 'bg-orange-500/30 text-orange-400' :
+                    'bg-yellow-500/30 text-yellow-400'
+                  }`}>Riesgo {showApprovalModal.capability.riskLevel}</span>
+                </div>
+                <p className="text-[11px] text-steel-300 leading-relaxed font-medium">
+                  Un técnico remoto solicita ejecutar <span className="text-white font-bold">{showApprovalModal.capability.displayName}</span> en el vehículo conectado a este dispositivo.
+                  Esta acción enviará comandos UDS directos a la ECU del vehículo.
+                  <span className="text-orange-300 font-bold"> MEET nunca ejecuta controles bidireccionales de forma remota sin su autorización explícita.</span>
+                </p>
+              </div>
+
+              {/* Reason */}
+              <div className="bg-black/40 p-3 rounded-xl border border-white/5">
+                <div className="text-[9px] text-steel-400 font-mono uppercase tracking-widest mb-1">Motivo de la solicitud:</div>
+                <p className="text-xs text-steel-200 leading-relaxed font-medium">{showApprovalModal.reason}</p>
+              </div>
+
+              {/* Safety Checklist */}
+              <div className="bg-steel-950/60 p-3 rounded-xl border border-white/5 text-[11px] text-steel-300 space-y-1.5 font-medium">
+                <div className="text-[9px] text-forge-400 font-mono uppercase tracking-widest font-bold mb-1">Antes de aprobar, verifique:</div>
+                <div className="flex gap-2 items-start"><CheckCircle2 size={12} className="text-forge-500 shrink-0 mt-0.5" /><span>El vehículo está estacionado con freno de mano</span></div>
+                <div className="flex gap-2 items-start"><CheckCircle2 size={12} className="text-forge-500 shrink-0 mt-0.5" /><span>No hay personas en contacto con componentes móviles</span></div>
+                <div className="flex gap-2 items-start"><CheckCircle2 size={12} className="text-forge-500 shrink-0 mt-0.5" /><span>El voltaje de batería es estable (≥ 11.8V)</span></div>
+              </div>
+
+            </div>
+
+            {/* Actions */}
+            <div className="p-5 border-t border-white/5 flex gap-3">
+              <button
+                onClick={() => handleRejectRemoteRequest(showApprovalModal.id)}
+                className="flex-1 bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 font-black py-3 rounded-xl text-xs uppercase tracking-wider transition-all"
+              >
+                Rechazar Solicitud
+              </button>
+              <button
+                onClick={() => handleApproveRemoteRequest(showApprovalModal.id)}
+                className="flex-1 bg-forge-500 hover:bg-forge-400 text-black font-black py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)]"
+              >
+                Aprobar y Autorizar Ejecución
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

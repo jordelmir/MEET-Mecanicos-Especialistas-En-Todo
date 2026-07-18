@@ -21,7 +21,7 @@ class DashboardViewModel @Inject constructor(
     private val customPidDao: CustomPidDao,
     private val savedGaugeDao: com.elysium369.meet.data.local.dao.SavedGaugeDao,
     private val obdSession: com.elysium369.meet.core.obd.ObdSession,
-    private val gemini: com.elysium369.meet.core.ai.GeminiDiagnostic
+    private val aiRepository: com.elysium369.meet.ai.data.AiRepository
 ) : ViewModel() {
 
     private val _aiInsight = MutableStateFlow("ANALIZANDO FLUJO DE DATOS...")
@@ -60,15 +60,51 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Periodic AI Insight Generation based on live data
+        // Periodic AI Insight Generation based on live data using the new unified AiRepository
         viewModelScope.launch {
             obdSession.liveData.collectLatest { data ->
                 if (data.isNotEmpty()) {
                     delay(5000) // Don't spam AI
                     val snapshot = data.entries.joinToString { "${it.key}: ${it.value}" }
                     try {
-                        val insight = gemini.analyzeQuick(snapshot)
-                        _aiInsight.value = insight.uppercase()
+                        val request = com.elysium369.meet.ai.domain.AiRequest(
+                            feature = com.elysium369.meet.ai.domain.AiFeature.LIVE_PID_ANALYSIS,
+                            providerId = "minimax",
+                            model = "MiniMax-M1",
+                            messages = listOf(
+                                com.elysium369.meet.ai.domain.AiMessage(
+                                    com.elysium369.meet.ai.domain.AiRole.USER,
+                                    "Analiza estos datos OBD2 y da una conclusión técnica de MÁXIMO 10 PALABRAS en español: $snapshot"
+                                )
+                            ),
+                            temperature = 0.2,
+                            maxTokens = 50,
+                            context = com.elysium369.meet.ai.domain.AiContext(
+                                vehicle = null,
+                                obd = com.elysium369.meet.ai.domain.ObdContext(
+                                    connected = obdSession.state.value == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+                                    activePidsCount = data.size
+                                ),
+                                dtcs = emptyList(),
+                                livePids = data.map {
+                                    com.elysium369.meet.ai.domain.PidReading(it.key, "", it.value.toString())
+                                },
+                                manualAvailability = null,
+                                appModule = "dashboard_insight",
+                                locale = "es-MX",
+                                userRole = com.elysium369.meet.ai.domain.UserRole.MECHANIC,
+                                safetyMode = true
+                            )
+                        )
+                        val result = aiRepository.complete(request)
+                        result.fold(
+                            onSuccess = { response ->
+                                _aiInsight.value = response.text.trim().replace(".", "").uppercase()
+                            },
+                            onFailure = {
+                                _aiInsight.value = "SISTEMA NOMINAL • SIN ANOMALÍAS"
+                            }
+                        )
                     } catch (e: Exception) {
                         _aiInsight.value = "SISTEMA NOMINAL • SIN ANOMALÍAS"
                     }

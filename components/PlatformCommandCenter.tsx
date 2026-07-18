@@ -4,7 +4,7 @@ import { Activity, BookOpen, Car, ClipboardList, Gauge, Radio, Users, Wrench } f
 type PlatformCommandCenterProps = {
   role?: string;
   adminViewMode?: string;
-  metrics?: Record<string, unknown>;
+  metrics?: any;
   workOrders?: unknown[];
   clients?: unknown[];
   mechanics?: unknown[];

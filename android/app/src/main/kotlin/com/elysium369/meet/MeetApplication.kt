@@ -38,6 +38,9 @@ class MeetApplication : Application(), Configuration.Provider {
         // Initialize custom theme colors
         com.elysium369.meet.ui.theme.MeetColors.initialize(this)
         
+        // Initialize monetization analytics
+        com.elysium369.meet.core.monetization.MonetizationAnalytics.initialize(this)
+        
         // Load DTC JSON if empty
         val dtcLoader = DtcDatabaseLoader(this, db)
         dtcLoader.loadIfEmpty()

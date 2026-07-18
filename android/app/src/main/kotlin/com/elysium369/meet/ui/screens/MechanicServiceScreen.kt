@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.elysium369.meet.core.services.RiskLevel
+import com.elysium369.meet.core.services.ServiceCategory
+import com.elysium369.meet.core.services.ServiceDefinition
+import com.elysium369.meet.core.services.WorkshopServiceCatalog
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
 import com.elysium369.meet.ui.ObdViewModel
@@ -51,7 +56,8 @@ private object MechanicColors {
 fun MechanicServiceScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onPostScanRequested: (vehicleId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMechanicMode by remember { mutableStateOf(false) }
@@ -60,6 +66,16 @@ fun MechanicServiceScreen(
     val vehicles by viewModel.vehicles.collectAsState()
     val isMechanicRegistered by viewModel.isMechanic.collectAsState()
     var showRegistrationScreen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(allRequests) {
+        for (req in allRequests) {
+            val consumed = com.elysium369.meet.core.reports.PostScanPrompt.consume(req.requestId)
+            if (consumed != null) {
+                onPostScanRequested(req.vehicleId)
+                break
+            }
+        }
+    }
 
     var showRatingDialog by remember { mutableStateOf(false) }
     var ratingTargetId by remember { mutableStateOf("") }
@@ -238,6 +254,22 @@ private fun ClientWorkspaceView(
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val activeDtcs by viewModel.activeDtcs.collectAsState()
+    var selectedServiceId by remember {
+        mutableStateOf(
+            WorkshopServiceCatalog.bestServicesForDtcs(activeDtcs).firstOrNull()?.id
+                ?: WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first().id
+        )
+    }
+    val selectedService = WorkshopServiceCatalog.serviceById(selectedServiceId)
+        ?: WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first()
+
+    LaunchedEffect(activeDtcs.joinToString()) {
+        val suggested = WorkshopServiceCatalog.bestServicesForDtcs(activeDtcs).firstOrNull()
+        if (suggested != null && problemText.isBlank()) {
+            selectedServiceId = suggested.id
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.detectCurrentLocation(context)
@@ -284,6 +316,32 @@ private fun ClientWorkspaceView(
                     )
                 }
             }
+        }
+
+        item {
+            WorkshopServiceCatalogPanel(
+                selectedService = selectedService,
+                activeDtcs = activeDtcs,
+                onServiceSelected = { service ->
+                    selectedServiceId = service.id
+                },
+                onUseService = { service ->
+                    selectedServiceId = service.id
+                    problemText = service.name
+                    if (descriptionText.isBlank()) {
+                        descriptionText = buildServiceDescription(service, activeDtcs)
+                    }
+                    priority = when (service.riskLevel) {
+                        RiskLevel.LOW -> "LOW"
+                        RiskLevel.MEDIUM -> "MEDIUM"
+                        RiskLevel.HIGH,
+                        RiskLevel.CRITICAL -> "HIGH"
+                    }
+                    val suggestedPrice = ((service.basePriceMinCrc + service.basePriceMaxCrc) / 2)
+                        .coerceIn(10000, 150000)
+                    priceOfferCrc = suggestedPrice.toFloat()
+                }
+            )
         }
 
         item {
@@ -481,14 +539,17 @@ private fun ClientWorkspaceView(
                             val vehicleId = selectedVehicle?.id ?: "demo_vehicle"
                             viewModel.createServiceRequest(
                                 vehicleId = vehicleId,
-                                problem = problemText,
+                                problem = problemText.ifBlank { selectedService.name },
                                 description = descriptionText,
                                 location = locationName,
                                 priority = priority,
                                 latitude = parsedLat,
                                 longitude = parsedLng,
                                 phone = phone,
-                                priceOffer = priceInDollars.toDouble()
+                                priceOffer = priceInDollars.toDouble(),
+                                serviceId = selectedService.id,
+                                serviceCategory = selectedService.category.name,
+                                dtcCodes = activeDtcs
                             )
                             Toast.makeText(context, "✅ Solicitud enviada a la red de mecánicos", Toast.LENGTH_SHORT).show()
                             problemText = ""
@@ -497,7 +558,7 @@ private fun ClientWorkspaceView(
                         colors = ButtonDefaults.buttonColors(containerColor = MechanicColors.cyanAccent),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = problemText.isNotBlank() && phone.isNotBlank()
+                        enabled = (problemText.isNotBlank() || selectedService.name.isNotBlank()) && phone.isNotBlank()
                     ) {
                         Text(
                             text = "🛠️ ENVIAR SOLICITUD A RED DE MECÁNICOS",
@@ -535,6 +596,288 @@ private fun ClientWorkspaceView(
 }
 
 @Composable
+private fun WorkshopServiceCatalogPanel(
+    selectedService: ServiceDefinition,
+    activeDtcs: List<String>,
+    onServiceSelected: (ServiceDefinition) -> Unit,
+    onUseService: (ServiceDefinition) -> Unit,
+    actionLabel: String = "USAR ESTE SERVICIO EN LA SOLICITUD"
+) {
+    val categories = remember { WorkshopServiceCatalog.categories() }
+    val servicesInCategory = remember(selectedService.category) {
+        WorkshopServiceCatalog.enabledServicesForCategory(selectedService.category)
+    }
+    val dtcSuggestions = remember(activeDtcs) { WorkshopServiceCatalog.bestServicesForDtcs(activeDtcs) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MechanicColors.cardBackground),
+        border = BorderStroke(1.dp, MechanicColors.cyanAccent.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "CATÁLOGO TÉCNICO DE SERVICIOS",
+                        color = MechanicColors.cyanAccent,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = "${WorkshopServiceCatalog.services.size} servicios · ${WorkshopServiceCatalog.providerRoles.size} roles · ${WorkshopServiceCatalog.servicePackages.size} paquetes",
+                        color = MechanicColors.textSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+                Surface(
+                    color = riskColor(selectedService.riskLevel).copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, riskColor(selectedService.riskLevel).copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = selectedService.riskLevel.name,
+                        color = riskColor(selectedService.riskLevel),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            if (activeDtcs.isNotEmpty() && dtcSuggestions.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MechanicColors.cyanAccent.copy(alpha = 0.08f)),
+                    border = BorderStroke(1.dp, MechanicColors.cyanAccent.copy(alpha = 0.25f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "DTC activo: ${activeDtcs.joinToString()}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = dtcSuggestions.take(3).joinToString(" · ") { it.name },
+                            color = MechanicColors.textSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(categories) { category ->
+                    FilterChip(
+                        selected = selectedService.category == category,
+                        onClick = {
+                            WorkshopServiceCatalog.enabledServicesForCategory(category).firstOrNull()?.let(onServiceSelected)
+                        },
+                        label = { Text(category.displayName, fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MechanicColors.cyanAccent,
+                            selectedLabelColor = Color.Black,
+                            labelColor = Color.White,
+                            containerColor = MechanicColors.darkBackground
+                        )
+                    )
+                }
+            }
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(servicesInCategory) { service ->
+                    WorkshopServiceMiniCard(
+                        service = service,
+                        selected = selectedService.id == service.id,
+                        onClick = { onServiceSelected(service) }
+                    )
+                }
+            }
+
+            WorkshopServiceDetailCard(
+                service = selectedService,
+                activeDtcs = activeDtcs,
+                onUseService = { onUseService(selectedService) },
+                actionLabel = actionLabel
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkshopServiceMiniCard(
+    service: ServiceDefinition,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = if (selected) MechanicColors.cyanAccent else MechanicColors.borderSubtle
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MechanicColors.cyanAccent.copy(alpha = 0.10f) else MechanicColors.darkBackground
+        ),
+        border = BorderStroke(1.dp, color.copy(alpha = if (selected) 0.75f else 1f)),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .width(220.dp)
+            .heightIn(min = 116.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = service.name,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                lineHeight = 15.sp
+            )
+            Text(
+                text = "${service.estimatedDurationMin} min · ${formatCrcRange(service)}",
+                color = MechanicColors.greenAccent,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+            Text(
+                text = serviceModeText(service),
+                color = MechanicColors.textSecondary,
+                fontSize = 10.sp,
+                lineHeight = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkshopServiceDetailCard(
+    service: ServiceDefinition,
+    activeDtcs: List<String>,
+    onUseService: () -> Unit,
+    actionLabel: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MechanicColors.darkBackground),
+        border = BorderStroke(1.dp, riskColor(service.riskLevel).copy(alpha = 0.30f)),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = service.name,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 15.sp,
+                lineHeight = 18.sp
+            )
+            Text(
+                text = service.description,
+                color = MechanicColors.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ServiceMetric("Duración", "${service.estimatedDurationMin} min", Modifier.weight(1f))
+                ServiceMetric("Base ref.", formatCrcRange(service), Modifier.weight(1f))
+                ServiceMetric("Riesgo", service.riskLevel.name, Modifier.weight(1f))
+            }
+
+            ServiceFactLine("Herramientas", service.requiredTools.joinToString())
+            ServiceFactLine("Evidencia", service.requiredEvidence.joinToString { evidenceLabel(it.name) })
+            ServiceFactLine("Modalidad", serviceModeText(service))
+
+            if (service.relatedDtcs.isNotEmpty()) {
+                ServiceFactLine("DTCs", service.relatedDtcs.joinToString())
+            } else if (activeDtcs.isNotEmpty()) {
+                ServiceFactLine("DTC activo", activeDtcs.joinToString())
+            }
+
+            if (service.relatedDtcs.contains("P0230")) {
+                Text(
+                    text = WorkshopServiceCatalog.p0230SafetyNote(),
+                    color = MechanicColors.orangeAccent,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+
+            Button(
+                onClick = onUseService,
+                colors = ButtonDefaults.buttonColors(containerColor = MechanicColors.cyanAccent),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = actionLabel,
+                    color = Color.Black,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServiceMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .background(MechanicColors.cardBackground, RoundedCornerShape(6.dp))
+            .padding(8.dp)
+    ) {
+        Text(label, color = MechanicColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black, lineHeight = 13.sp)
+    }
+}
+
+@Composable
+private fun ServiceFactLine(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label.uppercase(Locale.getDefault()), color = MechanicColors.cyanAccent, fontSize = 9.sp, fontWeight = FontWeight.Black)
+        Text(value, color = MechanicColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+    }
+}
+
+private fun buildServiceDescription(service: ServiceDefinition, activeDtcs: List<String>): String = buildString {
+    appendLine(service.description)
+    if (activeDtcs.isNotEmpty()) appendLine("DTCs activos: ${activeDtcs.joinToString()}")
+    appendLine("Herramientas requeridas: ${service.requiredTools.joinToString()}")
+    appendLine("Evidencia requerida: ${service.requiredEvidence.joinToString { evidenceLabel(it.name) }}")
+    appendLine("Modalidad: ${serviceModeText(service)}")
+    if (service.relatedDtcs.contains("P0230")) appendLine(WorkshopServiceCatalog.p0230SafetyNote())
+}.trim()
+
+private fun serviceModeText(service: ServiceDefinition): String {
+    val modes = buildList {
+        if (service.requiresObd) add("OBD")
+        if (service.supportsRemote) add("remoto")
+        if (service.supportsMobileService) add("domicilio")
+        if (service.requiresPhysicalPresence) add("taller/presencial")
+        if (service.requiresVehicleOn) add("vehiculo encendido")
+    }
+    return modes.ifEmpty { listOf("segun proveedor") }.joinToString(" · ")
+}
+
+private fun formatCrcRange(service: ServiceDefinition): String {
+    if (service.basePriceMinCrc == 0 && service.basePriceMaxCrc == 0) return "segun pieza"
+    return "₡%,d-₡%,d".format(Locale.getDefault(), service.basePriceMinCrc, service.basePriceMaxCrc)
+}
+
+private fun evidenceLabel(value: String): String =
+    value.lowercase(Locale.getDefault()).replace('_', ' ')
+
+private fun riskColor(riskLevel: RiskLevel): Color = when (riskLevel) {
+    RiskLevel.LOW -> MechanicColors.greenAccent
+    RiskLevel.MEDIUM -> MechanicColors.cyanAccent
+    RiskLevel.HIGH -> MechanicColors.orangeAccent
+    RiskLevel.CRITICAL -> MechanicColors.redAccent
+}
+
+@Composable
 private fun MechanicWorkspaceView(
     allRequests: List<ServiceRequestEntity>,
     viewModel: ObdViewModel,
@@ -543,6 +886,12 @@ private fun MechanicWorkspaceView(
 ) {
     var mechanicName by remember { mutableStateOf("Mecánica Pro") }
     var mechanicPhone by remember { mutableStateOf("+506 8888 8888") }
+    var providerServiceId by remember {
+        mutableStateOf(WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first().id)
+    }
+    var offeredServiceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val selectedProviderService = WorkshopServiceCatalog.serviceById(providerServiceId)
+        ?: WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first()
 
     val mechanicId = "mechanic_101"
 
@@ -603,6 +952,62 @@ private fun MechanicWorkspaceView(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+            }
+        }
+
+        item {
+            WorkshopServiceCatalogPanel(
+                selectedService = selectedProviderService,
+                activeDtcs = emptyList(),
+                onServiceSelected = { service ->
+                    providerServiceId = service.id
+                },
+                onUseService = { service ->
+                    offeredServiceIds = if (service.id in offeredServiceIds) {
+                        offeredServiceIds - service.id
+                    } else {
+                        offeredServiceIds + service.id
+                    }
+                    val message = if (service.id in offeredServiceIds) {
+                        "Servicio agregado al taller"
+                    } else {
+                        "Servicio removido del taller"
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                },
+                actionLabel = if (selectedProviderService.id in offeredServiceIds) {
+                    "QUITAR SERVICIO OFRECIDO"
+                } else {
+                    "MARCAR COMO SERVICIO OFRECIDO"
+                }
+            )
+        }
+
+        if (offeredServiceIds.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MechanicColors.cardBackground),
+                    border = BorderStroke(1.dp, MechanicColors.greenAccent.copy(alpha = 0.30f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "SERVICIOS OFRECIDOS POR ESTE TALLER",
+                            color = MechanicColors.greenAccent,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = offeredServiceIds
+                                .mapNotNull { WorkshopServiceCatalog.serviceById(it)?.name }
+                                .joinToString(" · "),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
                 }
             }
         }

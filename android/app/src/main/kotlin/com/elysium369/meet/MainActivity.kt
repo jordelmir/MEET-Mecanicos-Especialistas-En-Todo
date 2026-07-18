@@ -317,14 +317,30 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 AiDiagnosticScreen(
                     dtcCode = dtcCode,
                     onBack = { navController.popBackStack() },
-                    viewModel = obdViewModel
+                    viewModel = obdViewModel,
+                    onNavigateToSettings = { navController.navigate("ai_settings") },
+                    onRequestMechanic = { info ->
+                        navController.navigate("mechanic_service?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onRequestPart = { info ->
+                        navController.navigate("part_request?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onOpenComponent3d = { navController.navigate("component_locator") }
                 )
             }
             composable("ai") {
                 AiDiagnosticScreen(
                     dtcCode = "",
                     onBack = { navController.popBackStack() },
-                    viewModel = obdViewModel
+                    viewModel = obdViewModel,
+                    onNavigateToSettings = { navController.navigate("ai_settings") },
+                    onRequestMechanic = { info ->
+                        navController.navigate("mechanic_service?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onRequestPart = { info ->
+                        navController.navigate("part_request?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onOpenComponent3d = { navController.navigate("component_locator") }
                 )
             }
             composable("support_chat") {
@@ -353,6 +369,35 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             composable("reports") {
                 ReportScreen(navController = navController, viewModel = obdViewModel)
             }
+            composable("inspection_session/{vehicleId}") { backStack ->
+                val vehicleId = backStack.arguments?.getString("vehicleId").orEmpty()
+                val vehicles by obdViewModel.vehicles.collectAsState()
+                val vehicle = vehicles.find { it.id == vehicleId }
+                val obdState by obdViewModel.connectionState.collectAsState()
+                
+                InspectionSessionScreen(
+                    vehicleId = vehicleId,
+                    vehicleLabel = vehicle?.let { "${it.year} ${it.make} ${it.model}" } ?: vehicleId,
+                    vehicleVin = vehicle?.vin,
+                    vehicleOdometerKm = null,
+                    obdConnected = obdState == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+                    onClose = { navController.popBackStack() }
+                )
+            }
+            composable("vehicle_history/{vehicleId}") { backStack ->
+                val vehicleId = backStack.arguments?.getString("vehicleId").orEmpty()
+                val vehicles by obdViewModel.vehicles.collectAsState()
+                val vehicle = vehicles.find { it.id == vehicleId }
+                
+                VehicleHistoryScreen(
+                    vehicleId = vehicleId,
+                    vehicleLabel = vehicle?.let { "${it.year} ${it.make} ${it.model}" } ?: vehicleId,
+                    onClose = { navController.popBackStack() },
+                    onOpenReport = { reportId ->
+                        navController.navigate("inspection_session/$vehicleId")
+                    }
+                )
+            }
             composable("oscilloscope") {
                 OscilloscopeScreen(
                     onNavigateBack = { navController.popBackStack() },
@@ -376,6 +421,16 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 SettingsScreen(
                     navController = navController,
                     viewModel = obdViewModel
+                )
+            }
+            composable("ai_settings") {
+                val context = LocalContext.current
+                val keyStore = remember { com.elysium369.meet.ai.data.AiSecureKeyStoreImpl(context) }
+                val registry = remember { com.elysium369.meet.ai.data.AiProviderRegistry(keyStore) }
+                com.elysium369.meet.ai.ui.AiSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    registry = registry,
+                    keyStore = keyStore
                 )
             }
             composable("backup_settings") {
@@ -404,6 +459,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("premium") {
                 PremiumScreen(
+                    viewModel = obdViewModel,
                     onClose = { navController.popBackStack() }
                 )
             }
@@ -413,8 +469,32 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
-            composable("component_locator") {
-                ComponentLocatorScreen(navController = navController, viewModel = obdViewModel)
+            composable(
+                route = "component_locator?partId={partId}",
+                arguments = listOf(navArgument("partId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStack ->
+                ComponentLocatorScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    initialPartId = backStack.arguments?.getString("partId")
+                )
+            }
+            composable(
+                route = "parts_repairs?partId={partId}",
+                arguments = listOf(navArgument("partId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStack ->
+                PartsRepairsCatalogScreen(
+                    navController = navController,
+                    initialPartId = backStack.arguments?.getString("partId")
+                )
             }
             composable("adaptation") {
                 AdaptationScreen(navController = navController, viewModel = obdViewModel)
@@ -603,7 +683,10 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 com.elysium369.meet.ui.screens.MechanicServiceScreen(
                     viewModel = obdViewModel,
                     prefilledVehicleInfo = vehicleInfo,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onPostScanRequested = { vehicleId ->
+                        navController.navigate("inspection_session/$vehicleId")
+                    }
                 )
             }
             composable(

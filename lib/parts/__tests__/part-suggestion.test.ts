@@ -47,6 +47,19 @@ describe('suggestParts — P0230 (the headline scenario)', () => {
     expect(pump?.disclaimer).toContain('presión');
     expect(pump?.disclaimer?.toLowerCase()).toContain('manómetro');
   });
+
+  it('does not invent a fuel-pressure sensor candidate for P0230', () => {
+    expect(
+      suggestions.some((suggestion) =>
+        suggestion.partName.toLowerCase().includes('sensor de presión'),
+      ),
+    ).toBe(false);
+  });
+
+  it('does not justify parts with unsourced frequency or price claims', () => {
+    const rationales = suggestions.map((suggestion) => suggestion.rationale.toLowerCase()).join(' ');
+    expect(rationales).not.toMatch(/commonly|most common|meaningful slice|cheap/);
+  });
 });
 
 describe('suggestParts — other DTCs', () => {
@@ -56,7 +69,7 @@ describe('suggestParts — other DTCs', () => {
       dtcCodes: ['P0420'],
     });
     expect(suggestions.length).toBeGreaterThanOrEqual(2);
-    // The cheap O2 sensor comes first, the catalytic converter is riskPart last.
+    // Circuit/sensor checks come first; the catalytic converter is riskPart last.
     const last = suggestions[suggestions.length - 1];
     expect(last.riskPart).toBe(true);
   });
@@ -68,6 +81,15 @@ describe('suggestParts — other DTCs', () => {
     });
     const first = suggestions[0];
     expect(first.partName.toLowerCase()).toContain('bujía');
+  });
+
+  it('does not suggest a fuel-cap replacement for P0171', () => {
+    const suggestions = suggestParts({ source: 'DTC', dtcCodes: ['P0171'] });
+    expect(
+      suggestions.some((suggestion) =>
+        suggestion.partName.toLowerCase().includes('tapa'),
+      ),
+    ).toBe(false);
   });
 
   it('emits a generic placeholder when the DTC is unknown', () => {

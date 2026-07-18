@@ -171,6 +171,15 @@ export const SERVICE_CATALOG: CatalogSection[] = [
       { name: "Escaneo eléctrico completo", category: ServiceCategory.DIAG, estimatedMinutes: 45 },
     ]
   },
+  {
+    id: "servicios_especiales", icon: "🚗", title: "SERVICIOS ESPECIALES",
+    items: [
+      { name: "Transporte de vehículo a DEKRA — San José", category: ServiceCategory.MANT, estimatedMinutes: 120, basePrice: 30000 },
+      { name: "Transporte de vehículo a DEKRA — Heredia", category: ServiceCategory.MANT, estimatedMinutes: 120, basePrice: 30000 },
+      { name: "Transporte de vehículo a DEKRA — Alajuela", category: ServiceCategory.MANT, estimatedMinutes: 120, basePrice: 30000 },
+      { name: "Transporte de vehículo a DEKRA — Cartago", category: ServiceCategory.MANT, estimatedMinutes: 120, basePrice: 30000 },
+    ]
+  },
 ];
 
 // ─── DEFAULT SERVICES (Quick-access) ────────────────────────────────────────
@@ -181,6 +190,7 @@ export const SERVICES: Service[] = [
   { id: 's4', name: 'Alineación y Balanceo', category: ServiceCategory.MANT, estimatedMinutes: 45, basePrice: 20000, description: 'Alineación 4 ruedas + balanceo' },
   { id: 's5', name: 'Servicio Mayor', category: ServiceCategory.MANT, estimatedMinutes: 240, basePrice: 85000, description: 'Aceite, filtros, bujías, revisión completa' },
   { id: 's6', name: 'Recarga de A/C', category: ServiceCategory.MANT, estimatedMinutes: 45, basePrice: 35000, description: 'Recarga de gas + verificación de fugas' },
+  { id: 's7', name: 'Llevar Vehículo a DEKRA', category: ServiceCategory.MANT, estimatedMinutes: 120, basePrice: 30000, description: 'Transporte + acompañamiento a revisión técnica DEKRA — San José, Heredia, Alajuela, Cartago' },
 ];
 
 // ─── MECHANICS ───────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import {
   CompatibilityContext,
   evaluateCompatibility,
   isCriticalSafetyPart,
+  isValidVin,
 } from '../index';
 
 const baseVehicle = {
@@ -77,6 +78,22 @@ describe('evaluateCompatibility — base rules', () => {
         partName: 'Bobina de encendido',
       }).confidence,
     ).toBe('MEDIUM');
+  });
+
+  it('rejects partial VIN evidence instead of promoting it to EXACT', () => {
+    const result = evaluateCompatibility({
+      vehicle: { vin: 'KMHCN46C18U', oemNumber: '27301-2B100' },
+      partName: 'Bobina de encendido',
+    });
+
+    expect(result.confidence).not.toBe('EXACT');
+    expect(result.warnings.some((warning) => warning.code === 'INVALID_VIN')).toBe(true);
+  });
+
+  it('accepts only structurally valid 17-character VINs', () => {
+    expect(isValidVin('KMHCN46C18U123456')).toBe(true);
+    expect(isValidVin('KMHCN46C18O123456')).toBe(false);
+    expect(isValidVin('KMHCN46C18U12345')).toBe(false);
   });
 
   it('produces MEDIUM for brand+model+year (no OEM) and adds the safety warning for brakes', () => {

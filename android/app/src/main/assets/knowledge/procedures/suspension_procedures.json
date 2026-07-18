@@ -1,0 +1,97 @@
+[
+  {
+    "id": "lower_control_arm",
+    "canonicalNameEs": "Brazo inferior de control / tijereta",
+    "canonicalNameEn": "Lower control arm",
+    "system": "SUSPENSION",
+    "subsystem": "Frente",
+    "aliases": ["tijereta", "tijera", "trapecio", "brazo inferior", "brazo de control", "wishbone", "A-arm"],
+    "description": "Procedimiento de reemplazo del brazo inferior de control para plataforma Hyundai Accent Verna 2005 y similares.",
+    "symptoms": [
+      "Golpes en suspensión en caminos irregulares",
+      "Juego en la rótula inferior",
+      "Volante desalineado"
+    ],
+    "relatedDtcs": [],
+    "requiredTools": [
+      "Gata hidráulica",
+      "Torres de seguridad",
+      "Llaves y dados métricos",
+      "Torquímetro",
+      "Extractor de rótula"
+    ],
+    "safetyLevel": "HIGH",
+    "procedures": [
+      {
+        "id": "change_lower_control_arm_accent_2005",
+        "title": "Reemplazo de Brazo Inferior de Control (Tijereta) - Hyundai Accent Verna 2005",
+        "difficulty": "MEDIUM",
+        "estimatedTimeMinutes": 90,
+        "requiresLift": true,
+        "requiresAlignment": true,
+        "beforeStart": [
+          "Estacione el vehículo en una superficie plana y firme.",
+          "Coloque cuñas de seguridad en las ruedas traseras y active firmemente el freno de mano.",
+          "Afloje levemente las tuercas de seguridad de las llantas delanteras antes de levantar el auto."
+        ],
+        "steps": [
+          "Levante el vehículo utilizando una gata hidráulica desde los puntos de apoyo recomendados.",
+          "Coloque torres de soporte de seguridad en los puntos estructurales del chasis. Nunca trabaje solo con la gata hidráulica.",
+          "Retire completamente las tuercas y la llanta del lado a reparar.",
+          "Aplique líquido penetrante / aflojatodo en los tornillos de fijación del brazo de control, la tuerca de la rótula inferior y la bieleta de la barra estabilizadora.",
+          "Si la bieleta o barra estabilizadora está sujeta al brazo de control, desconéctela retirando su tuerca de fijación.",
+          "Retire el pasador de chaveta (si tiene) y afloje la tuerca castillo de la rótula inferior.",
+          "Use un extractor de rótulas adecuado para separar el vástago cónico de la rótula de la mangueta de dirección. No golpee la rosca directamente con un martillo metálico.",
+          "Retire el tornillo del buje delantero del brazo inferior que conecta al subchasis.",
+          "Retire el tornillo del buje trasero del brazo inferior.",
+          "Retire con cuidado el brazo de control viejo utilizando una palanca para liberarlo si está atascado.",
+          "Compare visualmente el brazo nuevo con el extraído: longitud total, ángulos de inclinación, ubicación y tipo de rótula y diámetro de bujes.",
+          "Presente el brazo nuevo e instale a mano los tornillos de los bujes delantero y trasero para evitar dañar las roscas.",
+          "Introduzca el vástago de la rótula inferior en la mangueta de dirección e instale la tuerca castillo.",
+          "Apriete previamente toda la tornillería sin aplicar el torque final.",
+          "ADVERTENCIA CRÍTICA: Baje el vehículo o use un gato secundario para comprimir la suspensión hasta la altura normal de rodaje antes de aplicar el torque final a los bujes del brazo. Si aprieta los bujes con la suspensión colgando, la goma del buje se retorcerá y se romperá prematuramente al bajar el auto.",
+          "Aplique el torque final especificado por el fabricante utilizando el torquímetro (consulte manual OEM para valores exactos).",
+          "Vuelva a colocar la rueda delantera y apriete las tuercas en patrón de estrella.",
+          "Baje el vehículo completamente y aplique el torque final a las tuercas de la rueda.",
+          "Realice una prueba de carretera a baja velocidad, prestando atención a ruidos extraños, tirones en la dirección o vibración.",
+          "Lleve el vehículo inmediatamente a un centro de alineación automotriz. El reemplazo de componentes de suspensión altera directamente los ángulos de geometría de las ruedas."
+        ],
+        "torqueSpecs": [
+          {
+            "description": "Tuerca de Rótula Inferior a Mangueta",
+            "torqueNm": 65.0
+          },
+          {
+            "description": "Pernos de Buje de Brazo a Subchasis",
+            "torqueNm": 95.0
+          },
+          {
+            "description": "Tuercas de Rueda",
+            "torqueNm": 100.0
+          }
+        ],
+        "commonMistakes": [
+          "Confundir la tijereta de suspensión con componentes de la transmisión como el cable selector de cambios.",
+          "Apretar los pernos de los bujes del brazo de control con la suspensión totalmente extendida (colgando en el elevador).",
+          "No realizar una alineación de dirección obligatoria tras el reemplazo.",
+          "Reutilizar tuercas autoblocantes desgastadas o pasadores de chaveta fatigados."
+        ],
+        "postRepairValidation": [
+          "Verificar que la suspensión no genere golpeteos al circular por superficies irregulares.",
+          "Confirmar que el vehículo ruede recto sin jalar a los lados y que el volante esté perfectamente centrado.",
+          "Realizar inspección visual después de 50 km para confirmar el torque de los tornillos."
+        ],
+        "whenToStopWarning": "Si nota que algún tornillo del subchasis está barrido (rosca dañada) o si los bujes nuevos no calzan exactamente en las orejetas del chasis, DETENGA el trabajo de inmediato. No intente forzar o soldar los componentes estructurales de la suspensión.",
+        "customerExplanation": "El brazo inferior de control (tijereta) mantiene la llanta delantera firme en su posición y absorbe los impactos del camino. Bujes agrietados o una rótula con juego provocan golpeteos y desgaste irregular de llantas, comprometiendo la estabilidad y seguridad del vehículo."
+      }
+    ],
+    "diagnosticRules": [
+      {
+        "symptom": "Golpeteo en baches",
+        "testDescription": "Inspección visual y juego lateral con palanca en bujes",
+        "expectedOutcome": "Goma del buje firme y sin holguras ni grietas profundas",
+        "actionIfFailed": "Reemplazar brazo de control o bujes"
+      }
+    ]
+  }
+]

@@ -35,15 +35,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.core.livelink.LiveLinkAccessCredentials
+import com.elysium369.meet.core.livelink.LiveLinkChatMessage
+import com.elysium369.meet.core.livelink.LiveLinkEvent
+import com.elysium369.meet.core.livelink.LiveLinkPermission
+import com.elysium369.meet.core.livelink.LiveLinkRemoteRequest
+import com.elysium369.meet.core.livelink.LiveLinkReport
 import com.elysium369.meet.core.livelink.LiveLinkServer
+import com.elysium369.meet.core.livelink.LiveLinkSession
+import com.elysium369.meet.core.livelink.LiveLinkTelemetryPacket
+import com.elysium369.meet.core.livelink.LiveLinkRequestStatus
+import com.elysium369.meet.core.livelink.LiveLinkSourceQuality
+import com.elysium369.meet.core.share.QrCodeImage
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -60,6 +73,14 @@ fun LiveLinkScreen(
 
     // Remote PRO State
     val remoteSession by viewModel.liveLinkProSession.collectAsState()
+    val coreSession by viewModel.liveLinkProCoreSession.collectAsState()
+    val credentials by viewModel.liveLinkProCredentials.collectAsState()
+    val permissions by viewModel.liveLinkProPermissions.collectAsState()
+    val events by viewModel.liveLinkProEvents.collectAsState()
+    val requests by viewModel.liveLinkProRequests.collectAsState()
+    val chatMessages by viewModel.liveLinkProMessages.collectAsState()
+    val latestPacket by viewModel.liveLinkProLatestPacket.collectAsState()
+    val report by viewModel.liveLinkProReport.collectAsState()
     val mechanicNotes by viewModel.mechanicNotes.collectAsState()
     val isRunningRemote = remoteSession != null
 
@@ -194,6 +215,14 @@ fun LiveLinkScreen(
             RemoteTelemetryPanel(
                 isRunning = isRunningRemote,
                 session = remoteSession,
+                coreSession = coreSession,
+                credentials = credentials,
+                permissions = permissions,
+                latestPacket = latestPacket,
+                events = events,
+                requests = requests,
+                chatMessages = chatMessages,
+                report = report,
                 notes = mechanicNotes,
                 duration = durationSelected,
                 onDurationChange = { durationSelected = it },
@@ -206,6 +235,27 @@ fun LiveLinkScreen(
                 },
                 onStopSession = {
                     viewModel.stopLiveLinkPro()
+                },
+                onRevokeSession = {
+                    viewModel.revokeLiveLinkPro()
+                },
+                onRequestSnapshot = {
+                    viewModel.requestLiveLinkSnapshot()
+                },
+                onRequestCriticalAudit = {
+                    viewModel.requestLiveLinkClearDtcForAudit()
+                },
+                onApproveRequest = { requestId ->
+                    viewModel.approveLiveLinkRequest(requestId)
+                },
+                onDenyRequest = { requestId ->
+                    viewModel.denyLiveLinkRequest(requestId)
+                },
+                onSendChat = { body ->
+                    viewModel.sendLiveLinkChat(body)
+                },
+                onGenerateReport = {
+                    viewModel.generateLiveLinkReport()
                 },
                 context = context
             )
@@ -369,9 +419,18 @@ private fun WiFiTelemetryPanel(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun RemoteTelemetryPanel(
     isRunning: Boolean,
     session: com.elysium369.meet.data.local.entities.LiveSessionEntity?,
+    coreSession: LiveLinkSession?,
+    credentials: LiveLinkAccessCredentials?,
+    permissions: LiveLinkPermission?,
+    latestPacket: LiveLinkTelemetryPacket?,
+    events: List<LiveLinkEvent>,
+    requests: List<LiveLinkRemoteRequest>,
+    chatMessages: List<LiveLinkChatMessage>,
+    report: LiveLinkReport?,
     notes: List<com.elysium369.meet.data.local.entities.MechanicNoteEntity>,
     duration: Int,
     onDurationChange: (Int) -> Unit,
@@ -381,6 +440,13 @@ private fun RemoteTelemetryPanel(
     onVideoCallChange: (Boolean) -> Unit,
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
+    onRevokeSession: () -> Unit,
+    onRequestSnapshot: () -> Unit,
+    onRequestCriticalAudit: () -> Unit,
+    onApproveRequest: (String) -> Unit,
+    onDenyRequest: (String) -> Unit,
+    onSendChat: (String) -> Unit,
+    onGenerateReport: () -> Unit,
     context: Context
 ) {
     if (!isRunning || session == null) {
@@ -392,11 +458,11 @@ private fun RemoteTelemetryPanel(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("CONFIGURACIÓN DE TELEMEDICINA PRO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("CONFIGURACION LIVE LINK PRO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
 
                 // Duration Selector
                 Column {
-                    Text("Duración de la Sesión", color = MeetColors.textSecondary, fontSize = 12.sp)
+                    Text("Duracion de la sesion", color = MeetColors.textSecondary, fontSize = 12.sp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(15, 30, 60, 120).forEach { mins ->
                             Box(
@@ -409,7 +475,7 @@ private fun RemoteTelemetryPanel(
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("${mins} Min", color = if (duration == mins) MeetColors.cyberCyan else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("${mins}m", color = if (duration == mins) MeetColors.cyberCyan else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -418,12 +484,21 @@ private fun RemoteTelemetryPanel(
                 // Controls
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = readOnly, onCheckedChange = onReadOnlyChange, colors = CheckboxDefaults.colors(checkedColor = MeetColors.cyberCyan))
-                    Text("Acceso de Solo Lectura (Recomendado)", color = Color.White, fontSize = 12.sp)
+                    Text("Solo lectura", color = Color.White, fontSize = 12.sp)
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = videoCall, onCheckedChange = onVideoCallChange, colors = CheckboxDefaults.colors(checkedColor = MeetColors.cyberCyan))
-                    Text("Activar arquitectura de Videollamada (WebRTC)", color = Color.White, fontSize = 12.sp)
+                    Text("Video opcional, audio apagado", color = Color.White, fontSize = 12.sp)
+                }
+
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LiveLinkChip("DTC", true)
+                    LiveLinkChip("PIDs", true)
+                    LiveLinkChip("Chat", true)
+                    LiveLinkChip("VIN parcial", true)
+                    LiveLinkChip("Ubicacion", false)
+                    LiveLinkChip("Control ECU", false)
                 }
 
                 EliteButton(
@@ -436,9 +511,23 @@ private fun RemoteTelemetryPanel(
         }
     } else {
         // Active Session View
+        var nowTick by remember(coreSession?.sessionId) { mutableStateOf(System.currentTimeMillis()) }
+        var chatDraft by remember(session.sessionId) { mutableStateOf("") }
+        LaunchedEffect(coreSession?.sessionId, coreSession?.state) {
+            while (coreSession?.isOpen == true) {
+                delay(1000L)
+                nowTick = System.currentTimeMillis()
+            }
+        }
+
+        val secureShareUrl = credentials?.shareUrl ?: session.shareUrl
+        val sessionState = coreSession?.state?.name ?: session.status
+        val remainingMs = coreSession?.timeRemainingMs(nowTick)
+        val sourceQuality = latestPacket?.sourceQuality ?: LiveLinkSourceQuality.NO_REAL_OBD
+
         Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             EliteCard(
-                glowColor = MeetColors.neonGreen,
+                glowColor = if (sessionState == "REVOKED" || sessionState == "EXPIRED") MeetColors.error else MeetColors.neonGreen,
                 backgroundColor = MeetColors.cardBackground,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -448,7 +537,12 @@ private fun RemoteTelemetryPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("SESIÓN DE DIAGNÓSTICO ACTIVA", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text(
+                        "SESION $sessionState",
+                        color = if (sessionState == "REVOKED" || sessionState == "EXPIRED") MeetColors.error else MeetColors.neonGreen,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 13.sp
+                    )
 
                     // Large Monospace Code Card
                     Box(
@@ -470,45 +564,21 @@ private fun RemoteTelemetryPanel(
                             fontWeight = FontWeight.Black,
                             fontSize = 32.sp,
                             fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp
+                            letterSpacing = 0.sp
                         )
                     }
 
-                    // QR Code Drawing
-                    Box(
-                        modifier = Modifier
-                            .size(150.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
-                            .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Canvas(modifier = Modifier.size(130.dp)) {
-                            // Draw 3 finder patterns in corners
-                            val stroke = 3.dp.toPx()
-                            val cornerSize = 25.dp.toPx()
-                            val innerSize = 9.dp.toPx()
+                    QrCodeImage(
+                        text = secureShareUrl,
+                        modifier = Modifier.size(158.dp),
+                        backgroundColor = Color.White,
+                        qrColor = Color.Black
+                    )
 
-                            drawRect(Color.Black, Offset(0f, 0f), Size(cornerSize, cornerSize), style = Stroke(stroke))
-                            drawRect(Color.Black, Offset(6.dp.toPx(), 6.dp.toPx()), Size(innerSize, innerSize))
-
-                            drawRect(Color.Black, Offset(size.width - cornerSize, 0f), Size(cornerSize, cornerSize), style = Stroke(stroke))
-                            drawRect(Color.Black, Offset(size.width - cornerSize + 6.dp.toPx(), 6.dp.toPx()), Size(innerSize, innerSize))
-
-                            drawRect(Color.Black, Offset(0f, size.height - cornerSize), Size(cornerSize, cornerSize), style = Stroke(stroke))
-                            drawRect(Color.Black, Offset(6.dp.toPx(), size.height - cornerSize + 6.dp.toPx()), Size(innerSize, innerSize))
-
-                            // Draw mock matrix blocks based on session code hash
-                            val random = java.util.Random(session.sessionCode.hashCode().toLong())
-                            for (i in 0..15) {
-                                val rx = random.nextInt(size.width.toInt() - 40) + 20
-                                val ry = random.nextInt(size.height.toInt() - 40) + 20
-                                drawRect(Color.Black, Offset(rx.toFloat(), ry.toFloat()), Size(6.dp.toPx(), 6.dp.toPx()))
-                            }
-                        }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LiveLinkChip(coreSession?.mode?.name ?: "REMOTE", true)
+                        LiveLinkChip("Expira ${remainingMs?.let { formatRemainingMs(it) } ?: "--"}", remainingMs != 0L)
                     }
-
-                    Text("Pide al mecánico escanear este QR o ingresar el código", color = MeetColors.textSecondary, fontSize = 11.sp, textAlign = TextAlign.Center)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -518,7 +588,7 @@ private fun RemoteTelemetryPanel(
                             onClick = {
                                 val shareIntent = android.content.Intent().apply {
                                     action = android.content.Intent.ACTION_SEND
-                                    putExtra(android.content.Intent.EXTRA_TEXT, "Elysium Vanguard LiveLink PRO — Conéctate a mi telemetría: ${session.shareUrl}")
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "Elysium Vanguard LiveLink PRO: $secureShareUrl")
                                     type = "text/plain"
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, "Compartir LiveLink PRO"))
@@ -532,52 +602,284 @@ private fun RemoteTelemetryPanel(
                         }
 
                         Button(
-                            onClick = onStopSession,
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LiveLink PRO", secureShareUrl))
+                                Toast.makeText(context, "Enlace copiado", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.backgroundDeep),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            AnimatedNeonIcon(Icons.Default.ContentCopy, "Copy", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Copiar", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            EliteCard(
+                glowColor = if (sourceQuality == LiveLinkSourceQuality.REAL_OBD) MeetColors.neonGreen else MeetColors.warning,
+                backgroundColor = MeetColors.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("TELEMETRIA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        LiveLinkChip(sourceQuality.name, sourceQuality == LiveLinkSourceQuality.REAL_OBD)
+                    }
+                    Text(
+                        latestPacket?.degradedReason ?: "${latestPacket?.connectionState ?: "OBD"} / ${latestPacket?.adapterQuality ?: "--"}",
+                        color = if (sourceQuality == LiveLinkSourceQuality.REAL_OBD) MeetColors.neonGreen else MeetColors.warning,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
+                    val samples = latestPacket?.samples.orEmpty().take(8)
+                    if (samples.isEmpty()) {
+                        Text("OBD sin enlace real: DTC/chat/reportes siguen disponibles.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                    } else {
+                        samples.chunked(2).forEach { row ->
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { sample ->
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MeetColors.backgroundDeep)
+                                            .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(sample.name.take(18), color = MeetColors.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            sample.value?.let { "${trimLiveLinkNumber(it)} ${sample.unit}".trim() } ?: "--",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(sample.quality.name, color = MeetColors.textMuted, fontSize = 9.sp)
+                                    }
+                                }
+                                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            EliteCard(
+                glowColor = MeetColors.cyberCyan,
+                backgroundColor = MeetColors.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("PERMISOS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LiveLinkChip("OBD", permissions?.canReadObdState == true)
+                        LiveLinkChip("DTC", permissions?.canReadDtc == true)
+                        LiveLinkChip("PIDs", permissions?.canReadLivePids == true)
+                        LiveLinkChip("Chat", permissions?.canUseChat == true)
+                        LiveLinkChip("Video", permissions?.canUseVideo == true)
+                        LiveLinkChip("Audio", permissions?.canUseAudio == true)
+                        LiveLinkChip("Ubicacion exacta", permissions?.canReadExactLocation == true)
+                        LiveLinkChip("VIN completo", permissions?.canSeeFullVin == true)
+                        LiveLinkChip("Clear DTC", permissions?.canClearDtcs == true)
+                    }
+                }
+            }
+
+            EliteCard(
+                glowColor = MeetColors.warning,
+                backgroundColor = MeetColors.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("SOLICITUDES", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("${requests.count { it.status == LiveLinkRequestStatus.PENDING_LOCAL_APPROVAL }} pendientes", color = MeetColors.textSecondary, fontSize = 11.sp)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onRequestSnapshot,
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Snapshot", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = onRequestCriticalAudit,
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.backgroundDeep),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            AnimatedNeonIcon(Icons.Default.Warning, "Audit", tint = MeetColors.warning, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Clear DTC", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                    requests.take(5).forEach { request ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MeetColors.backgroundDeep)
+                                .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
+                                .padding(10.dp)
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(request.type.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                Text(request.status.name, color = if (request.status == LiveLinkRequestStatus.BLOCKED) MeetColors.error else MeetColors.cyberCyan, fontSize = 10.sp)
+                            }
+                            Text(request.reason, color = MeetColors.textSecondary, fontSize = 11.sp)
+                            if (request.status == LiveLinkRequestStatus.PENDING_LOCAL_APPROVAL) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(onClick = { onDenyRequest(request.requestId) }, modifier = Modifier.weight(1f)) {
+                                        Text("Denegar", color = MeetColors.error)
+                                    }
+                                    TextButton(onClick = { onApproveRequest(request.requestId) }, modifier = Modifier.weight(1f)) {
+                                        Text("Aprobar", color = MeetColors.neonGreen)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            EliteCard(
+                glowColor = null,
+                backgroundColor = MeetColors.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("CHAT Y NOTAS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = chatDraft,
+                            onValueChange = { chatDraft = it.take(240) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("Mensaje", color = MeetColors.textMuted) },
+                            textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 13.sp)
+                        )
+                        Button(
+                            onClick = {
+                                onSendChat(chatDraft)
+                                chatDraft = ""
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen)
+                        ) {
+                            Text("Enviar", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    val combinedNotes = chatMessages.take(6)
+                    if (combinedNotes.isEmpty() && notes.isEmpty()) {
+                        Text("Sin mensajes.", color = MeetColors.textMuted, fontSize = 12.sp)
+                    } else {
+                        combinedNotes.forEach { message ->
+                            Text(
+                                "${message.authorRole.name}: ${message.body}",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (combinedNotes.isEmpty()) {
+                            notes.take(3).forEach { note ->
+                                Text(note.content, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+
+            EliteCard(
+                glowColor = MeetColors.electricBlue,
+                backgroundColor = MeetColors.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onGenerateReport,
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Reporte", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = onRevokeSession,
                             colors = ButtonDefaults.buttonColors(containerColor = MeetColors.error),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Revocar", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = onStopSession,
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.backgroundDeep),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Finalizar", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-            }
-
-            // Real-time Notes
-            Text(
-                "RECOMENDACIONES DEL MECÁNICO EN VIVO",
-                color = MeetColors.cyberCyan,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-
-            if (notes.isEmpty()) {
-                EliteCard(
-                    glowColor = null,
-                    backgroundColor = MeetColors.cardBackground,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("Esperando notas del mecánico...", color = MeetColors.textMuted, fontSize = 12.sp)
+                    report?.let {
+                        Text("Hash evidencia: ${it.evidenceHash.take(16)}...", color = MeetColors.cyberCyan, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                     }
-                }
-            } else {
-                notes.forEach { note ->
-                    EliteCard(
-                        glowColor = MeetColors.neonGreen,
-                        backgroundColor = MeetColors.backgroundDeep,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(note.content, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(4.dp))
-                            Text("Enviado: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(note.createdAt))}", color = MeetColors.textMuted, fontSize = 10.sp)
-                        }
+                    Text("EVENTOS", color = MeetColors.textSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    events.take(6).forEach { event ->
+                        Text(
+                            "${formatShortTime(event.createdAtMs)}  ${event.type.name}",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun LiveLinkChip(label: String, enabled: Boolean) {
+    val color = if (enabled) MeetColors.neonGreen else MeetColors.textMuted
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = if (enabled) 0.14f else 0.10f))
+            .border(1.dp, color.copy(alpha = if (enabled) 0.45f else 0.25f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            label,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun formatRemainingMs(value: Long): String {
+    val totalSeconds = value / 1000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "%02d:%02d".format(minutes, seconds)
+}
+
+private fun formatShortTime(value: Long): String {
+    return SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(value))
+}
+
+private fun trimLiveLinkNumber(value: Double): String {
+    return if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(Locale.US, value)
 }

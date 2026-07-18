@@ -94,6 +94,9 @@ supabase/.secrets.*
 __pycache__/
 *.pyc
 
+# --- Generated Knowledge Ingestion Artifacts ---
+build/knowledge/
+
 # --- APK Releases (track only latest) ---
 !releases/*.apk
 

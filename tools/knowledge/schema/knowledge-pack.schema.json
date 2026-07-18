@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meet.local/schemas/knowledge-pack.schema.json",
+  "title": "MEET Automotive Knowledge Pack",
+  "type": "object",
+  "required": [
+    "packId",
+    "title",
+    "domain",
+    "schemaVersion",
+    "packVersion",
+    "sourcePolicy",
+    "disclaimer"
+  ],
+  "properties": {
+    "packId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "domain": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "packVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "language": { "type": "string", "minLength": 2 },
+    "generatedAtEpochMs": { "type": "integer", "minimum": 0 },
+    "sourcePolicy": { "$ref": "#/$defs/sourcePolicy" },
+    "disclaimer": { "type": "string", "minLength": 1 },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "validationRules": { "type": "array", "items": { "$ref": "#/$defs/validationRule" } },
+    "profiles": { "type": "array", "items": { "$ref": "#/$defs/dtcProfile" } },
+    "vehicleProfiles": { "type": "array", "items": { "$ref": "#/$defs/vehicleProfile" } },
+    "sourceCitations": { "type": "array", "items": { "$ref": "#/$defs/sourceCitation" } },
+    "technicalClaims": { "type": "array", "items": { "$ref": "#/$defs/technicalClaim" } },
+    "measurementSpecifications": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/measurementSpecification" }
+    },
+    "knowledgeConflicts": { "type": "array", "items": { "$ref": "#/$defs/knowledgeConflict" } }
+  },
+  "$defs": {
+    "sourcePolicy": {
+      "type": "object",
+      "required": ["tier", "licenseType"],
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": [
+            "A_OWNED_CREATED",
+            "B_PUBLIC_PERMISSIVE",
+            "C_GOVERNMENT_PUBLIC",
+            "D_VERIFIED_MECHANIC",
+            "E_COMMUNITY_VALIDATED",
+            "F_AI_GENERATED_PENDING_REVIEW",
+            "G_EXTERNAL_LINK_ONLY",
+            "H_REJECTED_UNKNOWN_LICENSE"
+          ]
+        },
+        "licenseType": { "type": "string", "minLength": 1 },
+        "attributionRequired": { "type": "boolean" },
+        "commercialUseAllowed": { "type": "boolean" },
+        "redistributionAllowed": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "type": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "sourceTier": { "type": "string" },
+        "validationStatus": { "type": "string" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "from", "to", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      }
+    },
+    "validationRule": {
+      "type": "object",
+      "required": ["id", "rule"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "rule": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dtcProfile": {
+      "type": "object",
+      "required": ["code", "system", "severity", "description"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[PBCU][0-3][0-9A-F]{3}$" },
+        "system": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "rankedCauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "probability"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "probability": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "sourceCitation": {
+      "type": "object",
+      "required": [
+        "sourceId",
+        "sourceAuthority",
+        "title",
+        "contentHash",
+        "licenseStatus",
+        "retrievedAt"
+      ],
+      "properties": {
+        "sourceId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "sourceAuthority": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "publisher": { "type": "string" },
+        "documentIdentifier": { "type": "string" },
+        "edition": { "type": "string" },
+        "publicationDate": { "type": "string" },
+        "pageOrSection": { "type": "string" },
+        "marketScope": { "type": "string" },
+        "vehicleScope": { "type": "string" },
+        "urlOrLocalReference": { "type": "string" },
+        "contentHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "licenseStatus": { "type": "string", "minLength": 1 },
+        "retrievedAt": { "type": "string", "minLength": 1 },
+        "reviewedBy": { "type": "string" },
+        "reviewedAt": { "type": "string" }
+      }
+    },
+    "vehicleProfile": {
+      "type": "object",
+      "required": [
+        "profileId",
+        "make",
+        "models",
+        "yearStart",
+        "yearEnd",
+        "engine",
+        "transmission",
+        "applicability",
+        "confidence"
+      ],
+      "properties": {
+        "profileId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "make": { "type": "string", "minLength": 1 },
+        "models": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "yearStart": { "type": "integer", "minimum": 1886 },
+        "yearEnd": { "type": "integer", "minimum": 1886 },
+        "engine": { "type": "string", "minLength": 1 },
+        "transmission": { "type": "string", "minLength": 1 },
+        "markets": { "type": "array", "items": { "type": "string" } },
+        "applicability": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "string", "minLength": 1 },
+        "sourceCitationIds": { "type": "array", "items": { "type": "string" } },
+        "requiresVinConfirmation": { "type": "boolean" }
+      }
+    },
+    "technicalClaim": {
+      "type": "object",
+      "required": [
+        "claimId",
+        "subjectId",
+        "predicate",
+        "value",
+        "vehicleScopeId",
+        "scopeType",
+        "applicability",
+        "confidence"
+      ],
+      "properties": {
+        "claimId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "subjectId": { "type": "string", "minLength": 1 },
+        "predicate": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 },
+        "vehicleScopeId": { "type": "string", "minLength": 1 },
+        "scopeType": { "type": "string", "minLength": 1 },
+        "applicability": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "string", "minLength": 1 },
+        "sourceCitationId": { "type": ["string", "null"] },
+        "evidenceRequired": { "type": "array", "items": { "type": "string" } },
+        "evidenceIds": { "type": "array", "items": { "type": "string" } },
+        "requiresVinConfirmation": { "type": "boolean" },
+        "requiresOemConfirmation": { "type": "boolean" },
+        "requiresVisualConfirmation": { "type": "boolean" },
+        "referenceVehicle": { "type": ["string", "null"] },
+        "doNotTransferSpecsFromReference": { "type": "boolean" }
+      }
+    },
+    "measurementSpecification": {
+      "type": "object",
+      "required": [
+        "measurementId",
+        "quantityType",
+        "unitCode",
+        "measurementCondition",
+        "requiredInstrument",
+        "tolerance",
+        "verificationStatus"
+      ],
+      "properties": {
+        "measurementId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "quantityType": { "type": "string", "minLength": 1 },
+        "minimumValue": { "type": ["number", "null"] },
+        "nominalValue": { "type": ["number", "null"] },
+        "maximumValue": { "type": ["number", "null"] },
+        "unitCode": { "type": "string" },
+        "measurementCondition": { "type": "string" },
+        "temperatureCondition": { "type": "string" },
+        "engineState": { "type": "string" },
+        "ignitionState": { "type": "string" },
+        "connectorState": { "type": "string" },
+        "measurementPoints": { "type": "array", "items": { "type": "string" } },
+        "requiredInstrument": { "type": "string" },
+        "tolerance": { "type": "string" },
+        "sourceClaimId": { "type": ["string", "null"] },
+        "verificationStatus": { "type": "string", "minLength": 1 }
+      }
+    },
+    "knowledgeConflict": {
+      "type": "object",
+      "required": ["conflictId", "claimIds", "reason", "status"],
+      "properties": {
+        "conflictId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+        "claimIds": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "reason": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "resolution": { "type": "string" }
+      }
+    }
+  }
+}

@@ -45,6 +45,9 @@ import androidx.compose.material.icons.filled.CarRepair
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import com.elysium369.meet.core.parts.PartSuggestionEngine
+import com.elysium369.meet.core.parts.PartSuggestionInput
+import com.elysium369.meet.core.parts.SuggestionSource
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -1708,6 +1711,18 @@ private fun RepairKnowledgePanel(bundle: MechanicalKnowledgeBundle) {
 
 private fun suggestPartNameForDtc(dtcCode: String?, problem: String): String {
     val problemText = problem.lowercase()
+    val dtcSuggestion = dtcCode
+        ?.takeIf { it.isNotBlank() }
+        ?.let { code ->
+            PartSuggestionEngine.suggestParts(
+                PartSuggestionInput(
+                    source = SuggestionSource.DTC,
+                    dtcCodes = listOf(code)
+                )
+            ).firstOrNull { !it.partName.startsWith("Diagnóstico de") }
+        }
+    if (dtcSuggestion != null) return dtcSuggestion.partName
+
     return when {
         dtcCode?.startsWith("P030") == true || problemText.contains("buj") || problemText.contains("misfire") ->
             "Bujía / bobina de encendido compatible"

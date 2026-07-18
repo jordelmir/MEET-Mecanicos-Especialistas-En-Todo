@@ -11,6 +11,9 @@ import com.elysium369.meet.core.vanguard.SupabaseVanguardOutboxDispatcher
 import com.elysium369.meet.core.vanguard.VanguardOutboxDispatcher
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
+import com.elysium369.meet.core.reports.ReportVerifier
+import com.elysium369.meet.data.local.CertifiedReportRepository
+import io.github.jan.supabase.postgrest.postgrest
 
 import dagger.Module
 import dagger.Provides
@@ -2901,6 +2904,143 @@ object AppModule {
         }
     }
 
+    /**
+     * V2 Certified Reports — adds the 5 tables introduced for the
+     * Reports PDF Certificados + Vehicle Technical History round.
+     *
+     * Mirrors the Postgres schema in
+     *   supabase/migrations/20260704000000_reports_foundations.sql
+     *   supabase/migrations/20260705000000_reports_sync_and_evidence_extend.sql
+     *
+     * Indexes + FKs are created with `IF NOT EXISTS` so re-running the
+     * migration on a partially-upgraded device is safe.
+     */
+    private val MIGRATION_41_42 = object : Migration(41, 42) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            android.util.Log.i("ElysiumDB", "Migration 41→42: Certified Reports V2 (certified_reports, report_evidence, repair_actions, report_signatures, diagnostic_snapshots)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `certified_reports` (
+                  `reportId` TEXT NOT NULL,
+                  `vehicleId` TEXT NOT NULL,
+                  `userId` TEXT NOT NULL,
+                  `reportType` TEXT NOT NULL,
+                  `title` TEXT NOT NULL,
+                  `status` TEXT NOT NULL,
+                  `odometerKm` INTEGER,
+                  `vin` TEXT,
+                  `plate` TEXT,
+                  `generatedAt` INTEGER NOT NULL,
+                  `signedAt` INTEGER,
+                  `pdfUri` TEXT,
+                  `qrVerificationUrl` TEXT,
+                  `integrityHash` TEXT NOT NULL,
+                  `previousHash` TEXT,
+                  `createdAt` INTEGER NOT NULL,
+                  `updatedAt` INTEGER NOT NULL,
+                  PRIMARY KEY(`reportId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_vehicleId_generatedAt` ON `certified_reports` (`vehicleId`, `generatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_userId_generatedAt` ON `certified_reports` (`userId`, `generatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_vehicleId_integrityHash` ON `certified_reports` (`vehicleId`, `integrityHash`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_status` ON `certified_reports` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_certified_reports_reportType` ON `certified_reports` (`reportType`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `report_evidence` (
+                  `evidenceId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `evidenceType` TEXT NOT NULL,
+                  `label` TEXT NOT NULL,
+                  `description` TEXT NOT NULL,
+                  `uri` TEXT NOT NULL,
+                  `hash` TEXT,
+                  `capturedAt` INTEGER NOT NULL,
+                  `lat` REAL,
+                  `lng` REAL,
+                  PRIMARY KEY(`evidenceId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_evidence_reportId_capturedAt` ON `report_evidence` (`reportId`, `capturedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_evidence_evidenceType` ON `report_evidence` (`evidenceType`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `repair_actions` (
+                  `actionId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `actionType` TEXT NOT NULL,
+                  `component` TEXT NOT NULL,
+                  `dtcRelated` TEXT,
+                  `description` TEXT NOT NULL,
+                  `partUsed` TEXT,
+                  `supplier` TEXT,
+                  `mechanic` TEXT,
+                  `cost` REAL,
+                  `currency` TEXT NOT NULL,
+                  `warrantyDays` INTEGER,
+                  `createdAt` INTEGER NOT NULL,
+                  PRIMARY KEY(`actionId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_reportId` ON `repair_actions` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_dtcRelated` ON `repair_actions` (`dtcRelated`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_repair_actions_supplier` ON `repair_actions` (`supplier`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `report_signatures` (
+                  `signatureId` TEXT NOT NULL,
+                  `reportId` TEXT NOT NULL,
+                  `signerName` TEXT NOT NULL,
+                  `signerRole` TEXT NOT NULL,
+                  `signatureImageUri` TEXT NOT NULL,
+                  `signedAt` INTEGER NOT NULL,
+                  `deviceIdHash` TEXT NOT NULL,
+                  `integrityHash` TEXT NOT NULL,
+                  PRIMARY KEY(`signatureId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_report_signatures_reportId` ON `report_signatures` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_report_signatures_signerName` ON `report_signatures` (`signerName`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `diagnostic_snapshots` (
+                  `snapshotId` TEXT NOT NULL,
+                  `vehicleId` TEXT NOT NULL,
+                  `sessionId` TEXT,
+                  `createdAtMs` INTEGER NOT NULL,
+                  `dtcsActiveJson` TEXT NOT NULL,
+                  `dtcsPendingJson` TEXT NOT NULL,
+                  `dtcsPermanentJson` TEXT NOT NULL,
+                  `freezeFramePidValuesJson` TEXT NOT NULL,
+                  `livePidsJson` TEXT NOT NULL,
+                  `readinessJson` TEXT NOT NULL,
+                  `ecuVoltage` REAL,
+                  `rpm` REAL,
+                  `coolantTempC` REAL,
+                  `speedKph` REAL,
+                  `engineLoadPct` REAL,
+                  `fuelTrimStft` REAL,
+                  `fuelTrimLtft` REAL,
+                  `rawFramesJson` TEXT NOT NULL,
+                  `notes` TEXT NOT NULL,
+                  `liveFromAdapter` INTEGER NOT NULL,
+                  `provenanceLabel` TEXT NOT NULL,
+                  `hashSha256` TEXT NOT NULL,
+                  `reportId` TEXT,
+                  PRIMARY KEY(`snapshotId`),
+                  FOREIGN KEY(`reportId`) REFERENCES `certified_reports`(`reportId`) ON UPDATE NO ACTION ON DELETE SET NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_vehicleId_createdAtMs` ON `diagnostic_snapshots` (`vehicleId`, `createdAtMs`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_reportId` ON `diagnostic_snapshots` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_diagnostic_snapshots_hashSha256` ON `diagnostic_snapshots` (`hashSha256`)")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -2929,7 +3069,8 @@ object AppModule {
             MIGRATION_37_38,
             MIGRATION_38_39,
             MIGRATION_39_40,
-            MIGRATION_40_41
+            MIGRATION_40_41,
+            MIGRATION_41_42
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3026,8 +3167,26 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGeminiDiagnostic(): GeminiDiagnostic {
-        return GeminiDiagnostic()
+    fun provideGeminiDiagnostic(
+        aiRepository: com.elysium369.meet.ai.data.AiRepository
+    ): GeminiDiagnostic {
+        return GeminiDiagnostic(aiRepository = aiRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAiSecureKeyStore(@ApplicationContext context: Context): com.elysium369.meet.ai.data.AiSecureKeyStore {
+        return com.elysium369.meet.ai.data.AiSecureKeyStoreImpl(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAiRepository(
+        registry: com.elysium369.meet.ai.data.AiProviderRegistry,
+        usageTracker: com.elysium369.meet.ai.data.AiUsageTracker,
+        promptStore: com.elysium369.meet.ai.data.AiPromptStore
+    ): com.elysium369.meet.ai.data.AiRepository {
+        return com.elysium369.meet.ai.data.AiRepositoryImpl(registry, usageTracker, promptStore)
     }
 
     @Provides
@@ -3100,8 +3259,57 @@ object AppModule {
     fun provideVanguardCommerceDao(db: MeetDatabase): VanguardCommerceDao = db.vanguardCommerceDao()
 
     @Provides
+    fun provideCertifiedReportDao(db: MeetDatabase): CertifiedReportDao = db.certifiedReportDao()
+
+    @Provides
+    fun provideReportEvidenceDao(db: MeetDatabase): ReportEvidenceDao = db.reportEvidenceDao()
+
+    @Provides
+    fun provideRepairActionDao(db: MeetDatabase): RepairActionDao = db.repairActionDao()
+
+    @Provides
+    fun provideReportSignatureDao(db: MeetDatabase): ReportSignatureDao = db.reportSignatureDao()
+
+    @Provides
+    fun provideDiagnosticSnapshotDao(db: MeetDatabase): DiagnosticSnapshotDao = db.diagnosticSnapshotDao()
+
+    @Provides
     @Singleton
     fun provideVanguardOutboxDispatcher(
         dispatcher: SupabaseVanguardOutboxDispatcher
     ): VanguardOutboxDispatcher = dispatcher
+
+    @Provides
+    @Singleton
+    fun provideReportVerifier(
+        repo: CertifiedReportRepository,
+        supabase: io.github.jan.supabase.SupabaseClient
+    ): ReportVerifier {
+        return ReportVerifier(
+            reportRepo = repo,
+            remoteProbe = { payload ->
+                runCatching {
+                    supabase.postgrest["certified_reports"]
+                        .select { filter { eq("reportId", payload.reportId) } }
+                        .decodeSingleOrNull<RemoteReportRow>()
+                        ?.integrityHash
+                        ?.equals(payload.integrityHash, ignoreCase = true)
+                }.getOrNull()
+            }
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideProcedureKnowledgeBase(
+        @ApplicationContext context: Context
+    ): com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase {
+        return com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase(context)
+    }
 }
+
+@kotlinx.serialization.Serializable
+data class RemoteReportRow(
+    val reportId: String,
+    val integrityHash: String
+)

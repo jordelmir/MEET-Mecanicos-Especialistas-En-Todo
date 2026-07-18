@@ -567,8 +567,8 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 pickupLng = gps.longitude,
                                 pickupAddr = safePickupAddress,
                                 pickupAcc = gps.accuracy,
-                                destLat = if (destLatitude != 0.0) destLatitude else currentGps!!.latitude + 0.05,
-                                destLng = if (destLongitude != 0.0) destLongitude else currentGps!!.longitude + 0.05,
+                                destLat = destLatitude,
+                                destLng = destLongitude,
                                 destAddr = destAddress,
                                 priceOffer = if (isUsd) offerPrice / 500.0 else offerPrice,
                                 currency = if (isUsd) "USD" else "CRC",
@@ -1675,11 +1675,10 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
 /**
  * Sanitiza un `addressName` para que no filtre lat/lon cuando el geocoder falló.
  *
- * Caso concreto: cuando `Geocoder.getFromLocation` devuelve null o lanza SecurityException,
- * `ObdViewModel.resolveLocationDetails` setea `addressName = "Ubicación GPS (lat, lng)"`.
- * Si eso se persiste en una Room row o se envía al backend, las coords exactas quedan
- * expuestas en un canal que no debería tenerlas (las coordenadas ya están en
- * `pickupLat`/`pickupLng` como columnas dedicadas y firmadas con consent).
+ * Defensa en profundidad: builds anteriores podian guardar
+ * `addressName = "Ubicación GPS (lat, lng)"` cuando fallaba el geocoder.
+ * Si eso se persiste en una Room row o se envía al backend, las coords exactas
+ * quedan expuestas en un canal que no debería tenerlas.
  *
  * Detecta el patrón "Ubicación GPS (<number>, <number>)" y lo reemplaza por un label
  * genérico. Si no coincide el patrón, devuelve la entrada sin modificar.

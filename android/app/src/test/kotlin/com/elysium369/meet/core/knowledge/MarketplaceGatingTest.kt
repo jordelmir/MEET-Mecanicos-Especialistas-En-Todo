@@ -30,7 +30,7 @@ class MarketplaceGatingTest {
         val offer = MarketplaceGating.pumpOfferExample("P0230", "Hyundai Accent 2005")
         val result = MarketplaceGating().gate(
             listOf(offer),
-            listOf("battery_check", "fuse_check", "relay_check", "wiring_check", "pump_voltage_check")
+            offer.requiredTests
         )
         assertTrue(result.offers.contains(offer))
         assertFalse(result.blockedOffers.contains(offer))

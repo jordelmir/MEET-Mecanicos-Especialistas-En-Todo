@@ -1,0 +1,52 @@
+[
+  {
+    "id": "lower_control_arm",
+    "canonicalNameEs": "Brazo inferior de control / tijereta",
+    "canonicalNameEn": "Lower control arm",
+    "system": "SUSPENSION",
+    "subsystem": "Frente",
+    "aliases": ["tijereta", "tijera", "trapecio", "brazo inferior", "brazo de control", "wishbone", "A-arm"],
+    "description": "Componente estructural de la suspensión delantera que conecta el subchasis con la mangueta de la rueda, permitiendo el movimiento vertical articulado y alojando los bujes y la rótula inferior.",
+    "symptoms": [
+      "Golpeteo seco al pasar baches o irregularidades",
+      "Juego en la rueda al realizar inspección física",
+      "Desviación del vehículo hacia un lado durante la marcha",
+      "Desgaste irregular o prematuro de la banda de rodadura de los neumáticos"
+    ],
+    "relatedDtcs": [],
+    "requiredTools": [
+      "Gata hidráulica",
+      "Torres de soporte de seguridad",
+      "Cuñas para neumáticos",
+      "Extractor/Separador de rótulas",
+      "Llaves y dados métricos (12mm a 22mm)",
+      "Barra de fuerza o palanca larga",
+      "Torquímetro calibrado",
+      "Aflojatodo / Líquido penetrante"
+    ],
+    "safetyLevel": "HIGH",
+    "procedures": []
+  },
+  {
+    "id": "steering_knuckle",
+    "canonicalNameEs": "Mangueta de dirección / muñón",
+    "canonicalNameEn": "Steering knuckle",
+    "system": "STEERING",
+    "subsystem": "Frente",
+    "aliases": ["muñón", "mango", "porta masa", "knuckle"],
+    "description": "Punto de pivotaje de la suspensión y dirección delantera donde se montan la masa de la rueda, pinza de freno, terminales de dirección y amortiguador.",
+    "symptoms": [
+      "Alineación imposible de centrar",
+      "Vibración severa en el volante",
+      "Ruidos metálicos al girar la dirección"
+    ],
+    "relatedDtcs": [],
+    "requiredTools": [
+      "Extractor de terminales",
+      "Dados métricos grandes",
+      "Prensa de rótulas"
+    ],
+    "safetyLevel": "HIGH",
+    "procedures": []
+  }
+]

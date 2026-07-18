@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.obd.*
 import com.elysium369.meet.core.monetization.MonetizationPolicy
+import com.elysium369.meet.core.monetization.FeatureKey
 import com.elysium369.meet.data.supabase.SubscriptionRepository
 import io.github.jan.supabase.gotrue.auth
 import com.elysium369.meet.data.supabase.Vehicle
@@ -18,6 +19,8 @@ import com.elysium369.meet.data.local.dao.*
 import com.elysium369.meet.data.local.entities.*
 import com.elysium369.meet.core.twin.VehicleTwinEngine
 import com.elysium369.meet.core.blackbox.EvidenceCompiler
+import com.elysium369.meet.core.parts.PartsMarketplaceContract
+import com.elysium369.meet.core.services.WorkshopServiceCatalog
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import com.elysium369.meet.data.local.dao.TripDao
@@ -50,8 +53,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.elysium369.meet.core.sync.SyncWorker
-import com.elysium369.meet.core.livelink.LiveLinkServer
-import com.elysium369.meet.core.livelink.TelemetrySnapshot
+import com.elysium369.meet.core.livelink.*
 import com.elysium369.meet.core.vanguard.VanguardOutboxSyncWorker
 import com.elysium369.meet.ui.screens.TerminalLine
 import com.elysium369.meet.ui.screens.TerminalLineType
@@ -87,56 +89,86 @@ private data class RemotePartsStore(
 @Serializable
 private data class RemotePartRequest(
     val requestId: String,
-    val serviceRequestId: String?,
-    val vehicleId: String,
-    val dtcCode: String?,
-    val partName: String,
-    val partNumber: String?,
-    val quantity: Int,
-    val oemPreference: String,
-    val deliveryLocation: String,
-    val urgencyMinutes: Int,
-    val customerNotes: String,
-    val status: String,
-    val acceptedOfferId: String?,
-    val createdAt: Long,
-    val customer_id: String
+    val serviceRequestId: String? = null,
+    val vehicleId: String = "",
+    val dtcCode: String? = null,
+    val partName: String = "",
+    val partNumber: String? = null,
+    val quantity: Int = 1,
+    val oemPreference: String = "ANY",
+    val deliveryLocation: String = "",
+    val urgencyMinutes: Int = 60,
+    val customerNotes: String = "",
+    val status: String = "OPEN",
+    val acceptedOfferId: String? = null,
+    val createdAt: Long = 0L,
+    val customer_id: String? = null,
+    val statusV2: String? = null,
+    val sourceContext: String? = null,
+    val dtcCodes: List<String> = emptyList(),
+    val category: String? = null,
+    val preference: String? = null,
+    val position: String? = null,
+    val oemNumber: String? = null,
+    val photoUrls: List<String> = emptyList(),
+    val notes: String? = null,
+    val deliveryAddress: String? = null,
+    val locationLat: Double? = null,
+    val locationLng: Double? = null,
+    val urgencyLevel: String? = null,
+    val vin: String? = null
 ) {
     fun toLocal() = PartRequestEntity(
         requestId = requestId,
         serviceRequestId = serviceRequestId,
         vehicleId = vehicleId,
-        dtcCode = dtcCode,
+        dtcCode = dtcCode ?: dtcCodes.firstOrNull(),
         partName = partName,
-        partNumber = partNumber,
+        partNumber = partNumber ?: oemNumber,
         quantity = quantity,
-        oemPreference = oemPreference,
-        deliveryLocation = deliveryLocation,
+        oemPreference = PartsMarketplaceContract.preferenceToLegacy(preference ?: oemPreference),
+        deliveryLocation = deliveryAddress?.takeIf { it.isNotBlank() } ?: deliveryLocation,
         urgencyMinutes = urgencyMinutes,
-        customerNotes = customerNotes,
-        status = status,
+        customerNotes = notes?.takeIf { it.isNotBlank() } ?: customerNotes,
+        status = PartsMarketplaceContract.requestStatusToLegacy(statusV2 ?: status),
         acceptedOfferId = acceptedOfferId,
-        createdAt = createdAt
+        createdAt = createdAt,
+        partPosition = PartsMarketplaceContract.positionToLegacy(position),
+        latitude = locationLat ?: 0.0,
+        longitude = locationLng ?: 0.0
     )
 }
 
 @Serializable
 private data class RemotePartOffer(
     val offerId: String,
-    val partRequestId: String,
-    val storeId: String,
-    val storeName: String,
-    val brand: String,
-    val partNumber: String,
-    val condition: String,
-    val price: Double,
-    val deliveryFee: Double,
-    val etaMinutes: Int,
-    val warrantyDays: Int,
-    val message: String,
-    val status: String,
-    val createdAt: Long,
-    val store_owner_id: String
+    val partRequestId: String = "",
+    val storeId: String = "",
+    val storeName: String = "",
+    val brand: String = "",
+    val partNumber: String = "",
+    val condition: String = "NEW",
+    val price: Double = 0.0,
+    val deliveryFee: Double = 0.0,
+    val etaMinutes: Int = 0,
+    val warrantyDays: Int = 0,
+    val message: String = "",
+    val status: String = "PENDING",
+    val createdAt: Long = 0L,
+    val store_owner_id: String? = null,
+    val supplierQuoteId: String? = null,
+    val oemNumber: String? = null,
+    val currency: String = "CRC",
+    val availability: String? = null,
+    val estimatedDeliveryHours: Int? = null,
+    val includesDelivery: Boolean? = null,
+    val compatibilityConfidence: String? = null,
+    val compatibilityNotes: String? = null,
+    val photoUrls: List<String> = emptyList(),
+    val statusV2: String? = null,
+    val conditionDetail: String? = null,
+    val quoteVersion: Int? = null,
+    val expiresAt: Long? = null
 ) {
     fun toLocal() = PartOfferEntity(
         offerId = offerId,
@@ -144,14 +176,14 @@ private data class RemotePartOffer(
         storeId = storeId,
         storeName = storeName,
         brand = brand,
-        partNumber = partNumber,
-        condition = condition,
+        partNumber = partNumber.ifBlank { oemNumber ?: "Por confirmar" },
+        condition = PartsMarketplaceContract.conditionToLegacy(conditionDetail ?: condition),
         price = price,
         deliveryFee = deliveryFee,
-        etaMinutes = etaMinutes,
+        etaMinutes = etaMinutes.takeIf { it > 0 } ?: ((estimatedDeliveryHours ?: 1) * 60),
         warrantyDays = warrantyDays,
-        message = message,
-        status = status,
+        message = message.ifBlank { compatibilityNotes.orEmpty() },
+        status = PartsMarketplaceContract.quoteStatusToLegacy(statusV2 ?: status),
         createdAt = createdAt
     )
 }
@@ -171,7 +203,26 @@ private fun PartRequestEntity.toRemote(customerId: String) = RemotePartRequest(
     status = status,
     acceptedOfferId = acceptedOfferId,
     createdAt = createdAt,
-    customer_id = customerId
+    customer_id = customerId,
+    statusV2 = PartsMarketplaceContract.requestStatusToV2(status),
+    sourceContext = when {
+        !dtcCode.isNullOrBlank() -> "FROM_DTC"
+        !serviceRequestId.isNullOrBlank() -> "FROM_MECHANIC_WORK_ORDER"
+        else -> "MANUAL"
+    },
+    dtcCodes = listOfNotNull(dtcCode?.takeIf { it.isNotBlank() }),
+    preference = PartsMarketplaceContract.preferenceToV2(oemPreference),
+    position = PartsMarketplaceContract.positionToV2(partPosition),
+    oemNumber = partNumber?.takeIf { oemPreference.equals("OEM", ignoreCase = true) },
+    notes = customerNotes,
+    deliveryAddress = deliveryLocation,
+    locationLat = latitude.takeUnless { it == 0.0 },
+    locationLng = longitude.takeUnless { it == 0.0 },
+    urgencyLevel = when {
+        urgencyMinutes <= 30 -> "URGENT"
+        urgencyMinutes >= 180 -> "LOW"
+        else -> "NORMAL"
+    }
 )
 
 private fun PartsStoreEntity.toRemote(ownerId: String) = RemotePartsStore(
@@ -187,7 +238,11 @@ private fun PartsStoreEntity.toRemote(ownerId: String) = RemotePartsStore(
     owner_id = ownerId
 )
 
-private fun PartOfferEntity.toRemote(ownerId: String) = RemotePartOffer(
+private fun PartOfferEntity.toRemote(
+    ownerId: String,
+    compatibilityConfidence: String = "UNKNOWN",
+    compatibilityNotes: String = ""
+) = RemotePartOffer(
     offerId = offerId,
     partRequestId = partRequestId,
     storeId = storeId,
@@ -202,7 +257,22 @@ private fun PartOfferEntity.toRemote(ownerId: String) = RemotePartOffer(
     message = message,
     status = status,
     createdAt = createdAt,
-    store_owner_id = ownerId
+    store_owner_id = ownerId,
+    supplierQuoteId = offerId,
+    currency = "CRC",
+    availability = when {
+        etaMinutes <= 120 -> "SAME_DAY"
+        etaMinutes <= 24 * 60 -> "NEXT_DAY"
+        else -> "IMPORT_REQUIRED"
+    },
+    estimatedDeliveryHours = ((etaMinutes + 59) / 60).coerceAtLeast(1),
+    includesDelivery = deliveryFee <= 0.0,
+    compatibilityConfidence = compatibilityConfidence,
+    compatibilityNotes = compatibilityNotes,
+    statusV2 = PartsMarketplaceContract.quoteStatusToV2(status),
+    conditionDetail = PartsMarketplaceContract.conditionToV2(condition),
+    quoteVersion = 1,
+    expiresAt = createdAt + 24L * 60L * 60L * 1000L
 )
 
 @HiltViewModel
@@ -256,7 +326,11 @@ class ObdViewModel @Inject constructor(
     private val towTruckDao: TowTruckDao,
     private val ratingDao: RatingDao,
     private val providerProfileDao: ProviderProfileDao,
-    private val rideDao: com.elysium369.meet.data.local.dao.RideDao
+    private val rideDao: com.elysium369.meet.data.local.dao.RideDao,
+    val entitlementManager: com.elysium369.meet.core.monetization.EntitlementManager,
+    val adGateManager: com.elysium369.meet.core.monetization.AdGateManager,
+    val usageMeter: com.elysium369.meet.core.monetization.UsageMeter,
+    private val aiRepository: com.elysium369.meet.ai.data.AiRepository
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
@@ -267,6 +341,7 @@ class ObdViewModel @Inject constructor(
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
+    val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
 
     // --- UDS Protocol Manager (lazy, uses existing obdSession) ---
     private val udsProtocolManager by lazy {
@@ -364,8 +439,36 @@ class ObdViewModel @Inject constructor(
     val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
 
     // ── LiveLink PRO remote session state ──
+    private val liveLinkProEngine = LiveLinkSessionEngine()
+
     private val _liveLinkProSession = MutableStateFlow<LiveSessionEntity?>(null)
     val liveLinkProSession: StateFlow<LiveSessionEntity?> = _liveLinkProSession.asStateFlow()
+
+    private val _liveLinkProCoreSession = MutableStateFlow<LiveLinkSession?>(null)
+    val liveLinkProCoreSession: StateFlow<LiveLinkSession?> = _liveLinkProCoreSession.asStateFlow()
+
+    private val _liveLinkProCredentials = MutableStateFlow<LiveLinkAccessCredentials?>(null)
+    val liveLinkProCredentials: StateFlow<LiveLinkAccessCredentials?> = _liveLinkProCredentials.asStateFlow()
+
+    private val _liveLinkProPermissions = MutableStateFlow<LiveLinkPermission?>(null)
+    val liveLinkProPermissions: StateFlow<LiveLinkPermission?> = _liveLinkProPermissions.asStateFlow()
+
+    private val _liveLinkProEvents = MutableStateFlow<List<LiveLinkEvent>>(emptyList())
+    val liveLinkProEvents: StateFlow<List<LiveLinkEvent>> = _liveLinkProEvents.asStateFlow()
+
+    private val _liveLinkProRequests = MutableStateFlow<List<LiveLinkRemoteRequest>>(emptyList())
+    val liveLinkProRequests: StateFlow<List<LiveLinkRemoteRequest>> = _liveLinkProRequests.asStateFlow()
+
+    private val _liveLinkProMessages = MutableStateFlow<List<LiveLinkChatMessage>>(emptyList())
+    val liveLinkProMessages: StateFlow<List<LiveLinkChatMessage>> = _liveLinkProMessages.asStateFlow()
+
+    private val _liveLinkProLatestPacket = MutableStateFlow<LiveLinkTelemetryPacket?>(null)
+    val liveLinkProLatestPacket: StateFlow<LiveLinkTelemetryPacket?> = _liveLinkProLatestPacket.asStateFlow()
+
+    private val _liveLinkProReport = MutableStateFlow<LiveLinkReport?>(null)
+    val liveLinkProReport: StateFlow<LiveLinkReport?> = _liveLinkProReport.asStateFlow()
+
+    private val liveLinkProPackets = mutableListOf<LiveLinkTelemetryPacket>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val mechanicNotes: StateFlow<List<MechanicNoteEntity>> = _liveLinkProSession
@@ -378,37 +481,70 @@ class ObdViewModel @Inject constructor(
 
     fun startLiveLinkPro(durationMinutes: Int, readOnly: Boolean, videoCall: Boolean) {
         val vehicle = selectedVehicle.value ?: return
-        val sessionCode = (100000..999999).random().toString()
-        val sessionId = UUID.randomUUID().toString()
         val ownerId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: "anonymous"
+        val envelope = liveLinkProEngine.createSession(
+            CreateLiveLinkSessionInput(
+                ownerUserId = ownerId,
+                vehicleId = vehicle.id,
+                mode = if (readOnly) LiveLinkMode.REMOTE_READ_ONLY else LiveLinkMode.REMOTE_ASSISTED,
+                title = "${vehicle.year} ${vehicle.make} ${vehicle.model}".trim(),
+                durationMinutes = durationMinutes,
+                readOnly = readOnly,
+                allowVideo = videoCall,
+                allowAudio = false,
+                allowCamera = false,
+                allowLocation = false,
+                allowVehicleHistory = false,
+                allowReports = true,
+                allowDtc = true,
+                allowLivePids = true,
+            )
+        )
+        val coreSession = envelope.session
+        val publicSessionUrl = "https://meet.elysium369.com/livelink?session_id=${coreSession.sessionId}"
         val session = LiveSessionEntity(
-            sessionId = sessionId,
+            sessionId = coreSession.sessionId,
             vehicleId = vehicle.id,
             ownerId = ownerId,
             mechanicId = null,
-            status = "ACTIVE",
-            startedAt = System.currentTimeMillis(),
+            status = coreSession.state.name,
+            startedAt = coreSession.startedAtMs ?: coreSession.createdAtMs,
             endedAt = null,
-            permissions = if (readOnly) "READ_ONLY" else "FULL",
-            sessionCode = sessionCode,
-            shareUrl = "https://meet.elysium369.com/livelink/$sessionCode",
+            permissions = Json.encodeToString(envelope.permissions),
+            sessionCode = envelope.credentials.displayCode,
+            shareUrl = publicSessionUrl,
             durationMinutes = durationMinutes,
-            videoCallUrl = if (videoCall) "https://meet.elysium369.com/call/$sessionId" else null
+            videoCallUrl = if (videoCall) "https://meet.elysium369.com/call/${coreSession.sessionId}" else null
         )
+
+        _liveLinkProCoreSession.value = coreSession
+        _liveLinkProCredentials.value = envelope.credentials
+        _liveLinkProPermissions.value = envelope.permissions
+        _liveLinkProEvents.value = listOf(envelope.createdEvent)
+        _liveLinkProRequests.value = emptyList()
+        _liveLinkProMessages.value = emptyList()
+        _liveLinkProLatestPacket.value = null
+        _liveLinkProReport.value = null
+        liveLinkProPackets.clear()
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 liveSessionDao.insertLiveSession(session)
                 _liveLinkProSession.value = session
-                
-                // Upload active session to Supabase
-                SupabaseManager.client.postgrest["live_sessions"].insert(session)
-                
+
+                // Upload the legacy-compatible session shell. The real access token stays in memory only;
+                // persisted state keeps the token hash inside LiveLinkSession.
+                runCatching {
+                    SupabaseManager.client.postgrest["live_sessions"].insert(session)
+                }.onFailure { error ->
+                    Log.w("ObdViewModel", "LiveLink session created locally; cloud session shell sync failed", error)
+                }
+
                 // Start background upload loop for telemetry
-                startLiveLinkTelemetryLoop(sessionId)
-                
+                startLiveLinkTelemetryLoop(coreSession.sessionId)
+
                 // Start background note polling loop
-                startNotesPollingLoop(sessionId)
+                startNotesPollingLoop(coreSession.sessionId)
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Error starting remote LiveLink PRO session", e)
             }
@@ -417,9 +553,17 @@ class ObdViewModel @Inject constructor(
 
     fun stopLiveLinkPro() {
         val session = _liveLinkProSession.value ?: return
+        _liveLinkProCoreSession.value?.let { coreSession ->
+            val (completed, event) = liveLinkProEngine.complete(coreSession)
+            _liveLinkProCoreSession.value = completed
+            addLiveLinkEvent(event)
+        }
         telemetryUploadJob?.cancel()
         notesPollingJob?.cancel()
         _liveLinkProSession.value = null
+        _liveLinkProCoreSession.value = null
+        _liveLinkProCredentials.value = null
+        _liveLinkProPermissions.value = null
         
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -439,29 +583,168 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    fun revokeLiveLinkPro() {
+        val session = _liveLinkProSession.value ?: return
+        val coreSession = _liveLinkProCoreSession.value ?: return
+        val (revoked, event) = liveLinkProEngine.revoke(coreSession)
+        _liveLinkProCoreSession.value = revoked
+        _liveLinkProSession.value = session.copy(status = revoked.state.name, endedAt = revoked.endedAtMs)
+        addLiveLinkEvent(event)
+        telemetryUploadJob?.cancel()
+        notesPollingJob?.cancel()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                liveSessionDao.updateSessionStatus(session.sessionId, revoked.state.name)
+                revoked.endedAtMs?.let { liveSessionDao.updateSessionEndedAt(session.sessionId, it) }
+                runCatching {
+                    SupabaseManager.client.postgrest["live_sessions"].update(
+                        mapOf("status" to revoked.state.name, "endedAt" to revoked.endedAtMs)
+                    ) {
+                        filter { eq("sessionId", session.sessionId) }
+                    }
+                }.onFailure { error ->
+                    Log.w("ObdViewModel", "LiveLink revoke stored locally; cloud sync failed", error)
+                }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Error revoking LiveLink PRO session", e)
+            }
+        }
+    }
+
+    fun requestLiveLinkSnapshot() {
+        val session = _liveLinkProCoreSession.value ?: return
+        val permissions = _liveLinkProPermissions.value ?: return
+        val result = liveLinkProEngine.createRemoteRequest(
+            session = session,
+            permissions = permissions,
+            type = LiveLinkRemoteRequestType.CAPTURE_SNAPSHOT
+        )
+        _liveLinkProRequests.value = (listOf(result.request) + _liveLinkProRequests.value).take(40)
+        addLiveLinkEvent(result.event)
+    }
+
+    fun requestLiveLinkClearDtcForAudit() {
+        val session = _liveLinkProCoreSession.value ?: return
+        val permissions = _liveLinkProPermissions.value ?: return
+        val result = liveLinkProEngine.createRemoteRequest(
+            session = session,
+            permissions = permissions,
+            type = LiveLinkRemoteRequestType.CLEAR_DTCS
+        )
+        _liveLinkProRequests.value = (listOf(result.request) + _liveLinkProRequests.value).take(40)
+        addLiveLinkEvent(result.event)
+    }
+
+    fun approveLiveLinkRequest(requestId: String) {
+        resolveLiveLinkRequest(requestId, approved = true)
+    }
+
+    fun denyLiveLinkRequest(requestId: String) {
+        resolveLiveLinkRequest(requestId, approved = false)
+    }
+
+    fun sendLiveLinkChat(body: String) {
+        val session = _liveLinkProCoreSession.value ?: return
+        val trimmed = body.trim()
+        if (trimmed.isBlank()) return
+        val now = System.currentTimeMillis()
+        val message = LiveLinkChatMessage(
+            messageId = UUID.randomUUID().toString(),
+            sessionId = session.sessionId,
+            authorRole = LiveLinkActorRole.OWNER,
+            body = trimmed,
+            createdAtMs = now
+        )
+        _liveLinkProMessages.value = (listOf(message) + _liveLinkProMessages.value).take(80)
+        addLiveLinkEvent(
+            LiveLinkEvent(
+                eventId = UUID.randomUUID().toString(),
+                sessionId = session.sessionId,
+                type = LiveLinkEventType.CHAT_MESSAGE,
+                actorRole = LiveLinkActorRole.OWNER,
+                message = "Mensaje enviado en chat LiveLink.",
+                createdAtMs = now
+            )
+        )
+    }
+
+    fun generateLiveLinkReport() {
+        val session = _liveLinkProCoreSession.value ?: return
+        val (report, event) = liveLinkProEngine.buildReport(
+            session = session,
+            packets = liveLinkProPackets.toList(),
+            events = _liveLinkProEvents.value,
+            requests = _liveLinkProRequests.value
+        )
+        _liveLinkProReport.value = report
+        addLiveLinkEvent(event)
+    }
+
+    private fun resolveLiveLinkRequest(requestId: String, approved: Boolean) {
+        val request = _liveLinkProRequests.value.firstOrNull { it.requestId == requestId } ?: return
+        val (resolved, event) = liveLinkProEngine.resolveRequest(request, approved)
+        _liveLinkProRequests.value = _liveLinkProRequests.value.map {
+            if (it.requestId == requestId) resolved else it
+        }
+        addLiveLinkEvent(event)
+
+        if (approved && request.type == LiveLinkRemoteRequestType.CAPTURE_SNAPSHOT) {
+            val packet = buildLiveLinkTelemetryPacket(request.sessionId)
+            val (snapshot, snapshotEvent) = liveLinkProEngine.captureSnapshot(packet)
+            rememberLiveLinkPacket(snapshot.telemetryPacket)
+            addLiveLinkEvent(snapshotEvent)
+        }
+    }
+
     private fun startLiveLinkTelemetryLoop(sessionId: String) {
         telemetryUploadJob?.cancel()
         telemetryUploadJob = viewModelScope.launch(Dispatchers.IO) {
-            while (isActive && _liveLinkProSession.value?.status == "ACTIVE") {
+            while (isActive && _liveLinkProCoreSession.value?.isOpen == true) {
                 try {
-                    val pidsJson = Json.encodeToString(_liveData.value)
+                    val coreSession = _liveLinkProCoreSession.value ?: break
+                    val (checkedSession, expiredEvent) = liveLinkProEngine.expireIfNeeded(coreSession)
+                    if (expiredEvent != null) {
+                        _liveLinkProCoreSession.value = checkedSession
+                        _liveLinkProSession.value = _liveLinkProSession.value?.copy(
+                            status = checkedSession.state.name,
+                            endedAt = checkedSession.endedAtMs
+                        )
+                        addLiveLinkEvent(expiredEvent)
+                        liveSessionDao.updateSessionStatus(sessionId, checkedSession.state.name)
+                        checkedSession.endedAtMs?.let { liveSessionDao.updateSessionEndedAt(sessionId, it) }
+                        break
+                    }
+
+                    val packet = buildLiveLinkTelemetryPacket(sessionId)
+                    rememberLiveLinkPacket(packet)
+                    val pidsJson = Json.encodeToString(packet)
                     val snapshot = LiveSnapshotEntity(
                         snapshotId = UUID.randomUUID().toString(),
                         sessionId = sessionId,
                         timestamp = System.currentTimeMillis(),
                         pidValues = pidsJson,
-                        notes = ""
+                        notes = packet.degradedReason ?: packet.sourceQuality.name
                     )
                     
                     // Save local snapshot
                     liveSessionDao.insertLiveSnapshot(snapshot)
                     
                     // Upload to cloud
-                    SupabaseManager.client.postgrest["live_snapshots"].insert(snapshot)
+                    runCatching {
+                        SupabaseManager.client.postgrest["live_snapshots"].insert(snapshot)
+                    }.onFailure { error ->
+                        Log.w("ObdViewModel", "LiveLink telemetry stored locally; cloud snapshot sync failed", error)
+                    }
                 } catch (e: Exception) {
                     Log.e("ObdViewModel", "Error uploading telemetry snapshot", e)
                 }
-                delay(2000L) // Telemetry uploaded every 2 seconds
+                delay(
+                    LiveLinkFrequencyPolicy.intervalMs(
+                        mode = _liveLinkProCoreSession.value?.mode ?: LiveLinkMode.REMOTE_READ_ONLY,
+                        averageLatencyMs = _liveLinkProLatestPacket.value?.samples?.map { it.latencyMs }?.takeIf { it.isNotEmpty() }?.average()?.toLong() ?: 0L
+                    )
+                )
             }
         }
     }
@@ -470,7 +753,7 @@ class ObdViewModel @Inject constructor(
         notesPollingJob?.cancel()
         notesPollingJob = viewModelScope.launch(Dispatchers.IO) {
             var lastPollTime = 0L
-            while (isActive && _liveLinkProSession.value?.status == "ACTIVE") {
+            while (isActive && _liveLinkProCoreSession.value?.isOpen == true) {
                 try {
                     val newNotes = SupabaseManager.client.postgrest["mechanic_notes"]
                         .select {
@@ -483,6 +766,7 @@ class ObdViewModel @Inject constructor(
                     if (newNotes.isNotEmpty()) {
                         newNotes.forEach { note ->
                             liveSessionDao.insertMechanicNote(note)
+                            addRemoteLiveLinkNote(note)
                             if (note.createdAt > lastPollTime) {
                                 lastPollTime = note.createdAt
                             }
@@ -494,6 +778,42 @@ class ObdViewModel @Inject constructor(
                 delay(4000L) // Poll recommendations/notes every 4 seconds
             }
         }
+    }
+
+    private fun buildLiveLinkTelemetryPacket(sessionId: String): LiveLinkTelemetryPacket {
+        return LiveLinkTelemetryMapper.fromObdSamples(
+            sessionId = sessionId,
+            connectionState = connectionState.value.name,
+            adapterQuality = if (isAdapterPro.value) "PRO_ADAPTER" else "STANDARD_OR_UNKNOWN",
+            samples = telemetrySamples.value.values,
+            activeDtcs = activeDtcs.value,
+            freezeFrameAvailable = _freezeFrameData.value.isNotEmpty()
+        )
+    }
+
+    private fun rememberLiveLinkPacket(packet: LiveLinkTelemetryPacket) {
+        _liveLinkProLatestPacket.value = packet
+        liveLinkProPackets.add(packet)
+        if (liveLinkProPackets.size > 900) {
+            liveLinkProPackets.removeAt(0)
+        }
+    }
+
+    private fun addLiveLinkEvent(event: LiveLinkEvent) {
+        _liveLinkProEvents.value = (listOf(event) + _liveLinkProEvents.value).take(100)
+    }
+
+    private fun addRemoteLiveLinkNote(note: MechanicNoteEntity) {
+        val message = LiveLinkChatMessage(
+            messageId = note.noteId,
+            sessionId = note.sessionId,
+            authorRole = LiveLinkActorRole.REMOTE_MECHANIC,
+            authorId = note.authorId,
+            type = LiveLinkMessageType.NOTE,
+            body = note.content,
+            createdAtMs = note.createdAt
+        )
+        _liveLinkProMessages.value = (listOf(message) + _liveLinkProMessages.value).take(80)
     }
 
     // ── Marketplace (Bids and requests) ──
@@ -527,18 +847,38 @@ class ObdViewModel @Inject constructor(
         latitude: Double = 0.0,
         longitude: Double = 0.0,
         phone: String = "",
-        priceOffer: Double = 0.0
+        priceOffer: Double = 0.0,
+        serviceId: String? = null,
+        serviceCategory: String? = null,
+        dtcCodes: List<String> = activeDtcs.value,
+        serviceMetadata: String = ""
     ) {
+        val catalogService = WorkshopServiceCatalog.serviceById(serviceId)
+        val enrichedDescription = buildString {
+            if (catalogService != null) {
+                appendLine(WorkshopServiceCatalog.requestSummary(catalogService, dtcCodes))
+                appendLine()
+            } else if (serviceCategory?.isNotBlank() == true || serviceMetadata.isNotBlank()) {
+                appendLine("[MEET_SERVICE_CATALOG]")
+                serviceCategory?.takeIf { it.isNotBlank() }?.let { appendLine("service_category=$it") }
+                if (serviceMetadata.isNotBlank()) appendLine(serviceMetadata.trim())
+                if (dtcCodes.isNotEmpty()) appendLine("dtc_codes=${dtcCodes.joinToString()}")
+                appendLine("[/MEET_SERVICE_CATALOG]")
+                appendLine()
+            }
+            append(description.trim())
+        }.trim()
+
         val request = ServiceRequestEntity(
             requestId = UUID.randomUUID().toString(),
             vehicleId = vehicleId,
             problem = problem,
             priority = priority,
-            description = description,
+            description = enrichedDescription.ifBlank { description },
             location = location,
             radiusKm = 15.0,
             status = "OPEN",
-            autoDtcCode = activeDtcs.value.firstOrNull(),
+            autoDtcCode = dtcCodes.firstOrNull() ?: activeDtcs.value.firstOrNull(),
             createdAt = System.currentTimeMillis(),
             latitude = latitude,
             longitude = longitude,
@@ -663,6 +1003,8 @@ class ObdViewModel @Inject constructor(
                 Log.w("ObdViewModel", "Ignoring completion for non-accepted service request: $requestId")
             } else {
                 scheduleVanguardCommerceSync()
+                // V2 spec Phase 7: completion must trigger a Post-Scan prompt.
+                com.elysium369.meet.core.reports.PostScanPrompt.request(requestId)
             }
         }
     }
@@ -860,7 +1202,11 @@ class ObdViewModel @Inject constructor(
         oemPreference: String,
         deliveryLocation: String,
         urgencyMinutes: Int,
-        customerNotes: String
+        customerNotes: String,
+        partPosition: String = "N/A",
+        phone: String = "",
+        latitude: Double = 0.0,
+        longitude: Double = 0.0
     ) {
         val request = PartRequestEntity(
             requestId = UUID.randomUUID().toString(),
@@ -876,7 +1222,11 @@ class ObdViewModel @Inject constructor(
             customerNotes = customerNotes,
             status = "OPEN",
             acceptedOfferId = null,
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            partPosition = partPosition,
+            phone = phone,
+            latitude = latitude,
+            longitude = longitude
         )
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -905,7 +1255,9 @@ class ObdViewModel @Inject constructor(
         deliveryFee: Double,
         etaMinutes: Int,
         warrantyDays: Int,
-        message: String
+        message: String,
+        compatibilityConfidence: String = "UNKNOWN",
+        compatibilityNotes: String = ""
     ) {
         val ownerId = currentCloudUserId()
         val storeId = buildPartsStoreId(storeName, ownerId)
@@ -945,7 +1297,11 @@ class ObdViewModel @Inject constructor(
                 if (ownerId != null) {
                     runCatching { SupabaseManager.client.postgrest["parts_stores"].upsert(store.toRemote(ownerId)) }
                         .onFailure { Log.w("ObdViewModel", "Parts store saved locally; cloud table unavailable", it) }
-                    runCatching { SupabaseManager.client.postgrest["part_offers"].insert(offer.toRemote(ownerId)) }
+                    runCatching {
+                        SupabaseManager.client.postgrest["part_offers"].insert(
+                            offer.toRemote(ownerId, compatibilityConfidence, compatibilityNotes)
+                        )
+                    }
                         .onFailure { Log.w("ObdViewModel", "Part offer saved locally; cloud table unavailable", it) }
                 } else {
                     Log.i("ObdViewModel", "Part offer saved locally; sign in as a parts store to publish it.")
@@ -971,14 +1327,45 @@ class ObdViewModel @Inject constructor(
                 }
                 scheduleVanguardCommerceSync()
 
-                runCatching {
+                val requestSync = runCatching {
                     SupabaseManager.client.postgrest["part_requests"].update(
-                        mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
+                        mapOf(
+                            "status" to "ACCEPTED",
+                            "statusV2" to PartsMarketplaceContract.requestStatusToV2("ACCEPTED"),
+                            "acceptedOfferId" to offerId
+                        )
                     ) { filter { eq("requestId", partRequestId) } }
+                }
+                if (requestSync.isFailure) {
+                    runCatching {
+                        SupabaseManager.client.postgrest["part_requests"].update(
+                            mapOf("status" to "ACCEPTED", "acceptedOfferId" to offerId)
+                        ) { filter { eq("requestId", partRequestId) } }
+                    }
+                }
+
+                val offerSync = runCatching {
                     SupabaseManager.client.postgrest["part_offers"].update(
-                        mapOf("status" to "ACCEPTED")
+                        mapOf(
+                            "status" to "ACCEPTED",
+                            "statusV2" to PartsMarketplaceContract.quoteStatusToV2("ACCEPTED")
+                        )
                     ) { filter { eq("offerId", offerId) } }
-                }.onFailure { Log.w("ObdViewModel", "Part request accepted locally; cloud table unavailable", it) }
+                }
+                if (offerSync.isFailure) {
+                    runCatching {
+                        SupabaseManager.client.postgrest["part_offers"].update(
+                            mapOf("status" to "ACCEPTED")
+                        ) { filter { eq("offerId", offerId) } }
+                    }
+                }
+
+                requestSync.exceptionOrNull()?.let {
+                    Log.d("ObdViewModel", "Part request accepted with legacy cloud fallback", it)
+                }
+                offerSync.exceptionOrNull()?.let {
+                    Log.d("ObdViewModel", "Part offer accepted with legacy cloud fallback", it)
+                }
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to accept part offer", e)
             }
@@ -1040,48 +1427,12 @@ class ObdViewModel @Inject constructor(
         marketplaceDao.insertPartsStores(stores.map { it.toLocal() })
 
         val requests = SupabaseManager.client.postgrest["part_requests"]
-            .select(
-                columns = Columns.list(
-                    "requestId",
-                    "serviceRequestId",
-                    "vehicleId",
-                    "dtcCode",
-                    "partName",
-                    "partNumber",
-                    "quantity",
-                    "oemPreference",
-                    "deliveryLocation",
-                    "urgencyMinutes",
-                    "customerNotes",
-                    "status",
-                    "acceptedOfferId",
-                    "createdAt",
-                    "customer_id"
-                )
-            )
+            .select()
             .decodeList<RemotePartRequest>()
         requests.forEach { marketplaceDao.upsertPartRequestFromSync(it.toLocal()) }
 
         val offers = SupabaseManager.client.postgrest["part_offers"]
-            .select(
-                columns = Columns.list(
-                    "offerId",
-                    "partRequestId",
-                    "storeId",
-                    "storeName",
-                    "brand",
-                    "partNumber",
-                    "condition",
-                    "price",
-                    "deliveryFee",
-                    "etaMinutes",
-                    "warrantyDays",
-                    "message",
-                    "status",
-                    "createdAt",
-                    "store_owner_id"
-                )
-            )
+            .select()
             .decodeList<RemotePartOffer>()
         offers.forEach { marketplaceDao.upsertPartOfferRespectingRequestClaim(it.toLocal()) }
     }
@@ -2299,6 +2650,11 @@ class ObdViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            entitlementManager.hasAccess(FeatureKey.SCAN_ADVANCED).collect { hasAccess ->
+                _isPremium.value = hasAccess
+            }
+        }
         startMarketplaceSync()
         refreshProviderRoles()
         // Voice command manager callbacks and initial startup checking
@@ -2447,24 +2803,10 @@ class ObdViewModel @Inject constructor(
                                 if (server.isRunning.value) {
                                     launch(Dispatchers.IO) {
                                         try {
-                                            val snap = TelemetrySnapshot(
-                                                rpm = smoothedData["010C"]?.toInt() ?: 0,
-                                                speed = smoothedData["010D"]?.toInt() ?: 0,
-                                                coolantTemp = smoothedData["0105"]?.toInt() ?: 0,
-                                                intakeTemp = smoothedData["010F"]?.toInt() ?: 0,
-                                                throttlePos = smoothedData["0111"] ?: 0f,
-                                                engineLoad = smoothedData["0104"] ?: 0f,
-                                                fuelPressure = smoothedData["010A"]?.toInt() ?: 0,
-                                                timingAdvance = smoothedData["010E"] ?: 0f,
-                                                mafRate = smoothedData["0110"] ?: 0f,
-                                                voltage = smoothedData["0142"] ?: smoothedData["42"] ?: 0f,
-                                                fuelTrim1 = smoothedData["0106"] ?: 0f,
-                                                fuelTrim2 = smoothedData["0108"] ?: 0f,
-                                                healthScore = -1,
-                                                activeDtcs = activeDtcs.value,
-                                                vehicleName = _selectedVehicle.value?.let { "${it.year} ${it.make} ${it.model}" } ?: ""
+                                            val packet = buildLiveLinkTelemetryPacket(
+                                                sessionId = _liveLinkProCoreSession.value?.sessionId ?: "local_wifi"
                                             )
-                                            server.broadcastTelemetry(snap)
+                                            server.broadcastTelemetry(packet)
                                         } catch (_: Exception) {}
                                     }
                                 }
@@ -2654,11 +2996,10 @@ class ObdViewModel @Inject constructor(
                 }
 
                 // ─── STEP 2: Cloud sync (only if authenticated) ───
-                val user = SupabaseManager.client.auth.currentUserOrNull()
-                _isPremium.value = if (MonetizationPolicy.PAYWALLS_ENABLED) {
-                    MonetizationPolicy.unlocksPremium(subscriptionRepository.isPremium())
-                } else {
-                    MonetizationPolicy.LOCAL_FULL_ACCESS
+                val user = try {
+                    SupabaseManager.client.auth.currentUserOrNull()
+                } catch (e: Exception) {
+                    null
                 }
 
                 if (user != null) {
@@ -3821,11 +4162,21 @@ class ObdViewModel @Inject constructor(
     ): String {
         val dtcCodesStr = dtcList.sorted().joinToString(",")
         val savedConfig = _aiConfig.value
-        val effectiveProvider = normalizeAiProvider(providerOverride ?: savedConfig.provider)
-        val effectiveApiKey = apiKey ?: savedConfig.apiKey
-        val effectiveModel = modelNameOverride ?: savedConfig.modelName
-        val effectiveEndpoint = endpointUrl ?: resolveAiEndpoint(effectiveProvider, savedConfig.endpoint)
+        var effectiveProvider = normalizeAiProvider(providerOverride ?: savedConfig.provider)
+        var effectiveApiKey = apiKey ?: savedConfig.apiKey
+        var effectiveModel = modelNameOverride ?: savedConfig.modelName
+        var effectiveEndpoint = endpointUrl ?: resolveAiEndpoint(effectiveProvider, savedConfig.endpoint)
+
+        // Fallback to integrated MiniMax debug provider if no custom API key is configured
+        if (effectiveApiKey.isBlank() && effectiveProvider != "ollama") {
+            effectiveProvider = "minimax"
+            effectiveModel = "MiniMax-M1"
+            effectiveApiKey = ""
+            effectiveEndpoint = ""
+        }
+
         val remoteAiConfigured = when (effectiveProvider) {
+            "minimax" -> true
             "ollama" -> !effectiveEndpoint.isNullOrBlank()
             "gemini" -> effectiveApiKey.isNotBlank()
             "openai", "anthropic", "mavis", "custom" -> effectiveApiKey.isNotBlank() && !effectiveEndpoint.isNullOrBlank()
@@ -3849,24 +4200,69 @@ class ObdViewModel @Inject constructor(
             }
         }
 
-        // 2. Cache miss -> Query remote AI
+        // 2. Cache miss -> Query remote AI (new multi-provider engine first, legacy fallback)
         var resultText = ""
         var modelUsed = "$effectiveProvider:${effectiveModel.ifBlank { "default" }}"
         try {
-            geminiDiagnostic.updateConfig(effectiveApiKey, effectiveEndpoint, effectiveProvider, effectiveModel)
+            // Try new multi-provider AI engine
             val info = _selectedVehicle.value?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Genérico"
-            val result = geminiDiagnostic.analyzeDtc(
-                dtcList,
-                info,
-                _liveData.value.mapValues { "%.2f".format(it.value) },
-                _telemetryHistory.value
+            val aiContext = com.elysium369.meet.ai.domain.AiContext(
+                vehicle = _selectedVehicle.value?.let { v ->
+                    com.elysium369.meet.ai.domain.VehicleContext(
+                        make = v.make, model = v.model, year = v.year,
+                        engine = v.engine, transmission = v.transmission_type,
+                        fuel = v.fuel_type, vin = v.vin,
+                        odometer = null
+                    )
+                },
+                obd = com.elysium369.meet.ai.domain.ObdContext(
+                    connected = connectionState.value == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+                    activePidsCount = _liveData.value.size,
+                    dtcActiveCount = dtcList.size,
+                    batteryVoltage = (_liveData.value["CONTROL_MODULE_VOLTAGE"] ?: 0.0).toFloat()
+                ),
+                dtcs = dtcList.map { com.elysium369.meet.ai.domain.DtcContext(it, "Activo") },
+                livePids = _liveData.value.map { (k, v) ->
+                    com.elysium369.meet.ai.domain.PidReading(pid = k, name = k, value = "%.2f".format(v))
+                },
+                manualAvailability = null,
+                appModule = "DIAGNOSTIC_DTC",
+                locale = "es-MX",
+                userRole = com.elysium369.meet.ai.domain.UserRole.MECHANIC,
+                safetyMode = true
             )
-            resultText = result.analysisText
-
-            // Update the UI with detected anomalies
-            _anomalousPids.value = result.anomalousPids.map {
-                com.elysium369.meet.core.ai.HealthAnomaly(it, "Anomalía detectada en diagnóstico profundo")
+            val aiRequest = com.elysium369.meet.ai.domain.AiRequest(
+                feature = com.elysium369.meet.ai.domain.AiFeature.DIAGNOSTIC_DTC,
+                providerId = effectiveProvider,
+                model = effectiveModel.ifBlank { "MiniMax-M1" },
+                messages = listOf(
+                    com.elysium369.meet.ai.domain.AiMessage(
+                        com.elysium369.meet.ai.domain.AiRole.USER,
+                        com.elysium369.meet.ai.context.AiAutomotiveContextBuilder.buildContextPrompt(aiContext) +
+                            "\n\nDiagnostica los siguientes DTCs para $info: ${dtcList.joinToString(", ")}"
+                    )
+                ),
+                context = aiContext
+            )
+            val aiResult = aiRepository.complete(aiRequest)
+            if (aiResult.isSuccess) {
+                resultText = aiResult.getOrThrow().text
+                modelUsed = "${aiResult.getOrThrow().providerId}:${aiResult.getOrThrow().model}"
+            } else {
+                // Fallback to legacy GeminiDiagnostic
+                android.util.Log.w("ObdViewModel", "New AI engine failed, falling back to legacy: ${aiResult.exceptionOrNull()?.message}")
+                geminiDiagnostic.updateConfig(effectiveApiKey, effectiveEndpoint, effectiveProvider, effectiveModel)
+                val result = geminiDiagnostic.analyzeDtc(
+                    dtcList, info,
+                    _liveData.value.mapValues { "%.2f".format(it.value) },
+                    _telemetryHistory.value
+                )
+                resultText = result.analysisText
             }
+
+            // Update the UI with detected anomalies (only from legacy path)
+            // The new AiRepository returns text-only; anomalousPids are extracted separately if needed
+            _anomalousPids.value = emptyList()
         } catch (e: Exception) {
             android.util.Log.e("ObdViewModel", "Remote AI consultation failed, invoking offline expert diagnostic fallback: ${e.message}", e)
             val make = _selectedVehicle.value?.make ?: "GENERIC"
@@ -5144,7 +5540,7 @@ class ObdViewModel @Inject constructor(
                 val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                 val address = addresses?.firstOrNull()
                 val countryCode = address?.countryCode ?: ""
-                val addressLine = address?.getAddressLine(0) ?: "Ubicación GPS (${location.latitude}, ${location.longitude})"
+                val addressLine = address?.getAddressLine(0) ?: "Ubicación GPS detectada"
                 val prefix = countryPrefixMap[countryCode.uppercase()] ?: "+506"
 
                 _currentGpsLocation.value = GpsLocationInfo(
@@ -5163,7 +5559,7 @@ class ObdViewModel @Inject constructor(
                 _currentGpsLocation.value = GpsLocationInfo(
                     latitude = location.latitude,
                     longitude = location.longitude,
-                    addressName = "Ubicación GPS (${location.latitude}, ${location.longitude})",
+                    addressName = "Ubicación GPS detectada",
                     countryCode = "",
                     dialingPrefix = "+506",
                     accuracy = location.accuracy,

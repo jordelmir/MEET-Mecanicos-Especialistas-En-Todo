@@ -75,10 +75,14 @@ class MarketplaceGating {
                 "fuse_check",
                 "relay_check",
                 "wiring_check",
-                "pump_voltage_check"
+                "connector_check",
+                "pump_voltage_check",
+                "ground_check",
+                "fuel_pressure_check",
+                "pump_current_check"
             ),
-            estimatedCostRange = "$80-$250 USD",
-            notes = "Solo despues de verificar voltaje al conector de la bomba y tierra < 0.1V."
+            estimatedCostRange = "",
+            notes = "Solo despues de verificar alimentacion, tierra, rele, fusible, arnes, conector, presion y corriente con criterios validados."
         )
     }
 }

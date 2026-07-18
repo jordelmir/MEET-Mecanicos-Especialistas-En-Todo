@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Component } from 'react';
 
 type AppErrorBoundaryProps = {
   children: React.ReactNode;
@@ -8,7 +8,7 @@ type AppErrorBoundaryState = {
   error: Error | null;
 };
 
-export class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
@@ -21,7 +21,7 @@ export class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, App
 
   render() {
     if (!this.state.error) {
-      return this.props.children;
+      return (this as any).props.children;
     }
 
     return (

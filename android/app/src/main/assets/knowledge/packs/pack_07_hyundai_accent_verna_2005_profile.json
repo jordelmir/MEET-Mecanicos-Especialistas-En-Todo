@@ -1,0 +1,353 @@
+{
+  "packId": "pack_07_hyundai_accent_verna_2005_profile",
+  "title": "Hyundai Accent Verna 2005 1.6 AT - Perfil anti-alucinacion",
+  "domain": "automotive.vehicle_profile.hyundai_accent_verna_2005",
+  "schemaVersion": 1,
+  "packVersion": "1.0.0",
+  "language": "es-419",
+  "sourcePolicy": {
+    "tier": "A_OWNED_CREATED",
+    "licenseType": "USER_OWNED_ENGINEERING_CONTENT",
+    "attributionRequired": false,
+    "commercialUseAllowed": true,
+    "redistributionAllowed": true,
+    "notes": "Perfil conservador derivado de contenido aportado por el propietario. No es documentacion OEM y requiere revision tecnica antes de elevar cualquier claim a VERIFIED."
+  },
+  "disclaimer": "Perfil de control anti-alucinacion. La presencia o ausencia exacta depende de VIN, mercado, variante, inspeccion fisica y documentacion OEM aplicable. No transferir especificaciones desde vehiculos de referencia.",
+  "sourceCitations": [
+    {
+      "sourceId": "source_document_17_engineering",
+      "sourceAuthority": "ENGINEERING_INFERENCE",
+      "title": "Document (17) - Sensores, actuadores y aplicabilidad Accent Verna 2005",
+      "publisher": "Elysium Vanguard",
+      "documentIdentifier": "DOC17-SHA256-baf4add3f22202fc7d66f7b7f4aee549d90780f1891da6fa66ffbc2db1820824",
+      "edition": "Snapshot 2026-07-16",
+      "publicationDate": "2026-07-16",
+      "pageOrSection": "Matriz de sensores y reglas anti-alucinacion",
+      "marketScope": "Mercado no confirmado; requiere VIN",
+      "vehicleScope": "Hyundai Accent/Verna 2005 1.6 automatico, variante por confirmar",
+      "urlOrLocalReference": "Document (17).docx",
+      "contentHash": "baf4add3f22202fc7d66f7b7f4aee549d90780f1891da6fa66ffbc2db1820824",
+      "licenseStatus": "USER_OWNED_PENDING_TECHNICAL_REVIEW",
+      "retrievedAt": "2026-07-16T06:38:31Z",
+      "reviewedBy": "",
+      "reviewedAt": ""
+    }
+  ],
+  "vehicleProfiles": [
+    {
+      "profileId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "make": "Hyundai",
+      "models": ["Accent", "Verna"],
+      "yearStart": 2005,
+      "yearEnd": 2005,
+      "engine": "1.6L gasolina; codigo de motor requiere VIN/OEM",
+      "transmission": "Automatica; variante exacta requiere VIN/OEM",
+      "markets": ["UNSPECIFIED_REQUIRES_VIN"],
+      "applicability": "PRESENT_CONDITIONAL",
+      "confidence": "HIGH",
+      "sourceCitationIds": ["source_document_17_engineering"],
+      "requiresVinConfirmation": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "vehicle_accent_verna_2005_1_6_at",
+      "type": "VehicleProfile",
+      "name": "Hyundai Accent Verna 2005 1.6 AT",
+      "description": "Perfil objetivo de control. Mercado, motor y transmision exactos requieren confirmacion por VIN/OEM.",
+      "validationStatus": "NEEDS_REVIEW"
+    },
+    { "id": "system_engine_management", "type": "System", "name": "Gestion de motor" },
+    { "id": "system_fuel_pfi", "type": "System", "name": "Combustible PFI" },
+    { "id": "system_emissions", "type": "System", "name": "Emisiones" },
+    { "id": "system_steering", "type": "System", "name": "Direccion" },
+    { "id": "system_brakes", "type": "System", "name": "Frenos" },
+    { "id": "system_adas", "type": "System", "name": "ADAS" },
+    { "id": "system_srs", "type": "System", "name": "SRS y ocupante" },
+    { "id": "sensor_map", "type": "Sensor", "name": "Sensor MAP" },
+    { "id": "sensor_iat", "type": "Sensor", "name": "Sensor IAT" },
+    { "id": "sensor_maf", "type": "Sensor", "name": "Sensor MAF" },
+    { "id": "sensor_app_dual", "type": "Sensor", "name": "Sensor APP dual" },
+    { "id": "component_throttle_mechanical", "type": "Component", "name": "Acelerador mecanico" },
+    { "id": "sensor_o2_narrowband", "type": "Sensor", "name": "Sensor O2 narrowband" },
+    { "id": "sensor_afr_wideband", "type": "Sensor", "name": "Sensor AFR wideband" },
+    { "id": "sensor_fuel_rail_pressure", "type": "Sensor", "name": "Sensor de presion de rail" },
+    { "id": "component_dpf", "type": "Component", "name": "DPF" },
+    { "id": "sensor_nox", "type": "Sensor", "name": "Sensor NOx" },
+    { "id": "component_boost_vgt", "type": "Component", "name": "Boost y VGT" },
+    { "id": "component_epb", "type": "Component", "name": "Freno de estacionamiento electrico EPB" },
+    { "id": "component_eps", "type": "Component", "name": "Direccion asistida electrica EPS" },
+    { "id": "component_factory_adas", "type": "Component", "name": "ADAS de fabrica" },
+    { "id": "sensor_ocs", "type": "Sensor", "name": "Clasificacion de ocupante OCS" }
+  ],
+  "edges": [
+    { "id": "edge_vehicle_engine", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_engine_management", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_fuel", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_fuel_pfi", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_emissions", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_emissions", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_steering", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_steering", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_brakes", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_brakes", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_adas", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_adas", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_vehicle_srs", "from": "vehicle_accent_verna_2005_1_6_at", "to": "system_srs", "type": "EVALUATES_SYSTEM" },
+    { "id": "edge_engine_map", "from": "system_engine_management", "to": "sensor_map", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_engine_iat", "from": "system_engine_management", "to": "sensor_iat", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_engine_maf", "from": "system_engine_management", "to": "sensor_maf", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_engine_app", "from": "system_engine_management", "to": "sensor_app_dual", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_engine_throttle", "from": "system_engine_management", "to": "component_throttle_mechanical", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_emissions_o2", "from": "system_emissions", "to": "sensor_o2_narrowband", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_emissions_afr", "from": "system_emissions", "to": "sensor_afr_wideband", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_fuel_rail", "from": "system_fuel_pfi", "to": "sensor_fuel_rail_pressure", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_emissions_dpf", "from": "system_emissions", "to": "component_dpf", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_emissions_nox", "from": "system_emissions", "to": "sensor_nox", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_engine_boost", "from": "system_engine_management", "to": "component_boost_vgt", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_brakes_epb", "from": "system_brakes", "to": "component_epb", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_steering_eps", "from": "system_steering", "to": "component_eps", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_adas_factory", "from": "system_adas", "to": "component_factory_adas", "type": "EVALUATES_APPLICABILITY" },
+    { "id": "edge_srs_ocs", "from": "system_srs", "to": "sensor_ocs", "type": "EVALUATES_APPLICABILITY" }
+  ],
+  "technicalClaims": [
+    {
+      "claimId": "claim_map_present",
+      "subjectId": "sensor_map",
+      "predicate": "vehicle_applicability",
+      "value": "MAP documentado como entrada de gestion de motor",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "PRESENT_DOCUMENTED",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["vin_variant_confirmation"],
+      "requiresVinConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_iat_present",
+      "subjectId": "sensor_iat",
+      "predicate": "vehicle_applicability",
+      "value": "IAT documentado como entrada de gestion de motor",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "PRESENT_DOCUMENTED",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["vin_variant_confirmation"],
+      "requiresVinConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_maf_not_documented",
+      "subjectId": "sensor_maf",
+      "predicate": "vehicle_applicability",
+      "value": "MAF no documentado; la estrategia descrita usa MAP e IAT",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "UNKNOWN_INSUFFICIENT_EVIDENCE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["physical_sensor_inventory", "oem_engine_management_diagram"],
+      "requiresOemConfirmation": true,
+      "requiresVisualConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_app_dual_absent",
+      "subjectId": "sensor_app_dual",
+      "predicate": "vehicle_applicability",
+      "value": "No usar modelo de pedal APP dual como hecho de esta variante",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "ABSENT_DOCUMENTED",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_throttle_mechanical_present",
+      "subjectId": "component_throttle_mechanical",
+      "predicate": "vehicle_applicability",
+      "value": "Acelerador mecanico con cable; verificar variante fisicamente",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "PRESENT_CONDITIONAL",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["throttle_body_visual_confirmation"],
+      "requiresVisualConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_o2_narrowband_present",
+      "subjectId": "sensor_o2_narrowband",
+      "predicate": "vehicle_applicability",
+      "value": "Sensor O2 narrowband; cantidad y configuracion dependen de emisiones y mercado",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "PRESENT_CONDITIONAL",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["emissions_configuration_confirmation"],
+      "requiresVinConfirmation": true,
+      "requiresVisualConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_afr_wideband_not_applicable",
+      "subjectId": "sensor_afr_wideband",
+      "predicate": "vehicle_applicability",
+      "value": "No tratar el O2 narrowband como AFR wideband",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "NOT_APPLICABLE_ARCHITECTURE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_rail_pressure_sensor_not_applicable",
+      "subjectId": "sensor_fuel_rail_pressure",
+      "predicate": "vehicle_applicability",
+      "value": "No inventar sensor electronico de presion de rail en la arquitectura PFI descrita",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "NOT_APPLICABLE_ARCHITECTURE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_dpf_not_applicable",
+      "subjectId": "component_dpf",
+      "predicate": "vehicle_applicability",
+      "value": "DPF no aplica a la arquitectura de gasolina atmosferica descrita",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "NOT_APPLICABLE_ARCHITECTURE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_nox_not_applicable",
+      "subjectId": "sensor_nox",
+      "predicate": "vehicle_applicability",
+      "value": "Sensor NOx no aplica a la arquitectura de emisiones descrita",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "NOT_APPLICABLE_ARCHITECTURE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_boost_vgt_not_applicable",
+      "subjectId": "component_boost_vgt",
+      "predicate": "vehicle_applicability",
+      "value": "No inventar boost, wastegate o VGT en el motor atmosferico descrito",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "NOT_APPLICABLE_ARCHITECTURE",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_epb_absent",
+      "subjectId": "component_epb",
+      "predicate": "vehicle_applicability",
+      "value": "EPB no documentado para el perfil objetivo",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "ABSENT_DOCUMENTED",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_eps_absent_documented",
+      "subjectId": "component_eps",
+      "predicate": "vehicle_applicability",
+      "value": "La fuente aportada documenta direccion hidraulica y ausencia de EPS; confirmar variante antes de usar como hecho del vehiculo",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "ABSENT_DOCUMENTED",
+      "confidence": "MEDIUM",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["physical_power_steering_inspection", "vin_variant_confirmation", "oem_steering_diagram"],
+      "requiresVinConfirmation": true,
+      "requiresOemConfirmation": true,
+      "requiresVisualConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_factory_adas_absent",
+      "subjectId": "component_factory_adas",
+      "predicate": "vehicle_applicability",
+      "value": "ADAS de fabrica no documentado para el perfil objetivo",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "ABSENT_DOCUMENTED",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_ocs_verify_physically",
+      "subjectId": "sensor_ocs",
+      "predicate": "vehicle_applicability",
+      "value": "No asumir OCS; verificar switch, mat, asiento, conectores y VIN",
+      "vehicleScopeId": "vehicle_profile_hyundai_accent_verna_2005_1_6_at",
+      "scopeType": "TARGET_VARIANT",
+      "applicability": "VERIFY_PHYSICALLY",
+      "confidence": "LOW",
+      "sourceCitationId": "source_document_17_engineering",
+      "evidenceRequired": ["seat_label_photo", "srs_connector_photo", "vin_variant_confirmation"],
+      "requiresVinConfirmation": true,
+      "requiresOemConfirmation": true,
+      "requiresVisualConfirmation": true,
+      "doNotTransferSpecsFromReference": true
+    },
+    {
+      "claimId": "claim_ocs_later_accent_reference_only",
+      "subjectId": "sensor_ocs",
+      "predicate": "reference_vehicle_example",
+      "value": "OCS en Accent de anos posteriores es solo referencia y no prueba equipamiento del 2005",
+      "vehicleScopeId": "hyundai_accent_2006_2011_reference",
+      "scopeType": "REFERENCE_VEHICLE",
+      "applicability": "REFERENCE_VEHICLE_ONLY",
+      "confidence": "HIGH",
+      "sourceCitationId": "source_document_17_engineering",
+      "referenceVehicle": "Hyundai Accent 2006-2011",
+      "doNotTransferSpecsFromReference": true
+    }
+  ],
+  "measurementSpecifications": [],
+  "knowledgeConflicts": [],
+  "validationRules": [
+    {
+      "id": "rule_reference_not_target",
+      "rule": "REFERENCE_VEHICLE_ONLY never becomes PRESENT_DOCUMENTED for the target vehicle"
+    },
+    {
+      "id": "rule_no_exact_without_evidence",
+      "rule": "No exact vehicle fact without VIN, OEM or required physical evidence"
+    },
+    {
+      "id": "rule_not_documented_not_absent",
+      "rule": "UNKNOWN_INSUFFICIENT_EVIDENCE must remain distinct from ABSENT_DOCUMENTED"
+    }
+  ],
+  "tests": [
+    {
+      "id": "acceptance_no_maf_invention",
+      "assertion": "sensor_maf cannot resolve to a target-vehicle fact without physical and OEM evidence"
+    },
+    {
+      "id": "acceptance_no_ocs_year_transfer",
+      "assertion": "OCS from 2006-2011 remains reference-only for the 2005 target"
+    },
+    {
+      "id": "acceptance_eps_requires_confirmation",
+      "assertion": "EPS absence remains conditional on VIN, physical inspection and OEM verification"
+    }
+  ]
+}

@@ -114,6 +114,15 @@ fun isCriticalSafetyPart(name: String): Boolean {
     return SAFETY_KEYWORDS.any { lower.contains(it) }
 }
 
+private val VALID_VIN_REGEX = Regex(
+    pattern = "^(?=.*[0-9])[A-HJ-NPR-Z0-9]{17}$",
+    option = RegexOption.IGNORE_CASE,
+)
+
+/** Validates VIN structure only; it does not prove authenticity or ownership. */
+fun isValidVin(value: String?): Boolean =
+    value?.trim()?.let(VALID_VIN_REGEX::matches) == true
+
 private fun looksLikeFuelPump(partName: String): Boolean {
     val l = partName.lowercase()
     return l.contains("bomba de combustible") ||
@@ -136,8 +145,8 @@ object CompatibilityEngine {
     private val P0230_PUMP_MESSAGE =
         "No reemplazar bomba de combustible sin confirmar antes: alimentación " +
             "eléctrica, tierra, integridad de relé y fusible, y presión de " +
-            "combustible con manómetro. P0230 también se dispara por fallos en " +
-            "cableado o relé, no solo por la bomba."
+            "combustible con manómetro. P0230 identifica el circuito de control y " +
+            "no confirma por sí solo que la bomba esté dañada."
 
     private fun noVinWarning(whatWeHave: String) = CompatibilityWarning(
         code = "NO_VIN",
@@ -152,6 +161,14 @@ object CompatibilityEngine {
             "compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del " +
             "conector o de la caja de fusibles.",
         severity = WarningSeverity.WARN,
+    )
+
+    private val INVALID_VIN_WARNING = CompatibilityWarning(
+        code = "INVALID_VIN",
+        message = "El VIN recibido no tiene el formato estructural válido. Debe contener " +
+            "exactamente 17 caracteres y no puede incluir I, O ni Q. Corrígelo o " +
+            "elimínalo antes de confirmar compatibilidad.",
+        severity = WarningSeverity.BLOCK,
     )
 
     private val NO_PHOTO_WARNING = CompatibilityWarning(
@@ -169,6 +186,7 @@ object CompatibilityEngine {
     )
 
     private data class TierEvidence(
+        val vinProvided: Boolean,
         val hasVin: Boolean,
         val hasOem: Boolean,
         val hasPartNumber: Boolean,
@@ -184,12 +202,13 @@ object CompatibilityEngine {
     private fun collectEvidence(ctx: CompatibilityContext): TierEvidence {
         val v = ctx.vehicle
         return TierEvidence(
-            hasVin = !v.vin.isNullOrBlank() && v.vin.trim().length >= 11,
+            vinProvided = !v.vin.isNullOrBlank(),
+            hasVin = isValidVin(v.vin),
             hasOem = !v.oemNumber.isNullOrBlank(),
             hasPartNumber = !v.partNumber.isNullOrBlank(),
             hasBrand = !v.brand.isNullOrBlank(),
             hasModel = !v.model.isNullOrBlank(),
-            hasYear = v.year != null,
+            hasYear = v.year != null && v.year in 1886..2100,
             hasEngine = !v.engine.isNullOrBlank(),
             hasTransmission = !v.transmission.isNullOrBlank(),
             hasPosition = ctx.position != PartPosition.NOT_APPLICABLE,
@@ -205,7 +224,6 @@ object CompatibilityEngine {
 
     private fun pickTier(ctx: CompatibilityContext, e: TierEvidence): TierResult {
         val rationale = mutableListOf<String>()
-        val required = mutableListOf<String>()
 
         // EXACT: VIN + (OEM | partNumber) OR closed (brand+model+year+engine+OEM).
         if (e.hasVin && (e.hasOem || e.hasPartNumber)) {
@@ -325,7 +343,8 @@ object CompatibilityEngine {
             )
             questions.add(
                 "¿Confirma que la pieza es específicamente la bomba de combustible y " +
-                    "no el relé o el fusible? P0230 suele ser del circuito, no de la bomba.",
+                    "no el relé o el fusible? P0230 identifica el circuito de control y " +
+                    "no confirma por sí solo una bomba dañada.",
             )
             questions.add(
                 "¿Pueden verificar voltaje en el relé y en el conector de la bomba " +
@@ -342,7 +361,9 @@ object CompatibilityEngine {
         }
 
         // 3) Tier-driven prompts.
-        if (!evidence.hasVin) {
+        if (evidence.vinProvided && !evidence.hasVin) {
+            warnings.add(INVALID_VIN_WARNING)
+        } else if (!evidence.hasVin) {
             val whatWeHave = if (!ctx.vehicle.brand.isNullOrBlank() && !ctx.vehicle.model.isNullOrBlank()) {
                 "${ctx.vehicle.brand} ${ctx.vehicle.model}"
             } else {

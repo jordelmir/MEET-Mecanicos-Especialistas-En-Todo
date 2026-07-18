@@ -2,10 +2,10 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23"
+    id("com.android.legacy-kapt")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.dagger.hilt.android")
-    kotlin("kapt")
 }
 
 // Load local.properties for secrets
@@ -17,7 +17,7 @@ if (localPropsFile.exists()) {
 
 android {
     namespace = "com.elysium369.meet"
-    compileSdk = 35
+    compileSdk = 37
 
     testOptions {
         unitTests {
@@ -50,6 +50,11 @@ android {
         buildConfigField("String", "CAR2DB_REFERER", "\"$car2DbReferer\"")
         buildConfigField("String", "CAR2DB_LANGUAGE", "\"$car2DbLanguage\"")
         buildConfigField("boolean", "CAR2DB_ENABLED", "${car2DbApiKey.isNotBlank()}")
+
+        // MiniMax Debug configurations
+        buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
+        buildConfigField("String", "MINIMAX_BASE_URL", "\"${localProps.getProperty("MINIMAX_BASE_URL", "https://api.minimax.io/v1")}\"")
+        buildConfigField("String", "MINIMAX_DEFAULT_MODEL", "\"${localProps.getProperty("MINIMAX_DEFAULT_MODEL", "MiniMax-M1")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -92,15 +97,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
     }
     packaging {
         resources {
@@ -118,7 +117,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.05.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -126,7 +125,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Accompanist for Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
@@ -135,19 +134,19 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.50")
-    kapt("com.google.dagger:hilt-android-compiler:2.50")
-    implementation("androidx.hilt:hilt-work:1.1.0")
-    kapt("androidx.hilt:hilt-compiler:1.1.0")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("com.google.dagger:hilt-android:2.60.1")
+    kapt("com.google.dagger:hilt-android-compiler:2.60.1")
+    implementation("androidx.hilt:hilt-work:1.4.0")
+    kapt("androidx.hilt:hilt-compiler:1.4.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.4.0")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    kapt("androidx.room:room-compiler:2.8.4")
     
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
@@ -156,16 +155,19 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:storage-kt:2.2.3")
-    implementation("io.ktor:ktor-client-android:2.3.8")
-    implementation("io.ktor:ktor-client-core:2.3.8")
+    implementation(platform("io.ktor:ktor-bom:2.3.13"))
+    implementation("io.ktor:ktor-client-android")
+    implementation("io.ktor:ktor-client-okhttp")
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-content-negotiation")
     
     // Ktor Server (Embedded — for LiveLink WebSocket)
-    implementation("io.ktor:ktor-server-core:2.3.8")
-    implementation("io.ktor:ktor-server-cio:2.3.8")
-    implementation("io.ktor:ktor-server-websockets:2.3.8")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-    implementation("io.ktor:ktor-server-cors:2.3.8")
+    implementation("io.ktor:ktor-server-core")
+    implementation("io.ktor:ktor-server-cio")
+    implementation("io.ktor:ktor-server-websockets")
+    implementation("io.ktor:ktor-server-content-negotiation")
+    implementation("io.ktor:ktor-serialization-kotlinx-json")
+    implementation("io.ktor:ktor-server-cors")
     
     // Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
@@ -175,6 +177,9 @@ dependencies {
     
     // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // Complete vehicle digital twin: SceneView 4.22.0 + Google Filament 1.71.5.
+    implementation("io.github.sceneview:sceneview:4.22.0")
 
     // Google Play Billing Library. Use the Java artifact to stay compatible with the
     // project's Kotlin 1.9 toolchain while still targeting Billing 9.1.0.
@@ -214,9 +219,51 @@ dependencies {
     androidTestImplementation("androidx.test:core:1.5.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation("androidx.room:room-testing:2.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    androidTestImplementation("androidx.room:room-testing:2.8.4")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.05.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+tasks.register("verifyNoSecretsInSource") {
+    doLast {
+        val forbiddenPatterns = listOf(
+            Regex("""sk-[A-Za-z0-9_\-]{20,}"""),
+            Regex("""AIza[0-9A-Za-z_\-]{20,}"""),
+            Regex("""Bearer\s+[A-Za-z0-9_\-\.]{20,}"""),
+            Regex("""[0-9]{8,10}:[A-Za-z0-9_\-]{30,}""")
+        )
+
+        val files = fileTree(projectDir) {
+            include("src/**/*.kt")
+            include("src/**/*.java")
+            include("src/**/*.xml")
+            include("src/**/*.json")
+            include("*.gradle")
+            include("*.gradle.kts")
+        }
+
+        files.forEach { file ->
+            // Do not verify files containing test cases that check the redactor or tests checking debug config keys
+            if (file.name.contains("AiEngineTests") || file.name.contains("SecretRedactor")) {
+                return@forEach
+            }
+            val text = file.readText()
+            forbiddenPatterns.forEach { pattern ->
+                if (pattern.containsMatchIn(text)) {
+                    // Check if it's the build.gradle.kts itself defining the regex pattern or check
+                    if (file.name == "build.gradle.kts" && text.contains("forbiddenPatterns = listOf")) {
+                        // ignore the regex declaration itself
+                        return@forEach
+                    }
+                    throw GradleException("Potential secret found in ${file.path}")
+                }
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("verifyNoSecretsInSource")
 }

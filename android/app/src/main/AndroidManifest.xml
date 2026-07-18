@@ -99,6 +99,15 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Debug AI Test Receiver — invoke via: adb shell am broadcast -a com.elysium369.meet.AI_TEST -->
+        <receiver
+            android:name=".ai.debug.AiTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.elysium369.meet.AI_TEST" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.core.export.ReportGenerator
+import com.elysium369.meet.core.reports.ReportIntegrityCard
+import com.elysium369.meet.core.reports.rememberReportHashingService
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteButton
@@ -654,6 +656,8 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
+                    ReportIntegrityCard(service = rememberReportHashingService())
+                    Spacer(modifier = Modifier.height(16.dp))
                     TextButton(onClick = { reportFile = null }) {
                         Text("Configurar y generar otro reporte", color = MeetColors.electricBlue)
                     }
