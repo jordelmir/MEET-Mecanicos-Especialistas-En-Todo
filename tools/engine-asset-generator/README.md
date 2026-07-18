@@ -4,9 +4,12 @@ Generates the bundled `generic_inline4_engine.glb` and its manifest. The model
 is a recognizable, selectable L2 teaching assembly. Its proportions are
 illustrative and are not Hyundai, OEM, measured, or manufacturing geometry.
 
-The same package also generates five staged D3-detail cutaway vehicle-system assets
-for intake and boost, automatic transmission and drivetrain, suspension,
-steering/brakes/wheels, and electrical/control architecture. D3 refers to
+The same package also generates eighteen staged D3-detail cutaway vehicle-system assets.
+The first generator covers intake and boost, automatic transmission and drivetrain,
+suspension, steering/brakes/wheels, and electrical/control architecture. The extended
+generator covers lighting, HVAC, passive safety, ADAS, body, wipers, interior,
+infotainment, access, hybrid/EV, fluids/wear, hardware, and the functional overview.
+D3 refers to
 recognizable inspection internals and remains separate from L0-L5 geometry authority.
 
 ```bash
@@ -14,6 +17,9 @@ cd tools/engine-asset-generator
 npm ci
 npm run generate
 npm run generate:systems
+npm run generate:extended-systems
+# or regenerate the complete system atlas:
+npm run generate:all-systems
 ```
 
 Every renderable node uses `asset_mesh__<part-key>__<detail>` so Android can
@@ -29,4 +35,5 @@ Generate one system during asset development:
 
 ```bash
 node generate-vehicle-systems.mjs suspension
+node generate-extended-vehicle-systems.mjs hybrid_ev
 ```

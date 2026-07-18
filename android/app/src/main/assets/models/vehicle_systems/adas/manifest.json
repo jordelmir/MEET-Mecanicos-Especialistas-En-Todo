@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.adas.d3",
+  "assetFile": "generic_adas.glb",
+  "displayName": "adas",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 69,
+  "triangleCount": 13880,
+  "partKeys": [
+    "adaptive_cruise_module",
+    "aeb_module",
+    "blind_spot_module",
+    "front_adas_camera",
+    "front_radar",
+    "lane_keep_module",
+    "parking_module",
+    "parking_sensors",
+    "reverse_camera",
+    "surround_cameras",
+    "ultrasonic_array"
+  ],
+  "supportedSystemIds": [
+    "adas"
+  ],
+  "subsystemCoverage": [
+    "Cámaras",
+    "Parking",
+    "Conducción asistida",
+    "Percepción"
+  ],
+  "sha256": "34498aee3af3b7ce5ec1ef9f91d6a5f5f5b6634b128a5d3f296dda0cf10527f5",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

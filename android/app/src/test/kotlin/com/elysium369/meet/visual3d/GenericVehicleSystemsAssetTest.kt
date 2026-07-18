@@ -19,7 +19,20 @@ class GenericVehicleSystemsAssetTest {
         "transmission_drivetrain" to 230,
         "suspension" to 120,
         "steering_brakes_wheels" to 260,
-        "electrical_control" to 285
+        "electrical_control" to 285,
+        "lighting" to 80,
+        "hvac" to 95,
+        "passive_safety" to 65,
+        "adas" to 65,
+        "body" to 110,
+        "wipers" to 45,
+        "interior" to 70,
+        "infotainment" to 70,
+        "access" to 35,
+        "hybrid_ev" to 125,
+        "fluids" to 70,
+        "hardware" to 60,
+        "functional_overview" to 65
     )
 
     private fun asset(path: String): File = listOf(
@@ -76,7 +89,7 @@ class GenericVehicleSystemsAssetTest {
             assertTrue(manifest.contains("\"vehicleSpecificClaim\": false"))
         }
 
-        assertTrue("The complete staged atlas must remain below 36 MB", aggregateBytes < 36_000_000L)
+        assertTrue("The complete staged atlas must remain below 55 MB", aggregateBytes < 55_000_000L)
     }
 
     @Test
@@ -98,5 +111,22 @@ class GenericVehicleSystemsAssetTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `every proprietary system has a specialized visual renderer`() {
+        val manifest = Json.parseToJsonElement(
+            asset("knowledge/proprietary/manifest.json").readText()
+        ).jsonObject
+        val systemIds = manifest.getValue("systems").jsonArray.map { system ->
+            system.jsonObject.getValue("id").jsonPrimitive.content
+        }
+        val handledOutsideSystemAtlas = setOf("structure", "engine")
+        val unresolved = systemIds.filterNot { systemId ->
+            systemId in handledOutsideSystemAtlas ||
+                GenericVehicleSystemsAssetContract.assetForSystem(systemId) != null
+        }
+
+        assertTrue("Systems without a specialized 3D renderer: $unresolved", unresolved.isEmpty())
     }
 }

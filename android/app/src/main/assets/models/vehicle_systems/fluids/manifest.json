@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.fluids.d3",
+  "assetFile": "generic_fluids.glb",
+  "displayName": "fluids",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 76,
+  "triangleCount": 19288,
+  "partKeys": [
+    "ac_oil",
+    "air_filter",
+    "bearing_grease",
+    "brake_discs",
+    "brake_fluid",
+    "brake_pads",
+    "brake_shoes",
+    "cabin_filter",
+    "engine_oil",
+    "fuel_filter",
+    "oil_filter",
+    "transmission_filter"
+  ],
+  "supportedSystemIds": [
+    "fluids"
+  ],
+  "subsystemCoverage": [
+    "Fluidos",
+    "Filtros",
+    "Desgaste"
+  ],
+  "sha256": "2a24bf668aa0d9431243d358302101f4eaed5e882df2deac4132b7de0db1bd8e",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

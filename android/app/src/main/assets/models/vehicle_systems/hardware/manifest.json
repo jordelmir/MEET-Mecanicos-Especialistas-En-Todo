@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.hardware.d3",
+  "assetFile": "generic_hardware.glb",
+  "displayName": "hardware",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 61,
+  "triangleCount": 4832,
+  "partKeys": [
+    "alignment_bolts",
+    "axle_nuts",
+    "bushings",
+    "caliper_bolts",
+    "converter_bolts",
+    "engine_mount_bolts",
+    "flat_gaskets",
+    "flywheel_bolts",
+    "head_bolts",
+    "metal_clamps",
+    "mls_gaskets",
+    "rod_bolts"
+  ],
+  "supportedSystemIds": [
+    "hardware"
+  ],
+  "subsystemCoverage": [
+    "Fasteners",
+    "Sellos",
+    "Sujeción"
+  ],
+  "sha256": "a72c0bf9ba64159a2c57ff097a78c5c3e69b5e92f4031a8d466734a0c638444d",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

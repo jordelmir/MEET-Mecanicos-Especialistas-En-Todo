@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.hybrid_ev.d3",
+  "assetFile": "generic_hybrid_ev.glb",
+  "displayName": "hybrid ev",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 133,
+  "triangleCount": 25744,
+  "partKeys": [
+    "battery_modules",
+    "battery_temperature_sensors",
+    "cell_voltage_sensors",
+    "charge_port",
+    "current_sensors",
+    "e_axle",
+    "front_traction_motor",
+    "hv_battery",
+    "hv_connectors",
+    "hv_fuse",
+    "hv_junction_box",
+    "hybrid_control_module",
+    "orange_hv_cables",
+    "rear_traction_motor",
+    "reduction_gear",
+    "regenerative_brake",
+    "rotor_position_sensor",
+    "traction_inverters"
+  ],
+  "supportedSystemIds": [
+    "hybrid_ev"
+  ],
+  "subsystemCoverage": [
+    "Alta tensión",
+    "Tracción eléctrica"
+  ],
+  "sha256": "70f4bd91c83674dce13b3faa7aea934bf9f0a225dc2482d6e7a32277be94deef",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

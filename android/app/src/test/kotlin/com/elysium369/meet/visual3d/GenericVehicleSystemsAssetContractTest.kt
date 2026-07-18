@@ -15,7 +15,9 @@ class GenericVehicleSystemsAssetContractTest {
     fun `every requested system resolves to one staged asset`() {
         val requested = setOf(
             "intake", "forced_induction", "transmission", "suspension", "steering",
-            "brakes", "wheels", "electrical", "control_modules", "sensors", "actuators"
+            "brakes", "wheels", "electrical", "control_modules", "sensors", "actuators",
+            "lighting", "hvac", "passive_safety", "adas", "body", "wipers", "interior",
+            "infotainment", "access", "hybrid_ev", "fluids", "hardware", "overview"
         )
 
         assertEquals(
@@ -50,6 +52,26 @@ class GenericVehicleSystemsAssetContractTest {
         assertEquals(
             listOf("disc-first", "rack"),
             GenericVehicleSystemsAssetContract.sourceBackedNodes(asset, nodes).map { it.id }
+        )
+    }
+
+    @Test
+    fun `extended asset only exposes families present in the active subassembly`() {
+        val asset = GenericVehicleSystemsAssetContract.assetForSystem("body")!!
+        val doorSection = listOf(
+            UniversalCatalogSceneNode("door", "Puerta delantera izquierda", "body", 1L)
+        )
+        val glassSection = listOf(
+            UniversalCatalogSceneNode("glass", "Vidrio trasero", "body", 2L)
+        )
+
+        assertEquals(
+            listOf("door"),
+            GenericVehicleSystemsAssetContract.sourceBackedNodes(asset, doorSection).map { it.id }
+        )
+        assertEquals(
+            listOf("glass"),
+            GenericVehicleSystemsAssetContract.sourceBackedNodes(asset, glassSection).map { it.id }
         )
     }
 

@@ -237,7 +237,7 @@ object GenericVehicleSystemsAssetContract {
         suspension,
         steeringBrakesWheels,
         electricalControl
-    )
+    ) + GenericExtendedVehicleSystemsContract.assets
 
     private val assetBySystem = buildMap {
         assets.forEach { definition ->

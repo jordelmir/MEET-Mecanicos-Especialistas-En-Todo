@@ -19,6 +19,10 @@ extiende el mismo contrato de inspeccion a:
 - arneses y conectores;
 - ECU/ECM, TCM y control ABS;
 - sensores y actuadores.
+- iluminación, HVAC, seguridad pasiva y ADAS;
+- carrocería, limpiaparabrisas, interior, infotainment y acceso;
+- híbridos/EV, fluidos y desgaste, fasteners, sellos y hardware;
+- índice funcional y reglas como topología informativa.
 
 ## Activos 3D nuevos
 
@@ -30,14 +34,38 @@ extiende el mismo contrato de inspeccion a:
 | `steering_brakes_wheels` | 145 | 52,668 | 3,982,412 | `a0321724ed261a7a3aec70c645b8b58e387ff7856d7e0b430337d0126001e484` |
 | `electrical_control` | 140 | 59,684 | 5,294,060 | `c3b49d0e94f2f91a8e24585caf83e0c8cd59f749532035435a44eba7f3fe4ce8` |
 
-Los cinco GLB suman menos de 16 MB y se cargan por sistema activo. Sus
+Los cinco GLB iniciales fueron elevados posteriormente a detalle D3 y se
+complementan con trece GLB extendidos. Los nuevos activos suman aproximadamente
+17 MB y se cargan por sistema activo. Sus
 manifiestos declaran que no son mallas OEM, dimensionales ni de fabricacion.
+
+## Atlas extendido
+
+| Activo | Mallas | Triángulos | Bytes |
+|---|---:|---:|---:|
+| `lighting` | 82 | 21,908 | 1,108,416 |
+| `hvac` | 98 | 20,056 | 1,527,776 |
+| `passive_safety` | 69 | 16,600 | 939,372 |
+| `adas` | 69 | 13,880 | 1,309,452 |
+| `body` | 117 | 16,968 | 1,337,620 |
+| `wipers` | 46 | 10,048 | 696,072 |
+| `interior` | 72 | 13,400 | 1,216,056 |
+| `infotainment` | 75 | 15,976 | 1,287,072 |
+| `access` | 36 | 7,720 | 736,848 |
+| `hybrid_ev` | 133 | 25,744 | 2,034,120 |
+| `fluids` | 76 | 19,288 | 1,753,648 |
+| `hardware` | 61 | 4,832 | 288,860 |
+| `functional_overview` | 71 | 13,684 | 987,336 |
+
+El generador extendido produce también el contrato Kotlin, por lo que las
+familias de malla, alias literales, etapas y rutas se versionan juntas. Los
+subconjuntos seleccionados en pantalla limitan las familias visibles del GLB.
 
 ## APK
 
 - archivo local de construccion: `android/app/build/outputs/apk/debug/app-debug.apk`;
-- tamano: `122,163,215` bytes;
-- SHA-256: `cf60602ff7f4f1027acc7b92f0c607a15fd5e31519287bca87ebc510d7b4b163`;
+- tamaño: `127,310,586` bytes;
+- SHA-256: `cf12b98b8dd389d5dd76af7428d15e4e7d6865d97e175dfc95cc2ccfa1996776`;
 - instalacion fisica: `adb install -r -d`, resultado `Success`;
 - arranque frio: actividad `com.elysium369.meet/.MainActivity`, resultado `Status: ok`.
 
@@ -46,6 +74,8 @@ manifiestos declaran que no son mallas OEM, dimensionales ni de fabricacion.
 - `./gradlew :app:testDebugUnitTest :app:assembleDebug`: correcto;
 - pruebas de contratos/activos 3D: formato GLB 2, familias requeridas, SHA-256,
   limite movil y aliases literales: correctas;
+- generación determinista de los trece activos: correcta;
+- auditoría WebGL 1440x1000 y 390x844: 13/13 cargados, canvas no vacíos;
 - `bash tests/parity/ci-verify.sh`: TypeScript y Kotlin identicos;
 - `npm test`: 180 pruebas correctas;
 - `npm run build`: correcto;

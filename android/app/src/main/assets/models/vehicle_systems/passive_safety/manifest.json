@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.passive_safety.d3",
+  "assetFile": "generic_passive_safety.glb",
+  "displayName": "passive safety",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 69,
+  "triangleCount": 16600,
+  "partKeys": [
+    "curtain_airbags",
+    "driver_airbag",
+    "impact_sensors",
+    "knee_airbag",
+    "passenger_airbag",
+    "safing_sensor",
+    "seatbelt_pretensioner",
+    "side_airbags",
+    "srs_connectors",
+    "srs_harness",
+    "srs_module"
+  ],
+  "supportedSystemIds": [
+    "passive_safety"
+  ],
+  "subsystemCoverage": [
+    "Airbags",
+    "Sensores y control",
+    "Retención"
+  ],
+  "sha256": "661ca1dbe3fd48419953df471dedec660c84bc235a308cfcde632a5dae2951bc",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

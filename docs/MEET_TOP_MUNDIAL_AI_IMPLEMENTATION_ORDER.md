@@ -1837,7 +1837,7 @@ La fase F0 ya tiene una implementación Android funcional y verificable:
 - arquitectura eléctrica/control con batería, distribución de potencia,
   fusibles, relés, alternador, starter, arneses, conectores, ECU/TCM/ABS,
   sensores y actuadores;
-- cinco GLB de sistemas cargados exclusivamente bajo demanda;
+- dieciocho GLB de sistemas cargados exclusivamente bajo demanda;
 - picking nativo Filament, resaltado de selección y despiece en seis etapas;
 - alias validados literalmente contra `entity_index.json` sin modificar los
   documentos propietarios;
@@ -1850,6 +1850,16 @@ La fase F0 ya tiene una implementación Android funcional y verificable:
   estrías y CV, asientos y fijaciones de suspensión, pistones y superficies de
   fricción, celdas de batería, contactos de fusibles/relés, placas ECU,
   terminales multipin y ramales de arnés.
+- trece dominios extendidos especializados: iluminación, HVAC, seguridad
+  pasiva, ADAS, carrocería, limpiaparabrisas, interior, infotainment, acceso,
+  híbrido/EV, fluidos/desgaste, hardware e índice funcional;
+- los chips de subconjunto filtran tanto la lista literal como las familias de
+  malla visibles, por lo que paneles, puertas, vidrios, espejos y demás grupos
+  cambian efectivamente la inspección 3D;
+- el contrato Kotlin extendido se genera desde la misma tabla declarativa que
+  produce los GLB, evitando divergencia entre claves, alias y activos;
+- hashes deterministas, auditoría WebGL de escritorio/móvil y comprobación de
+  píxeles no vacíos para los trece activos extendidos.
 
 Este estado completa la arquitectura de inspección F0, no el gemelo dimensional
 de fabricación. `D3_RECOGNIZABLE_INTERNALS` es un nivel de detalle visual
