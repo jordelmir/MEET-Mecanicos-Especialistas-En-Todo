@@ -28,11 +28,35 @@ DOCX propietario inmutable
        `-> sections/<documento>-<seccion>-<fragmento>.json
              |-> Android AssetManager (carga perezosa)
              `-> Web public assets (fetch perezoso)
+  -> indice SQLite FTS4 derivado y comprimido
+       `-> busqueda offline sobre texto, tablas y casos reales
   -> Piezas: sistemas, busqueda, detalle literal y casos reales
   -> Motor 3D universal: escena procedural por sistema y entidad
 ```
 
 El manifiesto y el indice son compactos. Los 23 MB aproximados de texto fuente se dividen en fragmentos de tamano acotado; Android y web cargan solamente el fragmento que el usuario abre. Esto evita congelar la interfaz o duplicar el corpus completo en memoria.
+
+### Busqueda literal Android
+
+`tools/knowledge/build_proprietary_search_index.py` genera un SQLite FTS4
+derivado de los 347 shards. El archivo contiene exactamente 74.648 filas,
+valida el hash de cada texto y guarda el SHA del corpus en `metadata`. Se
+comprime como `search.sqlite.gzip` para assets y se instala atomicamente en
+`noBackupFilesDir` durante la primera consulta.
+
+La busqueda se ejecuta fuera del hilo principal y acepta filtros por sistema y
+rol documental. Cada resultado conserva documento, seccion, orden, bloque,
+hash, entidad padre y filas de tabla. Si el indice no supera la validacion, la
+interfaz degrada a la busqueda de nombres existente; los shards canonicos nunca
+dejan de estar disponibles.
+
+### Contexto IA citado
+
+`ProprietaryGroundedContextBuilder` prepara evidencia literal acotada para la
+IA. Cada fragmento incluye una cita `archivo#orden:hash`, y el sobre declara que
+el contenido fuente es dato no confiable, no instrucciones. Preparar contexto
+no publica conocimiento canonico, no confirma compatibilidad y no autoriza
+pruebas activas.
 
 ## Clasificacion sin perdida
 
@@ -64,4 +88,10 @@ La clasificacion ayuda a navegar, pero no cambia el texto. Los bloques ambiguos 
 - El perfil visible usa exactamente `Hyundai Accent/Verna 2005 · caja automatica · motor 1600 cc`.
 - Los casos reales no aplicables se muestran con el texto original del documento.
 - Busqueda, filtros, detalle literal y apertura 3D funcionan en Android y web.
+- La busqueda Android encuentra `COMPONENT`, `REAL_CASE`, `TABLE` y
+  `SOURCE_DETAIL` sin cargar todo el corpus en memoria.
+- Las tablas se presentan por filas y celdas, conservando tambien su texto y
+  hash original.
+- Toda pieza propietaria puede preparar contexto IA con citas aunque no exista
+  en el catalogo diagnostico generico.
 - Pruebas Python, web, Kotlin, paridad, build APK y smoke test quedan verdes.

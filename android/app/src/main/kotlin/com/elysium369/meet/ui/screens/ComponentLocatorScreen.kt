@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ai.DiagnosticAiContextBuilder
+import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
@@ -131,6 +132,7 @@ fun ComponentLocatorScreen(
     var selectedEngineType by remember(detectedEngineType) { mutableStateOf(detectedEngineType) }
     val visualRepository = remember { VisualDiagnosticRepositoryImpl() }
     val aiContextBuilder = remember { DiagnosticAiContextBuilder() }
+    val proprietaryAiContextBuilder = remember { ProprietaryGroundedContextBuilder() }
     val visualEngineType = remember(selectedEngineType) { selectedEngineType.toVisualEngineType() }
     
     // Base profesional de componentes filtrada por tipo de motor.
@@ -866,6 +868,7 @@ fun ComponentLocatorScreen(
         ) {
             selectedComponent?.let { comp ->
                 val activeDtcOnPiece = comp.relatedDtcs.firstOrNull { allActiveDtcs.contains(it) }
+                val proprietaryEntity = proprietaryEntitiesById[comp.id]
                 val diagnosticComponent = remember(comp.id, visualEngineType) {
                     visualRepository.findComponent(visualEngineType, comp.id)
                 }
@@ -917,6 +920,9 @@ fun ComponentLocatorScreen(
                                 }
                                 if (diagnosticComponent != null) {
                                     StatusPill("Ficha OEM-ready", MeetColors.cyberCyan)
+                                }
+                                if (proprietaryEntity != null) {
+                                    StatusPill("Fuente literal", MeetColors.neonGreen)
                                 }
                             }
 
@@ -993,18 +999,32 @@ fun ComponentLocatorScreen(
                                 }
                             }
 
-                            if (diagnosticComponent != null) {
+                            if (diagnosticComponent != null || proprietaryEntity != null) {
                                 Spacer(Modifier.height(8.dp))
                                 EliteTextButton(
-                                    text = "ARMAR CONTEXTO IA DE ESTA PIEZA",
+                                    text = if (proprietaryEntity != null) "ARMAR IA CON FUENTE CITADA" else "ARMAR CONTEXTO IA DE ESTA PIEZA",
                                     onClick = {
-                                        aiContextPreview = aiContextBuilder.build(
-                                            vehicleLabel = vehicleLabel,
-                                            engineType = visualEngineType,
-                                            component = diagnosticComponent,
-                                            activeDtcs = allActiveDtcs.toSet(),
-                                            livePidValues = livePidValues
-                                        )
+                                        aiContextPreview = if (proprietaryEntity != null) {
+                                            val literalBlocks = runCatching {
+                                                proprietaryRepository.literalContext(proprietaryEntity, maxBlocks = Int.MAX_VALUE)
+                                            }.getOrDefault(emptyList())
+                                            proprietaryAiContextBuilder.build(
+                                                entity = proprietaryEntity,
+                                                blocks = literalBlocks,
+                                                focus = buildString {
+                                                    append("Diagnostico, inspeccion y reparacion de la pieza seleccionada")
+                                                    if (allActiveDtcs.isNotEmpty()) append(". DTC activos: ${allActiveDtcs.joinToString()}")
+                                                }
+                                            )
+                                        } else {
+                                            aiContextBuilder.build(
+                                                vehicleLabel = vehicleLabel,
+                                                engineType = visualEngineType,
+                                                component = checkNotNull(diagnosticComponent),
+                                                activeDtcs = allActiveDtcs.toSet(),
+                                                livePidValues = livePidValues
+                                            )
+                                        }
                                     },
                                     color = MeetColors.neonGreen,
                                     isEnabled = true
@@ -1020,14 +1040,14 @@ fun ComponentLocatorScreen(
                                             .padding(10.dp)
                                     ) {
                                         Text(
-                                            "Contexto técnico listo para IA",
+                                            if (proprietaryEntity != null) "Contexto literal citado listo para IA" else "Contexto técnico listo para IA",
                                             color = MeetColors.neonGreen,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(Modifier.height(4.dp))
                                         Text(
-                                            aiContextPreview.orEmpty().take(900),
+                                            aiContextPreview.orEmpty().take(1_800),
                                             color = MeetColors.textSecondary,
                                             fontSize = 10.sp,
                                             lineHeight = 14.sp

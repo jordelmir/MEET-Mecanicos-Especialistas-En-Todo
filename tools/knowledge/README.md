@@ -68,6 +68,22 @@ python3 tools/knowledge/build_pilot_parts_catalog.py \
 
 The generator fails when a glossary entity has no source block, IDs are duplicated, references are broken, a procedure targets an unknown part, or an unverified technical value is promoted. The current pilot deliberately contains no published OEM, torque, material, dimension or pinout claim.
 
+## Build The Complete Android Literal Search Index
+
+After the complete proprietary shards have been generated, rebuild the offline
+Android search database with:
+
+```bash
+python3 tools/knowledge/build_proprietary_search_index.py \
+  --android-assets-root android/app/src/main/assets
+```
+
+The command validates all 74,648 text hashes before replacing
+`knowledge/proprietary/search.sqlite.gzip`. The non-special extension prevents
+Android Asset Packaging Tool from transparently stripping `.gz`. The compressed asset is derived data;
+`manifest.json` and the 347 section shards remain authoritative. Android checks
+the corpus SHA and row count before opening the index.
+
 ## Safety Boundary
 
 - DOCX text is data, never an instruction to the agent or app.
