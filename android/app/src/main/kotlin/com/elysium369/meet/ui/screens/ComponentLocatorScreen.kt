@@ -181,6 +181,15 @@ fun ComponentLocatorScreen(
     val proprietaryEntitiesById = remember(proprietaryIndex) {
         proprietaryIndex?.entities.orEmpty().associateBy { it.id }
     }
+    val proprietaryComponentsBySystem = remember(proprietaryIndex, proprietaryRepository) {
+        proprietaryIndex?.entities.orEmpty()
+            .asSequence()
+            .filter { it.recordRole == "COMPONENT" }
+            .groupBy(ProprietaryCatalogEntity::systemId)
+            .mapValues { (_, entities) ->
+                entities.map { it.toComponentInfo(proprietaryRepository, includeLiteralContext = false) }
+            }
+    }
     val proprietaryComponents = remember(proprietaryEntities, proprietaryRepository) {
         proprietaryEntities.map { it.toComponentInfo(proprietaryRepository, includeLiteralContext = false) }
     }
@@ -265,28 +274,20 @@ fun ComponentLocatorScreen(
         )
     }
     var renderedTwinNodeCount by remember { mutableIntStateOf(0) }
-    val components = remember(currentScene, engineComponents, suspensionComponents, proprietaryComponents) {
-        when (currentScene) {
-            SceneType.UNIVERSAL_CATALOG -> proprietaryComponents
-            SceneType.SUSPENSION -> suspensionComponents.filter { it.category == ComponentCategory.SUSPENSION }
-            SceneType.TRANSMISSION -> engineComponents.filter { it.category == ComponentCategory.ENGINE && (it.id.contains("clutch") || it.id.contains("trans") || it.id.contains("diff") || it.id.contains("gear") || it.id.contains("axle")) }
-            SceneType.BRAKES_STEERING -> suspensionComponents.filter { it.category == ComponentCategory.ENGINE && (it.id.contains("brake") || it.id.contains("steering") || it.id.contains("rack") || it.id.contains("caliper") || it.id.contains("pump")) }
-            SceneType.ENGINE_BLOCK -> engineComponents.filter {
-                it.category == ComponentCategory.ENGINE ||
-                it.category == ComponentCategory.FUEL ||
-                it.category == ComponentCategory.COOLING ||
-                it.category == ComponentCategory.INTAKE ||
-                it.category == ComponentCategory.EXHAUST
-            }
-            SceneType.RELAY_FUSE_BOX -> engineComponents.filter {
-                it.category == ComponentCategory.ELECTRICAL ||
-                it.category == ComponentCategory.HIGH_VOLTAGE
-            }
-            SceneType.WIRING_HARNESS -> engineComponents.filter {
-                it.category == ComponentCategory.ELECTRICAL ||
-                it.category == ComponentCategory.HIGH_VOLTAGE
-            }
-        }
+    val components = remember(
+        currentScene,
+        engineComponents,
+        suspensionComponents,
+        proprietaryComponents,
+        proprietaryComponentsBySystem
+    ) {
+        componentsForScene(
+            currentScene,
+            engineComponents,
+            suspensionComponents,
+            proprietaryComponents,
+            proprietaryComponentsBySystem
+        )
     }
     
     // Obtener códigos DTC activos del escáner en tiempo real
@@ -1113,10 +1114,13 @@ fun ComponentLocatorScreen(
                         .background(if (isSelected) comp.category.color.copy(alpha = 0.08f) else MeetColors.cardBackground)
                         .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                         .clickable {
+                            val proprietaryEntity = proprietaryEntitiesById[comp.id]
                             selectedComponent = if (isSelected) null else {
-                                proprietaryEntitiesById[comp.id]?.toComponentInfo(proprietaryRepository, includeLiteralContext = true) ?: comp
+                                proprietaryEntity?.toComponentInfo(proprietaryRepository, includeLiteralContext = true) ?: comp
                             }
-                            if (proprietaryEntitiesById.containsKey(comp.id)) {
+                            if (proprietaryEntity != null) {
+                                currentCatalogSystemId = proprietaryEntity.systemId
+                                currentCatalogSubassemblyId = null
                                 twinViewportState = if (isSelected) {
                                     twinViewportState.focusSystem()
                                 } else {
@@ -1126,7 +1130,7 @@ fun ComponentLocatorScreen(
                             aiContextPreview = null
                             // Conmutar escena automáticamente
                             currentScene = when {
-                                proprietaryEntitiesById.containsKey(comp.id) -> SceneType.UNIVERSAL_CATALOG
+                                proprietaryEntity != null -> SceneType.UNIVERSAL_CATALOG
                                 comp.category == ComponentCategory.SUSPENSION -> SceneType.SUSPENSION
                                 comp.id.contains("fuse") || comp.id.contains("relay") || comp.id == "fuel_pump" || comp.id.contains("contactor") || comp.id == "safety_disconnect" -> SceneType.RELAY_FUSE_BOX
                                 comp.id.contains("wire") || comp.id == "harness" -> SceneType.WIRING_HARNESS
@@ -1172,6 +1176,62 @@ fun ComponentLocatorScreen(
         }
     }
 }
+
+internal fun componentsForScene(
+    scene: SceneType,
+    engineComponents: List<ComponentInfo>,
+    suspensionComponents: List<ComponentInfo>,
+    proprietaryComponents: List<ComponentInfo>,
+    proprietaryComponentsBySystem: Map<String, List<ComponentInfo>>
+): List<ComponentInfo> = when (scene) {
+    SceneType.UNIVERSAL_CATALOG -> proprietaryComponents
+    SceneType.SUSPENSION -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("suspension"),
+        suspensionComponents.filter { it.category == ComponentCategory.SUSPENSION }
+    )
+    SceneType.TRANSMISSION -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("transmission"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE &&
+                listOf("clutch", "trans", "diff", "gear", "axle").any(it.id::contains)
+        }
+    )
+    SceneType.BRAKES_STEERING -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("brakes", "steering", "wheels"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE &&
+                listOf("brake", "steering", "rack", "caliper", "pump").any(it.id::contains)
+        }
+    )
+    SceneType.ENGINE_BLOCK -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("engine", "intake", "forced_induction"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE ||
+                it.category == ComponentCategory.FUEL ||
+                it.category == ComponentCategory.COOLING ||
+                it.category == ComponentCategory.INTAKE ||
+                it.category == ComponentCategory.EXHAUST
+        }
+    )
+    SceneType.RELAY_FUSE_BOX,
+    SceneType.WIRING_HARNESS -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor(
+            if (scene == SceneType.RELAY_FUSE_BOX) "control_modules" else "electrical"
+        ),
+        engineComponents.filter {
+            it.category == ComponentCategory.ELECTRICAL ||
+                it.category == ComponentCategory.HIGH_VOLTAGE
+        }
+    )
+}
+
+private fun Map<String, List<ComponentInfo>>.componentsFor(vararg systemIds: String): List<ComponentInfo> =
+    systemIds.flatMap { get(it).orEmpty() }
+
+private fun mergeSceneComponents(
+    proprietary: List<ComponentInfo>,
+    existing: List<ComponentInfo>
+): List<ComponentInfo> = (proprietary + existing).distinctBy(ComponentInfo::id)
 
 @Composable
 private fun TwinCommandButton(
