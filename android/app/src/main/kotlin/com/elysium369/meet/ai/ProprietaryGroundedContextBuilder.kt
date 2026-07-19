@@ -78,4 +78,33 @@ class ProprietaryGroundedContextBuilder(
             )
         )
     }
+
+    fun buildReadableBrief(
+        entity: ProprietaryCatalogEntity,
+        blocks: List<ProprietarySourceBlock>,
+        maxEvidenceBlocks: Int = 18
+    ): String = buildString {
+        appendLine("ANALISIS TECNICO CITADO")
+        appendLine(entity.nameOriginal)
+        appendLine()
+        appendLine("Alcance: ${entity.vehicleScope}")
+        appendLine("Sistema: ${entity.systemId}")
+        appendLine("Fuente: ${entity.sourceFileName}")
+        appendLine("SHA-256: ${entity.sourceDocumentSha256}")
+        appendLine()
+        appendLine("EVIDENCIA LITERAL RELACIONADA")
+        blocks.asSequence()
+            .filter { it.text.isNotBlank() }
+            .distinctBy { it.textHash }
+            .take(maxEvidenceBlocks.coerceIn(1, 40))
+            .forEach { block ->
+                appendLine()
+                appendLine("[${entity.sourceFileName} #${block.order} · ${block.textHash.take(12)}]")
+                appendLine(block.text)
+            }
+        appendLine()
+        appendLine("CRITERIO DE CONFIANZA")
+        append("La evidencia anterior se conserva literal. Medidas, torque, compatibilidad exacta, ")
+        append("materiales y procedimiento final requieren confirmacion OEM y prueba fisica cuando la fuente no los cierre.")
+    }
 }

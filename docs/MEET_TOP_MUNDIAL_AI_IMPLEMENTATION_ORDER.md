@@ -1869,6 +1869,42 @@ no autorizan tolerancias, cálculos estructurales, manufactura ni afirmaciones
 OEM. La evolución siguiente conserva estos contratos y sustituye familias genéricas
 por geometría medida sólo cuando exista evidencia suficiente.
 
+### 18.16 Interacción persistente, evidencia por pieza y plataformas MEET — 2026-07-19
+
+El siguiente incremento F0 conserva el vehículo existente de forma permanente y
+añade nueve plataformas 3D originales seleccionables:
+
+- `MEET Titan Forge`, vehículo pesado de tres ejes;
+- `MEET Backhoe HX`, retroexcavadora;
+- `MEET Terra Loader`, cargador frontal articulado;
+- `MEET Chronos Flux`, concepto de movilidad futura;
+- `MEET Ion Vector`, vehículo eléctrico;
+- `MEET Apex R`, superdeportivo;
+- `MEET Aero V1`, aeronave;
+- `MEET Asterion`, cohete;
+- `MEET Abyss One`, submarino.
+
+Cada plataforma tiene GLB propio, silueta diferenciada, grupos de pieza nombrados,
+manifiesto SHA-256 y fuente generadora reproducible. Son diseños procedurales
+propietarios de MEET, no reproducciones de RAM ni de ningún OEM. No son CAD
+dimensional, homologación, cálculo estructural ni autorización de fabricación:
+materiales, mediciones, física, fuerzas G y procesos deben superar los gates F1-F9.
+
+La selección de una pieza ya no forma parte de la identidad de la escena. Por tanto,
+el usuario puede orbitar con el dedo, tocar sucesivas piezas y conservar su cámara;
+solo un cambio explícito de plataforma reconstruye el activo. La pantalla completa
+de Motor 3D y la ficha técnica tienen desplazamiento vertical, y la lista de piezas
+mantiene su propio viewport acotado para no materializar miles de filas.
+
+El conocimiento propietario se vincula ahora en dos capas: bloque directo y
+explicaciones literales relacionadas dentro de la misma sección. Esto resuelve el
+patrón real de los DOCX, donde primero aparece una BOM y más adelante el detalle
+del sistema menciona cada pieza. La app conserva texto, orden, bloque, SHA-256 y
+archivo fuente; el análisis visible es legible y citado, no una vista previa de JSON.
+
+`RE-LEER FF` exige enlace OBD real, captura errores de transporte sin cerrar la app
+y comunica si falta conexión, la ECU no devolvió datos o la lectura falló.
+
 ### 17.12 Referencias técnicas primarias para la implementación
 
 - LiteRT CompiledModel: <https://developers.google.com/edge/litert/inference>

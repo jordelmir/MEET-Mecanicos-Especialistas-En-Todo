@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.RequestDisallowInterceptTouchEvent
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +51,8 @@ import com.elysium369.meet.data.visualdiagnostics.VisualDiagnosticRepositoryImpl
 import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
 import com.elysium369.meet.visual3d.domain.GenericInlineFourAssetContract
 import com.elysium369.meet.visual3d.domain.GenericVehicleSystemsAssetContract
+import com.elysium369.meet.visual3d.domain.MeetPlatformCatalog
+import com.elysium369.meet.visual3d.domain.MeetPlatformProfile
 import com.elysium369.meet.visual3d.ui.CompleteVehicleTwinView
 import com.elysium369.meet.visual3d.ui.TwinFocusMode
 import com.elysium369.meet.visual3d.ui.VehicleTwinViewportState
@@ -262,6 +266,7 @@ fun ComponentLocatorScreen(
         )
     }
     var explodedServiceView by remember { mutableStateOf(false) }
+    var selectedPlatform by remember { mutableStateOf(MeetPlatformCatalog.default) }
     var twinViewportState by remember(initialProprietaryEntity) {
         mutableStateOf(
             VehicleTwinViewportState(
@@ -321,7 +326,6 @@ fun ComponentLocatorScreen(
         aiContextPreview = null
         if (comp != null) {
             selectedComponent = comp
-            if (proprietaryEntity != null) twinViewportState = twinViewportState.focusComponent()
         } else {
             selectedComponent = ComponentInfo(
                 id = meshId,
@@ -355,6 +359,7 @@ fun ComponentLocatorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDeep)
+            .verticalScroll(rememberScrollState())
     ) {
         // ── Top Bar ──
         Row(
@@ -598,6 +603,30 @@ fun ComponentLocatorScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            MeetPlatformCatalog.profiles.forEach { platform ->
+                PlatformSelectorButton(
+                    platform = platform,
+                    selected = platform.id == selectedPlatform.id,
+                    onClick = {
+                        selectedPlatform = platform
+                        selectedComponent = null
+                        aiContextPreview = null
+                        explodedServiceView = false
+                        twinViewportState = twinViewportState.returnToVehicle()
+                    }
+                )
+            }
+        }
+
+        val disallowPageIntercept = remember { RequestDisallowInterceptTouchEvent() }
+
         // ── 3D Viewport Box ──
         Box(
             modifier = Modifier
@@ -607,6 +636,12 @@ fun ComponentLocatorScreen(
                 .clip(RoundedCornerShape(16.dp))
                 .background(MeetColors.cardBackground)
                 .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(16.dp))
+                .pointerInteropFilter(disallowPageIntercept) { event ->
+                    if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                        disallowPageIntercept(true)
+                    }
+                    false
+                }
         ) {
             val mappedSystemId = when (currentScene) {
                 SceneType.ENGINE_BLOCK -> "engine"
@@ -631,13 +666,14 @@ fun ComponentLocatorScreen(
             }
 
             key(
+                selectedPlatform.id,
                 mappedSystemId,
                 activeCatalogSceneNodes.size,
                 activeCatalogSceneNodes.firstOrNull()?.sectionId,
-                activeCatalogSceneNodes.lastOrNull()?.sectionId,
-                selectedComponent?.id
+                activeCatalogSceneNodes.lastOrNull()?.sectionId
             ) {
             CompleteVehicleTwinView(
+                platformAssetPath = selectedPlatform.assetPath,
                 selectedSystemId = mappedSystemId,
                 selectedEntityId = selectedComponent?.id,
                 viewportState = twinViewportState.copy(
@@ -705,7 +741,7 @@ fun ComponentLocatorScreen(
                 ) {
                     Text(
                         text = if (currentScene == SceneType.UNIVERSAL_CATALOG) {
-                            "Vehiculo 3D de referencia · ${proprietaryManifest?.systems?.firstOrNull { it.id == currentCatalogSystemId }?.title.orEmpty()}"
+                            "${selectedPlatform.displayName} · ${proprietaryManifest?.systems?.firstOrNull { it.id == currentCatalogSystemId }?.title.orEmpty()}"
                         } else {
                             "${selectedEngineType.label} - ${sceneDisplayName(currentScene, selectedEngineType)}"
                         },
@@ -725,9 +761,9 @@ fun ComponentLocatorScreen(
                         )
                         Text(
                             text = if (currentCatalogSystemId == "engine") {
-                                "Malla mecanica L2 + fallback · no dimensional/OEM"
+                                "Malla mecanica MEET L2 · no dimensional/OEM"
                             } else {
-                                "Esquema procedural · no dimensional/OEM"
+                                "Construccion procedural MEET · no dimensional/OEM"
                             },
                             color = MeetColors.warning,
                             fontSize = 7.sp,
@@ -744,7 +780,7 @@ fun ComponentLocatorScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "L2 · conjunto mecanico generico · ID literal",
+                                text = "L2 · conjunto mecanico MEET · ID literal",
                                 color = MeetColors.textSecondary,
                                 fontSize = 7.sp,
                                 maxLines = 1,
@@ -888,7 +924,7 @@ fun ComponentLocatorScreen(
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 320.dp)
+                            .heightIn(min = 240.dp, max = 560.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -1003,19 +1039,15 @@ fun ComponentLocatorScreen(
                             if (diagnosticComponent != null || proprietaryEntity != null) {
                                 Spacer(Modifier.height(8.dp))
                                 EliteTextButton(
-                                    text = if (proprietaryEntity != null) "ARMAR IA CON FUENTE CITADA" else "ARMAR CONTEXTO IA DE ESTA PIEZA",
+                                    text = if (proprietaryEntity != null) "ANALIZAR CON FUENTE CITADA" else "ARMAR CONTEXTO IA DE ESTA PIEZA",
                                     onClick = {
                                         aiContextPreview = if (proprietaryEntity != null) {
                                             val literalBlocks = runCatching {
                                                 proprietaryRepository.literalContext(proprietaryEntity, maxBlocks = Int.MAX_VALUE)
                                             }.getOrDefault(emptyList())
-                                            proprietaryAiContextBuilder.build(
+                                            proprietaryAiContextBuilder.buildReadableBrief(
                                                 entity = proprietaryEntity,
-                                                blocks = literalBlocks,
-                                                focus = buildString {
-                                                    append("Diagnostico, inspeccion y reparacion de la pieza seleccionada")
-                                                    if (allActiveDtcs.isNotEmpty()) append(". DTC activos: ${allActiveDtcs.joinToString()}")
-                                                }
+                                                blocks = literalBlocks
                                             )
                                         } else {
                                             aiContextBuilder.build(
@@ -1041,14 +1073,14 @@ fun ComponentLocatorScreen(
                                             .padding(10.dp)
                                     ) {
                                         Text(
-                                            if (proprietaryEntity != null) "Contexto literal citado listo para IA" else "Contexto técnico listo para IA",
+                                            if (proprietaryEntity != null) "Analisis literal citado" else "Contexto tecnico listo para IA",
                                             color = MeetColors.neonGreen,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(Modifier.height(4.dp))
                                         Text(
-                                            aiContextPreview.orEmpty().take(1_800),
+                                            aiContextPreview.orEmpty(),
                                             color = MeetColors.textSecondary,
                                             fontSize = 10.sp,
                                             lineHeight = 14.sp
@@ -1095,7 +1127,8 @@ fun ComponentLocatorScreen(
         // ── Component List ──
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(560.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
@@ -1234,6 +1267,42 @@ private fun mergeSceneComponents(
 ): List<ComponentInfo> = (proprietary + existing).distinctBy(ComponentInfo::id)
 
 @Composable
+private fun PlatformSelectorButton(
+    platform: MeetPlatformProfile,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = if (selected) MeetColors.neonGreen else MeetColors.cyberCyan
+    Column(
+        modifier = Modifier
+            .width(132.dp)
+            .height(54.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) color.copy(alpha = 0.16f) else MeetColors.cardBackground)
+            .border(1.dp, color.copy(alpha = if (selected) 0.9f else 0.32f), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            platform.displayName,
+            color = if (selected) color else Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            platform.category,
+            color = MeetColors.textMuted,
+            fontSize = 7.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 private fun TwinCommandButton(
     label: String,
     active: Boolean,
@@ -1349,7 +1418,7 @@ private fun sceneDisplayName(sceneType: SceneType, engineType: EngineType): Stri
         SceneType.ENGINE_BLOCK -> if (engineType == EngineType.ELECTRIC) "motor, inversor y batería" else "motor, admisión y escape"
         SceneType.RELAY_FUSE_BOX -> if (engineType == EngineType.ELECTRIC) "control y protecciones HV" else "fusibles, relés y protecciones"
         SceneType.WIRING_HARNESS -> if (engineType == EngineType.ELECTRIC) "arnés de alto voltaje" else "arnés, señales y alimentación"
-        SceneType.SUSPENSION -> "esquema genérico, no dimensional ni OEM"
+        SceneType.SUSPENSION -> "construccion MEET, no dimensional ni OEM"
         SceneType.TRANSMISSION -> "transmisión, embrague y diferencial"
         SceneType.BRAKES_STEERING -> "sistema de frenado, dirección hidráulica/asistida"
         SceneType.UNIVERSAL_CATALOG -> "catálogo propietario completo · esquema procedural"
@@ -1417,7 +1486,7 @@ private fun CatalogPart.toComponentInfo(): ComponentInfo {
         professionalChecks = listOf("Confirme VIN, OEM, foto, conector o medidas antes de decidir compatibilidad."),
         repairWorkflow = listOf("Use el catálogo de Piezas y Reparaciones para abrir un procedimiento revisable."),
         serviceSpecs = listOf("Datos técnicos: no confirmados para esta variante."),
-        safetyNotes = listOf("Modelo visual genérico; no es una geometría OEM ni dimensional.")
+        safetyNotes = listOf("Modelo visual MEET; no es una geometria OEM ni dimensional.")
     )
 }
 

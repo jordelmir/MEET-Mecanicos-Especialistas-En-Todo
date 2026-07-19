@@ -77,10 +77,9 @@ import dev.romainguy.kotlin.math.Mat4
 import kotlin.math.abs
 import kotlin.math.sin
 
-private const val REFERENCE_VEHICLE_ASSET = "models/vehicle_twin/reference_vehicle.glb"
-
 @Composable
 fun CompleteVehicleTwinView(
+    platformAssetPath: String,
     selectedSystemId: String,
     selectedEntityId: String?,
     viewportState: VehicleTwinViewportState,
@@ -104,6 +103,7 @@ fun CompleteVehicleTwinView(
     }
 
     FilamentVehicleScene(
+        platformAssetPath = platformAssetPath,
         selectedSystemId = selectedSystemId,
         selectedEntityId = selectedEntityId,
         viewportState = viewportState,
@@ -122,6 +122,7 @@ fun CompleteVehicleTwinView(
 
 @Composable
 private fun FilamentVehicleScene(
+    platformAssetPath: String,
     selectedSystemId: String,
     selectedEntityId: String?,
     viewportState: VehicleTwinViewportState,
@@ -140,7 +141,9 @@ private fun FilamentVehicleScene(
     val filamentView = rememberView(engine)
     val sceneCollisionSystem = rememberCollisionSystem(filamentView)
     val modelLoader = rememberModelLoader(engine)
-    val modelInstance = rememberModelInstance(modelLoader, REFERENCE_VEHICLE_ASSET)
+    val modelInstance = androidx.compose.runtime.key(platformAssetPath) {
+        rememberModelInstance(modelLoader, platformAssetPath)
+    }
     val inlineFourModelInstance = rememberModelInstance(
         modelLoader,
         GenericInlineFourAssetContract.ASSET_PATH

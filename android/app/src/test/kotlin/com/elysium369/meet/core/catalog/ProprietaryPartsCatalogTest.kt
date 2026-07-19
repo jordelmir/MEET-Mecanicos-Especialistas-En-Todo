@@ -71,4 +71,20 @@ class ProprietaryPartsCatalogTest {
         }
         assertEquals(74_648, blockCount)
     }
+
+    @Test
+    fun `leaf component receives later literal system explanation`() {
+        val entity = index.entities.first {
+            it.sourceDocumentId == "document_16" && it.nameOriginal == "Pedal de freno"
+        }
+        val shard = ProprietaryCatalogParser.decodeSection(asset(entity.shardPath).readText())
+
+        val context = selectLiteralContext(shard.blocks, entity, maxBlocks = 360)
+
+        assertTrue(context.any { it.blockId == entity.sourceBlockId })
+        assertTrue(context.any { it.text.contains("Pedal de freno", ignoreCase = true) && it.order > entity.sourceOrder })
+        assertTrue(context.size > 1)
+        assertEquals(context.map { it.order }.sorted(), context.map { it.order })
+        assertEquals(context.map { it.blockId }.distinct().size, context.size)
+    }
 }

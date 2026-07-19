@@ -1231,6 +1231,7 @@ private fun HoloDtcCard(
 
                     // Freeze Frame
                     val freezeFrame by viewModel.freezeFrameData.collectAsState()
+                    val freezeFrameStatus by viewModel.cloudSyncState.collectAsState()
                     val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
                     if (scopedFrame.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(14.dp))
@@ -1285,6 +1286,20 @@ private fun HoloDtcCard(
                             val cs = rememberCoroutineScope()
                             EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
                         }
+                    }
+
+                    if (
+                        freezeFrameStatus.contains("freeze frame", ignoreCase = true) ||
+                        freezeFrameStatus.contains("Cuadro Congelado", ignoreCase = true) ||
+                        freezeFrameStatus.contains("Conecta el OBD", ignoreCase = true)
+                    ) {
+                        Text(
+                            freezeFrameStatus,
+                            color = if (freezeFrameStatus.startsWith("No se pudo")) MeetColors.error else MeetColors.cyberCyan,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))

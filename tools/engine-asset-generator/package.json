@@ -7,7 +7,8 @@
     "generate": "node generate-inline4-engine.mjs",
     "generate:systems": "node generate-vehicle-systems.mjs",
     "generate:extended-systems": "node generate-extended-vehicle-systems.mjs",
-    "generate:all-systems": "npm run generate:systems && npm run generate:extended-systems"
+    "generate:all-systems": "npm run generate:systems && npm run generate:extended-systems",
+    "generate:meet-platforms": "node generate-meet-platforms.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

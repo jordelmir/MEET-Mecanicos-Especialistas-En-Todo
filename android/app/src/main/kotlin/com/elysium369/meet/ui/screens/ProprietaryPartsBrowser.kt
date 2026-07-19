@@ -156,7 +156,7 @@ fun ProprietaryPartsBrowser(
                     entity = activeEntity,
                     blocks = literalBlocks,
                     groundedAiContext = remember(activeEntity, literalBlocks) {
-                        groundedContextBuilder.build(activeEntity, literalBlocks)
+                        groundedContextBuilder.buildReadableBrief(activeEntity, literalBlocks)
                     },
                     onBack = { selectedEntity = null },
                     onOpen3d = { navController.navigate("component_locator?partId=${activeEntity.id}") }
@@ -400,7 +400,7 @@ private fun ProprietaryEntityDetail(
                 onClick = { showAiContext = !showAiContext },
                 modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
             ) {
-                Text(if (showAiContext) "CERRAR IA" else "IA CITADA", fontWeight = FontWeight.Black, fontSize = 10.sp)
+                Text(if (showAiContext) "CERRAR ANALISIS" else "ANALISIS CITADO", fontWeight = FontWeight.Black, fontSize = 10.sp)
             }
         }
 
@@ -415,17 +415,14 @@ private fun ProprietaryEntityDetail(
                     .verticalScroll(rememberScrollState())
                     .padding(10.dp)
             ) {
-                Text("CONTEXTO IA CON EVIDENCIA", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                Text("CONOCIMIENTO PROPIETARIO CON EVIDENCIA", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    groundedAiContext.take(3_600),
+                    groundedAiContext,
                     color = MeetColors.textSecondary,
                     fontSize = 9.sp,
                     lineHeight = 13.sp
                 )
-                if (groundedAiContext.length > 3_600) {
-                    Text("Vista previa truncada; el paquete interno conserva el presupuesto completo.", color = MeetColors.warning, fontSize = 8.sp)
-                }
             }
         }
         LazyColumn(

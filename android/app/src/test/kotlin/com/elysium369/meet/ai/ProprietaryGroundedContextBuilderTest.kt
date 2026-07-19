@@ -61,6 +61,20 @@ class ProprietaryGroundedContextBuilderTest {
         assertTrue(decoded.evidence.all { it.text.length == 10 || it.text.length == 1_000 })
     }
 
+    @Test
+    fun `readable brief exposes literal evidence instead of raw json`() {
+        val brief = ProprietaryGroundedContextBuilder().buildReadableBrief(
+            entity,
+            listOf(block(123, "Sensor CKP", "1".repeat(64)), block(124, "Prueba con osciloscopio", "2".repeat(64)))
+        )
+
+        assertTrue(brief.startsWith("ANALISIS TECNICO CITADO"))
+        assertTrue(brief.contains("Prueba con osciloscopio"))
+        assertTrue(brief.contains("Document (16).docx #124"))
+        assertTrue(brief.contains("prueba fisica"))
+        assertFalse(brief.trimStart().startsWith("{"))
+    }
+
     private fun block(order: Int, text: String, hash: String) = ProprietarySourceBlock(
         blockId = "block_$order",
         kind = "paragraph",
