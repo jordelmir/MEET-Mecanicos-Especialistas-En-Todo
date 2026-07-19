@@ -96,6 +96,12 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 "📚", MeetColors.cyberCyan, "vehicle_manuals"
             ),
             ProFeature(
+                "elysium_manuals",
+                "Manuales de Elysium", "Elysium Manuals",
+                "Corpus propietario literal integrado", "Integrated literal proprietary corpus",
+                "📖", MeetColors.neonGreen, "elysium_manuals"
+            ),
+            ProFeature(
                 "holo_local_read",
                 "Lectura Holográfica", "Holographic Live Read",
                 "Dashboard 3D holográfico en tiempo real", "Real-time 3D holographic OBD2 dashboard",

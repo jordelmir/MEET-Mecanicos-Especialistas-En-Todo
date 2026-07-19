@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generator": "tools/engine-asset-generator/generate-meet-platforms.mjs",
-  "warning": "Original MEET procedural concepts. Dimensions, materials, physics and manufacturing require engineering validation.",
+  "warning": "Original MEET high-detail procedural concepts. Visual realism is illustrative; dimensions, materials, physics and manufacturing require engineering validation.",
   "platforms": [
     {
       "id": "titan_forge",
@@ -12,9 +12,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 21,
-      "meshCount": 33,
-      "sha256": "4b6f0ea0f25de482fc1fe350e8b806b35ccdc4493413648d70b51b09e4e4b10d"
+      "partCount": 29,
+      "meshCount": 127,
+      "sha256": "52377fd28afce1fcaaa1412171e83b7083cd381eed07f5c7c24f8cb724312b77"
     },
     {
       "id": "backhoe_hx",
@@ -25,9 +25,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 19,
-      "meshCount": 30,
-      "sha256": "7cac080a923d2d22342888cc39f9dd064bf25c977fe17db1ba47fd82395bd96b"
+      "partCount": 20,
+      "meshCount": 91,
+      "sha256": "c75e3ba623e8ddf115696f7e516f510f5d63dbdd390c284110fdadefbf499cd2"
     },
     {
       "id": "terra_loader",
@@ -38,9 +38,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 16,
-      "meshCount": 27,
-      "sha256": "a3293e3e9cfbdb38996a2c7877598297006af0cded3e8cc388778623e6d4de06"
+      "partCount": 18,
+      "meshCount": 84,
+      "sha256": "5a48427f1496f714f20a0a425c7f5f913e99cbdd3679dc3a862fef8adeed7fb2"
     },
     {
       "id": "chronos_flux",
@@ -51,9 +51,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 20,
-      "meshCount": 28,
-      "sha256": "c6287fa26a1d1fb95c447376dd75de408d9a930df953de577b13976424c5cdd1"
+      "partCount": 22,
+      "meshCount": 76,
+      "sha256": "9f80dcbe9de27e7ae3883ae09fefa0732868ab66cf301c805ef2b6578bcf91ff"
     },
     {
       "id": "ion_vector",
@@ -64,9 +64,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 18,
-      "meshCount": 26,
-      "sha256": "bf57c334b5ad05afab427086dcf9ba96db8b7fe176596ea547f0bd33a9a8d679"
+      "partCount": 20,
+      "meshCount": 74,
+      "sha256": "e913fca0e000f35f4b250b240e534f8ea02cc3528da37708815952ddde3e02f5"
     },
     {
       "id": "apex_r",
@@ -77,9 +77,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 17,
-      "meshCount": 25,
-      "sha256": "e7325e4368625c548a32d39df88b0178fcb92188e042fb62baa7d415ef00f165"
+      "partCount": 19,
+      "meshCount": 73,
+      "sha256": "c1f86ab5eba3c2d7bf4545656892cb9c49ea453d6bf95eac774a76af0411e244"
     },
     {
       "id": "aero_v1",
@@ -90,9 +90,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 11,
-      "meshCount": 18,
-      "sha256": "02d5d6e9c145473d097c80dcf8c93699b9334234a9b103f2391c95c262b35136"
+      "partCount": 12,
+      "meshCount": 76,
+      "sha256": "04c67a565a8ed1ac4c60744780472ad74c5f182538e0334a4f0a0a911e1edd26"
     },
     {
       "id": "asterion",
@@ -103,9 +103,9 @@
       "dimensional": false,
       "oemClaim": false,
       "manufacturingCertified": false,
-      "partCount": 9,
-      "meshCount": 16,
-      "sha256": "8c8e66f7d6b31ece16f08f01103afe38362d332499c1154d877190619ba25e42"
+      "partCount": 11,
+      "meshCount": 28,
+      "sha256": "18edd3e094ea7a5286063edf125d4a8bad28837c21803331278f92f5fa67fccb"
     },
     {
       "id": "abyss_one",
@@ -117,8 +117,8 @@
       "oemClaim": false,
       "manufacturingCertified": false,
       "partCount": 12,
-      "meshCount": 12,
-      "sha256": "e67a9c26976a5d6d212a7762ecf7e98c08a600a9b39a7f505333c0203e6cfb30"
+      "meshCount": 23,
+      "sha256": "3e1c2cc99bafaa0fbf828a97a7e17b4cd785028c75e475f9ee7dc07207f2a879"
     }
   ]
 }

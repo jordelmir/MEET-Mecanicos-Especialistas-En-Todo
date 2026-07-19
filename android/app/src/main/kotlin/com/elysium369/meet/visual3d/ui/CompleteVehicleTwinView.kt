@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -157,6 +159,10 @@ private fun FilamentVehicleScene(
         }
     }
     val context = LocalContext.current
+    val touchSlop = remember(context) { ViewConfiguration.get(context).scaledTouchSlop.toFloat() }
+    var gestureDownX by remember { mutableFloatStateOf(0f) }
+    var gestureDownY by remember { mutableFloatStateOf(0f) }
+    var gestureExceededTapSlop by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val materialLoader = remember(engine) { MaterialLoader(engine, context, coroutineScope) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -314,7 +320,25 @@ private fun FilamentVehicleScene(
             autoCenterContent = true,
             autoFitContent = true,
             onTouchEvent = { event, hitResult ->
-                if (event.action != MotionEvent.ACTION_UP) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        gestureDownX = event.x
+                        gestureDownY = event.y
+                        gestureExceededTapSlop = false
+                    }
+                    MotionEvent.ACTION_POINTER_DOWN -> gestureExceededTapSlop = true
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = event.x - gestureDownX
+                        val dy = event.y - gestureDownY
+                        if (dx * dx + dy * dy > touchSlop * touchSlop) {
+                            gestureExceededTapSlop = true
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> gestureExceededTapSlop = true
+                }
+                val isTapRelease = event.actionMasked == MotionEvent.ACTION_UP &&
+                    !gestureExceededTapSlop && event.pointerCount == 1
+                if (!isTapRelease) {
                     false
                 } else if (
                     currentXRay.value &&
@@ -866,6 +890,7 @@ private fun FilamentVehicleScene(
                         var previousFrame = 0L
                         var autoPhase = 0f
                         var renderedExplosion = currentExplodedProgress.value
+                        var renderedVisibilitySignature: String? = null
                         updateServiceLayout(renderedExplosion)
                         onFrame = { frameTimeNanos ->
                             val deltaSeconds = if (previousFrame == 0L) {
@@ -894,9 +919,17 @@ private fun FilamentVehicleScene(
                                 updateServiceLayout(renderedExplosion)
                             }
                             
-                            // Dynamic 3D Marker & assembly visibility update
                             val showOverlay = currentShowDiagnosticOverlay.value
-                            val currentActiveCategories = targetCategoryForSystem(currentSystemId.value)
+                            val visibilitySignature = listOf(
+                                showOverlay,
+                                currentSystemId.value,
+                                currentXRay.value,
+                                currentSelectedEntityId.value,
+                                currentExplodedProgress.value > 0.01f
+                            ).joinToString("|")
+                            if (visibilitySignature != renderedVisibilitySignature) {
+                                // Visibility only changes when the diagnostic state changes.
+                                val currentActiveCategories = targetCategoryForSystem(currentSystemId.value)
                             childNodes.filter { it.name?.startsWith("marker_") == true }.forEach { markerNode ->
                                 val compId = markerNode.name!!.removePrefix("marker_")
                                 val comp = diagnosticComponents.firstOrNull { it.id == compId }
@@ -1007,6 +1040,8 @@ private fun FilamentVehicleScene(
                                 
                                 partNode.setLayerVisible(!shouldHide)
                                 partNode.isHittable = !shouldHide
+                            }
+                                renderedVisibilitySignature = visibilitySignature
                             }
                             
                             previousFrame = frameTimeNanos

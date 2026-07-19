@@ -1905,6 +1905,42 @@ archivo fuente; el análisis visible es legible y citado, no una vista previa de
 `RE-LEER FF` exige enlace OBD real, captura errores de transporte sin cerrar la app
 y comunica si falta conexión, la ECU no devolvió datos o la lectura falló.
 
+### 18.17 Gestos continuos, Manuales de Elysium y plataformas D4 — 2026-07-19
+
+La interacción de SceneView debe distinguir un toque deliberado de una órbita o
+un zoom. El picking sólo se ejecuta cuando el gesto termina dentro del `touchSlop`
+de Android y nunca después de multitoque. El contenedor 3D retiene el gesto desde
+`ACTION_DOWN`; el desplazamiento vertical queda reservado a la zona inferior. Una
+órbita no puede seleccionar, reenfocar, reconstruir la escena ni devolver la cámara
+al encuadre inicial.
+
+La actualización de visibilidad de marcadores, ensamblajes y carrocería se ejecuta
+por cambio de firma, no en cada frame. En el Android VER_N49 la mediana durante
+órbitas automatizadas bajó de 30 ms a 16 ms y el jank moderno de 8,84 % a 5,51 %,
+manteniendo `RenderQuality.Default` para no sacrificar detalle visual.
+
+`Manuales de Elysium` es un lector Compose local independiente del catálogo de
+manuales descargables. Presenta `Document (16).docx` y `Document (17).docx` desde
+los shards propietarios ya verificados, en orden de fuente y sin traducción,
+resumen ni reescritura. El lector conserva texto, filas y celdas de tabla, número
+de bloque, archivo y SHA-256. Carga una sección por vez para que los 74 648 bloques
+sean navegables sin agotar memoria.
+
+Las nueve plataformas originales pasan a la revisión visual D4 ilustrativa:
+
+- carrocerías y fuselajes continuos construidos por secciones;
+- materiales PBR separados para pintura, cristal, caucho, acero y ópticas;
+- ruedas con neumático, disco, cáliper, cubo y diez radios;
+- iluminación, paneles aerodinámicos y elementos funcionales propios;
+- hidráulica, dientes de cucharón, articulaciones y cabinas detalladas;
+- fuselaje aeronáutico, propulsores, navegación y tren de aterrizaje;
+- etapas, anillos, RCS y clúster de motores en el cohete;
+- casco hidrodinámico, frames, sonar, planos y propulsor en el submarino.
+
+`D4` describe fidelidad visual reconocible y no eleva autoridad geométrica. Todos
+los activos siguen siendo conceptos MEET no dimensionales, sin afirmación OEM,
+homologación, cálculo físico ni autorización de fabricación.
+
 ### 17.12 Referencias técnicas primarias para la implementación
 
 - LiteRT CompiledModel: <https://developers.google.com/edge/litert/inference>

@@ -417,6 +417,9 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     navController = navController
                 )
             }
+            composable("elysium_manuals") {
+                com.elysium369.meet.ui.screens.ElysiumManualsScreen(navController)
+            }
             composable("settings") {
                 SettingsScreen(
                     navController = navController,
