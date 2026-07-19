@@ -59,9 +59,10 @@ Campos minimos:
 - Un nodo `VisualBomNode` puede originar un flujo de Parts Marketplace,
   pero debe conservar `evidenceRequirements` y `exactnessDisclaimer`.
 
-## Atlas mecanico L2 implementado
+## Atlas mecanico D3 de inspeccion implementado
 
-El visor dispone de seis conjuntos 3D detallados y seleccionables:
+El visor dispone de diecinueve conjuntos 3D detallados y seleccionables: motor
+L4, cinco conjuntos mecánicos iniciales y trece dominios extendidos.
 
 | Conjunto | Sistemas cubiertos | Activo |
 |---|---|---|
@@ -72,7 +73,27 @@ El visor dispone de seis conjuntos 3D detallados y seleccionables:
 | Chasis rodante | direccion, frenos y ruedas | `models/vehicle_systems/steering_brakes_wheels/generic_steering_brakes_wheels.glb` |
 | Electrico y control | bateria, fusibles, reles, arneses, ECU, sensores y actuadores | `models/vehicle_systems/electrical_control/generic_electrical_control.glb` |
 
-Los cinco conjuntos de sistemas se cargan bajo demanda. El visor no mantiene
+| Dominio extendido | Subconjuntos cubiertos | Activo |
+|---|---|---|
+| Iluminación | exterior e interior | `models/vehicle_systems/lighting/generic_lighting.glb` |
+| HVAC | aire acondicionado, calefacción y ventilación | `models/vehicle_systems/hvac/generic_hvac.glb` |
+| Seguridad pasiva | airbags, sensores, SRS y retención | `models/vehicle_systems/passive_safety/generic_passive_safety.glb` |
+| ADAS | cámaras, parking, percepción y asistencia | `models/vehicle_systems/adas/generic_adas.glb` |
+| Carrocería | paneles, puertas, vidrios y espejos | `models/vehicle_systems/body/generic_body.glb` |
+| Limpieza | barrido delantero/trasero, lavado y control | `models/vehicle_systems/wipers/generic_wipers.glb` |
+| Interior | tablero/controles, asientos y acabados | `models/vehicle_systems/interior/generic_interior.glb` |
+| Infotainment | comunicación, integración móvil y captura | `models/vehicle_systems/infotainment/generic_infotainment.glb` |
+| Acceso | encendido, inmovilizador, cierre y sensores | `models/vehicle_systems/access/generic_access.glb` |
+| Híbrido/EV | alta tensión y tracción eléctrica | `models/vehicle_systems/hybrid_ev/generic_hybrid_ev.glb` |
+| Servicio | fluidos, filtros y desgaste | `models/vehicle_systems/fluids/generic_fluids.glb` |
+| Hardware | fasteners, sellos y sujeción | `models/vehicle_systems/hardware/generic_hardware.glb` |
+| Índice funcional | mapa informativo, críticos olvidados y reglas | `models/vehicle_systems/functional_overview/generic_functional_overview.glb` |
+
+Los dieciocho conjuntos de sistemas usan autoridad `L2_GENERIC_CUTAWAY` y detalle
+visual `D3_RECOGNIZABLE_INTERNALS`: muestran
+internos reconocibles de servicio, fijaciones, rodamientos, estrias, terminales,
+conectores y superficies funcionales sin declarar cotas OEM. Se cargan bajo
+demanda; el visor no mantiene
 todos los GLB pesados en memoria simultaneamente. Cada familia renderizable usa
 `system_mesh__<part-key>__<detail>` y se enlaza mediante
 `GenericVehicleSystemsAssetContract` a un nombre literal y un `systemId` del
@@ -92,16 +113,28 @@ indice propietario.
 
 ### Autoridad y regeneracion
 
-Todos estos activos declaran `L2_GENERIC_ASSEMBLY` y
-`ILLUSTRATIVE_PROPORTIONS_ONLY`. No son geometria Hyundai, OEM, medida ni apta
-para fabricar. La aplicabilidad instalada sigue dependiendo de evidencia de la
-base, VIN/OEM cuando corresponda y confirmacion fisica.
+Todos estos activos declaran `L2_GENERIC_CUTAWAY`,
+`D3_RECOGNIZABLE_INTERNALS` y `ILLUSTRATIVE_PROPORTIONS_ONLY`. El nivel D3
+describe detalle visual de inspeccion y es independiente de la autoridad
+geometrica L0-L5. No son
+geometria Hyundai, OEM, medida ni apta para fabricar. La aplicabilidad instalada
+sigue dependiendo de evidencia de la base, VIN/OEM cuando corresponda y
+confirmacion fisica.
+
+| Activo D3 | Mallas | Triangulos | Tamano |
+|---|---:|---:|---:|
+| Admision y sobrealimentacion | 157 | 70,864 | 4,108,748 bytes |
+| Transmision y tren motriz | 242 | 75,868 | 4,814,260 bytes |
+| Suspension | 126 | 46,392 | 1,647,520 bytes |
+| Direccion, frenos y ruedas | 269 | 120,064 | 10,296,452 bytes |
+| Electrico, ECU y actuadores | 295 | 109,248 | 9,656,352 bytes |
 
 ```bash
 cd tools/engine-asset-generator
 npm ci
 npm run generate
 npm run generate:systems
+npm run generate:extended-systems
 ```
 
 Cada directorio de modelo incluye `manifest.json`, SHA-256, conteos de mallas y

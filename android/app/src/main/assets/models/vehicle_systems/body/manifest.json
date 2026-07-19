@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.body.d3",
+  "assetFile": "generic_body.glb",
+  "displayName": "body",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 117,
+  "triangleCount": 16968,
+  "partKeys": [
+    "door_checks",
+    "door_glass",
+    "door_latches",
+    "engine_splash_shields",
+    "exterior_handles",
+    "front_doors",
+    "mirror_heaters",
+    "mirror_motors",
+    "rear_doors",
+    "rear_glass",
+    "rocker_panels",
+    "side_mirrors",
+    "side_panels",
+    "tailgate",
+    "window_motors"
+  ],
+  "supportedSystemIds": [
+    "body"
+  ],
+  "subsystemCoverage": [
+    "Paneles",
+    "Puertas",
+    "Vidrios",
+    "Espejos"
+  ],
+  "sha256": "81541130581036d4dd79588506bc8076ce096057b51e39aee5be184b2245a91b",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

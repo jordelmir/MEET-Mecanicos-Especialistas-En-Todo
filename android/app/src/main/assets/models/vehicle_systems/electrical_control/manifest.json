@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "assetId": "meet.generic.electrical_control.l2",
+  "assetId": "meet.generic.electrical_control.d3",
   "assetFile": "generic_electrical_control.glb",
   "displayName": "electrical control",
-  "geometryAuthority": "L2_GENERIC_ASSEMBLY",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
   "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-systems.mjs",
-  "generatorVersion": "1.0.0",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "2.0.0",
   "threeVersion": "185",
   "meshNodePrefix": "system_mesh__",
-  "meshCount": 140,
-  "triangleCount": 59684,
+  "meshCount": 295,
+  "triangleCount": 109248,
   "partKeys": [
     "abs_controller",
     "abs_harness",
@@ -57,7 +58,7 @@
     "transmission_solenoids",
     "vvt_solenoid"
   ],
-  "sha256": "c3b49d0e94f2f91a8e24585caf83e0c8cd59f749532035435a44eba7f3fe4ce8",
+  "sha256": "3481c1f8e9c5a94020f37ca19d71611cad450529b0a4a96b0f7237ac8ae9d246",
   "license": "Original procedural asset generated for MEET; project-owned source generator",
   "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
 }

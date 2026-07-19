@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.lighting.d3",
+  "assetFile": "generic_lighting.glb",
+  "displayName": "lighting",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 82,
+  "triangleCount": 21908,
+  "partKeys": [
+    "afs_module",
+    "brake_lamps",
+    "bulb_connectors",
+    "door_lamps",
+    "headlamp_harness",
+    "headlamp_level_sensor",
+    "interior_light_module",
+    "lamp_seals",
+    "matrix_led_module",
+    "rear_lamps"
+  ],
+  "supportedSystemIds": [
+    "lighting"
+  ],
+  "subsystemCoverage": [
+    "Exterior",
+    "Interior"
+  ],
+  "sha256": "5618b40e7c17e8cc260a0689a03112427269f6ccc7268234c1c5a7e10c77e58d",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

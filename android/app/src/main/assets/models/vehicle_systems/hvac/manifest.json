@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.hvac.d3",
+  "assetFile": "generic_hvac.glb",
+  "displayName": "hvac",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 98,
+  "triangleCount": 20056,
+  "partKeys": [
+    "ac_compressor",
+    "ac_pressure_sensor",
+    "air_doors",
+    "air_ducts",
+    "blower_motor",
+    "blower_pwm",
+    "cabin_filter",
+    "compressor_clutch",
+    "compressor_control_valve",
+    "compressor_pulley",
+    "expansion_valve",
+    "heater_core",
+    "heater_hoses",
+    "hvac_box",
+    "receiver_drier",
+    "refrigerant_lines"
+  ],
+  "supportedSystemIds": [
+    "hvac"
+  ],
+  "subsystemCoverage": [
+    "Aire acondicionado",
+    "Calefacción y ventilación"
+  ],
+  "sha256": "799ac14d434748345a704fa135e7333fceb1d7bcb38630a2be52a07457ed830d",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.interior.d3",
+  "assetFile": "generic_interior.glb",
+  "displayName": "interior",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 72,
+  "triangleCount": 13400,
+  "partKeys": [
+    "armrest",
+    "defog_switch",
+    "door_trims",
+    "front_seats",
+    "hazard_switch",
+    "hvac_panel",
+    "light_switch",
+    "occupant_sensor",
+    "parking_brake",
+    "rear_seats",
+    "seat_memory",
+    "seat_motors",
+    "seat_rails"
+  ],
+  "supportedSystemIds": [
+    "interior"
+  ],
+  "subsystemCoverage": [
+    "Tablero y controles",
+    "Asientos",
+    "Acabados"
+  ],
+  "sha256": "b9aaaf3dc8593e0cb9348d523cc1a300485cdeacf85f73cb5d131e2b30f87016",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.wipers.d3",
+  "assetFile": "generic_wipers.glb",
+  "displayName": "wipers",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 46,
+  "triangleCount": 10048,
+  "partKeys": [
+    "front_wiper_motor",
+    "multifunction_switch",
+    "rain_sensor",
+    "rear_wiper_arm",
+    "rear_wiper_motor",
+    "washer_hoses",
+    "washer_level_sensor",
+    "washer_pumps",
+    "washer_reservoir",
+    "wiper_linkage",
+    "wiper_relay"
+  ],
+  "supportedSystemIds": [
+    "wipers"
+  ],
+  "subsystemCoverage": [
+    "Barrido delantero",
+    "Barrido trasero",
+    "Lavado y control"
+  ],
+  "sha256": "bd7aca2493f994506bb78b636ae316b4028737f1eb34dfafb91595fa753eb5a9",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

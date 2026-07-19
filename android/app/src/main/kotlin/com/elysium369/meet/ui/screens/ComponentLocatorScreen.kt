@@ -216,9 +216,9 @@ fun ComponentLocatorScreen(
     }
     val currentSystemAssetCatalogSceneNodes = remember(
         currentCatalogSystemId,
-        orderedProprietarySceneNodes
+        catalogSceneNodes
     ) {
-        val currentSystemNodes = orderedProprietarySceneNodes.filter {
+        val currentSystemNodes = catalogSceneNodes.filter {
             it.systemId == currentCatalogSystemId
         }
         when (currentCatalogSystemId) {

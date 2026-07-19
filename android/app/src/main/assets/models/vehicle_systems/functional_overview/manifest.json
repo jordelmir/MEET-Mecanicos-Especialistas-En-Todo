@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.functional_overview.d3",
+  "assetFile": "generic_functional_overview.glb",
+  "displayName": "functional overview",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 71,
+  "triangleCount": 13684,
+  "partKeys": [
+    "battery_ibs",
+    "engine_grounds",
+    "evap_pressure_sensor",
+    "evap_valves",
+    "main_fusible_link",
+    "main_relay",
+    "neutral_safety_switch",
+    "prndl_sensor",
+    "sensor_domain",
+    "transmission_bulkhead",
+    "transmission_harness",
+    "transmission_solenoids"
+  ],
+  "supportedSystemIds": [
+    "overview"
+  ],
+  "subsystemCoverage": [
+    "Mapa funcional",
+    "Elementos críticos olvidados",
+    "Reglas de evidencia"
+  ],
+  "sha256": "c03e3f9f176b7ed58297524bdae0d591795d8b14c29c33944d7fa8fb04cf0f92",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

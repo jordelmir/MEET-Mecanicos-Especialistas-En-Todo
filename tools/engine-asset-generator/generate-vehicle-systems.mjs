@@ -34,7 +34,7 @@ globalThis.FileReader ??= NodeFileReader;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../..");
 const modelRoot = path.join(repoRoot, "android/app/src/main/assets/models/vehicle_systems");
-const authority = "L2_GENERIC_ASSEMBLY";
+const authority = "L2_GENERIC_CUTAWAY";
 
 function materials() {
   const material = (name, color, roughness, metalness) =>
@@ -60,9 +60,9 @@ function materials() {
 class AssemblyBuilder {
   constructor(assetId) {
     this.scene = new THREE.Scene();
-    this.scene.name = `MEET_${assetId}_L2`;
+    this.scene.name = `MEET_${assetId}_D3`;
     this.root = new THREE.Group();
-    this.root.name = `system_root__${assetId}_l2`;
+    this.root.name = `system_root__${assetId}_d3`;
     this.root.userData = { authority, dimensional: false, purpose: "service inspection atlas" };
     this.scene.add(this.root);
     this.materials = materials();
@@ -192,6 +192,48 @@ class AssemblyBuilder {
     this.cylinder(key, "motor_case", radius, length, position, this.materials.darkSteel, [0, 0, Math.PI / 2], 28);
     this.cylinder(key, "shaft", radius * 0.28, length + 0.28, position, this.materials.steel, [0, 0, Math.PI / 2], 18);
     this.box(key, "connector", [0.22, 0.18, 0.18], [position[0], position[1] + radius, position[2]], this.materials.black, 0.04);
+  }
+
+  bolt(key, detail, position, radius = 0.045, length = 0.16, rotation = [0, 0, 0]) {
+    this.cylinder(key, `${detail}_shaft`, radius * 0.52, length, position, this.materials.steel, rotation, 12);
+    this.cylinder(key, `${detail}_hex_head`, radius, length * 0.28, [position[0], position[1] + length * 0.55, position[2]], this.materials.darkSteel, rotation, 6);
+  }
+
+  bearing(key, detail, position, radius = 0.22, rotation = [0, Math.PI / 2, 0]) {
+    this.torus(key, `${detail}_outer_race`, radius, radius * 0.12, position, this.materials.darkSteel, rotation);
+    this.torus(key, `${detail}_inner_race`, radius * 0.58, radius * 0.10, position, this.materials.steel, rotation);
+    for (let index = 0; index < 8; index += 1) {
+      const angle = index / 8 * Math.PI * 2;
+      this.sphere(
+        key,
+        `${detail}_ball_${index + 1}`,
+        radius * 0.105,
+        [position[0], position[1] + Math.sin(angle) * radius * 0.78, position[2] + Math.cos(angle) * radius * 0.78],
+        this.materials.steel
+      );
+    }
+  }
+
+  hoseClamp(key, detail, position, radius, rotation = [0, Math.PI / 2, 0]) {
+    this.torus(key, `${detail}_band`, radius, 0.025, position, this.materials.steel, rotation);
+    this.box(key, `${detail}_screw_housing`, [0.14, 0.08, 0.07], [position[0], position[1] + radius, position[2]], this.materials.darkSteel, 0.018);
+  }
+
+  connectorPins(key, detail, position, columns = 4, rows = 2, spacing = 0.055) {
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        this.cylinder(
+          key,
+          `${detail}_pin_${row + 1}_${column + 1}`,
+          0.009,
+          0.10,
+          [position[0] + (column - (columns - 1) / 2) * spacing, position[1], position[2] + (row - (rows - 1) / 2) * spacing],
+          this.materials.copper,
+          [Math.PI / 2, 0, 0],
+          8
+        );
+      }
+    }
   }
 }
 
@@ -478,12 +520,186 @@ function buildElectrical(b) {
   b.motor("abs_pump", [2.7, -1.75, 0.75], 0.52, 0.20);
 }
 
+function enhanceIntake(b) {
+  const m = b.materials;
+  for (const [index, [x, z]] of [[-3.18, -0.43], [-2.12, -0.43], [-3.18, 0.43], [-2.12, 0.43]].entries()) {
+    b.box("air_box_lid", `spring_clip_${index + 1}`, [0.10, 0.30, 0.07], [x, 0.48, z], m.steel, 0.018);
+  }
+  b.cylinder("throttle_body", "butterfly_shaft", 0.035, 0.86, [0.1, 0.65, -0.35], m.steel, [Math.PI / 2, 0, 0], 14);
+  b.torus("throttle_body", "shaft_return_spring", 0.11, 0.018, [0.1, 0.65, 0.02], m.darkSteel, [Math.PI / 2, 0, 0]);
+  b.hoseClamp("intake_duct", "airbox_clamp", [-1.94, 0.25, 0], 0.29);
+  b.hoseClamp("intake_duct", "throttle_clamp", [-0.60, 0.50, -0.25], 0.29);
+  b.hoseClamp("charge_hoses", "compressor_clamp", [1.98, -0.96, -0.45], 0.21);
+  b.hoseClamp("charge_hoses", "throttle_clamp", [0.10, 0.39, -0.35], 0.21);
+  b.cylinder("turbocharger", "common_shaft", 0.055, 1.12, [2.5, -0.95, 0], m.steel, [0, 0, Math.PI / 2], 18);
+  b.bearing("turbocharger", "journal_bearing", [2.5, -0.95, 0], 0.18);
+  for (const [key, x, material, reverse] of [
+    ["turbo_cold_housing", 2.10, m.aluminum, 1],
+    ["turbo_hot_housing", 2.90, m.darkSteel, -1]
+  ]) {
+    b.cylinder(key, "impeller_hub", 0.13, 0.18, [x, -0.95, 0], material, [0, 0, Math.PI / 2], 24);
+    for (let index = 0; index < 11; index += 1) {
+      const angle = index / 11 * Math.PI * 2;
+      b.box(
+        key,
+        `curved_blade_${index + 1}`,
+        [0.12, 0.34, 0.035],
+        [x, -0.95 + Math.sin(angle) * 0.21, Math.cos(angle) * 0.21],
+        material,
+        0.015,
+        [angle * reverse, 0, Math.PI / 2]
+      );
+    }
+  }
+  b.cylinder("wastegate_actuator", "diaphragm_can", 0.23, 0.18, [3.35, -0.58, 0.38], m.aluminum, [0, 0, Math.PI / 2], 28);
+  b.cylinder("wastegate_actuator", "actuator_rod", 0.025, 0.72, [3.08, -0.82, 0.30], m.steel, [0, 0, Math.PI / 3], 12);
+  for (const x of [-2.55, -1.90, -1.25]) b.bearing("supercharger", `rotor_support_${x}`, [x, -1.15, 0], 0.20);
+}
+
+function enhanceTransmission(b) {
+  const m = b.materials;
+  b.cylinder("torque_converter", "turbine_hub", 0.22, 0.72, [-2.15, 0.25, 0], m.steel, [0, 0, Math.PI / 2], 26);
+  b.bearing("torque_converter", "stator_one_way_clutch", [-1.92, 0.25, 0], 0.30);
+  for (const x of [-1.15, -0.85, 1.65]) b.gear("input_shaft", `spline_${x}`, 20, 0.11, 0.15, 0.16, [x, 0.3, 0], m.steel);
+  for (const x of [0.45, 1.25, 1.95]) b.gear("output_shaft", `spline_${x}`, 22, 0.14, 0.18, 0.16, [x, 0.55, 0], m.steel);
+  for (let row = 0; row < 3; row += 1) {
+    for (let column = 0; column < 7; column += 1) {
+      b.bolt("valve_body", `separator_bolt_${row + 1}_${column + 1}`, [-0.75 + column * 0.26, -0.80, -0.42 + row * 0.42], 0.035, 0.11);
+    }
+  }
+  for (let index = 0; index < 8; index += 1) {
+    const angle = index / 8 * Math.PI * 2;
+    b.box("clutch_packs", `friction_tab_${index + 1}`, [0.10, 0.12, 0.08], [1.05, 0.28 + Math.sin(angle) * 0.68, Math.cos(angle) * 0.68], m.brass, 0.018);
+  }
+  b.gear("differential", "left_spider_gear", 12, 0.17, 0.24, 0.20, [1.65, 0.55, 0], m.steel, [Math.PI / 2, 0, 0]);
+  b.gear("differential", "right_spider_gear", 12, 0.17, 0.24, 0.20, [1.65, -0.05, 0], m.steel, [Math.PI / 2, 0, 0]);
+  for (const [joint, x] of [["outer_left", -4.25], ["inner_left", -2.2], ["inner_right", 2.05], ["outer_right", 3.85]]) {
+    const key = joint.startsWith("outer") ? "outer_cv_joints" : "inner_cv_joints";
+    for (let index = 0; index < 6; index += 1) {
+      const angle = index / 6 * Math.PI * 2;
+      b.sphere(key, `${joint}_ball_${index + 1}`, 0.055, [x, 0.25 + Math.sin(angle) * 0.22, Math.cos(angle) * 0.22], m.steel);
+    }
+  }
+  for (let index = 0; index < 14; index += 1) {
+    const angle = index / 14 * Math.PI * 2;
+    b.bolt("transmission_pan", `pan_bolt_${index + 1}`, [0.1 + Math.cos(angle) * 1.22, -1.58, Math.sin(angle) * 0.64], 0.038, 0.13);
+  }
+  b.connectorPins("bulkhead_connector", "sealed_terminals", [-1.38, -0.39, 0.73], 4, 3);
+}
+
+function enhanceSuspension(b) {
+  const m = b.materials;
+  for (const [side, x] of [["left", -1.55], ["right", 1.55]]) {
+    b.torus("front_struts", `${side}_lower_spring_seat`, 0.36, 0.055, [x, 0.55, -1.1], m.darkSteel, [Math.PI / 2, 0, 0]);
+    b.torus("upper_strut_mounts", `${side}_rubber_isolator`, 0.29, 0.075, [x, 1.91, -1.1], m.rubber, [Math.PI / 2, 0, 0]);
+    b.bolt("upper_strut_mounts", `${side}_shaft_nut`, [x, 2.08, -1.1], 0.075, 0.18);
+    b.box("front_struts", `${side}_knuckle_bracket`, [0.42, 0.52, 0.16], [x, -0.05, -1.1], m.darkSteel, 0.055);
+    for (const y of [-0.18, 0.10]) b.bolt("front_struts", `${side}_knuckle_bolt_${y}`, [x, y, -1.22], 0.055, 0.24, [Math.PI / 2, 0, 0]);
+    b.box("lower_control_arms", `${side}_stamped_reinforcement`, [0.58, 0.08, 0.44], [x * 0.58, -0.53, -1.02], m.cast, 0.08, [0, side === "left" ? -0.25 : 0.25, 0]);
+    b.cylinder("control_arm_bushings", `${side}_front_inner_sleeve`, 0.075, 0.32, [x * 0.3, -0.25, -0.55], m.steel, [0, 0, Math.PI / 2], 18);
+    b.cylinder("control_arm_bushings", `${side}_rear_inner_sleeve`, 0.075, 0.32, [x * 0.3, -0.25, -1.35], m.steel, [0, 0, Math.PI / 2], 18);
+    b.cylinder("lower_ball_joints", `${side}_tapered_stud`, 0.065, 0.42, [x, -0.33, -1.12], m.steel, [0, 0, 0], 16);
+    b.torus("lower_ball_joints", `${side}_dust_boot`, 0.12, 0.045, [x, -0.48, -1.12], m.rubber, [Math.PI / 2, 0, 0]);
+    b.torus("rear_hubs", `${side}_flange`, 0.31, 0.055, [x, -0.45, 1.55], m.darkSteel, [0, Math.PI / 2, 0]);
+    b.bearing("rear_bearings", `${side}_double_row`, [x, -0.45, 1.55], 0.19);
+    for (let index = 0; index < 4; index += 1) {
+      const angle = index / 4 * Math.PI * 2;
+      b.bolt("rear_hubs", `${side}_wheel_stud_${index + 1}`, [x, -0.45 + Math.sin(angle) * 0.19, 1.55 + Math.cos(angle) * 0.19], 0.035, 0.22, [0, 0, Math.PI / 2]);
+    }
+  }
+  for (const x of [-0.62, 0.62]) b.box("stabilizer_bushings", `retainer_${x}`, [0.34, 0.08, 0.24], [x, -0.59, -0.08], m.steel, 0.035);
+}
+
+function enhanceSteeringBrakes(b) {
+  const m = b.materials;
+  b.cylinder("steering_wheel", "center_hub", 0.18, 0.18, [0, 1.65, -1.4], m.darkSteel, [Math.PI / 2, 0, 0], 24);
+  b.gear("steering_column", "column_spline", 20, 0.08, 0.11, 0.22, [0, 0.25, -0.36], m.steel, [Math.PI / 3, 0, 0]);
+  for (let index = 0; index < 18; index += 1) b.box("rack_pinion", `rack_tooth_${index + 1}`, [0.08, 0.08, 0.18], [-0.78 + index * 0.09, -0.08, -0.30], m.steel, 0.012, [0, 0, Math.PI / 4]);
+  for (const [side, x] of [["left", -2.65], ["right", 2.65]]) {
+    b.cylinder("front_discs", `${side}_hub_hat`, 0.20, 0.11, [x, -0.35, -0.85], m.darkSteel, [0, 0, Math.PI / 2], 30);
+    for (let index = 0; index < 10; index += 1) {
+      const angle = index / 10 * Math.PI * 2;
+      b.box("front_discs", `${side}_internal_vane_${index + 1}`, [0.06, 0.32, 0.035], [x, -0.35 + Math.sin(angle) * 0.28, -0.85 + Math.cos(angle) * 0.28], m.darkSteel, 0.012, [angle, 0, Math.PI / 2]);
+    }
+    b.cylinder("front_calipers", `${side}_hydraulic_piston`, 0.15, 0.12, [x - Math.sign(x) * 0.11, -0.08, -0.85], m.steel, [0, 0, Math.PI / 2], 28);
+    b.cylinder("front_calipers", `${side}_bleeder_screw`, 0.025, 0.22, [x, 0.23, -0.70], m.brass, [0, 0, 0], 10);
+    b.box("brake_pads", `${side}_inner_friction`, [0.045, 0.31, 0.15], [x - Math.sign(x) * 0.045, -0.08, -0.85], m.cast, 0.025);
+    b.box("brake_pads", `${side}_outer_friction`, [0.045, 0.31, 0.15], [x + Math.sign(x) * 0.045, -0.08, -0.85], m.cast, 0.025);
+  }
+  for (const [side, x] of [["left", -2.65], ["right", 2.65]]) {
+    b.torus("rear_drum_context", `${side}_primary_shoe`, 0.28, 0.045, [x, -0.35, 0.95], m.cast, [0, Math.PI / 2, 0]);
+    b.spring("rear_drum_context", `${side}_return_spring`, [x, -0.05, 0.95], 0.07, 0.38, m.red);
+  }
+  for (let index = 0; index < 6; index += 1) {
+    b.cylinder("abs_module", `hydraulic_port_${index + 1}`, 0.035, 0.18, [1.55 + index * 0.10, 0.91, 1.28], m.brass, [0, 0, 0], 12);
+  }
+  for (const [wheel, [x, z]] of [[1, [-2.65, -0.85]], [2, [2.65, -0.85]], [3, [-2.65, 0.95]], [4, [2.65, 0.95]]]) {
+    for (let index = 0; index < 16; index += 1) {
+      const angle = index / 16 * Math.PI * 2;
+      b.box("wheels_tires", `tire_${wheel}_tread_${index + 1}`, [0.24, 0.10, 0.08], [x, -0.35 + Math.sin(angle) * 0.70, z + Math.cos(angle) * 0.70], m.rubber, 0.018, [angle, 0, Math.PI / 2]);
+    }
+  }
+}
+
+function enhanceElectrical(b) {
+  const m = b.materials;
+  for (let index = 0; index < 6; index += 1) {
+    const x = -3.12 + index * 0.17;
+    b.box("battery", `cell_plate_${index + 1}`, [0.08, 0.52, 0.52], [x, 1.20, 0], index % 2 ? m.copper : m.darkSteel, 0.018);
+    b.cylinder("battery", `vent_cap_${index + 1}`, 0.045, 0.06, [x, 1.68, 0], m.black, [0, 0, 0], 14);
+  }
+  for (let index = 0; index < 12; index += 1) {
+    const x = -0.7 + index * 0.13;
+    const z = -0.75 + (index % 2) * 0.38;
+    b.box("blade_fuses", `fuse_${index + 1}_left_blade`, [0.018, 0.22, 0.045], [x - 0.026, 1.68, z], m.copper, 0.004);
+    b.box("blade_fuses", `fuse_${index + 1}_right_blade`, [0.018, 0.22, 0.045], [x + 0.026, 1.68, z], m.copper, 0.004);
+  }
+  for (let index = 0; index < 5; index += 1) {
+    const x = -0.55 + index * 0.34;
+    b.cylinder("iso_relays", `relay_${index + 1}_coil`, 0.065, 0.16, [x, 1.90, -0.45], m.copper, [Math.PI / 2, 0, 0], 18);
+    b.box("iso_relays", `relay_${index + 1}_contact`, [0.10, 0.025, 0.04], [x, 2.02, -0.45], m.steel, 0.006, [0, 0, 0.25]);
+  }
+  for (let index = 0; index < 12; index += 1) {
+    const angle = index / 12 * Math.PI * 2;
+    b.box("alternator", `vent_${index + 1}`, [0.07, 0.20, 0.035], [-2.2, -1.2 + Math.sin(angle) * 0.27, -0.2 + Math.cos(angle) * 0.27], m.aluminum, 0.012, [angle, 0, Math.PI / 2]);
+  }
+  b.gear("starter_motor", "starter_pinion", 10, 0.10, 0.15, 0.16, [-0.68, -1.35, -0.2], m.steel);
+  const moduleDetails = [
+    ["ecm", [-2.25, 0.20, -0.85], 0.72],
+    ["tcm", [-1.05, 0.20, -0.85], 0.62],
+    ["abs_controller", [0.05, 0.20, -0.85], 0.62]
+  ];
+  for (const [key, position, width] of moduleDetails) {
+    b.box(key, "pcb", [width, 0.035, 0.42], position, m.green, 0.012);
+    for (let index = 0; index < 4; index += 1) b.box(key, `processor_${index + 1}`, [0.12, 0.055, 0.10], [position[0] - width * 0.27 + index * width * 0.18, position[1] + 0.045, position[2]], m.black, 0.015);
+    for (let index = 0; index < 8; index += 1) b.cylinder(key, `capacitor_${index + 1}`, 0.018, 0.07, [position[0] - width * 0.35 + index * width * 0.10, position[1] + 0.07, position[2] + 0.14], m.copper, [0, 0, 0], 10);
+  }
+  for (let index = 0; index < 4; index += 1) b.connectorPins("multipin_connectors", `connector_${index + 1}`, [2.65 + index * 0.32, 0.82 - index * 0.25, 0.7], 4, 2);
+  const branchPoints = [
+    ["engine_harness", [0.0, 0.2, 0.7], [0.2, 1.0, 1.0]],
+    ["injector_harness", [0.5, -0.4, 0.8], [0.5, -0.85, 1.15]],
+    ["coil_harness", [0.8, 0.8, 0.65], [0.8, 1.25, 1.0]],
+    ["transmission_harness", [0.6, -0.9, 1.1], [0.6, -1.45, 1.35]],
+    ["abs_harness", [1.2, 1.0, 1.15], [1.5, 1.45, 1.35]],
+    ["sensor_harness", [1.6, 1.35, 0.95], [2.0, 1.75, 1.15]]
+  ];
+  for (const [key, start, end] of branchPoints) {
+    b.tube(key, "service_branch", [start, [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2 + 0.15], end], 0.035, m.black, 22);
+    b.box(key, "branch_connector", [0.18, 0.15, 0.18], end, m.blue, 0.03);
+  }
+  for (const [key, x] of [["ckp_sensor", 0.95], ["cmp_sensor", 1.35], ["maf_sensor", 1.75], ["map_sensor", 2.15], ["ect_sensor", 2.55], ["oxygen_sensors", 2.95], ["knock_sensor", 3.35]]) {
+    b.torus(key, "sealing_o_ring", 0.07, 0.015, [x, 0.00, -0.75], m.rubber, [Math.PI / 2, 0, 0]);
+  }
+  for (let index = 0; index < 4; index += 1) b.cylinder("injectors", `injector_${index + 1}_nozzle`, 0.022, 0.16, [0.65 + index * 0.34, -1.29, -0.8], m.brass, [0, 0, 0], 10);
+  for (const [key, x] of [["vvt_solenoid", 2.15], ["evap_purge_solenoid", 2.65]]) b.cylinder(key, "magnetic_core", 0.045, 0.52, [x, -1.0, -0.8], m.steel, [Math.PI / 2, 0, 0], 14);
+}
+
 const assets = [
-  { id: "intake_boost", file: "generic_intake_boost.glb", keys: intakeKeys, build: buildIntake },
-  { id: "transmission_drivetrain", file: "generic_transmission_drivetrain.glb", keys: transmissionKeys, build: buildTransmission },
-  { id: "suspension", file: "generic_suspension.glb", keys: suspensionKeys, build: buildSuspension },
-  { id: "steering_brakes_wheels", file: "generic_steering_brakes_wheels.glb", keys: steeringKeys, build: buildSteeringBrakes },
-  { id: "electrical_control", file: "generic_electrical_control.glb", keys: electricalKeys, build: buildElectrical }
+  { id: "intake_boost", file: "generic_intake_boost.glb", keys: intakeKeys, build: (b) => { buildIntake(b); enhanceIntake(b); } },
+  { id: "transmission_drivetrain", file: "generic_transmission_drivetrain.glb", keys: transmissionKeys, build: (b) => { buildTransmission(b); enhanceTransmission(b); } },
+  { id: "suspension", file: "generic_suspension.glb", keys: suspensionKeys, build: (b) => { buildSuspension(b); enhanceSuspension(b); } },
+  { id: "steering_brakes_wheels", file: "generic_steering_brakes_wheels.glb", keys: steeringKeys, build: (b) => { buildSteeringBrakes(b); enhanceSteeringBrakes(b); } },
+  { id: "electrical_control", file: "generic_electrical_control.glb", keys: electricalKeys, build: (b) => { buildElectrical(b); enhanceElectrical(b); } }
 ];
 
 async function exportAsset(config) {
@@ -512,7 +728,7 @@ async function exportAsset(config) {
   const sha256 = crypto.createHash("sha256").update(glb).digest("hex");
   const manifest = {
     schemaVersion: 1,
-    assetId: `meet.generic.${config.id}.l2`,
+    assetId: `meet.generic.${config.id}.d3`,
     assetFile: config.file,
     displayName: config.id.replaceAll("_", " "),
     geometryAuthority: authority,
@@ -520,7 +736,8 @@ async function exportAsset(config) {
     oemClaim: false,
     vehicleSpecificClaim: false,
     generatedBy: "tools/engine-asset-generator/generate-vehicle-systems.mjs",
-    generatorVersion: "1.0.0",
+    detailLevel: "D3_RECOGNIZABLE_INTERNALS",
+    generatorVersion: "2.0.0",
     threeVersion: THREE.REVISION,
     meshNodePrefix: "system_mesh__",
     meshCount: builder.meshCount,

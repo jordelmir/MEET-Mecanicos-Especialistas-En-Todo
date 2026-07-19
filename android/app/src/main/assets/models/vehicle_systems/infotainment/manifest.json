@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.infotainment.d3",
+  "assetFile": "generic_infotainment.glb",
+  "displayName": "infotainment",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 75,
+  "triangleCount": 15976,
+  "partKeys": [
+    "antenna_network",
+    "audio_bus",
+    "bluetooth_module",
+    "cellular_module",
+    "oem_dashcam",
+    "phone_projection_module",
+    "steering_controls",
+    "wifi_module"
+  ],
+  "supportedSystemIds": [
+    "infotainment"
+  ],
+  "subsystemCoverage": [
+    "Comunicación",
+    "Integración móvil",
+    "Controles y captura"
+  ],
+  "sha256": "ab42700b25a550e65efdf4440166ec600e696f7ca37e7bbd6784a3af1f99adbb",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}

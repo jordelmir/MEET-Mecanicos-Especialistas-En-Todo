@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "assetId": "meet.generic.access.d3",
+  "assetFile": "generic_access.glb",
+  "displayName": "access",
+  "geometryAuthority": "L2_GENERIC_CUTAWAY",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-extended-vehicle-systems.mjs",
+  "detailLevel": "D3_RECOGNIZABLE_INTERNALS",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "meshNodePrefix": "system_mesh__",
+  "meshCount": 36,
+  "triangleCount": 7720,
+  "partKeys": [
+    "central_lock_actuators",
+    "hood_sensor",
+    "ignition_switch",
+    "immobilizer_module",
+    "motion_sensor",
+    "tilt_sensor",
+    "trunk_actuator",
+    "trunk_sensor",
+    "ultrasonic_security_sensor"
+  ],
+  "supportedSystemIds": [
+    "access"
+  ],
+  "subsystemCoverage": [
+    "Encendido",
+    "Inmovilizador",
+    "Cierre y sensores"
+  ],
+  "sha256": "53ca79bd99fe060bf30e14d34454b254171a8dba3b45b8d1212c543177c0cc45",
+  "license": "Original procedural asset generated for MEET; project-owned source generator",
+  "warning": "No dimensional/OEM evidence. Installed applicability requires source evidence and physical confirmation."
+}
