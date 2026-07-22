@@ -195,12 +195,29 @@
           "type": "string",
           "minLength": 1
         },
+        "corpusManifestSha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "corpusId": {
           "$ref": "#/$defs/id"
         },
         "corpusVersion": {
           "type": "string",
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "entityIndexPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entityIndexSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "curatedOverlayPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "curatedOverlaySha256": {
+          "$ref": "#/$defs/sha256"
         },
         "curatedPacks": {
           "type": "array",
@@ -223,6 +240,9 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "contentSha256": {
+                "$ref": "#/$defs/sha256"
               },
               "authority": {
                 "type": "string",
