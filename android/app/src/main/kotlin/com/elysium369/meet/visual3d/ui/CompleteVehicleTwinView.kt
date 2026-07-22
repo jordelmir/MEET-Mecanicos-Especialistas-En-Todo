@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.sceneview.RenderQuality
 import io.github.sceneview.SceneView
+import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCollisionSystem
@@ -75,7 +76,9 @@ import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
 import com.elysium369.meet.domain.visualdiagnostics.ComponentCategory
 import kotlinx.coroutines.delay
 import dev.romainguy.kotlin.math.Float4
+import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.Mat4
+import dev.romainguy.kotlin.math.lookAt
 import kotlin.math.abs
 import kotlin.math.sin
 
@@ -94,7 +97,8 @@ fun CompleteVehicleTwinView(
     catalogNodes: List<UniversalCatalogSceneNode> = emptyList(),
     activeDtcs: List<String> = emptyList(),
     onComponentSelected: ((String, String) -> Unit)? = null,
-    isObdConnected: Boolean = false
+    isObdConnected: Boolean = false,
+    onViewportGestureActiveChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val supportsFilament = remember(context) { context.supportsFilament() }
@@ -118,7 +122,8 @@ fun CompleteVehicleTwinView(
         catalogNodes = catalogNodes,
         activeDtcs = activeDtcs,
         onComponentSelected = onComponentSelected,
-        isObdConnected = isObdConnected
+        isObdConnected = isObdConnected,
+        onViewportGestureActiveChanged = onViewportGestureActiveChanged
     )
 }
 
@@ -137,7 +142,8 @@ private fun FilamentVehicleScene(
     catalogNodes: List<UniversalCatalogSceneNode>,
     activeDtcs: List<String>,
     onComponentSelected: ((String, String) -> Unit)?,
-    isObdConnected: Boolean
+    isObdConnected: Boolean,
+    onViewportGestureActiveChanged: (Boolean) -> Unit
 ) {
     val engine = rememberEngine()
     val filamentView = rememberView(engine)
@@ -160,6 +166,33 @@ private fun FilamentVehicleScene(
     }
     val context = LocalContext.current
     val touchSlop = remember(context) { ViewConfiguration.get(context).scaledTouchSlop.toFloat() }
+    val cameraManipulator = remember(platformAssetPath) {
+        val orbit = ContinuousOrbitState()
+        object : CameraGestureDetector.CameraManipulator {
+            override fun setViewport(width: Int, height: Int) = orbit.setViewport(width, height)
+
+            override fun getTransform(): Mat4 = orbit.pose().let { pose ->
+                lookAt(
+                    Float3(pose.eyeX, pose.eyeY, pose.eyeZ),
+                    Float3(pose.targetX, pose.targetY, pose.targetZ),
+                    Float3(pose.upX, pose.upY, pose.upZ)
+                )
+            }
+
+            override fun grabBegin(x: Int, y: Int, strafe: Boolean) = orbit.grabBegin(x, y)
+            override fun grabUpdate(x: Int, y: Int) = orbit.grabUpdate(x, y)
+            override fun grabEnd() = orbit.grabEnd()
+            override fun scrollBegin(x: Int, y: Int, separation: Float) = Unit
+            override fun scrollUpdate(
+                x: Int,
+                y: Int,
+                prevSeparation: Float,
+                currSeparation: Float
+            ) = orbit.zoom(prevSeparation, currSeparation)
+            override fun scrollEnd() = Unit
+            override fun update(deltaTime: Float) = Unit
+        }
+    }
     var gestureDownX by remember { mutableFloatStateOf(0f) }
     var gestureDownY by remember { mutableFloatStateOf(0f) }
     var gestureExceededTapSlop by remember { mutableStateOf(false) }
@@ -316,12 +349,14 @@ private fun FilamentVehicleScene(
             view = filamentView,
             collisionSystem = sceneCollisionSystem,
             modelLoader = modelLoader,
+            cameraManipulator = cameraManipulator,
             renderQuality = RenderQuality.Default,
             autoCenterContent = true,
             autoFitContent = true,
             onTouchEvent = { event, hitResult ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        onViewportGestureActiveChanged(true)
                         gestureDownX = event.x
                         gestureDownY = event.y
                         gestureExceededTapSlop = false
@@ -334,7 +369,11 @@ private fun FilamentVehicleScene(
                             gestureExceededTapSlop = true
                         }
                     }
-                    MotionEvent.ACTION_CANCEL -> gestureExceededTapSlop = true
+                    MotionEvent.ACTION_UP -> onViewportGestureActiveChanged(false)
+                    MotionEvent.ACTION_CANCEL -> {
+                        onViewportGestureActiveChanged(false)
+                        gestureExceededTapSlop = true
+                    }
                 }
                 val isTapRelease = event.actionMasked == MotionEvent.ACTION_UP &&
                     !gestureExceededTapSlop && event.pointerCount == 1

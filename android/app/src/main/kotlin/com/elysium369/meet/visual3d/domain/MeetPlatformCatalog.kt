@@ -1,12 +1,18 @@
 package com.elysium369.meet.visual3d.domain
 
+enum class PlatformVisualMaturity {
+    REALISTIC_REFERENCE,
+    PROCEDURAL_CONCEPT
+}
+
 data class MeetPlatformProfile(
     val id: String,
     val displayName: String,
     val category: String,
     val assetPath: String,
     val permanent: Boolean = false,
-    val originalMeetDesign: Boolean = true
+    val originalMeetDesign: Boolean = true,
+    val visualMaturity: PlatformVisualMaturity = PlatformVisualMaturity.PROCEDURAL_CONCEPT
 )
 
 object MeetPlatformCatalog {
@@ -17,7 +23,8 @@ object MeetPlatformCatalog {
             category = "Vehiculo base permanente",
             assetPath = "models/vehicle_twin/reference_vehicle.glb",
             permanent = true,
-            originalMeetDesign = false
+            originalMeetDesign = false,
+            visualMaturity = PlatformVisualMaturity.REALISTIC_REFERENCE
         ),
         MeetPlatformProfile("titan_forge", "MEET Titan Forge", "4x4 pesado original", "models/meet_platforms/titan_forge.glb"),
         MeetPlatformProfile("backhoe_hx", "MEET Backhoe HX", "Retroexcavadora original", "models/meet_platforms/backhoe_hx.glb"),
@@ -31,6 +38,14 @@ object MeetPlatformCatalog {
     )
 
     val default = profiles.first()
+
+    val realisticReferences = profiles.filter {
+        it.visualMaturity == PlatformVisualMaturity.REALISTIC_REFERENCE
+    }
+
+    val conceptsAwaitingFinalMesh = profiles.filter {
+        it.visualMaturity == PlatformVisualMaturity.PROCEDURAL_CONCEPT
+    }
 
     fun requireById(id: String): MeetPlatformProfile =
         profiles.firstOrNull { it.id == id } ?: error("Unknown MEET platform: $id")

@@ -5,6 +5,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.RequestDisallowInterceptTouchEvent
-import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +56,7 @@ import com.elysium369.meet.visual3d.domain.GenericInlineFourAssetContract
 import com.elysium369.meet.visual3d.domain.GenericVehicleSystemsAssetContract
 import com.elysium369.meet.visual3d.domain.MeetPlatformCatalog
 import com.elysium369.meet.visual3d.domain.MeetPlatformProfile
+import com.elysium369.meet.visual3d.domain.PlatformVisualMaturity
 import com.elysium369.meet.visual3d.ui.CompleteVehicleTwinView
 import com.elysium369.meet.visual3d.ui.TwinFocusMode
 import com.elysium369.meet.visual3d.ui.VehicleTwinViewportState
@@ -316,6 +320,8 @@ fun ComponentLocatorScreen(
             (selectedCategory == null || c.category == selectedCategory)
         }
     }
+    val pageScrollState = rememberScrollState()
+    var viewportGestureActive by remember { mutableStateOf(false) }
 
     // Mapeo inverso de Malla 3D a ComponentInfo al presionar la pantalla
     val onMeshSelected: (String, String) -> Unit = { meshId, meshName ->
@@ -359,7 +365,7 @@ fun ComponentLocatorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDeep)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(pageScrollState, enabled = !viewportGestureActive)
     ) {
         // ── Top Bar ──
         Row(
@@ -636,11 +642,23 @@ fun ComponentLocatorScreen(
                 .clip(RoundedCornerShape(16.dp))
                 .background(MeetColors.cardBackground)
                 .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(16.dp))
-                .pointerInteropFilter(disallowPageIntercept) { event ->
-                    if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                .pointerInput(disallowPageIntercept) {
+                    awaitEachGesture {
+                        awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial
+                        )
+                        viewportGestureActive = true
                         disallowPageIntercept(true)
+                        try {
+                            do {
+                                val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (pointerEvent.changes.any { it.pressed })
+                        } finally {
+                            viewportGestureActive = false
+                            disallowPageIntercept(false)
+                        }
                     }
-                    false
                 }
         ) {
             val mappedSystemId = when (currentScene) {
@@ -720,7 +738,8 @@ fun ComponentLocatorScreen(
                 catalogNodes = activeCatalogSceneNodes,
                 activeDtcs = allActiveDtcs,
                 onComponentSelected = onMeshSelected,
-                isObdConnected = isObdConnected
+                isObdConnected = isObdConnected,
+                onViewportGestureActiveChanged = { viewportGestureActive = it }
             )
             }
 
@@ -1293,8 +1312,16 @@ private fun PlatformSelectorButton(
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            platform.category,
-            color = MeetColors.textMuted,
+            if (platform.visualMaturity == PlatformVisualMaturity.REALISTIC_REFERENCE) {
+                "Referencia realista"
+            } else {
+                "Concepto 3D · malla final pendiente"
+            },
+            color = if (platform.visualMaturity == PlatformVisualMaturity.REALISTIC_REFERENCE) {
+                MeetColors.neonGreen
+            } else {
+                MeetColors.warning
+            },
             fontSize = 7.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

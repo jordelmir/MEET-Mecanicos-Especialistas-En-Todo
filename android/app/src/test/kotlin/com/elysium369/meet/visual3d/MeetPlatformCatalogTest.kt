@@ -1,6 +1,7 @@
 package com.elysium369.meet.visual3d
 
 import com.elysium369.meet.visual3d.domain.MeetPlatformCatalog
+import com.elysium369.meet.visual3d.domain.PlatformVisualMaturity
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -26,6 +27,17 @@ class MeetPlatformCatalogTest {
         assertEquals(profiles.size, profiles.map { it.id }.distinct().size)
         assertEquals(profiles.size, profiles.map { it.assetPath }.distinct().size)
         assertFalse(profiles.drop(1).any { it.displayName.contains("RAM", ignoreCase = true) })
+    }
+
+    @Test
+    fun `only artist grade licensed asset passes current realism gate`() {
+        assertEquals(listOf("origin"), MeetPlatformCatalog.realisticReferences.map { it.id })
+        assertEquals(9, MeetPlatformCatalog.conceptsAwaitingFinalMesh.size)
+        assertTrue(
+            MeetPlatformCatalog.conceptsAwaitingFinalMesh.all {
+                it.visualMaturity == PlatformVisualMaturity.PROCEDURAL_CONCEPT && it.originalMeetDesign
+            }
+        )
     }
 
     @Test

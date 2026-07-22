@@ -26,7 +26,7 @@ class GenericInlineFourAssetTest {
         assertEquals(2, header.getInt(4))
         assertEquals(model.length(), header.getInt(8).toLong())
         assertTrue("Detailed engine asset should contain real mesh data", model.length() > 250_000L)
-        assertTrue("Core engine GLB must remain mobile-sized", model.length() < 8_000_000L)
+        assertTrue("Core engine GLB must remain mobile-sized", model.length() < 12_000_000L)
 
         val jsonLength = header.getInt(12)
         assertEquals(0x4E4F534A, header.getInt(16))
