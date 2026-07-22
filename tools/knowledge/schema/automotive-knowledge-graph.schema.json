@@ -7,6 +7,7 @@
   "required": [
     "schemaVersion",
     "sourceCorpusHash",
+    "observedEvidence",
     "nodes",
     "edges"
   ],
@@ -52,6 +53,13 @@
         "$ref": "#/$defs/applicabilityRule"
       }
     },
+    "observedEvidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observedEvidence"
+      },
+      "uniqueItems": true
+    },
     "nodes": {
       "type": "array",
       "items": {
@@ -80,6 +88,10 @@
     "sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
     },
     "nodeType": {
       "type": "string",
@@ -250,9 +262,93 @@
               },
               "reviewState": {
                 "$ref": "#/$defs/reviewState"
+              },
+              "reviewedBy": {
+                "$ref": "#/$defs/id"
+              },
+              "reviewedAt": {
+                "$ref": "#/$defs/utcTimestamp"
+              },
+              "reviewedContentSha256": {
+                "$ref": "#/$defs/sha256"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "reviewState": {
+                      "const": "REVIEWED"
+                    }
+                  },
+                  "required": [
+                    "reviewState"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "reviewedBy",
+                    "reviewedAt",
+                    "reviewedContentSha256"
+                  ]
+                }
+              }
+            ]
           }
+        }
+      }
+    },
+    "observedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "subjectId",
+        "subjectKind",
+        "status",
+        "artifactSha256",
+        "observationMethod",
+        "observedBy",
+        "observedAt",
+        "reviewedBy",
+        "reviewedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "subjectId": {
+          "$ref": "#/$defs/id"
+        },
+        "subjectKind": {
+          "type": "string",
+          "enum": [
+            "NODE",
+            "EDGE",
+            "PROFILE",
+            "APPLICABILITY_RULE"
+          ]
+        },
+        "status": {
+          "const": "VERIFIED"
+        },
+        "artifactSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observationMethod": {
+          "$ref": "#/$defs/id"
+        },
+        "observedBy": {
+          "$ref": "#/$defs/id"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/utcTimestamp"
+        },
+        "reviewedBy": {
+          "$ref": "#/$defs/id"
+        },
+        "reviewedAt": {
+          "$ref": "#/$defs/utcTimestamp"
         }
       }
     },
@@ -370,6 +466,13 @@
           },
           "uniqueItems": true
         },
+        "reviewedCuratedSourceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
         "observedEvidenceIds": {
           "type": "array",
           "items": {
@@ -453,12 +556,12 @@
             "anyOf": [
               {
                 "properties": {
-                  "curatedSourceIds": {
+                  "reviewedCuratedSourceIds": {
                     "minItems": 1
                   }
                 },
                 "required": [
-                  "curatedSourceIds"
+                  "reviewedCuratedSourceIds"
                 ]
               },
               {
@@ -592,6 +695,20 @@
           },
           "uniqueItems": true
         },
+        "reviewedCuratedSourceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "observedEvidenceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
         "evidenceRequired": {
           "type": "array",
           "minItems": 1,
@@ -600,7 +717,45 @@
           },
           "uniqueItems": true
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applicability": {
+                "const": "CONFIRMED"
+              }
+            },
+            "required": [
+              "applicability"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "reviewedCuratedSourceIds": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "reviewedCuratedSourceIds"
+                ]
+              },
+              {
+                "properties": {
+                  "observedEvidenceIds": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "observedEvidenceIds"
+                ]
+              }
+            ]
+          }
+        }
+      ]
     },
     "applicabilityRule": {
       "type": "object",
@@ -663,6 +818,20 @@
           },
           "uniqueItems": true
         },
+        "reviewedCuratedSourceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "observedEvidenceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
         "evidenceRequired": {
           "type": "array",
           "items": {
@@ -684,6 +853,44 @@
             "evidenceRequired": {
               "minItems": 1
             }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFIRMED"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "reviewedCuratedSourceIds": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "reviewedCuratedSourceIds"
+                ]
+              },
+              {
+                "properties": {
+                  "observedEvidenceIds": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "observedEvidenceIds"
+                ]
+              }
+            ]
           }
         }
       ]

@@ -53,6 +53,7 @@
     "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
     "evidenceRequired": ["vin", "market", "engine_code", "physical_inventory"]
   },
+  "observedEvidence": [],
   "nodes": [
     {
       "id": "hyundai_accent_verna_2005_1_6_at",

@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 from collections import Counter
@@ -40,6 +41,7 @@ SET_LIKE_ARRAY_FIELDS = {
     "evidenceRequired",
     "models",
     "observedEvidenceIds",
+    "reviewedCuratedSourceIds",
     "sourceBlockIds",
 }
 FORBIDDEN_GRAPH_KEYS = {
@@ -352,7 +354,7 @@ def _load_and_validate_curated(
     repo_root: Path,
     schema: dict[str, Any],
     corpus: dict[str, Any],
-) -> tuple[dict[str, Any], str, list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], str, list[dict[str, Any]], list[dict[str, Any]]]:
     curated_path = repo_root / CURATED_OVERLAY_RELATIVE_PATH
     curated = _load_json(curated_path)
     Draft202012Validator(schema).validate(curated)
@@ -369,6 +371,7 @@ def _load_and_validate_curated(
 
     pack_inputs: list[dict[str, Any]] = []
     pack_ids: set[str] = set()
+    pack_input_by_id: dict[str, dict[str, Any]] = {}
     for pack_input in source_inputs.get("curatedPacks", []):
         pack_relative = _require_relative_path(
             pack_input.get("path", ""), f"curated pack path for {pack_input.get('packId')}"
@@ -380,9 +383,28 @@ def _load_and_validate_curated(
         pack_ids.add(pack_id)
         if pack.get("packId") != pack_id or pack.get("packVersion") != pack_input.get("packVersion"):
             raise ValueError(f"Curated pack identity mismatch for {pack_id}")
+        pack_sha256 = _sha256_bytes(canonical_json_bytes(pack))
+        if (
+            pack_input.get("reviewState") == "REVIEWED"
+            and pack_input.get("reviewedContentSha256") != pack_sha256
+        ):
+            raise ValueError(
+                f"Reviewed content hash attestation mismatch for curated pack {pack_id}"
+            )
         traced_pack = copy.deepcopy(pack_input)
-        traced_pack["contentSha256"] = _sha256_bytes(canonical_json_bytes(pack))
+        traced_pack["contentSha256"] = pack_sha256
         pack_inputs.append(traced_pack)
+        pack_input_by_id[pack_id] = traced_pack
+
+    observed_evidence = copy.deepcopy(curated.get("observedEvidence", []))
+    observed_evidence_by_id: dict[str, dict[str, Any]] = {}
+    for evidence in observed_evidence:
+        evidence_id = evidence.get("id")
+        if evidence_id in observed_evidence_by_id:
+            raise ValueError(f"Duplicate observed evidence ID: {evidence_id}")
+        if evidence.get("status") != "VERIFIED":
+            raise ValueError(f"Observed evidence is not VERIFIED: {evidence_id}")
+        observed_evidence_by_id[evidence_id] = evidence
 
     qualified_source_refs = corpus["qualifiedSourceRefs"]
     source_carriers: list[tuple[str, dict[str, Any]]] = []
@@ -398,7 +420,55 @@ def _load_and_validate_curated(
         if unknown_pack_ids:
             raise ValueError(f"Unknown curated pack references in {label}: {unknown_pack_ids}")
 
-    return curated, overlay_sha256, pack_inputs
+    confirmation_carriers = [
+        ("EDGE", edge, edge.get("applicability"))
+        for edge in curated.get("edges", [])
+    ]
+    if profile is not None:
+        confirmation_carriers.append(("PROFILE", profile, profile.get("applicability")))
+    confirmation_carriers.extend(
+        ("APPLICABILITY_RULE", rule, rule.get("state"))
+        for rule in curated.get("applicabilityRules", [])
+    )
+    for subject_kind, carrier, state in confirmation_carriers:
+        carrier_id = carrier.get("id")
+        evidence_ids = carrier.get("observedEvidenceIds", [])
+        verified_evidence: list[dict[str, Any]] = []
+        for evidence_id in evidence_ids:
+            evidence = observed_evidence_by_id.get(evidence_id)
+            if evidence is None:
+                raise ValueError(
+                    f"Unknown observed evidence ID {evidence_id} referenced by {carrier_id}"
+                )
+            if (
+                evidence.get("subjectKind") != subject_kind
+                or evidence.get("subjectId") != carrier_id
+            ):
+                raise ValueError(
+                    f"Observed evidence {evidence_id} is not bound to {subject_kind} {carrier_id}"
+                )
+            verified_evidence.append(evidence)
+        reviewed_pack_ids = set(carrier.get("reviewedCuratedSourceIds", []))
+        curated_pack_ids = set(carrier.get("curatedSourceIds", []))
+        if not reviewed_pack_ids.issubset(curated_pack_ids):
+            raise ValueError(
+                f"Reviewed curated sources are not a subset of curated sources for {carrier_id}"
+            )
+        for pack_id in reviewed_pack_ids:
+            pack_input = pack_input_by_id.get(pack_id)
+            if pack_input is None or pack_input.get("reviewState") != "REVIEWED":
+                raise ValueError(
+                    f"Reviewed curated source {pack_id} lacks hash-attested REVIEWED authority"
+                )
+        if state != "CONFIRMED":
+            continue
+        if not reviewed_pack_ids and not verified_evidence:
+            raise ValueError(
+                f"CONFIRMED {subject_kind} {carrier_id} lacks hash-attested REVIEWED "
+                "curated authority or VERIFIED observed evidence"
+            )
+
+    return curated, overlay_sha256, pack_inputs, observed_evidence
 
 
 def _build_system_nodes(manifest: dict[str, Any]) -> list[dict[str, Any]]:
@@ -582,7 +652,7 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
     schema = _load_json(repo_root / SCHEMA_RELATIVE_PATH)
     Draft202012Validator.check_schema(schema)
     corpus = _load_and_validate_corpus(repo_root)
-    curated, overlay_sha256, pack_inputs = _load_and_validate_curated(
+    curated, overlay_sha256, pack_inputs, observed_evidence_input = _load_and_validate_curated(
         repo_root, schema, corpus
     )
     manifest = corpus["manifest"]
@@ -633,6 +703,13 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
         (_normalize_record(pack, f"curated pack {pack['packId']}") for pack in pack_inputs),
         key=lambda pack: (pack["packId"], pack["path"]),
     )
+    observed_evidence = sorted(
+        (
+            _normalize_record(evidence, f"observed evidence {evidence['id']}")
+            for evidence in observed_evidence_input
+        ),
+        key=lambda evidence: evidence["id"],
+    )
 
     _validate_compiled_references(
         nodes,
@@ -643,6 +720,7 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
     )
 
     role_counts = corpus["recordRoleCounts"]
+    node_type_counts = Counter(node["type"] for node in nodes)
     base_node_count = len(generated_nodes)
     structural_edge_count = len(generated_edges)
     graph: dict[str, Any] = {
@@ -665,15 +743,20 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
         "edges": edges,
         "profiles": profiles,
         "applicabilityRules": applicability_rules,
+        "observedEvidence": observed_evidence,
         "statistics": {
             "sourceBlockCount": len(corpus["qualifiedSourceRefs"]),
             "qualifiedSourceRefCount": len(corpus["qualifiedSourceRefs"]),
             "bareSourceBlockIdCount": len(corpus["bareSourceBlockIds"]),
-            "systemNodeCount": len(manifest["systems"]),
-            "sectionNodeCount": len(manifest["sections"]),
+            "corpusSystemNodeCount": len(manifest["systems"]),
+            "corpusSectionNodeCount": len(manifest["sections"]),
             "entityNodeCount": len(entity_index["entities"]),
-            "componentNodeCount": role_counts["COMPONENT"],
-            "realCaseNodeCount": role_counts["REAL_CASE"],
+            "corpusComponentNodeCount": role_counts["COMPONENT"],
+            "corpusRealCaseNodeCount": role_counts["REAL_CASE"],
+            "totalSystemNodeCount": node_type_counts["SYSTEM"],
+            "totalSectionNodeCount": node_type_counts["SECTION"],
+            "totalComponentNodeCount": node_type_counts["COMPONENT"],
+            "totalSourceBlockNodeCount": node_type_counts["SOURCE_BLOCK"],
             "baseNodeCount": base_node_count,
             "structuralEdgeCount": structural_edge_count,
             "curatedNodeCount": len(curated_nodes),
@@ -682,6 +765,7 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
             "edgeCount": len(edges),
             "profileCount": len(profiles),
             "applicabilityRuleCount": len(applicability_rules),
+            "observedEvidenceCount": len(observed_evidence),
         },
     }
     graph = _normalize_record(graph, "graph")
@@ -692,14 +776,14 @@ def build_graph(repo_root: Path) -> dict[str, Any]:
     return graph
 
 
-def _stage_bytes(path: Path, encoded: bytes) -> Path:
+def _stage_bytes(path: Path, encoded: bytes, mode: int = 0o644) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
     temporary_path = Path(temporary_name)
     try:
-        os.fchmod(descriptor, 0o644)
+        os.fchmod(descriptor, mode)
         with os.fdopen(descriptor, "wb") as destination:
             destination.write(encoded)
             destination.flush()
@@ -710,31 +794,68 @@ def _stage_bytes(path: Path, encoded: bytes) -> Path:
     return temporary_path
 
 
+def _snapshot_target(path: Path) -> tuple[bool, bytes, int | None]:
+    if not path.exists():
+        return False, b"", None
+    if not path.is_file():
+        raise OSError(f"Graph output target is not a regular file: {path}")
+    return True, path.read_bytes(), stat.S_IMODE(path.stat().st_mode)
+
+
+def _restore_target(path: Path, snapshot: tuple[bool, bytes, int | None]) -> None:
+    existed, original_bytes, original_mode = snapshot
+    if not existed:
+        path.unlink(missing_ok=True)
+        return
+    if original_mode is None:
+        raise OSError(f"Missing original mode while restoring {path}")
+    restoration = _stage_bytes(path, original_bytes, original_mode)
+    try:
+        os.replace(restoration, path)
+    finally:
+        restoration.unlink(missing_ok=True)
+
+
 def compile_graph(repo_root: Path, output_root: Path) -> tuple[Path, Path]:
-    """Build once, atomically write both targets, and verify byte equality."""
+    """Build once and transactionally replace both outputs for handled failures."""
 
     graph = build_graph(Path(repo_root))
     encoded = canonical_json_bytes(graph) + b"\n"
     output_root = Path(output_root)
     public_path = output_root / PUBLIC_GRAPH_RELATIVE_PATH
     android_path = output_root / ANDROID_GRAPH_RELATIVE_PATH
+    targets = [public_path, android_path]
+    snapshots = {target: _snapshot_target(target) for target in targets}
     staged: list[tuple[Path, Path]] = []
+    replaced: list[Path] = []
     try:
-        staged = [
-            (_stage_bytes(public_path, encoded), public_path),
-            (_stage_bytes(android_path, encoded), android_path),
-        ]
+        for target in targets:
+            staged.append((_stage_bytes(target, encoded), target))
         for temporary_path, target_path in staged:
             os.replace(temporary_path, target_path)
-        staged.clear()
+            replaced.append(target_path)
+
+        public_bytes = public_path.read_bytes()
+        android_bytes = android_path.read_bytes()
+        if public_bytes != encoded or android_bytes != encoded or public_bytes != android_bytes:
+            raise OSError("Compiled public and Android graph artifacts are not byte-identical")
+    except BaseException as replacement_error:
+        rollback_errors: list[str] = []
+        for target in reversed(replaced):
+            try:
+                _restore_target(target, snapshots[target])
+            except BaseException as rollback_error:
+                rollback_errors.append(f"{target}: {rollback_error}")
+        if rollback_errors:
+            details = "; ".join(rollback_errors)
+            raise OSError(
+                f"Graph output transaction failed ({replacement_error}); rollback failed: {details}"
+            ) from replacement_error
+        raise
     finally:
         for temporary_path, _ in staged:
             temporary_path.unlink(missing_ok=True)
 
-    public_bytes = public_path.read_bytes()
-    android_bytes = android_path.read_bytes()
-    if public_bytes != encoded or android_bytes != encoded or public_bytes != android_bytes:
-        raise OSError("Compiled public and Android graph artifacts are not byte-identical")
     return public_path, android_path
 
 

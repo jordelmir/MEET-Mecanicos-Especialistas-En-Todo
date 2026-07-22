@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import re
 import shutil
 import stat
@@ -11,8 +12,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -20,6 +23,7 @@ TOOLS_DIR = REPO_ROOT / "tools/knowledge"
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
+import build_automotive_knowledge_graph as compiler
 from build_automotive_knowledge_graph import build_graph, compile_graph
 
 
@@ -124,7 +128,7 @@ class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
         )
         self.assertTrue(REQUIRED_EDGE_FIELDS <= set(schema["$defs"]["edge"]["required"]))
 
-    def test_confirmed_edge_schema_requires_curated_or_observed_evidence(self) -> None:
+    def test_confirmed_edge_schema_requires_reviewed_or_observed_evidence(self) -> None:
         schema = load_json(SCHEMA_PATH)
         edge_rules = schema["$defs"]["edge"]["allOf"]
         confirmed_rule = next(
@@ -144,7 +148,39 @@ class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
             for field, contract in option.get("properties", {}).items()
             if contract.get("minItems") == 1
         }
-        self.assertEqual({"curatedSourceIds", "observedEvidenceIds"}, required_evidence)
+        self.assertEqual(
+            {"reviewedCuratedSourceIds", "observedEvidenceIds"}, required_evidence
+        )
+
+    def test_schema_models_review_attestation_and_structured_observed_evidence(self) -> None:
+        schema = load_json(SCHEMA_PATH)
+        curated = load_json(CURATED_PATH)
+        self.assertIn("observedEvidence", schema["properties"])
+        self.assertIn("observedEvidence", schema["$defs"])
+
+        reviewed = copy.deepcopy(curated)
+        reviewed["sourceInputs"]["curatedPacks"][0]["reviewState"] = "REVIEWED"
+        with self.assertRaises(ValidationError):
+            Draft202012Validator(schema).validate(reviewed)
+
+        confirmed_cases = (
+            ("edges", "applicability"),
+            ("referenceVehicleProfile", "applicability"),
+            ("applicabilityRules", "state"),
+        )
+        for collection, state_field in confirmed_cases:
+            candidate = copy.deepcopy(curated)
+            record = (
+                candidate[collection][0]
+                if isinstance(candidate[collection], list)
+                else candidate[collection]
+            )
+            record[state_field] = "CONFIRMED"
+            self.assertTrue(record["curatedSourceIds"])
+            record["reviewedCuratedSourceIds"] = []
+            record["observedEvidenceIds"] = []
+            with self.subTest(collection=collection), self.assertRaises(ValidationError):
+                Draft202012Validator(schema).validate(candidate)
 
     def test_source_corpus_hash_is_sha256_and_matches_manifest(self) -> None:
         curated = load_json(CURATED_PATH)
@@ -197,8 +233,9 @@ class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
             )
             if edge["applicability"] == "CONFIRMED":
                 self.assertTrue(
-                    edge.get("curatedSourceIds") or edge.get("observedEvidenceIds"),
-                    f"{edge['id']} confirms applicability without curated or observed evidence",
+                    edge.get("reviewedCuratedSourceIds")
+                    or edge.get("observedEvidenceIds"),
+                    f"{edge['id']} confirms applicability without reviewed or observed evidence",
                 )
 
     def test_curated_source_block_ids_exist_in_immutable_corpus(self) -> None:
@@ -296,6 +333,7 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.graph = build_graph(REPO_ROOT)
+        cls.corpus = compiler._load_and_validate_corpus(REPO_ROOT)
 
     def test_compiled_graph_validates_and_has_expected_base_statistics(self) -> None:
         Draft202012Validator(load_json(SCHEMA_PATH)).validate(self.graph)
@@ -304,11 +342,15 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
             "sourceBlockCount": 74_648,
             "qualifiedSourceRefCount": 74_648,
             "bareSourceBlockIdCount": 74_638,
-            "systemNodeCount": 26,
-            "sectionNodeCount": 347,
+            "corpusSystemNodeCount": 26,
+            "corpusSectionNodeCount": 347,
             "entityNodeCount": 5_050,
-            "componentNodeCount": 4_753,
-            "realCaseNodeCount": 297,
+            "corpusComponentNodeCount": 4_753,
+            "corpusRealCaseNodeCount": 297,
+            "totalSystemNodeCount": 28,
+            "totalSectionNodeCount": 347,
+            "totalComponentNodeCount": 4_759,
+            "totalSourceBlockNodeCount": 297,
             "baseNodeCount": 5_423,
             "structuralEdgeCount": 5_397,
             "curatedNodeCount": 23,
@@ -317,9 +359,17 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
             "edgeCount": 5_411,
             "profileCount": 1,
             "applicabilityRuleCount": 8,
+            "observedEvidenceCount": 0,
         }
         for key, value in expected.items():
             self.assertEqual(value, self.graph["statistics"][key], key)
+        for ambiguous_key in (
+            "systemNodeCount",
+            "sectionNodeCount",
+            "componentNodeCount",
+            "realCaseNodeCount",
+        ):
+            self.assertNotIn(ambiguous_key, self.graph["statistics"])
 
     def test_entity_records_are_split_honestly_between_components_and_real_cases(self) -> None:
         entity_nodes = [
@@ -519,6 +569,10 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
             sorted(rule["id"] for rule in self.graph["applicabilityRules"]),
         )
         self.assertEqual(
+            [evidence["id"] for evidence in self.graph["observedEvidence"]],
+            sorted(evidence["id"] for evidence in self.graph["observedEvidence"]),
+        )
+        self.assertEqual(
             [(pack["packId"], pack["path"]) for pack in self.graph["sourceInputs"]["curatedPacks"]],
             sorted((pack["packId"], pack["path"]) for pack in self.graph["sourceInputs"]["curatedPacks"]),
         )
@@ -603,6 +657,55 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "collision"):
                 build_graph(fixture_root)
 
+    def test_confirmed_edge_rejects_current_review_required_pack(self) -> None:
+        def mutate(overlay: dict) -> None:
+            overlay["edges"][0]["applicability"] = "CONFIRMED"
+
+        self._assert_overlay_mutation_rejected(mutate, "CONFIRMED")
+
+    def test_confirmed_profile_rejects_current_review_required_pack(self) -> None:
+        def mutate(overlay: dict) -> None:
+            overlay["referenceVehicleProfile"]["applicability"] = "CONFIRMED"
+
+        self._assert_overlay_mutation_rejected(mutate, "CONFIRMED")
+
+    def test_confirmed_rule_rejects_current_review_required_pack(self) -> None:
+        def mutate(overlay: dict) -> None:
+            overlay["applicabilityRules"][0]["state"] = "CONFIRMED"
+
+        self._assert_overlay_mutation_rejected(mutate, "CONFIRMED")
+
+    def test_unknown_observed_evidence_id_is_rejected(self) -> None:
+        def mutate(overlay: dict) -> None:
+            overlay["edges"][0]["observedEvidenceIds"] = ["observation_missing"]
+
+        self._assert_overlay_mutation_rejected(mutate, "observed evidence")
+
+    def test_reviewed_source_marker_rejects_review_required_pack(self) -> None:
+        def mutate(overlay: dict) -> None:
+            edge = overlay["edges"][0]
+            edge["applicability"] = "CONFIRMED"
+            edge["reviewedCuratedSourceIds"] = [edge["curatedSourceIds"][0]]
+
+        self._assert_overlay_mutation_rejected(mutate, "lacks hash-attested reviewed")
+
+    def test_reviewed_sources_must_be_subset_of_curated_sources(self) -> None:
+        def mutate(overlay: dict) -> None:
+            edge = overlay["edges"][0]
+            edge["reviewedCuratedSourceIds"] = ["pack_06_dtc_P0230"]
+
+        self._assert_overlay_mutation_rejected(mutate, "not a subset")
+
+    def test_reviewed_pack_attestation_must_match_exact_pack_content(self) -> None:
+        def mutate(overlay: dict) -> None:
+            pack = overlay["sourceInputs"]["curatedPacks"][0]
+            pack["reviewState"] = "REVIEWED"
+            pack["reviewedBy"] = "reviewer_fixture"
+            pack["reviewedAt"] = "2026-07-22T12:00:00Z"
+            pack["reviewedContentSha256"] = "0" * 64
+
+        self._assert_overlay_mutation_rejected(mutate, "attestation mismatch")
+
     def test_check_detects_drift_without_writing(self) -> None:
         script = REPO_ROOT / "tools/knowledge/build_automotive_knowledge_graph.py"
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -641,6 +744,110 @@ class AutomotiveKnowledgeGraphCompilerTest(unittest.TestCase):
             target = root / pack["path"]
             target.symlink_to(REPO_ROOT / pack["path"])
         return root
+
+    def _assert_overlay_mutation_rejected(self, mutate: object, pattern: str) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            fixture_root = self._make_repo_fixture(Path(temporary_dir))
+            overlay_path = fixture_root / "tools/knowledge/curated/accent_verna_2005_knowledge.json"
+            overlay = load_json(overlay_path)
+            mutate(overlay)  # type: ignore[operator]
+            overlay_path.write_text(json.dumps(overlay, ensure_ascii=False), encoding="utf-8")
+            with (
+                mock.patch.object(
+                    compiler, "_load_and_validate_corpus", return_value=self.corpus
+                ),
+                self.assertRaises((ValueError, ValidationError)) as raised,
+            ):
+                build_graph(fixture_root)
+            self.assertIn(pattern.lower(), str(raised.exception).lower())
+
+class AutomotiveKnowledgeGraphTransactionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.graph = load_json(PUBLIC_GRAPH_PATH)
+
+    def test_second_stage_failure_preserves_targets_and_cleans_staged_temp(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            output_root = Path(temporary_dir)
+            public_path, android_path = self._seed_output_targets(output_root)
+            before = self._snapshot_targets(public_path, android_path)
+            real_stage = compiler._stage_bytes
+            stage_calls = 0
+
+            def fail_second_stage(path: Path, encoded: bytes) -> Path:
+                nonlocal stage_calls
+                stage_calls += 1
+                if stage_calls == 2:
+                    raise OSError("injected second-stage failure")
+                return real_stage(path, encoded)
+
+            with (
+                mock.patch.object(compiler, "build_graph", return_value=self.graph),
+                mock.patch.object(compiler, "_stage_bytes", side_effect=fail_second_stage),
+                self.assertRaisesRegex(OSError, "injected second-stage failure"),
+            ):
+                compile_graph(REPO_ROOT, output_root)
+
+            self._assert_targets_match_snapshot(before, public_path, android_path)
+            self.assertEqual([], self._temporary_artifacts(output_root))
+
+    def test_second_replace_failure_rolls_back_both_targets_and_cleans_temp(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            output_root = Path(temporary_dir)
+            public_path, android_path = self._seed_output_targets(output_root)
+            before = self._snapshot_targets(public_path, android_path)
+            real_replace = os.replace
+            replace_calls = 0
+
+            def fail_second_replace(source: Path, target: Path) -> None:
+                nonlocal replace_calls
+                replace_calls += 1
+                if replace_calls == 2:
+                    raise OSError("injected second-replace failure")
+                real_replace(source, target)
+
+            with (
+                mock.patch.object(compiler, "build_graph", return_value=self.graph),
+                mock.patch.object(compiler.os, "replace", side_effect=fail_second_replace),
+                self.assertRaisesRegex(OSError, "injected second-replace failure"),
+            ):
+                compile_graph(REPO_ROOT, output_root)
+
+            self._assert_targets_match_snapshot(before, public_path, android_path)
+            self.assertEqual([], self._temporary_artifacts(output_root))
+
+    @staticmethod
+    def _seed_output_targets(output_root: Path) -> tuple[Path, Path]:
+        public_path = output_root / compiler.PUBLIC_GRAPH_RELATIVE_PATH
+        android_path = output_root / compiler.ANDROID_GRAPH_RELATIVE_PATH
+        public_path.parent.mkdir(parents=True)
+        android_path.parent.mkdir(parents=True)
+        public_path.write_bytes(b"original-public\n")
+        android_path.write_bytes(b"original-android\n")
+        public_path.chmod(0o640)
+        android_path.chmod(0o604)
+        return public_path, android_path
+
+    @staticmethod
+    def _snapshot_targets(*paths: Path) -> dict[Path, tuple[bytes, int]]:
+        return {
+            path: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in paths
+        }
+
+    def _assert_targets_match_snapshot(
+        self, snapshot: dict[Path, tuple[bytes, int]], *paths: Path
+    ) -> None:
+        for path in paths:
+            self.assertEqual(snapshot[path][0], path.read_bytes(), path)
+            self.assertEqual(snapshot[path][1], stat.S_IMODE(path.stat().st_mode), path)
+
+    @staticmethod
+    def _temporary_artifacts(output_root: Path) -> list[Path]:
+        return sorted(
+            path
+            for path in output_root.rglob("*")
+            if path.is_file() and path.name.endswith(".tmp")
+        )
 
 
 if __name__ == "__main__":
