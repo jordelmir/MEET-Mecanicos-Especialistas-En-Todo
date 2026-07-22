@@ -112,6 +112,7 @@
         "MAY_SET_DTC",
         "AFFECTS",
         "CONFIRMED_BY_TEST",
+        "HAS_DIAGNOSTIC_TEST",
         "REQUIRES_TEST_BEFORE_REPLACE",
         "USES_TOOL",
         "HAS_WARNING",
@@ -284,7 +285,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/sourceRef"
-          }
+          },
+          "uniqueItems": true
         },
         "curatedSourceIds": {
           "type": "array",
@@ -337,7 +339,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/sourceRef"
-          }
+          },
+          "uniqueItems": true
         },
         "curatedSourceIds": {
           "type": "array",
@@ -558,7 +561,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/sourceRef"
-          }
+          },
+          "uniqueItems": true
         },
         "curatedSourceIds": {
           "type": "array",
@@ -628,7 +632,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/sourceRef"
-          }
+          },
+          "uniqueItems": true
         },
         "curatedSourceIds": {
           "type": "array",

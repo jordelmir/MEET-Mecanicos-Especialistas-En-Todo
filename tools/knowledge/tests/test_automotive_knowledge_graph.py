@@ -5,6 +5,8 @@ import re
 import unittest
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA_PATH = REPO_ROOT / "tools/knowledge/schema/automotive-knowledge-graph.schema.json"
@@ -66,6 +68,13 @@ def load_json(path: Path) -> dict:
 
 
 class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
+    def test_schema_is_valid_draft_2020_12_and_accepts_curated_overlay(self) -> None:
+        schema = load_json(SCHEMA_PATH)
+        curated = load_json(CURATED_PATH)
+
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(curated)
+
     def test_schema_version_and_vocabularies_are_exact(self) -> None:
         schema = load_json(SCHEMA_PATH)
 
@@ -183,6 +192,19 @@ class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
                 {source_ref["blockId"] for source_ref in relation["sourceRefs"]},
                 relation["id"],
             )
+            qualified_refs = [
+                (
+                    source_ref["sourceDocumentId"],
+                    source_ref["blockId"],
+                    source_ref["textHash"],
+                )
+                for source_ref in relation["sourceRefs"]
+            ]
+            self.assertEqual(
+                len(qualified_refs),
+                len(set(qualified_refs)),
+                f"{relation['id']} contains duplicate qualified source references",
+            )
             for source_ref in relation["sourceRefs"]:
                 qualified_ref = (
                     source_ref["sourceDocumentId"],
@@ -193,6 +215,11 @@ class AutomotiveKnowledgeGraphContractTest(unittest.TestCase):
 
     def test_p0230_sequence_is_circuit_first_and_replacement_gated(self) -> None:
         curated = load_json(CURATED_PATH)
+        first_test_edge = next(
+            edge for edge in curated["edges"] if edge["id"] == "edge_p0230_first_test"
+        )
+        self.assertEqual("HAS_DIAGNOSTIC_TEST", first_test_edge["type"])
+
         sequence_edges = sorted(
             (
                 edge

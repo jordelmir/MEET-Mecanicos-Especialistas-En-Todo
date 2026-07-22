@@ -275,10 +275,13 @@
       "id": "test_p0230_pump_current",
       "type": "DIAGNOSTIC_TEST",
       "label": "Medir corriente, presión y retención con criterios revisados",
-      "sourceBlockIds": ["block_007622_4790cad377", "block_007625_349bc2b23c"],
+      "sourceBlockIds": ["block_007627_286dddc7b8", "block_007628_66207aaab5", "block_007629_fa468373cc", "block_007630_949a768dec", "block_007631_fcdd77b100"],
       "sourceRefs": [
-        {"sourceDocumentId": "document_17", "blockId": "block_007622_4790cad377", "textHash": "4790cad377fcb13b4d33d345ade879ce855db127401471d2ddd4c96763e1116b"},
-        {"sourceDocumentId": "document_17", "blockId": "block_007625_349bc2b23c", "textHash": "349bc2b23c414f79c56f6e3fb00b6b24006608eaeea705c6323f1e2010fcf595"}
+        {"sourceDocumentId": "document_17", "blockId": "block_007627_286dddc7b8", "textHash": "286dddc7b85841b3a524b5f647249fa338e8474d1094d32d666bae5ce2ab37fc"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007628_66207aaab5", "textHash": "66207aaab5b885d98d7fa024a18d01b2b93cf7203923507ccdb9aa26359c83aa"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007629_fa468373cc", "textHash": "fa468373ccba530a3a7e55d9ed0fdd72f8868d900759e7271a679ba788639b4a"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007630_949a768dec", "textHash": "949a768dec7187e984810e0b89bf1e7ab9bc89531ff8ce46c7c5aa9edd8f4db9"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007631_fcdd77b100", "textHash": "fcdd77b100c1a37d1cab46d911e26820b77ed98a8ecd89879f471d27d92661ff"}
       ],
       "curatedSourceIds": ["pack_06_dtc_P0230"]
     },
@@ -363,7 +366,7 @@
       "id": "edge_p0230_first_test",
       "from": "dtc_P0230",
       "to": "test_p0230_capture_context",
-      "type": "CONFIRMED_BY_TEST",
+      "type": "HAS_DIAGNOSTIC_TEST",
       "sourceBlockIds": [],
       "sourceRefs": [],
       "curatedSourceIds": ["pack_06_dtc_P0230"],
@@ -446,10 +449,13 @@
       "from": "fuel_pump",
       "to": "test_p0230_pump_current",
       "type": "REQUIRES_TEST_BEFORE_REPLACE",
-      "sourceBlockIds": ["block_007622_4790cad377", "block_007625_349bc2b23c"],
+      "sourceBlockIds": ["block_007627_286dddc7b8", "block_007628_66207aaab5", "block_007629_fa468373cc", "block_007630_949a768dec", "block_007631_fcdd77b100"],
       "sourceRefs": [
-        {"sourceDocumentId": "document_17", "blockId": "block_007622_4790cad377", "textHash": "4790cad377fcb13b4d33d345ade879ce855db127401471d2ddd4c96763e1116b"},
-        {"sourceDocumentId": "document_17", "blockId": "block_007625_349bc2b23c", "textHash": "349bc2b23c414f79c56f6e3fb00b6b24006608eaeea705c6323f1e2010fcf595"}
+        {"sourceDocumentId": "document_17", "blockId": "block_007627_286dddc7b8", "textHash": "286dddc7b85841b3a524b5f647249fa338e8474d1094d32d666bae5ce2ab37fc"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007628_66207aaab5", "textHash": "66207aaab5b885d98d7fa024a18d01b2b93cf7203923507ccdb9aa26359c83aa"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007629_fa468373cc", "textHash": "fa468373ccba530a3a7e55d9ed0fdd72f8868d900759e7271a679ba788639b4a"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007630_949a768dec", "textHash": "949a768dec7187e984810e0b89bf1e7ab9bc89531ff8ce46c7c5aa9edd8f4db9"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007631_fcdd77b100", "textHash": "fcdd77b100c1a37d1cab46d911e26820b77ed98a8ecd89879f471d27d92661ff"}
       ],
       "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
       "evidenceRequired": ["loaded_voltage_at_pump", "ground_drop", "pump_current", "fuel_pressure_oem_criteria"],
