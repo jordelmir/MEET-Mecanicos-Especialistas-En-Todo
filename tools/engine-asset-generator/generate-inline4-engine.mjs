@@ -63,7 +63,16 @@ const materials = {
   polymer: new THREE.MeshStandardMaterial({ name: "technical_polymer", color: 0x151b20, roughness: 0.66, metalness: 0.04 }),
   gasket: new THREE.MeshStandardMaterial({ name: "gasket", color: 0x151719, roughness: 0.82, metalness: 0.02 }),
   intake: new THREE.MeshStandardMaterial({ name: "intake_alloy", color: 0x526b75, roughness: 0.36, metalness: 0.66 }),
-  exhaust: new THREE.MeshStandardMaterial({ name: "heat_aged_steel", color: 0x6b4b3a, roughness: 0.5, metalness: 0.7 })
+  exhaust: new THREE.MeshStandardMaterial({ name: "heat_aged_steel", color: 0x6b4b3a, roughness: 0.5, metalness: 0.7 }),
+  ceramic: new THREE.MeshStandardMaterial({ name: "spark_plug_ceramic", color: 0xe8edf0, roughness: 0.3, metalness: 0.02 }),
+  copper: new THREE.MeshStandardMaterial({ name: "electrical_copper", color: 0xb96f35, roughness: 0.28, metalness: 0.86 }),
+  coilEpoxy: new THREE.MeshStandardMaterial({ name: "coil_epoxy", color: 0x222a31, roughness: 0.46, metalness: 0.08 }),
+  wireInsulation: new THREE.MeshStandardMaterial({ name: "ignition_wire_insulation", color: 0x172a35, roughness: 0.64, metalness: 0.03 }),
+  connector: new THREE.MeshStandardMaterial({ name: "connector_lock", color: 0xd28b1f, roughness: 0.52, metalness: 0.05 }),
+  fuelRail: new THREE.MeshStandardMaterial({ name: "fuel_rail_alloy", color: 0xb9c1c8, roughness: 0.24, metalness: 0.9 }),
+  fuelPolymer: new THREE.MeshStandardMaterial({ name: "fuel_resistant_polymer", color: 0x29343b, roughness: 0.58, metalness: 0.04 }),
+  sensor: new THREE.MeshStandardMaterial({ name: "sensor_housing", color: 0x263742, roughness: 0.5, metalness: 0.08 }),
+  coolantHose: new THREE.MeshStandardMaterial({ name: "coolant_hose", color: 0x1c262b, roughness: 0.76, metalness: 0.01 })
 };
 
 const groups = new Map();
@@ -264,6 +273,33 @@ roundedBox("valve_cover_gasket", "perimeter", 3.7, 0.06, 1.58, 0.055, materials.
 roundedBox("valve_cover", "shell", 3.72, 0.56, 1.62, 0.22, materials.polymer, [0, 2.56, 0], [0, 0, 0], [1, 0.75, 1]);
 cylinder("valve_cover", "oil_filler", 0.18, 0.12, materials.darkSteel, [-1.15, 2.87, -0.28], [0, 0, 0], 28);
 
+// Ignition assembly: four service-visible spark plugs, boots/coils and routed wiring.
+for (const [index, x] of [-1.2, -0.4, 0.4, 1.2].entries()) {
+  const cylinderNumber = index + 1;
+  cylinder("spark_plugs", `cylinder_${cylinderNumber}_threaded_shell`, 0.055, 0.23, materials.steel, [x, 2.31, 0], [0, 0, 0], 24);
+  cylinder("spark_plugs", `cylinder_${cylinderNumber}_hex`, 0.105, 0.12, materials.darkSteel, [x, 2.48, 0], [0, 0, 0], 6);
+  cylinder("spark_plugs", `cylinder_${cylinderNumber}_ceramic`, 0.068, 0.34, materials.ceramic, [x, 2.69, 0], [0, 0, 0], 28);
+  cylinder("spark_plugs", `cylinder_${cylinderNumber}_terminal`, 0.035, 0.09, materials.copper, [x, 2.905, 0], [0, 0, 0], 20);
+  cylinder("spark_plugs", `cylinder_${cylinderNumber}_electrode`, 0.018, 0.11, materials.copper, [x, 2.125, 0], [0, 0, 0], 14);
+
+  cylinder("ignition_coils", `cylinder_${cylinderNumber}_boot`, 0.105, 0.42, materials.wireInsulation, [x, 2.93, 0], [0, 0, 0], 28);
+  roundedBox("ignition_coils", `cylinder_${cylinderNumber}_body`, 0.34, 0.47, 0.4, 0.09, materials.coilEpoxy, [x, 3.2, 0]);
+  roundedBox("ignition_coils", `cylinder_${cylinderNumber}_connector`, 0.22, 0.14, 0.22, 0.04, materials.connector, [x, 3.26, -0.27]);
+
+  tube(
+    "ignition_harness",
+    `coil_branch_${cylinderNumber}`,
+    [[x, 3.31, -0.27], [x, 3.48, -0.48], [x, 3.48, -0.62]],
+    0.035,
+    materials.wireInsulation,
+    18
+  );
+}
+tube("ignition_harness", "main_loom", [[-1.72, 3.48, -0.62], [0, 3.5, -0.64], [1.72, 3.48, -0.62]], 0.065, materials.wireInsulation, 42);
+tube("ignition_harness", "ecu_feed", [[-1.72, 3.48, -0.62], [-1.95, 3.25, -0.82], [-2.08, 2.78, -0.92]], 0.055, materials.wireInsulation, 28);
+tube("ignition_harness", "engine_ground", [[1.72, 3.48, -0.62], [1.92, 3.12, -0.72], [1.8, 2.62, -0.8]], 0.045, materials.copper, 24);
+roundedBox("ignition_harness", "main_connector", 0.3, 0.24, 0.34, 0.05, materials.connector, [-2.08, 2.76, -0.92]);
+
 // Timing drive with toothed wheels and individually visible links.
 gear("cam_sprockets_context", "intake", 30, 0.42, 0.49, 0.16, materials.steel, [2.06, 2.0, -0.43]);
 gear("cam_sprockets_context", "exhaust", 30, 0.42, 0.49, 0.16, materials.steel, [2.06, 2.0, 0.43]);
@@ -295,10 +331,63 @@ for (const [index, x] of [-1.2, -0.4, 0.4, 1.2].entries()) {
 cylinder("throttle_body", "bore", 0.35, 0.48, materials.aluminum, [1.78, 1.25, -1.55], [0, 0, Math.PI / 2], 36);
 cylinder("throttle_body", "plate", 0.31, 0.035, materials.bronze, [1.79, 1.25, -1.55], [0, 0, Math.PI / 2], 30);
 
+// MPI fuel delivery and individually serviceable injector hardware.
+cylinder("fuel_rail", "main_tube", 0.09, 3.35, materials.fuelRail, [0, 1.92, -0.92], [0, 0, Math.PI / 2], 32);
+cylinder("fuel_rail", "pressure_damper", 0.17, 0.16, materials.fuelRail, [-1.78, 1.92, -0.92], [0, 0, Math.PI / 2], 28);
+for (const [index, x] of [-1.2, -0.4, 0.4, 1.2].entries()) {
+  const cylinderNumber = index + 1;
+  cylinder("fuel_injectors", `cylinder_${cylinderNumber}_body`, 0.075, 0.44, materials.fuelPolymer, [x, 1.72, -0.83], [0.12, 0, 0], 24);
+  cylinder("fuel_injectors", `cylinder_${cylinderNumber}_nozzle`, 0.035, 0.16, materials.steel, [x, 1.48, -0.79], [0.12, 0, 0], 18);
+  roundedBox("fuel_injectors", `cylinder_${cylinderNumber}_connector`, 0.2, 0.16, 0.19, 0.04, materials.connector, [x, 1.82, -1.02]);
+  torus("injector_o_rings", `cylinder_${cylinderNumber}_upper`, 0.077, 0.015, materials.gasket, [x, 1.91, -0.88], [Math.PI / 2, 0, 0]);
+  torus("injector_o_rings", `cylinder_${cylinderNumber}_lower`, 0.057, 0.012, materials.gasket, [x, 1.51, -0.79], [Math.PI / 2, 0, 0]);
+  addMesh("injector_clips", `cylinder_${cylinderNumber}`, new THREE.BoxGeometry(0.18, 0.035, 0.16), materials.steel, [x, 1.91, -0.91]);
+  tube("injector_harness", `branch_${cylinderNumber}`, [[x, 1.84, -1.03], [x, 2.08, -1.14], [x, 2.14, -1.24]], 0.027, materials.wireInsulation, 16);
+}
+tube("injector_harness", "main_loom", [[-1.65, 2.14, -1.24], [0, 2.16, -1.26], [1.65, 2.14, -1.24]], 0.052, materials.wireInsulation, 40);
+tube("fuel_lines", "rail_feed", [[-1.78, 1.92, -0.92], [-2.02, 1.72, -1.08], [-2.2, 1.18, -1.24]], 0.06, materials.fuelPolymer, 30);
+
 for (const [index, x] of [-1.2, -0.4, 0.4, 1.2].entries()) {
   tube("exhaust_manifold", `primary_${index + 1}`, [[x, 1.45, 0.84], [x, 1.2, 1.28], [0.7 - index * 0.25, 0.65, 1.55]], 0.12, materials.exhaust, 28);
 }
 tube("exhaust_manifold", "collector", [[0.35, 0.7, 1.55], [0.6, 0.25, 1.6], [0.9, -0.15, 1.6]], 0.22, materials.exhaust, 30);
+
+// Engine-mounted electrical accessories and auxiliary drive.
+cylinder("alternator", "stator_housing", 0.43, 0.62, materials.aluminum, [1.55, 0.1, -1.42], [0, 0, Math.PI / 2], 40);
+cylinder("alternator", "rotor", 0.19, 0.72, materials.copper, [1.55, 0.1, -1.42], [0, 0, Math.PI / 2], 28);
+for (let index = 0; index < 10; index += 1) {
+  const angle = index / 10 * Math.PI * 2;
+  roundedBox("alternator", `vent_${index + 1}`, 0.12, 0.1, 0.28, 0.025, materials.darkSteel, [1.88, 0.1 + Math.sin(angle) * 0.31, -1.42 + Math.cos(angle) * 0.31], [angle, 0, 0]);
+}
+cylinder("alternator_pulley", "grooved", 0.24, 0.16, materials.darkSteel, [1.96, 0.1, -1.42], [0, 0, Math.PI / 2], 32);
+cylinder("starter_motor", "motor_body", 0.31, 0.92, materials.darkSteel, [-1.62, -0.48, -1.18], [0, 0, Math.PI / 2], 36);
+cylinder("starter_solenoid", "solenoid_body", 0.16, 0.58, materials.copper, [-1.58, -0.15, -1.18], [0, 0, Math.PI / 2], 28);
+gear("starter_motor", "pinion", 10, 0.1, 0.15, 0.14, materials.steel, [-2.12, -0.48, -1.18]);
+gear("accessory_tensioner", "pulley", 20, 0.25, 0.31, 0.14, materials.machinedAluminum, [2.5, 0.78, -0.62]);
+tube("accessory_belt", "serpentine_route", [[2.52, -0.9, 0], [2.52, -0.48, -0.58], [2.25, 0.1, -1.42], [2.5, 0.78, -0.62], [2.35, 0.25, 0.88], [2.52, -0.9, 0]], 0.055, materials.gasket, 72);
+
+// Crankcase ventilation, service hoses, mounts and principal engine sensors.
+cylinder("pcv_valve", "valve", 0.09, 0.24, materials.sensor, [-0.72, 2.9, -0.42], [0, 0, 0], 24);
+tube("pcv_hose", "breather", [[-0.72, 3.02, -0.42], [-0.88, 2.72, -0.88], [-1.05, 2.15, -1.38]], 0.065, materials.coolantHose, 34);
+tube("vacuum_hoses", "manifold_vacuum", [[1.15, 1.55, -1.72], [0.8, 1.95, -1.9], [0.25, 2.16, -1.82]], 0.038, materials.coolantHose, 28);
+tube("coolant_hoses", "upper_radiator", [[-1.58, 1.42, 0.92], [-1.95, 1.65, 1.18], [-2.28, 1.35, 1.42]], 0.13, materials.coolantHose, 34);
+tube("coolant_hoses", "heater_feed", [[-1.45, 1.2, 0.78], [-1.72, 1.05, 0.55], [-2.15, 1.12, 0.42]], 0.085, materials.coolantHose, 28);
+roundedBox("engine_mounts", "left_mount", 0.62, 0.42, 0.54, 0.12, materials.darkSteel, [-2.08, 0.2, 0.78]);
+roundedBox("engine_mounts", "right_mount", 0.62, 0.42, 0.54, 0.12, materials.darkSteel, [2.08, 0.2, 0.78]);
+
+roundedBox("ckp_sensor", "housing", 0.2, 0.34, 0.18, 0.045, materials.sensor, [1.86, -0.48, 0.48]);
+roundedBox("ckp_sensor", "connector", 0.16, 0.15, 0.2, 0.035, materials.connector, [1.86, -0.2, 0.5]);
+roundedBox("cmp_sensor", "housing", 0.22, 0.3, 0.2, 0.05, materials.sensor, [1.78, 2.16, -0.48]);
+roundedBox("cmp_sensor", "connector", 0.16, 0.15, 0.2, 0.035, materials.connector, [1.62, 2.34, -0.48]);
+roundedBox("map_sensor", "housing", 0.24, 0.16, 0.22, 0.04, materials.sensor, [0.65, 1.52, -1.9]);
+roundedBox("map_sensor", "connector", 0.16, 0.12, 0.18, 0.03, materials.connector, [0.65, 1.68, -1.92]);
+cylinder("ect_sensor", "probe", 0.055, 0.26, materials.copper, [-1.58, 1.42, 1.12], [Math.PI / 2, 0, 0], 18);
+roundedBox("ect_sensor", "connector", 0.16, 0.2, 0.16, 0.035, materials.connector, [-1.58, 1.42, 1.3]);
+cylinder("knock_sensor", "piezo_body", 0.14, 0.1, materials.sensor, [0.35, 0.55, 0.96], [Math.PI / 2, 0, 0], 28);
+cylinder("knock_sensor", "center_bolt", 0.035, 0.18, materials.steel, [0.35, 0.55, 1.0], [Math.PI / 2, 0, 0], 16);
+cylinder("oil_pressure_sensor", "switch", 0.1, 0.24, materials.sensor, [-1.12, -0.05, -1.12], [Math.PI / 2, 0, 0], 22);
+tube("oil_dipstick", "guide_tube", [[-1.45, -0.72, -0.72], [-1.62, 0.1, -0.92], [-1.7, 1.0, -1.0]], 0.025, materials.steel, 28);
+torus("oil_dipstick", "handle", 0.11, 0.028, materials.connector, [-1.7, 1.08, -1.0], [Math.PI / 2, 0, 0]);
 
 const exporter = new GLTFExporter();
 const arrayBuffer = await new Promise((resolve, reject) => {
@@ -325,7 +414,7 @@ const manifest = {
   oemClaim: false,
   vehicleSpecificClaim: false,
   generatedBy: "tools/engine-asset-generator/generate-inline4-engine.mjs",
-  generatorVersion: "1.0.0",
+  generatorVersion: "1.2.0",
   threeVersion: THREE.REVISION,
   meshNodePrefix: "asset_mesh__",
   meshCount,

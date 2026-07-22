@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -43,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.sceneview.RenderQuality
 import io.github.sceneview.SceneView
+import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCollisionSystem
@@ -73,14 +76,15 @@ import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
 import com.elysium369.meet.domain.visualdiagnostics.ComponentCategory
 import kotlinx.coroutines.delay
 import dev.romainguy.kotlin.math.Float4
+import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.Mat4
+import dev.romainguy.kotlin.math.lookAt
 import kotlin.math.abs
 import kotlin.math.sin
 
-private const val REFERENCE_VEHICLE_ASSET = "models/vehicle_twin/reference_vehicle.glb"
-
 @Composable
 fun CompleteVehicleTwinView(
+    platformAssetPath: String,
     selectedSystemId: String,
     selectedEntityId: String?,
     viewportState: VehicleTwinViewportState,
@@ -93,7 +97,8 @@ fun CompleteVehicleTwinView(
     catalogNodes: List<UniversalCatalogSceneNode> = emptyList(),
     activeDtcs: List<String> = emptyList(),
     onComponentSelected: ((String, String) -> Unit)? = null,
-    isObdConnected: Boolean = false
+    isObdConnected: Boolean = false,
+    onViewportGestureActiveChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val supportsFilament = remember(context) { context.supportsFilament() }
@@ -104,6 +109,7 @@ fun CompleteVehicleTwinView(
     }
 
     FilamentVehicleScene(
+        platformAssetPath = platformAssetPath,
         selectedSystemId = selectedSystemId,
         selectedEntityId = selectedEntityId,
         viewportState = viewportState,
@@ -116,12 +122,14 @@ fun CompleteVehicleTwinView(
         catalogNodes = catalogNodes,
         activeDtcs = activeDtcs,
         onComponentSelected = onComponentSelected,
-        isObdConnected = isObdConnected
+        isObdConnected = isObdConnected,
+        onViewportGestureActiveChanged = onViewportGestureActiveChanged
     )
 }
 
 @Composable
 private fun FilamentVehicleScene(
+    platformAssetPath: String,
     selectedSystemId: String,
     selectedEntityId: String?,
     viewportState: VehicleTwinViewportState,
@@ -134,13 +142,16 @@ private fun FilamentVehicleScene(
     catalogNodes: List<UniversalCatalogSceneNode>,
     activeDtcs: List<String>,
     onComponentSelected: ((String, String) -> Unit)?,
-    isObdConnected: Boolean
+    isObdConnected: Boolean,
+    onViewportGestureActiveChanged: (Boolean) -> Unit
 ) {
     val engine = rememberEngine()
     val filamentView = rememberView(engine)
     val sceneCollisionSystem = rememberCollisionSystem(filamentView)
     val modelLoader = rememberModelLoader(engine)
-    val modelInstance = rememberModelInstance(modelLoader, REFERENCE_VEHICLE_ASSET)
+    val modelInstance = androidx.compose.runtime.key(platformAssetPath) {
+        rememberModelInstance(modelLoader, platformAssetPath)
+    }
     val inlineFourModelInstance = rememberModelInstance(
         modelLoader,
         GenericInlineFourAssetContract.ASSET_PATH
@@ -154,6 +165,37 @@ private fun FilamentVehicleScene(
         }
     }
     val context = LocalContext.current
+    val touchSlop = remember(context) { ViewConfiguration.get(context).scaledTouchSlop.toFloat() }
+    val cameraManipulator = remember(platformAssetPath) {
+        val orbit = ContinuousOrbitState()
+        object : CameraGestureDetector.CameraManipulator {
+            override fun setViewport(width: Int, height: Int) = orbit.setViewport(width, height)
+
+            override fun getTransform(): Mat4 = orbit.pose().let { pose ->
+                lookAt(
+                    Float3(pose.eyeX, pose.eyeY, pose.eyeZ),
+                    Float3(pose.targetX, pose.targetY, pose.targetZ),
+                    Float3(pose.upX, pose.upY, pose.upZ)
+                )
+            }
+
+            override fun grabBegin(x: Int, y: Int, strafe: Boolean) = orbit.grabBegin(x, y)
+            override fun grabUpdate(x: Int, y: Int) = orbit.grabUpdate(x, y)
+            override fun grabEnd() = orbit.grabEnd()
+            override fun scrollBegin(x: Int, y: Int, separation: Float) = Unit
+            override fun scrollUpdate(
+                x: Int,
+                y: Int,
+                prevSeparation: Float,
+                currSeparation: Float
+            ) = orbit.zoom(prevSeparation, currSeparation)
+            override fun scrollEnd() = Unit
+            override fun update(deltaTime: Float) = Unit
+        }
+    }
+    var gestureDownX by remember { mutableFloatStateOf(0f) }
+    var gestureDownY by remember { mutableFloatStateOf(0f) }
+    var gestureExceededTapSlop by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val materialLoader = remember(engine) { MaterialLoader(engine, context, coroutineScope) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -307,11 +349,35 @@ private fun FilamentVehicleScene(
             view = filamentView,
             collisionSystem = sceneCollisionSystem,
             modelLoader = modelLoader,
+            cameraManipulator = cameraManipulator,
             renderQuality = RenderQuality.Default,
             autoCenterContent = true,
             autoFitContent = true,
             onTouchEvent = { event, hitResult ->
-                if (event.action != MotionEvent.ACTION_UP) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        onViewportGestureActiveChanged(true)
+                        gestureDownX = event.x
+                        gestureDownY = event.y
+                        gestureExceededTapSlop = false
+                    }
+                    MotionEvent.ACTION_POINTER_DOWN -> gestureExceededTapSlop = true
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = event.x - gestureDownX
+                        val dy = event.y - gestureDownY
+                        if (dx * dx + dy * dy > touchSlop * touchSlop) {
+                            gestureExceededTapSlop = true
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> onViewportGestureActiveChanged(false)
+                    MotionEvent.ACTION_CANCEL -> {
+                        onViewportGestureActiveChanged(false)
+                        gestureExceededTapSlop = true
+                    }
+                }
+                val isTapRelease = event.actionMasked == MotionEvent.ACTION_UP &&
+                    !gestureExceededTapSlop && event.pointerCount == 1
+                if (!isTapRelease) {
                     false
                 } else if (
                     currentXRay.value &&
@@ -863,6 +929,7 @@ private fun FilamentVehicleScene(
                         var previousFrame = 0L
                         var autoPhase = 0f
                         var renderedExplosion = currentExplodedProgress.value
+                        var renderedVisibilitySignature: String? = null
                         updateServiceLayout(renderedExplosion)
                         onFrame = { frameTimeNanos ->
                             val deltaSeconds = if (previousFrame == 0L) {
@@ -891,9 +958,17 @@ private fun FilamentVehicleScene(
                                 updateServiceLayout(renderedExplosion)
                             }
                             
-                            // Dynamic 3D Marker & assembly visibility update
                             val showOverlay = currentShowDiagnosticOverlay.value
-                            val currentActiveCategories = targetCategoryForSystem(currentSystemId.value)
+                            val visibilitySignature = listOf(
+                                showOverlay,
+                                currentSystemId.value,
+                                currentXRay.value,
+                                currentSelectedEntityId.value,
+                                currentExplodedProgress.value > 0.01f
+                            ).joinToString("|")
+                            if (visibilitySignature != renderedVisibilitySignature) {
+                                // Visibility only changes when the diagnostic state changes.
+                                val currentActiveCategories = targetCategoryForSystem(currentSystemId.value)
                             childNodes.filter { it.name?.startsWith("marker_") == true }.forEach { markerNode ->
                                 val compId = markerNode.name!!.removePrefix("marker_")
                                 val comp = diagnosticComponents.firstOrNull { it.id == compId }
@@ -1004,6 +1079,8 @@ private fun FilamentVehicleScene(
                                 
                                 partNode.setLayerVisible(!shouldHide)
                                 partNode.isHittable = !shouldHide
+                            }
+                                renderedVisibilitySignature = visibilitySignature
                             }
                             
                             previousFrame = frameTimeNanos

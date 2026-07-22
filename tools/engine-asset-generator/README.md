@@ -37,3 +37,16 @@ Generate one system during asset development:
 node generate-vehicle-systems.mjs suspension
 node generate-extended-vehicle-systems.mjs hybrid_ev
 ```
+# Plataformas originales MEET
+
+Ejecute `npm run generate:meet-platforms` para reconstruir las nueve plataformas
+seleccionables en `android/app/src/main/assets/models/meet_platforms`. El generador
+produce un GLB distinto por concepto y un manifiesto con hashes, piezas y límites
+de autoridad. Estos activos son conceptos procedurales originales de MEET; no son
+CAD dimensional, diseño OEM ni evidencia suficiente para fabricación.
+
+La revisión D4 usa carrocerías continuas por secciones, materiales PBR, cristales,
+ópticas y ruedas multicapa. Las plataformas industriales, aérea, espacial y
+submarina agregan detalle funcional específico. D4 es sólo autoridad visual: el
+manifiesto mantiene `dimensional=false`, `oemClaim=false` y
+`manufacturingCertified=false`.

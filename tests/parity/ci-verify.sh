@@ -19,12 +19,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FIXTURE="$REPO_ROOT/tests/parity/fixtures/snapshot-p0230.json"
 TS_RESULT="$(mktemp)"
+TS_STDERR="$(mktemp)"
 KOTLIN_RESULT="$(mktemp)"
-trap 'rm -f "$TS_RESULT" "$KOTLIN_RESULT"' EXIT
+trap 'rm -f "$TS_RESULT" "$TS_STDERR" "$KOTLIN_RESULT"' EXIT
 
 echo "=== TS parity ==="
-( cd "$REPO_ROOT" && npx tsx tests/parity/hash-parity.ts "$FIXTURE" > "$TS_RESULT" 2>&1 ) || {
+( cd "$REPO_ROOT" && npm_config_update_notifier=false npx tsx tests/parity/hash-parity.ts "$FIXTURE" > "$TS_RESULT" 2> "$TS_STDERR" ) || {
   cat "$TS_RESULT"
+  cat "$TS_STDERR" >&2
   echo "TS parity FAILED"
   exit 1
 }

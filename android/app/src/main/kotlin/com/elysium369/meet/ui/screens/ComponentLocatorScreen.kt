@@ -5,6 +5,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.RequestDisallowInterceptTouchEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ai.DiagnosticAiContextBuilder
+import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
@@ -48,6 +54,9 @@ import com.elysium369.meet.data.visualdiagnostics.VisualDiagnosticRepositoryImpl
 import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
 import com.elysium369.meet.visual3d.domain.GenericInlineFourAssetContract
 import com.elysium369.meet.visual3d.domain.GenericVehicleSystemsAssetContract
+import com.elysium369.meet.visual3d.domain.MeetPlatformCatalog
+import com.elysium369.meet.visual3d.domain.MeetPlatformProfile
+import com.elysium369.meet.visual3d.domain.PlatformVisualMaturity
 import com.elysium369.meet.visual3d.ui.CompleteVehicleTwinView
 import com.elysium369.meet.visual3d.ui.TwinFocusMode
 import com.elysium369.meet.visual3d.ui.VehicleTwinViewportState
@@ -131,6 +140,7 @@ fun ComponentLocatorScreen(
     var selectedEngineType by remember(detectedEngineType) { mutableStateOf(detectedEngineType) }
     val visualRepository = remember { VisualDiagnosticRepositoryImpl() }
     val aiContextBuilder = remember { DiagnosticAiContextBuilder() }
+    val proprietaryAiContextBuilder = remember { ProprietaryGroundedContextBuilder() }
     val visualEngineType = remember(selectedEngineType) { selectedEngineType.toVisualEngineType() }
     
     // Base profesional de componentes filtrada por tipo de motor.
@@ -178,6 +188,15 @@ fun ComponentLocatorScreen(
     }
     val proprietaryEntitiesById = remember(proprietaryIndex) {
         proprietaryIndex?.entities.orEmpty().associateBy { it.id }
+    }
+    val proprietaryComponentsBySystem = remember(proprietaryIndex, proprietaryRepository) {
+        proprietaryIndex?.entities.orEmpty()
+            .asSequence()
+            .filter { it.recordRole == "COMPONENT" }
+            .groupBy(ProprietaryCatalogEntity::systemId)
+            .mapValues { (_, entities) ->
+                entities.map { it.toComponentInfo(proprietaryRepository, includeLiteralContext = false) }
+            }
     }
     val proprietaryComponents = remember(proprietaryEntities, proprietaryRepository) {
         proprietaryEntities.map { it.toComponentInfo(proprietaryRepository, includeLiteralContext = false) }
@@ -251,6 +270,7 @@ fun ComponentLocatorScreen(
         )
     }
     var explodedServiceView by remember { mutableStateOf(false) }
+    var selectedPlatform by remember { mutableStateOf(MeetPlatformCatalog.default) }
     var twinViewportState by remember(initialProprietaryEntity) {
         mutableStateOf(
             VehicleTwinViewportState(
@@ -263,28 +283,20 @@ fun ComponentLocatorScreen(
         )
     }
     var renderedTwinNodeCount by remember { mutableIntStateOf(0) }
-    val components = remember(currentScene, engineComponents, suspensionComponents, proprietaryComponents) {
-        when (currentScene) {
-            SceneType.UNIVERSAL_CATALOG -> proprietaryComponents
-            SceneType.SUSPENSION -> suspensionComponents.filter { it.category == ComponentCategory.SUSPENSION }
-            SceneType.TRANSMISSION -> engineComponents.filter { it.category == ComponentCategory.ENGINE && (it.id.contains("clutch") || it.id.contains("trans") || it.id.contains("diff") || it.id.contains("gear") || it.id.contains("axle")) }
-            SceneType.BRAKES_STEERING -> suspensionComponents.filter { it.category == ComponentCategory.ENGINE && (it.id.contains("brake") || it.id.contains("steering") || it.id.contains("rack") || it.id.contains("caliper") || it.id.contains("pump")) }
-            SceneType.ENGINE_BLOCK -> engineComponents.filter {
-                it.category == ComponentCategory.ENGINE ||
-                it.category == ComponentCategory.FUEL ||
-                it.category == ComponentCategory.COOLING ||
-                it.category == ComponentCategory.INTAKE ||
-                it.category == ComponentCategory.EXHAUST
-            }
-            SceneType.RELAY_FUSE_BOX -> engineComponents.filter {
-                it.category == ComponentCategory.ELECTRICAL ||
-                it.category == ComponentCategory.HIGH_VOLTAGE
-            }
-            SceneType.WIRING_HARNESS -> engineComponents.filter {
-                it.category == ComponentCategory.ELECTRICAL ||
-                it.category == ComponentCategory.HIGH_VOLTAGE
-            }
-        }
+    val components = remember(
+        currentScene,
+        engineComponents,
+        suspensionComponents,
+        proprietaryComponents,
+        proprietaryComponentsBySystem
+    ) {
+        componentsForScene(
+            currentScene,
+            engineComponents,
+            suspensionComponents,
+            proprietaryComponents,
+            proprietaryComponentsBySystem
+        )
     }
     
     // Obtener códigos DTC activos del escáner en tiempo real
@@ -308,6 +320,8 @@ fun ComponentLocatorScreen(
             (selectedCategory == null || c.category == selectedCategory)
         }
     }
+    val pageScrollState = rememberScrollState()
+    var viewportGestureActive by remember { mutableStateOf(false) }
 
     // Mapeo inverso de Malla 3D a ComponentInfo al presionar la pantalla
     val onMeshSelected: (String, String) -> Unit = { meshId, meshName ->
@@ -318,7 +332,6 @@ fun ComponentLocatorScreen(
         aiContextPreview = null
         if (comp != null) {
             selectedComponent = comp
-            if (proprietaryEntity != null) twinViewportState = twinViewportState.focusComponent()
         } else {
             selectedComponent = ComponentInfo(
                 id = meshId,
@@ -352,6 +365,7 @@ fun ComponentLocatorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDeep)
+            .verticalScroll(pageScrollState, enabled = !viewportGestureActive)
     ) {
         // ── Top Bar ──
         Row(
@@ -595,6 +609,30 @@ fun ComponentLocatorScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            MeetPlatformCatalog.profiles.forEach { platform ->
+                PlatformSelectorButton(
+                    platform = platform,
+                    selected = platform.id == selectedPlatform.id,
+                    onClick = {
+                        selectedPlatform = platform
+                        selectedComponent = null
+                        aiContextPreview = null
+                        explodedServiceView = false
+                        twinViewportState = twinViewportState.returnToVehicle()
+                    }
+                )
+            }
+        }
+
+        val disallowPageIntercept = remember { RequestDisallowInterceptTouchEvent() }
+
         // ── 3D Viewport Box ──
         Box(
             modifier = Modifier
@@ -604,6 +642,24 @@ fun ComponentLocatorScreen(
                 .clip(RoundedCornerShape(16.dp))
                 .background(MeetColors.cardBackground)
                 .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(16.dp))
+                .pointerInput(disallowPageIntercept) {
+                    awaitEachGesture {
+                        awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial
+                        )
+                        viewportGestureActive = true
+                        disallowPageIntercept(true)
+                        try {
+                            do {
+                                val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (pointerEvent.changes.any { it.pressed })
+                        } finally {
+                            viewportGestureActive = false
+                            disallowPageIntercept(false)
+                        }
+                    }
+                }
         ) {
             val mappedSystemId = when (currentScene) {
                 SceneType.ENGINE_BLOCK -> "engine"
@@ -628,13 +684,14 @@ fun ComponentLocatorScreen(
             }
 
             key(
+                selectedPlatform.id,
                 mappedSystemId,
                 activeCatalogSceneNodes.size,
                 activeCatalogSceneNodes.firstOrNull()?.sectionId,
-                activeCatalogSceneNodes.lastOrNull()?.sectionId,
-                selectedComponent?.id
+                activeCatalogSceneNodes.lastOrNull()?.sectionId
             ) {
             CompleteVehicleTwinView(
+                platformAssetPath = selectedPlatform.assetPath,
                 selectedSystemId = mappedSystemId,
                 selectedEntityId = selectedComponent?.id,
                 viewportState = twinViewportState.copy(
@@ -681,7 +738,8 @@ fun ComponentLocatorScreen(
                 catalogNodes = activeCatalogSceneNodes,
                 activeDtcs = allActiveDtcs,
                 onComponentSelected = onMeshSelected,
-                isObdConnected = isObdConnected
+                isObdConnected = isObdConnected,
+                onViewportGestureActiveChanged = { viewportGestureActive = it }
             )
             }
 
@@ -702,7 +760,7 @@ fun ComponentLocatorScreen(
                 ) {
                     Text(
                         text = if (currentScene == SceneType.UNIVERSAL_CATALOG) {
-                            "Vehiculo 3D de referencia · ${proprietaryManifest?.systems?.firstOrNull { it.id == currentCatalogSystemId }?.title.orEmpty()}"
+                            "${selectedPlatform.displayName} · ${proprietaryManifest?.systems?.firstOrNull { it.id == currentCatalogSystemId }?.title.orEmpty()}"
                         } else {
                             "${selectedEngineType.label} - ${sceneDisplayName(currentScene, selectedEngineType)}"
                         },
@@ -722,9 +780,9 @@ fun ComponentLocatorScreen(
                         )
                         Text(
                             text = if (currentCatalogSystemId == "engine") {
-                                "Malla mecanica L2 + fallback · no dimensional/OEM"
+                                "Malla mecanica MEET L2 · no dimensional/OEM"
                             } else {
-                                "Esquema procedural · no dimensional/OEM"
+                                "Construccion procedural MEET · no dimensional/OEM"
                             },
                             color = MeetColors.warning,
                             fontSize = 7.sp,
@@ -741,7 +799,7 @@ fun ComponentLocatorScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "L2 · conjunto mecanico generico · ID literal",
+                                text = "L2 · conjunto mecanico MEET · ID literal",
                                 color = MeetColors.textSecondary,
                                 fontSize = 7.sp,
                                 maxLines = 1,
@@ -866,6 +924,7 @@ fun ComponentLocatorScreen(
         ) {
             selectedComponent?.let { comp ->
                 val activeDtcOnPiece = comp.relatedDtcs.firstOrNull { allActiveDtcs.contains(it) }
+                val proprietaryEntity = proprietaryEntitiesById[comp.id]
                 val diagnosticComponent = remember(comp.id, visualEngineType) {
                     visualRepository.findComponent(visualEngineType, comp.id)
                 }
@@ -884,7 +943,7 @@ fun ComponentLocatorScreen(
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 320.dp)
+                            .heightIn(min = 240.dp, max = 560.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -917,6 +976,9 @@ fun ComponentLocatorScreen(
                                 }
                                 if (diagnosticComponent != null) {
                                     StatusPill("Ficha OEM-ready", MeetColors.cyberCyan)
+                                }
+                                if (proprietaryEntity != null) {
+                                    StatusPill("Fuente literal", MeetColors.neonGreen)
                                 }
                             }
 
@@ -993,18 +1055,28 @@ fun ComponentLocatorScreen(
                                 }
                             }
 
-                            if (diagnosticComponent != null) {
+                            if (diagnosticComponent != null || proprietaryEntity != null) {
                                 Spacer(Modifier.height(8.dp))
                                 EliteTextButton(
-                                    text = "ARMAR CONTEXTO IA DE ESTA PIEZA",
+                                    text = if (proprietaryEntity != null) "ANALIZAR CON FUENTE CITADA" else "ARMAR CONTEXTO IA DE ESTA PIEZA",
                                     onClick = {
-                                        aiContextPreview = aiContextBuilder.build(
-                                            vehicleLabel = vehicleLabel,
-                                            engineType = visualEngineType,
-                                            component = diagnosticComponent,
-                                            activeDtcs = allActiveDtcs.toSet(),
-                                            livePidValues = livePidValues
-                                        )
+                                        aiContextPreview = if (proprietaryEntity != null) {
+                                            val literalBlocks = runCatching {
+                                                proprietaryRepository.literalContext(proprietaryEntity, maxBlocks = Int.MAX_VALUE)
+                                            }.getOrDefault(emptyList())
+                                            proprietaryAiContextBuilder.buildReadableBrief(
+                                                entity = proprietaryEntity,
+                                                blocks = literalBlocks
+                                            )
+                                        } else {
+                                            aiContextBuilder.build(
+                                                vehicleLabel = vehicleLabel,
+                                                engineType = visualEngineType,
+                                                component = checkNotNull(diagnosticComponent),
+                                                activeDtcs = allActiveDtcs.toSet(),
+                                                livePidValues = livePidValues
+                                            )
+                                        }
                                     },
                                     color = MeetColors.neonGreen,
                                     isEnabled = true
@@ -1020,14 +1092,14 @@ fun ComponentLocatorScreen(
                                             .padding(10.dp)
                                     ) {
                                         Text(
-                                            "Contexto técnico listo para IA",
+                                            if (proprietaryEntity != null) "Analisis literal citado" else "Contexto tecnico listo para IA",
                                             color = MeetColors.neonGreen,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(Modifier.height(4.dp))
                                         Text(
-                                            aiContextPreview.orEmpty().take(900),
+                                            aiContextPreview.orEmpty(),
                                             color = MeetColors.textSecondary,
                                             fontSize = 10.sp,
                                             lineHeight = 14.sp
@@ -1074,7 +1146,8 @@ fun ComponentLocatorScreen(
         // ── Component List ──
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(560.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
@@ -1093,10 +1166,13 @@ fun ComponentLocatorScreen(
                         .background(if (isSelected) comp.category.color.copy(alpha = 0.08f) else MeetColors.cardBackground)
                         .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                         .clickable {
+                            val proprietaryEntity = proprietaryEntitiesById[comp.id]
                             selectedComponent = if (isSelected) null else {
-                                proprietaryEntitiesById[comp.id]?.toComponentInfo(proprietaryRepository, includeLiteralContext = true) ?: comp
+                                proprietaryEntity?.toComponentInfo(proprietaryRepository, includeLiteralContext = true) ?: comp
                             }
-                            if (proprietaryEntitiesById.containsKey(comp.id)) {
+                            if (proprietaryEntity != null) {
+                                currentCatalogSystemId = proprietaryEntity.systemId
+                                currentCatalogSubassemblyId = null
                                 twinViewportState = if (isSelected) {
                                     twinViewportState.focusSystem()
                                 } else {
@@ -1106,7 +1182,7 @@ fun ComponentLocatorScreen(
                             aiContextPreview = null
                             // Conmutar escena automáticamente
                             currentScene = when {
-                                proprietaryEntitiesById.containsKey(comp.id) -> SceneType.UNIVERSAL_CATALOG
+                                proprietaryEntity != null -> SceneType.UNIVERSAL_CATALOG
                                 comp.category == ComponentCategory.SUSPENSION -> SceneType.SUSPENSION
                                 comp.id.contains("fuse") || comp.id.contains("relay") || comp.id == "fuel_pump" || comp.id.contains("contactor") || comp.id == "safety_disconnect" -> SceneType.RELAY_FUSE_BOX
                                 comp.id.contains("wire") || comp.id == "harness" -> SceneType.WIRING_HARNESS
@@ -1150,6 +1226,106 @@ fun ComponentLocatorScreen(
                 }
             }
         }
+    }
+}
+
+internal fun componentsForScene(
+    scene: SceneType,
+    engineComponents: List<ComponentInfo>,
+    suspensionComponents: List<ComponentInfo>,
+    proprietaryComponents: List<ComponentInfo>,
+    proprietaryComponentsBySystem: Map<String, List<ComponentInfo>>
+): List<ComponentInfo> = when (scene) {
+    SceneType.UNIVERSAL_CATALOG -> proprietaryComponents
+    SceneType.SUSPENSION -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("suspension"),
+        suspensionComponents.filter { it.category == ComponentCategory.SUSPENSION }
+    )
+    SceneType.TRANSMISSION -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("transmission"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE &&
+                listOf("clutch", "trans", "diff", "gear", "axle").any(it.id::contains)
+        }
+    )
+    SceneType.BRAKES_STEERING -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("brakes", "steering", "wheels"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE &&
+                listOf("brake", "steering", "rack", "caliper", "pump").any(it.id::contains)
+        }
+    )
+    SceneType.ENGINE_BLOCK -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor("engine", "intake", "forced_induction"),
+        engineComponents.filter {
+            it.category == ComponentCategory.ENGINE ||
+                it.category == ComponentCategory.FUEL ||
+                it.category == ComponentCategory.COOLING ||
+                it.category == ComponentCategory.INTAKE ||
+                it.category == ComponentCategory.EXHAUST
+        }
+    )
+    SceneType.RELAY_FUSE_BOX,
+    SceneType.WIRING_HARNESS -> mergeSceneComponents(
+        proprietaryComponentsBySystem.componentsFor(
+            if (scene == SceneType.RELAY_FUSE_BOX) "control_modules" else "electrical"
+        ),
+        engineComponents.filter {
+            it.category == ComponentCategory.ELECTRICAL ||
+                it.category == ComponentCategory.HIGH_VOLTAGE
+        }
+    )
+}
+
+private fun Map<String, List<ComponentInfo>>.componentsFor(vararg systemIds: String): List<ComponentInfo> =
+    systemIds.flatMap { get(it).orEmpty() }
+
+private fun mergeSceneComponents(
+    proprietary: List<ComponentInfo>,
+    existing: List<ComponentInfo>
+): List<ComponentInfo> = (proprietary + existing).distinctBy(ComponentInfo::id)
+
+@Composable
+private fun PlatformSelectorButton(
+    platform: MeetPlatformProfile,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = if (selected) MeetColors.neonGreen else MeetColors.cyberCyan
+    Column(
+        modifier = Modifier
+            .width(132.dp)
+            .height(54.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) color.copy(alpha = 0.16f) else MeetColors.cardBackground)
+            .border(1.dp, color.copy(alpha = if (selected) 0.9f else 0.32f), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            platform.displayName,
+            color = if (selected) color else Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            if (platform.visualMaturity == PlatformVisualMaturity.REALISTIC_REFERENCE) {
+                "Referencia realista"
+            } else {
+                "Concepto 3D · malla final pendiente"
+            },
+            color = if (platform.visualMaturity == PlatformVisualMaturity.REALISTIC_REFERENCE) {
+                MeetColors.neonGreen
+            } else {
+                MeetColors.warning
+            },
+            fontSize = 7.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1269,7 +1445,7 @@ private fun sceneDisplayName(sceneType: SceneType, engineType: EngineType): Stri
         SceneType.ENGINE_BLOCK -> if (engineType == EngineType.ELECTRIC) "motor, inversor y batería" else "motor, admisión y escape"
         SceneType.RELAY_FUSE_BOX -> if (engineType == EngineType.ELECTRIC) "control y protecciones HV" else "fusibles, relés y protecciones"
         SceneType.WIRING_HARNESS -> if (engineType == EngineType.ELECTRIC) "arnés de alto voltaje" else "arnés, señales y alimentación"
-        SceneType.SUSPENSION -> "esquema genérico, no dimensional ni OEM"
+        SceneType.SUSPENSION -> "construccion MEET, no dimensional ni OEM"
         SceneType.TRANSMISSION -> "transmisión, embrague y diferencial"
         SceneType.BRAKES_STEERING -> "sistema de frenado, dirección hidráulica/asistida"
         SceneType.UNIVERSAL_CATALOG -> "catálogo propietario completo · esquema procedural"
@@ -1337,7 +1513,7 @@ private fun CatalogPart.toComponentInfo(): ComponentInfo {
         professionalChecks = listOf("Confirme VIN, OEM, foto, conector o medidas antes de decidir compatibilidad."),
         repairWorkflow = listOf("Use el catálogo de Piezas y Reparaciones para abrir un procedimiento revisable."),
         serviceSpecs = listOf("Datos técnicos: no confirmados para esta variante."),
-        safetyNotes = listOf("Modelo visual genérico; no es una geometría OEM ni dimensional.")
+        safetyNotes = listOf("Modelo visual MEET; no es una geometria OEM ni dimensional.")
     )
 }
 

@@ -225,28 +225,62 @@ class ProprietaryPartsCatalogRepository(context: Context) {
     }
 
     fun literalContext(entity: ProprietaryCatalogEntity, maxBlocks: Int = 360): List<ProprietarySourceBlock> {
-        val blocks = loadSection(entity.shardPath).blocks
-        val sourceIndex = blocks.indexOfFirst { it.blockId == entity.sourceBlockId }
-        if (sourceIndex < 0) return emptyList()
-        val selected = mutableListOf(blocks[sourceIndex])
-        for (index in (sourceIndex + 1) until blocks.size) {
-            val block = blocks[index]
-            if (block.entityId != null && block.entityId != entity.id) break
-            if (block.parentEntityId == entity.id || block.entityId == entity.id || entity.recordRole == "REAL_CASE") {
-                selected += block
-            } else if (selected.size > 1) {
-                break
-            }
-            if (selected.size >= maxBlocks) break
-        }
-        return selected
+        return selectLiteralContext(loadSection(entity.shardPath).blocks, entity, maxBlocks)
     }
 
     private fun readAsset(path: String): String =
         appContext.assets.open(path).bufferedReader().use { it.readText() }
 }
 
-private fun String.normalizedCatalogText(): String = Normalizer.normalize(this, Normalizer.Form.NFD)
+/**
+ * Keeps the direct entity block and links later literal explanations that mention it.
+ * The source documents often declare a BOM first and explain those pieces under a
+ * system heading afterwards.
+ */
+internal fun selectLiteralContext(
+    blocks: List<ProprietarySourceBlock>,
+    entity: ProprietaryCatalogEntity,
+    maxBlocks: Int
+): List<ProprietarySourceBlock> {
+    if (maxBlocks <= 0) return emptyList()
+    val sourceIndex = blocks.indexOfFirst { it.blockId == entity.sourceBlockId }
+    if (sourceIndex < 0) return emptyList()
+    val selected = linkedMapOf<String, ProprietarySourceBlock>()
+
+    fun addDirectContext(index: Int) {
+        val anchor = blocks[index]
+        selected[anchor.blockId] = anchor
+        val ownerId = anchor.entityId ?: anchor.parentEntityId ?: return
+        for (cursor in (index + 1) until blocks.size) {
+            val block = blocks[cursor]
+            if (block.entityId != null && block.entityId != ownerId) break
+            if (block.entityId == ownerId || block.parentEntityId == ownerId) {
+                selected[block.blockId] = block
+            } else if (selected.size > 1) {
+                break
+            }
+        }
+    }
+
+    addDirectContext(sourceIndex)
+    val needle = entity.nameOriginal.normalizedCatalogText()
+    if (needle.length >= 4) {
+        blocks.forEachIndexed { index, block ->
+            val searchable = buildString {
+                append(block.text)
+                block.rows.orEmpty().flatten().forEach { append('\n').append(it) }
+            }.normalizedCatalogText()
+            if (!searchable.contains(needle)) return@forEachIndexed
+            val parentIndex = block.parentEntityId?.let { parentId ->
+                (index downTo 0).firstOrNull { blocks[it].entityId == parentId }
+            }
+            addDirectContext(parentIndex ?: index)
+        }
+    }
+    return selected.values.sortedBy(ProprietarySourceBlock::order).take(maxBlocks)
+}
+
+internal fun String.normalizedCatalogText(): String = Normalizer.normalize(this, Normalizer.Form.NFD)
     .replace(Regex("\\p{Mn}+"), "")
     .lowercase()
     .trim()

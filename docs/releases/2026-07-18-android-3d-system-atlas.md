@@ -64,10 +64,23 @@ subconjuntos seleccionados en pantalla limitan las familias visibles del GLB.
 ## APK
 
 - archivo local de construccion: `android/app/build/outputs/apk/debug/app-debug.apk`;
-- tamaño: `127,310,586` bytes;
-- SHA-256: `cf12b98b8dd389d5dd76af7428d15e4e7d6865d97e175dfc95cc2ccfa1996776`;
-- instalacion fisica: `adb install -r -d`, resultado `Success`;
-- arranque frio: actividad `com.elysium369.meet/.MainActivity`, resultado `Status: ok`.
+- tamaño: `136,229,830` bytes;
+- SHA-256: `a247a6a7fd10d2d73b941f863e30a547e1c8ee71e5846256577d225b976fdaa1`;
+- instalacion en emulador Android API 35: `adb install -r -d`, resultado `Success`;
+- arranque frio: actividad `com.elysium369.meet/.MainActivity`, resultado `Status: ok`;
+- instalacion fisica de este hash exacto: pendiente de reconectar el Android.
+
+## Conocimiento propietario buscable
+
+- indice offline FTS4 sobre los 74.648 bloques literales;
+- 4.753 piezas, 297 casos reales y 77 tablas localizables por contenido;
+- filtros por sistema y rol documental;
+- tablas renderizadas por filas y celdas sin cambiar el texto fuente;
+- resultados con documento, orden, bloque y SHA-256;
+- contexto IA citado disponible desde Piezas y Motor 3D para cualquier entidad
+  propietaria;
+- indice comprimido de 8.622.091 bytes, validado contra el SHA del corpus antes
+  de abrirse.
 
 ## Validacion
 
@@ -77,6 +90,9 @@ subconjuntos seleccionados en pantalla limitan las familias visibles del GLB.
 - generación determinista de los trece activos: correcta;
 - auditoría WebGL 1440x1000 y 390x844: 13/13 cargados, canvas no vacíos;
 - `bash tests/parity/ci-verify.sh`: TypeScript y Kotlin identicos;
+- smoke test Android API 35: busqueda `osciloscopio` devuelve 115 bloques,
+  abre la tabla exacta, muestra sus celdas, navega a la pieza relacionada y
+  presenta contexto IA citado sin excepciones SQLite ni cierre de proceso;
 - `npm test`: 180 pruebas correctas;
 - `npm run build`: correcto;
 - sincronizacion Codex/Mavis/Google Antigravity: `ALREADY_INTEGRATED`.

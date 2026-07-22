@@ -4072,13 +4072,29 @@ class ObdViewModel @Inject constructor(
         obdSession.enableOemPids(mfr)
     }
 
-    suspend fun refreshFreezeFrame(dtc: String) {
+    suspend fun refreshFreezeFrame(dtc: String): Boolean {
+        if (connectionState.value != ObdState.CONNECTED) {
+            _cloudSyncState.value = "Conecta el OBD para volver a leer el freeze frame de $dtc."
+            return false
+        }
         _cloudSyncState.value = "Refrescando Cuadro Congelado..."
-        val ff = obdSession.readFreezeFrame(dtc)
-        // Merge into existing map with DTC-scoped keys to prevent cross-DTC contamination
-        val scoped = ff.mapKeys { (key, _) -> "$dtc:$key" }
-        _freezeFrameData.value = _freezeFrameData.value + scoped
-        _cloudSyncState.value = "Cuadro Congelado actualizado."
+        return try {
+            val ff = obdSession.readFreezeFrame(dtc)
+            val scoped = ff.mapKeys { (key, _) -> "$dtc:$key" }
+            _freezeFrameData.value = _freezeFrameData.value + scoped
+            _cloudSyncState.value = if (ff.isEmpty()) {
+                "La ECU no devolvio freeze frame para $dtc."
+            } else {
+                "Cuadro Congelado actualizado."
+            }
+            ff.isNotEmpty()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Log.e("ObdViewModel", "Freeze frame refresh failed for $dtc", error)
+            _cloudSyncState.value = "No se pudo releer el freeze frame de $dtc: ${error.message ?: "respuesta OBD no disponible"}."
+            false
+        }
     }
 
     suspend fun readVin(): String? {

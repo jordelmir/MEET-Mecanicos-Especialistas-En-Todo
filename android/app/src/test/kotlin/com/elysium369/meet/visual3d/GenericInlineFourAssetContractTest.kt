@@ -15,13 +15,53 @@ class GenericInlineFourAssetContractTest {
         val nodes = listOf(
             UniversalCatalogSceneNode("first-head", "Culata", "engine", 1L),
             UniversalCatalogSceneNode("duplicate-head", "Culata", "engine", 2L),
-            UniversalCatalogSceneNode("unbound", "Bujía 1", "engine", 3L),
+            UniversalCatalogSceneNode("ignition", "Paquete de bobinas", "engine", 3L),
             UniversalCatalogSceneNode("pistons", "Pistones", "engine", 4L)
         )
 
         assertEquals(
-            listOf("first-head", "pistons"),
+            listOf("first-head", "ignition", "pistons"),
             GenericInlineFourAssetContract.sourceBackedNodes(nodes).map { it.id }
+        )
+    }
+
+    @Test
+    fun `literal ignition records bind to detailed engine meshes`() {
+        assertEquals(
+            "ignition_coils",
+            GenericInlineFourAssetContract.bindingForSourceName("Paquete de bobinas")?.meshKey
+        )
+        assertEquals(
+            "ignition_harness",
+            GenericInlineFourAssetContract.bindingForSourceName("Cables de bujía")?.meshKey
+        )
+        assertEquals(
+            "ignition_harness",
+            GenericInlineFourAssetContract.bindingForSourceName("Arnés de bobinas")?.meshKey
+        )
+    }
+
+    @Test
+    fun `fuel injection and principal external systems have literal bindings`() {
+        assertEquals(
+            "fuel_injectors",
+            GenericInlineFourAssetContract.bindingForSourceName("Inyectores")?.meshKey
+        )
+        assertEquals(
+            "fuel_rail",
+            GenericInlineFourAssetContract.bindingForSourceName("Riel de inyectores")?.meshKey
+        )
+        assertEquals(
+            "alternator",
+            GenericInlineFourAssetContract.bindingForSourceName("Alternador")?.meshKey
+        )
+        assertEquals(
+            "starter_motor",
+            GenericInlineFourAssetContract.bindingForSourceName("Motor de arranque")?.meshKey
+        )
+        assertEquals(
+            "ckp_sensor",
+            GenericInlineFourAssetContract.bindingForSourceName("Sensor CKP cigüeñal")?.meshKey
         )
     }
 
