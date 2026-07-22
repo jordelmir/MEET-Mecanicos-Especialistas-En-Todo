@@ -12,14 +12,22 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class AutomotiveKnowledgeGraphRepositoryTest {
+    @Before
+    fun reclaimHeapBeforeLargeAssetTest() = reclaimLargeFixtureHeap()
+
+    @After
+    fun reclaimHeapAfterLargeAssetTest() = reclaimLargeFixtureHeap()
+
     @Test
     fun `real graph validates its fixed corpus identity hash and complete statistics`() {
         val graph = AutomotiveKnowledgeGraphParser.decode(graphAsset().readText())
@@ -104,6 +112,42 @@ class AutomotiveKnowledgeGraphRepositoryTest {
         assertThrows(AutomotiveKnowledgeGraphValidationException::class.java) {
             AutomotiveKnowledgeGraphParser.decode(raw)
         }
+    }
+
+    @Test
+    fun `public parser rejects a consistently rehashed payload outside the pinned release`() {
+        val (raw, recomputedHash) = mutateAndRehash { root ->
+            val nodes = root.getValue("nodes").jsonArray.toMutableList()
+            nodes[0] = JsonObject(nodes[0].jsonObject.toMutableMap().apply {
+                this["label"] = JsonPrimitive("Semantically valid but not release-authorized")
+            })
+            root["nodes"] = JsonArray(nodes)
+        }
+
+        assertFalse(recomputedHash == EXPECTED_GRAPH_HASH)
+        assertThrows(AutomotiveKnowledgeGraphValidationException::class.java) {
+            AutomotiveKnowledgeGraphParser.decode(raw)
+        }
+    }
+
+    @Test
+    fun `normalized DTC ambiguity is rejected before index creation`() {
+        val (raw, recomputedHash) = mutateAndRehash { root ->
+            val nodes = root.getValue("nodes").jsonArray.toMutableList()
+            val dtc = nodes.first {
+                it.jsonObject["id"]?.jsonPrimitive?.content == "dtc_P0230"
+            }.jsonObject
+            nodes.add(JsonObject(dtc.toMutableMap().apply {
+                this["id"] = JsonPrimitive("dtc_p0230_duplicate")
+                this["canonicalKey"] = JsonPrimitive("p0230")
+            }))
+            root["nodes"] = JsonArray(nodes)
+        }
+
+        val error = assertThrows(AutomotiveKnowledgeGraphValidationException::class.java) {
+            AutomotiveKnowledgeGraphParser.decodeWithExpectedContentSha256(raw, recomputedHash)
+        }
+        assertTrue(error.message.orEmpty().contains("DTC", ignoreCase = true))
     }
 
     @Test
@@ -222,19 +266,21 @@ class AutomotiveKnowledgeGraphRepositoryTest {
         File("android/app/src/main/assets/$GRAPH_ASSET_PATH")
     ).firstOrNull(File::isFile) ?: error("Missing graph asset: $GRAPH_ASSET_PATH")
 
-    private fun mutateAndRehash(mutate: (MutableMap<String, JsonElement>) -> Unit): String {
+    private fun mutateAndRehash(
+        mutate: (MutableMap<String, JsonElement>) -> Unit
+    ): Pair<String, String> {
         val root = Json.parseToJsonElement(graphAsset().readText()).jsonObject.toMutableMap()
         mutate(root)
         root.remove("contentSha256")
         val hash = sha256(canonical(JsonObject(root)).encodeToByteArray())
         root["contentSha256"] = JsonPrimitive(hash)
-        return JsonObject(root).toString()
+        return JsonObject(root).toString() to hash
     }
 
     private fun assertMutationRejected(mutate: (MutableMap<String, JsonElement>) -> Unit) {
-        val raw = mutateAndRehash(mutate)
+        val (raw, recomputedHash) = mutateAndRehash(mutate)
         assertThrows(AutomotiveKnowledgeGraphValidationException::class.java) {
-            AutomotiveKnowledgeGraphParser.decode(raw)
+            AutomotiveKnowledgeGraphParser.decodeWithExpectedContentSha256(raw, recomputedHash)
         }
     }
 
@@ -252,6 +298,11 @@ class AutomotiveKnowledgeGraphRepositoryTest {
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes)
         .joinToString("") { "%02x".format(it) }
+
+    private fun reclaimLargeFixtureHeap() {
+        System.gc()
+        System.runFinalization()
+    }
 
     companion object {
         private const val GRAPH_ASSET_PATH = "knowledge/graph/automotive_knowledge_graph.json"

@@ -16,6 +16,9 @@ import kotlinx.serialization.json.jsonPrimitive
 const val AUTOMOTIVE_KNOWLEDGE_GRAPH_ASSET =
     "knowledge/graph/automotive_knowledge_graph.json"
 
+const val EXPECTED_AUTOMOTIVE_GRAPH_CONTENT_SHA256 =
+    "2617bfa199a0e5b88f9ccb03ed46741d657f7f9fe00ba8aefe8f17926d4ab466"
+
 class AutomotiveKnowledgeGraphValidationException(
     message: String,
     cause: Throwable? = null
@@ -30,14 +33,26 @@ object AutomotiveKnowledgeGraphParser {
         explicitNulls = false
     }
 
-    fun decode(raw: String): AutomotiveKnowledgeGraph {
+    fun decode(raw: String): AutomotiveKnowledgeGraph =
+        decodeWithExpectedContentSha256(raw, EXPECTED_AUTOMOTIVE_GRAPH_CONTENT_SHA256)
+
+    internal fun decodeWithExpectedContentSha256(
+        raw: String,
+        expectedHash: String
+    ): AutomotiveKnowledgeGraph {
         try {
+            if (!SHA_256_PATTERN.matches(expectedHash)) {
+                invalid("Expected automotive knowledge graph release hash is malformed")
+            }
             val root = strictJson.parseToJsonElement(raw) as? JsonObject
                 ?: invalid("Automotive knowledge graph root must be a JSON object")
             val claimedHash = root["contentSha256"]?.jsonPrimitive?.content
                 ?: invalid("Automotive knowledge graph is missing contentSha256")
             if (!SHA_256_PATTERN.matches(claimedHash)) {
                 invalid("Automotive knowledge graph contentSha256 is malformed")
+            }
+            if (claimedHash != expectedHash) {
+                invalid("Automotive knowledge graph is not the pinned release payload")
             }
 
             val unhashedRoot = JsonObject(root.filterKeys { it != "contentSha256" })
@@ -96,6 +111,21 @@ object AutomotiveKnowledgeGraphParser {
             CuratedPackInput::packId,
             "curated pack"
         )
+
+        val normalizedDtcCodes = graph.nodes
+            .filter { it.type == KnowledgeNodeType.DTC }
+            .map { node ->
+                val canonicalCode = node.canonicalKey
+                    ?: invalid("DTC node ${node.id} is missing a canonical code")
+                normalizeGraphDtc(canonicalCode).also { normalized ->
+                    if (normalized.isBlank()) invalid("DTC node ${node.id} has a blank canonical code")
+                }
+            }
+        val duplicateDtc = normalizedDtcCodes.groupingBy { it }.eachCount()
+            .entries.firstOrNull { it.value > 1 }
+        if (duplicateDtc != null) {
+            invalid("Duplicate normalized DTC code ${duplicateDtc.key}")
+        }
 
         graph.nodes.forEach { node ->
             validateSourceCarrier(node.id, node.sourceBlockIds, node.sourceRefs)
@@ -401,6 +431,10 @@ object AutomotiveKnowledgeGraphParser {
     )
 }
 
+/**
+ * Lazy fail-closed graph access. The first query loads and validates the full asset synchronously;
+ * Android callers must dispatch that first access away from the main thread.
+ */
 class AutomotiveKnowledgeGraphRepository(
     private val assetLoader: () -> ByteArray
 ) {
@@ -482,7 +516,7 @@ class AutomotiveKnowledgeGraphRepository(
         return components.sortedBy(KnowledgeNode::id)
     }
 
-    fun dtc(code: String): KnowledgeNode? = index()?.dtcs?.get(normalizeDtc(code))
+    fun dtc(code: String): KnowledgeNode? = index()?.dtcs?.get(normalizeGraphDtc(code))
 
     fun profile(id: String): VehicleGraphProfile? = index()?.profilesById?.get(id)
 
@@ -579,9 +613,16 @@ class AutomotiveKnowledgeGraphRepository(
                     .toSortedMap()
                 val dtcs = graph.nodes.asSequence()
                     .filter { it.type == KnowledgeNodeType.DTC }
-                    .groupBy { normalizeDtc(it.canonicalKey ?: it.id.removePrefix("dtc_")) }
-                    .mapValues { (_, nodes) -> nodes.minBy(KnowledgeNode::id) }
-                    .toSortedMap()
+                    .map { node ->
+                        normalizeGraphDtc(requireNotNull(node.canonicalKey)) to node
+                    }
+                    .toList()
+                check(dtcs.all { it.first.isNotBlank() }) {
+                    "Validated graph contains a blank normalized DTC code"
+                }
+                check(dtcs.map { it.first }.distinct().size == dtcs.size) {
+                    "Validated graph contains duplicate normalized DTC codes"
+                }
                 return GraphIndex(
                     nodesById = graph.nodes.associateBy(KnowledgeNode::id),
                     edgesById = graph.edges.associateBy(KnowledgeEdge::id),
@@ -597,13 +638,12 @@ class AutomotiveKnowledgeGraphRepository(
                         StructuredObservedEvidence::id
                     ),
                     nodesByCanonicalKey = canonicalNodes,
-                    dtcs = dtcs
+                    dtcs = dtcs.toMap().toSortedMap()
                 )
             }
         }
     }
 
-    companion object {
-        private fun normalizeDtc(code: String): String = code.trim().uppercase(Locale.ROOT)
-    }
 }
+
+private fun normalizeGraphDtc(code: String): String = code.trim().uppercase(Locale.ROOT)
