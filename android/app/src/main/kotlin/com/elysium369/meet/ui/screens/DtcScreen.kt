@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.buildAnnotatedString
@@ -48,6 +50,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.core.search.DtcBrowserLaunchResult
+import com.elysium369.meet.core.search.DtcBrowserSearchLauncher
+import com.elysium369.meet.core.search.DtcGoogleSearch
+import com.elysium369.meet.core.search.DtcGoogleSearchVehicleContext
+import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
@@ -328,6 +335,9 @@ private fun HoloCard(
 fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val googleSearchVehicle = remember(selectedVehicle) {
+        selectedVehicle.toDtcGoogleSearchVehicleContext()
+    }
     val repairKnowledgeState by rememberRepairKnowledgeUiState(
         vehicle = selectedVehicle,
         dtcs = activeDtcs
@@ -646,6 +656,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     itemsIndexed(activeDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact,
+                                                googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 }
@@ -661,6 +672,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     itemsIndexed(pendingDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact,
+                                                googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 }
@@ -676,6 +688,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     itemsIndexed(permanentDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact,
+                                                googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 }
@@ -686,7 +699,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                             }
                             3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, navController, isCompact) } }
                             4 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
-                            5 -> { item { ManualSearchTab(navController, viewModel, isCompact) } }
+                            5 -> { item { ManualSearchTab(navController, viewModel, isCompact, googleSearchVehicle) } }
                         }
                     }
 
@@ -1076,6 +1089,7 @@ private fun HoloDtcCard(
     navController: NavController,
     viewModel: ObdViewModel,
     isCompact: Boolean,
+    googleSearchVehicle: DtcGoogleSearchVehicleContext?,
     onRequestService: (String, String) -> Unit = { _, _ -> }
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
@@ -1301,6 +1315,13 @@ private fun HoloDtcCard(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DtcGoogleSearchButton(
+                        dtc = dtc,
+                        vehicle = googleSearchVehicle,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     if (
                         freezeFrameStatus.contains("freeze frame", ignoreCase = true) ||
                         freezeFrameStatus.contains("Cuadro Congelado", ignoreCase = true) ||
@@ -1370,6 +1391,49 @@ private fun HoloDtcCard(
             }
         }
     }
+}
+
+@Composable
+private fun DtcGoogleSearchButton(
+    dtc: String,
+    vehicle: DtcGoogleSearchVehicleContext?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val request = remember(dtc, vehicle) {
+        DtcGoogleSearch.buildRequest(dtc, vehicle)
+    }
+
+    EliteOutlinedButton(
+        text = "🔎 BUSCAR EN GOOGLE",
+        onClick = {
+            val safeRequest = request ?: return@EliteOutlinedButton
+            val message = when (DtcBrowserSearchLauncher.open(context, safeRequest)) {
+                DtcBrowserLaunchResult.OPENED -> null
+                DtcBrowserLaunchResult.NO_BROWSER ->
+                    "No hay un navegador disponible para abrir la búsqueda."
+                DtcBrowserLaunchResult.BLOCKED ->
+                    "Android bloqueó la apertura del navegador."
+            }
+            message?.let {
+                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            }
+        },
+        modifier = modifier,
+        color = Color(0xFF4285F4),
+        isEnabled = request != null
+    )
+}
+
+private fun Vehicle?.toDtcGoogleSearchVehicleContext(): DtcGoogleSearchVehicleContext? {
+    val vehicle = this ?: return null
+    return DtcGoogleSearchVehicleContext(
+        make = vehicle.make,
+        model = vehicle.model,
+        year = vehicle.year,
+        transmissionType = vehicle.transmission_type,
+        displacementCc = vehicle.displacement_cc
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1697,7 +1761,12 @@ private fun ReadinessMonitorsView(readiness: com.elysium369.meet.core.obd.Readin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ManualSearchTab(navController: NavController, viewModel: ObdViewModel, isCompact: Boolean) {
+private fun ManualSearchTab(
+    navController: NavController,
+    viewModel: ObdViewModel,
+    isCompact: Boolean,
+    googleSearchVehicle: DtcGoogleSearchVehicleContext?
+) {
     var searchQuery by remember { mutableStateOf("") }
     val manualResults by viewModel.manualSearchResults.collectAsState()
     Column(Modifier.fillMaxWidth()) {
@@ -1758,6 +1827,13 @@ private fun ManualSearchTab(navController: NavController, viewModel: ObdViewMode
                                         EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/${dtc.code}") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
                                     }
                                 }
+
+                                Spacer(Modifier.height(8.dp))
+                                DtcGoogleSearchButton(
+                                    dtc = dtc.code,
+                                    vehicle = googleSearchVehicle,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
 
                                 Spacer(Modifier.height(10.dp))
                                 val desc = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(dtc, dtc.code)
