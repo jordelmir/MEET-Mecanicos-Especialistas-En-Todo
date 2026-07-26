@@ -272,7 +272,7 @@ class AutomotiveKnowledgeGraphRepositoryTest {
         val root = Json.parseToJsonElement(graphAsset().readText()).jsonObject.toMutableMap()
         mutate(root)
         root.remove("contentSha256")
-        val hash = sha256(canonical(JsonObject(root)).encodeToByteArray())
+        val hash = canonicalSha256(JsonObject(root))
         root["contentSha256"] = JsonPrimitive(hash)
         return JsonObject(root).toString() to hash
     }
@@ -284,20 +284,36 @@ class AutomotiveKnowledgeGraphRepositoryTest {
         }
     }
 
-    private fun canonical(element: JsonElement): String = when (element) {
-        is JsonObject -> element.entries.sortedBy(Map.Entry<String, JsonElement>::key)
-            .joinToString(prefix = "{", postfix = "}", separator = ",") { (key, value) ->
-                "${JsonPrimitive(key)}:${canonical(value)}"
-            }
-        is JsonArray -> element.joinToString(prefix = "[", postfix = "]", separator = ",") {
-            canonical(it)
-        }
-        else -> element.toString()
+    private fun canonicalSha256(element: JsonElement): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        updateCanonicalDigest(digest, element)
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
-        .digest(bytes)
-        .joinToString("") { "%02x".format(it) }
+    private fun updateCanonicalDigest(digest: MessageDigest, element: JsonElement) {
+        when (element) {
+            is JsonObject -> {
+                digest.update("{".encodeToByteArray())
+                element.entries.sortedBy(Map.Entry<String, JsonElement>::key)
+                    .forEachIndexed { index, (key, value) ->
+                        if (index > 0) digest.update(",".encodeToByteArray())
+                        digest.update(JsonPrimitive(key).toString().encodeToByteArray())
+                        digest.update(":".encodeToByteArray())
+                        updateCanonicalDigest(digest, value)
+                    }
+                digest.update("}".encodeToByteArray())
+            }
+            is JsonArray -> {
+                digest.update("[".encodeToByteArray())
+                element.forEachIndexed { index, value ->
+                    if (index > 0) digest.update(",".encodeToByteArray())
+                    updateCanonicalDigest(digest, value)
+                }
+                digest.update("]".encodeToByteArray())
+            }
+            else -> digest.update(element.toString().encodeToByteArray())
+        }
+    }
 
     private fun reclaimLargeFixtureHeap() {
         System.gc()
