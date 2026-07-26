@@ -10,6 +10,32 @@
 
 ---
 
+## Estado de implementación — 2026-07-26
+
+Los diez cortes de este plan están implementados en
+`codex/master-automotive-knowledge-implementation`.
+
+La implementación final usa estos nombres equivalentes:
+
+- `RepairKnowledgeVisualNavigator` en lugar de `KnowledgeDtc3dResolver`;
+- `RepairKnowledgeEvidencePanel` en lugar de `RepairIntelligencePanel`;
+- `RepairKnowledgeUi` como loader compartido fuera del hilo principal.
+
+Resultado:
+
+- grafo público/Android byte-idéntico y fijado por hash;
+- repositorio Kotlin, aplicabilidad y orquestador citados;
+- IA allowlist, repuestos fail-closed y 3D con autoridad honesta;
+- superficies DTC, IA, Parts y Repair Network conectadas;
+- paridad TypeScript/Kotlin obligatoria;
+- documentación canónica en
+  `docs/knowledge/AUTOMOTIVE_KNOWLEDGE_FABRIC.md`.
+
+Las casillas históricas que siguen abajo se conservan como guion de ejecución y
+evidencia de diseño; esta sección es el estado autoritativo posterior.
+
+---
+
 ## File structure
 
 ### Build-time knowledge files
@@ -561,4 +587,3 @@ git commit -m "docs(knowledge): document automotive knowledge fabric verificatio
 - Web/Android artifact equality and report parity are explicit gates.
 - No task requires guessed measurements, OEM part numbers, or silent exact compatibility.
 - No implementation placeholder remains in this plan.
-
