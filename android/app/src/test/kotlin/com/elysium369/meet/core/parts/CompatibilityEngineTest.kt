@@ -77,6 +77,22 @@ class CompatibilityEngineTest {
     }
 
     @Test
+    fun `VIN plus an unverified part number is not EXACT`() {
+        val result = CompatibilityEngine.evaluate(
+            CompatibilityContext(
+                vehicle = VehicleFingerprint(
+                    vin = "KMHCN46C18U123456",
+                    partNumber = "AFTERMARKET-123",
+                ),
+                partName = "Bobina de encendido",
+            ),
+        )
+
+        assertNotEquals(CompatibilityConfidence.EXACT, result.confidence)
+        assertTrue(result.warnings.any { it.code == "NO_OEM" })
+    }
+
+    @Test
     fun `VIN validator requires 17 allowed characters`() {
         assertTrue(isValidVin("KMHCN46C18U123456"))
         assertTrue(!isValidVin("KMHCN46C18O123456"))
