@@ -62,6 +62,11 @@ android {
             "RIDE_PLAY_BILLING_POLICY_APPROVED",
             ridePlayBillingPolicyApproved.toString(),
         )
+        val rideMapStyleUrl = localProps.getProperty(
+            "RIDE_MAP_STYLE_URL",
+            "https://tiles.openfreemap.org/styles/liberty",
+        )
+        buildConfigField("String", "RIDE_MAP_STYLE_URL", "\"$rideMapStyleUrl\"")
 
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
@@ -128,6 +133,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation(platform("androidx.compose:compose-bom:2026.05.01"))
     implementation("androidx.compose.ui:ui")
@@ -203,6 +209,9 @@ dependencies {
 
     // Google Location Services (Uber-grade GPS precision)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // Open map renderer. Tile/style/routing providers remain interchangeable.
+    implementation("org.maplibre.gl:android-sdk:13.0.2")
 
     // Google Sign-In and Drive Backup API
     implementation("com.google.android.gms:play-services-auth:20.7.0")
