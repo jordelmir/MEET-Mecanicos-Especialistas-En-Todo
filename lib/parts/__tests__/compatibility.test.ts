@@ -90,6 +90,19 @@ describe('evaluateCompatibility — base rules', () => {
     expect(result.warnings.some((warning) => warning.code === 'INVALID_VIN')).toBe(true);
   });
 
+  it('does not treat VIN plus an unverified part number as EXACT', () => {
+    const result = evaluateCompatibility({
+      vehicle: {
+        vin: 'KMHCN46C18U123456',
+        partNumber: 'AFTERMARKET-123',
+      },
+      partName: 'Bobina de encendido',
+    });
+
+    expect(result.confidence).not.toBe('EXACT');
+    expect(result.warnings.some((warning) => warning.code === 'NO_OEM')).toBe(true);
+  });
+
   it('accepts only structurally valid 17-character VINs', () => {
     expect(isValidVin('KMHCN46C18U123456')).toBe(true);
     expect(isValidVin('KMHCN46C18O123456')).toBe(false);

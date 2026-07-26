@@ -60,8 +60,8 @@ const NO_OEM_WARNING: CompatibilityWarning = {
   code: 'NO_OEM',
   severity: 'WARN',
   message:
-    'No se recibió número OEM ni número de parte. La app no puede confirmar ' +
-    'compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del ' +
+    'No se recibió un número OEM verificado. Un número de parte escrito o aftermarket ' +
+    'no demuestra por sí solo compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del ' +
     'conector o de la caja de fusibles.',
 };
 
@@ -106,7 +106,6 @@ interface TierEvidence {
   vinProvided: boolean;
   hasVin: boolean;
   hasOem: boolean;
-  hasPartNumber: boolean;
   hasBrand: boolean;
   hasModel: boolean;
   hasYear: boolean;
@@ -122,7 +121,6 @@ function collectEvidence(ctx: CompatibilityContext): TierEvidence {
     vinProvided: !!v.vin && v.vin.trim().length > 0,
     hasVin: isValidVin(v.vin),
     hasOem: !!v.oemNumber && v.oemNumber.trim().length > 0,
-    hasPartNumber: !!v.partNumber && v.partNumber.trim().length > 0,
     hasBrand: !!v.brand && v.brand.trim().length > 0,
     hasModel: !!v.model && v.model.trim().length > 0,
     hasYear:
@@ -146,12 +144,12 @@ function pickTier(ctx: CompatibilityContext, e: TierEvidence): {
   const rationale: string[] = [];
   const requiredConfirmations: string[] = [];
 
-  // EXACT requires VIN + (OEM or part number), OR a closed tuple.
+  // EXACT requires VIN + OEM, OR a closed tuple ending in OEM.
   if (
     e.hasVin &&
-    (e.hasOem || e.hasPartNumber)
+    e.hasOem
   ) {
-    rationale.push('VIN + número de parte disponibles: tupla cerrada.');
+    rationale.push('VIN + número OEM verificado disponibles: tupla cerrada.');
     return {
       confidence: 'EXACT',
       requiredConfirmations: [],

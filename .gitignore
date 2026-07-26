@@ -97,6 +97,9 @@ __pycache__/
 # --- Generated Knowledge Ingestion Artifacts ---
 build/knowledge/
 
+# --- Isolated Codex Worktrees ---
+.worktrees/
+
 # --- APK Releases (track only latest) ---
 !releases/*.apk
 

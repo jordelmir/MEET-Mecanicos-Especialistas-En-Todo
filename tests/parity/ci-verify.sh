@@ -8,7 +8,7 @@
 # The Kotlin side is invoked through gradle's `test` task on the
 # `HashEngineParityTest` class which produces the canonical string +
 # SHA-256 of the same input and writes it to a known location
-# (build/reports/parity/snapshot-p0230.tsv). The bash script reads
+# (build/reports/parity/snapshot-p0230.txt). The bash script reads
 # both and asserts equality.
 #
 # Local invocation:
@@ -35,10 +35,9 @@ cat "$TS_RESULT"
 echo
 echo "=== Kotlin parity ==="
 if [[ -f "$REPO_ROOT/android/gradlew" ]]; then
-  ( cd "$REPO_ROOT/android" && ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.core.reports.HashEngineParityTest' --info --quiet ) || {
-    echo "Kotlin parity test failed to run (gradle not available in this environment)."
-    echo "Skipping cross-runtime comparison. The TS side is sufficient for CI until a Kotlin container is wired up."
-    exit 0
+  ( cd "$REPO_ROOT/android" && ./gradlew --no-parallel :app:testDebugUnitTest --tests 'com.elysium369.meet.core.reports.HashEngineParityTest' --info --quiet ) || {
+    echo "Kotlin parity test failed. Cross-runtime verification is mandatory."
+    exit 1
   }
   KOTLIN_HASH_FILE="$REPO_ROOT/android/app/build/reports/parity/snapshot-p0230.txt"
   if [[ ! -f "$KOTLIN_HASH_FILE" ]]; then

@@ -25,6 +25,12 @@ export type SuggestionSource =
   | 'MAINTENANCE_ALERT'
   | 'PREPURCHASE';
 
+export type PartSuggestionEvidenceState =
+  | 'INFORMATIONAL'
+  | 'REQUIRES_TESTS'
+  | 'REPLACEMENT_CONFIRMED'
+  | 'PURCHASE_VERIFIED';
+
 export interface PartSuggestion {
   partName: string;
   category: string;
@@ -35,6 +41,21 @@ export interface PartSuggestion {
   disclaimer?: string;
   /** True if this is the install risk-high part the user usually jumps to. */
   riskPart?: boolean;
+  /** Canonical graph identity. Names and aliases never open a request. */
+  canonicalKey?: string;
+  evidenceState?: PartSuggestionEvidenceState;
+  requestAllowed?: boolean;
+  missingEvidence?: string[];
+}
+
+export interface PartEvidenceGateContract {
+  componentCanonicalKey?: string | null;
+  replacementAllowed: boolean;
+  purchaseAllowed: boolean;
+  purchaseCompatibility: 'EXACT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  requiredTests: string[];
+  missingEvidence: string[];
+  missingRequirements: string[];
 }
 
 export interface PartSuggestionInput {
@@ -59,6 +80,7 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       priority: 1,
       rationale:
         'Verificar el relé y su zócalo antes de atribuir P0230 a la bomba.',
+      canonicalKey: 'fuel_pump_relay',
     },
     {
       partName: 'Fusible circuito bomba',
@@ -67,6 +89,7 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       priority: 2,
       rationale:
         'Verificar continuidad del fusible y descartar un corto aguas abajo antes de reemplazarlo.',
+      canonicalKey: 'fuel_pump_fuse',
     },
     {
       partName: 'Arnés eléctrico / terminales de bomba',
@@ -75,6 +98,7 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
       priority: 3,
       rationale:
         'Inspeccionar conector y arnés; documentar alimentación, tierra y caída de voltaje bajo carga.',
+      canonicalKey: 'fuel_pump_harness',
     },
     {
       partName: 'Bomba de combustible',
@@ -88,6 +112,7 @@ const DTC_TO_SUGGESTIONS: Record<string, PartSuggestion[]> = {
         'No reemplazar la bomba sin confirmar antes: alimentación, tierra, ' +
         'relé/fusible y presión con manómetro.',
       riskPart: true,
+      canonicalKey: 'fuel_pump',
     },
   ],
 
@@ -186,6 +211,7 @@ const COMPONENT_TO_SUGGESTION: Record<string, PartSuggestion> = {
     position: 'FUSE_BOX',
     priority: 1,
     rationale: 'Selected from the 3D engine viewer.',
+    canonicalKey: 'fuel_pump_relay',
   },
   fuel_pump_assembly: {
     partName: 'Bomba de combustible',
@@ -196,6 +222,7 @@ const COMPONENT_TO_SUGGESTION: Record<string, PartSuggestion> = {
     disclaimer:
       'Antes de ordenar, verifica alimentación, tierra, relé y presión con manómetro.',
     riskPart: true,
+    canonicalKey: 'fuel_pump',
   },
   abs_module: {
     partName: 'Módulo ABS',
@@ -204,6 +231,7 @@ const COMPONENT_TO_SUGGESTION: Record<string, PartSuggestion> = {
     priority: 1,
     rationale: 'Selected from the 3D chassis viewer.',
     disclaimer: 'Pieza safety-critical: instalación por técnico calificado.',
+    canonicalKey: 'abs_module',
   },
 };
 
@@ -259,7 +287,67 @@ export function suggestParts(input: PartSuggestionInput): PartSuggestion[] {
       const ap = a.riskPart ? 1000 : a.priority;
       const bp = b.riskPart ? 1000 : b.priority;
       return ap - bp;
-    });
+    })
+    .map((suggestion) => ({
+      ...suggestion,
+      evidenceState: suggestion.evidenceState ?? 'INFORMATIONAL',
+      requestAllowed: suggestion.requestAllowed ?? false,
+      missingEvidence: suggestion.missingEvidence ?? [],
+    }));
+}
+
+/**
+ * Applies the same fail-closed canonical evidence gate used by Android.
+ * Legacy DTC/3D mappings remain informational until this function receives an EXACT graph gate.
+ */
+export function applyPartEvidenceGate(
+  suggestions: PartSuggestion[],
+  gate: PartEvidenceGateContract,
+): PartSuggestion[] {
+  const missing = Array.from(new Set([
+    ...gate.missingEvidence,
+    ...gate.missingRequirements,
+    ...(gate.replacementAllowed ? [] : gate.requiredTests),
+  ])).sort();
+
+  return suggestions.map((suggestion) => {
+    const isGateTarget =
+      Boolean(suggestion.canonicalKey) &&
+      suggestion.canonicalKey === gate.componentCanonicalKey;
+    if (
+      isGateTarget &&
+      gate.purchaseAllowed &&
+      gate.purchaseCompatibility === 'EXACT'
+    ) {
+      return {
+        ...suggestion,
+        evidenceState: 'PURCHASE_VERIFIED',
+        requestAllowed: true,
+        missingEvidence: [],
+      };
+    }
+    if (isGateTarget && gate.replacementAllowed) {
+      return {
+        ...suggestion,
+        evidenceState: 'REPLACEMENT_CONFIRMED',
+        requestAllowed: false,
+        missingEvidence: missing,
+      };
+    }
+    if (isGateTarget) {
+      return {
+        ...suggestion,
+        evidenceState: 'REQUIRES_TESTS',
+        requestAllowed: false,
+        missingEvidence: missing,
+      };
+    }
+    return {
+      ...suggestion,
+      evidenceState: 'INFORMATIONAL',
+      requestAllowed: false,
+    };
+  });
 }
 
 /**

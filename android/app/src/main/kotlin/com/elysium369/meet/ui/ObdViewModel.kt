@@ -4174,7 +4174,8 @@ class ObdViewModel @Inject constructor(
         endpointUrl: String?,
         dtcList: List<String>,
         providerOverride: String? = null,
-        modelNameOverride: String? = null
+        modelNameOverride: String? = null,
+        groundedRepairContext: String? = null
     ): String {
         val dtcCodesStr = dtcList.sorted().joinToString(",")
         val savedConfig = _aiConfig.value
@@ -4227,7 +4228,7 @@ class ObdViewModel @Inject constructor(
                     com.elysium369.meet.ai.domain.VehicleContext(
                         make = v.make, model = v.model, year = v.year,
                         engine = v.engine, transmission = v.transmission_type,
-                        fuel = v.fuel_type, vin = v.vin,
+                        fuel = v.fuel_type, vin = null,
                         odometer = null
                     )
                 },
@@ -4255,6 +4256,9 @@ class ObdViewModel @Inject constructor(
                     com.elysium369.meet.ai.domain.AiMessage(
                         com.elysium369.meet.ai.domain.AiRole.USER,
                         com.elysium369.meet.ai.context.AiAutomotiveContextBuilder.buildContextPrompt(aiContext) +
+                            groundedRepairContext?.let {
+                                "\n\n=== CONOCIMIENTO ESTRUCTURADO CITADO ===\n$it"
+                            }.orEmpty() +
                             "\n\nDiagnostica los siguientes DTCs para $info: ${dtcList.joinToString(", ")}"
                     )
                 ),
@@ -4271,7 +4275,8 @@ class ObdViewModel @Inject constructor(
                 val result = geminiDiagnostic.analyzeDtc(
                     dtcList, info,
                     _liveData.value.mapValues { "%.2f".format(it.value) },
-                    _telemetryHistory.value
+                    _telemetryHistory.value,
+                    groundedRepairContext
                 )
                 resultText = result.analysisText
             }

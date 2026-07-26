@@ -109,7 +109,7 @@ La cola final tiene 17,456 elementos, cero publicables y cero contradicciones de
 Este corte cierra tres rutas por las que una inferencia podia aparentar mayor certeza que la evidencia:
 
 - VIN validado con exactamente 17 caracteres permitidos en Kotlin y TypeScript; un VIN parcial o con `I`, `O` o `Q` genera bloqueo y nunca cuenta como evidencia de `EXACT`;
-- cotizaciones `EXACT` limitadas a VIN valido + OEM/numero de parte, o tupla cerrada marca/modelo/ano/motor/OEM;
+- cotizaciones `EXACT` limitadas a VIN valido + OEM verificado, o tupla cerrada marca/modelo/ano/motor/OEM; un numero de parte escrito o aftermarket no es evidencia decisiva;
 - evidencia estructurada del vehiculo conectada desde la solicitud al formulario de cotizacion, sin usar notas libres como prueba;
 - sugerencias P0230 sin sensor de presion inventado para el perfil Accent y sin afirmaciones estadisticas o de costo no citadas;
 - P0171 sin la recomendacion incorrecta de tapa de combustible y con MAF/MAP condicionado al equipamiento real;

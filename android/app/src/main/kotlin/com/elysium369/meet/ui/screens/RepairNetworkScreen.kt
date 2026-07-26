@@ -47,7 +47,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import com.elysium369.meet.core.parts.PartSuggestionEngine
 import com.elysium369.meet.core.parts.PartSuggestionInput
+import com.elysium369.meet.core.parts.PartRequestPublicationPolicy
 import com.elysium369.meet.core.parts.SuggestionSource
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeUiState
+import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -65,6 +69,11 @@ fun RepairNetworkScreen(
     val predictionEvents by obdViewModel.predictionEvents.collectAsState()
     val selectedVehicle by obdViewModel.selectedVehicle.collectAsState()
     val activeDtcs by obdViewModel.activeDtcs.collectAsState()
+    val repairKnowledgeState by rememberRepairKnowledgeUiState(
+        vehicle = selectedVehicle,
+        dtcs = activeDtcs
+    )
+    val repairBundle = (repairKnowledgeState as? RepairKnowledgeUiState.Ready)?.bundle
     val partRequests by obdViewModel.partRequests.collectAsState()
     val vehicles by obdViewModel.vehicles.collectAsState()
 
@@ -1099,6 +1108,27 @@ fun RepairNetworkScreen(
         }
 
         if (showPartRequestDialog) {
+            val effectivePartDtc = partDtcCode ?: activeDtcs.firstOrNull()
+            val dialogSuggestions = remember(effectivePartDtc, repairBundle) {
+                val input = PartSuggestionInput(
+                    source = SuggestionSource.DTC,
+                    dtcCodes = listOfNotNull(effectivePartDtc)
+                )
+                repairBundle?.let { PartSuggestionEngine.suggestParts(input, it) }
+                    ?: PartSuggestionEngine.suggestParts(input)
+            }
+            val selectedDialogSuggestion = dialogSuggestions.firstOrNull {
+                it.partName.equals(partNameInput.trim(), ignoreCase = true)
+            }
+            val dialogPublicationDecision = PartRequestPublicationPolicy.evaluate(
+                partName = partNameInput,
+                vehiclePresent = !(partVehicleId ?: selectedVehicle?.id).isNullOrBlank(),
+                contactPresent = true,
+                graphEvidenceRequired = effectivePartDtc != null,
+                compatibility = null,
+                suggestion = selectedDialogSuggestion,
+                knowledge = repairBundle
+            )
             AlertDialog(
                 onDismissRequest = { showPartRequestDialog = false },
                 containerColor = MeetColors.backgroundDeep,
@@ -1110,6 +1140,10 @@ fun RepairNetworkScreen(
                             color = MeetColors.textSecondary,
                             fontSize = 12.sp,
                             lineHeight = 16.sp
+                        )
+                        RepairKnowledgeEvidencePanel(
+                            state = repairKnowledgeState,
+                            accentColor = MeetColors.cyberCyan
                         )
                         OutlinedTextField(
                             value = partNameInput,
@@ -1177,7 +1211,11 @@ fun RepairNetworkScreen(
                     Button(
                         onClick = {
                             val vehicleId = partVehicleId ?: selectedVehicle?.id
-                            if (!vehicleId.isNullOrBlank() && partNameInput.isNotBlank()) {
+                            if (
+                                !vehicleId.isNullOrBlank() &&
+                                partNameInput.isNotBlank() &&
+                                dialogPublicationDecision.allowed
+                            ) {
                                 obdViewModel.createPartRequest(
                                     serviceRequestId = partServiceRequestId,
                                     vehicleId = vehicleId,
@@ -1196,7 +1234,11 @@ fun RepairNetworkScreen(
                                 partNotesInput = ""
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan)
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                        enabled =
+                            !(partVehicleId ?: selectedVehicle?.id).isNullOrBlank() &&
+                                partNameInput.isNotBlank() &&
+                                dialogPublicationDecision.allowed
                     ) {
                         Text("PUBLICAR PIEZA", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
@@ -1727,7 +1769,7 @@ private fun suggestPartNameForDtc(dtcCode: String?, problem: String): String {
         dtcCode?.startsWith("P030") == true || problemText.contains("buj") || problemText.contains("misfire") ->
             "Bujía / bobina de encendido compatible"
         dtcCode in setOf("P0171", "P0174") || problemText.contains("mezcla") ->
-            "Sensor MAF / manguera PCV / filtro combustible"
+            "Manguera de vacío / ducto de admisión / sensor de carga según equipamiento"
         dtcCode in setOf("P0420", "P0430") || problemText.contains("catalizador") ->
             "Sensor de oxígeno o catalizador compatible"
         problemText.contains("freno") || problemText.contains("pastilla") ->

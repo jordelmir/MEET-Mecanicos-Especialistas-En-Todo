@@ -89,7 +89,8 @@ class GeminiDiagnostic(
         dtcList: List<String>, 
         vehicleInfo: String, 
         liveData: Map<String, String>,
-        telemetryHistory: Map<String, List<Float>> = emptyMap()
+        telemetryHistory: Map<String, List<Float>> = emptyMap(),
+        groundedRepairContext: String? = null
     ): DiagnosticResult {
         return withContext(Dispatchers.IO) {
             if (dtcList.isEmpty() && telemetryHistory.isEmpty()) {
@@ -125,6 +126,9 @@ class GeminiDiagnostic(
                 
                 ## ANÁLISIS DE TELEMETRÍA (WAVEFORMS/TENDENCIAS):
                 ${if (telemetrySummary.isBlank()) "No se proporcionó historial de telemetría." else telemetrySummary}
+
+                ## CONOCIMIENTO ESTRUCTURADO CITADO:
+                ${groundedRepairContext ?: "No disponible. No inventar aplicabilidad, valores exactos ni compatibilidad."}
                 
                 ## TU MISIÓN CRÍTICA:
                 Realiza un diagnóstico profundo e integral siguiendo estos pilares:

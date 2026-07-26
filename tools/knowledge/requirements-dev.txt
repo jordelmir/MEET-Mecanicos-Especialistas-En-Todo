@@ -1,0 +1,2 @@
+# Draft 2020-12 schema execution for the knowledge contract tests.
+jsonschema>=4.18,<5

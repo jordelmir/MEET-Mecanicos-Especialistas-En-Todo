@@ -6,7 +6,7 @@ package com.elysium369.meet.core.parts
  * Speaks the same language as the TypeScript `lib/parts/compatibility.ts`
  * so the web wizard and the Android client produce identical verdicts
  * for the same input. Anti-fraud posture is preserved on both sides:
- *   - EXACT is REFUSED unless VIN + (OEM | part number) is present, or
+ *   - EXACT is REFUSED unless VIN + OEM is present, or
  *     a closed (brand + model + year + engine + OEM) tuple is present.
  *   - P0230 + fuel-pump request ALWAYS carries a BLOCK warning.
  *   - Critical-safety parts (brakes, steering, airbag, fuel system,
@@ -157,8 +157,8 @@ object CompatibilityEngine {
 
     private val NO_OEM_WARNING = CompatibilityWarning(
         code = "NO_OEM",
-        message = "No se recibió número OEM ni número de parte. La app no puede confirmar " +
-            "compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del " +
+        message = "No se recibió un número OEM verificado. Un número de parte escrito o aftermarket " +
+            "no demuestra por sí solo compatibilidad exacta. Recomendamos adjuntar foto de la pieza, del " +
             "conector o de la caja de fusibles.",
         severity = WarningSeverity.WARN,
     )
@@ -189,7 +189,6 @@ object CompatibilityEngine {
         val vinProvided: Boolean,
         val hasVin: Boolean,
         val hasOem: Boolean,
-        val hasPartNumber: Boolean,
         val hasBrand: Boolean,
         val hasModel: Boolean,
         val hasYear: Boolean,
@@ -205,7 +204,6 @@ object CompatibilityEngine {
             vinProvided = !v.vin.isNullOrBlank(),
             hasVin = isValidVin(v.vin),
             hasOem = !v.oemNumber.isNullOrBlank(),
-            hasPartNumber = !v.partNumber.isNullOrBlank(),
             hasBrand = !v.brand.isNullOrBlank(),
             hasModel = !v.model.isNullOrBlank(),
             hasYear = v.year != null && v.year in 1886..2100,
@@ -225,9 +223,9 @@ object CompatibilityEngine {
     private fun pickTier(ctx: CompatibilityContext, e: TierEvidence): TierResult {
         val rationale = mutableListOf<String>()
 
-        // EXACT: VIN + (OEM | partNumber) OR closed (brand+model+year+engine+OEM).
-        if (e.hasVin && (e.hasOem || e.hasPartNumber)) {
-            rationale.add("VIN + número de parte disponibles: tupla cerrada.")
+        // EXACT: VIN + OEM OR closed (brand+model+year+engine+OEM).
+        if (e.hasVin && e.hasOem) {
+            rationale.add("VIN + número OEM verificado disponibles: tupla cerrada.")
             return TierResult(CompatibilityConfidence.EXACT, emptyList(), rationale)
         }
         if (e.hasBrand && e.hasModel && e.hasYear && e.hasEngine && e.hasOem) {

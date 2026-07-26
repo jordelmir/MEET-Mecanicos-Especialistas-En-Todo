@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 1,
+  "overlayId": "accent_verna_2005_knowledge",
+  "overlayVersion": "1.0.0",
+  "sourceCorpusHash": "7a4a2f2f328bf422ea1c4d987f88eb093e664d6cf4e53609282506d4261d960f",
+  "sourceInputs": {
+    "corpusManifestPath": "public/knowledge/proprietary/manifest.json",
+    "corpusId": "meet_owner_proprietary_parts_corpus",
+    "corpusVersion": "1.0.0",
+    "curatedPacks": [
+      {
+        "packId": "pack_06_dtc_P0230",
+        "packVersion": "1.0.0",
+        "path": "android/app/src/main/assets/knowledge/packs/pack_06_dtc_P0230.json",
+        "authority": "GENERIC_CONCEPTUAL",
+        "reviewState": "REVIEW_REQUIRED"
+      },
+      {
+        "packId": "pack_07_hyundai_accent_verna_2005_profile",
+        "packVersion": "1.0.0",
+        "path": "android/app/src/main/assets/knowledge/packs/pack_07_hyundai_accent_verna_2005_profile.json",
+        "authority": "ENGINEERING_INFERENCE",
+        "reviewState": "REVIEW_REQUIRED"
+      }
+    ]
+  },
+  "referenceVehicleProfile": {
+    "id": "hyundai_accent_verna_2005_1_6_at",
+    "nodeId": "hyundai_accent_verna_2005_1_6_at",
+    "make": "Hyundai",
+    "models": ["Accent", "Verna"],
+    "year": 2005,
+    "engine": "1.6L; engine code and market require VIN or OEM confirmation",
+    "transmission": "Automatic; exact variant requires VIN or OEM confirmation",
+    "marketState": "UNCONFIRMED",
+    "requiresVinConfirmation": true,
+    "applicability": "CONDITIONAL",
+    "confidence": "MEDIUM",
+    "reviewState": "REVIEW_REQUIRED",
+    "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+    "sourceRefs": [
+      {
+        "sourceDocumentId": "document_17",
+        "blockId": "block_000040_82d1f224cb",
+        "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"
+      },
+      {
+        "sourceDocumentId": "document_17",
+        "blockId": "block_000042_263b88892e",
+        "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"
+      }
+    ],
+    "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
+    "evidenceRequired": ["vin", "market", "engine_code", "physical_inventory"]
+  },
+  "observedEvidence": [],
+  "nodes": [
+    {
+      "id": "hyundai_accent_verna_2005_1_6_at",
+      "type": "VEHICLE_PROFILE",
+      "label": "Hyundai Accent/Verna 2005 1.6 AT",
+      "canonicalKey": "hyundai_accent_verna_2005_1_6_at",
+      "description": "Reference profile with market, engine code and exact equipment intentionally left evidence-gated.",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {
+          "sourceDocumentId": "document_17",
+          "blockId": "block_000040_82d1f224cb",
+          "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"
+        },
+        {
+          "sourceDocumentId": "document_17",
+          "blockId": "block_000042_263b88892e",
+          "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"
+        }
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "map_sensor",
+      "type": "COMPONENT",
+      "label": "Sensor MAP",
+      "canonicalKey": "map_sensor",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "iat_sensor",
+      "type": "COMPONENT",
+      "label": "Sensor IAT",
+      "canonicalKey": "iat_sensor",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "mechanical_throttle",
+      "type": "ASSEMBLY",
+      "label": "Acelerador mecánico por cable",
+      "canonicalKey": "mechanical_throttle",
+      "sourceBlockIds": ["block_007342_1d1f4864bc"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007342_1d1f4864bc", "textHash": "1d1f4864bcaba0a115619af84223b82aae572578a0c16b1d8b5a61de7de5c359"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "fuel_pump",
+      "type": "COMPONENT",
+      "label": "Bomba eléctrica de combustible",
+      "canonicalKey": "fuel_pump",
+      "sourceBlockIds": ["block_007066_be030d00fb", "block_007622_4790cad377"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007622_4790cad377", "textHash": "4790cad377fcb13b4d33d345ade879ce855db127401471d2ddd4c96763e1116b"}
+      ],
+      "curatedSourceIds": ["pack_06_dtc_P0230", "pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "pcm_driver",
+      "type": "COMPONENT",
+      "label": "Controlador PCM del relé de bomba",
+      "canonicalKey": "pcm_driver",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "maf_sensor",
+      "type": "COMPONENT",
+      "label": "Sensor MAF",
+      "canonicalKey": "maf_sensor",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "app_sensor",
+      "type": "COMPONENT",
+      "label": "Sensor APP electrónico",
+      "canonicalKey": "app_sensor",
+      "sourceBlockIds": ["block_000042_263b88892e", "block_007342_1d1f4864bc"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007342_1d1f4864bc", "textHash": "1d1f4864bcaba0a115619af84223b82aae572578a0c16b1d8b5a61de7de5c359"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "eps",
+      "type": "ASSEMBLY",
+      "label": "Dirección asistida eléctrica EPS",
+      "canonicalKey": "eps",
+      "sourceBlockIds": ["block_003302_cccaa028f7", "block_007066_be030d00fb"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_003302_cccaa028f7", "textHash": "cccaa028f758b8f7120d7bd118478b6b76ac9080edb27d01fa63122ae0ae7dfd"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "epb",
+      "type": "ASSEMBLY",
+      "label": "Freno de estacionamiento eléctrico EPB",
+      "canonicalKey": "epb",
+      "sourceBlockIds": ["block_007066_be030d00fb", "block_026778_5c389450bc"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"},
+        {"sourceDocumentId": "document_17", "blockId": "block_026778_5c389450bc", "textHash": "5c389450bca61a7646b5b4523dd1ace122ad31fb9dc3e5bfce95fa1543c86dd5"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "turbocharger",
+      "type": "ASSEMBLY",
+      "label": "Turbocompresor",
+      "canonicalKey": "turbocharger",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "diesel_system",
+      "type": "SYSTEM",
+      "label": "Sistema diésel common rail",
+      "canonicalKey": "diesel_system",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "dpf",
+      "type": "ASSEMBLY",
+      "label": "Filtro de partículas diésel DPF",
+      "canonicalKey": "dpf",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "adas",
+      "type": "SYSTEM",
+      "label": "ADAS de fábrica",
+      "canonicalKey": "adas",
+      "sourceBlockIds": ["block_016970_f17650c335"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_016970_f17650c335", "textHash": "f17650c33505245f4a8f9fa1e715ffac7ad4f4947e9468f3706a4a05f762823e"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"]
+    },
+    {
+      "id": "dtc_P0230",
+      "type": "DTC",
+      "label": "P0230 — circuito primario de la bomba de combustible",
+      "canonicalKey": "P0230",
+      "description": "Topología genérica de diagnóstico; pinout, colores y umbrales requieren información OEM del vehículo.",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_capture_context",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Guardar DTC, freeze frame y contexto del vehículo",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_power_and_ground",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Verificar batería, alimentación y masa bajo carga",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_fuse_and_feed",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Comprobar fusible, feed, corto y sobreconsumo",
+      "sourceBlockIds": ["block_007074_73dfe71dbb"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007074_73dfe71dbb", "textHash": "73dfe71dbb101f8173f60590f5b67499545f4dd961c81f77537974e1ab75b38f"}],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_relay_control_and_output",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Separar control y salida de carga del relé",
+      "sourceBlockIds": ["block_007074_73dfe71dbb"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007074_73dfe71dbb", "textHash": "73dfe71dbb101f8173f60590f5b67499545f4dd961c81f77537974e1ab75b38f"}],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_connector_and_harness",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Inspeccionar conector, terminales y arnés",
+      "sourceBlockIds": ["block_007097_0e47f8d766"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007097_0e47f8d766", "textHash": "0e47f8d766e504c769fdd7eafba387bfa86d5aad9620b8c3dffe11fb659346ce"}],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_loaded_voltage_drop",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Medir alimentación y caída de masa con el circuito cargado",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_pump_current",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Medir corriente, presión y retención con criterios revisados",
+      "sourceBlockIds": ["block_007627_286dddc7b8", "block_007628_66207aaab5", "block_007629_fa468373cc", "block_007630_949a768dec", "block_007631_fcdd77b100"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007627_286dddc7b8", "textHash": "286dddc7b85841b3a524b5f647249fa338e8474d1094d32d666bae5ce2ab37fc"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007628_66207aaab5", "textHash": "66207aaab5b885d98d7fa024a18d01b2b93cf7203923507ccdb9aa26359c83aa"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007629_fa468373cc", "textHash": "fa468373ccba530a3a7e55d9ed0fdd72f8868d900759e7271a679ba788639b4a"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007630_949a768dec", "textHash": "949a768dec7187e984810e0b89bf1e7ab9bc89531ff8ce46c7c5aa9edd8f4db9"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007631_fcdd77b100", "textHash": "fcdd77b100c1a37d1cab46d911e26820b77ed98a8ecd89879f471d27d92661ff"}
+      ],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    },
+    {
+      "id": "test_p0230_pcm_driver",
+      "type": "DIAGNOSTIC_TEST",
+      "label": "Evaluar PCM o TSB solo como hipótesis final",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_profile_map",
+      "from": "hyundai_accent_verna_2005_1_6_at",
+      "to": "map_sensor",
+      "type": "APPLIES_TO",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
+      "observedEvidenceIds": [],
+      "evidenceRequired": ["vin_engine_variant"],
+      "reviewState": "REVIEW_REQUIRED",
+      "applicability": "PROBABLE",
+      "confidence": "MEDIUM",
+      "reason": "The owner corpus describes MAP for the reference architecture, but market and engine code are not closed.",
+      "requiresVinConfirmation": true
+    },
+    {
+      "id": "edge_profile_iat",
+      "from": "hyundai_accent_verna_2005_1_6_at",
+      "to": "iat_sensor",
+      "type": "APPLIES_TO",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
+      "observedEvidenceIds": [],
+      "evidenceRequired": ["vin_engine_variant"],
+      "reviewState": "REVIEW_REQUIRED",
+      "applicability": "PROBABLE",
+      "confidence": "MEDIUM",
+      "reason": "The owner corpus describes IAT for the reference architecture, pending exact variant confirmation.",
+      "requiresVinConfirmation": true
+    },
+    {
+      "id": "edge_profile_mechanical_throttle",
+      "from": "hyundai_accent_verna_2005_1_6_at",
+      "to": "mechanical_throttle",
+      "type": "APPLIES_TO",
+      "sourceBlockIds": ["block_007342_1d1f4864bc"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007342_1d1f4864bc", "textHash": "1d1f4864bcaba0a115619af84223b82aae572578a0c16b1d8b5a61de7de5c359"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
+      "observedEvidenceIds": [],
+      "evidenceRequired": ["throttle_body_visual_confirmation"],
+      "reviewState": "REVIEW_REQUIRED",
+      "applicability": "CONDITIONAL",
+      "confidence": "MEDIUM",
+      "reason": "The corpus describes a cable throttle; physical confirmation closes the target unit.",
+      "requiresPhysicalConfirmation": true
+    },
+    {
+      "id": "edge_profile_fuel_pump",
+      "from": "hyundai_accent_verna_2005_1_6_at",
+      "to": "fuel_pump",
+      "type": "APPLIES_TO",
+      "sourceBlockIds": ["block_007066_be030d00fb", "block_007622_4790cad377"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007622_4790cad377", "textHash": "4790cad377fcb13b4d33d345ade879ce855db127401471d2ddd4c96763e1116b"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"],
+      "observedEvidenceIds": [],
+      "evidenceRequired": ["vin_fuel_system_confirmation"],
+      "reviewState": "REVIEW_REQUIRED",
+      "applicability": "PROBABLE",
+      "confidence": "MEDIUM",
+      "reason": "The corpus describes an in-tank electric pump; exact module remains vehicle-evidence gated.",
+      "requiresVinConfirmation": true
+    },
+    {
+      "id": "edge_p0230_first_test",
+      "from": "dtc_P0230",
+      "to": "test_p0230_capture_context",
+      "type": "HAS_DIAGNOSTIC_TEST",
+      "sourceBlockIds": [],
+      "sourceRefs": [],
+      "curatedSourceIds": ["pack_06_dtc_P0230"],
+      "observedEvidenceIds": [],
+      "evidenceRequired": ["dtc_scan_record", "freeze_frame", "vin_oem_diagram"],
+      "reviewState": "REVIEW_REQUIRED",
+      "applicability": "GENERIC",
+      "confidence": "UNASSESSED",
+      "reason": "P0230 is a circuit code; capture evidence before ranking a failed component."
+    },
+    {
+      "id": "edge_p0230_step_1",
+      "from": "test_p0230_capture_context",
+      "to": "test_p0230_power_and_ground",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["battery_loaded_test"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 1
+    },
+    {
+      "id": "edge_p0230_step_2",
+      "from": "test_p0230_power_and_ground",
+      "to": "test_p0230_fuse_and_feed",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["fuse_continuity_loaded_feed"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 2
+    },
+    {
+      "id": "edge_p0230_step_3",
+      "from": "test_p0230_fuse_and_feed",
+      "to": "test_p0230_relay_control_and_output",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": ["block_007074_73dfe71dbb"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007074_73dfe71dbb", "textHash": "73dfe71dbb101f8173f60590f5b67499545f4dd961c81f77537974e1ab75b38f"}],
+      "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["relay_control_and_load_measurement"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 3
+    },
+    {
+      "id": "edge_p0230_step_4",
+      "from": "test_p0230_relay_control_and_output",
+      "to": "test_p0230_connector_and_harness",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["connector_harness_inspection"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 4
+    },
+    {
+      "id": "edge_p0230_step_5",
+      "from": "test_p0230_connector_and_harness",
+      "to": "test_p0230_loaded_voltage_drop",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": ["block_007097_0e47f8d766"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_007097_0e47f8d766", "textHash": "0e47f8d766e504c769fdd7eafba387bfa86d5aad9620b8c3dffe11fb659346ce"}],
+      "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["loaded_voltage_drop"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 5
+    },
+    {
+      "id": "edge_p0230_step_6",
+      "from": "test_p0230_loaded_voltage_drop",
+      "to": "test_p0230_pump_current",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["oem_pump_current_pressure_criteria"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 6
+    },
+    {
+      "id": "edge_p0230_step_7",
+      "from": "test_p0230_pump_current",
+      "to": "test_p0230_pcm_driver",
+      "type": "NEXT_STEP",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["all_upstream_tests_passed", "oem_pcm_circuit_test", "tsb_check"], "reviewState": "REVIEW_REQUIRED", "applicability": "GENERIC", "confidence": "UNASSESSED",
+      "sequenceId": "p0230_circuit_first", "sequenceOrder": 7
+    },
+    {
+      "id": "edge_gate_fuel_pump",
+      "from": "fuel_pump",
+      "to": "test_p0230_pump_current",
+      "type": "REQUIRES_TEST_BEFORE_REPLACE",
+      "sourceBlockIds": ["block_007627_286dddc7b8", "block_007628_66207aaab5", "block_007629_fa468373cc", "block_007630_949a768dec", "block_007631_fcdd77b100"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007627_286dddc7b8", "textHash": "286dddc7b85841b3a524b5f647249fa338e8474d1094d32d666bae5ce2ab37fc"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007628_66207aaab5", "textHash": "66207aaab5b885d98d7fa024a18d01b2b93cf7203923507ccdb9aa26359c83aa"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007629_fa468373cc", "textHash": "fa468373ccba530a3a7e55d9ed0fdd72f8868d900759e7271a679ba788639b4a"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007630_949a768dec", "textHash": "949a768dec7187e984810e0b89bf1e7ab9bc89531ff8ce46c7c5aa9edd8f4db9"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007631_fcdd77b100", "textHash": "fcdd77b100c1a37d1cab46d911e26820b77ed98a8ecd89879f471d27d92661ff"}
+      ],
+      "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["loaded_voltage_at_pump", "ground_drop", "pump_current", "fuel_pressure_oem_criteria"],
+      "reviewState": "REVIEW_REQUIRED", "applicability": "CONDITIONAL", "confidence": "UNASSESSED",
+      "reason": "Do not replace the pump from P0230 alone."
+    },
+    {
+      "id": "edge_gate_pcm",
+      "from": "pcm_driver",
+      "to": "test_p0230_pcm_driver",
+      "type": "REQUIRES_TEST_BEFORE_REPLACE",
+      "sourceBlockIds": [], "sourceRefs": [], "curatedSourceIds": ["pack_06_dtc_P0230"], "observedEvidenceIds": [],
+      "evidenceRequired": ["all_upstream_tests_passed", "oem_pcm_circuit_test", "tsb_check"],
+      "reviewState": "REVIEW_REQUIRED", "applicability": "CONDITIONAL", "confidence": "UNASSESSED",
+      "reason": "PCM remains the final hypothesis after the complete circuit is proven."
+    }
+  ],
+  "applicabilityRules": [
+    {
+      "id": "rule_maf_not_documented", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "maf_sensor",
+      "state": "NOT_DOCUMENTED", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "The corpus describes MAP plus IAT and does not document MAF; absence still requires physical or OEM confirmation.",
+      "sourceBlockIds": ["block_000042_263b88892e"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["physical_sensor_inventory", "oem_engine_diagram"]
+    },
+    {
+      "id": "rule_app_not_applicable", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "app_sensor",
+      "state": "NOT_APPLICABLE", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "APP is excluded only for the described cable-throttle architecture; confirm the target vehicle physically.",
+      "sourceBlockIds": ["block_000042_263b88892e", "block_007342_1d1f4864bc"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007342_1d1f4864bc", "textHash": "1d1f4864bcaba0a115619af84223b82aae572578a0c16b1d8b5a61de7de5c359"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["throttle_body_visual_confirmation", "vin_engine_variant"]
+    },
+    {
+      "id": "rule_eps_not_documented", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "eps",
+      "state": "NOT_DOCUMENTED", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "The corpus describes hydraulic steering; exact installed equipment remains VIN and inspection dependent.",
+      "sourceBlockIds": ["block_003302_cccaa028f7", "block_007066_be030d00fb"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_003302_cccaa028f7", "textHash": "cccaa028f758b8f7120d7bd118478b6b76ac9080edb27d01fa63122ae0ae7dfd"},
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["vin_steering_option", "physical_steering_inventory"]
+    },
+    {
+      "id": "rule_epb_not_documented", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "epb",
+      "state": "NOT_DOCUMENTED", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "The corpus describes a mechanical handbrake and no EPB motor, but the target unit still requires inspection.",
+      "sourceBlockIds": ["block_007066_be030d00fb", "block_026778_5c389450bc"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_007066_be030d00fb", "textHash": "be030d00fbc04f6912bd625a1063543b7b08c6c22249e27817198d436b858023"},
+        {"sourceDocumentId": "document_17", "blockId": "block_026778_5c389450bc", "textHash": "5c389450bca61a7646b5b4523dd1ace122ad31fb9dc3e5bfce95fa1543c86dd5"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["physical_parking_brake_inventory"]
+    },
+    {
+      "id": "rule_turbo_not_applicable", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "turbocharger",
+      "state": "NOT_APPLICABLE", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "Only excluded under the described naturally aspirated gasoline architecture; do not transfer to another variant.",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["vin_engine_variant", "physical_induction_inventory"]
+    },
+    {
+      "id": "rule_diesel_not_applicable", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "diesel_system",
+      "state": "NOT_APPLICABLE", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "The reference profile is the described gasoline PFI architecture; exact engine identity must be closed before applying the exclusion.",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["vin_engine_variant"]
+    },
+    {
+      "id": "rule_dpf_not_applicable", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "dpf",
+      "state": "NOT_APPLICABLE", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "DPF is excluded only after confirming the described gasoline architecture.",
+      "sourceBlockIds": ["block_000040_82d1f224cb", "block_000042_263b88892e"],
+      "sourceRefs": [
+        {"sourceDocumentId": "document_17", "blockId": "block_000040_82d1f224cb", "textHash": "82d1f224cb82d5436589d51335d0ee279f1ec5e2e684c3fa5ecd8f6432409509"},
+        {"sourceDocumentId": "document_17", "blockId": "block_000042_263b88892e", "textHash": "263b88892e5e814bf30b83adc04e43fb6dce7d465c066ec0946a09b7bf294c9c"}
+      ],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["vin_engine_variant"]
+    },
+    {
+      "id": "rule_adas_not_documented", "profileId": "hyundai_accent_verna_2005_1_6_at", "canonicalKey": "adas",
+      "state": "NOT_DOCUMENTED", "confidence": "MEDIUM", "reviewState": "REVIEW_REQUIRED",
+      "reason": "Factory ADAS is not documented; aftermarket installations and market variants require inspection.",
+      "sourceBlockIds": ["block_016970_f17650c335"],
+      "sourceRefs": [{"sourceDocumentId": "document_17", "blockId": "block_016970_f17650c335", "textHash": "f17650c33505245f4a8f9fa1e715ffac7ad4f4947e9468f3706a4a05f762823e"}],
+      "curatedSourceIds": ["pack_07_hyundai_accent_verna_2005_profile"], "evidenceRequired": ["vin_factory_options", "physical_aftermarket_inventory"]
+    }
+  ]
+}

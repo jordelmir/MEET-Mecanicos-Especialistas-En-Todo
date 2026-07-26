@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyPartEvidenceGate,
   filterRiskParts,
   suggestParts,
 } from '../part-suggestion';
@@ -59,6 +60,53 @@ describe('suggestParts — P0230 (the headline scenario)', () => {
   it('does not justify parts with unsourced frequency or price claims', () => {
     const rationales = suggestions.map((suggestion) => suggestion.rationale.toLowerCase()).join(' ');
     expect(rationales).not.toMatch(/commonly|most common|meaningful slice|cheap/);
+  });
+
+  it('keeps legacy mappings informational and unable to publish', () => {
+    expect(suggestions.every((suggestion) => suggestion.evidenceState === 'INFORMATIONAL')).toBe(true);
+    expect(suggestions.some((suggestion) => suggestion.requestAllowed)).toBe(false);
+  });
+
+  it('opens only the exact canonical component selected by the graph gate', () => {
+    const gated = applyPartEvidenceGate(suggestions, {
+      componentCanonicalKey: 'fuel_pump',
+      replacementAllowed: true,
+      purchaseAllowed: true,
+      purchaseCompatibility: 'EXACT',
+      requiredTests: ['fuel_pressure_check'],
+      missingEvidence: [],
+      missingRequirements: [],
+    });
+
+    const pump = gated.find((suggestion) => suggestion.canonicalKey === 'fuel_pump');
+    expect(pump?.evidenceState).toBe('PURCHASE_VERIFIED');
+    expect(pump?.requestAllowed).toBe(true);
+    expect(
+      gated.filter((suggestion) => suggestion.canonicalKey !== 'fuel_pump')
+        .some((suggestion) => suggestion.requestAllowed),
+    ).toBe(false);
+  });
+
+  it('carries missing graph evidence into a blocked canonical suggestion', () => {
+    const gated = applyPartEvidenceGate(suggestions, {
+      componentCanonicalKey: 'fuel_pump',
+      replacementAllowed: false,
+      purchaseAllowed: false,
+      purchaseCompatibility: 'UNKNOWN',
+      requiredTests: ['fuel_pressure_check'],
+      missingEvidence: ['VIN', 'OEM'],
+      missingRequirements: ['pump_failure_confirmed'],
+    });
+    const pump = gated.find((suggestion) => suggestion.canonicalKey === 'fuel_pump');
+
+    expect(pump?.requestAllowed).toBe(false);
+    expect(pump?.evidenceState).toBe('REQUIRES_TESTS');
+    expect(pump?.missingEvidence).toEqual([
+      'OEM',
+      'VIN',
+      'fuel_pressure_check',
+      'pump_failure_confirmed',
+    ]);
   });
 });
 

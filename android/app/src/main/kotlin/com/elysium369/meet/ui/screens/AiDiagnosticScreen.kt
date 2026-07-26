@@ -45,6 +45,11 @@ import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteIconButton
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
+import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeUiState
+import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
+import com.elysium369.meet.ui.knowledge.toActiveVehicleIdentity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +78,25 @@ fun AiDiagnosticScreen(
     val telemetrySamples by viewModel.telemetrySamples.collectAsState()
     val freezeFrameData by viewModel.freezeFrameData.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val dtcsForKnowledge = remember(dtcCode, activeDtcs) {
+        (listOf(dtcCode) + activeDtcs)
+            .map { it.trim().uppercase() }
+            .filter(String::isNotBlank)
+            .distinct()
+    }
+    val repairKnowledgeState by rememberRepairKnowledgeUiState(
+        vehicle = selectedVehicle,
+        dtcs = dtcsForKnowledge
+    )
+    val groundedContextBuilder = remember { ProprietaryGroundedContextBuilder() }
+    val groundedRepairContext = remember(repairKnowledgeState, selectedVehicle) {
+        (repairKnowledgeState as? RepairKnowledgeUiState.Ready)?.let { ready ->
+            groundedContextBuilder.build(
+                bundle = ready.bundle,
+                vehicle = selectedVehicle?.toActiveVehicleIdentity()
+            )
+        }
+    }
     val reasoningEngine = remember { DiagnosticReasoningEngine() }
     var completedLocalTests by remember(dtcCode) { mutableStateOf<Set<String>>(emptySet()) }
     val localReasoning = remember(
@@ -126,8 +150,8 @@ fun AiDiagnosticScreen(
         else -> 0.25f
     }
 
-    LaunchedEffect(dtcCode) {
-        if (dtcCode.isNotEmpty()) {
+    LaunchedEffect(dtcCode, repairKnowledgeState) {
+        if (dtcCode.isNotEmpty() && repairKnowledgeState !is RepairKnowledgeUiState.Loading) {
             isLoading = true
             // Use null for apiKey/baseUrl so consultAi falls through to global config
             aiResponse = viewModel.consultAi(
@@ -135,7 +159,8 @@ fun AiDiagnosticScreen(
                 null,
                 listOf(dtcCode),
                 provider.takeIf { it != "minimax" },
-                modelName.takeIf { it.isNotBlank() }
+                modelName.takeIf { it.isNotBlank() },
+                groundedRepairContext
             )
             isLoading = false
         }
@@ -275,6 +300,11 @@ fun AiDiagnosticScreen(
                                 }
 
                                 if (hasLocalCase) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    RepairKnowledgeEvidencePanel(
+                                        state = repairKnowledgeState,
+                                        accentColor = MeetColors.cyberCyan
+                                    )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     LocalDiagnosticReasoningPanel(
                                         result = localReasoning,

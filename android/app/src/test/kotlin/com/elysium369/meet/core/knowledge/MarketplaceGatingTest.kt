@@ -71,4 +71,19 @@ class MarketplaceGatingTest {
         assertTrue(reason.contains("Bomba de combustible"))
         assertTrue(reason.contains("battery_check"))
     }
+
+    @Test
+    fun `offer without declared evidence requirements fails closed`() {
+        val unsupported = MarketplaceOffer(
+            partName = "Pieza sin contrato",
+            associatedCause = "Sin evidencia",
+            associatedComponent = "unknown_component"
+        )
+
+        val result = MarketplaceGating().gate(listOf(unsupported), emptyList())
+
+        assertTrue(result.offers.isEmpty())
+        assertEquals(listOf(unsupported), result.blockedOffers)
+        assertTrue(result.allBlockedReason().contains("no declaró pruebas"))
+    }
 }
