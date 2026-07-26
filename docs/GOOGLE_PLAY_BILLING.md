@@ -2,6 +2,13 @@
 
 La app debe publicarse inicialmente gratis y monetizar con productos dentro de la app. La integración Android usa Play Billing Library 9.x y el backend verifica tokens antes de activar PRO.
 
+> Importante: este documento aplica a bienes y funciones digitales. Google
+> Play Billing no debe usarse para cobrar o financiar transporte físico. La
+> billetera de choferes permanece detrás de
+> `RIDE_PLAY_BILLING_POLICY_APPROVED=false` hasta contar con una clasificación
+> y un proveedor autorizados. Véase la
+> [política oficial de pagos de Google Play](https://support.google.com/googleplay/android-developer/answer/10281818?hl=en-EN).
+
 ## Productos recomendados en Play Console
 
 Compras únicas:
@@ -10,6 +17,9 @@ Compras únicas:
 - `gauge_pack_elite`
 - `report_pack`
 - `gauge_tier_1` a `gauge_tier_10`
+
+No crear productos de Play Console para saldo de viajes ni comisión de
+transporte con la configuración actual.
 
 Suscripciones:
 
@@ -44,4 +54,3 @@ SUPABASE_ANON_KEY=...
 - Google Play Billing Library 9.1.0 fue publicada el 18 de junio de 2026.
 - Google exige usar versiones no deprecadas; para el 31 de agosto de 2026 las apps nuevas/updates deben usar Billing Library 8 o superior.
 - La verificación de compras debe hacerse con backend usando Google Play Developer API, no solo confiando en el cliente.
-
