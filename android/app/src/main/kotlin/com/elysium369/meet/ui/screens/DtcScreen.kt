@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
+import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -325,6 +327,11 @@ private fun HoloCard(
 @Composable
 fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val activeDtcs by viewModel.activeDtcs.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val repairKnowledgeState by rememberRepairKnowledgeUiState(
+        vehicle = selectedVehicle,
+        dtcs = activeDtcs
+    )
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val permanentDtcs by viewModel.permanentDtcs.collectAsState()
     val historicalDtcs by viewModel.historicalDtcs.collectAsState()
@@ -630,6 +637,12 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 if (activeDtcs.isEmpty()) {
                                     item { HolographicEmptyState("SISTEMA OK", "No hay códigos de falla activos detectados.", MeetColors.neonGreen, isCompact) }
                                 } else {
+                                    item {
+                                        RepairKnowledgeEvidencePanel(
+                                            state = repairKnowledgeState,
+                                            accentColor = MeetColors.cyberCyan
+                                        )
+                                    }
                                     itemsIndexed(activeDtcs) { index, dtc ->
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact,

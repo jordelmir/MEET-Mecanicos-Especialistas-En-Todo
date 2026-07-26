@@ -37,6 +37,7 @@ import com.elysium369.meet.core.parts.PartAvailability
 import com.elysium369.meet.core.parts.PartCondition
 import com.elysium369.meet.core.parts.PartPosition
 import com.elysium369.meet.core.parts.PartQuoteRanker
+import com.elysium369.meet.core.parts.PartRequestPublicationPolicy
 import com.elysium369.meet.core.parts.PartSuggestionEngine
 import com.elysium369.meet.core.parts.PartSuggestionInput
 import com.elysium369.meet.core.parts.PartsMarketplaceContract
@@ -52,6 +53,9 @@ import com.elysium369.meet.data.local.entities.PartOfferEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
+import com.elysium369.meet.ui.knowledge.RepairKnowledgeUiState
+import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -480,18 +484,23 @@ private fun ClientWorkspaceView(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val activeDtcCodes by viewModel.activeDtcs.collectAsState()
+    val repairKnowledgeState by rememberRepairKnowledgeUiState(
+        vehicle = selectedVehicle,
+        dtcs = activeDtcCodes
+    )
+    val repairBundle = (repairKnowledgeState as? RepairKnowledgeUiState.Ready)?.bundle
     LaunchedEffect(activeDtcCodes.joinToString()) {
         if (activeDtcCodes.isNotEmpty() && sourceContext == "MANUAL") {
             sourceContext = "FROM_DTC"
         }
     }
-    val partSuggestions = remember(activeDtcCodes) {
-        PartSuggestionEngine.suggestParts(
-            PartSuggestionInput(
-                source = SuggestionSource.DTC,
-                dtcCodes = activeDtcCodes
-            )
+    val partSuggestions = remember(activeDtcCodes, repairBundle) {
+        val input = PartSuggestionInput(
+            source = SuggestionSource.DTC,
+            dtcCodes = activeDtcCodes
         )
+        repairBundle?.let { PartSuggestionEngine.suggestParts(input, it) }
+            ?: PartSuggestionEngine.suggestParts(input)
     }
     val compatibilityResult = remember(selectedVehicle, partName, partNumber, partPosition, oemPreference, activeDtcCodes) {
         if (partName.isBlank()) {
@@ -507,6 +516,19 @@ private fun ClientWorkspaceView(
             )
         }
     }
+    val selectedGraphSuggestion = partSuggestions.firstOrNull {
+        it.partName.equals(partName.trim(), ignoreCase = true)
+    }
+    val publicationDecision = PartRequestPublicationPolicy.evaluate(
+        partName = partName,
+        vehiclePresent = selectedVehicle != null,
+        contactPresent = phone.isNotBlank(),
+        graphEvidenceRequired = sourceContext in setOf("FROM_DTC", "FROM_3D_COMPONENT"),
+        compatibility = compatibilityResult,
+        suggestion = selectedGraphSuggestion,
+        knowledge = repairBundle
+    )
+    val canPublishPartRequest = publicationDecision.allowed
 
     LaunchedEffect(Unit) {
         viewModel.detectCurrentLocation(context)
@@ -644,6 +666,13 @@ private fun ClientWorkspaceView(
                     }
                 }
             }
+        }
+
+        item {
+            RepairKnowledgeEvidencePanel(
+                state = repairKnowledgeState,
+                accentColor = PartColors.cyanAccent
+            )
         }
 
         item {
@@ -964,6 +993,14 @@ private fun ClientWorkspaceView(
 
                     Button(
                         onClick = {
+                            if (!canPublishPartRequest) {
+                                Toast.makeText(
+                                    context,
+                                    "Solicitud bloqueada: complete evidencia y compatibilidad antes de publicar.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@Button
+                            }
                             val parsedLat = latText.toDoubleOrNull() ?: 0.0
                             val parsedLng = lngText.toDoubleOrNull() ?: 0.0
                             val vehicleId = selectedVehicle?.id ?: "demo_vehicle"
@@ -1000,13 +1037,22 @@ private fun ClientWorkspaceView(
                         colors = ButtonDefaults.buttonColors(containerColor = PartColors.cyanAccent),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = partName.isNotBlank() && phone.isNotBlank()
+                        enabled = canPublishPartRequest
                     ) {
                         Text(
                             text = "🧩 ENVIAR SOLICITUD A RED DE REPUESTERAS",
                             color = Color.Black,
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp
+                        )
+                    }
+                    if (!canPublishPartRequest && partName.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = publicationDecision.reasons.joinToString(" "),
+                            color = PartColors.redAccent,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
                         )
                     }
                 }
