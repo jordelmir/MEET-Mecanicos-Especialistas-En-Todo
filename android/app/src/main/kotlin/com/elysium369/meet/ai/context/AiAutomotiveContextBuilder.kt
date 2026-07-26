@@ -8,7 +8,9 @@ object AiAutomotiveContextBuilder {
             appendLine("=== CONTEXTO AUTOMOTRIZ REAL DE LA APP ===")
             context.vehicle?.let { v ->
                 appendLine("Vehículo: ${v.make} ${v.model} ${v.year} (Motor: ${v.engine}, Tracción/Caja: ${v.transmission}, Combustible: ${v.fuel})")
-                v.vin?.takeIf { it.isNotBlank() }?.let { appendLine("VIN: $it") }
+                v.vin?.takeIf { it.isNotBlank() }?.let {
+                    appendLine("VIN presente: sí (no se envía el identificador completo a la IA)")
+                }
                 v.odometer?.let { appendLine("Odómetro: $it km") }
             }
             context.obd?.let { o ->

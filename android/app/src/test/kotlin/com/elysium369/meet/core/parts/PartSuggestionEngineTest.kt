@@ -1,7 +1,11 @@
 package com.elysium369.meet.core.parts
 
-import com.elysium369.meet.core.parts.PartSuggestionEngine
+import com.elysium369.meet.core.knowledge.graph.GraphBundleIntegrity
+import com.elysium369.meet.core.knowledge.graph.GraphIntegrityStatus
+import com.elysium369.meet.core.knowledge.graph.PartEvidenceGate
+import com.elysium369.meet.core.knowledge.graph.RepairKnowledgeBundle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -124,4 +128,92 @@ class PartSuggestionEngineTest {
         assertEquals(1, s.size)
         assertEquals("Pastilla freno trasero", s[0].partName)
     }
+
+    @Test
+    fun `legacy suggestions are informational and cannot silently open a request`() {
+        val suggestions = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0230"))
+        )
+
+        assertTrue(suggestions.all { it.evidenceState == PartSuggestionEvidenceState.INFORMATIONAL })
+        assertTrue(suggestions.none { it.requestAllowed })
+    }
+
+    @Test
+    fun `graph gate only opens the exact matching canonical component`() {
+        val bundle = emptyBundle(
+            PartEvidenceGate(
+                componentCanonicalKey = "fuel_pump",
+                replacementAllowed = true,
+                purchaseAllowed = true,
+                purchaseCompatibility = CompatibilityConfidence.EXACT,
+                requiredTests = listOf("fuel_pressure_check"),
+                missingEvidence = emptyList(),
+                missingRequirements = emptyList(),
+                reason = "Evidencia verificada."
+            )
+        )
+
+        val suggestions = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0230")),
+            bundle
+        )
+
+        val pump = suggestions.single { it.canonicalKey == "fuel_pump" }
+        assertEquals(PartSuggestionEvidenceState.PURCHASE_VERIFIED, pump.evidenceState)
+        assertTrue(pump.requestAllowed)
+        assertTrue(
+            suggestions.filterNot { it.canonicalKey == "fuel_pump" }
+                .none { it.requestAllowed }
+        )
+    }
+
+    @Test
+    fun `missing graph evidence is carried into a blocked part suggestion`() {
+        val bundle = emptyBundle(
+            PartEvidenceGate(
+                componentCanonicalKey = "fuel_pump",
+                replacementAllowed = false,
+                purchaseAllowed = false,
+                purchaseCompatibility = CompatibilityConfidence.UNKNOWN,
+                requiredTests = listOf("fuel_pressure_check"),
+                missingEvidence = listOf(
+                    com.elysium369.meet.core.knowledge.graph.EvidenceKind.VIN,
+                    com.elysium369.meet.core.knowledge.graph.EvidenceKind.OEM
+                ),
+                missingRequirements = listOf("pump_failure_confirmed"),
+                reason = "Falta evidencia."
+            )
+        )
+
+        val pump = PartSuggestionEngine.suggestParts(
+            PartSuggestionInput(source = SuggestionSource.DTC, dtcCodes = listOf("P0230")),
+            bundle
+        ).single { it.canonicalKey == "fuel_pump" }
+
+        assertFalse(pump.requestAllowed)
+        assertEquals(PartSuggestionEvidenceState.REQUIRES_TESTS, pump.evidenceState)
+        assertTrue(pump.missingEvidence.containsAll(listOf("VIN", "OEM", "pump_failure_confirmed")))
+    }
+
+    private fun emptyBundle(partGate: PartEvidenceGate) = RepairKnowledgeBundle(
+        observations = emptyList(),
+        dtcs = emptyList(),
+        invalidDtcInputs = emptyList(),
+        sourceClaims = emptyList(),
+        inferences = emptyList(),
+        candidates = emptyList(),
+        nextTests = emptyList(),
+        doNotReplaceYet = emptyList(),
+        procedures = emptyList(),
+        tools = emptyList(),
+        safetyNotices = emptyList(),
+        partGate = partGate,
+        visualTargets = emptyList(),
+        citations = emptyList(),
+        warnings = emptyList(),
+        insufficientDataReasons = emptyList(),
+        fallbackUsed = false,
+        graphIntegrity = GraphBundleIntegrity(GraphIntegrityStatus.VALID, "a".repeat(64))
+    )
 }

@@ -3,6 +3,17 @@ package com.elysium369.meet.ai
 import com.elysium369.meet.core.catalog.ProprietaryCatalogEntity
 import com.elysium369.meet.core.catalog.ProprietarySourceBlock
 import com.elysium369.meet.core.catalog.ProprietaryThreeDimensionalBinding
+import com.elysium369.meet.core.knowledge.graph.ActiveVehicleIdentity
+import com.elysium369.meet.core.knowledge.graph.GraphBundleIntegrity
+import com.elysium369.meet.core.knowledge.graph.GraphIntegrityStatus
+import com.elysium369.meet.core.knowledge.graph.KnowledgeCitation
+import com.elysium369.meet.core.knowledge.graph.PartEvidenceGate
+import com.elysium369.meet.core.knowledge.graph.RepairKnowledgeAuthority
+import com.elysium369.meet.core.knowledge.graph.RepairKnowledgeBundle
+import com.elysium369.meet.core.knowledge.graph.RepairSourceClaim
+import com.elysium369.meet.core.knowledge.graph.SourceRef
+import com.elysium369.meet.core.knowledge.graph.VehicleApplicabilityState
+import com.elysium369.meet.core.parts.CompatibilityConfidence
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,6 +84,85 @@ class ProprietaryGroundedContextBuilderTest {
         assertTrue(brief.contains("Document (16).docx #124"))
         assertTrue(brief.contains("prueba fisica"))
         assertFalse(brief.trimStart().startsWith("{"))
+    }
+
+    @Test
+    fun `structured repair context separates authority and redacts identifiers`() {
+        val vin = "KMHCG45C51U123456"
+        val sourceRef = SourceRef(
+            sourceDocumentId = "document_17",
+            blockId = "block_000042_263b88892e",
+            textHash = "c".repeat(64)
+        )
+        val bundle = RepairKnowledgeBundle(
+            observations = emptyList(),
+            dtcs = emptyList(),
+            invalidDtcInputs = emptyList(),
+            sourceClaims = listOf(
+                RepairSourceClaim(
+                    id = "claim_map",
+                    carrierId = "map_sensor",
+                    statement = "MAP documentado para el perfil de referencia.",
+                    authority = RepairKnowledgeAuthority.REVIEWED_GRAPH,
+                    applicability = VehicleApplicabilityState.CONFIRMED,
+                    citationIds = listOf("citation_map")
+                )
+            ),
+            inferences = emptyList(),
+            candidates = emptyList(),
+            nextTests = emptyList(),
+            doNotReplaceYet = emptyList(),
+            procedures = emptyList(),
+            tools = emptyList(),
+            safetyNotices = emptyList(),
+            partGate = PartEvidenceGate(
+                componentCanonicalKey = "map_sensor",
+                replacementAllowed = false,
+                purchaseAllowed = false,
+                purchaseCompatibility = CompatibilityConfidence.UNKNOWN,
+                requiredTests = listOf("signal_test"),
+                missingEvidence = emptyList(),
+                missingRequirements = listOf("failure_confirmed"),
+                reason = "Requiere prueba física."
+            ),
+            visualTargets = emptyList(),
+            citations = listOf(
+                KnowledgeCitation(
+                    id = "citation_map",
+                    carrierId = "map_sensor",
+                    carrierKind = "COMPONENT",
+                    sourceRef = sourceRef
+                )
+            ),
+            warnings = listOf("No leer /Users/persona/diagnostico.json"),
+            insufficientDataReasons = emptyList(),
+            fallbackUsed = false,
+            graphIntegrity = GraphBundleIntegrity(GraphIntegrityStatus.VALID, "d".repeat(64))
+        )
+
+        val encoded = ProprietaryGroundedContextBuilder().build(
+            bundle,
+            ActiveVehicleIdentity(
+                make = "Hyundai",
+                model = "Accent",
+                year = 2005,
+                engine = "1.6",
+                vin = vin
+            )
+        )
+        val decoded = Json.decodeFromString<RepairKnowledgeAiContext>(encoded)
+
+        assertEquals(
+            "OBSERVATIONS_ARE_NOT_SOURCE_CLAIMS; INFERENCES_REQUIRE_CITATIONS; " +
+                "EXACT_VALUES_REQUIRE_REVIEWED_EVIDENCE",
+            decoded.responsePolicy
+        )
+        assertTrue(decoded.vinEvidencePresent)
+        assertFalse(encoded.contains(vin))
+        assertFalse(encoded.contains("/Users/persona"))
+        assertEquals("citation_map", decoded.sourceClaims.single().citationIds.single())
+        assertEquals(sourceRef.blockId, decoded.citations.single().blockId)
+        assertFalse(decoded.partGate.purchaseAllowed)
     }
 
     private fun block(order: Int, text: String, hash: String) = ProprietarySourceBlock(

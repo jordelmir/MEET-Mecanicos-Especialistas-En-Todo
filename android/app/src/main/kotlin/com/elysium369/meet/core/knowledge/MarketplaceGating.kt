@@ -30,7 +30,11 @@ data class MarketplaceGatingResult(
 ) {
     fun hasActionableOffers(): Boolean = offers.isNotEmpty()
     fun allBlockedReason(): String = blockedOffers.joinToString("\n") {
-        "${it.partName}: faltan pruebas ${it.requiredTests.joinToString(", ")}"
+        if (it.requiredTests.isEmpty()) {
+            "${it.partName}: no declaró pruebas verificables; oferta bloqueada."
+        } else {
+            "${it.partName}: faltan pruebas ${it.requiredTests.joinToString(", ")}"
+        }
     }
 }
 
@@ -46,7 +50,8 @@ class MarketplaceGating {
         completedTests: List<String>
     ): MarketplaceGatingResult {
         val (ready, blocked) = offers.partition { offer ->
-            offer.requiredTests.all { it in completedTests }
+            offer.requiredTests.isNotEmpty() &&
+                offer.requiredTests.all { it in completedTests }
         }
         return MarketplaceGatingResult(
             offers = ready,

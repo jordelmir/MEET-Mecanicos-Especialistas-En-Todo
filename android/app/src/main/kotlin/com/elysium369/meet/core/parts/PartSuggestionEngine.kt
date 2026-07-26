@@ -1,5 +1,7 @@
 package com.elysium369.meet.core.parts
 
+import com.elysium369.meet.core.knowledge.graph.RepairKnowledgeBundle
+
 /**
  * Part Suggestion Engine — pure, no I/O.
  *
@@ -19,7 +21,18 @@ data class PartSuggestion(
     val rationale: String,
     val disclaimer: String? = null,
     val riskPart: Boolean = false,
+    val canonicalKey: String? = null,
+    val evidenceState: PartSuggestionEvidenceState = PartSuggestionEvidenceState.INFORMATIONAL,
+    val requestAllowed: Boolean = false,
+    val missingEvidence: List<String> = emptyList(),
 )
+
+enum class PartSuggestionEvidenceState {
+    INFORMATIONAL,
+    REQUIRES_TESTS,
+    REPLACEMENT_CONFIRMED,
+    PURCHASE_VERIFIED
+}
 
 enum class SuggestionSource { DTC, FROM_3D_COMPONENT, WORK_ORDER, MAINTENANCE_ALERT, PREPURCHASE }
 
@@ -39,6 +52,7 @@ object PartSuggestionEngine {
             position = PartPosition.FUSE_BOX,
             priority = 1,
             rationale = "Verificar el relé y su zócalo antes de atribuir P0230 a la bomba.",
+            canonicalKey = "fuel_pump_relay",
         ),
         PartSuggestion(
             partName = "Fusible circuito bomba",
@@ -46,6 +60,7 @@ object PartSuggestionEngine {
             position = PartPosition.FUSE_BOX,
             priority = 2,
             rationale = "Verificar continuidad del fusible y descartar un corto aguas abajo antes de reemplazarlo.",
+            canonicalKey = "fuel_pump_fuse",
         ),
         PartSuggestion(
             partName = "Arnés eléctrico / terminales de bomba",
@@ -53,6 +68,7 @@ object PartSuggestionEngine {
             position = PartPosition.ENGINE,
             priority = 3,
             rationale = "Inspeccionar conector y arnés; documentar alimentación, tierra y caída de voltaje bajo carga.",
+            canonicalKey = "fuel_pump_harness",
         ),
         PartSuggestion(
             partName = "Bomba de combustible",
@@ -64,6 +80,7 @@ object PartSuggestionEngine {
             disclaimer = "No reemplazar la bomba sin confirmar antes: alimentación, " +
                 "tierra, relé/fusible y presión con manómetro.",
             riskPart = true,
+            canonicalKey = "fuel_pump",
         ),
     )
 
@@ -166,6 +183,7 @@ object PartSuggestionEngine {
             position = PartPosition.FUSE_BOX,
             priority = 1,
             rationale = "Selected from the 3D engine viewer.",
+            canonicalKey = "fuel_pump_relay",
         ),
         "fuel_pump_assembly" to PartSuggestion(
             partName = "Bomba de combustible",
@@ -175,6 +193,7 @@ object PartSuggestionEngine {
             rationale = "Selected from the 3D engine viewer.",
             disclaimer = "Antes de ordenar, verifica alimentación, tierra, relé y presión con manómetro.",
             riskPart = true,
+            canonicalKey = "fuel_pump",
         ),
         "abs_module" to PartSuggestion(
             partName = "Módulo ABS",
@@ -183,6 +202,7 @@ object PartSuggestionEngine {
             priority = 1,
             rationale = "Selected from the 3D chassis viewer.",
             disclaimer = "Pieza safety-critical: instalación por técnico calificado.",
+            canonicalKey = "abs_module",
         ),
     )
 
@@ -215,5 +235,55 @@ object PartSuggestionEngine {
             val bp = if (b.riskPart) 1000 else b.priority
             ap - bp
         })
+    }
+
+    /**
+     * Applies the evidence gate produced by the structured graph.
+     *
+     * A legacy DTC/name mapping remains educational. It can never open a part request on its
+     * own. Only the exact canonical component selected by a graph bundle with verified purchase
+     * evidence becomes actionable.
+     */
+    fun suggestParts(
+        input: PartSuggestionInput,
+        knowledge: RepairKnowledgeBundle
+    ): List<PartSuggestion> {
+        val gate = knowledge.partGate
+        val missing = buildList {
+            addAll(gate.missingEvidence.map { it.name })
+            addAll(gate.missingRequirements)
+            if (!gate.replacementAllowed) addAll(gate.requiredTests)
+        }.distinct().sorted()
+
+        return suggestParts(input).map { suggestion ->
+            val isGateTarget =
+                !suggestion.canonicalKey.isNullOrBlank() &&
+                    suggestion.canonicalKey == gate.componentCanonicalKey
+            when {
+                isGateTarget && gate.purchaseAllowed &&
+                    gate.purchaseCompatibility == CompatibilityConfidence.EXACT ->
+                    suggestion.copy(
+                        evidenceState = PartSuggestionEvidenceState.PURCHASE_VERIFIED,
+                        requestAllowed = true,
+                        missingEvidence = emptyList()
+                    )
+                isGateTarget && gate.replacementAllowed ->
+                    suggestion.copy(
+                        evidenceState = PartSuggestionEvidenceState.REPLACEMENT_CONFIRMED,
+                        requestAllowed = false,
+                        missingEvidence = missing
+                    )
+                isGateTarget ->
+                    suggestion.copy(
+                        evidenceState = PartSuggestionEvidenceState.REQUIRES_TESTS,
+                        requestAllowed = false,
+                        missingEvidence = missing
+                    )
+                else -> suggestion.copy(
+                    evidenceState = PartSuggestionEvidenceState.INFORMATIONAL,
+                    requestAllowed = false
+                )
+            }
+        }
     }
 }
