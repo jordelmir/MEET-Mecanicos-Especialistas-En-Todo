@@ -305,7 +305,6 @@ fun ProviderRegistrationScreen(
                 )
                 showDriverOnboarding = false
             },
-            onAutoApprove = { viewModel.autoApproveDriverVerification() },
             onDelete = {
                 viewModel.deleteDriverVerification()
                 showDriverOnboarding = false
@@ -1200,7 +1199,6 @@ private fun DriverOnboardingDialog(
         selfie: String, selfieCed: String, selfieLic: String,
         vehF: String, vehB: String, vehI: String
     ) -> Unit,
-    onAutoApprove: () -> Unit,
     onDelete: () -> Unit
 ) {
     val accent = MeetColors.electricBlue
@@ -1293,18 +1291,6 @@ private fun DriverOnboardingDialog(
                                             fontSize = 12.sp
                                         )
                                     }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Button(
-                                    onClick = onAutoApprove,
-                                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MeetColors.warning,
-                                        contentColor = Color.Black
-                                    )
-                                ) {
-                                    Text("⚡ AUTO-APROBAR (DEV)", fontWeight = FontWeight.ExtraBold)
                                 }
                             }
                             "REJECTED" -> {

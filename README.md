@@ -13,7 +13,7 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.1.0
+## Versión actual: 4.1.1
 
 La integración Master Automotive Knowledge añade un grafo determinista y
 citado que conecta DTC, pruebas, reparación, repuestos, IA y 3D sin eliminar el
@@ -21,10 +21,16 @@ Motor 360° restaurado. Las decisiones de reemplazo y compra fallan cerradas sin
 evidencia canónica; la geometría actual sigue declarada como
 procedural/genérica y no dimensional.
 
+La acción `BUSCAR EN GOOGLE` de cada resultado DTC abre el navegador
+predeterminado del dispositivo. La consulta contiene únicamente el DTC cuando
+no hay vehículo activo y añade marca, modelo, año, transmisión y cilindrada
+cuando el usuario sí tiene uno seleccionado; nunca envía VIN ni placa.
+
 Documentación técnica:
 
 - [`docs/knowledge/AUTOMOTIVE_KNOWLEDGE_FABRIC.md`](docs/knowledge/AUTOMOTIVE_KNOWLEDGE_FABRIC.md)
 - [`docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md`](docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md)
+- [`docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md`](docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md)
 
 ## Que es real hoy
 

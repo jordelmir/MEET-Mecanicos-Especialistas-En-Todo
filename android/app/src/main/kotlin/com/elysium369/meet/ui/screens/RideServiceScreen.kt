@@ -42,6 +42,8 @@ import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ride.map.RideGeoPoint
+import com.elysium369.meet.ride.map.RideMapStateFactory
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -169,6 +171,21 @@ fun RideServiceScreen(
     }
 }
 
+private fun rideGeoPointOrNull(
+    latitude: Double,
+    longitude: Double,
+    accuracyMeters: Float?,
+    capturedAtEpochMs: Long,
+): RideGeoPoint? =
+    runCatching {
+        RideGeoPoint(
+            latitude = latitude,
+            longitude = longitude,
+            accuracyMeters = accuracyMeters,
+            capturedAtEpochMs = capturedAtEpochMs.coerceAtLeast(0L),
+        )
+    }.getOrNull()
+
 @Composable
 fun PassengerDashboard(viewModel: ObdViewModel) {
     val context = LocalContext.current
@@ -185,13 +202,18 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     // Passenger verification state
     val passengerVer by viewModel.passengerVerification.collectAsState()
 
-    val userRides = remember(allRides) {
-        allRides
+    val userRides = remember(allRides, passengerVer) {
+        passengerVer?.passengerId?.let { passengerId ->
+            allRides.filter { it.passengerId == passengerId }
+        }.orEmpty()
     }
 
     val activeRideForPassenger = remember(allRides, passengerVer) {
-        val myId = passengerVer?.passengerId ?: "local_passenger_1"
-        allRides.firstOrNull { it.passengerId == myId && it.status in listOf("OPEN", "ACCEPTED", "ARRIVED", "IN_PROGRESS") }
+        val myId = passengerVer?.passengerId ?: return@remember null
+        allRides.firstOrNull {
+            it.passengerId == myId &&
+                it.status in listOf("OPEN", "ACCEPTED", "ARRIVED", "IN_PROGRESS")
+        }
     }
 
     var showPaxVerification by remember { mutableStateOf(false) }
@@ -264,18 +286,6 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                         Text("⏳ Tu verificación está siendo revisada...", color = MeetColors.warning, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text("Esto puede tardar unas horas.", color = MeetColors.textMuted, fontSize = 12.sp)
                                     }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Button(
-                                    onClick = { viewModel.autoApprovePassengerVerification() },
-                                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MeetColors.warning,
-                                        contentColor = Color.Black
-                                    )
-                                ) {
-                                    Text("⚡ AUTO-APROBAR (DEV)", fontWeight = FontWeight.ExtraBold)
                                 }
                             }
                             "REJECTED" -> {
@@ -533,6 +543,23 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
 
                     Button(
                         onClick = {
+                            val verifiedPassenger = passengerVer
+                            if (verifiedPassenger?.status != "APPROVED") {
+                                Toast.makeText(
+                                    context,
+                                    "Completa la verificación de identidad antes de solicitar",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                                return@Button
+                            }
+                            if (verifiedPassenger.phone.isBlank()) {
+                                Toast.makeText(
+                                    context,
+                                    "Falta un teléfono verificado",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                                return@Button
+                            }
                             val gps = currentGps
                             if (gps == null) {
                                 Toast.makeText(context, "Espere a obtener coordenadas GPS válidas", Toast.LENGTH_LONG).show()
@@ -560,9 +587,9 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             } else 0.0
 
                             viewModel.createRideRequest(
-                                passengerId = passengerVer?.passengerId ?: "local_passenger_1",
-                                passengerName = passengerVer?.fullName ?: "Usuario MEET",
-                                passengerPhone = passengerVer?.phone ?: (gps.dialingPrefix + " 8888-8888"),
+                                passengerId = verifiedPassenger.passengerId,
+                                passengerName = verifiedPassenger.fullName,
+                                passengerPhone = verifiedPassenger.phone,
                                 pickupLat = gps.latitude,
                                 pickupLng = gps.longitude,
                                 pickupAddr = safePickupAddress,
@@ -608,7 +635,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 PassengerRideItem(
                     ride = ride,
                     onSelect = { viewModel.selectActiveRide(ride) },
-                    onCancel = { viewModel.updateRideStatus(ride.requestId, "CANCELLED") }
+                    onCancel = { viewModel.selectActiveRide(ride) }
                 )
             }
         }
@@ -643,16 +670,24 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
 
 @Composable
 fun DriverDashboard(viewModel: ObdViewModel) {
-    val context = LocalContext.current
     val openRides by viewModel.openRideRequests.collectAsState()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val allRides by viewModel.rideRequests.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val activeDtcs by viewModel.activeDtcEvents.collectAsState()
+    val historicalDtcs by viewModel.historicalDtcEvents.collectAsState()
+    val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     val driverVer by viewModel.driverVerification.collectAsState()
-    val myDriverId = driverVer?.driverId ?: "local_driver_99"
+    val myDriverId = driverVer?.driverId
 
     val activeRideForDriver = remember(allRides, myDriverId) {
-        allRides.firstOrNull { it.assignedDriverId == myDriverId && it.status in listOf("ACCEPTED", "ARRIVED", "IN_PROGRESS") }
+        myDriverId?.let { driverId ->
+            allRides.firstOrNull {
+                it.assignedDriverId == driverId &&
+                    it.status in listOf("ACCEPTED", "ARRIVED", "IN_PROGRESS")
+            }
+        }
     }
 
     LazyColumn(
@@ -683,7 +718,7 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            "Debes completar el proceso de registro de chofer y adjuntar la documentación requerida para poder visualizar solicitudes en tiempo real y ofertar.",
+                            "Debes completar el registro de chofer y adjuntar la documentación requerida para visualizar solicitudes y ofertar.",
                             color = MeetColors.textSecondary,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
@@ -702,6 +737,10 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                 }
             }
         } else {
+            item {
+                RideWalletStatusCard()
+            }
+
             // Banner de viaje asignado activo
             if (activeRideForDriver != null) {
                 item {
@@ -736,6 +775,23 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                         }
                     }
                 }
+
+                item {
+                    RideSharingCenter(
+                        enabledCategories = sharingSelections[activeRideForDriver.requestId].orEmpty(),
+                        vehicle = selectedVehicle,
+                        activeDtcs = activeDtcs,
+                        historicalDtcs = historicalDtcs,
+                        currentGps = currentGps,
+                        onCategoryChanged = { category, enabled ->
+                            viewModel.setRideShareCategory(
+                                requestId = activeRideForDriver.requestId,
+                                category = category,
+                                enabled = enabled,
+                            )
+                        },
+                    )
+                }
             }
 
             item {
@@ -754,7 +810,11 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("Tablero de Chofer", fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Abajo se listan los pasajeros buscando chofer en tiempo real. ¡Ofrece tu tarifa!", color = MeetColors.textSecondary, fontSize = 12.sp)
+                            Text(
+                                "Abajo se listan las solicitudes disponibles. La nube debe estar autenticada para sincronización entre dispositivos.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp,
+                            )
                         }
                     }
                 }
@@ -1052,18 +1112,114 @@ fun ActiveRidePanel(
     val isRecording by viewModel.isRecordingAudio.collectAsState()
     val playingPath by viewModel.isPlayingAudio.collectAsState()
     val presetMessages by viewModel.driverPresetMessages.collectAsState()
+    val currentGps by viewModel.currentGpsLocation.collectAsState()
+    val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
+    var showCancellationDialog by remember { mutableStateOf(false) }
 
     val driverVer by viewModel.driverVerification.collectAsState()
     val passengerVer by viewModel.passengerVerification.collectAsState()
-    val myDriverId = driverVer?.driverId ?: "local_driver_99"
-    val myPassengerId = passengerVer?.passengerId ?: "local_passenger_1"
+    val myDriverId = driverVer?.driverId
+    val myPassengerId = passengerVer?.passengerId
 
     val myId = if (isDriver) myDriverId else myPassengerId
-    val myName = if (isDriver) (driverVer?.fullName ?: "Chofer Profesional MEET") else (passengerVer?.fullName ?: "Usuario MEET")
+    val myName = if (isDriver) driverVer?.fullName else passengerVer?.fullName
     val myRole = if (isDriver) "DRIVER" else "PASSENGER"
+
+    if (myId == null || myName.isNullOrBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MeetColors.backgroundDark)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "No se puede abrir este viaje sin una identidad verificada.",
+                color = MeetColors.warning,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        return
+    }
+
+    val acceptedOffer = remember(offers, ride.acceptedOfferId) {
+        offers.firstOrNull {
+            it.offerId == ride.acceptedOfferId || it.status == "ACCEPTED"
+        }
+    }
+    val pickupPoint = remember(ride) {
+        rideGeoPointOrNull(
+            latitude = ride.pickupLatitude,
+            longitude = ride.pickupLongitude,
+            accuracyMeters = ride.pickupAccuracy,
+            capturedAtEpochMs = ride.createdAt,
+        )
+    }
+    val destinationPoint = remember(ride) {
+        if (ride.destLatitude == 0.0 && ride.destLongitude == 0.0) {
+            null
+        } else {
+            rideGeoPointOrNull(
+                latitude = ride.destLatitude,
+                longitude = ride.destLongitude,
+                accuracyMeters = null,
+                capturedAtEpochMs = ride.createdAt,
+            )
+        }
+    }
+    val localPoint = currentGps?.let {
+        rideGeoPointOrNull(
+            latitude = it.latitude,
+            longitude = it.longitude,
+            accuracyMeters = it.accuracy,
+            capturedAtEpochMs = it.timestamp.coerceAtLeast(0L),
+        )
+    }
+    val acceptedDriverPoint = acceptedOffer
+        ?.takeIf { it.driverLatitude != 0.0 || it.driverLongitude != 0.0 }
+        ?.let {
+            rideGeoPointOrNull(
+                latitude = it.driverLatitude,
+                longitude = it.driverLongitude,
+                accuracyMeters = null,
+                capturedAtEpochMs = it.createdAt,
+            )
+        }
+    val mapState = remember(
+        isDriver,
+        pickupPoint,
+        destinationPoint,
+        localPoint,
+        acceptedDriverPoint,
+    ) {
+        RideMapStateFactory.create(
+            passengerGps = if (isDriver) null else localPoint,
+            pickup = pickupPoint,
+            destination = destinationPoint,
+            driverGps = if (isDriver) localPoint else acceptedDriverPoint,
+        )
+    }
+
+    if (showCancellationDialog) {
+        RideCancellationDialog(
+            actorLabel = if (isDriver) "Conductor" else "Pasajero",
+            onDismiss = { showCancellationDialog = false },
+            onConfirm = { reason, detail ->
+                viewModel.cancelRide(
+                    requestId = ride.requestId,
+                    reason = reason,
+                    detail = detail,
+                    actorRole = myRole,
+                )
+                showCancellationDialog = false
+                onCloseRide()
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -1150,10 +1306,7 @@ fun ActiveRidePanel(
                                     Text("Ya Llegué 🚕", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Button(
-                                    onClick = {
-                                        viewModel.updateRideStatus(ride.requestId, "CANCELLED")
-                                        onCloseRide()
-                                    },
+                                    onClick = { showCancellationDialog = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
                                     modifier = Modifier.weight(0.9f)
                                 ) {
@@ -1169,10 +1322,7 @@ fun ActiveRidePanel(
                                     Text("Iniciar Viaje 🏁", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Button(
-                                    onClick = {
-                                        viewModel.updateRideStatus(ride.requestId, "CANCELLED")
-                                        onCloseRide()
-                                    },
+                                    onClick = { showCancellationDialog = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
                                     modifier = Modifier.weight(0.9f)
                                 ) {
@@ -1194,6 +1344,15 @@ fun ActiveRidePanel(
                         }
                     } else {
                         // Pasajero
+                        if (ride.status == "OPEN") {
+                            Button(
+                                onClick = { showCancellationDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                                modifier = Modifier.weight(1.2f),
+                            ) {
+                                Text("Cancelar solicitud", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                         if (ride.status == "COMPLETED" && ride.passengerRating == null) {
                             Button(
                                 onClick = { showRatingDialog = true },
@@ -1205,10 +1364,7 @@ fun ActiveRidePanel(
                         }
                         if (ride.status in listOf("ACCEPTED", "ARRIVED")) {
                             Button(
-                                onClick = {
-                                    viewModel.updateRideStatus(ride.requestId, "CANCELLED")
-                                    onCloseRide()
-                                },
+                                onClick = { showCancellationDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
                                 modifier = Modifier.weight(1.2f)
                             ) {
@@ -1251,6 +1407,31 @@ fun ActiveRidePanel(
                 }
             }
         }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+            border = BorderStroke(1.dp, MeetColors.borderSubtle),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            RideMapPanel(
+                state = mapState,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Text(
+            text = if (isDriver && mapState.marker(com.elysium369.meet.ride.map.RideMarkerRole.PASSENGER_GPS) == null) {
+                "GPS exacto del pasajero: esperando sincronización autenticada."
+            } else {
+                "U: pasajero · R: recogida · D: destino · C: conductor"
+            },
+            color = MeetColors.textMuted,
+            fontSize = 10.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+        )
 
         // Partner Info Card (Visible if ride is ACCEPTED or later status)
         if (ride.status != "OPEN") {
@@ -1328,14 +1509,18 @@ fun ActiveRidePanel(
                                     fontSize = 15.sp
                                 )
                                 Text(
-                                    text = ride.assignedDriverVehicle ?: "Vehículo Acreditado",
+                                    text = ride.assignedDriverVehicle ?: "Vehículo: dato no capturado",
                                     color = MeetColors.textSecondary,
                                     fontSize = 12.sp
                                 )
                                 if (acceptedOffer != null) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "⭐ ${acceptedOffer.driverRating} (${acceptedOffer.driverTotalTrips} viajes)",
+                                        text = if (acceptedOffer.driverTotalTrips > 0) {
+                                            "⭐ ${acceptedOffer.driverRating} (${acceptedOffer.driverTotalTrips} viajes)"
+                                        } else {
+                                            "Conductor nuevo · sin historial de viajes capturado"
+                                        },
                                         color = MeetColors.warning,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -1365,6 +1550,14 @@ fun ActiveRidePanel(
                     }
                 }
             }
+        }
+
+        if (!isDriver && ride.status != "OPEN") {
+            RidePassengerTrustCard(
+                vehicleDescription = ride.assignedDriverVehicle,
+                sharedCategories = sharingSelections[ride.requestId].orEmpty(),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
         }
 
         // Bids / Negotiation Panel if status is OPEN
@@ -2168,7 +2361,7 @@ fun PassengerLiveOffersPanel(
                                                 shape = RoundedCornerShape(4.dp)
                                             ) {
                                                 Text(
-                                                    "Acreditado",
+                                                    "Identidad revisada",
                                                     color = MeetColors.cyberCyan,
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -2176,7 +2369,16 @@ fun PassengerLiveOffersPanel(
                                                 )
                                             }
                                         }
-                                        Text(text = "⭐ ${offer.driverRating} (${offer.driverTotalTrips} viajes)", color = MeetColors.warning, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = if (offer.driverTotalTrips > 0) {
+                                                "⭐ ${offer.driverRating} (${offer.driverTotalTrips} viajes)"
+                                            } else {
+                                                "Conductor nuevo · sin historial capturado"
+                                            },
+                                            color = MeetColors.warning,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
                                         Text(text = offer.vehicleDescription, color = MeetColors.textSecondary, fontSize = 12.sp)
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
@@ -2236,7 +2438,7 @@ fun DriverNegotiationPanel(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val driverVer by viewModel.driverVerification.collectAsState()
 
-    val myDriverId = driverVer?.driverId ?: "local_driver_99"
+    val myDriverId = driverVer?.driverId
     // Only find pending offer from this driver
     val myOffer = offers.firstOrNull { it.driverId == myDriverId && it.status == "PENDING" }
     // Detect if this driver's offer was recently rejected
@@ -2496,19 +2698,37 @@ fun DriverNegotiationPanel(
             // Submit offer button
             Button(
                 onClick = {
+                    val verifiedDriver = driverVer
+                    val gps = currentGps
+                    if (verifiedDriver?.status != "APPROVED") {
+                        Toast.makeText(
+                            context,
+                            "Se requiere identidad de conductor aprobada",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        return@Button
+                    }
+                    if (gps == null) {
+                        Toast.makeText(
+                            context,
+                            "Esperando una ubicación GPS válida",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        return@Button
+                    }
                     viewModel.makeRideOffer(
                         requestId = ride.requestId,
-                        driverId = myDriverId,
-                        driverName = driverVer?.fullName ?: "Chofer Profesional MEET",
-                        driverPhone = driverVer?.phone ?: "+506 7777-7777",
-                        driverRating = 4.9,
-                        driverTotalTrips = 142,
-                        vehicleDesc = driverVer?.let { "${it.vehicleMake} ${it.vehicleModel} (${it.vehicleColor}) [${it.vehiclePlate}]" } ?: "Hyundai Accent 2018 Azul",
+                        driverId = verifiedDriver.driverId,
+                        driverName = verifiedDriver.fullName,
+                        driverPhone = verifiedDriver.phone,
+                        driverRating = 0.0,
+                        driverTotalTrips = 0,
+                        vehicleDesc = "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]",
                         counterPrice = counterPrice,
                         currency = ride.currency,
                         estArrivalMin = selectedEta,
-                        driverLat = currentGps?.latitude ?: 0.0,
-                        driverLng = currentGps?.longitude ?: 0.0,
+                        driverLat = gps.latitude,
+                        driverLng = gps.longitude,
                         message = driverMsg.takeIf { it.isNotBlank() }
                     )
                 },

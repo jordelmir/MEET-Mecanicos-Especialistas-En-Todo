@@ -3,6 +3,7 @@ package com.elysium369.meet.ui.screens
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -258,6 +259,17 @@ fun RepairNetworkScreen(
                     onOpenParts = { navController.navigate("part_request") },
                     onOpenRide = { navController.navigate("ride_service") },
                     onOpenCommunityCases = { navController.navigate("community_cases") }
+                )
+            }
+
+            item {
+                MobilitySafetyBridgeCard(
+                    vehicleLabel = selectedVehicle?.let {
+                        "${it.make} ${it.model} ${it.year}"
+                    },
+                    activeDtcCodes = activeDtcs,
+                    onOpenRide = { navController.navigate("ride_service") },
+                    onOpenGarage = { navController.navigate("garage") },
                 )
             }
 
@@ -1560,6 +1572,83 @@ fun RepairNetworkScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun MobilitySafetyBridgeCard(
+    vehicleLabel: String?,
+    activeDtcCodes: List<String>,
+    onOpenRide: () -> Unit,
+    onOpenGarage: () -> Unit,
+) {
+    EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = MeetColors.electricBlue,
+        backgroundColor = MeetColors.backgroundDeep,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AnimatedNeonIcon(
+                    Icons.Default.DirectionsCar,
+                    contentDescription = null,
+                    tint = MeetColors.electricBlue,
+                )
+                Column {
+                    Text(
+                        "MOVILIDAD + CONFIANZA MECÁNICA",
+                        color = MeetColors.electricBlue,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        vehicleLabel ?: "No hay vehículo seleccionado",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            Text(
+                text = when {
+                    vehicleLabel == null ->
+                        "Selecciona un vehículo para preparar DTC, mantenimiento y evidencia antes de compartirlos voluntariamente en un viaje."
+                    activeDtcCodes.isEmpty() ->
+                        "No hay DTC activos capturados. Esto no certifica que el vehículo sea seguro; confirma con inspección física."
+                    else ->
+                        "${activeDtcCodes.size} DTC activo(s) capturado(s): ${activeDtcCodes.take(3).joinToString()}. Revísalos antes de ofrecer transporte."
+                },
+                color = if (activeDtcCodes.isEmpty()) MeetColors.textSecondary else MeetColors.warning,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenGarage,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                ) {
+                    Text("GARAGE", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onOpenRide,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
+                ) {
+                    Text("VIAJES", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

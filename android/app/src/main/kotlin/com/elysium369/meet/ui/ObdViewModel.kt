@@ -59,6 +59,9 @@ import com.elysium369.meet.ui.screens.TerminalLine
 import com.elysium369.meet.ui.screens.TerminalLineType
 import com.elysium369.meet.core.obd.ObdTrafficListener
 import com.elysium369.meet.core.obd.PredictiveTelemetryEstimator
+import com.elysium369.meet.ride.domain.RideCancellationPolicy
+import com.elysium369.meet.ride.domain.RideCancellationReason
+import com.elysium369.meet.ride.domain.RideShareCategory
 
 @Serializable
 private data class RemotePartsStore(
@@ -5614,6 +5617,11 @@ class ObdViewModel @Inject constructor(
     private val _rideDriverMode = MutableStateFlow(false)
     val rideDriverMode: StateFlow<Boolean> = _rideDriverMode.asStateFlow()
 
+    private val _rideSharingSelections =
+        MutableStateFlow<Map<String, Set<RideShareCategory>>>(emptyMap())
+    val rideSharingSelections: StateFlow<Map<String, Set<RideShareCategory>>> =
+        _rideSharingSelections.asStateFlow()
+
     private val _driverPresetMessages = MutableStateFlow<List<String>>(listOf(
         "Ya me encuentro en la ubicación",
         "Voy en camino, llego en unos 5 minutos",
@@ -5636,6 +5644,15 @@ class ObdViewModel @Inject constructor(
         jobChatCollection?.cancel()
 
         if (request != null) {
+            _rideSharingSelections.update { current ->
+                if (request.requestId in current) {
+                    current
+                } else {
+                    current + (
+                        request.requestId to setOf(RideShareCategory.EXACT_LOCATION)
+                        )
+                }
+            }
             jobOffersCollection = viewModelScope.launch {
                 rideDao.getOffersForRequest(request.requestId).collect {
                     _rideOffers.value = it
@@ -5649,6 +5666,19 @@ class ObdViewModel @Inject constructor(
         } else {
             _rideOffers.value = emptyList()
             _rideChatMessages.value = emptyList()
+        }
+    }
+
+    fun setRideShareCategory(
+        requestId: String,
+        category: RideShareCategory,
+        enabled: Boolean,
+    ) {
+        if (requestId.isBlank()) return
+        _rideSharingSelections.update { current ->
+            val existing = current[requestId].orEmpty()
+            val updated = if (enabled) existing + category else existing - category
+            current + (requestId to updated)
         }
     }
 
@@ -5797,6 +5827,64 @@ class ObdViewModel @Inject constructor(
             rideDao.insertChatMessage(systemMsg)
 
             val updatedRequest = rideDao.getRequestById(requestId)
+            withContext(Dispatchers.Main) {
+                _activeRideRequest.value = updatedRequest
+            }
+            if (newStatus == "COMPLETED" || newStatus == "CANCELLED") {
+                _rideSharingSelections.update { it - requestId }
+            }
+        }
+    }
+
+    fun cancelRide(
+        requestId: String,
+        reason: RideCancellationReason,
+        detail: String?,
+        actorRole: String,
+    ) {
+        if (!RideCancellationPolicy.isDetailValid(reason, detail)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (request.status !in setOf("OPEN", "ACCEPTED", "ARRIVED", "IN_PROGRESS")) {
+                return@launch
+            }
+            rideDao.updateRequestStatus(requestId, "CANCELLED")
+            val decision = RideCancellationPolicy.evaluate(reason)
+            val normalizedRole = actorRole.uppercase().takeIf {
+                it == "DRIVER" || it == "PASSENGER"
+            } ?: "SYSTEM"
+            val actorId = when (normalizedRole) {
+                "DRIVER" -> driverVerification.value?.driverId
+                "PASSENGER" -> passengerVerification.value?.passengerId
+                else -> null
+            } ?: "SYSTEM"
+            val actorName = when (normalizedRole) {
+                "DRIVER" -> driverVerification.value?.fullName
+                "PASSENGER" -> passengerVerification.value?.fullName
+                else -> null
+            } ?: "Sistema"
+            val safetyNote = if (decision.requiresSafetyReview) {
+                " Caso marcado para revisión de seguridad."
+            } else {
+                ""
+            }
+            val detailNote = detail?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                " Detalle: $it"
+            }.orEmpty()
+            rideDao.insertChatMessage(
+                RideChatMessageEntity(
+                    messageId = UUID.randomUUID().toString(),
+                    rideRequestId = requestId,
+                    senderId = actorId,
+                    senderName = actorName,
+                    senderRole = normalizedRole,
+                    messageType = "SYSTEM",
+                    textContent = "Viaje cancelado. Motivo: ${reason.name}.$safetyNote$detailNote",
+                    createdAt = System.currentTimeMillis(),
+                ),
+            )
+            val updatedRequest = rideDao.getRequestById(requestId)
+            _rideSharingSelections.update { it - requestId }
             withContext(Dispatchers.Main) {
                 _activeRideRequest.value = updatedRequest
             }
@@ -6209,36 +6297,6 @@ class ObdViewModel @Inject constructor(
             )
             rideDao.insertPassengerVerification(entity)
             android.util.Log.i("MeetRides", "Passenger verification submitted for $localDeviceId")
-        }
-    }
-
-    /**
-     * Auto-approve a driver verification (simulates admin review for testing).
-     * In production this would be a server-side review process.
-     */
-    fun autoApproveDriverVerification() {
-        viewModelScope.launch {
-            rideDao.updateDriverVerificationStatus(
-                driverId = localDeviceId,
-                status = "APPROVED",
-                approvedAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            android.util.Log.i("MeetRides", "Driver verification AUTO-APPROVED for $localDeviceId")
-        }
-    }
-
-    /**
-     * Auto-approve a passenger verification (simulates admin review for testing).
-     */
-    fun autoApprovePassengerVerification() {
-        viewModelScope.launch {
-            rideDao.updatePassengerVerificationStatus(
-                passengerId = localDeviceId,
-                status = "APPROVED",
-                approvedAt = System.currentTimeMillis()
-            )
-            android.util.Log.i("MeetRides", "Passenger verification AUTO-APPROVED for $localDeviceId")
         }
     }
 
