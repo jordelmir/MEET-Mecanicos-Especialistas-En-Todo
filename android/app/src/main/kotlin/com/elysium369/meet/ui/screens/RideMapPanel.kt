@@ -182,11 +182,21 @@ private fun renderRideState(
         val accuracy = marker.point.accuracyMeters?.let {
             String.format(Locale.ROOT, "Precisión ±%.0f m", it)
         } ?: "Precisión no reportada"
+        val freshness = when (
+            marker.point.freshness(
+                nowEpochMs = System.currentTimeMillis(),
+                staleAfterMs = 30_000,
+            )
+        ) {
+            com.elysium369.meet.ride.map.RidePositionFreshness.FRESH -> "posición reciente"
+            com.elysium369.meet.ride.map.RidePositionFreshness.STALE -> "posición desactualizada"
+            com.elysium369.meet.ride.map.RidePositionFreshness.CLOCK_SKEW -> "hora del dispositivo no coincide"
+        }
         map.addMarker(
             MarkerOptions()
                 .position(LatLng(marker.point.latitude, marker.point.longitude))
                 .title(marker.label)
-                .snippet(accuracy)
+                .snippet("$accuracy · $freshness")
                 .icon(icons.getValue(marker.role)),
         )
     }
@@ -194,13 +204,19 @@ private fun renderRideState(
     val allPoints = (
         state.markers.map { it.point } + state.route
         ).distinctBy { it.latitude to it.longitude }
-    if (map.cameraPosition.zoom <= 2.0 && allPoints.isNotEmpty()) {
+    if (allPoints.isNotEmpty()) {
         val latLngs = allPoints.map { LatLng(it.latitude, it.longitude) }
         if (latLngs.size == 1) {
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngs.first(), 16.0))
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(latLngs.first(), 16.0),
+                500,
+            )
         } else {
             val bounds = LatLngBounds.Builder().includes(latLngs).build()
-            map.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 96))
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngBounds(bounds, 96),
+                500,
+            )
         }
     }
 }

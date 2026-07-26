@@ -72,4 +72,37 @@ class RideMapModelsTest {
             )
         }
     }
+
+    @Test
+    fun `factory preserves live passenger pickup destination and driver as separate markers`() {
+        val passenger = RideGeoPoint(9.9281, -84.0907, 4f, 10_000)
+        val pickup = RideGeoPoint(9.9281, -84.0907, null, 9_000)
+        val destination = RideGeoPoint(9.9350, -84.0800, null, 9_000)
+        val driver = RideGeoPoint(9.9200, -84.1000, 6f, 10_100)
+
+        val state = RideMapStateFactory.create(
+            passengerGps = passenger,
+            pickup = pickup,
+            destination = destination,
+            driverGps = driver,
+        )
+
+        assertEquals(4, state.markers.size)
+        assertEquals(passenger, state.marker(RideMarkerRole.PASSENGER_GPS)?.point)
+        assertEquals(pickup, state.marker(RideMarkerRole.PICKUP)?.point)
+        assertEquals(destination, state.marker(RideMarkerRole.DESTINATION)?.point)
+        assertEquals(driver, state.marker(RideMarkerRole.DRIVER)?.point)
+        assertEquals(listOf(pickup, destination), state.route)
+    }
+
+    @Test
+    fun `factory omits unavailable positions instead of inventing coordinates`() {
+        val pickup = RideGeoPoint(9.9281, -84.0907, null, 9_000)
+
+        val state = RideMapStateFactory.create(pickup = pickup)
+
+        assertEquals(1, state.markers.size)
+        assertEquals(RideMarkerRole.PICKUP, state.markers.single().role)
+        assertEquals(emptyList<RideGeoPoint>(), state.route)
+    }
 }

@@ -18,6 +18,7 @@ required_tables=(
   ride_consents
   ride_positions
   ride_vehicle_questions
+  ride_vehicle_evidence
   ride_wallets
   ride_wallet_ledger
   ride_commission_reservations
@@ -71,6 +72,14 @@ rg -q "revoke insert, update, delete on public\\.ride_wallet_ledger from authent
 }
 rg -q "revoke insert, update, delete on public\\.ride_trip_events from authenticated" "$migration" || {
   echo "ride migration contract: FAIL (event client writes not revoked)" >&2
+  exit 1
+}
+rg -q "revoke update, delete on public\\.ride_vehicle_evidence from authenticated" "$migration" || {
+  echo "ride migration contract: FAIL (vehicle evidence mutability guard missing)" >&2
+  exit 1
+}
+rg -q "c\\.category = ride_vehicle_evidence\\.category" "$migration" || {
+  echo "ride migration contract: FAIL (vehicle evidence consent gate missing)" >&2
   exit 1
 }
 rg -q "raise exception 'Ride transition denied'" "$migration" || {

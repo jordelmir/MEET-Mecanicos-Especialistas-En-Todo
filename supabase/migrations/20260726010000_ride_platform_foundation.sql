@@ -147,6 +147,36 @@ create table if not exists public.ride_vehicle_questions (
     answered_at timestamptz
 );
 
+create table if not exists public.ride_vehicle_evidence (
+    id bigint generated always as identity primary key,
+    trip_id uuid not null references public.ride_requests(id) on delete cascade,
+    driver_id uuid not null references public.ride_profiles(user_id) on delete restrict,
+    category text not null check (
+        category in (
+            'BASIC_TELEMETRY', 'ACTIVE_DTCS', 'DTC_HISTORY',
+            'MAINTENANCE', 'INSTALLED_PARTS', 'CERTIFIED_REPORTS'
+        )
+    ),
+    sample_key text not null check (char_length(sample_key) between 1 and 120),
+    display_value text not null check (char_length(display_value) between 1 and 1000),
+    source text not null check (
+        source in (
+            'REAL_OBD', 'CERTIFIED_REPORT', 'VERIFIED_SERVICE_EVENT',
+            'DRIVER_STATEMENT'
+        )
+    ),
+    captured_at timestamptz not null,
+    expires_at timestamptz not null,
+    evidence_reference text check (
+        evidence_reference is null or char_length(evidence_reference) between 1 and 500
+    ),
+    created_at timestamptz not null default now(),
+    check (captured_at <= expires_at)
+);
+
+create index if not exists ride_vehicle_evidence_trip_idx
+    on public.ride_vehicle_evidence(trip_id, category, captured_at desc);
+
 create table if not exists public.ride_wallets (
     driver_id uuid primary key references public.ride_profiles(user_id) on delete restrict,
     currency text not null check (currency ~ '^[A-Z]{3}$'),
@@ -333,6 +363,11 @@ create trigger ride_wallet_ledger_immutable
 before update or delete on public.ride_wallet_ledger
 for each row execute function public.ride_reject_immutable_change();
 
+drop trigger if exists ride_vehicle_evidence_immutable on public.ride_vehicle_evidence;
+create trigger ride_vehicle_evidence_immutable
+before update or delete on public.ride_vehicle_evidence
+for each row execute function public.ride_reject_immutable_change();
+
 alter table public.ride_profiles enable row level security;
 alter table public.ride_driver_vehicles enable row level security;
 alter table public.ride_requests enable row level security;
@@ -341,6 +376,7 @@ alter table public.ride_trip_events enable row level security;
 alter table public.ride_consents enable row level security;
 alter table public.ride_positions enable row level security;
 alter table public.ride_vehicle_questions enable row level security;
+alter table public.ride_vehicle_evidence enable row level security;
 alter table public.ride_wallets enable row level security;
 alter table public.ride_wallet_ledger enable row level security;
 alter table public.ride_commission_reservations enable row level security;
@@ -502,6 +538,47 @@ with check (
     )
 );
 
+drop policy if exists ride_vehicle_evidence_participant_select on public.ride_vehicle_evidence;
+create policy ride_vehicle_evidence_participant_select on public.ride_vehicle_evidence
+for select to authenticated
+using (
+    public.ride_is_participant(trip_id) and
+    public.ride_trip_is_active(trip_id) and
+    expires_at > now() and
+    exists (
+        select 1
+        from public.ride_consents c
+        where c.trip_id = ride_vehicle_evidence.trip_id
+          and c.driver_id = ride_vehicle_evidence.driver_id
+          and c.category = ride_vehicle_evidence.category
+          and c.granted_at is not null
+          and c.granted_at <= now()
+          and c.revoked_at is null
+          and c.expires_at > now()
+    )
+);
+
+drop policy if exists ride_vehicle_evidence_driver_insert on public.ride_vehicle_evidence;
+create policy ride_vehicle_evidence_driver_insert on public.ride_vehicle_evidence
+for insert to authenticated
+with check (
+    driver_id = (select auth.uid()) and
+    public.ride_is_assigned_driver(trip_id) and
+    public.ride_trip_is_active(trip_id) and
+    expires_at <= now() + interval '24 hours' and
+    exists (
+        select 1
+        from public.ride_consents c
+        where c.trip_id = ride_vehicle_evidence.trip_id
+          and c.driver_id = (select auth.uid())
+          and c.category = ride_vehicle_evidence.category
+          and c.granted_at is not null
+          and c.granted_at <= now()
+          and c.revoked_at is null
+          and c.expires_at >= ride_vehicle_evidence.expires_at
+    )
+);
+
 drop policy if exists ride_wallets_owner_select on public.ride_wallets;
 create policy ride_wallets_owner_select on public.ride_wallets
 for select to authenticated
@@ -530,6 +607,7 @@ revoke all on public.ride_trip_events from anon;
 revoke all on public.ride_consents from anon;
 revoke all on public.ride_positions from anon;
 revoke all on public.ride_vehicle_questions from anon;
+revoke all on public.ride_vehicle_evidence from anon;
 revoke all on public.ride_wallets from anon;
 revoke all on public.ride_wallet_ledger from anon;
 revoke all on public.ride_commission_reservations from anon;
@@ -543,6 +621,7 @@ grant select on public.ride_trip_events to authenticated;
 grant select, insert, update, delete on public.ride_consents to authenticated;
 grant select, insert, update, delete on public.ride_positions to authenticated;
 grant select, insert, update on public.ride_vehicle_questions to authenticated;
+grant select, insert on public.ride_vehicle_evidence to authenticated;
 grant select on public.ride_wallets to authenticated;
 grant select on public.ride_wallet_ledger to authenticated;
 grant select on public.ride_commission_reservations to authenticated;
@@ -550,6 +629,7 @@ grant select on public.ride_cancellations to authenticated;
 
 revoke insert, update, delete on public.ride_wallet_ledger from authenticated;
 revoke insert, update, delete on public.ride_trip_events from authenticated;
+revoke update, delete on public.ride_vehicle_evidence from authenticated;
 
 create or replace function public.ride_grant_promotional_balance()
 returns jsonb
