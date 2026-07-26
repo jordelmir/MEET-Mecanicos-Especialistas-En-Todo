@@ -51,6 +51,18 @@ android {
         buildConfigField("String", "CAR2DB_LANGUAGE", "\"$car2DbLanguage\"")
         buildConfigField("boolean", "CAR2DB_ENABLED", "${car2DbApiKey.isNotBlank()}")
 
+        // Ride wallet funding must remain off until the store/payment method is
+        // approved for transportation commission credits in the launch market.
+        val ridePlayBillingPolicyApproved = localProps
+            .getProperty("RIDE_PLAY_BILLING_POLICY_APPROVED", "false")
+            .toBooleanStrictOrNull()
+            ?: false
+        buildConfigField(
+            "boolean",
+            "RIDE_PLAY_BILLING_POLICY_APPROVED",
+            ridePlayBillingPolicyApproved.toString(),
+        )
+
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
         buildConfigField("String", "MINIMAX_BASE_URL", "\"${localProps.getProperty("MINIMAX_BASE_URL", "https://api.minimax.io/v1")}\"")
