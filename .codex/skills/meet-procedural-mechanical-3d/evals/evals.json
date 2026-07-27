@@ -1,0 +1,50 @@
+{
+  "skill_name": "meet-procedural-mechanical-3d",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Crea la experiencia 3D individual del bloque G4ED y déjala lista para Piezas y Repuestos.",
+      "expected_output": "A component binding with stable nodes, orbit, bounds, hashes and non-OEM authority.",
+      "files": [],
+      "expectations": [
+        "Ordinal 1 resolves to one GLB group and at least one mesh.",
+        "The binding supports ORBIT_360 and finite camera bounds.",
+        "The manifest forbids OEM and dimensional claims."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Haz seleccionable el cilindro número 1 y permite pedirlo como repuesto.",
+      "expected_output": "A semantic region that is selectable but redirects commerce to the cylinder block.",
+      "files": [],
+      "expectations": [
+        "Ordinal 2 uses SEMANTIC_REGION and SCHEMATIC_REGION.",
+        "The region points to the block parent.",
+        "The region cannot be sold independently."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Anima en 3D las galerías internas de aceite del bloque.",
+      "expected_output": "A schematic emissive flow path with FLOW_TRACE and source traceability.",
+      "files": [],
+      "expectations": [
+        "Ordinal 7 uses FLOW_TRACE.",
+        "The GLB contains a dedicated ordinal 7 mesh node.",
+        "The manifest atlas hash matches the canonical knowledge asset."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Construye cigüeñal, muñones y contrapesos en 360 sin confundirlos como repuestos separados.",
+      "expected_output": "A rotating crankshaft component plus three non-sellable semantic regions.",
+      "files": [],
+      "expectations": [
+        "Ordinals 27 through 30 have unique node bindings.",
+        "Ordinals 28 through 30 redirect to ordinal 27.",
+        "Explode vectors and neutral transforms are finite and deterministic."
+      ]
+    }
+  ]
+}
+
