@@ -44,7 +44,28 @@
         "Ordinals 28 through 30 redirect to ordinal 27.",
         "Explode vectors and neutral transforms are finite and deterministic."
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Genera y verifica todas las 420 experiencias del atlas sin dejar paquetes parciales.",
+      "expected_output": "Twenty complete system packs with exactly 420 unique, traceable and offline bindings.",
+      "files": [],
+      "expectations": [
+        "Exactly 20 manifests and 20 GLBs are present.",
+        "The manifests contain exactly 420 unique ordinals.",
+        "Every GLB hash and atlas content hash verifies."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Integra el atlas en Piezas, IA y Repuestos sin afirmar compatibilidad exacta.",
+      "expected_output": "Canonical navigation, cited AI context and a reference showroom that preserves evidence gates.",
+      "files": [],
+      "expectations": [
+        "Piezas exposes the G4ED atlas and Motor 3D links to it.",
+        "AI receives canonical source and authority context.",
+        "Repuestos carries the canonical ID and keeps visual match non-exact."
+      ]
     }
   ]
 }
-

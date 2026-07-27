@@ -132,6 +132,63 @@ Run:
 - The UI states that the asset is a non-dimensional reference reconstruction.
 - No visual result alone produces `EXACT` compatibility.
 
+## Full-atlas production lessons (v2)
+
+### Regenerate complete shared packs
+
+Range generation is useful for recipe development, but a partial range can
+share a `packId` with elements outside that range. Before release, regenerate
+`1-420` so the final pack manifest contains every member of each system:
+
+```bash
+cd tools/engine-asset-generator
+npm run generate:g4ed -- --range 1-420
+npm run verify:g4ed -- --range 1-420
+```
+
+Never publish a partial manifest over a previously complete pack.
+
+### Bound runtime memory
+
+- Keep one GLB per mechanical system rather than one 420-part monolith.
+- Load the selected pack lazily from Android assets.
+- Cache parsed manifests, not native Filament model instances.
+- Dispose scene nodes and material instances when the composable leaves.
+- Default the product showroom to the selected part in isolation.
+- Reveal pack context only on demand.
+
+### Preserve commerce separation
+
+The canonical atlas describes the reference entity and visualization. A parts
+request or seller listing stores its canonical reference ID but keeps seller
+photos, price, condition, declared OEM and evidence separate. A canonical 3D
+reference may open a request for quotes; it does not authorize purchase or
+promote compatibility.
+
+### Carry cited AI context
+
+When opening AI from an atlas element, include:
+
+- canonical ID and original name;
+- system title and literal knowledge;
+- visual authority and warning;
+- current vehicle/DTC/OBD evidence when available;
+- an explicit instruction not to claim exact fit without the evidence gate.
+
+### Release gate
+
+Run the v2 skill evaluation and the complete project gates:
+
+```bash
+python3 .codex/skills/meet-procedural-mechanical-3d/scripts/run_evals.py
+python3 tools/knowledge/build_g4ed_engine_atlas.py --verify
+cd tools/engine-asset-generator && npm run verify:g4ed -- --range 1-420
+cd ../../android && ./gradlew testDebugUnitTest assembleDebug
+```
+
+Read [system-pack-matrix.md](references/system-pack-matrix.md) when changing
+pack routing, generation batches or Android lazy-loading behavior.
+
 ## Proven examples
 
 The first verified G4ED milestone provides four reference patterns:
@@ -143,4 +200,3 @@ The first verified G4ED milestone provides four reference patterns:
   regions.
 
 Use these as patterns, not as dimensions for unrelated parts.
-
