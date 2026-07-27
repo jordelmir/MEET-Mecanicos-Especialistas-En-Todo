@@ -29,8 +29,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "4.2.0"
+        versionCode = 20
+        versionName = "4.2.1"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -61,6 +61,14 @@ android {
             "boolean",
             "RIDE_PLAY_BILLING_POLICY_APPROVED",
             ridePlayBillingPolicyApproved.toString(),
+        )
+        val rideLocalVerificationAutoApprove = providers.gradleProperty(
+            "RIDE_LOCAL_VERIFICATION_AUTO_APPROVE",
+        ).orElse("true").get().toBoolean()
+        buildConfigField(
+            "boolean",
+            "RIDE_LOCAL_VERIFICATION_AUTO_APPROVE",
+            rideLocalVerificationAutoApprove.toString(),
         )
         val rideMapStyleUrl = localProps.getProperty(
             "RIDE_MAP_STYLE_URL",

@@ -44,6 +44,7 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideMapStateFactory
+import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -70,6 +71,12 @@ fun RideServiceScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(viewModel) {
+        viewModel.rideVerificationNotice.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Permissions check
     val permissionsToRequest = arrayOf(
@@ -231,7 +238,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         // ── Identity Verification Gate ────────────────────────────────────
-        if (passengerVer?.status != "APPROVED") {
+        if (!RideVerificationPolicy.grantsAccess(passengerVer?.status)) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
@@ -544,7 +551,10 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                     Button(
                         onClick = {
                             val verifiedPassenger = passengerVer
-                            if (verifiedPassenger?.status != "APPROVED") {
+                            if (
+                                verifiedPassenger == null ||
+                                !RideVerificationPolicy.grantsAccess(verifiedPassenger.status)
+                            ) {
                                 Toast.makeText(
                                     context,
                                     "Completa la verificación de identidad antes de solicitar",
@@ -697,7 +707,7 @@ fun DriverDashboard(viewModel: ObdViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        if (driverVer?.status != "APPROVED") {
+        if (!RideVerificationPolicy.grantsAccess(driverVer?.status)) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
@@ -1908,17 +1918,7 @@ fun PaxVerificationDialog(
             paxProfilePhoto.isNotBlank() && paxCedulaFront.isNotBlank() &&
             paxSelfieWithCedula.isNotBlank()
 
-    val context = LocalContext.current
-    var photoFile by remember { mutableStateOf<java.io.File?>(null) }
-    var onPhotoCaptured by remember { mutableStateOf<((String) -> Unit)?>(null) }
-
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && photoFile != null) {
-            onPhotoCaptured?.invoke(photoFile!!.absolutePath)
-        }
-    }
+    val launchVerificationPhoto = rememberVerificationPhotoCapture()
 
     var captureGuideType by remember { mutableStateOf<String?>(null) }
     var onCaptureGuideProceed by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -1927,22 +1927,11 @@ fun PaxVerificationDialog(
         captureGuideType = docType
         onCaptureGuideProceed = {
             captureGuideType = null
-            try {
-                val file = java.io.File(
-                    context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES),
-                    "passenger_${docType.lowercase()}_${System.currentTimeMillis()}.jpg"
-                )
-                photoFile = file
-                onPhotoCaptured = callback
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                takePictureLauncher.launch(uri)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error al iniciar cámara: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            launchVerificationPhoto(
+                "passenger",
+                docType,
+                callback,
+            )
         }
     }
 
@@ -1987,6 +1976,25 @@ fun PaxVerificationDialog(
                                 fontSize = 13.sp,
                                 lineHeight = 18.sp
                             )
+                        }
+
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MeetColors.electricBlue.copy(alpha = 0.10f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MeetColors.electricBlue.copy(alpha = 0.35f),
+                                ),
+                            ) {
+                                Text(
+                                    text = "🧪 Piloto Costa Rica: al completar estos datos y fotos se habilitarán los viajes inmediatamente. La evidencia queda guardada para validación posterior.",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 17.sp,
+                                    modifier = Modifier.padding(14.dp),
+                                )
+                            }
                         }
 
                         item {
@@ -2700,7 +2708,10 @@ fun DriverNegotiationPanel(
                 onClick = {
                     val verifiedDriver = driverVer
                     val gps = currentGps
-                    if (verifiedDriver?.status != "APPROVED") {
+                    if (
+                        verifiedDriver == null ||
+                        !RideVerificationPolicy.grantsAccess(verifiedDriver.status)
+                    ) {
                         Toast.makeText(
                             context,
                             "Se requiere identidad de conductor aprobada",

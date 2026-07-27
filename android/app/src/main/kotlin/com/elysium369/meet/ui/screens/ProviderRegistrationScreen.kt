@@ -1,9 +1,6 @@
 package com.elysium369.meet.ui.screens
 
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -40,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.ProviderProfileEntity
+import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.ElysiumSectionIcon
 import com.elysium369.meet.ui.components.EliteCard
@@ -102,6 +100,12 @@ fun ProviderRegistrationScreen(
     onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
+
+    LaunchedEffect(viewModel) {
+        viewModel.rideVerificationNotice.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Observe view-model state
     val profiles by viewModel.userProviderProfiles.collectAsState()
@@ -212,13 +216,15 @@ fun ProviderRegistrationScreen(
                     "MECHANIC" -> isMechanic
                     "TOW_TRUCK" -> isTowTruck
                     "PARTS_STORE" -> isPartsStore
-                    "RIDE_DRIVER" -> driverVerification?.status == "APPROVED"
+                    "RIDE_DRIVER" -> RideVerificationPolicy.grantsAccess(driverVerification?.status)
                     else -> false
                 }
                 val statusLabel = when {
                     typeInfo.type != "RIDE_DRIVER" -> null
                     driverVerification?.status == "PENDING" -> "Verificación en revisión"
                     driverVerification?.status == "APPROVED" -> "Chofer verificado"
+                    driverVerification?.status == RideVerificationPolicy.PILOT_APPROVED ->
+                        "Acceso piloto habilitado"
                     driverVerification?.status == "REJECTED" -> "Reintentar verificación"
                     else -> null
                 }
@@ -1228,16 +1234,22 @@ private fun DriverOnboardingDialog(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         when (existingVerification.status) {
-                            "APPROVED" -> {
+                            "APPROVED", RideVerificationPolicy.PILOT_APPROVED -> {
+                                val isPilotAccess =
+                                    existingVerification.status == RideVerificationPolicy.PILOT_APPROVED
                                 Text("✅", fontSize = 56.sp)
                                 Text(
-                                    "CHOFER VERIFICADO",
+                                    if (isPilotAccess) "ACCESO PILOTO HABILITADO" else "CHOFER VERIFICADO",
                                     color = MeetColors.neonGreen,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    "Tu cuenta de chofer está aprobada. Ya puedes recibir solicitudes de viaje.",
+                                    if (isPilotAccess) {
+                                        "Puedes usar Viajes sin esperar una revisión remota. Tus documentos quedaron guardados para una validación posterior."
+                                    } else {
+                                        "Tu cuenta de chofer está aprobada. Ya puedes recibir solicitudes de viaje."
+                                    },
                                     color = MeetColors.textSecondary,
                                     fontSize = 14.sp,
                                     textAlign = TextAlign.Center,
@@ -1248,7 +1260,15 @@ private fun DriverOnboardingDialog(
                                     color = MeetColors.neonGreen.copy(alpha = 0.1f)
                                 ) {
                                     Text(
-                                        text = "Aprobado el ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(existingVerification.approvedAt ?: 0))}",
+                                        text = buildString {
+                                            append(if (isPilotAccess) "Habilitado localmente el " else "Aprobado el ")
+                                            append(
+                                                java.text.SimpleDateFormat(
+                                                    "dd/MM/yyyy HH:mm",
+                                                    java.util.Locale.getDefault(),
+                                                ).format(java.util.Date(existingVerification.approvedAt ?: 0)),
+                                            )
+                                        },
                                         color = MeetColors.neonGreen,
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1366,17 +1386,7 @@ private fun DriverOnboardingDialog(
     var vColor by remember { mutableStateOf("") }
     var vPlate by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
-    var photoFile by remember { mutableStateOf<java.io.File?>(null) }
-    var onPhotoCaptured by remember { mutableStateOf<((String) -> Unit)?>(null) }
-
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && photoFile != null) {
-            onPhotoCaptured?.invoke(photoFile!!.absolutePath)
-        }
-    }
+    val launchVerificationPhoto = rememberVerificationPhotoCapture()
 
     var captureGuideType by remember { mutableStateOf<String?>(null) }
     var onCaptureGuideProceed by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -1385,22 +1395,11 @@ private fun DriverOnboardingDialog(
         captureGuideType = docType
         onCaptureGuideProceed = {
             captureGuideType = null
-            try {
-                val file = java.io.File(
-                    context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES),
-                    "driver_${docType.lowercase()}_${System.currentTimeMillis()}.jpg"
-                )
-                photoFile = file
-                onPhotoCaptured = callback
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                takePictureLauncher.launch(uri)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error al iniciar cámara: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            launchVerificationPhoto(
+                "driver",
+                docType,
+                callback,
+            )
         }
     }
 
@@ -1499,6 +1498,25 @@ private fun DriverOnboardingDialog(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MeetColors.electricBlue.copy(alpha = 0.10f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MeetColors.electricBlue.copy(alpha = 0.35f),
+                                ),
+                            ) {
+                                Text(
+                                    text = "🧪 Piloto Costa Rica: al completar los datos y evidencias requeridas se habilitará el acceso inmediatamente. Esto no sustituye una revisión documental remota.",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 17.sp,
+                                    modifier = Modifier.padding(14.dp),
+                                )
+                            }
+                        }
+
                         when (currentStep) {
                             0 -> {
                                 item {

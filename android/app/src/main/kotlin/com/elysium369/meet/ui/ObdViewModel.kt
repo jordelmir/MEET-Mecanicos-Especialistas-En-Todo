@@ -59,9 +59,13 @@ import com.elysium369.meet.ui.screens.TerminalLine
 import com.elysium369.meet.ui.screens.TerminalLineType
 import com.elysium369.meet.core.obd.ObdTrafficListener
 import com.elysium369.meet.core.obd.PredictiveTelemetryEstimator
+import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
 import com.elysium369.meet.ride.domain.RideShareCategory
+import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
+import com.elysium369.meet.ride.domain.RideVerificationPolicy
+import com.elysium369.meet.ride.domain.VerificationFileEvidence
 
 @Serializable
 private data class RemotePartsStore(
@@ -6182,14 +6186,77 @@ class ObdViewModel @Inject constructor(
     // FEATURE 9 — IDENTITY VERIFICATION (UBER-GRADE ONBOARDING)
     // ═══════════════════════════════════════════════════════════════════════════
 
+    private val _rideVerificationNotice = MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+    )
+    val rideVerificationNotice: SharedFlow<String> =
+        _rideVerificationNotice.asSharedFlow()
+
     // ── Driver verification state ────────────────────────────────────────────
     val driverVerification: StateFlow<com.elysium369.meet.data.local.entities.DriverVerificationEntity?> =
         rideDao.getDriverVerificationFlow(localDeviceId)
+            .onEach { verification ->
+                if (
+                    BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
+                    verification?.status == "PENDING"
+                ) {
+                    val evidence = evaluateDriverEvidence(verification)
+                    if (evidence.isReady) {
+                        val now = System.currentTimeMillis()
+                        rideDao.updateDriverVerificationStatus(
+                            driverId = verification.driverId,
+                            status = RideVerificationPolicy.PILOT_APPROVED,
+                            approvedAt = now,
+                            updatedAt = now,
+                        )
+                        android.util.Log.i(
+                            "MeetRides",
+                            "Pending driver verification upgraded to local pilot access",
+                        )
+                    } else {
+                        android.util.Log.w(
+                            "MeetRides",
+                            "Driver pilot access withheld: ${evidence.issues.joinToString()}",
+                        )
+                        _rideVerificationNotice.emit(
+                            "Completa nuevamente las evidencias del chofer; una o más fotos no están disponibles.",
+                        )
+                    }
+                }
+            }
             .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     // ── Passenger verification state ─────────────────────────────────────────
     val passengerVerification: StateFlow<com.elysium369.meet.data.local.entities.PassengerVerificationEntity?> =
         rideDao.getPassengerVerificationFlow(localDeviceId)
+            .onEach { verification ->
+                if (
+                    BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
+                    verification?.status == "PENDING"
+                ) {
+                    val evidence = evaluatePassengerEvidence(verification)
+                    if (evidence.isReady) {
+                        val now = System.currentTimeMillis()
+                        rideDao.updatePassengerVerificationStatus(
+                            passengerId = verification.passengerId,
+                            status = RideVerificationPolicy.PILOT_APPROVED,
+                            approvedAt = now,
+                        )
+                        android.util.Log.i(
+                            "MeetRides",
+                            "Pending passenger verification upgraded to local pilot access",
+                        )
+                    } else {
+                        android.util.Log.w(
+                            "MeetRides",
+                            "Passenger pilot access withheld: ${evidence.issues.joinToString()}",
+                        )
+                        _rideVerificationNotice.emit(
+                            "Completa nuevamente las fotos de identidad; una o más evidencias no están disponibles.",
+                        )
+                    }
+                }
+            }
             .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     /**
@@ -6209,6 +6276,61 @@ class ObdViewModel @Inject constructor(
         val dir = getVerificationPhotosDir(context)
         return java.io.File(dir, "${prefix}_${System.currentTimeMillis()}.jpg")
     }
+
+    private fun verificationFileEvidence(
+        label: String,
+        path: String,
+    ): VerificationFileEvidence {
+        val file = java.io.File(path)
+        return VerificationFileEvidence(
+            label = label,
+            path = path,
+            byteCount = if (file.isFile) file.length() else 0L,
+        )
+    }
+
+    private fun evaluatePassengerEvidence(
+        verification: com.elysium369.meet.data.local.entities.PassengerVerificationEntity,
+    ) = RideVerificationEvidencePolicy.evaluatePassenger(
+        fullName = verification.fullName,
+        phone = verification.phone,
+        files = listOf(
+            verificationFileEvidence("profile", verification.pathProfilePhoto),
+            verificationFileEvidence("id_front", verification.pathCedulaFront),
+            verificationFileEvidence("selfie_with_id", verification.pathSelfieWithCedula),
+        ),
+    )
+
+    private fun evaluateDriverEvidence(
+        verification: com.elysium369.meet.data.local.entities.DriverVerificationEntity,
+    ) = RideVerificationEvidencePolicy.evaluateDriver(
+        fullName = verification.fullName,
+        phone = verification.phone,
+        email = verification.email,
+        dateOfBirth = verification.dateOfBirth,
+        vehicleMake = verification.vehicleMake,
+        vehicleModel = verification.vehicleModel,
+        vehicleYear = verification.vehicleYear,
+        vehicleColor = verification.vehicleColor,
+        vehiclePlate = verification.vehiclePlate,
+        currentYear = Calendar.getInstance().get(Calendar.YEAR),
+        files = listOf(
+            verificationFileEvidence("license_front", verification.pathLicenciaFront),
+            verificationFileEvidence("license_back", verification.pathLicenciaBack),
+            verificationFileEvidence("id_front", verification.pathCedulaFront),
+            verificationFileEvidence("id_back", verification.pathCedulaBack),
+            verificationFileEvidence("criminal_record", verification.pathHojaDelincuencia),
+            verificationFileEvidence("marchamo", verification.pathMarchamo),
+            verificationFileEvidence("inspection", verification.pathDekra),
+            verificationFileEvidence("insurance", verification.pathSeguro),
+            verificationFileEvidence("profile", verification.pathSelfieProfile),
+            verificationFileEvidence("selfie_with_id", verification.pathSelfieWithCedula),
+            verificationFileEvidence("selfie_with_license", verification.pathSelfieWithLicencia),
+            verificationFileEvidence("vehicle_front", verification.pathVehicleFront),
+            verificationFileEvidence("vehicle_back", verification.pathVehicleBack),
+            verificationFileEvidence("vehicle_interior", verification.pathVehicleInterior),
+        ),
+    )
 
     /**
      * Submit a complete driver verification application with all required
@@ -6241,6 +6363,50 @@ class ObdViewModel @Inject constructor(
         pathVehicleInterior: String
     ) {
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val evidence = RideVerificationEvidencePolicy.evaluateDriver(
+                fullName = fullName,
+                phone = phone,
+                email = email,
+                dateOfBirth = dateOfBirth,
+                vehicleMake = vehicleMake,
+                vehicleModel = vehicleModel,
+                vehicleYear = vehicleYear,
+                vehicleColor = vehicleColor,
+                vehiclePlate = vehiclePlate,
+                currentYear = Calendar.getInstance().get(Calendar.YEAR),
+                files = listOf(
+                    verificationFileEvidence("license_front", pathLicenciaFront),
+                    verificationFileEvidence("license_back", pathLicenciaBack),
+                    verificationFileEvidence("id_front", pathCedulaFront),
+                    verificationFileEvidence("id_back", pathCedulaBack),
+                    verificationFileEvidence("criminal_record", pathHojaDelincuencia),
+                    verificationFileEvidence("marchamo", pathMarchamo),
+                    verificationFileEvidence("inspection", pathDekra),
+                    verificationFileEvidence("insurance", pathSeguro),
+                    verificationFileEvidence("profile", pathSelfieProfile),
+                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
+                    verificationFileEvidence("selfie_with_license", pathSelfieWithLicencia),
+                    verificationFileEvidence("vehicle_front", pathVehicleFront),
+                    verificationFileEvidence("vehicle_back", pathVehicleBack),
+                    verificationFileEvidence("vehicle_interior", pathVehicleInterior),
+                ),
+            )
+            val verificationDecision = RideVerificationPolicy.decide(
+                localAutoApprovalEnabled = BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE,
+                evidenceReady = evidence.isReady,
+                nowEpochMs = now,
+            )
+            if (!evidence.isReady) {
+                android.util.Log.w(
+                    "MeetRides",
+                    "Driver verification rejected as incomplete: ${evidence.issues.joinToString()}",
+                )
+                _rideVerificationNotice.emit(
+                    "No se pudo habilitar el acceso: verifica los datos y vuelve a capturar cualquier foto faltante.",
+                )
+                return@launch
+            }
             val entity = com.elysium369.meet.data.local.entities.DriverVerificationEntity(
                 driverId = localDeviceId,
                 fullName = fullName,
@@ -6266,11 +6432,16 @@ class ObdViewModel @Inject constructor(
                 pathVehicleFront = pathVehicleFront,
                 pathVehicleBack = pathVehicleBack,
                 pathVehicleInterior = pathVehicleInterior,
-                status = "PENDING",
-                createdAt = System.currentTimeMillis()
+                status = verificationDecision.status,
+                createdAt = now,
+                updatedAt = now,
+                approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertDriverVerification(entity)
-            android.util.Log.i("MeetRides", "Driver verification submitted for $localDeviceId")
+            android.util.Log.i(
+                "MeetRides",
+                "Driver verification submitted; status=${verificationDecision.status}",
+            )
         }
     }
 
@@ -6285,6 +6456,31 @@ class ObdViewModel @Inject constructor(
         pathSelfieWithCedula: String
     ) {
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val evidence = RideVerificationEvidencePolicy.evaluatePassenger(
+                fullName = fullName,
+                phone = phone,
+                files = listOf(
+                    verificationFileEvidence("profile", pathProfilePhoto),
+                    verificationFileEvidence("id_front", pathCedulaFront),
+                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
+                ),
+            )
+            val verificationDecision = RideVerificationPolicy.decide(
+                localAutoApprovalEnabled = BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE,
+                evidenceReady = evidence.isReady,
+                nowEpochMs = now,
+            )
+            if (!evidence.isReady) {
+                android.util.Log.w(
+                    "MeetRides",
+                    "Passenger verification rejected as incomplete: ${evidence.issues.joinToString()}",
+                )
+                _rideVerificationNotice.emit(
+                    "No se pudo habilitar el acceso: verifica tus datos y vuelve a capturar las tres fotos.",
+                )
+                return@launch
+            }
             val entity = com.elysium369.meet.data.local.entities.PassengerVerificationEntity(
                 passengerId = localDeviceId,
                 fullName = fullName,
@@ -6292,11 +6488,15 @@ class ObdViewModel @Inject constructor(
                 pathProfilePhoto = pathProfilePhoto,
                 pathCedulaFront = pathCedulaFront,
                 pathSelfieWithCedula = pathSelfieWithCedula,
-                status = "PENDING",
-                createdAt = System.currentTimeMillis()
+                status = verificationDecision.status,
+                createdAt = now,
+                approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertPassengerVerification(entity)
-            android.util.Log.i("MeetRides", "Passenger verification submitted for $localDeviceId")
+            android.util.Log.i(
+                "MeetRides",
+                "Passenger verification submitted; status=${verificationDecision.status}",
+            )
         }
     }
 
@@ -6322,14 +6522,14 @@ class ObdViewModel @Inject constructor(
      * Check if the current device user is an approved driver.
      */
     fun isApprovedDriver(): Boolean {
-        return driverVerification.value?.status == "APPROVED"
+        return RideVerificationPolicy.grantsAccess(driverVerification.value?.status)
     }
 
     /**
      * Check if the current device user is an approved passenger.
      */
     fun isApprovedPassenger(): Boolean {
-        return passengerVerification.value?.status == "APPROVED"
+        return RideVerificationPolicy.grantsAccess(passengerVerification.value?.status)
     }
 
     override fun onCleared() {
