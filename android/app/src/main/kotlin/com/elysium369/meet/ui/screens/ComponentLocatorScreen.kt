@@ -472,6 +472,15 @@ fun ComponentLocatorScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             SceneSelectorTab(
+                label = "G4ED · 420 PIEZAS",
+                isSelected = false,
+                onClick = {
+                    navController.navigate(
+                        "parts_repairs?partId=g4ed-001-bloque-de-cilindros",
+                    )
+                },
+            )
+            SceneSelectorTab(
                 label = "MOTOR 3D UNIVERSAL",
                 isSelected = currentScene == SceneType.UNIVERSAL_CATALOG,
                 onClick = {

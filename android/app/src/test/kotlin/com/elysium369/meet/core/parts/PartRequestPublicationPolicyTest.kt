@@ -104,6 +104,29 @@ class PartRequestPublicationPolicyTest {
         assertFalse(decision.allowed)
     }
 
+    @Test
+    fun `canonical 3d reference may request quotes without claiming exact compatibility`() {
+        val decision = PartRequestPublicationPolicy.evaluate(
+            partName = "Cigüeñal",
+            vehiclePresent = true,
+            contactPresent = true,
+            graphEvidenceRequired = true,
+            compatibility = CompatibilityResult(
+                confidence = CompatibilityConfidence.UNKNOWN,
+                warnings = emptyList(),
+                requiredConfirmations = listOf("Confirmar VIN y OEM"),
+                crossReferenceNumbers = emptyList(),
+                recommendedQuestions = emptyList(),
+                rationale = listOf("Referencia 3D no dimensional"),
+            ),
+            suggestion = null,
+            knowledge = null,
+            canonicalReferenceId = "g4ed-027-ciguenal",
+        )
+
+        assertTrue(decision.allowed)
+    }
+
     private fun bundle(
         canonicalKey: String,
         purchaseAllowed: Boolean
