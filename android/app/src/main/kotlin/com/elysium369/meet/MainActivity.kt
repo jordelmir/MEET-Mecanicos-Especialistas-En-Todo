@@ -328,9 +328,49 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onOpenComponent3d = { navController.navigate("component_locator") }
                 )
             }
-            composable("ai") {
+            composable(
+                route = "ai?atlasPartId={atlasPartId}",
+                arguments = listOf(
+                    navArgument("atlasPartId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { backStack ->
+                val screenContext = LocalContext.current
+                val atlasPartId = backStack.arguments?.getString("atlasPartId")
+                val atlasContext = remember(atlasPartId, screenContext) {
+                    atlasPartId?.let { canonicalId ->
+                        runCatching {
+                            val canonicalPart = requireNotNull(
+                                com.elysium369.meet.core.catalog
+                                    .CanonicalVehiclePartRepository(screenContext)
+                                    .find(canonicalId),
+                            )
+                            val element = canonicalPart.element
+                            val section = canonicalPart.section
+                            buildString {
+                                appendLine("FUENTE CANÓNICA MEET · ${canonicalPart.atlasDisplayName}")
+                                appendLine("Atlas: ${canonicalPart.atlasId}")
+                                appendLine("ID: ${element.canonicalId}")
+                                appendLine("Elemento: ${element.nameOriginal}")
+                                appendLine("Sistema: ${section.title}")
+                                appendLine("Conocimiento: ${section.knowledge}")
+                                appendLine("Autoridad visual: ${element.visual.authority}")
+                                appendLine("Vehículo de referencia: ${canonicalPart.vehicleLabel}")
+                                appendLine(canonicalPart.geometryWarning)
+                                append(
+                                    "No afirmar compatibilidad exacta sin VIN/OEM/foto/" +
+                                        "conector/medidas y confirmación física.",
+                                )
+                            }
+                        }.getOrNull()
+                    }
+                }
                 AiDiagnosticScreen(
                     dtcCode = "",
+                    initialGroundedContext = atlasContext,
                     onBack = { navController.popBackStack() },
                     viewModel = obdViewModel,
                     onNavigateToSettings = { navController.navigate("ai_settings") },
@@ -693,9 +733,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable(
-                route = "part_request?vehicleInfo={vehicleInfo}",
+                route = "part_request?vehicleInfo={vehicleInfo}&atlasPartId={atlasPartId}",
                 arguments = listOf(
                     androidx.navigation.navArgument("vehicleInfo") {
+                        type = androidx.navigation.NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    },
+                    androidx.navigation.navArgument("atlasPartId") {
                         type = androidx.navigation.NavType.StringType
                         defaultValue = ""
                         nullable = true
@@ -708,6 +753,9 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 com.elysium369.meet.ui.screens.PartRequestScreen(
                     viewModel = obdViewModel,
                     prefilledVehicleInfo = vehicleInfo,
+                    prefilledAtlasPartId = backStack.arguments
+                        ?.getString("atlasPartId")
+                        ?.takeIf { it.isNotBlank() },
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

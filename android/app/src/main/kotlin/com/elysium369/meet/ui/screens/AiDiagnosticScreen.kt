@@ -55,6 +55,7 @@ import com.elysium369.meet.ui.knowledge.toActiveVehicleIdentity
 @Composable
 fun AiDiagnosticScreen(
     dtcCode: String,
+    initialGroundedContext: String? = null,
     onBack: () -> Unit,
     viewModel: com.elysium369.meet.ui.ObdViewModel,
     onNavigateToSettings: () -> Unit = {},
@@ -96,6 +97,12 @@ fun AiDiagnosticScreen(
                 vehicle = selectedVehicle?.toActiveVehicleIdentity()
             )
         }
+    }
+    val combinedGroundedContext = remember(groundedRepairContext, initialGroundedContext) {
+        listOfNotNull(
+            initialGroundedContext?.takeIf(String::isNotBlank),
+            groundedRepairContext?.takeIf(String::isNotBlank),
+        ).joinToString("\n\n").takeIf(String::isNotBlank)
     }
     val reasoningEngine = remember { DiagnosticReasoningEngine() }
     var completedLocalTests by remember(dtcCode) { mutableStateOf<Set<String>>(emptySet()) }
@@ -150,8 +157,11 @@ fun AiDiagnosticScreen(
         else -> 0.25f
     }
 
-    LaunchedEffect(dtcCode, repairKnowledgeState) {
-        if (dtcCode.isNotEmpty() && repairKnowledgeState !is RepairKnowledgeUiState.Loading) {
+    LaunchedEffect(dtcCode, repairKnowledgeState, initialGroundedContext) {
+        if (
+            (dtcCode.isNotEmpty() || !initialGroundedContext.isNullOrBlank()) &&
+            repairKnowledgeState !is RepairKnowledgeUiState.Loading
+        ) {
             isLoading = true
             // Use null for apiKey/baseUrl so consultAi falls through to global config
             aiResponse = viewModel.consultAi(
@@ -160,7 +170,7 @@ fun AiDiagnosticScreen(
                 listOf(dtcCode),
                 provider.takeIf { it != "minimax" },
                 modelName.takeIf { it.isNotBlank() },
-                groundedRepairContext
+                combinedGroundedContext
             )
             isLoading = false
         }

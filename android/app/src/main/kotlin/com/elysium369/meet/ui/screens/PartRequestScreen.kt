@@ -48,6 +48,12 @@ import com.elysium369.meet.core.parts.SuggestionSource
 import com.elysium369.meet.core.parts.ValidationLevel
 import com.elysium369.meet.core.parts.VehicleFingerprint
 import com.elysium369.meet.core.parts.WarningSeverity
+import com.elysium369.meet.core.catalog.CanonicalVehiclePartRepository
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
+import com.elysium369.meet.visual3d.domain.G4edAtlas3dCatalog
+import com.elysium369.meet.visual3d.domain.G4edAtlas3dRepository
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dCatalog
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dRepository
 import com.elysium369.meet.data.local.entities.PartRequestEntity
 import com.elysium369.meet.data.local.entities.PartOfferEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
@@ -294,6 +300,7 @@ private fun QuoteValidationPanel(
 fun PartRequestScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
+    prefilledAtlasPartId: String? = null,
     onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -427,6 +434,7 @@ fun PartRequestScreen(
                     viewModel = viewModel,
                     allRequests = clientRequests,
                     prefilledVehicleInfo = prefilledVehicleInfo,
+                    prefilledAtlasPartId = prefilledAtlasPartId,
                     context = context,
                     onCompleteService = { requestId, storeId ->
                         ratingTargetId = storeId ?: "store"
@@ -462,22 +470,68 @@ private fun ClientWorkspaceView(
     viewModel: ObdViewModel,
     allRequests: List<PartRequestEntity>,
     prefilledVehicleInfo: String?,
+    prefilledAtlasPartId: String?,
     context: Context,
     onCompleteService: (String, String?) -> Unit
 ) {
     val autoVehicleInfo = remember { viewModel.buildVehicleInfoForRequest() }
     val vehicleInfoToUse = prefilledVehicleInfo ?: autoVehicleInfo
+    val canonicalPart = remember(context, prefilledAtlasPartId) {
+        prefilledAtlasPartId?.let { canonicalId ->
+            runCatching { CanonicalVehiclePartRepository(context).find(canonicalId) }
+                .getOrNull()
+                ?.takeIf { it.element.commerce.directlySellable }
+        }
+    }
+    val atlasElement = canonicalPart?.element
+    val atlasManifest = remember(context, canonicalPart) {
+        canonicalPart?.let { part ->
+            runCatching {
+                if (part.element.canonicalId.startsWith("g4ed-")) {
+                    G4edAtlas3dRepository(context).manifest(part.element.visual.packId)
+                } else {
+                    val domainId = requireNotNull(
+                        VehicleTechnicalAtlasDescriptors
+                            .forCanonicalId(part.element.canonicalId),
+                    ).domainId
+                    VehicleTechnicalAtlas3dRepository(context)
+                        .manifest(domainId, part.element.visual.packId)
+                }
+            }.getOrNull()
+        }
+    }
+    val atlasBinding = remember(atlasElement, atlasManifest) {
+        if (atlasElement == null || atlasManifest == null) {
+            null
+        } else {
+            if (atlasElement.canonicalId.startsWith("g4ed-")) {
+                G4edAtlas3dCatalog.bindingFor(atlasElement, atlasManifest)
+            } else {
+                VehicleTechnicalAtlas3dCatalog.bindingFor(atlasElement, atlasManifest)
+            }
+        }
+    }
 
-    var partName by remember { mutableStateOf("") }
+    var partName by remember(atlasElement) { mutableStateOf(atlasElement?.nameOriginal.orEmpty()) }
     var partNumber by remember { mutableStateOf("") }
-    var partCategory by remember { mutableStateOf("") }
-    var sourceContext by remember { mutableStateOf("MANUAL") }
+    var partCategory by remember(atlasElement) { mutableStateOf(atlasElement?.systemId.orEmpty()) }
+    var sourceContext by remember(atlasElement) {
+        mutableStateOf(if (atlasElement == null) "MANUAL" else "FROM_3D_COMPONENT")
+    }
     var quantity by remember { mutableStateOf(1) }
     var partPosition by remember { mutableStateOf("N/A") }
     var oemPreference by remember { mutableStateOf("ANY") }
     var locationName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("+506 ") }
-    var customerNotes by remember { mutableStateOf("") }
+    var customerNotes by remember(atlasElement) {
+        mutableStateOf(
+            atlasElement?.let {
+                "Referencia canónica MEET: ${it.canonicalId}. " +
+                    "Atlas: ${canonicalPart?.atlasDisplayName}. " +
+                    "Reconstrucción 3D no dimensional; confirmar VIN, OEM, foto, conector y medidas."
+            }.orEmpty(),
+        )
+    }
     var latText by remember { mutableStateOf("9.9281") }
     var lngText by remember { mutableStateOf("-84.0907") }
 
@@ -526,7 +580,8 @@ private fun ClientWorkspaceView(
         graphEvidenceRequired = sourceContext in setOf("FROM_DTC", "FROM_3D_COMPONENT"),
         compatibility = compatibilityResult,
         suggestion = selectedGraphSuggestion,
-        knowledge = repairBundle
+        knowledge = repairBundle,
+        canonicalReferenceId = atlasElement?.canonicalId,
     )
     val canPublishPartRequest = publicationDecision.allowed
 
@@ -573,6 +628,41 @@ private fun ClientWorkspaceView(
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
+                }
+            }
+        }
+
+        if (atlasElement != null && atlasManifest != null && atlasBinding != null) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = PartColors.cardBackground),
+                    border = BorderStroke(1.dp, PartColors.greenAccent.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            "SHOWROOM 3D DE REFERENCIA",
+                            color = PartColors.greenAccent,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp,
+                        )
+                        Text(
+                            "${atlasElement.nameOriginal} · ${atlasElement.canonicalId}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                        )
+                        G4edPartViewer(atlasManifest, atlasBinding)
+                        Text(
+                            "Compare esta reconstrucción con fotos reales del vendedor. La similitud visual no confirma compatibilidad exacta.",
+                            color = PartColors.orangeAccent,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp,
+                        )
+                    }
                 }
             }
         }

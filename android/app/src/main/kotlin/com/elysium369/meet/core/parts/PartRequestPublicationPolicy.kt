@@ -15,7 +15,8 @@ object PartRequestPublicationPolicy {
         graphEvidenceRequired: Boolean,
         compatibility: CompatibilityResult?,
         suggestion: PartSuggestion?,
-        knowledge: RepairKnowledgeBundle?
+        knowledge: RepairKnowledgeBundle?,
+        canonicalReferenceId: String? = null,
     ): PartRequestPublicationDecision {
         val reasons = linkedSetOf<String>()
         if (partName.isBlank()) reasons += "Nombre de pieza requerido."
@@ -27,7 +28,7 @@ object PartRequestPublicationPolicy {
                 suggestion.evidenceState == PartSuggestionEvidenceState.PURCHASE_VERIFIED &&
                 knowledge?.partGate?.purchaseAllowed == true &&
                 knowledge.partGate.componentCanonicalKey == suggestion.canonicalKey
-        if (graphEvidenceRequired && !graphExact) {
+        if (graphEvidenceRequired && !graphExact && canonicalReferenceId.isNullOrBlank()) {
             reasons +=
                 "La solicitud DTC/3D requiere componente canónico, pruebas, VIN/OEM y confirmación física."
         }
