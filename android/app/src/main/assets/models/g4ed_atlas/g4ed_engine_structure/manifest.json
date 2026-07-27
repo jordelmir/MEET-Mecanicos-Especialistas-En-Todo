@@ -1,0 +1,1435 @@
+{
+  "schemaVersion": 1,
+  "packId": "g4ed_engine_structure",
+  "atlasId": "meet.g4ed.engine.parts.420",
+  "atlasVersion": "1.0.0",
+  "atlasContentSha256": "17f41f9f18a4dddf07433e5252b5b8742679354b6d95debfc435b956a87bc3de",
+  "sourceSha256": "99a2dc92a2acd5364d9f85e257b382b93998065647617fed4ddd11165785a89f",
+  "assetFile": "g4ed_engine_structure.glb",
+  "assetPath": "models/g4ed_atlas/g4ed_engine_structure/g4ed_engine_structure.glb",
+  "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-g4ed-atlas.mjs",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "groupNodePrefix": "asset_part__",
+  "meshNodePrefix": "asset_mesh__",
+  "elementCount": 26,
+  "ordinalRange": [
+    1,
+    26
+  ],
+  "meshCount": 105,
+  "triangleCount": 61876,
+  "sha256": "c89a1fd947ce646254fc11f8190dff5a3f0a373dce83b46e09ba598235ad9fb4",
+  "license": "Original procedural reference reconstruction generated for MEET",
+  "warning": "Reconstrucción técnica de referencia. Confirmar VIN, código de motor, OEM, fotografía, conector y medidas antes de comprar.",
+  "bindings": [
+    {
+      "ordinal": 1,
+      "canonicalId": "g4ed-001-bloque-de-cilindros",
+      "nodeKey": "g4ed_001",
+      "groupNode": "asset_part__g4ed_001",
+      "meshNodePrefix": "asset_mesh__g4ed_001__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.6931,
+        -0.36,
+        0.6552
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.09,
+          0
+        ],
+        "radius": 2.3884
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 2,
+      "canonicalId": "g4ed-002-cilindro-numero-1",
+      "nodeKey": "g4ed_002",
+      "groupNode": "asset_part__g4ed_002",
+      "meshNodePrefix": "asset_mesh__g4ed_002__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.09,
+        -0.18,
+        -1.0858
+      ],
+      "bounds": {
+        "center": [
+          -1.2,
+          0,
+          0
+        ],
+        "radius": 0.8782
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 3,
+      "canonicalId": "g4ed-003-cilindro-numero-2",
+      "nodeKey": "g4ed_003",
+      "groupNode": "asset_part__g4ed_003",
+      "meshNodePrefix": "asset_mesh__g4ed_003__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6815,
+        0,
+        0.6746
+      ],
+      "bounds": {
+        "center": [
+          -0.4,
+          0,
+          0
+        ],
+        "radius": 0.8782
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 4,
+      "canonicalId": "g4ed-004-cilindro-numero-3",
+      "nodeKey": "g4ed_004",
+      "groupNode": "asset_part__g4ed_004",
+      "meshNodePrefix": "asset_mesh__g4ed_004__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1915,
+        0.18,
+        -0.169
+      ],
+      "bounds": {
+        "center": [
+          0.4,
+          0,
+          0
+        ],
+        "radius": 0.8782
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 5,
+      "canonicalId": "g4ed-005-cilindro-numero-4",
+      "nodeKey": "g4ed_005",
+      "groupNode": "asset_part__g4ed_005",
+      "meshNodePrefix": "asset_mesh__g4ed_005__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7172,
+        0.36,
+        -0.585
+      ],
+      "bounds": {
+        "center": [
+          1.2,
+          0,
+          0
+        ],
+        "radius": 0.8782
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 6,
+      "canonicalId": "g4ed-006-camisas-integradas-de-los-cilindros",
+      "nodeKey": "g4ed_006",
+      "groupNode": "asset_part__g4ed_006",
+      "meshNodePrefix": "asset_mesh__g4ed_006__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.244,
+        0.54,
+        0.8209
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.7321
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 7,
+      "canonicalId": "g4ed-007-galerias-internas-de-lubricacion",
+      "nodeKey": "g4ed_007",
+      "groupNode": "asset_part__g4ed_007",
+      "meshNodePrefix": "asset_mesh__g4ed_007__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4747,
+        -0.54,
+        -0.8608
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.214,
+          -0.402
+        ],
+        "radius": 1.7742
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 8,
+      "canonicalId": "g4ed-008-camisas-o-pasos-internos-de-refrigerante",
+      "nodeKey": "g4ed_008",
+      "groupNode": "asset_part__g4ed_008",
+      "meshNodePrefix": "asset_mesh__g4ed_008__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.052,
+        -0.36,
+        0.3739
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.4406,
+          0.1225
+        ],
+        "radius": 1.7714
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 9,
+      "canonicalId": "g4ed-009-superficie-superior-del-bloque-o-deck",
+      "nodeKey": "g4ed_009",
+      "groupNode": "asset_part__g4ed_009",
+      "meshNodePrefix": "asset_mesh__g4ed_009__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1185,
+        -0.18,
+        0.3243
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.02,
+          0
+        ],
+        "radius": 2.1837
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 10,
+      "canonicalId": "g4ed-010-bancadas-principales-del-ciguenal",
+      "nodeKey": "g4ed_010",
+      "groupNode": "asset_part__g4ed_010",
+      "meshNodePrefix": "asset_mesh__g4ed_010__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3603,
+        0,
+        -0.8786
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.6626
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 11,
+      "canonicalId": "g4ed-011-tapas-de-bancada",
+      "nodeKey": "g4ed_011",
+      "groupNode": "asset_part__g4ed_011",
+      "meshNodePrefix": "asset_mesh__g4ed_011__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2813,
+        0.18,
+        1.04
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.11,
+          0
+        ],
+        "radius": 1.769
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 12,
+      "canonicalId": "g4ed-012-pernos-de-tapas-de-bancada",
+      "nodeKey": "g4ed_012",
+      "groupNode": "asset_part__g4ed_012",
+      "meshNodePrefix": "asset_mesh__g4ed_012__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8912,
+        0.36,
+        -0.4262
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.0495,
+          0
+        ],
+        "radius": 1.6826
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 13,
+      "canonicalId": "g4ed-013-tapones-de-expansion-del-bloque",
+      "nodeKey": "g4ed_013",
+      "groupNode": "asset_part__g4ed_013",
+      "meshNodePrefix": "asset_mesh__g4ed_013__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0939,
+        0.54,
+        -0.2083
+      ],
+      "bounds": {
+        "center": [
+          0.025,
+          0,
+          0
+        ],
+        "radius": 1.4666
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 14,
+      "canonicalId": "g4ed-014-tapones-de-galerias-de-aceite",
+      "nodeKey": "g4ed_014",
+      "groupNode": "asset_part__g4ed_014",
+      "meshNodePrefix": "asset_mesh__g4ed_014__",
+      "parentCanonicalId": "g4ed-001-bloque-de-cilindros",
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.6959,
+        -0.54,
+        0.8917
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7479
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 15,
+      "canonicalId": "g4ed-015-carcasa-frontal-del-motor",
+      "nodeKey": "g4ed_015",
+      "groupNode": "asset_part__g4ed_015",
+      "meshNodePrefix": "asset_mesh__g4ed_015__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.1092,
+        -0.36,
+        -0.843
+      ],
+      "bounds": {
+        "center": [
+          0.07,
+          0,
+          0
+        ],
+        "radius": 1.4212
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 16,
+      "canonicalId": "g4ed-016-carcasa-del-reten-trasero",
+      "nodeKey": "g4ed_016",
+      "groupNode": "asset_part__g4ed_016",
+      "meshNodePrefix": "asset_mesh__g4ed_016__",
+      "parentCanonicalId": null,
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7188,
+        -0.18,
+        0.6251
+      ],
+      "bounds": {
+        "center": [
+          0.08,
+          0,
+          0
+        ],
+        "radius": 0.9229
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 17,
+      "canonicalId": "g4ed-017-placa-posterior-del-motor",
+      "nodeKey": "g4ed_017",
+      "groupNode": "asset_part__g4ed_017",
+      "meshNodePrefix": "asset_mesh__g4ed_017__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.0291,
+        0,
+        0.045
+      ],
+      "bounds": {
+        "center": [
+          0.045,
+          0,
+          0
+        ],
+        "radius": 1.3554
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 18,
+      "canonicalId": "g4ed-018-culata-o-cabeza-de-cilindros",
+      "nodeKey": "g4ed_018",
+      "groupNode": "asset_part__g4ed_018",
+      "meshNodePrefix": "asset_mesh__g4ed_018__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7939,
+        0.18,
+        -0.5996
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.05,
+          0
+        ],
+        "radius": 2.1326
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 19,
+      "canonicalId": "g4ed-019-tapa-de-valvulas",
+      "nodeKey": "g4ed_019",
+      "groupNode": "asset_part__g4ed_019",
+      "meshNodePrefix": "asset_mesh__g4ed_019__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.0559,
+        0.36,
+        0.969
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.0675,
+          0
+        ],
+        "radius": 2.0583
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 20,
+      "canonicalId": "g4ed-020-tapa-decorativa-dohc-cuando-esta-instalada",
+      "nodeKey": "g4ed_020",
+      "groupNode": "asset_part__g4ed_020",
+      "meshNodePrefix": "asset_mesh__g4ed_020__",
+      "parentCanonicalId": "g4ed-019-tapa-de-valvulas",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5446,
+        0.54,
+        -0.8369
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.0275,
+          0
+        ],
+        "radius": 1.7556
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 21,
+      "canonicalId": "g4ed-021-cubierta-superior-de-distribucion",
+      "nodeKey": "g4ed_021",
+      "groupNode": "asset_part__g4ed_021",
+      "meshNodePrefix": "asset_mesh__g4ed_021__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9316,
+        -0.54,
+        0.1133
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.0608
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 22,
+      "canonicalId": "g4ed-022-cubierta-inferior-de-distribucion",
+      "nodeKey": "g4ed_022",
+      "groupNode": "asset_part__g4ed_022",
+      "meshNodePrefix": "asset_mesh__g4ed_022__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8455,
+        -0.36,
+        0.554
+      ],
+      "bounds": {
+        "center": [
+          0.06,
+          -0.085,
+          0
+        ],
+        "radius": 1.2322
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 23,
+      "canonicalId": "g4ed-023-placa-posterior-de-distribucion",
+      "nodeKey": "g4ed_023",
+      "groupNode": "asset_part__g4ed_023",
+      "meshNodePrefix": "asset_mesh__g4ed_023__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2458,
+        -0.18,
+        -1.0634
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.5557
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 24,
+      "canonicalId": "g4ed-024-carter-de-aceite",
+      "nodeKey": "g4ed_024",
+      "groupNode": "asset_part__g4ed_024",
+      "meshNodePrefix": "asset_mesh__g4ed_024__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6016,
+        0,
+        0.7375
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.001,
+          0
+        ],
+        "radius": 1.9681
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 25,
+      "canonicalId": "g4ed-025-deflector-interno-del-carter",
+      "nodeKey": "g4ed_025",
+      "groupNode": "asset_part__g4ed_025",
+      "meshNodePrefix": "asset_mesh__g4ed_025__",
+      "parentCanonicalId": "g4ed-024-carter-de-aceite",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8098,
+        0.18,
+        -0.2948
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0.0275,
+          0
+        ],
+        "radius": 1.5804
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 26,
+      "canonicalId": "g4ed-026-separador-o-rompeolas-de-aceite",
+      "nodeKey": "g4ed_026",
+      "groupNode": "asset_part__g4ed_026",
+      "meshNodePrefix": "asset_mesh__g4ed_026__",
+      "parentCanonicalId": "g4ed-024-carter-de-aceite",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8533,
+        0.36,
+        -0.4572
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.0999
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    }
+  ]
+}

@@ -8,7 +8,9 @@
     "generate:systems": "node generate-vehicle-systems.mjs",
     "generate:extended-systems": "node generate-extended-vehicle-systems.mjs",
     "generate:all-systems": "npm run generate:systems && npm run generate:extended-systems",
-    "generate:meet-platforms": "node generate-meet-platforms.mjs"
+    "generate:meet-platforms": "node generate-meet-platforms.mjs",
+    "generate:g4ed": "node generate-g4ed-atlas.mjs",
+    "verify:g4ed": "node verify-g4ed-atlas.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

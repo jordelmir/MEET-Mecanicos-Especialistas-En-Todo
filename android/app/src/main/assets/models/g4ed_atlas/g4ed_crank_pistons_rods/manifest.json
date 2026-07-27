@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "packId": "g4ed_crank_pistons_rods",
+  "atlasId": "meet.g4ed.engine.parts.420",
+  "atlasVersion": "1.0.0",
+  "atlasContentSha256": "17f41f9f18a4dddf07433e5252b5b8742679354b6d95debfc435b956a87bc3de",
+  "sourceSha256": "99a2dc92a2acd5364d9f85e257b382b93998065647617fed4ddd11165785a89f",
+  "assetFile": "g4ed_crank_pistons_rods.glb",
+  "assetPath": "models/g4ed_atlas/g4ed_crank_pistons_rods/g4ed_crank_pistons_rods.glb",
+  "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-g4ed-atlas.mjs",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "groupNodePrefix": "asset_part__",
+  "meshNodePrefix": "asset_mesh__",
+  "elementCount": 4,
+  "ordinalRange": [
+    27,
+    30
+  ],
+  "meshCount": 27,
+  "triangleCount": 10528,
+  "sha256": "f2649988843bc3e409ab38ac3dbfb6a21569d028089d43b6d4ab6cb652fa76c3",
+  "license": "Original procedural reference reconstruction generated for MEET",
+  "warning": "Reconstrucción técnica de referencia. Confirmar VIN, código de motor, OEM, fotografía, conector y medidas antes de comprar.",
+  "bindings": [
+    {
+      "ordinal": 27,
+      "canonicalId": "g4ed-027-ciguenal",
+      "nodeKey": "g4ed_027",
+      "groupNode": "asset_part__g4ed_027",
+      "meshNodePrefix": "asset_mesh__g4ed_027__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3976,
+        0.54,
+        0.7841
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 2.2539
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 28,
+      "canonicalId": "g4ed-028-munones-principales-del-ciguenal",
+      "nodeKey": "g4ed_028",
+      "groupNode": "asset_part__g4ed_028",
+      "meshNodePrefix": "asset_mesh__g4ed_028__",
+      "parentCanonicalId": "g4ed-027-ciguenal",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3791,
+        -0.54,
+        -0.9128
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.688
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 29,
+      "canonicalId": "g4ed-029-munones-de-biela",
+      "nodeKey": "g4ed_029",
+      "groupNode": "asset_part__g4ed_029",
+      "meshNodePrefix": "asset_mesh__g4ed_029__",
+      "parentCanonicalId": "g4ed-027-ciguenal",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0711,
+        -0.36,
+        0.5071
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.4344
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 30,
+      "canonicalId": "g4ed-030-contrapesos-del-ciguenal",
+      "nodeKey": "g4ed_030",
+      "groupNode": "asset_part__g4ed_030",
+      "meshNodePrefix": "asset_mesh__g4ed_030__",
+      "parentCanonicalId": "g4ed-027-ciguenal",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8219,
+        -0.18,
+        0.2167
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.5298
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    }
+  ]
+}
