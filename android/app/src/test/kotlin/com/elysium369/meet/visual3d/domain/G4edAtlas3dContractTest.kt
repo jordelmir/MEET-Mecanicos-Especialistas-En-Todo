@@ -33,6 +33,7 @@ class G4edAtlas3dContractTest {
         )
         val bindingByOrdinal = manifests
             .flatMap { it.bindings }
+            .filter { it.ordinal <= 30 }
             .associateBy { it.ordinal }
 
         assertEquals((1..30).toSet(), bindingByOrdinal.keys)
@@ -41,6 +42,32 @@ class G4edAtlas3dContractTest {
             val binding = G4edAtlas3dCatalog.bindingFor(element, pack)
             assertNotNull("Missing 3D binding for ${element.ordinal}", binding)
             assertTrue(binding!!.interactionModes.contains("ORBIT_360"))
+            assertFalse(binding.oemClaim)
+            assertFalse(binding.dimensional)
+        }
+    }
+
+    @Test
+    fun `all 420 elements have one traceable offline 3d experience`() {
+        val manifests = atlas.elements
+            .map { it.visual.packId }
+            .distinct()
+            .map(::manifest)
+        val bindings = manifests.flatMap { it.bindings }
+        val bindingByOrdinal = bindings.associateBy { it.ordinal }
+
+        assertEquals(20, manifests.size)
+        assertEquals(420, bindings.size)
+        assertEquals(420, bindingByOrdinal.size)
+        assertEquals((1..420).toSet(), bindingByOrdinal.keys)
+        atlas.elements.forEach { element ->
+            val binding = bindingByOrdinal.getValue(element.ordinal)
+            assertEquals(element.canonicalId, binding.canonicalId)
+            assertEquals(element.visual.nodeKey, binding.nodeKey)
+            assertEquals(element.visual.packId, manifests.single {
+                manifest -> binding in manifest.bindings
+            }.packId)
+            assertEquals(element.visual.authority, binding.authority)
             assertFalse(binding.oemClaim)
             assertFalse(binding.dimensional)
         }

@@ -1,0 +1,949 @@
+{
+  "schemaVersion": 1,
+  "packId": "g4ed_cylinder_head_combustion",
+  "atlasId": "meet.g4ed.engine.parts.420",
+  "atlasVersion": "1.0.0",
+  "atlasContentSha256": "17f41f9f18a4dddf07433e5252b5b8742679354b6d95debfc435b956a87bc3de",
+  "sourceSha256": "99a2dc92a2acd5364d9f85e257b382b93998065647617fed4ddd11165785a89f",
+  "assetFile": "g4ed_cylinder_head_combustion.glb",
+  "assetPath": "models/g4ed_atlas/g4ed_cylinder_head_combustion/g4ed_cylinder_head_combustion.glb",
+  "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-g4ed-atlas.mjs",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "groupNodePrefix": "asset_part__",
+  "meshNodePrefix": "asset_mesh__",
+  "elementCount": 17,
+  "ordinalRange": [
+    61,
+    77
+  ],
+  "meshCount": 22,
+  "triangleCount": 12344,
+  "sha256": "1c257b1a9f8985342c4346da66b0cbde05fa37c4e0e5a8ccccc283af0e98e562",
+  "license": "Original procedural reference reconstruction generated for MEET",
+  "warning": "Reconstrucción técnica de referencia. Confirmar VIN, código de motor, OEM, fotografía, conector y medidas antes de comprar.",
+  "bindings": [
+    {
+      "ordinal": 61,
+      "canonicalId": "g4ed-061-culata-de-aluminio",
+      "nodeKey": "g4ed_061",
+      "groupNode": "asset_part__g4ed_061",
+      "meshNodePrefix": "asset_mesh__g4ed_061__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2901,
+        0.36,
+        0.9227
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.1286
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 62,
+      "canonicalId": "g4ed-062-camara-de-combustion-numero-1",
+      "nodeKey": "g4ed_062",
+      "groupNode": "asset_part__g4ed_062",
+      "meshNodePrefix": "asset_mesh__g4ed_062__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4274,
+        0.54,
+        -0.9917
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.0596
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 63,
+      "canonicalId": "g4ed-063-camara-de-combustion-numero-2",
+      "nodeKey": "g4ed_063",
+      "groupNode": "asset_part__g4ed_063",
+      "meshNodePrefix": "asset_mesh__g4ed_063__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.031,
+        -0.54,
+        0.332
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6437
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 64,
+      "canonicalId": "g4ed-064-camara-de-combustion-numero-3",
+      "nodeKey": "g4ed_064",
+      "groupNode": "asset_part__g4ed_064",
+      "meshNodePrefix": "asset_mesh__g4ed_064__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1406,
+        -0.36,
+        0.3238
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.713
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 65,
+      "canonicalId": "g4ed-065-camara-de-combustion-numero-4",
+      "nodeKey": "g4ed_065",
+      "groupNode": "asset_part__g4ed_065",
+      "meshNodePrefix": "asset_mesh__g4ed_065__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3991,
+        -0.18,
+        -0.9624
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7823
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 66,
+      "canonicalId": "g4ed-066-conductos-de-admision",
+      "nodeKey": "g4ed_066",
+      "groupNode": "asset_part__g4ed_066",
+      "meshNodePrefix": "asset_mesh__g4ed_066__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2352,
+        0,
+        0.823
+      ],
+      "bounds": {
+        "center": [
+          -0.0033,
+          0.0549,
+          0.0251
+        ],
+        "radius": 0.9747
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 67,
+      "canonicalId": "g4ed-067-conductos-de-escape",
+      "nodeKey": "g4ed_067",
+      "groupNode": "asset_part__g4ed_067",
+      "meshNodePrefix": "asset_mesh__g4ed_067__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8636,
+        0.18,
+        -0.5286
+      ],
+      "bounds": {
+        "center": [
+          -0.0041,
+          0.0554,
+          0.025
+        ],
+        "radius": 1.0531
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 68,
+      "canonicalId": "g4ed-068-galerias-internas-de-aceite-de-la-culata",
+      "nodeKey": "g4ed_068",
+      "groupNode": "asset_part__g4ed_068",
+      "meshNodePrefix": "asset_mesh__g4ed_068__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.1047,
+        0.36,
+        -0.1794
+      ],
+      "bounds": {
+        "center": [
+          -0.0049,
+          0.0558,
+          0.0249
+        ],
+        "radius": 1.131
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 69,
+      "canonicalId": "g4ed-069-pasos-internos-de-refrigerante",
+      "nodeKey": "g4ed_069",
+      "groupNode": "asset_part__g4ed_069",
+      "meshNodePrefix": "asset_mesh__g4ed_069__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7455,
+        0.54,
+        0.6695
+      ],
+      "bounds": {
+        "center": [
+          -0.0032,
+          0.0535,
+          0.0249
+        ],
+        "radius": 1.1663
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 70,
+      "canonicalId": "g4ed-070-junta-de-culata",
+      "nodeKey": "g4ed_070",
+      "groupNode": "asset_part__g4ed_070",
+      "meshNodePrefix": "asset_mesh__g4ed_070__",
+      "parentCanonicalId": null,
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.066,
+        -0.54,
+        -0.9671
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5965
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 71,
+      "canonicalId": "g4ed-071-pernos-de-culata",
+      "nodeKey": "g4ed_071",
+      "groupNode": "asset_part__g4ed_071",
+      "meshNodePrefix": "asset_mesh__g4ed_071__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6869,
+        -0.36,
+        0.7441
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1514,
+          0
+        ],
+        "radius": 0.3424
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 72,
+      "canonicalId": "g4ed-072-pasadores-de-centrado-de-la-culata",
+      "nodeKey": "g4ed_072",
+      "groupNode": "asset_part__g4ed_072",
+      "meshNodePrefix": "asset_mesh__g4ed_072__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.03,
+        -0.18,
+        -0.0083
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1467,
+          0
+        ],
+        "radius": 0.3757
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 73,
+      "canonicalId": "g4ed-073-pozos-de-bujias",
+      "nodeKey": "g4ed_073",
+      "groupNode": "asset_part__g4ed_073",
+      "meshNodePrefix": "asset_mesh__g4ed_073__",
+      "parentCanonicalId": "g4ed-061-culata-de-aluminio",
+      "elementKind": "INTEGRATED_FEATURE",
+      "renderStrategy": "SEMANTIC_REGION",
+      "authority": "SCHEMATIC_REGION",
+      "cameraPreset": "MACRO_REGION_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REGION_PULSE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8332,
+        0,
+        -0.6482
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8516
+      },
+      "directlySellable": false,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 74,
+      "canonicalId": "g4ed-074-sellos-de-los-pozos-de-bujias",
+      "nodeKey": "g4ed_074",
+      "groupNode": "asset_part__g4ed_074",
+      "meshNodePrefix": "asset_mesh__g4ed_074__",
+      "parentCanonicalId": "g4ed-073-pozos-de-bujias",
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.1175,
+        0.18,
+        1.0848
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8011
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 75,
+      "canonicalId": "g4ed-075-junta-de-la-tapa-de-valvulas",
+      "nodeKey": "g4ed_075",
+      "groupNode": "asset_part__g4ed_075",
+      "meshNodePrefix": "asset_mesh__g4ed_075__",
+      "parentCanonicalId": null,
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5106,
+        0.36,
+        -0.6796
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8523
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 76,
+      "canonicalId": "g4ed-076-tapon-de-llenado-de-aceite",
+      "nodeKey": "g4ed_076",
+      "groupNode": "asset_part__g4ed_076",
+      "meshNodePrefix": "asset_mesh__g4ed_076__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.924,
+        0.54,
+        0.1783
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1278,
+          0
+        ],
+        "radius": 0.5089
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 77,
+      "canonicalId": "g4ed-077-sello-del-tapon-de-aceite",
+      "nodeKey": "g4ed_077",
+      "groupNode": "asset_part__g4ed_077",
+      "meshNodePrefix": "asset_mesh__g4ed_077__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8744,
+        -0.54,
+        0.576
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1561,
+          0
+        ],
+        "radius": 0.3091
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    }
+  ]
+}

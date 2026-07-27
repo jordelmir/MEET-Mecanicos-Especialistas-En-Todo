@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "packId": "g4ed_crank_pistons_rods",
+  "packId": "g4ed_cooling",
   "atlasId": "meet.g4ed.engine.parts.420",
   "atlasVersion": "1.0.0",
   "atlasContentSha256": "17f41f9f18a4dddf07433e5252b5b8742679354b6d95debfc435b956a87bc3de",
   "sourceSha256": "99a2dc92a2acd5364d9f85e257b382b93998065647617fed4ddd11165785a89f",
-  "assetFile": "g4ed_crank_pistons_rods.glb",
-  "assetPath": "models/g4ed_atlas/g4ed_crank_pistons_rods/g4ed_crank_pistons_rods.glb",
+  "assetFile": "g4ed_cooling.glb",
+  "assetPath": "models/g4ed_atlas/g4ed_cooling/g4ed_cooling.glb",
   "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
   "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
   "oemClaim": false,
@@ -16,23 +16,23 @@
   "threeVersion": "185",
   "groupNodePrefix": "asset_part__",
   "meshNodePrefix": "asset_mesh__",
-  "elementCount": 34,
+  "elementCount": 29,
   "ordinalRange": [
-    27,
-    60
+    153,
+    181
   ],
-  "meshCount": 79,
-  "triangleCount": 36164,
-  "sha256": "42c4eea1a1b096dc5ecc148b22208b279c9d6436e38bbf71273d9ea815a34e86",
+  "meshCount": 49,
+  "triangleCount": 26608,
+  "sha256": "6b528ab885a7d18f8be36d2763da42b3e02d65a6d77e7cb94fc743003437ce73",
   "license": "Original procedural reference reconstruction generated for MEET",
   "warning": "Reconstrucción técnica de referencia. Confirmar VIN, código de motor, OEM, fotografía, conector y medidas antes de comprar.",
   "bindings": [
     {
-      "ordinal": 27,
-      "canonicalId": "g4ed-027-ciguenal",
-      "nodeKey": "g4ed_027",
-      "groupNode": "asset_part__g4ed_027",
-      "meshNodePrefix": "asset_mesh__g4ed_027__",
+      "ordinal": 153,
+      "canonicalId": "g4ed-153-bomba-de-agua",
+      "nodeKey": "g4ed_153",
+      "groupNode": "asset_part__g4ed_153",
+      "meshNodePrefix": "asset_mesh__g4ed_153__",
       "parentCanonicalId": null,
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
@@ -65,9 +65,9 @@
         ]
       },
       "explodeVector": [
-        -0.3976,
+        -1.0434,
         0.54,
-        0.7841
+        0.3089
       ],
       "bounds": {
         "center": [
@@ -75,23 +75,23 @@
           0,
           0
         ],
-        "radius": 2.2539
+        "radius": 0.9469
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 28,
-      "canonicalId": "g4ed-028-munones-principales-del-ciguenal",
-      "nodeKey": "g4ed_028",
-      "groupNode": "asset_part__g4ed_028",
-      "meshNodePrefix": "asset_mesh__g4ed_028__",
-      "parentCanonicalId": "g4ed-027-ciguenal",
-      "elementKind": "INTEGRATED_FEATURE",
-      "renderStrategy": "SEMANTIC_REGION",
-      "authority": "SCHEMATIC_REGION",
-      "cameraPreset": "MACRO_REGION_ORBIT",
+      "ordinal": 154,
+      "canonicalId": "g4ed-154-impulsor-de-la-bomba",
+      "nodeKey": "g4ed_154",
+      "groupNode": "asset_part__g4ed_154",
+      "meshNodePrefix": "asset_mesh__g4ed_154__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
       "interactionModes": [
         "ORBIT_360",
         "ZOOM",
@@ -119,387 +119,9 @@
         ]
       },
       "explodeVector": [
-        -0.3791,
+        0.5341,
         -0.54,
-        -0.9128
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.688
-      },
-      "directlySellable": false,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 29,
-      "canonicalId": "g4ed-029-munones-de-biela",
-      "nodeKey": "g4ed_029",
-      "groupNode": "asset_part__g4ed_029",
-      "meshNodePrefix": "asset_mesh__g4ed_029__",
-      "parentCanonicalId": "g4ed-027-ciguenal",
-      "elementKind": "INTEGRATED_FEATURE",
-      "renderStrategy": "SEMANTIC_REGION",
-      "authority": "SCHEMATIC_REGION",
-      "cameraPreset": "MACRO_REGION_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "REGION_PULSE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        1.0711,
-        -0.36,
-        0.5071
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.4344
-      },
-      "directlySellable": false,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 30,
-      "canonicalId": "g4ed-030-contrapesos-del-ciguenal",
-      "nodeKey": "g4ed_030",
-      "groupNode": "asset_part__g4ed_030",
-      "meshNodePrefix": "asset_mesh__g4ed_030__",
-      "parentCanonicalId": "g4ed-027-ciguenal",
-      "elementKind": "INTEGRATED_FEATURE",
-      "renderStrategy": "SEMANTIC_REGION",
-      "authority": "SCHEMATIC_REGION",
-      "cameraPreset": "MACRO_REGION_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "ROTATIONAL_FUNCTION",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.8219,
-        -0.18,
-        0.2167
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.5298
-      },
-      "directlySellable": false,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 31,
-      "canonicalId": "g4ed-031-cojinete-principal-superior-numero-1",
-      "nodeKey": "g4ed_031",
-      "groupNode": "asset_part__g4ed_031",
-      "meshNodePrefix": "asset_mesh__g4ed_031__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.5084,
-        0,
-        -0.8159
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.9706
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 32,
-      "canonicalId": "g4ed-032-cojinete-principal-inferior-numero-1",
-      "nodeKey": "g4ed_032",
-      "groupNode": "asset_part__g4ed_032",
-      "meshNodePrefix": "asset_mesh__g4ed_032__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.1745,
-        0.18,
-        1.0743
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.0496
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 33,
-      "canonicalId": "g4ed-033-cojinetes-principales-restantes",
-      "nodeKey": "g4ed_033",
-      "groupNode": "asset_part__g4ed_033",
-      "meshNodePrefix": "asset_mesh__g4ed_033__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.8855,
-        0.36,
-        -0.5205
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.1286
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 34,
-      "canonicalId": "g4ed-034-arandelas-o-cojinetes-de-empuje-axial",
-      "nodeKey": "g4ed_034",
-      "groupNode": "asset_part__g4ed_034",
-      "meshNodePrefix": "asset_mesh__g4ed_034__",
-      "parentCanonicalId": null,
-      "elementKind": "SERVICE_HARDWARE",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "REMOVE_INSTALL",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        1.2059,
-        0.54,
-        -0.0801
-      ],
-      "bounds": {
-        "center": [
-          0,
-          -0.1278,
-          0
-        ],
-        "radius": 0.5089
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 35,
-      "canonicalId": "g4ed-035-pinon-dentado-del-ciguenal",
-      "nodeKey": "g4ed_035",
-      "groupNode": "asset_part__g4ed_035",
-      "meshNodePrefix": "asset_mesh__g4ed_035__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "ROTATIONAL_FUNCTION",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.5772,
-        -0.54,
-        0.8001
+        -0.8704
       ],
       "bounds": {
         "center": [
@@ -514,13 +136,13 @@
       "oemClaim": false
     },
     {
-      "ordinal": 36,
-      "canonicalId": "g4ed-036-chaveta-del-ciguenal",
-      "nodeKey": "g4ed_036",
-      "groupNode": "asset_part__g4ed_036",
-      "meshNodePrefix": "asset_mesh__g4ed_036__",
-      "parentCanonicalId": null,
-      "elementKind": "SERVICE_HARDWARE",
+      "ordinal": 155,
+      "canonicalId": "g4ed-155-eje-de-la-bomba",
+      "nodeKey": "g4ed_155",
+      "groupNode": "asset_part__g4ed_155",
+      "meshNodePrefix": "asset_mesh__g4ed_155__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
+      "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -551,30 +173,30 @@
         ]
       },
       "explodeVector": [
-        0.0046,
+        0.2385,
         -0.36,
-        -0.85
+        1.0462
       ],
       "bounds": {
         "center": [
           0,
-          -0.1514,
+          0,
           0
         ],
-        "radius": 0.3424
+        "radius": 0.6724
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 37,
-      "canonicalId": "g4ed-037-perno-central-de-la-polea",
-      "nodeKey": "g4ed_037",
-      "groupNode": "asset_part__g4ed_037",
-      "meshNodePrefix": "asset_mesh__g4ed_037__",
-      "parentCanonicalId": null,
-      "elementKind": "SERVICE_HARDWARE",
+      "ordinal": 156,
+      "canonicalId": "g4ed-156-rodamiento-de-la-bomba",
+      "nodeKey": "g4ed_156",
+      "groupNode": "asset_part__g4ed_156",
+      "meshNodePrefix": "asset_mesh__g4ed_156__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
+      "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -605,30 +227,30 @@
         ]
       },
       "explodeVector": [
-        0.692,
+        -0.8039,
         -0.18,
-        0.7184
+        -0.4405
       ],
       "bounds": {
         "center": [
           0,
-          -0.1467,
+          0,
           0
         ],
-        "radius": 0.3757
+        "radius": 0.7273
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 38,
-      "canonicalId": "g4ed-038-polea-del-ciguenal",
-      "nodeKey": "g4ed_038",
-      "groupNode": "asset_part__g4ed_038",
-      "meshNodePrefix": "asset_mesh__g4ed_038__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
+      "ordinal": 157,
+      "canonicalId": "g4ed-157-sello-mecanico-de-la-bomba",
+      "nodeKey": "g4ed_157",
+      "groupNode": "asset_part__g4ed_157",
+      "meshNodePrefix": "asset_mesh__g4ed_157__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
+      "elementKind": "CONSUMABLE",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -659,9 +281,9 @@
         ]
       },
       "explodeVector": [
-        -1.1152,
+        1.0101,
         0,
-        -0.1006
+        -0.1898
       ],
       "bounds": {
         "center": [
@@ -669,19 +291,19 @@
           0,
           0
         ],
-        "radius": 0.7822
+        "radius": 0.7499
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 39,
-      "canonicalId": "g4ed-039-amortiguador-armonico-integrado-en-la-polea",
-      "nodeKey": "g4ed_039",
-      "groupNode": "asset_part__g4ed_039",
-      "meshNodePrefix": "asset_mesh__g4ed_039__",
-      "parentCanonicalId": null,
+      "ordinal": 158,
+      "canonicalId": "g4ed-158-carcasa-de-la-bomba",
+      "nodeKey": "g4ed_158",
+      "groupNode": "asset_part__g4ed_158",
+      "meshNodePrefix": "asset_mesh__g4ed_158__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
@@ -713,9 +335,9 @@
         ]
       },
       "explodeVector": [
-        0.9638,
+        -0.6619,
         0.18,
-        -0.5139
+        0.8793
       ],
       "bounds": {
         "center": [
@@ -730,12 +352,12 @@
       "oemClaim": false
     },
     {
-      "ordinal": 40,
-      "canonicalId": "g4ed-040-reten-delantero-del-ciguenal",
-      "nodeKey": "g4ed_040",
-      "groupNode": "asset_part__g4ed_040",
-      "meshNodePrefix": "asset_mesh__g4ed_040__",
-      "parentCanonicalId": null,
+      "ordinal": 159,
+      "canonicalId": "g4ed-159-junta-u-o-ring-de-la-bomba",
+      "nodeKey": "g4ed_159",
+      "groupNode": "asset_part__g4ed_159",
+      "meshNodePrefix": "asset_mesh__g4ed_159__",
+      "parentCanonicalId": "g4ed-153-bomba-de-agua",
       "elementKind": "CONSUMABLE",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
@@ -767,9 +389,9 @@
         ]
       },
       "explodeVector": [
-        -0.1521,
+        -0.1321,
         0.36,
-        0.9543
+        -0.8449
       ],
       "bounds": {
         "center": [
@@ -784,13 +406,769 @@
       "oemClaim": false
     },
     {
-      "ordinal": 41,
-      "canonicalId": "g4ed-041-reten-trasero-del-ciguenal",
-      "nodeKey": "g4ed_041",
-      "groupNode": "asset_part__g4ed_041",
-      "meshNodePrefix": "asset_mesh__g4ed_041__",
+      "ordinal": 160,
+      "canonicalId": "g4ed-160-termostato",
+      "nodeKey": "g4ed_160",
+      "groupNode": "asset_part__g4ed_160",
+      "meshNodePrefix": "asset_mesh__g4ed_160__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6391,
+        0.54,
+        0.6395
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.2076
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 161,
+      "canonicalId": "g4ed-161-sello-del-termostato",
+      "nodeKey": "g4ed_161",
+      "groupNode": "asset_part__g4ed_161",
+      "meshNodePrefix": "asset_mesh__g4ed_161__",
       "parentCanonicalId": null,
       "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9398,
+        -0.54,
+        0.0238
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5965
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 162,
+      "canonicalId": "g4ed-162-carcasa-del-termostato",
+      "nodeKey": "g4ed_162",
+      "groupNode": "asset_part__g4ed_162",
+      "meshNodePrefix": "asset_mesh__g4ed_162__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7441,
+        -0.36,
+        -0.5877
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8126
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 163,
+      "canonicalId": "g4ed-163-cuello-de-salida-de-refrigerante",
+      "nodeKey": "g4ed_163",
+      "groupNode": "asset_part__g4ed_163",
+      "meshNodePrefix": "asset_mesh__g4ed_163__",
+      "parentCanonicalId": "g4ed-162-carcasa-del-termostato",
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.0736,
+        -0.18,
+        0.9679
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8916
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 164,
+      "canonicalId": "g4ed-164-tubo-metalico-de-refrigerante",
+      "nodeKey": "g4ed_164",
+      "groupNode": "asset_part__g4ed_164",
+      "meshNodePrefix": "asset_mesh__g4ed_164__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.757,
+        0,
+        -0.8504
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.9706
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 165,
+      "canonicalId": "g4ed-165-manguera-superior-del-radiador",
+      "nodeKey": "g4ed_165",
+      "groupNode": "asset_part__g4ed_165",
+      "meshNodePrefix": "asset_mesh__g4ed_165__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.84,
+        0.18,
+        0.1298
+      ],
+      "bounds": {
+        "center": [
+          -0.0033,
+          0.0543,
+          0.025
+        ],
+        "radius": 1.0379
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 166,
+      "canonicalId": "g4ed-166-manguera-inferior-del-radiador",
+      "nodeKey": "g4ed_166",
+      "groupNode": "asset_part__g4ed_166",
+      "meshNodePrefix": "asset_mesh__g4ed_166__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7819,
+        0.36,
+        0.5384
+      ],
+      "bounds": {
+        "center": [
+          -0.004,
+          0.0548,
+          0.0249
+        ],
+        "radius": 1.1163
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 167,
+      "canonicalId": "g4ed-167-manguera-bypass",
+      "nodeKey": "g4ed_167",
+      "groupNode": "asset_part__g4ed_167",
+      "meshNodePrefix": "asset_mesh__g4ed_167__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2456,
+        0.54,
+        -1.0586
+      ],
+      "bounds": {
+        "center": [
+          -0.0048,
+          0.0552,
+          0.0249
+        ],
+        "radius": 1.1942
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 168,
+      "canonicalId": "g4ed-168-manguera-de-entrada-al-calefactor",
+      "nodeKey": "g4ed_168",
+      "groupNode": "asset_part__g4ed_168",
+      "meshNodePrefix": "asset_mesh__g4ed_168__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.5378,
+        -0.54,
+        0.7456
+      ],
+      "bounds": {
+        "center": [
+          -0.003,
+          0.057,
+          0.0256
+        ],
+        "radius": 0.7905
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 169,
+      "canonicalId": "g4ed-169-manguera-de-retorno-del-calefactor",
+      "nodeKey": "g4ed_169",
+      "groupNode": "asset_part__g4ed_169",
+      "meshNodePrefix": "asset_mesh__g4ed_169__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1454,
+        -0.36,
+        -0.3128
+      ],
+      "bounds": {
+        "center": [
+          -0.0039,
+          0.0577,
+          0.0253
+        ],
+        "radius": 0.8684
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 170,
+      "canonicalId": "g4ed-170-radiador",
+      "nodeKey": "g4ed_170",
+      "groupNode": "asset_part__g4ed_170",
+      "meshNodePrefix": "asset_mesh__g4ed_170__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7784,
+        -0.18,
+        -0.4378
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8916
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 171,
+      "canonicalId": "g4ed-171-tapon-presurizado-del-radiador",
+      "nodeKey": "g4ed_171",
+      "groupNode": "asset_part__g4ed_171",
+      "meshNodePrefix": "asset_mesh__g4ed_171__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3797,
+        0,
+        0.7776
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1419,
+          0
+        ],
+        "radius": 0.409
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 172,
+      "canonicalId": "g4ed-172-deposito-de-expansion",
+      "nodeKey": "g4ed_172",
+      "groupNode": "asset_part__g4ed_172",
+      "meshNodePrefix": "asset_mesh__g4ed_172__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3296,
+        0.18,
+        -0.919
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 1.0496
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 173,
+      "canonicalId": "g4ed-173-manguera-del-deposito",
+      "nodeKey": "g4ed_173",
+      "groupNode": "asset_part__g4ed_173",
+      "meshNodePrefix": "asset_mesh__g4ed_173__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9811,
+        0.36,
+        0.5258
+      ],
+      "bounds": {
+        "center": [
+          -0.0049,
+          0.0558,
+          0.0249
+        ],
+        "radius": 1.131
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 174,
+      "canonicalId": "g4ed-174-ventilador-del-radiador",
+      "nodeKey": "g4ed_174",
+      "groupNode": "asset_part__g4ed_174",
+      "meshNodePrefix": "asset_mesh__g4ed_174__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -821,9 +1199,9 @@
         ]
       },
       "explodeVector": [
-        -0.5006,
+        -1.1758,
         0.54,
-        -0.9225
+        0.2006
       ],
       "bounds": {
         "center": [
@@ -831,19 +1209,19 @@
           0,
           0
         ],
-        "radius": 0.9036
+        "radius": 0.9469
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 42,
-      "canonicalId": "g4ed-042-piston-numero-1",
-      "nodeKey": "g4ed_042",
-      "groupNode": "asset_part__g4ed_042",
-      "meshNodePrefix": "asset_mesh__g4ed_042__",
-      "parentCanonicalId": null,
+      "ordinal": 175,
+      "canonicalId": "g4ed-175-motor-electrico-del-ventilador",
+      "nodeKey": "g4ed_175",
+      "groupNode": "asset_part__g4ed_175",
+      "meshNodePrefix": "asset_mesh__g4ed_175__",
+      "parentCanonicalId": "g4ed-174-ventilador-del-radiador",
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
@@ -856,7 +1234,7 @@
         "EXPLODE_REASSEMBLE",
         "RESET_CAMERA"
       ],
-      "animationMode": "RECIPROCATING_MOTION",
+      "animationMode": "ROTATIONAL_FUNCTION",
       "originalTransform": {
         "position": [
           0,
@@ -875,9 +1253,9 @@
         ]
       },
       "explodeVector": [
-        0.9934,
+        0.4736,
         -0.54,
-        0.2247
+        -0.8055
       ],
       "bounds": {
         "center": [
@@ -885,19 +1263,19 @@
           0,
           0
         ],
-        "radius": 0.6437
+        "radius": 0.6176
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 43,
-      "canonicalId": "g4ed-043-piston-numero-2",
-      "nodeKey": "g4ed_043",
-      "groupNode": "asset_part__g4ed_043",
-      "meshNodePrefix": "asset_mesh__g4ed_043__",
-      "parentCanonicalId": null,
+      "ordinal": 176,
+      "canonicalId": "g4ed-176-aspas-del-ventilador",
+      "nodeKey": "g4ed_176",
+      "groupNode": "asset_part__g4ed_176",
+      "meshNodePrefix": "asset_mesh__g4ed_176__",
+      "parentCanonicalId": "g4ed-174-ventilador-del-radiador",
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
@@ -910,7 +1288,7 @@
         "EXPLODE_REASSEMBLE",
         "RESET_CAMERA"
       ],
-      "animationMode": "RECIPROCATING_MOTION",
+      "animationMode": "ROTATIONAL_FUNCTION",
       "originalTransform": {
         "position": [
           0,
@@ -929,9 +1307,9 @@
         ]
       },
       "explodeVector": [
-        -0.9964,
+        0.1411,
         -0.36,
-        0.4429
+        1.0776
       ],
       "bounds": {
         "center": [
@@ -939,19 +1317,19 @@
           0,
           0
         ],
-        "radius": 0.713
+        "radius": 0.6724
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 44,
-      "canonicalId": "g4ed-044-piston-numero-3",
-      "nodeKey": "g4ed_044",
-      "groupNode": "asset_part__g4ed_044",
-      "meshNodePrefix": "asset_mesh__g4ed_044__",
-      "parentCanonicalId": null,
+      "ordinal": 177,
+      "canonicalId": "g4ed-177-marco-o-shroud-del-ventilador",
+      "nodeKey": "g4ed_177",
+      "groupNode": "asset_part__g4ed_177",
+      "meshNodePrefix": "asset_mesh__g4ed_177__",
+      "parentCanonicalId": "g4ed-174-ventilador-del-radiador",
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
@@ -964,7 +1342,7 @@
         "EXPLODE_REASSEMBLE",
         "RESET_CAMERA"
       ],
-      "animationMode": "RECIPROCATING_MOTION",
+      "animationMode": "ROTATIONAL_FUNCTION",
       "originalTransform": {
         "position": [
           0,
@@ -983,9 +1361,9 @@
         ]
       },
       "explodeVector": [
-        0.4206,
+        -0.8019,
         -0.18,
-        -1.022
+        -0.5335
       ],
       "bounds": {
         "center": [
@@ -993,18 +1371,18 @@
           0,
           0
         ],
-        "radius": 0.7823
+        "radius": 0.7273
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 45,
-      "canonicalId": "g4ed-045-piston-numero-4",
-      "nodeKey": "g4ed_045",
-      "groupNode": "asset_part__g4ed_045",
-      "meshNodePrefix": "asset_mesh__g4ed_045__",
+      "ordinal": 178,
+      "canonicalId": "g4ed-178-rele-del-ventilador",
+      "nodeKey": "g4ed_178",
+      "groupNode": "asset_part__g4ed_178",
+      "meshNodePrefix": "asset_mesh__g4ed_178__",
       "parentCanonicalId": null,
       "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
@@ -1018,7 +1396,7 @@
         "EXPLODE_REASSEMBLE",
         "RESET_CAMERA"
       ],
-      "animationMode": "RECIPROCATING_MOTION",
+      "animationMode": "ROTATIONAL_FUNCTION",
       "originalTransform": {
         "position": [
           0,
@@ -1037,9 +1415,9 @@
         ]
       },
       "explodeVector": [
-        0.3205,
+        1.1178,
         0,
-        0.7873
+        -0.0612
       ],
       "bounds": {
         "center": [
@@ -1047,20 +1425,20 @@
           0,
           0
         ],
-        "radius": 0.8516
+        "radius": 0.7822
       },
       "directlySellable": true,
       "dimensional": false,
       "oemClaim": false
     },
     {
-      "ordinal": 46,
-      "canonicalId": "g4ed-046-pasadores-o-bulones-de-piston",
-      "nodeKey": "g4ed_046",
-      "groupNode": "asset_part__g4ed_046",
-      "meshNodePrefix": "asset_mesh__g4ed_046__",
+      "ordinal": 179,
+      "canonicalId": "g4ed-179-sensor-ect-de-temperatura-del-refrigerante",
+      "nodeKey": "g4ed_179",
+      "groupNode": "asset_part__g4ed_179",
+      "meshNodePrefix": "asset_mesh__g4ed_179__",
       "parentCanonicalId": null,
-      "elementKind": "SERVICE_HARDWARE",
+      "elementKind": "SELLABLE_COMPONENT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -1072,7 +1450,7 @@
         "EXPLODE_REASSEMBLE",
         "RESET_CAMERA"
       ],
-      "animationMode": "RECIPROCATING_MOTION",
+      "animationMode": "EXPLODE_REASSEMBLE",
       "originalTransform": {
         "position": [
           0,
@@ -1091,387 +1469,9 @@
         ]
       },
       "explodeVector": [
-        -0.8494,
+        -0.8389,
         0.18,
-        -0.4154
-      ],
-      "bounds": {
-        "center": [
-          0,
-          -0.1372,
-          0
-        ],
-        "radius": 0.4423
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 47,
-      "canonicalId": "g4ed-047-seguros-de-los-pasadores",
-      "nodeKey": "g4ed_047",
-      "groupNode": "asset_part__g4ed_047",
-      "meshNodePrefix": "asset_mesh__g4ed_047__",
-      "parentCanonicalId": null,
-      "elementKind": "SERVICE_HARDWARE",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "REMOVE_INSTALL",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.9843,
-        0.36,
-        -0.3211
-      ],
-      "bounds": {
-        "center": [
-          0,
-          -0.1325,
-          0
-        ],
-        "radius": 0.4756
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 48,
-      "canonicalId": "g4ed-048-primer-anillo-de-compresion-de-cada-piston",
-      "nodeKey": "g4ed_048",
-      "groupNode": "asset_part__g4ed_048",
-      "meshNodePrefix": "asset_mesh__g4ed_048__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "RECIPROCATING_MOTION",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.5663,
-        0.54,
-        0.7333
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.0596
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 49,
-      "canonicalId": "g4ed-049-segundo-anillo-de-compresion-de-cada-piston",
-      "nodeKey": "g4ed_049",
-      "groupNode": "asset_part__g4ed_049",
-      "meshNodePrefix": "asset_mesh__g4ed_049__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "RECIPROCATING_MOTION",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.254,
-        -0.54,
-        -0.9484
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.6437
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 50,
-      "canonicalId": "g4ed-050-expansor-del-anillo-de-aceite",
-      "nodeKey": "g4ed_050",
-      "groupNode": "asset_part__g4ed_050",
-      "meshNodePrefix": "asset_mesh__g4ed_050__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.693,
-        -0.36,
-        0.6312
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.8126
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 51,
-      "canonicalId": "g4ed-051-riel-superior-del-anillo-de-aceite",
-      "nodeKey": "g4ed_051",
-      "groupNode": "asset_part__g4ed_051",
-      "meshNodePrefix": "asset_mesh__g4ed_051__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.9328,
-        -0.18,
-        0.1051
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.8916
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 52,
-      "canonicalId": "g4ed-052-riel-inferior-del-anillo-de-aceite",
-      "nodeKey": "g4ed_052",
-      "groupNode": "asset_part__g4ed_052",
-      "meshNodePrefix": "asset_mesh__g4ed_052__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.6676,
-        0,
-        -0.7387
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.9706
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 53,
-      "canonicalId": "g4ed-053-biela-numero-1",
-      "nodeKey": "g4ed_053",
-      "groupNode": "asset_part__g4ed_053",
-      "meshNodePrefix": "asset_mesh__g4ed_053__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.0408,
-        0.18,
-        1.0893
+        0.7855
       ],
       "bounds": {
         "center": [
@@ -1486,13 +1486,13 @@
       "oemClaim": false
     },
     {
-      "ordinal": 54,
-      "canonicalId": "g4ed-054-biela-numero-2",
-      "nodeKey": "g4ed_054",
-      "groupNode": "asset_part__g4ed_054",
-      "meshNodePrefix": "asset_mesh__g4ed_054__",
+      "ordinal": 180,
+      "canonicalId": "g4ed-180-emisor-de-temperatura-para-el-indicador-segun-version",
+      "nodeKey": "g4ed_180",
+      "groupNode": "asset_part__g4ed_180",
+      "meshNodePrefix": "asset_mesh__g4ed_180__",
       "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
+      "elementKind": "CONDITIONAL_VARIANT",
       "renderStrategy": "ISOLATED_PART",
       "authority": "REFERENCE_RECONSTRUCTION",
       "cameraPreset": "PRODUCT_ORBIT",
@@ -1523,9 +1523,9 @@
         ]
       },
       "explodeVector": [
-        -0.8493,
+        0.0207,
         0.36,
-        -0.6054
+        -0.8497
       ],
       "bounds": {
         "center": [
@@ -1540,281 +1540,11 @@
       "oemClaim": false
     },
     {
-      "ordinal": 55,
-      "canonicalId": "g4ed-055-biela-numero-3",
-      "nodeKey": "g4ed_055",
-      "groupNode": "asset_part__g4ed_055",
-      "meshNodePrefix": "asset_mesh__g4ed_055__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.8489,
-        0.54,
-        0.0495
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 1.2076
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 56,
-      "canonicalId": "g4ed-056-biela-numero-4",
-      "nodeKey": "g4ed_056",
-      "groupNode": "asset_part__g4ed_056",
-      "meshNodePrefix": "asset_mesh__g4ed_056__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -0.7246,
-        -0.54,
-        0.6943
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.7336
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 57,
-      "canonicalId": "g4ed-057-tapas-de-biela",
-      "nodeKey": "g4ed_057",
-      "groupNode": "asset_part__g4ed_057",
-      "meshNodePrefix": "asset_mesh__g4ed_057__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.1423,
-        -0.36,
-        -0.8418
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.8126
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 58,
-      "canonicalId": "g4ed-058-cojinetes-superiores-de-biela",
-      "nodeKey": "g4ed_058",
-      "groupNode": "asset_part__g4ed_058",
-      "meshNodePrefix": "asset_mesh__g4ed_058__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        0.6352,
-        -0.18,
-        0.7989
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.8916
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 59,
-      "canonicalId": "g4ed-059-cojinetes-inferiores-de-biela",
-      "nodeKey": "g4ed_059",
-      "groupNode": "asset_part__g4ed_059",
-      "meshNodePrefix": "asset_mesh__g4ed_059__",
-      "parentCanonicalId": null,
-      "elementKind": "SELLABLE_COMPONENT",
-      "renderStrategy": "ISOLATED_PART",
-      "authority": "REFERENCE_RECONSTRUCTION",
-      "cameraPreset": "PRODUCT_ORBIT",
-      "interactionModes": [
-        "ORBIT_360",
-        "ZOOM",
-        "ISOLATE",
-        "XRAY_CONTEXT",
-        "EXPLODE_REASSEMBLE",
-        "RESET_CAMERA"
-      ],
-      "animationMode": "EXPLODE_REASSEMBLE",
-      "originalTransform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
-      "explodeVector": [
-        -1.1792,
-        0,
-        -0.2444
-      ],
-      "bounds": {
-        "center": [
-          0,
-          0,
-          0
-        ],
-        "radius": 0.9706
-      },
-      "directlySellable": true,
-      "dimensional": false,
-      "oemClaim": false
-    },
-    {
-      "ordinal": 60,
-      "canonicalId": "g4ed-060-pernos-o-tuercas-de-biela",
-      "nodeKey": "g4ed_060",
-      "groupNode": "asset_part__g4ed_060",
-      "meshNodePrefix": "asset_mesh__g4ed_060__",
+      "ordinal": 181,
+      "canonicalId": "g4ed-181-tapon-de-drenaje-del-radiador",
+      "nodeKey": "g4ed_181",
+      "groupNode": "asset_part__g4ed_181",
+      "meshNodePrefix": "asset_mesh__g4ed_181__",
       "parentCanonicalId": null,
       "elementKind": "SERVICE_HARDWARE",
       "renderStrategy": "ISOLATED_PART",
@@ -1847,17 +1577,17 @@
         ]
       },
       "explodeVector": [
-        0.7396,
-        0.18,
-        -0.419
+        0.6179,
+        0.54,
+        0.731
       ],
       "bounds": {
         "center": [
           0,
-          -0.1372,
+          -0.1278,
           0
         ],
-        "radius": 0.4423
+        "radius": 0.5089
       },
       "directlySellable": true,
       "dimensional": false,
