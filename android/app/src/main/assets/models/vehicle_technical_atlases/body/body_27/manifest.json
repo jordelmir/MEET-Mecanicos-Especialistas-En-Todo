@@ -1,0 +1,2461 @@
+{
+  "schemaVersion": 1,
+  "packId": "body_27",
+  "atlasId": "meet.accent2005.sedan-body.parts.1665",
+  "atlasVersion": "1.0.0",
+  "atlasContentSha256": "fbc45bbacd051909754336b64512a7b20b8e675dea18a5910800641ed52d498d",
+  "sourceSha256": "719fbb72f6994d1e37a6072395a23ad84caa82b2bedc4b65b1a06586ed568e5f",
+  "assetFile": "body_27.glb",
+  "assetPath": "models/vehicle_technical_atlases/body/body_27/body_27.glb",
+  "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-vehicle-technical-atlases.mjs",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "groupNodePrefix": "asset_part__",
+  "meshNodePrefix": "asset_mesh__",
+  "elementCount": 45,
+  "ordinalRange": [
+    1266,
+    1310
+  ],
+  "meshCount": 48,
+  "triangleCount": 41416,
+  "sha256": "2425607d97c426976f0d414a734b02cf10c20d87b46e72eb3d30e1dec19b3899",
+  "license": "Original procedural reference reconstruction generated for MEET",
+  "warning": "Reconstrucción técnica de referencia. Confirmar VIN, OEM, código aplicable, equipamiento, foto, conector y medidas.",
+  "bindings": [
+    {
+      "ordinal": 1266,
+      "canonicalId": "body-1266-bastidor-del-cojin-inferior",
+      "nodeKey": "body_1266",
+      "groupNode": "asset_part__body_1266",
+      "meshNodePrefix": "asset_mesh__body_1266__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8531,
+        0.54,
+        -0.3569
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7814
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1267,
+      "canonicalId": "body-1267-muelles-del-cojin",
+      "nodeKey": "body_1267",
+      "groupNode": "asset_part__body_1267",
+      "meshNodePrefix": "asset_mesh__body_1267__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9814,
+        -0.54,
+        -0.2943
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8282
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1268,
+      "canonicalId": "body-1268-espuma-inferior",
+      "nodeKey": "body_1268",
+      "groupNode": "asset_part__body_1268",
+      "meshNodePrefix": "asset_mesh__body_1268__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5574,
+        -0.36,
+        0.9454
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8751
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1269,
+      "canonicalId": "body-1269-tapizado-inferior",
+      "nodeKey": "body_1269",
+      "groupNode": "asset_part__body_1269",
+      "meshNodePrefix": "asset_mesh__body_1269__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2649,
+        -0.18,
+        -0.8294
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5001
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1270,
+      "canonicalId": "body-1270-ganchos-delanteros-del-cojin",
+      "nodeKey": "body_1270",
+      "groupNode": "asset_part__body_1270",
+      "meshNodePrefix": "asset_mesh__body_1270__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6975,
+        0,
+        0.5544
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5469
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1271,
+      "canonicalId": "body-1271-anclajes-traseros",
+      "nodeKey": "body_1271",
+      "groupNode": "asset_part__body_1271",
+      "meshNodePrefix": "asset_mesh__body_1271__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9317,
+        0.18,
+        0.1448
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5938
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1272,
+      "canonicalId": "body-1272-tornillos-de-fijacion",
+      "nodeKey": "body_1272",
+      "groupNode": "asset_part__body_1272",
+      "meshNodePrefix": "asset_mesh__body_1272__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6604,
+        0.36,
+        -0.6523
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1282,
+          0
+        ],
+        "radius": 0.2242
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1273,
+      "canonicalId": "body-1273-respaldo-fijo-completo-version-base",
+      "nodeKey": "body_1273",
+      "groupNode": "asset_part__body_1273",
+      "meshNodePrefix": "asset_mesh__body_1273__",
+      "parentCanonicalId": null,
+      "elementKind": "ASSEMBLY",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.0511,
+        0.54,
+        0.969
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6876
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1274,
+      "canonicalId": "body-1274-bastidor-de-respaldo-fijo",
+      "nodeKey": "body_1274",
+      "groupNode": "asset_part__body_1274",
+      "meshNodePrefix": "asset_mesh__body_1274__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8572,
+        -0.54,
+        -0.7693
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7345
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1275,
+      "canonicalId": "body-1275-espuma-de-respaldo",
+      "nodeKey": "body_1275",
+      "groupNode": "asset_part__body_1275",
+      "meshNodePrefix": "asset_mesh__body_1275__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8493,
+        -0.36,
+        0.0356
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7814
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1276,
+      "canonicalId": "body-1276-tapizado",
+      "nodeKey": "body_1276",
+      "groupNode": "asset_part__body_1276",
+      "meshNodePrefix": "asset_mesh__body_1276__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7191,
+        -0.18,
+        0.6247
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8282
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1277,
+      "canonicalId": "body-1277-panel-posterior",
+      "nodeKey": "body_1277",
+      "groupNode": "asset_part__body_1277",
+      "meshNodePrefix": "asset_mesh__body_1277__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.1329,
+        0,
+        -1.0809
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8751
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1278,
+      "canonicalId": "body-1278-respaldo-izquierdo-abatible-si-equipa",
+      "nodeKey": "body_1278",
+      "groupNode": "asset_part__body_1278",
+      "meshNodePrefix": "asset_mesh__body_1278__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6436,
+        0.18,
+        0.6956
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5001
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1279,
+      "canonicalId": "body-1279-respaldo-derecho-abatible",
+      "nodeKey": "body_1279",
+      "groupNode": "asset_part__body_1279",
+      "meshNodePrefix": "asset_mesh__body_1279__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1816,
+        0.36,
+        -0.2088
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5469
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1280,
+      "canonicalId": "body-1280-bastidor-izquierdo",
+      "nodeKey": "body_1280",
+      "groupNode": "asset_part__body_1280",
+      "meshNodePrefix": "asset_mesh__body_1280__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7357,
+        0.54,
+        -0.546
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5938
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1281,
+      "canonicalId": "body-1281-bastidor-derecho",
+      "nodeKey": "body_1281",
+      "groupNode": "asset_part__body_1281",
+      "meshNodePrefix": "asset_mesh__body_1281__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2818,
+        -0.54,
+        0.8109
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6407
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1282,
+      "canonicalId": "body-1282-espuma-izquierda",
+      "nodeKey": "body_1282",
+      "groupNode": "asset_part__body_1282",
+      "meshNodePrefix": "asset_mesh__body_1282__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4361,
+        -0.36,
+        -0.8788
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6876
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1283,
+      "canonicalId": "body-1283-espuma-derecha",
+      "nodeKey": "body_1283",
+      "groupNode": "asset_part__body_1283",
+      "meshNodePrefix": "asset_mesh__body_1283__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.035,
+        -0.18,
+        0.4164
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7345
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1284,
+      "canonicalId": "body-1284-tapizado-izquierdo",
+      "nodeKey": "body_1284",
+      "groupNode": "asset_part__body_1284",
+      "meshNodePrefix": "asset_mesh__body_1284__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1368,
+        0,
+        0.2911
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7814
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1285,
+      "canonicalId": "body-1285-tapizado-derecho",
+      "nodeKey": "body_1285",
+      "groupNode": "asset_part__body_1285",
+      "meshNodePrefix": "asset_mesh__body_1285__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3922,
+        0.18,
+        -0.8606
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8282
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1286,
+      "canonicalId": "body-1286-bisagra-central",
+      "nodeKey": "body_1286",
+      "groupNode": "asset_part__body_1286",
+      "meshNodePrefix": "asset_mesh__body_1286__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2435,
+        0.36,
+        1.0528
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8751
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1287,
+      "canonicalId": "body-1287-bisagra-lateral-izquierda",
+      "nodeKey": "body_1287",
+      "groupNode": "asset_part__body_1287",
+      "meshNodePrefix": "asset_mesh__body_1287__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8688,
+        0.54,
+        -0.4566
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5001
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1288,
+      "canonicalId": "body-1288-bisagra-lateral-derecha",
+      "nodeKey": "body_1288",
+      "groupNode": "asset_part__body_1288",
+      "meshNodePrefix": "asset_mesh__body_1288__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.103,
+        -0.54,
+        -0.1684
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5469
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1289,
+      "canonicalId": "body-1289-pernos-de-bisagras",
+      "nodeKey": "body_1289",
+      "groupNode": "asset_part__body_1289",
+      "meshNodePrefix": "asset_mesh__body_1289__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7367,
+        -0.36,
+        0.8647
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1305,
+          0
+        ],
+        "radius": 0.2078
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1290,
+      "canonicalId": "body-1290-cerradura-izquierda-del-respaldo",
+      "nodeKey": "body_1290",
+      "groupNode": "asset_part__body_1290",
+      "meshNodePrefix": "asset_mesh__body_1290__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.0739,
+        -0.18,
+        -0.8468
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6407
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1291,
+      "canonicalId": "body-1291-cerradura-derecha",
+      "nodeKey": "body_1291",
+      "groupNode": "asset_part__body_1291",
+      "meshNodePrefix": "asset_mesh__body_1291__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6928,
+        0,
+        0.6556
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6876
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1292,
+      "canonicalId": "body-1292-striker-izquierdo",
+      "nodeKey": "body_1292",
+      "groupNode": "asset_part__body_1292",
+      "meshNodePrefix": "asset_mesh__body_1292__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.03,
+        0.18,
+        -0.0006
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7345
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1293,
+      "canonicalId": "body-1293-striker-derecho",
+      "nodeKey": "body_1293",
+      "groupNode": "asset_part__body_1293",
+      "meshNodePrefix": "asset_mesh__body_1293__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8263,
+        0.36,
+        -0.5738
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7814
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1294,
+      "canonicalId": "body-1294-boton-de-liberacion-izquierdo",
+      "nodeKey": "body_1294",
+      "groupNode": "asset_part__body_1294",
+      "meshNodePrefix": "asset_mesh__body_1294__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.1064,
+        0.54,
+        0.9662
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8282
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1295,
+      "canonicalId": "body-1295-boton-de-liberacion-derecho",
+      "nodeKey": "body_1295",
+      "groupNode": "asset_part__body_1295",
+      "meshNodePrefix": "asset_mesh__body_1295__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5168,
+        -0.54,
+        -0.8654
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8751
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1296,
+      "canonicalId": "body-1296-varilla-o-cable-de-liberacion",
+      "nodeKey": "body_1296",
+      "groupNode": "asset_part__body_1296",
+      "meshNodePrefix": "asset_mesh__body_1296__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9255,
+        -0.36,
+        0.1485
+      ],
+      "bounds": {
+        "center": [
+          -0.0018,
+          0.0491,
+          0.0208
+        ],
+        "radius": 0.5763
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1297,
+      "canonicalId": "body-1297-escudos-laterales",
+      "nodeKey": "body_1297",
+      "groupNode": "asset_part__body_1297",
+      "meshNodePrefix": "asset_mesh__body_1297__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8694,
+        -0.18,
+        0.5202
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5469
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1298,
+      "canonicalId": "body-1298-reposacabezas-trasero-izquierdo-si-equipa",
+      "nodeKey": "body_1298",
+      "groupNode": "asset_part__body_1298",
+      "meshNodePrefix": "asset_mesh__body_1298__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2913,
+        0,
+        -1.0525
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5938
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1299,
+      "canonicalId": "body-1299-reposacabezas-trasero-central-si-equipa",
+      "nodeKey": "body_1299",
+      "groupNode": "asset_part__body_1299",
+      "meshNodePrefix": "asset_mesh__body_1299__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.5571,
+        0.18,
+        0.7545
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6407
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1300,
+      "canonicalId": "body-1300-reposacabezas-trasero-derecho",
+      "nodeKey": "body_1300",
+      "groupNode": "asset_part__body_1300",
+      "meshNodePrefix": "asset_mesh__body_1300__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7983,
+        0.36,
+        -0.3332
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6876
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1301,
+      "canonicalId": "body-1301-guias-de-reposacabezas",
+      "nodeKey": "body_1301",
+      "groupNode": "asset_part__body_1301",
+      "meshNodePrefix": "asset_mesh__body_1301__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8691,
+        0.54,
+        -0.4153
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7345
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1302,
+      "canonicalId": "body-1302-botones-de-liberacion",
+      "nodeKey": "body_1302",
+      "groupNode": "asset_part__body_1302",
+      "meshNodePrefix": "asset_mesh__body_1302__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4371,
+        -0.54,
+        0.7697
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7814
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1303,
+      "canonicalId": "body-1303-bracket-inferior-de-anclaje-infantil-izquierdo",
+      "nodeKey": "body_1303",
+      "groupNode": "asset_part__body_1303",
+      "meshNodePrefix": "asset_mesh__body_1303__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3346,
+        -0.36,
+        -0.9257
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8282
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1304,
+      "canonicalId": "body-1304-bracket-inferior-de-anclaje-infantil-derecho",
+      "nodeKey": "body_1304",
+      "groupNode": "asset_part__body_1304",
+      "meshNodePrefix": "asset_mesh__body_1304__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0466,
+        -0.18,
+        0.547
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.8751
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1305,
+      "canonicalId": "body-1305-anclaje-superior-de-silla-infantil",
+      "nodeKey": "body_1305",
+      "groupNode": "asset_part__body_1305",
+      "meshNodePrefix": "asset_mesh__body_1305__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8303,
+        0,
+        0.1821
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5001
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1306,
+      "canonicalId": "body-1306-tapa-de-anclaje",
+      "nodeKey": "body_1306",
+      "groupNode": "asset_part__body_1306",
+      "meshNodePrefix": "asset_mesh__body_1306__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.541,
+        0.18,
+        -0.7932
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5469
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1307,
+      "canonicalId": "body-1307-apoyabrazos-central-si-equipa",
+      "nodeKey": "body_1307",
+      "groupNode": "asset_part__body_1307",
+      "meshNodePrefix": "asset_mesh__body_1307__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.1318,
+        0.36,
+        1.081
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5938
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1308,
+      "canonicalId": "body-1308-bisagra-del-apoyabrazos",
+      "nodeKey": "body_1308",
+      "groupNode": "asset_part__body_1308",
+      "meshNodePrefix": "asset_mesh__body_1308__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "RECIPROCATING_MOTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.856,
+        0.54,
+        -0.5481
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6407
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1309,
+      "canonicalId": "body-1309-retenedor",
+      "nodeKey": "body_1309",
+      "groupNode": "asset_part__body_1309",
+      "meshNodePrefix": "asset_mesh__body_1309__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.209,
+        -0.54,
+        -0.0396
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6876
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1310,
+      "canonicalId": "body-1310-portavasos-si-equipa",
+      "nodeKey": "body_1310",
+      "groupNode": "asset_part__body_1310",
+      "meshNodePrefix": "asset_mesh__body_1310__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.6028,
+        -0.36,
+        0.7684
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7345
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    }
+  ]
+}

@@ -1,0 +1,3379 @@
+{
+  "schemaVersion": 1,
+  "packId": "remaining_systems_20",
+  "atlasId": "meet.accent2005.remaining-systems.parts.1953",
+  "atlasVersion": "1.0.0",
+  "atlasContentSha256": "b1889977beca8d1d8a221391ef40052fc9fd8006e8455da53981cf1889cae059",
+  "sourceSha256": "e9d82c61d08bfda44867666ecf5a7b4ba0d3bf67ced2fc32ba0271eeee3d9364",
+  "assetFile": "remaining_systems_20.glb",
+  "assetPath": "models/vehicle_technical_atlases/remaining_systems/remaining_systems_20/remaining_systems_20.glb",
+  "geometryAuthority": "MIXED_REFERENCE_AND_SEMANTIC",
+  "dimensionalState": "ILLUSTRATIVE_PROPORTIONS_ONLY",
+  "oemClaim": false,
+  "vehicleSpecificClaim": false,
+  "generatedBy": "tools/engine-asset-generator/generate-vehicle-technical-atlases.mjs",
+  "generatorVersion": "1.0.0",
+  "threeVersion": "185",
+  "groupNodePrefix": "asset_part__",
+  "meshNodePrefix": "asset_mesh__",
+  "elementCount": 62,
+  "ordinalRange": [
+    1676,
+    1737
+  ],
+  "meshCount": 69,
+  "triangleCount": 54420,
+  "sha256": "81519c785865274f74804ece41ffa2f87732650caa501e6c98aa51d1cb48d25e",
+  "license": "Original procedural reference reconstruction generated for MEET",
+  "warning": "Reconstrucción técnica de referencia. Confirmar VIN, OEM, código aplicable, equipamiento, foto, conector y medidas.",
+  "bindings": [
+    {
+      "ordinal": 1676,
+      "canonicalId": "remaining_systems-1676-unidad-principal",
+      "nodeKey": "remaining_systems_1676",
+      "groupNode": "asset_part__remaining_systems_1676",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1676__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.4266,
+        0,
+        0.9713
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5612
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1677,
+      "canonicalId": "remaining_systems-1677-chasis-metalico",
+      "nodeKey": "remaining_systems_1677",
+      "groupNode": "asset_part__remaining_systems_1677",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1677__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9646,
+        0.18,
+        -0.298
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1678,
+      "canonicalId": "remaining_systems-1678-panel-frontal",
+      "nodeKey": "remaining_systems_1678",
+      "groupNode": "asset_part__remaining_systems_1678",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1678__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0387,
+        0.36,
+        -0.3629
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1679,
+      "canonicalId": "remaining_systems-1679-pantalla",
+      "nodeKey": "remaining_systems_1679",
+      "groupNode": "asset_part__remaining_systems_1679",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1679__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5216,
+        0.54,
+        0.9835
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1680,
+      "canonicalId": "remaining_systems-1680-pcb-principal",
+      "nodeKey": "remaining_systems_1680",
+      "groupNode": "asset_part__remaining_systems_1680",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1680__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2479,
+        -0.54,
+        -0.813
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7384
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1681,
+      "canonicalId": "remaining_systems-1681-sintonizador",
+      "nodeKey": "remaining_systems_1681",
+      "groupNode": "asset_part__remaining_systems_1681",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1681__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8095,
+        -0.36,
+        0.4931
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1682,
+      "canonicalId": "remaining_systems-1682-amplificador-interno",
+      "nodeKey": "remaining_systems_1682",
+      "groupNode": "asset_part__remaining_systems_1682",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1682__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.0077,
+        -0.18,
+        0.2255
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1683,
+      "canonicalId": "remaining_systems-1683-disipador",
+      "nodeKey": "remaining_systems_1683",
+      "groupNode": "asset_part__remaining_systems_1683",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1683__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6515,
+        0,
+        -0.6914
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1684,
+      "canonicalId": "remaining_systems-1684-mecanismo-de-casete-cd-segun-radio",
+      "nodeKey": "remaining_systems_1684",
+      "groupNode": "asset_part__remaining_systems_1684",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1684__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.1459,
+        0.18,
+        0.9629
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1685,
+      "canonicalId": "remaining_systems-1685-motor-del-mecanismo",
+      "nodeKey": "remaining_systems_1685",
+      "groupNode": "asset_part__remaining_systems_1685",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1685__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.6456,
+        0.36,
+        -0.7091
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4801
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1686,
+      "canonicalId": "remaining_systems-1686-engranajes",
+      "nodeKey": "remaining_systems_1686",
+      "groupNode": "asset_part__remaining_systems_1686",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1686__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9395,
+        0.54,
+        -0.0283
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5122
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1687,
+      "canonicalId": "remaining_systems-1687-lector-optico-si-equipa-cd",
+      "nodeKey": "remaining_systems_1687",
+      "groupNode": "asset_part__remaining_systems_1687",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1687__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7359,
+        -0.54,
+        0.6787
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1688,
+      "canonicalId": "remaining_systems-1688-boton-de-encendido",
+      "nodeKey": "remaining_systems_1688",
+      "groupNode": "asset_part__remaining_systems_1688",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1688__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.0607,
+        -0.36,
+        -1.0884
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1689,
+      "canonicalId": "remaining_systems-1689-perilla-de-volumen",
+      "nodeKey": "remaining_systems_1689",
+      "groupNode": "asset_part__remaining_systems_1689",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1689__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7678,
+        -0.18,
+        0.657
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7384
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1690,
+      "canonicalId": "remaining_systems-1690-encoder",
+      "nodeKey": "remaining_systems_1690",
+      "groupNode": "asset_part__remaining_systems_1690",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1690__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8415,
+        0,
+        -0.137
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1691,
+      "canonicalId": "remaining_systems-1691-botones-de-memoria",
+      "nodeKey": "remaining_systems_1691",
+      "groupNode": "asset_part__remaining_systems_1691",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1691__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7759,
+        0.18,
+        -0.6154
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1692,
+      "canonicalId": "remaining_systems-1692-botones-de-sintonia",
+      "nodeKey": "remaining_systems_1692",
+      "groupNode": "asset_part__remaining_systems_1692",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1692__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2341,
+        0.36,
+        0.8278
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1693,
+      "canonicalId": "remaining_systems-1693-conector-principal",
+      "nodeKey": "remaining_systems_1693",
+      "groupNode": "asset_part__remaining_systems_1693",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1693__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5491,
+        0.54,
+        -0.8454
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1694,
+      "canonicalId": "remaining_systems-1694-conector-de-altavoces",
+      "nodeKey": "remaining_systems_1694",
+      "groupNode": "asset_part__remaining_systems_1694",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1694__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.1498,
+        -0.54,
+        0.3396
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5612
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1695,
+      "canonicalId": "remaining_systems-1695-conector-de-antena",
+      "nodeKey": "remaining_systems_1695",
+      "groupNode": "asset_part__remaining_systems_1695",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1695__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.7744,
+        -0.36,
+        0.3503
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1696,
+      "canonicalId": "remaining_systems-1696-bracket-izquierdo",
+      "nodeKey": "remaining_systems_1696",
+      "groupNode": "asset_part__remaining_systems_1696",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1696__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3698,
+        -0.18,
+        -0.8918
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1697,
+      "canonicalId": "remaining_systems-1697-bracket-derecho",
+      "nodeKey": "remaining_systems_1697",
+      "groupNode": "asset_part__remaining_systems_1697",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1697__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3408,
+        0,
+        1.0286
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1698,
+      "canonicalId": "remaining_systems-1698-tornillos",
+      "nodeKey": "remaining_systems_1698",
+      "groupNode": "asset_part__remaining_systems_1698",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1698__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9872,
+        0.18,
+        -0.4015
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1212,
+          0
+        ],
+        "radius": 0.2735
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1699,
+      "canonicalId": "remaining_systems-1699-marco-bisel",
+      "nodeKey": "remaining_systems_1699",
+      "groupNode": "asset_part__remaining_systems_1699",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1699__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.1725,
+        0.36,
+        -0.2397
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1700,
+      "canonicalId": "remaining_systems-1700-bolsillo-din-cuando-se-instala-radio-de-una-altura",
+      "nodeKey": "remaining_systems_1700",
+      "groupNode": "asset_part__remaining_systems_1700",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1700__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4654,
+        0.54,
+        0.9121
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1701,
+      "canonicalId": "remaining_systems-1701-altavoz-delantero-izquierdo",
+      "nodeKey": "remaining_systems_1701",
+      "groupNode": "asset_part__remaining_systems_1701",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1701__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.1518,
+        -0.54,
+        -0.8388
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1702,
+      "canonicalId": "remaining_systems-1702-altavoz-delantero-derecho",
+      "nodeKey": "remaining_systems_1702",
+      "groupNode": "asset_part__remaining_systems_1702",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1702__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8093,
+        -0.36,
+        0.6
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1703,
+      "canonicalId": "remaining_systems-1703-altavoz-trasero-izquierdo",
+      "nodeKey": "remaining_systems_1703",
+      "groupNode": "asset_part__remaining_systems_1703",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1703__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.1169,
+        -0.18,
+        0.0813
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5612
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1704,
+      "canonicalId": "remaining_systems-1704-altavoz-trasero-derecho",
+      "nodeKey": "remaining_systems_1704",
+      "groupNode": "asset_part__remaining_systems_1704",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1704__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8288,
+        0,
+        -0.6193
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1705,
+      "canonicalId": "remaining_systems-1705-canasta-de-cada-altavoz",
+      "nodeKey": "remaining_systems_1705",
+      "groupNode": "asset_part__remaining_systems_1705",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1705__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.0109,
+        0.18,
+        0.9699
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1706,
+      "canonicalId": "remaining_systems-1706-iman",
+      "nodeKey": "remaining_systems_1706",
+      "groupNode": "asset_part__remaining_systems_1706",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1706__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.626,
+        0.36,
+        -0.8131
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1707,
+      "canonicalId": "remaining_systems-1707-placa-polar",
+      "nodeKey": "remaining_systems_1707",
+      "groupNode": "asset_part__remaining_systems_1707",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1707__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0248,
+        0.54,
+        0.0852
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7384
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1708,
+      "canonicalId": "remaining_systems-1708-bobina-movil",
+      "nodeKey": "remaining_systems_1708",
+      "groupNode": "asset_part__remaining_systems_1708",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1708__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.8975,
+        -0.54,
+        0.5802
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1709,
+      "canonicalId": "remaining_systems-1709-cono",
+      "nodeKey": "remaining_systems_1709",
+      "groupNode": "asset_part__remaining_systems_1709",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1709__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2261,
+        -0.36,
+        -1.0708
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1710,
+      "canonicalId": "remaining_systems-1710-suspension-exterior",
+      "nodeKey": "remaining_systems_1710",
+      "groupNode": "asset_part__remaining_systems_1710",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1710__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.4469,
+        -0.18,
+        0.723
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1711,
+      "canonicalId": "remaining_systems-1711-arana",
+      "nodeKey": "remaining_systems_1711",
+      "groupNode": "asset_part__remaining_systems_1711",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1711__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9046,
+        0,
+        -0.2639
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1712,
+      "canonicalId": "remaining_systems-1712-guardapolvo-central",
+      "nodeKey": "remaining_systems_1712",
+      "groupNode": "asset_part__remaining_systems_1712",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1712__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.9201,
+        0.18,
+        -0.4899
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5612
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1713,
+      "canonicalId": "remaining_systems-1713-terminal-positivo",
+      "nodeKey": "remaining_systems_1713",
+      "groupNode": "asset_part__remaining_systems_1713",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1713__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.3977,
+        0.36,
+        0.7946
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1714,
+      "canonicalId": "remaining_systems-1714-terminal-negativo",
+      "nodeKey": "remaining_systems_1714",
+      "groupNode": "asset_part__remaining_systems_1714",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1714__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.4472,
+        0.54,
+        -0.9013
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1715,
+      "canonicalId": "remaining_systems-1715-adaptadores",
+      "nodeKey": "remaining_systems_1715",
+      "groupNode": "asset_part__remaining_systems_1715",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1715__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7652,
+        -0.54,
+        0.4747
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1716,
+      "canonicalId": "remaining_systems-1716-tornillos",
+      "nodeKey": "remaining_systems_1716",
+      "groupNode": "asset_part__remaining_systems_1716",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1716__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9005,
+        -0.36,
+        0.2439
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1212,
+          0
+        ],
+        "radius": 0.2735
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1717,
+      "canonicalId": "remaining_systems-1717-rejillas",
+      "nodeKey": "remaining_systems_1717",
+      "groupNode": "asset_part__remaining_systems_1717",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1717__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.5279,
+        -0.18,
+        -0.8329
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.7827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1718,
+      "canonicalId": "remaining_systems-1718-espumas-selladoras",
+      "nodeKey": "remaining_systems_1718",
+      "groupNode": "asset_part__remaining_systems_1718",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1718__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2264,
+        0,
+        1.0675
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1719,
+      "canonicalId": "remaining_systems-1719-tweeter-izquierdo-si-equipa",
+      "nodeKey": "remaining_systems_1719",
+      "groupNode": "asset_part__remaining_systems_1719",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1719__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9808,
+        0.18,
+        -0.4978
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1720,
+      "canonicalId": "remaining_systems-1720-tweeter-derecho",
+      "nodeKey": "remaining_systems_1720",
+      "groupNode": "asset_part__remaining_systems_1720",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1720__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.8443,
+        0.36,
+        -0.1123
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1721,
+      "canonicalId": "remaining_systems-1721-capacitores-de-filtro",
+      "nodeKey": "remaining_systems_1721",
+      "groupNode": "asset_part__remaining_systems_1721",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1721__",
+      "parentCanonicalId": null,
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.615,
+        0.54,
+        0.8244
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.468
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1722,
+      "canonicalId": "remaining_systems-1722-mastil",
+      "nodeKey": "remaining_systems_1722",
+      "groupNode": "asset_part__remaining_systems_1722",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1722__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.0293,
+        -0.54,
+        -0.8497
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1723,
+      "canonicalId": "remaining_systems-1723-secciones-telescopicas-si-es-retractil",
+      "nodeKey": "remaining_systems_1723",
+      "groupNode": "asset_part__remaining_systems_1723",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1723__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.7797,
+        -0.36,
+        0.6963
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6498
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1724,
+      "canonicalId": "remaining_systems-1724-base",
+      "nodeKey": "remaining_systems_1724",
+      "groupNode": "asset_part__remaining_systems_1724",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1724__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.2079,
+        -0.18,
+        -0.0644
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6941
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1725,
+      "canonicalId": "remaining_systems-1725-tuerca-exterior",
+      "nodeKey": "remaining_systems_1725",
+      "groupNode": "asset_part__remaining_systems_1725",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1725__",
+      "parentCanonicalId": null,
+      "elementKind": "SERVICE_HARDWARE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.6596,
+        0,
+        -0.5362
+      ],
+      "bounds": {
+        "center": [
+          0,
+          -0.1212,
+          0
+        ],
+        "radius": 0.2735
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1726,
+      "canonicalId": "remaining_systems-1726-sello-de-base",
+      "nodeKey": "remaining_systems_1726",
+      "groupNode": "asset_part__remaining_systems_1726",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1726__",
+      "parentCanonicalId": null,
+      "elementKind": "CONSUMABLE",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "REMOVE_INSTALL",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.1373,
+        0.18,
+        0.9596
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6199
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1727,
+      "canonicalId": "remaining_systems-1727-cable-coaxial",
+      "nodeKey": "remaining_systems_1727",
+      "groupNode": "asset_part__remaining_systems_1727",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1727__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5773,
+        0.36,
+        -0.9027
+      ],
+      "bounds": {
+        "center": [
+          -0.003,
+          0.0513,
+          0.0211
+        ],
+        "radius": 0.9181
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1728,
+      "canonicalId": "remaining_systems-1728-conductor-central",
+      "nodeKey": "remaining_systems_1728",
+      "groupNode": "asset_part__remaining_systems_1728",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1728__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0894,
+        0.54,
+        0.1972
+      ],
+      "bounds": {
+        "center": [
+          -0.0018,
+          0.0491,
+          0.0208
+        ],
+        "radius": 0.5763
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1729,
+      "canonicalId": "remaining_systems-1729-blindaje",
+      "nodeKey": "remaining_systems_1729",
+      "groupNode": "asset_part__remaining_systems_1729",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1729__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.0575,
+        -0.54,
+        0.4714
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5169
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1730,
+      "canonicalId": "remaining_systems-1730-conector-de-radio",
+      "nodeKey": "remaining_systems_1730",
+      "groupNode": "asset_part__remaining_systems_1730",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1730__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.2687,
+        -0.36,
+        -1.0341
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5612
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1731,
+      "canonicalId": "remaining_systems-1731-brackets-de-ruta",
+      "nodeKey": "remaining_systems_1731",
+      "groupNode": "asset_part__remaining_systems_1731",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1731__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.3832,
+        -0.18,
+        0.7761
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6055
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1732,
+      "canonicalId": "remaining_systems-1732-motor-de-antena-electrica-si-equipa",
+      "nodeKey": "remaining_systems_1732",
+      "groupNode": "asset_part__remaining_systems_1732",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1732__",
+      "parentCanonicalId": null,
+      "elementKind": "CONDITIONAL_VARIANT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.9449,
+        0,
+        -0.386
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.5442
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1733,
+      "canonicalId": "remaining_systems-1733-tambor-de-cable",
+      "nodeKey": "remaining_systems_1733",
+      "groupNode": "asset_part__remaining_systems_1733",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1733__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        1.0587,
+        0.18,
+        -0.3557
+      ],
+      "bounds": {
+        "center": [
+          -0.003,
+          0.0515,
+          0.0211
+        ],
+        "radius": 0.7945
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1734,
+      "canonicalId": "remaining_systems-1734-cable-dentado",
+      "nodeKey": "remaining_systems_1734",
+      "groupNode": "asset_part__remaining_systems_1734",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1734__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "FLOW_TRACE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.5767,
+        0.36,
+        0.7473
+      ],
+      "bounds": {
+        "center": [
+          -0.0021,
+          0.0504,
+          0.021
+        ],
+        "radius": 0.8195
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1735,
+      "canonicalId": "remaining_systems-1735-engranajes",
+      "nodeKey": "remaining_systems_1735",
+      "groupNode": "asset_part__remaining_systems_1735",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1735__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "ROTATIONAL_FUNCTION",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -0.2061,
+        0.54,
+        -0.9411
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.6405
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1736,
+      "canonicalId": "remaining_systems-1736-rele-interno",
+      "nodeKey": "remaining_systems_1736",
+      "groupNode": "asset_part__remaining_systems_1736",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1736__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        0.784,
+        -0.54,
+        0.6013
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.827
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    },
+    {
+      "ordinal": 1737,
+      "canonicalId": "remaining_systems-1737-tubo-de-drenaje",
+      "nodeKey": "remaining_systems_1737",
+      "groupNode": "asset_part__remaining_systems_1737",
+      "meshNodePrefix": "asset_mesh__remaining_systems_1737__",
+      "parentCanonicalId": null,
+      "elementKind": "SELLABLE_COMPONENT",
+      "renderStrategy": "ISOLATED_PART",
+      "authority": "REFERENCE_RECONSTRUCTION",
+      "cameraPreset": "PRODUCT_ORBIT",
+      "interactionModes": [
+        "ORBIT_360",
+        "ZOOM",
+        "ISOLATE",
+        "XRAY_CONTEXT",
+        "EXPLODE_REASSEMBLE",
+        "RESET_CAMERA"
+      ],
+      "animationMode": "EXPLODE_REASSEMBLE",
+      "originalTransform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "explodeVector": [
+        -1.0173,
+        -0.36,
+        0.1332
+      ],
+      "bounds": {
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "radius": 0.4726
+      },
+      "directlySellable": true,
+      "dimensional": false,
+      "oemClaim": false
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# G4ED system pack matrix
+# MEET system pack matrix
 
 | Pack | Scope |
 |---|---|
@@ -39,3 +39,22 @@ A release build contains:
 - the same atlas content SHA-256 in every manifest;
 - no missing group or mesh prefix in the GLB JSON chunks.
 
+## Vehicle technical atlas families
+
+| Root | Packs | Elements | Scope |
+|---|---:|---:|---|
+| `vehicle_technical_atlases/transmission_hydraulics` | 13 | 838 | Automatic transmission, driveline, brakes and hydraulic interfaces |
+| `vehicle_technical_atlases/electrical` | 34 | 1,529 | Power, starting, charging, control, harnesses, sensors and equipment |
+| `vehicle_technical_atlases/body` | 38 | 1,665 | Structure, exterior, doors, glazing, trim, cabin and body equipment |
+| `vehicle_technical_atlases/remaining_systems` | 25 | 1,953 | Suspension, steering, brakes, fuel, EVAP, exhaust, HVAC, SRS and service items |
+
+Technical pack IDs are `<domainId>_<sectionNumber padded to 2 digits>`. The
+atlas owns that routing. Android resolves manifests through the domain
+descriptor and never guesses paths from display names.
+
+## Combined completion invariant
+
+A full release contains 130 manifests and GLBs: 20 G4ED plus 110 technical.
+They bind exactly 6,405 canonical experiences. Each family has its own
+canonical content SHA-256; each manifest repeats that hash and independently
+signs its GLB bytes.

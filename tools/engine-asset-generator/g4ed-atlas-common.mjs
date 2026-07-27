@@ -317,7 +317,18 @@ export function elementBounds(group) {
   };
 }
 
-export async function exportPack(state, packId, elements, atlas) {
+export async function exportPack(
+  state,
+  packId,
+  elements,
+  atlas,
+  {
+    root = outputRoot,
+    assetRoot = "models/g4ed_atlas",
+    generatedBy = "tools/engine-asset-generator/generate-g4ed-atlas.mjs",
+    generatorVersion = "1.0.0"
+  } = {}
+) {
   const exporter = new GLTFExporter();
   const arrayBuffer = await new Promise((resolve, reject) => {
     exporter.parse(state.scene, resolve, reject, {
@@ -328,7 +339,7 @@ export async function exportPack(state, packId, elements, atlas) {
       maxTextureSize: 1024
     });
   });
-  const directory = path.join(outputRoot, packId);
+  const directory = path.join(root, packId);
   const assetFile = `${packId}.glb`;
   fs.mkdirSync(directory, { recursive: true });
   const glb = Buffer.from(arrayBuffer);
@@ -372,13 +383,13 @@ export async function exportPack(state, packId, elements, atlas) {
     atlasContentSha256: atlas.contentSha256,
     sourceSha256: atlas.source.sha256,
     assetFile,
-    assetPath: `models/g4ed_atlas/${packId}/${assetFile}`,
+    assetPath: `${assetRoot}/${packId}/${assetFile}`,
     geometryAuthority: "MIXED_REFERENCE_AND_SEMANTIC",
     dimensionalState: "ILLUSTRATIVE_PROPORTIONS_ONLY",
     oemClaim: false,
     vehicleSpecificClaim: false,
-    generatedBy: "tools/engine-asset-generator/generate-g4ed-atlas.mjs",
-    generatorVersion: "1.0.0",
+    generatedBy,
+    generatorVersion,
     threeVersion: THREE.REVISION,
     groupNodePrefix: GROUP_PREFIX,
     meshNodePrefix: NODE_PREFIX,
@@ -401,4 +412,3 @@ export async function exportPack(state, packId, elements, atlas) {
     sha256
   };
 }
-

@@ -68,6 +68,7 @@ import com.elysium369.meet.core.catalog.ProprietaryKnowledgeHit
 import com.elysium369.meet.core.catalog.ProprietaryKnowledgeSearchRepository
 import com.elysium369.meet.core.catalog.ProprietaryPartsCatalogRepository
 import com.elysium369.meet.core.catalog.ProprietarySourceBlock
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -97,6 +98,11 @@ fun ProprietaryPartsBrowser(
     var searchFailure by remember { mutableStateOf<String?>(null) }
     var selectedStandaloneHit by remember { mutableStateOf<ProprietaryKnowledgeHit?>(null) }
     var showG4edAtlas by remember { mutableStateOf(initialPartId?.startsWith("g4ed-") == true) }
+    var showTechnicalAtlases by remember {
+        mutableStateOf(
+            initialPartId?.let(VehicleTechnicalAtlasDescriptors::forCanonicalId) != null,
+        )
+    }
     var selectedEntity by remember(initialPartId, index) {
         mutableStateOf(index?.entities?.firstOrNull { it.id == initialPartId })
     }
@@ -152,6 +158,11 @@ fun ProprietaryPartsBrowser(
                 initialPartId = initialPartId,
                 onBack = { showG4edAtlas = false },
             )
+            showTechnicalAtlases -> VehicleTechnicalAtlasesExperience(
+                navController = navController,
+                initialPartId = initialPartId,
+                onBack = { showTechnicalAtlases = false },
+            )
             selectedEntity != null -> {
                 val activeEntity = selectedEntity!!
                 val literalBlocks = remember(activeEntity) {
@@ -199,6 +210,7 @@ fun ProprietaryPartsBrowser(
                     if (directEntity != null) selectedEntity = directEntity else selectedStandaloneHit = hit
                 },
                 onOpenG4edAtlas = { showG4edAtlas = true },
+                onOpenTechnicalAtlases = { showTechnicalAtlases = true },
                 onOpenGuidedPilot = onOpenGuidedPilot
             )
         }
@@ -250,6 +262,7 @@ private fun ProprietaryCatalogList(
     onEntitySelected: (ProprietaryCatalogEntity) -> Unit,
     onKnowledgeHitSelected: (ProprietaryKnowledgeHit) -> Unit,
     onOpenG4edAtlas: () -> Unit,
+    onOpenTechnicalAtlases: () -> Unit,
     onOpenGuidedPilot: () -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -319,6 +332,42 @@ private fun ProprietaryCatalogList(
                 )
             }
             Text("ABRIR", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp)
+                .background(MeetColors.electricBlue.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.48f), RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpenTechnicalAtlases)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(MeetColors.electricBlue.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.55f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.ViewInAr, null, tint = MeetColors.electricBlue, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "ATLAS TÉCNICOS · 5.985 EXPERIENCIAS 3D",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
+                )
+                Text(
+                    "Transmisión · eléctrico · carrocería · chasis y periféricos",
+                    color = MeetColors.electricBlue,
+                    fontSize = 9.sp,
+                )
+            }
+            Text("ABRIR", color = MeetColors.electricBlue, fontSize = 9.sp, fontWeight = FontWeight.Black)
         }
 
         OutlinedTextField(

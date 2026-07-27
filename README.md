@@ -13,18 +13,18 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.3.0
+## Versión actual: 4.4.0
 
-La versión 4.3.0 incorpora el Atlas G4ED: 420 elementos mecánicos trazables,
-20 paquetes 3D/360 offline y un flujo canónico compartido por Motor 3D,
-Piezas, IA y Repuestos. El atlas distingue 333 repuestos de 87 regiones
-integradas, conserva ocho variantes condicionales y nunca presenta la
-reconstrucción procedural como CAD OEM o evidencia dimensional.
+La versión 4.4.0 amplía el Atlas G4ED a un universo técnico de 6.405
+experiencias 3D/360 offline: 420 elementos de motor y 5.985 elementos de
+transmisión/hidráulica, sistema eléctrico, carrocería/interior, chasis y
+periféricos. Los 130 paquetes GLB comparten IDs canónicos con Motor 3D,
+Piezas, IA, DTC y Repuestos.
 
 Cada detalle permite orbitar, aislar, ver contexto, activar auto-rotación y
-despiece; las solicitudes de repuestos conservan el ID canónico y muestran la
-referencia 3D junto a la advertencia de que una coincidencia visual no prueba
-compatibilidad exacta.
+despiece. La aplicabilidad registra lado, carrocería y equipamiento condicional;
+OEM, cantidad, supersesión y relaciones de fijación quedan explícitamente
+pendientes de VIN/EPC cuando la fuente no permite afirmarlos.
 
 La integración Master Automotive Knowledge añade un grafo determinista y
 citado que conecta DTC, pruebas, reparación, repuestos, IA y 3D sin eliminar el
@@ -43,7 +43,9 @@ Documentación técnica:
 - [`docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md`](docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md)
 - [`docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md`](docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md)
 - [`docs/visual3d/G4ED-420-ATLAS.md`](docs/visual3d/G4ED-420-ATLAS.md)
+- [`docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md`](docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md)
 - [`docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md`](docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md)
+- [`docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md`](docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md)
 
 ## Que es real hoy
 
@@ -58,6 +60,8 @@ Documentación técnica:
 - DoIP: activacion de routing ISO 13400 real y sondeo real del gateway/servidor UDS cuando se usa `:13400`.
 - Diagnostico Visual 3D: el visor ya se alimenta de fichas tecnicas por componente con DTCs, PIDs, pruebas, flujo de reparacion, herramientas, seguridad y contexto listo para IA.
 - Atlas G4ED: 420 experiencias 3D/360 offline enlazadas por ID canónico con Piezas, IA y solicitudes de Repuestos.
+- Atlas técnicos: 5.985 experiencias adicionales, 110 sistemas y 110 paquetes
+  GLB trazables para transmisión, eléctrico, carrocería, chasis y periféricos.
 - Monetizacion: la APK actual opera con acceso completo temporal sin paywalls; Google Play Billing 9.1.0 queda integrado para reactivacion futura.
 - Analytics web: eventos estructurados, consentimiento, cola offline, retencion y panel debug opcional para medir embudos reales sin depender de logs sueltos.
 - Onboarding y Home: perfil de uso, adaptador preferido, centro de mando con siguiente accion y demo de entrenamiento rotulada.

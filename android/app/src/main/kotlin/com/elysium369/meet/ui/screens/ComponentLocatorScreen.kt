@@ -481,6 +481,15 @@ fun ComponentLocatorScreen(
                 },
             )
             SceneSelectorTab(
+                label = "ATLAS · 5.985 SISTEMAS",
+                isSelected = false,
+                onClick = {
+                    navController.navigate(
+                        "parts_repairs?partId=transmission_hydraulics-0001-transaxle-automatica-completa",
+                    )
+                },
+            )
+            SceneSelectorTab(
                 label = "MOTOR 3D UNIVERSAL",
                 isSelected = currentScene == SceneType.UNIVERSAL_CATALOG,
                 onClick = {

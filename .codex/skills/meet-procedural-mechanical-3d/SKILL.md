@@ -1,6 +1,6 @@
 ---
 name: meet-procedural-mechanical-3d
-description: Build, extend, verify, or integrate procedural mechanical 3D/360 assets for MEET. Use this skill whenever work mentions engine parts, component meshes, GLB generation, Filament picking, exploded views, semantic regions, fluid paths, PBR mechanical materials, 3D parts commerce, or the G4ED 420-element atlas—even when the user only asks to “add a part in 3D.”
+description: Build, extend, verify, or integrate traceable procedural automotive 3D/360 assets for MEET. Use this skill for engine, transmission, hydraulics, electrical, body, interior, suspension, brakes, HVAC, SRS, component meshes, GLB generation, Filament picking, exploded views, semantic regions, flow/current traces, PBR materials, 3D parts commerce, or any of MEET's 6,405 canonical experiences—even when the user only asks to “add a part in 3D.”
 compatibility: Node.js, Three.js 0.185.1, Kotlin, Android assets, Filament
 ---
 
@@ -75,6 +75,15 @@ cd tools/engine-asset-generator
 npm ci
 npm run generate:g4ed -- --range START-END
 npm run verify:g4ed -- --range START-END
+```
+
+For the multidomain vehicle atlases:
+
+```bash
+python3 tools/knowledge/build_vehicle_technical_atlases.py --verify
+cd tools/engine-asset-generator
+npm run generate:technical-atlases
+npm run verify:technical-atlases
 ```
 
 Keep generation deterministic: stable element order, seeded explode vectors,
@@ -200,3 +209,78 @@ The first verified G4ED milestone provides four reference patterns:
   regions.
 
 Use these as patterns, not as dimensions for unrelated parts.
+
+## Multidomain production lessons (v3)
+
+### Preserve source numbering and canonical numbering separately
+
+Some owner-provided corpora restart at ordinal 1 for every system. Keep a
+single contiguous canonical ordinal for IDs and bindings, and preserve the
+local source ordinal separately. Never discard the source section/subsection
+needed to reconstruct provenance.
+
+### Normalize applicability before geometry
+
+Every technical element must explicitly encode:
+
+- side: left, right, both or not side-specific;
+- body-style condition;
+- installed-equipment conditions;
+- `REQUIRES_VERIFICATION` compatibility ceiling;
+- `PENDING_VIN_EPC` OEM resolution when VIN/EPC evidence is absent;
+- null OEM, quantity and supersession rather than invented placeholders.
+
+Hatchback-only parts must never appear as applicable to a selected sedan.
+ABS, EBD, SRS, A/C, cruise control and regional variants remain pending
+physical confirmation.
+
+### Use domain-specific functional language
+
+- hydraulics, lubrication, fuel and refrigerant: `FLOW_TRACE`;
+- electrical conductors and harnesses: `CURRENT_TRACE`;
+- shafts, hubs, pulleys and rotors: `ROTATIONAL_FUNCTION`;
+- struts, valves, pedals and actuators: `RECIPROCATING_MOTION`;
+- inseparable surfaces and passages: `REGION_PULSE`;
+- service hardware and consumables: `REMOVE_INSTALL`.
+
+Animations teach function. They do not simulate live pressure, current, force,
+temperature or motion unless measured data is present.
+
+### Treat safety-critical domains conservatively
+
+- Do not simplify the documented Accent rear suspension to a torsion beam:
+  preserve upper arm, lower arm, assist link and rear strut relationships until
+  VIN and physical verification establish the exact assembly.
+- SRS and pretensioner geometry must remain inert, non-service-operational
+  reference content.
+- Brake, steering, suspension and structural-body visuals require explicit
+  inspection/torque/alignment/manual gates before service.
+- Electrical diagnosis must prioritize voltage drop under load, connector
+  keying, pin count and ground integrity instead of visual similarity.
+
+### Full vehicle-atlas release gate
+
+A complete 4.4+ release contains:
+
+- 20 G4ED packs with 420 bindings;
+- 110 multidomain packs with 5,985 bindings;
+- 6,405 unique experiences across 130 packs;
+- source, canonical-atlas and GLB hashes verified;
+- Piezas and Motor 3D entry points;
+- cited canonical context for AI;
+- DTC navigation and reference-safe parts requests;
+- zero unsupported OEM, dimensional or exact-compatibility claims.
+
+Run:
+
+```bash
+python3 .codex/skills/meet-procedural-mechanical-3d/scripts/run_evals.py
+python3 -m unittest tools.knowledge.test_build_vehicle_technical_atlases
+python3 tools/knowledge/build_vehicle_technical_atlases.py --verify
+node tools/engine-asset-generator/verify-vehicle-technical-atlases.mjs
+bash tests/parity/ci-verify.sh
+./android/gradlew -p android testDebugUnitTest assembleDebug
+```
+
+Read [system-pack-matrix.md](references/system-pack-matrix.md) for the combined
+130-pack routing contract.

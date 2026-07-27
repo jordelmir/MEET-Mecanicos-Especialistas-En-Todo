@@ -48,9 +48,12 @@ import com.elysium369.meet.core.parts.SuggestionSource
 import com.elysium369.meet.core.parts.ValidationLevel
 import com.elysium369.meet.core.parts.VehicleFingerprint
 import com.elysium369.meet.core.parts.WarningSeverity
-import com.elysium369.meet.core.catalog.G4edEngineAtlasRepository
+import com.elysium369.meet.core.catalog.CanonicalVehiclePartRepository
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dCatalog
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dRepository
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dCatalog
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dRepository
 import com.elysium369.meet.data.local.entities.PartRequestEntity
 import com.elysium369.meet.data.local.entities.PartOfferEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
@@ -473,25 +476,39 @@ private fun ClientWorkspaceView(
 ) {
     val autoVehicleInfo = remember { viewModel.buildVehicleInfoForRequest() }
     val vehicleInfoToUse = prefilledVehicleInfo ?: autoVehicleInfo
-    val atlasElement = remember(context, prefilledAtlasPartId) {
+    val canonicalPart = remember(context, prefilledAtlasPartId) {
         prefilledAtlasPartId?.let { canonicalId ->
-            runCatching {
-                G4edEngineAtlasRepository(context).atlas.elements.singleOrNull {
-                    it.canonicalId == canonicalId && it.commerce.directlySellable
-                }
-            }.getOrNull()
+            runCatching { CanonicalVehiclePartRepository(context).find(canonicalId) }
+                .getOrNull()
+                ?.takeIf { it.element.commerce.directlySellable }
         }
     }
-    val atlasManifest = remember(context, atlasElement) {
-        atlasElement?.let { element ->
-            runCatching { G4edAtlas3dRepository(context).manifest(element.visual.packId) }.getOrNull()
+    val atlasElement = canonicalPart?.element
+    val atlasManifest = remember(context, canonicalPart) {
+        canonicalPart?.let { part ->
+            runCatching {
+                if (part.element.canonicalId.startsWith("g4ed-")) {
+                    G4edAtlas3dRepository(context).manifest(part.element.visual.packId)
+                } else {
+                    val domainId = requireNotNull(
+                        VehicleTechnicalAtlasDescriptors
+                            .forCanonicalId(part.element.canonicalId),
+                    ).domainId
+                    VehicleTechnicalAtlas3dRepository(context)
+                        .manifest(domainId, part.element.visual.packId)
+                }
+            }.getOrNull()
         }
     }
     val atlasBinding = remember(atlasElement, atlasManifest) {
         if (atlasElement == null || atlasManifest == null) {
             null
         } else {
-            G4edAtlas3dCatalog.bindingFor(atlasElement, atlasManifest)
+            if (atlasElement.canonicalId.startsWith("g4ed-")) {
+                G4edAtlas3dCatalog.bindingFor(atlasElement, atlasManifest)
+            } else {
+                VehicleTechnicalAtlas3dCatalog.bindingFor(atlasElement, atlasManifest)
+            }
         }
     }
 
@@ -510,6 +527,7 @@ private fun ClientWorkspaceView(
         mutableStateOf(
             atlasElement?.let {
                 "Referencia canónica MEET: ${it.canonicalId}. " +
+                    "Atlas: ${canonicalPart?.atlasDisplayName}. " +
                     "Reconstrucción 3D no dimensional; confirmar VIN, OEM, foto, conector y medidas."
             }.orEmpty(),
         )

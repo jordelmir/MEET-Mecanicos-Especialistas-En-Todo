@@ -80,6 +80,7 @@ data class G4edAtlasElement(
     val commerce: G4edCommerceContract,
     val visual: G4edVisualContract,
     val knowledgeBinding: G4edKnowledgeBinding,
+    val normalization: G4edNormalizationState? = null,
 )
 
 @Serializable
@@ -88,6 +89,19 @@ data class G4edApplicability(
     val engineScope: String,
     val installedState: String,
     val compatibilityCeiling: String,
+    val side: String = "NOT_SIDE_SPECIFIC",
+    val bodyStyleCondition: String = "ALL_REFERENCED_BODY_STYLES",
+    val equipmentConditions: List<String> = emptyList(),
+)
+
+@Serializable
+data class G4edNormalizationState(
+    val identityKey: String,
+    val oemResolutionState: String,
+    val oemNumber: String?,
+    val quantity: Int?,
+    val supersededBy: String?,
+    val fastenerRelationshipState: String,
 )
 
 @Serializable
@@ -116,6 +130,7 @@ data class G4edKnowledgeBinding(
     val sourceSha256: String,
     val sectionNumber: Int,
     val sourceOrdinal: Int,
+    val sourceLocalOrdinal: Int? = null,
     val provenance: String,
 )
 

@@ -343,18 +343,23 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 val atlasContext = remember(atlasPartId, screenContext) {
                     atlasPartId?.let { canonicalId ->
                         runCatching {
-                            val atlas = com.elysium369.meet.core.catalog
-                                .G4edEngineAtlasRepository(screenContext).atlas
-                            val element = atlas.elements.single { it.canonicalId == canonicalId }
-                            val section = atlas.sections.single { it.systemId == element.systemId }
+                            val canonicalPart = requireNotNull(
+                                com.elysium369.meet.core.catalog
+                                    .CanonicalVehiclePartRepository(screenContext)
+                                    .find(canonicalId),
+                            )
+                            val element = canonicalPart.element
+                            val section = canonicalPart.section
                             buildString {
-                                appendLine("FUENTE CANÓNICA MEET G4ED")
+                                appendLine("FUENTE CANÓNICA MEET · ${canonicalPart.atlasDisplayName}")
+                                appendLine("Atlas: ${canonicalPart.atlasId}")
                                 appendLine("ID: ${element.canonicalId}")
                                 appendLine("Elemento: ${element.nameOriginal}")
                                 appendLine("Sistema: ${section.title}")
                                 appendLine("Conocimiento: ${section.knowledge}")
                                 appendLine("Autoridad visual: ${element.visual.authority}")
-                                appendLine(atlas.geometryPolicy.warning)
+                                appendLine("Vehículo de referencia: ${canonicalPart.vehicleLabel}")
+                                appendLine(canonicalPart.geometryWarning)
                                 append(
                                     "No afirmar compatibilidad exacta sin VIN/OEM/foto/" +
                                         "conector/medidas y confirmación física.",

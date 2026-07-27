@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run deterministic v1 evaluations against MEET's proven G4ED assets."""
+"""Run deterministic v3 evaluations against MEET's 6,405 3D experiences."""
 
 from __future__ import annotations
 
@@ -26,6 +26,33 @@ BINDINGS = {
     binding["ordinal"]: binding
     for manifest in MANIFESTS.values()
     for binding in manifest["bindings"]
+}
+TECHNICAL_DOMAINS = (
+    "transmission_hydraulics",
+    "electrical",
+    "body",
+    "remaining_systems",
+)
+TECHNICAL_ATLASES = {
+    domain: json.loads(
+        (
+            ASSET_ROOT
+            / f"knowledge/vehicle_technical_atlases/{domain}_atlas.json"
+        ).read_text()
+    )
+    for domain in TECHNICAL_DOMAINS
+}
+TECHNICAL_MANIFESTS = {
+    (domain, pack_id): json.loads(
+        (
+            ASSET_ROOT
+            / f"models/vehicle_technical_atlases/{domain}/{pack_id}/manifest.json"
+        ).read_text()
+    )
+    for domain, atlas in TECHNICAL_ATLASES.items()
+    for pack_id in dict.fromkeys(
+        element["visual"]["packId"] for element in atlas["elements"]
+    )
 }
 
 
@@ -154,9 +181,10 @@ def main() -> None:
         ),
         grade(
             "AI receives canonical source and authority context",
-            "FUENTE CANÓNICA MEET G4ED" in main_ui
+            "FUENTE CANÓNICA MEET" in main_ui
+            and "CanonicalVehiclePartRepository" in main_ui
             and "Autoridad visual" in main_ui,
-            "Grounded G4ED AI context builder found",
+            "Grounded multidomain AI context builder found",
         ),
         grade(
             "Commerce carries canonical reference without exact visual promotion",
@@ -165,10 +193,140 @@ def main() -> None:
             "Canonical reference and compatibility disclaimer found",
         ),
     ]
+    technical_bindings = [
+        binding
+        for manifest in TECHNICAL_MANIFESTS.values()
+        for binding in manifest["bindings"]
+    ]
+    technical_nodes_valid = True
+    technical_hashes_valid = True
+    for (domain, _), manifest in TECHNICAL_MANIFESTS.items():
+        nodes = glb_nodes(manifest)
+        technical_nodes_valid &= all(
+            binding["groupNode"] in nodes
+            and any(name.startswith(binding["meshNodePrefix"]) for name in nodes)
+            for binding in manifest["bindings"]
+        )
+        technical_hashes_valid &= (
+            manifest["atlasContentSha256"]
+            == TECHNICAL_ATLASES[domain]["contentSha256"]
+        )
+    all_technical_elements = [
+        element
+        for atlas in TECHNICAL_ATLASES.values()
+        for element in atlas["elements"]
+    ]
+    grades += [
+        grade(
+            "Four technical atlases preserve expected identities",
+            {domain: len(atlas["elements"]) for domain, atlas in TECHNICAL_ATLASES.items()}
+            == {
+                "transmission_hydraulics": 838,
+                "electrical": 1529,
+                "body": 1665,
+                "remaining_systems": 1953,
+            },
+            f"{sum(len(atlas['elements']) for atlas in TECHNICAL_ATLASES.values())} elements",
+        ),
+        grade(
+            "Exactly 110 complete technical packs exist",
+            len(TECHNICAL_MANIFESTS) == 110,
+            f"{len(TECHNICAL_MANIFESTS)} manifests and GLBs",
+        ),
+        grade(
+            "All 5,985 technical bindings are unique",
+            len(technical_bindings) == 5985
+            and len({binding["canonicalId"] for binding in technical_bindings}) == 5985,
+            f"{len(technical_bindings)} bindings",
+        ),
+        grade(
+            "Every technical GLB node and hash verifies",
+            technical_nodes_valid and technical_hashes_valid,
+            "GLB, node and canonical atlas hashes verified",
+        ),
+        grade(
+            "Side-specific names have explicit side",
+            all(
+                ("izquierd" not in element["nameOriginal"].lower()
+                 or element["applicability"]["side"] in {"LEFT", "LEFT_AND_RIGHT"})
+                and
+                ("derech" not in element["nameOriginal"].lower()
+                 or element["applicability"]["side"] in {"RIGHT", "LEFT_AND_RIGHT"})
+                for element in all_technical_elements
+            ),
+            "Applicability side gate verified",
+        ),
+        grade(
+            "Hatchback-only parts cannot target the sedan",
+            all(
+                element["applicability"]["bodyStyleCondition"] != "HATCHBACK_ONLY"
+                or "sedán 4 puertas" not in element["applicability"]["vehicleScope"]
+                for element in all_technical_elements
+            ),
+            "Body-style gate verified",
+        ),
+        grade(
+            "Conditional equipment and OEM state fail closed",
+            all(
+                (
+                    element["elementKind"] != "CONDITIONAL_VARIANT"
+                    or element["applicability"]["installedState"]
+                    == "PENDING_PHYSICAL_CONFIRMATION"
+                )
+                and element["normalization"]["oemResolutionState"]
+                == "PENDING_VIN_EPC"
+                and element["normalization"]["oemNumber"] is None
+                and element["normalization"]["quantity"] is None
+                for element in all_technical_elements
+            ),
+            "Conditional and VIN/EPC gates verified",
+        ),
+        grade(
+            "Piezas and Motor 3D expose all technical atlases",
+            "ATLAS TÉCNICOS · 5.985 EXPERIENCIAS 3D" in pieces_ui
+            and "ATLAS · 5.985 SISTEMAS" in motor_ui,
+            "Multidomain navigation entry points found",
+        ),
+        grade(
+            "Commerce resolves G4ED and technical 3D manifests",
+            "VehicleTechnicalAtlas3dRepository" in commerce_ui
+            and "CanonicalVehiclePartRepository" in commerce_ui
+            and "G4edAtlas3dRepository" in commerce_ui,
+            "Canonical showroom resolver found",
+        ),
+        grade(
+            "Rear suspension architecture remains explicit",
+            all(
+                token in " ".join(
+                    section["knowledge"]
+                    for section in TECHNICAL_ATLASES["remaining_systems"]["sections"]
+                    if section["sectionNumber"] == 2
+                ).lower()
+                for token in ("upper arm", "lower arm", "assist link", "strut")
+            ),
+            "Rear upper/lower arms, assist link and strut preserved",
+        ),
+        grade(
+            "Electrical current traces have dedicated meshes",
+            any(
+                binding["animationMode"] == "CURRENT_TRACE"
+                for (domain, _), manifest in TECHNICAL_MANIFESTS.items()
+                if domain == "electrical"
+                for binding in manifest["bindings"]
+            ),
+            "CURRENT_TRACE bindings verified",
+        ),
+        grade(
+            "Combined release binds exactly 6,405 experiences in 130 packs",
+            len(BINDINGS) + len(technical_bindings) == 6405
+            and len(MANIFESTS) + len(TECHNICAL_MANIFESTS) == 130,
+            "420 + 5,985 bindings; 20 + 110 packs",
+        ),
+    ]
     passed = sum(item["passed"] for item in grades)
     output = {
         "skill": "meet-procedural-mechanical-3d",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "expectations": grades,
         "summary": {
             "passed": passed,

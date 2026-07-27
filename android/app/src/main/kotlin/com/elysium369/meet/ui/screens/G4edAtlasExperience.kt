@@ -67,11 +67,18 @@ import com.elysium369.meet.core.catalog.G4edAtlasSection
 import com.elysium369.meet.core.catalog.G4edEngineAtlas
 import com.elysium369.meet.core.catalog.G4edEngineAtlasEngine
 import com.elysium369.meet.core.catalog.G4edEngineAtlasRepository
+import com.elysium369.meet.core.catalog.G4edGeometryPolicy
+import com.elysium369.meet.core.catalog.G4edAtlasStatistics
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlas
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
+import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasRepository
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dBinding
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dCatalog
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dManifest
 import com.elysium369.meet.visual3d.domain.G4edAtlas3dRepository
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dCatalog
+import com.elysium369.meet.visual3d.domain.VehicleTechnicalAtlas3dRepository
 import io.github.sceneview.RenderQuality
 import io.github.sceneview.SceneView
 import io.github.sceneview.math.Position
@@ -88,6 +95,38 @@ private val atlasViolet = Color(0xFFB026FF)
 private val atlasAmber = Color(0xFFFFB000)
 private val atlasGlass = Color(0xC9111822)
 
+private data class AtlasExperienceContent(
+    val domainId: String,
+    val displayName: String,
+    val vehicleLabel: String,
+    val geometryPolicy: G4edGeometryPolicy,
+    val statistics: G4edAtlasStatistics,
+    val sections: List<G4edAtlasSection>,
+    val elements: List<G4edAtlasElement>,
+)
+
+private fun G4edEngineAtlas.experienceContent(): AtlasExperienceContent =
+    AtlasExperienceContent(
+        domainId = "g4ed",
+        displayName = displayName,
+        vehicleLabel = vehicleLabel,
+        geometryPolicy = geometryPolicy,
+        statistics = statistics,
+        sections = sections,
+        elements = elements,
+    )
+
+private fun VehicleTechnicalAtlas.experienceContent(): AtlasExperienceContent =
+    AtlasExperienceContent(
+        domainId = domainId,
+        displayName = displayName,
+        vehicleLabel = vehicleLabel,
+        geometryPolicy = geometryPolicy,
+        statistics = statistics,
+        sections = sections,
+        elements = elements,
+    )
+
 @Composable
 fun G4edAtlasExperience(
     navController: NavController,
@@ -96,7 +135,7 @@ fun G4edAtlasExperience(
 ) {
     val context = LocalContext.current
     val atlasResult = remember(context) { runCatching { G4edEngineAtlasRepository(context).atlas } }
-    val atlas = atlasResult.getOrNull()
+    val atlas = atlasResult.getOrNull()?.experienceContent()
     var query by remember { mutableStateOf("") }
     var selectedSystem by remember { mutableStateOf<String?>(null) }
     var sellableOnly by remember { mutableStateOf(false) }
@@ -139,8 +178,132 @@ fun G4edAtlasExperience(
 }
 
 @Composable
+fun VehicleTechnicalAtlasesExperience(
+    navController: NavController,
+    initialPartId: String?,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val repository = remember(context) { VehicleTechnicalAtlasRepository(context) }
+    val initialDomain = remember(initialPartId) {
+        initialPartId?.let(VehicleTechnicalAtlasDescriptors::forCanonicalId)?.domainId
+    }
+    var selectedDomain by remember(initialDomain) { mutableStateOf(initialDomain) }
+    val atlasResult = remember(repository, selectedDomain) {
+        selectedDomain?.let { domain -> runCatching { repository.atlas(domain) } }
+    }
+    val atlas = atlasResult?.getOrNull()?.experienceContent()
+    var query by remember(selectedDomain) { mutableStateOf("") }
+    var selectedSystem by remember(selectedDomain) { mutableStateOf<String?>(null) }
+    var sellableOnly by remember(selectedDomain) { mutableStateOf(false) }
+    var selectedElement by remember(atlas, initialPartId) {
+        mutableStateOf(atlas?.elements?.firstOrNull { it.canonicalId == initialPartId })
+    }
+
+    when {
+        selectedDomain == null -> TechnicalAtlasSelector(
+            onSelect = { selectedDomain = it },
+            onBack = onBack,
+        )
+        atlasResult?.isFailure == true -> Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "No se pudo validar el atlas: ${atlasResult.exceptionOrNull()?.message}",
+                color = MeetColors.error,
+                modifier = Modifier.padding(24.dp),
+            )
+        }
+        atlas == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Validando contratos técnicos...", color = atlasCyan)
+        }
+        selectedElement != null -> G4edElementDetail(
+            atlas = atlas,
+            element = selectedElement!!,
+            navController = navController,
+            onBack = { selectedElement = null },
+            onOpenParent = { parentId ->
+                selectedElement = atlas.elements.singleOrNull { it.canonicalId == parentId }
+            },
+        )
+        else -> G4edAtlasBrowser(
+            atlas = atlas,
+            query = query,
+            selectedSystem = selectedSystem,
+            sellableOnly = sellableOnly,
+            onQueryChanged = { query = it },
+            onSystemChanged = { selectedSystem = it },
+            onSellableChanged = { sellableOnly = it },
+            onElementSelected = { selectedElement = it },
+            onBack = { selectedDomain = null },
+        )
+    }
+}
+
+@Composable
+private fun TechnicalAtlasSelector(
+    onSelect: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    val cards = listOf(
+        Triple("transmission_hydraulics", "TRANSMISIÓN + HIDRÁULICA", "838 elementos · 13 sistemas"),
+        Triple("electrical", "SISTEMA ELÉCTRICO", "1.529 elementos · 34 sistemas"),
+        Triple("body", "CARROCERÍA + INTERIOR", "1.665 elementos · 38 sistemas"),
+        Triple("remaining_systems", "CHASIS + PERIFÉRICOS", "1.953 elementos · 25 sistemas"),
+    )
+    Column(
+        Modifier.fillMaxSize().background(Color(0xFF03070B)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("ATLAS TÉCNICOS 3D", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Text("5.985 experiencias offline · 110 sistemas", color = atlasCyan, fontSize = 9.sp)
+            }
+            Text("360°", color = atlasViolet, fontWeight = FontWeight.Black)
+        }
+        AtlasGlassPanel("AUTORIDAD Y TRAZABILIDAD", atlasAmber) {
+            Text(
+                "Reconstrucciones técnicas de referencia enlazadas al corpus aportado. No sustituyen VIN, OEM, EPC, foto, conector ni medidas.",
+                color = MeetColors.textSecondary,
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
+            )
+        }
+        cards.forEachIndexed { index, (domainId, title, subtitle) ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(atlasGlass, RoundedCornerShape(16.dp))
+                    .border(
+                        1.dp,
+                        if (index % 2 == 0) atlasCyan.copy(alpha = 0.48f) else atlasViolet.copy(alpha = 0.48f),
+                        RoundedCornerShape(16.dp),
+                    )
+                    .clickable { onSelect(domainId) }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AtlasPartGlyph((index + 1) * 17, "EXPLODE_REASSEMBLE")
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    Text(subtitle, color = atlasCyan, fontSize = 9.sp)
+                    Text("BÚSQUEDA · 3D · IA · DTC · REPUESTOS", color = atlasAmber, fontSize = 7.sp)
+                }
+                Icon(Icons.Default.ViewInAr, null, tint = atlasViolet)
+            }
+        }
+    }
+}
+
+@Composable
 private fun G4edAtlasBrowser(
-    atlas: G4edEngineAtlas,
+    atlas: AtlasExperienceContent,
     query: String,
     selectedSystem: String?,
     sellableOnly: Boolean,
@@ -169,8 +332,8 @@ private fun G4edAtlasBrowser(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
             }
             Column(Modifier.weight(1f)) {
-                Text("ATLAS MOTOR G4ED", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
-                Text("Hyundai Accent/Verna 2005 · 1.6 DOHC · automático", color = atlasCyan, fontSize = 9.sp)
+                Text(atlas.displayName.uppercase(), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                Text(atlas.vehicleLabel, color = atlasCyan, fontSize = 9.sp, maxLines = 1)
             }
             Box(
                 Modifier
@@ -178,7 +341,7 @@ private fun G4edAtlasBrowser(
                     .border(1.dp, atlasViolet.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
                     .padding(horizontal = 9.dp, vertical = 6.dp),
             ) {
-                Text("420 · 3D", color = atlasViolet, fontWeight = FontWeight.Black, fontSize = 10.sp)
+                Text("${atlas.statistics.elementCount} · 3D", color = atlasViolet, fontWeight = FontWeight.Black, fontSize = 10.sp)
             }
         }
 
@@ -186,9 +349,9 @@ private fun G4edAtlasBrowser(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AtlasMetric("420", "ELEMENTOS", atlasCyan, Modifier.weight(1f))
-            AtlasMetric("20", "SISTEMAS", atlasViolet, Modifier.weight(1f))
-            AtlasMetric("333", "REPUESTOS", atlasAmber, Modifier.weight(1f))
+            AtlasMetric(atlas.statistics.elementCount.toString(), "ELEMENTOS", atlasCyan, Modifier.weight(1f))
+            AtlasMetric(atlas.statistics.sectionCount.toString(), "SISTEMAS", atlasViolet, Modifier.weight(1f))
+            AtlasMetric(atlas.statistics.directlySellableCount.toString(), "REPUESTOS", atlasAmber, Modifier.weight(1f))
         }
 
         OutlinedTextField(
@@ -285,20 +448,30 @@ private fun G4edElementRow(
 
 @Composable
 private fun G4edElementDetail(
-    atlas: G4edEngineAtlas,
+    atlas: AtlasExperienceContent,
     element: G4edAtlasElement,
     navController: NavController,
     onBack: () -> Unit,
     onOpenParent: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val repository = remember(context) { G4edAtlas3dRepository(context) }
-    val manifestResult = remember(repository, element.visual.packId) {
-        runCatching { repository.manifest(element.visual.packId) }
+    val g4edRepository = remember(context) { G4edAtlas3dRepository(context) }
+    val technicalRepository = remember(context) { VehicleTechnicalAtlas3dRepository(context) }
+    val manifestResult = remember(atlas.domainId, element.visual.packId) {
+        runCatching {
+            if (atlas.domainId == "g4ed") {
+                g4edRepository.manifest(element.visual.packId)
+            } else {
+                technicalRepository.manifest(atlas.domainId, element.visual.packId)
+            }
+        }
     }
     val manifest = manifestResult.getOrNull()
-    val binding = remember(element, manifest) {
-        manifest?.let { G4edAtlas3dCatalog.bindingFor(element, it) }
+    val binding = remember(atlas.domainId, element, manifest) {
+        manifest?.let {
+            if (atlas.domainId == "g4ed") G4edAtlas3dCatalog.bindingFor(element, it)
+            else VehicleTechnicalAtlas3dCatalog.bindingFor(element, it)
+        }
     }
     val section = atlas.sections.single { it.systemId == element.systemId }
     val commerceElement = remember(element, atlas) {
@@ -370,6 +543,35 @@ private fun G4edElementDetail(
                         fontSize = 10.sp,
                         lineHeight = 15.sp,
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "POSICIÓN: ${element.applicability.side.replace('_', ' ')}",
+                        color = atlasCyan,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "CARROCERÍA: ${element.applicability.bodyStyleCondition.replace('_', ' ')}",
+                        color = atlasCyan,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (element.applicability.equipmentConditions.isNotEmpty()) {
+                        Text(
+                            "EQUIPAMIENTO: ${element.applicability.equipmentConditions.joinToString(" · ")}",
+                            color = atlasViolet,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    element.normalization?.let { normalization ->
+                        Text(
+                            "OEM / CANTIDAD / SUPERSESIÓN: ${normalization.oemResolutionState.replace('_', ' ')}",
+                            color = atlasAmber,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
 

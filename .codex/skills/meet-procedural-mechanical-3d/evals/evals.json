@@ -66,6 +66,50 @@
         "AI receives canonical source and authority context.",
         "Repuestos carries the canonical ID and keeps visual match non-exact."
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Convierte transmisión, sistema eléctrico, carrocería y sistemas faltantes en experiencias 3D completas.",
+      "expected_output": "Four traceable atlases with 5,985 elements in 110 complete GLB packs.",
+      "files": [],
+      "expectations": [
+        "All four canonical atlas hashes match their manifests.",
+        "Exactly 5,985 unique technical bindings exist in 110 packs.",
+        "Every GLB byte hash and node binding verifies."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Evita que la app invente compatibilidad OEM, lados u opciones instaladas.",
+      "expected_output": "Explicit side, body-style, equipment and VIN/EPC normalization gates.",
+      "files": [],
+      "expectations": [
+        "Left and right names carry an explicit side.",
+        "Hatchback-only parts are not presented as sedan-applicable.",
+        "Conditional equipment stays pending and unresolved OEM data stays null."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Integra los 6.405 elementos en Piezas, Motor 3D, IA, DTC y Repuestos.",
+      "expected_output": "One canonical closed loop spanning all 130 packs.",
+      "files": [],
+      "expectations": [
+        "Piezas and Motor 3D expose the multidomain selector.",
+        "AI resolves every supported canonical prefix through one repository.",
+        "Commerce shows canonical 3D separately from seller evidence."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Modela suspensión trasera, rutas eléctricas y seguridad sin falsificar autoridad.",
+      "expected_output": "Domain-aware functional recipes and conservative safety constraints.",
+      "files": [],
+      "expectations": [
+        "Rear suspension knowledge preserves upper arm, lower arm, assist link and rear strut.",
+        "Electrical routes use CURRENT_TRACE and dedicated mesh nodes.",
+        "No technical binding claims OEM or dimensional authority."
+      ]
     }
   ]
 }

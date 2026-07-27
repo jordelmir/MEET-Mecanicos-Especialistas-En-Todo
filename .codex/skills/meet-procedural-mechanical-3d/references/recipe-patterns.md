@@ -19,6 +19,32 @@ plausible but label them schematic unless routing evidence exists. Use distinct
 oil, coolant, air, fuel and exhaust materials; do not animate a live value when
 OBD data is absent.
 
+## Electrical path
+
+Use a dedicated emissive conductor or harness trace and `CURRENT_TRACE`.
+Distinguish source, load, control and ground conceptually without inventing pin
+numbers or voltages. Commerce comparison must include connector, pin count,
+keying and voltage drop under load.
+
+## Body and interior
+
+Prioritize silhouette, mounting edges, clip/weld patterns, side and body-style
+identity. Do not imply collision dimensions, structural repair authorization or
+sedan/hatchback interchangeability from a procedural panel.
+
+## Suspension, steering and brakes
+
+Show the joint topology and service interfaces needed to identify the part.
+Keep alignment, torque, preload and press-fit values out of geometry unless
+supported by the service source. Never collapse a documented mult-link layout
+into a visually simpler axle architecture.
+
+## SRS and safety equipment
+
+Use inert reference geometry only. Do not animate deployment, pyrotechnic
+activation or bypass procedures. Conditional equipment must stay pending
+physical confirmation.
+
 ## Rotational function
 
 Provide an explicit rotation axis and visually separate journals, teeth, rotor
@@ -44,4 +70,3 @@ When a dedicated recipe is not yet available, select a stable recipe from
 element kind and animation mode. Seed variations from the canonical ordinal.
 Fallback coverage must remain labeled `REFERENCE_RECONSTRUCTION`; prioritize
 high-value or safety-critical elements for dedicated refinement.
-
