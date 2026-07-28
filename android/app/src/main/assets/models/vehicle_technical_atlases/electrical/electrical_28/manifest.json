@@ -12,7 +12,7 @@
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-technical-atlases.mjs",
-  "generatorVersion": "1.0.0",
+  "generatorVersion": "1.1.0",
   "threeVersion": "185",
   "groupNodePrefix": "asset_part__",
   "meshNodePrefix": "asset_mesh__",
@@ -21,9 +21,9 @@
     1334,
     1367
   ],
-  "meshCount": 35,
-  "triangleCount": 29220,
-  "sha256": "84fe72d19ce51490c0847244a88fdf493b569f36574a96530bdfdeb420925260",
+  "meshCount": 82,
+  "triangleCount": 39308,
+  "sha256": "8322a56f0bbebf06352831cb8d80aecc11c69da7492806db094c29c5bbf5b62a",
   "license": "Original procedural reference reconstruction generated for MEET",
   "warning": "Reconstrucción técnica de referencia. Confirmar VIN, OEM, código aplicable, equipamiento, foto, conector y medidas.",
   "bindings": [
@@ -72,10 +72,10 @@
       "bounds": {
         "center": [
           0,
-          0,
-          0
+          -0.104,
+          -0.0057
         ],
-        "radius": 0.4939
+        "radius": 0.5524
       },
       "directlySellable": true,
       "dimensional": false,
@@ -126,10 +126,10 @@
       "bounds": {
         "center": [
           0,
-          0,
-          0
+          -0.1122,
+          -0.0061
         ],
-        "radius": 0.5329
+        "radius": 0.596
       },
       "directlySellable": true,
       "dimensional": false,
@@ -287,11 +287,11 @@
       ],
       "bounds": {
         "center": [
-          0,
-          0,
+          0.1312,
+          -0.0337,
           0
         ],
-        "radius": 0.6499
+        "radius": 0.5716
       },
       "directlySellable": true,
       "dimensional": false,
@@ -719,11 +719,11 @@
       ],
       "bounds": {
         "center": [
-          0,
-          0,
+          0.1234,
+          -0.0317,
           0
         ],
-        "radius": 0.6109
+        "radius": 0.5373
       },
       "directlySellable": true,
       "dimensional": false,
@@ -773,11 +773,11 @@
       ],
       "bounds": {
         "center": [
-          0,
-          0,
+          0.1312,
+          -0.0337,
           0
         ],
-        "radius": 0.6499
+        "radius": 0.5716
       },
       "directlySellable": true,
       "dimensional": false,
@@ -882,10 +882,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0966,
           0
         ],
-        "radius": 0.7278
+        "radius": 0.7563
       },
       "directlySellable": true,
       "dimensional": false,
@@ -936,10 +936,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0552,
           0
         ],
-        "radius": 0.4159
+        "radius": 0.4322
       },
       "directlySellable": true,
       "dimensional": false,
@@ -990,10 +990,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0604,
           0
         ],
-        "radius": 0.4549
+        "radius": 0.4727
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1044,10 +1044,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0656,
           0
         ],
-        "radius": 0.4939
+        "radius": 0.5132
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1098,10 +1098,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0707,
           0
         ],
-        "radius": 0.5329
+        "radius": 0.5537
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1152,10 +1152,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0759,
           0
         ],
-        "radius": 0.5719
+        "radius": 0.5943
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1530,10 +1530,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.0656,
           0
         ],
-        "radius": 0.4939
+        "radius": 0.5132
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1584,10 +1584,10 @@
       "bounds": {
         "center": [
           0,
-          0,
-          0
+          -0.1122,
+          -0.0061
         ],
-        "radius": 0.5968
+        "radius": 0.596
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1637,11 +1637,11 @@
       ],
       "bounds": {
         "center": [
-          0,
-          0,
+          0.1155,
+          -0.0297,
           0
         ],
-        "radius": 0.5719
+        "radius": 0.503
       },
       "directlySellable": true,
       "dimensional": false,
@@ -1691,11 +1691,11 @@
       ],
       "bounds": {
         "center": [
-          0,
-          0,
+          0.1234,
+          -0.0317,
           0
         ],
-        "radius": 0.6109
+        "radius": 0.5373
       },
       "directlySellable": true,
       "dimensional": false,
