@@ -1527,7 +1527,7 @@ object ElysiumProceduralModels {
                 .forEach(::add)
         }.distinctBy { it.id }
 
-        return visible.mapIndexed { index, node ->
+        return visible.flatMapIndexed { index, node ->
             val seed = node.seed and 0xffffffffL
             val selectedNode = node.id == selectedNodeId
             val visualIndex = if (selectedNode) 0 else index
@@ -1542,36 +1542,151 @@ object ElysiumProceduralModels {
             )
             val base = catalogSystemColor(node.systemId)
             val color = if (selectedNode) Color(0xFFA3E635) else base
-            val width = if (selectedNode) 27f else 9f + (seed % 9).toFloat()
-            val height = if (selectedNode) 34f else 11f + ((seed shr 8) % 17).toFloat()
-            val depth = if (selectedNode) 22f else 8f + ((seed shr 16) % 11).toFloat()
-            val mesh = when ((seed % 3).toInt()) {
-                0 -> createCylinder(
-                    id = node.id,
-                    name = node.name,
-                    radius = width * 0.55f,
-                    height = height,
-                    segments = 8,
-                    color = color,
-                    position = position,
-                    rotation = Vector3D(0f, angle * 0.4f, 0f),
-                    isTranslucent = !selectedNode,
-                    opacity = if (selectedNode) 1f else 0.82f
-                )
-                else -> createBox(
-                    id = node.id,
-                    name = node.name,
-                    width = width,
-                    height = height,
-                    depth = depth,
-                    color = color,
-                    position = position,
-                    rotation = Vector3D(angle * 0.08f, angle * 0.5f, angle * 0.04f),
-                    isTranslucent = !selectedNode,
-                    opacity = if (selectedNode) 1f else 0.84f
+            semanticCatalogMeshes(
+                node = node,
+                position = position,
+                rotationY = angle * 0.5f,
+                color = color,
+                selected = selectedNode,
+                seed = seed,
+            ).map { it.copy(isHighlighted = selectedNode) }
+        }
+    }
+
+    /**
+     * Recognizable generic automotive archetypes. These are procedural reference
+     * forms, not OEM dimensions. Stable source seeds vary harmless visual detail.
+     */
+    private fun semanticCatalogMeshes(
+        node: UniversalCatalogSceneNode,
+        position: Vector3D,
+        rotationY: Float,
+        color: Color,
+        selected: Boolean,
+        seed: Long,
+    ): List<Mesh3D> {
+        val name = node.name.lowercase()
+        val scale = if (selected) 1f else 0.48f
+        val opacity = if (selected) 1f else 0.84f
+        fun box(
+            suffix: String,
+            width: Float,
+            height: Float,
+            depth: Float,
+            offset: Vector3D = Vector3D(0f, 0f, 0f),
+            tint: Color = color,
+        ) = createBox(
+            id = if (suffix.isBlank()) node.id else "${node.id}-$suffix",
+            name = node.name,
+            width = width * scale,
+            height = height * scale,
+            depth = depth * scale,
+            color = tint,
+            position = position + offset * scale,
+            rotation = Vector3D(0f, rotationY, 0f),
+            isTranslucent = !selected,
+            opacity = opacity,
+        )
+        fun cylinder(
+            suffix: String,
+            radius: Float,
+            height: Float,
+            offset: Vector3D = Vector3D(0f, 0f, 0f),
+            rotation: Vector3D = Vector3D(0f, rotationY, 0f),
+            tint: Color = color,
+        ) = createCylinder(
+            id = if (suffix.isBlank()) node.id else "${node.id}-$suffix",
+            name = node.name,
+            radius = radius * scale,
+            height = height * scale,
+            segments = if (selected) 24 else 10,
+            color = tint,
+            position = position + offset * scale,
+            rotation = rotation,
+            isTranslucent = !selected,
+            opacity = opacity,
+        )
+
+        val darkMetal = Color(0xFF5D6872)
+        val copper = Color(0xFFB87333)
+        val polymer = Color(0xFF202A33)
+        return when {
+            listOf("panel", "puerta", "capó", "capo", "guardabarro", "piso", "techo", "firewall", "cortafuego")
+                .any(name::contains) -> listOf(
+                box("", 58f, 5f, 42f),
+                box("rib-a", 44f, 8f, 4f, Vector3D(0f, 3f, -12f), darkMetal),
+                box("rib-b", 44f, 8f, 4f, Vector3D(0f, 3f, 12f), darkMetal),
+            )
+            listOf("vidrio", "cristal", "parabrisas", "ventana").any(name::contains) -> listOf(
+                box("", 58f, 3f, 38f, tint = Color(0xFF4FC3F7)),
+                box("frame", 62f, 5f, 4f, Vector3D(0f, 0f, -20f), darkMetal),
+            )
+            listOf("arnés", "arnes", "cable", "manguera", "tubería", "tuberia", "línea", "linea")
+                .any(name::contains) -> listOf(
+                cylinder("", 4f, 66f, rotation = Vector3D(0f, 0f, 90f), tint = polymer),
+                box("connector-a", 12f, 11f, 14f, Vector3D(-35f, 0f, 0f), copper),
+                box("connector-b", 12f, 11f, 14f, Vector3D(35f, 0f, 0f), copper),
+            )
+            listOf("ecu", "módulo", "modulo", "computadora", "relay", "relé", "rele", "fusible")
+                .any(name::contains) -> listOf(
+                box("", 48f, 16f, 38f, tint = polymer),
+                box("socket", 32f, 10f, 12f, Vector3D(0f, -10f, 22f), copper),
+                box("label", 30f, 2f, 22f, Vector3D(0f, 9f, 0f), Color(0xFFCBD5E1)),
+            )
+            listOf("sensor", "interruptor", "switch").any(name::contains) -> listOf(
+                cylinder("", 12f, 34f, tint = darkMetal),
+                box("connector", 22f, 18f, 18f, Vector3D(0f, 22f, 0f), polymer),
+                cylinder("probe", 5f, 28f, Vector3D(0f, -28f, 0f), tint = copper),
+            )
+            listOf("válvula", "valvula", "inyector", "solenoide", "actuador").any(name::contains) -> listOf(
+                cylinder("", 14f, 48f, tint = darkMetal),
+                cylinder("stem", 5f, 34f, Vector3D(0f, -38f, 0f), tint = copper),
+                box("coil", 25f, 22f, 24f, Vector3D(0f, 31f, 0f), polymer),
+            )
+            listOf("engranaje", "piñón", "pinon", "polea", "disco", "rotor", "volante", "rodamiento", "cojinete")
+                .any(name::contains) -> listOf(
+                cylinder("", 30f, 12f, rotation = Vector3D(90f, rotationY, 0f), tint = darkMetal),
+                cylinder("hub", 12f, 24f, rotation = Vector3D(90f, rotationY, 0f), tint = copper),
+            )
+            listOf("eje", "árbol", "arbol", "flecha", "cigüeñal", "ciguenal").any(name::contains) -> listOf(
+                cylinder("", 8f, 78f, rotation = Vector3D(0f, 0f, 90f), tint = darkMetal),
+                cylinder("journal-a", 16f, 14f, Vector3D(-24f, 0f, 0f), Vector3D(0f, 0f, 90f)),
+                cylinder("journal-b", 16f, 14f, Vector3D(24f, 0f, 0f), Vector3D(0f, 0f, 90f)),
+            )
+            listOf("bomba", "alternador", "motor eléctrico", "motor electrico", "compresor").any(name::contains) -> listOf(
+                cylinder("", 28f, 48f, tint = darkMetal),
+                cylinder("shaft", 7f, 72f, tint = copper),
+                box("terminal", 18f, 18f, 16f, Vector3D(24f, 14f, 0f), polymer),
+            )
+            listOf("amortiguador", "puntal", "resorte", "muelle").any(name::contains) -> listOf(
+                cylinder("", 15f, 76f, tint = darkMetal),
+                cylinder("rod", 6f, 104f, tint = Color(0xFFDCE3E8)),
+                cylinder("mount", 25f, 12f, Vector3D(0f, 48f, 0f), tint = polymer),
+            )
+            listOf("pinza", "caliper", "cilindro maestro").any(name::contains) -> listOf(
+                box("", 48f, 34f, 26f, tint = darkMetal),
+                cylinder("bore", 14f, 38f, rotation = Vector3D(0f, 0f, 90f), tint = copper),
+            )
+            listOf("rueda", "llanta", "neumático", "neumatico").any(name::contains) -> listOf(
+                cylinder("", 34f, 22f, rotation = Vector3D(90f, rotationY, 0f), tint = polymer),
+                cylinder("rim", 22f, 26f, rotation = Vector3D(90f, rotationY, 0f), tint = Color(0xFFAAB4BE)),
+            )
+            listOf("tornillo", "perno", "tuerca", "espárrago", "esparrago").any(name::contains) -> listOf(
+                cylinder("", 7f, 58f, tint = darkMetal),
+                box("head", 18f, 11f, 18f, Vector3D(0f, 34f, 0f), darkMetal),
+            )
+            listOf("sello", "retén", "reten", "o-ring", "junta", "empaque").any(name::contains) -> listOf(
+                cylinder("", 27f, 7f, rotation = Vector3D(90f, rotationY, 0f), tint = polymer),
+                cylinder("inner", 15f, 9f, rotation = Vector3D(90f, rotationY, 0f), tint = Color(0xFF111827)),
+            )
+            else -> {
+                val width = 30f + (seed % 10).toFloat()
+                listOf(
+                    box("", width, 32f, 25f),
+                    cylinder("interface", 8f, 44f, Vector3D(0f, -25f, 0f), tint = copper),
+                    box("mount", 38f, 8f, 18f, Vector3D(0f, 22f, 0f), darkMetal),
                 )
             }
-            mesh.copy(isHighlighted = selectedNode)
         }
     }
 

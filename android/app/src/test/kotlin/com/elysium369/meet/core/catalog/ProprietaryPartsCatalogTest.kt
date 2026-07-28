@@ -52,9 +52,10 @@ class ProprietaryPartsCatalogTest {
                 entity.systemId,
                 entity.threeDimensionalBinding.seed
             )
-            val first = ElysiumProceduralModels.buildUniversalCatalogScene(listOf(node), entity.id).single()
-            val second = ElysiumProceduralModels.buildUniversalCatalogScene(listOf(node), entity.id).single()
-            assertEquals(entity.id, first.id)
+            val first = ElysiumProceduralModels.buildUniversalCatalogScene(listOf(node), entity.id)
+            val second = ElysiumProceduralModels.buildUniversalCatalogScene(listOf(node), entity.id)
+            assertTrue(first.isNotEmpty())
+            assertTrue(first.any { it.id == entity.id })
             assertEquals(first, second)
         }
     }

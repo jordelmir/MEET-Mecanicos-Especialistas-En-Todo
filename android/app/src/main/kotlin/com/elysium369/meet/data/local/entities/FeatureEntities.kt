@@ -368,6 +368,10 @@ data class RideRequestEntity(
     val currency: String,                // CRC o USD
     val estimatedDistanceKm: Double,     // Distancia calculada
     val estimatedDurationMin: Int,       // Duración aproximada
+    val stopsJson: String = "[]",        // Ordered stop snapshots; never inferred
+    val paymentMethod: String = "CASH",  // CASH or SINPE (declared, not settlement proof)
+    val quoteVersion: Long = 1L,
+    val fareBreakdownJson: String = "{}",
     val status: String,                  // OPEN, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED
     val acceptedOfferId: String? = null,
     val assignedDriverId: String? = null,
@@ -494,4 +498,3 @@ data class PassengerVerificationEntity(
     val createdAt: Long,
     val approvedAt: Long? = null
 )
-

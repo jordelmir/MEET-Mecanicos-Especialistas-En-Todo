@@ -3,8 +3,10 @@ package com.elysium369.meet.ride.map
 enum class RideMarkerRole {
     PASSENGER_GPS,
     PICKUP,
+    STOP,
     DESTINATION,
     DRIVER,
+    ROAD_INCIDENT,
 }
 
 enum class RidePositionFreshness {

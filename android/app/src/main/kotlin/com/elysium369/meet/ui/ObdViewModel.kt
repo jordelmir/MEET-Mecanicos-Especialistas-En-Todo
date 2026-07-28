@@ -66,6 +66,14 @@ import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.VerificationFileEvidence
+import com.elysium369.meet.ride.domain.RideBoardingChallenge
+import com.elysium369.meet.ride.domain.RideBoardingPinPolicy
+import com.elysium369.meet.ride.domain.RidePinVerificationStatus
+import com.elysium369.meet.ride.traffic.RideRoadIncident
+import com.elysium369.meet.ride.traffic.RideRoadIncidentType
+import com.elysium369.meet.ride.traffic.RideRoadSide
+import com.elysium369.meet.ride.traffic.RideGeoCell
+import com.elysium369.meet.ride.traffic.RideSegmentSpeedSample
 
 @Serializable
 private data class RemotePartsStore(
@@ -92,6 +100,43 @@ private data class RemotePartsStore(
         createdAt = createdAt
     )
 }
+
+@Serializable
+private data class RemoteRideRoadIncident(
+    val id: String,
+    val reporter_id: String,
+    val trip_id: String?,
+    val road_segment_id: String,
+    val incident_type: String,
+    val road_side: String,
+    val severity: Int,
+    val latitude: Double,
+    val longitude: Double,
+    val bearing_degrees: Float?,
+    val accuracy_meters: Float?,
+    val geohash_coarse: String,
+    val created_at: String? = null,
+    val expires_at: String,
+)
+
+@Serializable
+private data class RemoteRideSpeedObservation(
+    val observer_id: String,
+    val trip_id: String,
+    val road_segment_id: String,
+    val speed_mps: Float,
+    val accuracy_meters: Float?,
+    val bearing_degrees: Float?,
+    val captured_at: String,
+    val time_bucket: String,
+)
+
+data class RideClaimFeedback(
+    val requestId: String,
+    val won: Boolean,
+    val message: String,
+    val emittedAtEpochMs: Long = System.currentTimeMillis(),
+)
 
 @Serializable
 private data class RemotePartRequest(
@@ -5626,6 +5671,25 @@ class ObdViewModel @Inject constructor(
     val rideSharingSelections: StateFlow<Map<String, Set<RideShareCategory>>> =
         _rideSharingSelections.asStateFlow()
 
+    private val _rideRoadIncidents = MutableStateFlow<List<RideRoadIncident>>(emptyList())
+    val rideRoadIncidents: StateFlow<List<RideRoadIncident>> = _rideRoadIncidents.asStateFlow()
+
+    private val _rideSpeedSamples =
+        MutableStateFlow<Map<String, List<RideSegmentSpeedSample>>>(emptyMap())
+    val rideSpeedSamples: StateFlow<Map<String, List<RideSegmentSpeedSample>>> =
+        _rideSpeedSamples.asStateFlow()
+    private val lastUploadedRideSpeedBucket = mutableMapOf<String, Long>()
+
+    private val _rideClaimFeedback = MutableSharedFlow<RideClaimFeedback>(extraBufferCapacity = 8)
+    val rideClaimFeedback: SharedFlow<RideClaimFeedback> = _rideClaimFeedback.asSharedFlow()
+
+    private val rideBoardingChallenges = mutableMapOf<String, RideBoardingChallenge>()
+    private val _rideBoardingPins = MutableStateFlow<Map<String, String>>(emptyMap())
+    val rideBoardingPins: StateFlow<Map<String, String>> = _rideBoardingPins.asStateFlow()
+
+    private val _ridePinFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val ridePinFeedback: SharedFlow<String> = _ridePinFeedback.asSharedFlow()
+
     private val _driverPresetMessages = MutableStateFlow<List<String>>(listOf(
         "Ya me encuentro en la ubicación",
         "Voy en camino, llego en unos 5 minutos",
@@ -5686,6 +5750,137 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    fun reportRideRoadIncident(
+        tripId: String?,
+        type: RideRoadIncidentType,
+        side: RideRoadSide,
+        severity: Int,
+    ) {
+        val gps = _currentGpsLocation.value ?: return
+        val now = System.currentTimeMillis()
+        val lifetimeMs = when (type) {
+            RideRoadIncidentType.POLICE_PRESENCE -> 20 * 60 * 1000L
+            RideRoadIncidentType.TRAFFIC_CONTROL,
+            RideRoadIncidentType.SLOW_TRAFFIC,
+            RideRoadIncidentType.VERY_SLOW_TRAFFIC,
+            -> 30 * 60 * 1000L
+            RideRoadIncidentType.ROAD_CLOSED,
+            RideRoadIncidentType.WRONG_WAY_HAZARD,
+            RideRoadIncidentType.STALLED_VEHICLE,
+            RideRoadIncidentType.OBSTACLE,
+            -> 90 * 60 * 1000L
+            RideRoadIncidentType.POTHOLE -> 6 * 60 * 60 * 1000L
+        }
+        val coarseCell = RideGeoCell.encode(gps.latitude, gps.longitude)
+        val incident = RideRoadIncident(
+            id = UUID.randomUUID().toString(),
+            roadSegmentId = "cell:$coarseCell",
+            type = type,
+            side = side,
+            severity = severity.coerceIn(1, 3),
+            latitude = gps.latitude,
+            longitude = gps.longitude,
+            bearingDegrees = gps.bearing,
+            accuracyMeters = gps.accuracy,
+            reporterReliability = 0.50,
+            independentConfirmations = 0,
+            independentDenials = 0,
+            observedSpeedRatio = null,
+            createdAtEpochMs = now,
+            expiresAtEpochMs = now + lifetimeMs,
+        )
+        _rideRoadIncidents.update { current ->
+            (current.filterNot { it.isExpired(now) } + incident).takeLast(100)
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return@launch
+            val isoExpiry = java.time.Instant.ofEpochMilli(incident.expiresAtEpochMs).toString()
+            val remoteReport = RemoteRideRoadIncident(
+                id = incident.id,
+                reporter_id = userId,
+                trip_id = tripId,
+                road_segment_id = incident.roadSegmentId,
+                incident_type = incident.type.name,
+                road_side = incident.side.name,
+                severity = incident.severity,
+                latitude = incident.latitude,
+                longitude = incident.longitude,
+                bearing_degrees = incident.bearingDegrees,
+                accuracy_meters = incident.accuracyMeters,
+                geohash_coarse = coarseCell,
+                expires_at = isoExpiry,
+            )
+            runCatching {
+                SupabaseManager.client.postgrest["ride_road_incidents"].insert(
+                    remoteReport,
+                )
+            }.onFailure {
+                // A local Room request may not yet exist in the authoritative
+                // cloud. Preserve the safety signal without claiming a trip FK.
+                runCatching {
+                    SupabaseManager.client.postgrest["ride_road_incidents"].insert(
+                        remoteReport.copy(trip_id = null),
+                    )
+                }.onFailure { fallbackError ->
+                    Log.w(
+                        "ObdViewModel",
+                        "Road report queued locally; cloud sync unavailable",
+                        fallbackError,
+                    )
+                }
+            }
+        }
+    }
+
+    fun recordRideSpeedObservation(tripId: String) {
+        if (tripId.isBlank()) return
+        val gps = _currentGpsLocation.value ?: return
+        val now = System.currentTimeMillis()
+        val sample = RideSegmentSpeedSample(
+            speedMetersPerSecond = gps.speed.toDouble().coerceAtLeast(0.0),
+            capturedAtEpochMs = now,
+        )
+        _rideSpeedSamples.update { current ->
+            val fresh = current[tripId]
+                .orEmpty()
+                .filter { now - it.capturedAtEpochMs <= 10 * 60 * 1000L }
+                .plus(sample)
+                .takeLast(120)
+            current + (tripId to fresh)
+        }
+
+        val minuteBucket = now / 60_000L * 60_000L
+        if (lastUploadedRideSpeedBucket[tripId] == minuteBucket) return
+        lastUploadedRideSpeedBucket[tripId] = minuteBucket
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return@launch
+            val capturedAt = java.time.Instant.ofEpochMilli(now).toString()
+            val bucketAt = java.time.Instant.ofEpochMilli(minuteBucket).toString()
+            runCatching {
+                SupabaseManager.client.postgrest["ride_segment_speed_observations"].insert(
+                    RemoteRideSpeedObservation(
+                        observer_id = userId,
+                        trip_id = tripId,
+                        road_segment_id = "cell:${RideGeoCell.encode(gps.latitude, gps.longitude)}",
+                        speed_mps = gps.speed.coerceIn(0f, 100f),
+                        accuracy_meters = gps.accuracy.coerceAtLeast(0f),
+                        bearing_degrees = gps.bearing.coerceIn(0f, 360f),
+                        captured_at = capturedAt,
+                        time_bucket = bucketAt,
+                    ),
+                )
+            }.onFailure {
+                Log.d("ObdViewModel", "Speed telemetry retained locally; cloud trip not synchronized")
+            }
+        }
+    }
+
+    fun announceRideEvent(spanish: String, english: String) {
+        voiceFeedbackManager.speak(spanish, english)
+    }
+
     fun createRideRequest(
         passengerId: String,
         passengerName: String,
@@ -5700,7 +5895,9 @@ class ObdViewModel @Inject constructor(
         priceOffer: Double,
         currency: String,
         estDistance: Double,
-        estDuration: Int
+        estDuration: Int,
+        stopsJson: String = "[]",
+        paymentMethod: String = "CASH",
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = RideRequestEntity(
@@ -5719,6 +5916,9 @@ class ObdViewModel @Inject constructor(
                 currency = currency,
                 estimatedDistanceKm = estDistance,
                 estimatedDurationMin = estDuration,
+                stopsJson = stopsJson,
+                paymentMethod = paymentMethod,
+                fareBreakdownJson = """{"acceptedFare":$priceOffer,"currency":"$currency"}""",
                 status = "OPEN",
                 createdAt = System.currentTimeMillis()
             )
@@ -5801,6 +6001,106 @@ class ObdViewModel @Inject constructor(
             val updatedRequest = rideDao.getRequestById(requestId)
             withContext(Dispatchers.Main) {
                 _activeRideRequest.value = updatedRequest
+            }
+        }
+    }
+
+    fun claimRideFirstCome(
+        requestId: String,
+        driverId: String,
+        driverName: String,
+        driverPhone: String,
+        vehicleDescription: String,
+    ) {
+        if (requestId.isBlank() || driverId.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val won = rideDao.claimOpenRequest(
+                requestId = requestId,
+                driverId = driverId,
+                driverName = driverName,
+                driverPhone = driverPhone,
+                vehicle = vehicleDescription,
+            ) == 1
+            if (won) {
+                val (pin, challenge) = RideBoardingPinPolicy.issue(System.currentTimeMillis())
+                rideBoardingChallenges[requestId] = challenge
+                _rideBoardingPins.update { it + (requestId to pin) }
+                rideDao.insertChatMessage(
+                    RideChatMessageEntity(
+                        messageId = UUID.randomUUID().toString(),
+                        rideRequestId = requestId,
+                        senderId = "SYSTEM",
+                        senderName = "Sistema",
+                        senderRole = "SYSTEM",
+                        messageType = "TEXT",
+                        textContent = "Conductor asignado por primera confirmación válida.",
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+                rideDao.getRequestById(requestId)?.let { updated ->
+                    withContext(Dispatchers.Main) { selectActiveRide(updated) }
+                }
+            }
+            _rideClaimFeedback.emit(
+                RideClaimFeedback(
+                    requestId = requestId,
+                    won = won,
+                    message = if (won) {
+                        "¡Viaje asignado! Fuiste el primer conductor confirmado."
+                    } else {
+                        "Otro conductor confirmó este viaje primero."
+                    },
+                ),
+            )
+            voiceFeedbackManager.speak(
+                if (won) {
+                    "Viaje asignado. Fuiste el primer conductor confirmado."
+                } else {
+                    "Otro conductor confirmó este viaje primero."
+                },
+                if (won) {
+                    "Ride assigned. You were the first confirmed driver."
+                } else {
+                    "Another driver confirmed this ride first."
+                },
+            )
+        }
+    }
+
+    fun verifyRideBoardingPin(requestId: String, candidate: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val challenge = rideBoardingChallenges[requestId]
+            if (challenge == null) {
+                _ridePinFeedback.emit("PIN pendiente de sincronización. Solicita uno nuevo al pasajero.")
+                return@launch
+            }
+            val verification = RideBoardingPinPolicy.verify(
+                challenge = challenge,
+                candidate = candidate,
+                nowEpochMs = System.currentTimeMillis(),
+            )
+            rideBoardingChallenges[requestId] = verification.challenge
+            when (verification.status) {
+                RidePinVerificationStatus.VERIFIED -> {
+                    _rideBoardingPins.update { it - requestId }
+                    rideDao.updateRequestStatus(requestId, "PASSENGER_ONBOARD")
+                    val request = rideDao.getRequestById(requestId)
+                    request?.let { updated ->
+                        withContext(Dispatchers.Main) { _activeRideRequest.value = updated }
+                    }
+                    val passengerName = request?.passengerName.orEmpty().ifBlank { "pasajero" }
+                    voiceFeedbackManager.speak(
+                        "Hola, $passengerName. Vamos a iniciar el servicio. ¿Tienes una ruta preferida o usamos la ruta de la aplicación?",
+                        "Hello, $passengerName. We are starting the service. Do you have a preferred route or should we use the app route?",
+                    )
+                    _ridePinFeedback.emit("PIN correcto. Pasajero confirmado.")
+                }
+                RidePinVerificationStatus.INVALID ->
+                    _ridePinFeedback.emit("PIN incorrecto. Verifica los cuatro dígitos con el pasajero.")
+                RidePinVerificationStatus.LOCKED ->
+                    _ridePinFeedback.emit("Demasiados intentos. Espera cinco minutos por seguridad.")
+                RidePinVerificationStatus.EXPIRED_OR_USED ->
+                    _ridePinFeedback.emit("El PIN venció o ya fue utilizado.")
             }
         }
     }

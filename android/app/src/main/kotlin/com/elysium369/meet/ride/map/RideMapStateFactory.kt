@@ -4,6 +4,7 @@ object RideMapStateFactory {
     fun create(
         passengerGps: RideGeoPoint? = null,
         pickup: RideGeoPoint? = null,
+        stops: List<RideGeoPoint> = emptyList(),
         destination: RideGeoPoint? = null,
         driverGps: RideGeoPoint? = null,
         route: List<RideGeoPoint>? = null,
@@ -26,6 +27,16 @@ object RideMapStateFactory {
                         role = RideMarkerRole.PICKUP,
                         point = it,
                         label = "Punto de recogida",
+                    ),
+                )
+            }
+            stops.forEachIndexed { index, point ->
+                add(
+                    RideMapMarker(
+                        id = "requested-stop-${index + 1}",
+                        role = RideMarkerRole.STOP,
+                        point = point,
+                        label = "Parada ${index + 1}",
                     ),
                 )
             }
@@ -52,7 +63,7 @@ object RideMapStateFactory {
         }
         val resolvedRoute = when {
             route != null && route.size >= 2 -> route
-            pickup != null && destination != null -> listOf(pickup, destination)
+            pickup != null && destination != null -> listOf(pickup) + stops + destination
             else -> emptyList()
         }
         return RideMapState(markers = markers, route = resolvedRoute)

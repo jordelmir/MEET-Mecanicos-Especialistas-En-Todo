@@ -29,8 +29,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "4.4.1"
+        versionCode = 24
+        versionName = "4.5.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -75,6 +75,11 @@ android {
             "https://tiles.openfreemap.org/styles/liberty",
         )
         buildConfigField("String", "RIDE_MAP_STYLE_URL", "\"$rideMapStyleUrl\"")
+        val rideGeocoderUrl = localProps.getProperty(
+            "RIDE_GEOCODER_URL",
+            "https://photon.komoot.io/api/",
+        )
+        buildConfigField("String", "RIDE_GEOCODER_URL", "\"$rideGeocoderUrl\"")
 
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")

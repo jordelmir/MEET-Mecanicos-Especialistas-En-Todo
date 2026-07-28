@@ -74,3 +74,28 @@ An integrated feature or reference mark:
 - has a known parent;
 - is not directly sellable;
 - redirects to its parent part or a service such as inspection or machining.
+
+## Inline resolution contract
+
+Resolve each physical catalogue component using this ordered policy:
+
+1. valid canonical binding plus verified asset bytes;
+2. deterministic semantic inline reconstruction;
+3. never an unrelated atlas redirect.
+
+Both outcomes remain inside the selected component screen. A semantic
+reconstruction may teach silhouette, relationships and service-facing cues,
+but it keeps `REFERENCE_RECONSTRUCTION`, `dimensional=false`,
+`oemClaim=false` and `vehicleSpecificClaim=false`.
+
+Literal corpus evidence and geometry authority are separate:
+
+```
+physical component identity
+  ├── source neighbourhood blocks + hashes -> cited repair workflow
+  └── canonical binding or semantic recipe -> inline 3D/360
+```
+
+Neither branch may silently elevate the other. A detailed repair paragraph
+does not prove mesh dimensions, and a realistic mesh does not prove a repair
+instruction or exact fit.
