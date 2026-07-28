@@ -89,4 +89,16 @@ class ProprietaryCatalogPresentationTest {
 
         assertNull(resolution)
     }
+
+    @Test
+    fun `physical identity is separated from tabular procedure text`() {
+        assertEquals(
+            "Panel frontal",
+            physicalComponentName("Panel frontal\tSoldado. Revisar corrosión y reparar por secciones."),
+        )
+        assertEquals(
+            "Sensor de velocidad",
+            physicalComponentName("Sensor de velocidad\nProcedimiento de prueba"),
+        )
+    }
 }

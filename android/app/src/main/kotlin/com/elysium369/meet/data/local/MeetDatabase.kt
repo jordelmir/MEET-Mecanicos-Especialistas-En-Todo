@@ -118,7 +118,7 @@ import com.elysium369.meet.data.local.entities.*
         ReportSignatureEntity::class,
         DiagnosticSnapshotEntity::class,
     ],
-    version = 42,
+    version = 43,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

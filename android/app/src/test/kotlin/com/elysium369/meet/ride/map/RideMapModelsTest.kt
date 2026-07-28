@@ -26,7 +26,7 @@ class RideMapModelsTest {
         }
         val state = RideMapState(markers = markers)
 
-        assertEquals(4, state.markers.size)
+        assertEquals(RideMarkerRole.entries.size, state.markers.size)
         assertEquals(RideMarkerRole.entries.toSet(), state.markers.map { it.role }.toSet())
         assertNotEquals(state.markers[0], state.markers[1])
     }

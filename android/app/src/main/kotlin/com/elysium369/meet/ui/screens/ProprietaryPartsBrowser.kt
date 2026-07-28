@@ -70,10 +70,17 @@ import com.elysium369.meet.core.catalog.ProprietaryKnowledgeHit
 import com.elysium369.meet.core.catalog.ProprietaryKnowledgeSearchRepository
 import com.elysium369.meet.core.catalog.ProprietaryPartsCatalogRepository
 import com.elysium369.meet.core.catalog.ProprietarySourceBlock
+import com.elysium369.meet.core.catalog.PartRepairPhaseCard
+import com.elysium369.meet.core.catalog.PartRepairWorkflowBuilder
+import com.elysium369.meet.core.catalog.PrincipalRepairKnowledgeRepository
+import com.elysium369.meet.core.catalog.PRINCIPAL_REPAIR_SOURCE_SHA256
 import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.visual3d.domain.ProprietaryInline3dExperience
 import com.elysium369.meet.visual3d.domain.ProprietaryInline3dRepository
+import com.elysium369.meet.core.engine3d.EngineType
+import com.elysium369.meet.ui.components.Interactive3DDiagView
+import com.elysium369.meet.ui.components.SceneType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -681,6 +688,19 @@ private fun ProprietaryEntityDetail(
     val context = LocalContext.current
     val system = manifest.systems.firstOrNull { it.id == entity.systemId }
     val color = system?.color?.toCatalogColor() ?: MeetColors.cyberCyan
+    val principalRepository = remember(context) { PrincipalRepairKnowledgeRepository(context) }
+    val principalBlocks by produceState(
+        initialValue = emptyList<ProprietarySourceBlock>(),
+        key1 = entity.id,
+        key2 = principalRepository,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { principalRepository.evidenceFor(entity) }.getOrDefault(emptyList())
+        }
+    }
+    val repairWorkflow = remember(blocks, principalBlocks) {
+        PartRepairWorkflowBuilder.build(blocks + principalBlocks)
+    }
     var showAiContext by remember(entity.id) { mutableStateOf(false) }
     val inlineRepository = remember(context) { ProprietaryInline3dRepository(context) }
     val inline3dState by produceState<Inline3dState>(
@@ -735,12 +755,11 @@ private fun ProprietaryEntityDetail(
                             fontSize = 9.sp,
                         )
                     }
-                    val canonicalId = (inline3dState as? Inline3dState.Ready)
-                        ?.experience
-                        ?.resolution
-                        ?.part
-                        ?.element
-                        ?.canonicalId
+                    val canonicalId = (
+                        (inline3dState as? Inline3dState.Ready)
+                            ?.experience as? ProprietaryInline3dExperience.Canonical
+                        )
+                        ?.resolution?.part?.element?.canonicalId
                     Button(
                         onClick = { onOpen3d(canonicalId) },
                         modifier = Modifier.weight(1f).height(48.dp),
@@ -782,6 +801,35 @@ private fun ProprietaryEntityDetail(
                     }
                 }
             }
+            item(key = "repair-workflow-${entity.id}") {
+                PartRepairWorkflowPanel(repairWorkflow, color)
+            }
+            if (principalBlocks.isNotEmpty()) {
+                item(key = "principal-v2-title-${entity.id}") {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MeetColors.neonGreen.copy(alpha = 0.055f), RoundedCornerShape(10.dp))
+                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                    ) {
+                        Text(
+                            "BASE DE DATOS PRINCIPAL V2 · EVIDENCIA VINCULADA",
+                            color = MeetColors.neonGreen,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text(
+                            "${principalBlocks.size} bloques cercanos · SHA-256 ${PRINCIPAL_REPAIR_SOURCE_SHA256.take(16)}…",
+                            color = MeetColors.textMuted,
+                            fontSize = 8.sp,
+                        )
+                    }
+                }
+                items(principalBlocks, key = { it.blockId }) { block ->
+                    LiteralBlockCard(block, MeetColors.neonGreen)
+                }
+            }
             item(key = "literal-title-${entity.id}") {
                 Text(
                     "INFORMACIÓN LITERAL",
@@ -794,6 +842,84 @@ private fun ProprietaryEntityDetail(
             items(blocks, key = { it.blockId }) { block -> LiteralBlockCard(block, color) }
             item {
                 Text("Fuente propietaria del usuario · ${entity.sourceFileName} · SHA-256 ${entity.sourceDocumentSha256}", color = MeetColors.textMuted, fontSize = 8.sp, modifier = Modifier.padding(vertical = 8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartRepairWorkflowPanel(
+    cards: List<PartRepairPhaseCard>,
+    color: Color,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF071019), RoundedCornerShape(16.dp))
+            .border(1.dp, color.copy(alpha = 0.38f), RoundedCornerShape(16.dp))
+            .padding(13.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Build, contentDescription = null, tint = color)
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    "PROCESO DE DIAGNÓSTICO Y REPARACIÓN",
+                    color = color,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Checklist universal + evidencia literal atribuible",
+                    color = MeetColors.textMuted,
+                    fontSize = 8.sp,
+                )
+            }
+        }
+        cards.forEachIndexed { index, card ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(color.copy(alpha = 0.055f), RoundedCornerShape(10.dp))
+                    .padding(10.dp),
+            ) {
+                Text(
+                    "${index + 1}. ${card.phase.title.uppercase()}",
+                    color = if (card.hasLiteralEvidence) MeetColors.neonGreen else color,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    card.universalChecklist,
+                    color = MeetColors.textSecondary,
+                    fontSize = 9.sp,
+                    lineHeight = 13.sp,
+                )
+                if (card.hasLiteralEvidence) {
+                    Spacer(Modifier.height(5.dp))
+                    card.evidence.take(2).forEach { evidence ->
+                        Text(
+                            "FUENTE #${evidence.sourceOrder} · SHA ${evidence.sourceTextHash.take(10)}",
+                            color = MeetColors.textMuted,
+                            fontSize = 7.sp,
+                        )
+                        Text(
+                            evidence.text,
+                            color = Color.White.copy(alpha = 0.82f),
+                            fontSize = 8.sp,
+                            lineHeight = 12.sp,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Text(
+                        "Dato específico no capturado en los bloques vinculados; requiere fuente o prueba física.",
+                        color = MeetColors.warning,
+                        fontSize = 8.sp,
+                    )
+                }
             }
         }
     }
@@ -829,58 +955,14 @@ private fun Inline3dPanel(
         }
         is Inline3dState.Ready -> {
             val experience = state.experience
-            val part = experience.resolution.part
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                        .border(1.dp, color.copy(alpha = 0.28f), RoundedCornerShape(12.dp))
-                        .padding(11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.ViewInAr, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(9.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "RECONSTRUCCIÓN TÉCNICA DE REFERENCIA · 360°",
-                            color = color,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Black,
-                        )
-                        Text(
-                            part.element.nameOriginal,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                    Text(
-                        when (experience.resolution.method.name) {
-                            "EXACT_NAME_OR_ALIAS" -> "ENLACE DIRECTO"
-                            else -> "ENLACE NOMINAL"
-                        },
-                        color = MeetColors.textMuted,
-                        fontSize = 7.sp,
-                    )
-                }
-                G4edPartViewer(experience.manifest, experience.binding)
-                Text(
-                    "${part.section.title} · ID ${part.element.canonicalId}",
-                    color = MeetColors.textMuted,
-                    fontSize = 8.sp,
-                )
-                Text(
-                    "Forma y proporciones ilustrativas. Confirmar VIN, OEM, foto, conector y medidas antes de comprar o instalar.",
-                    color = MeetColors.warning,
-                    fontSize = 8.sp,
-                    lineHeight = 11.sp,
-                )
+            when (experience) {
+                is ProprietaryInline3dExperience.Canonical -> CanonicalInline3dPanel(experience, color)
+                is ProprietaryInline3dExperience.Semantic -> SemanticInline3dPanel(experience, color)
             }
         }
         Inline3dState.NotLinked -> Inline3dUnavailablePanel(
-            title = "MODELO 3D AÚN NO VINCULADO",
-            detail = "No se encontró una identidad canónica única. Se conserva el conocimiento sin fabricar una coincidencia.",
+            title = "REGISTRO NO FÍSICO",
+            detail = "Este registro contiene conocimiento o un caso, no una pieza física representable.",
             color = color,
             onClick = { onOpen3d(null) },
         )
@@ -890,6 +972,105 @@ private fun Inline3dPanel(
             color = color,
             onClick = { onOpen3d(null) },
         )
+    }
+}
+
+@Composable
+private fun CanonicalInline3dPanel(
+    experience: ProprietaryInline3dExperience.Canonical,
+    color: Color,
+) {
+    val part = experience.resolution.part
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Inline3dAuthorityHeader(
+            title = "${experience.authorityLabel} · 360°",
+            name = part.element.nameOriginal,
+            badge = when (experience.resolution.method.name) {
+                "EXACT_NAME_OR_ALIAS" -> "ENLACE DIRECTO"
+                else -> "ENLACE NOMINAL"
+            },
+            color = color,
+        )
+        G4edPartViewer(experience.manifest, experience.binding)
+        Text(
+            "${part.section.title} · ID ${part.element.canonicalId}",
+            color = MeetColors.textMuted,
+            fontSize = 8.sp,
+        )
+        Text(
+            experience.limitations,
+            color = MeetColors.warning,
+            fontSize = 8.sp,
+            lineHeight = 11.sp,
+        )
+    }
+}
+
+@Composable
+private fun SemanticInline3dPanel(
+    experience: ProprietaryInline3dExperience.Semantic,
+    color: Color,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Inline3dAuthorityHeader(
+            title = "${experience.authorityLabel} · 360°",
+            name = experience.normalizedName,
+            badge = "COBERTURA UNIVERSAL",
+            color = color,
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .background(Color(0xFF05090D), RoundedCornerShape(18.dp))
+                .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(18.dp)),
+        ) {
+            Interactive3DDiagView(
+                sceneType = SceneType.UNIVERSAL_CATALOG,
+                engineType = EngineType.INLINE_4,
+                activeDtcs = emptyList(),
+                selectedComponentId = experience.node.id,
+                onComponentSelected = { _, _ -> },
+                catalogNodes = listOf(experience.node),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Text(
+            "Gira con un dedo · pellizca para zoom · arrastra para inspeccionar",
+            color = MeetColors.cyberCyan,
+            fontSize = 8.sp,
+        )
+        Text(
+            experience.limitations,
+            color = MeetColors.warning,
+            fontSize = 8.sp,
+            lineHeight = 11.sp,
+        )
+    }
+}
+
+@Composable
+private fun Inline3dAuthorityHeader(
+    title: String,
+    name: String,
+    badge: String,
+    color: Color,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, color.copy(alpha = 0.28f), RoundedCornerShape(12.dp))
+            .padding(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.ViewInAr, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = color, fontSize = 8.sp, fontWeight = FontWeight.Black)
+            Text(name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(badge, color = MeetColors.textMuted, fontSize = 7.sp)
     }
 }
 

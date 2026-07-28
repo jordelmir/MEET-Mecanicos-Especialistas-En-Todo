@@ -135,13 +135,28 @@ class ProprietaryCanonical3dResolver(context: Context) {
     fun resolve(entity: ProprietaryCatalogEntity): ProprietaryCanonical3dResolution? {
         if (entity.recordRole != "COMPONENT") return null
         val identityResolution = resolveCanonicalIdentity(
-            sourceName = entity.nameOriginal,
+            sourceName = physicalComponentName(entity.nameOriginal),
             preferredCanonicalPrefixes = preferredCanonicalPrefixes(entity.systemId),
             candidates = identities,
         ) ?: return null
         val part = partById[identityResolution.identity.canonicalId] ?: return null
         return ProprietaryCanonical3dResolution(part, identityResolution.method)
     }
+}
+
+/**
+ * Some source tables store the physical name and the service procedure in the
+ * same cell. Only the leading identity is suitable for canonical matching.
+ * The complete literal value remains untouched in the corpus and UI.
+ */
+internal fun physicalComponentName(value: String): String {
+    val firstField = value
+        .lineSequence()
+        .firstOrNull()
+        .orEmpty()
+        .substringBefore('\t')
+        .trim()
+    return firstField.ifBlank { value.trim() }
 }
 
 internal fun resolveCanonicalIdentity(

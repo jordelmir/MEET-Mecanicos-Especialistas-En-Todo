@@ -252,14 +252,18 @@ private fun RideMarkerRole.color(): Int =
     when (this) {
         RideMarkerRole.PASSENGER_GPS -> Color.rgb(0, 188, 212)
         RideMarkerRole.PICKUP -> Color.rgb(0, 200, 83)
+        RideMarkerRole.STOP -> Color.rgb(255, 214, 0)
         RideMarkerRole.DESTINATION -> Color.rgb(213, 0, 249)
         RideMarkerRole.DRIVER -> Color.rgb(255, 145, 0)
+        RideMarkerRole.ROAD_INCIDENT -> Color.rgb(255, 45, 85)
     }
 
 private fun RideMarkerRole.shortLabel(): String =
     when (this) {
         RideMarkerRole.PASSENGER_GPS -> "U"
         RideMarkerRole.PICKUP -> "R"
+        RideMarkerRole.STOP -> "P"
         RideMarkerRole.DESTINATION -> "D"
         RideMarkerRole.DRIVER -> "C"
+        RideMarkerRole.ROAD_INCIDENT -> "!"
     }

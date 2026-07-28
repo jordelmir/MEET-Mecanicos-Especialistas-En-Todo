@@ -1,7 +1,7 @@
 # MEET Viajes — Runbook de plataforma
 
-Fecha: 2026-07-26  
-Versión Android: 4.2.0 (`versionCode 19`)  
+Fecha: 2026-07-28
+Versión Android: 4.5.0 (`versionCode 24`)
 Piloto: Costa Rica  
 Arquitectura: mundial y multimoneda
 
@@ -26,6 +26,24 @@ La versión 4.2.0 entrega una base ejecutable y auditable:
 - DTC, mantenimiento, repuestos y reportes sin datos inventados;
 - eliminación de autoaprobaciones, identidades, teléfonos, vehículos,
   calificaciones y viajes simulados en el flujo productivo.
+
+La extensión V3 de 4.5.0 agrega:
+
+- búsqueda real de destino y paradas por proveedor geográfico configurable;
+- hasta ocho paradas resueltas y ordenadas, visibles antes de aceptar;
+- declaración de efectivo o SINPE y desglose final;
+- PIN de abordaje de cuatro dígitos, de un solo uso, con hash, expiración,
+  límite de intentos e idempotencia;
+- adjudicación transaccional al primer conductor confirmado, con reserva de
+  comisión antes de asignar;
+- reportes de tráfico lento/muy lento, vehículo varado con lado de vía,
+  bache, obstáculo, cierre, contravía, presencia policial y control de tránsito;
+- geohash grueso para consultas regionales y coordenada exacta separada;
+- muestras de velocidad por minuto y estimador con mediana robusta;
+- confianza ponderada por vigencia, precisión, dirección, reputación,
+  votos independientes y evidencia de velocidad;
+- incidentes con caducidad y límites matemáticos sobre el ETA;
+- prohibición de cerrar una ruta por un solo reporte.
 
 ## Límites honestos de esta versión
 
@@ -52,6 +70,7 @@ La migración principal es:
 
 ```text
 supabase/migrations/20260726010000_ride_platform_foundation.sql
+supabase/migrations/20260728010000_ride_stops_boarding_and_road_intelligence.sql
 ```
 
 Comprobar su contrato:
@@ -65,7 +84,10 @@ Contiene 13 tablas `ride_*`, RLS en todas ellas y las RPC:
 - `ride_grant_promotional_balance`;
 - `ride_accept_offer`;
 - `ride_cancel_trip`;
-- `ride_complete_trip`.
+- `ride_complete_trip`;
+- `ride_create_boarding_pin`;
+- `ride_verify_boarding_pin`;
+- `ride_claim_request`.
 
 Las aplicaciones cliente no escriben directamente el ledger ni los eventos.
 La evidencia mecánica solo puede insertarla el conductor asignado con viaje
@@ -99,6 +121,27 @@ el dominio del viaje.
 
 No se deben usar los servidores públicos comunitarios de OpenStreetMap o
 Nominatim como backend masivo.
+
+La búsqueda se abstrae mediante `RidePlaceSearchProvider`. El piloto usa Photon
+con atribución OpenStreetMap y la URL se configura en `RIDE_GEOCODER_URL`.
+Antes del lanzamiento abierto se requiere una instancia propia o contratada
+con SLA, límites, caché y política de privacidad.
+
+## Tráfico colaborativo y ETA
+
+- La app toma velocidad solo durante un viaje activo del conductor.
+- Las muestras locales se conservan diez minutos; la nube recibe como máximo
+  una observación por conductor, segmento y minuto.
+- El estimador exige tres muestras recientes antes de aceptar una velocidad
+  observada y usa mediana para reducir GPS espurio.
+- Un incidente con confianza suficiente puede degradar el ETA dentro de un
+  rango acotado.
+- `ROAD_CLOSED` y `WRONG_WAY_HAZARD` solo bloquean ruteo con al menos dos
+  confirmaciones independientes y confianza alta.
+- Policía se presenta como aviso de seguridad vial; no se usa para evadir
+  controles.
+- Los reportes vencen automáticamente y pueden confirmarse, negarse o marcarse
+  despejados.
 
 ## Privacidad y retención
 

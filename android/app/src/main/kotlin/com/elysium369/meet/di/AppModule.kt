@@ -3041,6 +3041,15 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_42_43 = object : Migration(42, 43) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `ride_requests` ADD COLUMN `stopsJson` TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE `ride_requests` ADD COLUMN `paymentMethod` TEXT NOT NULL DEFAULT 'CASH'")
+            db.execSQL("ALTER TABLE `ride_requests` ADD COLUMN `quoteVersion` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `ride_requests` ADD COLUMN `fareBreakdownJson` TEXT NOT NULL DEFAULT '{}'")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3070,7 +3079,8 @@ object AppModule {
             MIGRATION_38_39,
             MIGRATION_39_40,
             MIGRATION_40_41,
-            MIGRATION_41_42
+            MIGRATION_41_42,
+            MIGRATION_42_43
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

@@ -284,3 +284,65 @@ bash tests/parity/ci-verify.sh
 
 Read [system-pack-matrix.md](references/system-pack-matrix.md) for the combined
 130-pack routing contract.
+
+## Universal inline coverage lessons (v4)
+
+### Keep the 3D experience inside the selected part
+
+The detail screen for a physical component must always resolve to an inline
+experience. Use a canonical GLB when its binding and bytes validate; otherwise
+use a deterministic semantic reconstruction in the same screen. Never redirect
+a selected part to an unrelated general atlas and never replace the viewer with
+an empty placeholder.
+
+Derive geometry identity from the physical component name, not from appended
+procedure or corpus text. Strip tabs, newlines and other literal detail before
+canonical matching so identical parts remain stable as knowledge improves.
+
+### Distinguish two independent coverage numbers
+
+- Canonical technical-atlas coverage: the verified 6,405 experiences and pack
+  contracts described above.
+- Principal-database inline coverage: every physical `COMPONENT` record exposed
+  by the proprietary catalogue, currently proven as 4,753 of 4,753.
+
+Do not add these counts or describe semantic fallback as newly verified OEM
+geometry. It is interactive reference coverage.
+
+### Choose semantic fallback by mechanical archetype
+
+Route normalized names into stable recipes such as panel/glass,
+harness/hose, ECU/fuse/relay, sensor, valve/injector, gear/bearing,
+shaft, pump/alternator, suspension, brake, wheel, fastener, seal or generic
+component. Seed proportions and detail placement from stable component
+identity. Include mounting or service cues that make the class recognizable,
+without inventing exact dimensions.
+
+### Couple 3D with cited repair evidence
+
+The selected component screen must keep these layers distinct and visible:
+
+1. literal source identity and hashes;
+2. inline 3D/360 with its authority label;
+3. cited diagnostic and repair workflow;
+4. compatibility and physical-test gates.
+
+Extract repair evidence from source-neighbourhood blocks and preserve block
+order plus content hash. Universal safety checklists may fill process gaps, but
+must say when a specific value, test or procedure is absent from the source.
+
+### Prove universal coverage
+
+Run the repository coverage and source-contract tests in addition to atlas
+verification:
+
+```bash
+./android/gradlew -p android testDebugUnitTest \
+  --tests '*ProprietaryInline3dCoverageTest' \
+  --tests '*PrincipalRepairSourceContractTest' \
+  --tests '*PartRepairWorkflowTest'
+```
+
+The release fails if any physical component returns no inline experience,
+source bytes or block hashes drift, or a procedural fallback is promoted to
+OEM/dimensional authority.
