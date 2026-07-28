@@ -46,6 +46,7 @@ Documentación técnica:
 - [`docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md`](docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md)
 - [`docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md`](docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md)
 - [`docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md`](docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md)
+- [`docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md`](docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md)
 
 ## Que es real hoy
 

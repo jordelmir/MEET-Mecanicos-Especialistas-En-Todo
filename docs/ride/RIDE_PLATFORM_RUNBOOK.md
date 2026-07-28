@@ -1,7 +1,7 @@
 # MEET Viajes — Runbook de plataforma
 
 Fecha: 2026-07-28
-Versión Android: 4.5.0 (`versionCode 24`)
+Versión Android: 4.6.0 (`versionCode 25`)
 Piloto: Costa Rica  
 Arquitectura: mundial y multimoneda
 
@@ -27,7 +27,21 @@ La versión 4.2.0 entrega una base ejecutable y auditable:
 - eliminación de autoaprobaciones, identidades, teléfonos, vehículos,
   calificaciones y viajes simulados en el flujo productivo.
 
-La extensión V3 de 4.5.0 agrega:
+La extensión V4 de 4.6.0 agrega:
+
+- búsqueda de lugares Photon corregida sin `lang=es` incompatible, con
+  `Accept-Language`, sesgo GPS, distancia, carga y error visibles;
+- Casa, Trabajo y Favorito persistidos localmente;
+- ofertas CRC normalizadas en saltos exactos de ₡300 tanto en UI como en
+  la lógica de dominio;
+- perfiles Elysium separados para pasajero y conductor, historial de viajes,
+  soporte, reputación capturada y reconocimientos derivados;
+- gasto anual del pasajero e ingresos del conductor por día, semana, mes,
+  año y ventana móvil de tres años;
+- cancelaciones separadas por rol y validadas también fuera de la UI;
+- acceso desde la guía DTC a componentes 3D/360 realmente relacionados.
+
+La extensión V3 de 4.5.0 agregó:
 
 - búsqueda real de destino y paradas por proveedor geográfico configurable;
 - hasta ocho paradas resueltas y ordenadas, visibles antes de aceptar;

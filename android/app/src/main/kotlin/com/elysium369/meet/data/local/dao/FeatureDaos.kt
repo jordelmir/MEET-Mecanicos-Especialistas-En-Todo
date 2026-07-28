@@ -735,6 +735,9 @@ interface RideDao {
     @Query("UPDATE ride_requests SET status = :status WHERE requestId = :requestId")
     suspend fun updateRequestStatus(requestId: String, status: String)
 
+    @Query("UPDATE ride_requests SET status = :status, completedAt = :completedAt WHERE requestId = :requestId")
+    suspend fun updateRequestStatusAndCompletedAt(requestId: String, status: String, completedAt: Long?)
+
     @Query("UPDATE ride_requests SET status = 'ACCEPTED', acceptedOfferId = :offerId, assignedDriverId = :driverId, assignedDriverName = :driverName, assignedDriverPhone = :driverPhone, assignedDriverVehicle = :vehicle, finalPrice = :price WHERE requestId = :requestId")
     suspend fun acceptOffer(requestId: String, offerId: String, driverId: String, driverName: String, driverPhone: String, vehicle: String, price: Double)
 

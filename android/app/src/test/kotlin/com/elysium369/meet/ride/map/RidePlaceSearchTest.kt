@@ -29,4 +29,21 @@ class RidePlaceSearchTest {
         assertEquals(-84.0907, result.longitude, 0.00001)
         assertTrue(result.attribution.contains("OpenStreetMap"))
     }
+
+    @Test
+    fun `distance is calculated from the GPS bias without changing coordinates`() {
+        val suggestion = RidePlaceSuggestion(
+            providerId = "hospital",
+            primaryLabel = "Hospital San Juan de Dios",
+            secondaryLabel = "San José, Costa Rica",
+            latitude = 9.9345,
+            longitude = -84.0919,
+            attribution = "OpenStreetMap",
+        )
+
+        val distance = requireNotNull(suggestion.distanceKmFrom(9.9281, -84.0907))
+
+        assertTrue(distance in 0.6..0.9)
+        assertEquals(9.9345, suggestion.latitude, 0.000001)
+    }
 }

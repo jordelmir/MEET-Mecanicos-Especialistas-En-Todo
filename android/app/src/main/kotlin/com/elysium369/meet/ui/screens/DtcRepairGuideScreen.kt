@@ -3,6 +3,7 @@ package com.elysium369.meet.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -1384,6 +1385,49 @@ fun DtcRepairGuideScreen(
                     when (selectedTabIndex) {
                         0 -> {
                             // ═══════════ TAB 0: DIAGNÓSTICO ═══════════
+                            EliteCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                glowColor = MeetColors.neonGreen,
+                                enableHolo3D = true,
+                            ) {
+                                Column(
+                                    Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Text(
+                                        "DTC → PRUEBA → PIEZA → 3D/360",
+                                        color = MeetColors.neonGreen,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 12.sp,
+                                    )
+                                    Text(
+                                        "Abre únicamente componentes vinculados a $dtcCode. La relación orienta la inspección; no autoriza reemplazo ni compatibilidad exacta sin VIN/OEM/prueba física.",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                    )
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                navController.navigate("component_locator?dtcCode=$dtcCode")
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                                        ) {
+                                            Text("VER PIEZAS 3D", color = MeetColors.backgroundDark, fontWeight = FontWeight.Black)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { navController.navigate("part_request") },
+                                            modifier = Modifier.weight(1f),
+                                            border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                                        ) {
+                                            Text("COTIZAR PIEZA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
                             // Header Card
                             EliteCard(
                                 modifier = Modifier.fillMaxWidth(),

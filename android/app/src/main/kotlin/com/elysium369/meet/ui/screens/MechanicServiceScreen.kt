@@ -352,7 +352,7 @@ private fun ClientWorkspaceView(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "⚡ PEDIR AYUDA A MECÁNICO (INDRIVER STYLE)",
+                        text = "PEDIR AYUDA A MECÁNICO · ELYSIUM",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 16.sp

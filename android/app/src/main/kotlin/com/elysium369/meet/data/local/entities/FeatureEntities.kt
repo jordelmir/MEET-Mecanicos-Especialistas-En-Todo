@@ -122,11 +122,11 @@ data class ServiceRequestEntity(
     val createdAt: Long,
     val escrowStatus: String? = "NONE", // "NONE", "HELD", "RELEASED", "REFUNDED"
     val paymentId: String? = null,
-    // v31 — Mechanic assignment + Indriver-style fields
+    // v31 — Mechanic assignment + Elysium marketplace fields
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
     val phone: String = "",
-    val priceOffer: Double = 0.0,           // Indriver-style price in USD
+    val priceOffer: Double = 0.0,           // Elysium Vanguard proposed price
     val assignedMechanicId: String? = null,
     val assignedMechanicName: String? = null,
     val assignedMechanicPhone: String? = null,
@@ -288,7 +288,7 @@ data class TowTruckRequestEntity(
     val assignedDriverId: String? = null,
     val assignedDriverName: String? = null,
     val assignedDriverPhone: String? = null,
-    val priceOffer: Double,        // Indriver style proposed fare
+    val priceOffer: Double,        // Elysium Vanguard proposed fare
     val createdAt: Long,
     val completedAt: Long? = null
 )
@@ -340,7 +340,7 @@ data class ProviderProfileEntity(
 )
 
 // ═══════════════════════════════════════════════════════════════
-// FEATURE 8 — MEET Rides (Viajes InDriver-Style)
+// FEATURE 8 — Elysium Vanguard Viajes
 // ═══════════════════════════════════════════════════════════════
 
 @Entity(

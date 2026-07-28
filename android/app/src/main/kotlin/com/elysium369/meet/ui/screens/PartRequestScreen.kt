@@ -1711,7 +1711,7 @@ private fun StoreWorkspaceView(
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("🙋‍♂️ OFERTA COMO REPUESTERA (INDRIVER)", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("OFERTA COMO REPUESTERA · ELYSIUM", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         } else {
                             val compatibilityResult = remember(req, partNumberOffer) {

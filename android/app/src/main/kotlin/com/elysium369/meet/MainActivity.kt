@@ -513,8 +513,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable(
-                route = "component_locator?partId={partId}",
+                route = "component_locator?partId={partId}&dtcCode={dtcCode}",
                 arguments = listOf(navArgument("partId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }, navArgument("dtcCode") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -523,7 +527,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 ComponentLocatorScreen(
                     navController = navController,
                     viewModel = obdViewModel,
-                    initialPartId = backStack.arguments?.getString("partId")
+                    initialPartId = backStack.arguments?.getString("partId"),
+                    initialDtcCode = backStack.arguments?.getString("dtcCode"),
                 )
             }
             composable(
