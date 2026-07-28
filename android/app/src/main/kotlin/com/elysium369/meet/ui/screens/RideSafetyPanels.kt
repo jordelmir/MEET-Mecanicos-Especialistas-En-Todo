@@ -37,6 +37,7 @@ import com.elysium369.meet.data.local.entities.DtcEventEntity
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
+import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideConsentPolicy
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ui.ObdViewModel
@@ -246,7 +247,7 @@ fun RidePassengerTrustCard(
 
 @Composable
 fun RideCancellationDialog(
-    actorLabel: String,
+    actorRole: RideActorRole,
     onDismiss: () -> Unit,
     onConfirm: (RideCancellationReason, String?) -> Unit,
 ) {
@@ -265,10 +266,10 @@ fun RideCancellationDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "$actorLabel: selecciona el motivo real. Los casos de seguridad se señalan para revisión; el piloto no aplica cargos automáticos.",
+                    text = "${if (actorRole == RideActorRole.DRIVER) "Conductor" else "Pasajero"}: selecciona el motivo real. Los casos de seguridad se señalan para revisión; el piloto no aplica cargos automáticos.",
                     fontSize = 12.sp,
                 )
-                RideCancellationReason.entries.forEach { reason ->
+                RideCancellationPolicy.reasonsFor(actorRole).forEach { reason ->
                     OutlinedButton(
                         onClick = { selected = reason },
                         modifier = Modifier.fillMaxWidth(),

@@ -293,7 +293,7 @@ private fun ClientWorkspaceView(
         }
 
         item {
-            // Request Form Card (Indriver Style)
+            // Elysium Vanguard request form
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = TowTruckColors.cardBackground),
@@ -302,7 +302,7 @@ private fun ClientWorkspaceView(
             ) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(
-                        text = "⚡ PEDIR AUXILIO / GRÚA ESTILO INDRIVER",
+                        text = "PEDIR AUXILIO / GRÚA · ELYSIUM",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
                         color = TowTruckColors.textPrimary

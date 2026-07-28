@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,11 +45,16 @@ import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.domain.RidePaymentMethod
+import com.elysium369.meet.ride.domain.RideFareBidPolicy
+import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ride.domain.RideTripPlanPolicy
 import com.elysium369.meet.ride.map.PhotonRidePlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSuggestion
+import com.elysium369.meet.ride.map.distanceKmFrom
+import com.elysium369.meet.ride.map.RideSavedPlace
+import com.elysium369.meet.ride.map.RideSavedPlacesStore
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ride.map.RideGeoPoint
@@ -122,13 +128,14 @@ fun RideServiceScreen(
 
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
+    var showProfile by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "MEET Rides 🚗",
+                        text = "ELYSIUM VANGUARD · VIAJES",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -147,6 +154,13 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        IconButton(onClick = { showProfile = true }) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "Abrir perfil e historial",
+                                tint = MeetColors.cyberCyan,
+                            )
+                        }
                         Text(
                             text = if (driverMode) "Modo Chofer" else "Modo Pasajero",
                             color = if (driverMode) MeetColors.cyberCyan else MeetColors.neonGreen,
@@ -178,7 +192,13 @@ fun RideServiceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (activeRide != null) {
+            if (showProfile) {
+                RideProfileScreen(
+                    viewModel = viewModel,
+                    isDriver = driverMode,
+                    onBack = { showProfile = false },
+                )
+            } else if (activeRide != null) {
                 // Si hay un viaje activo, mostrar la pantalla de viaje activo con el chat
                 ActiveRidePanel(
                     viewModel = viewModel,
@@ -223,13 +243,17 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     var destLongitude by remember { mutableStateOf(0.0) }
     var destinationPlaceId by remember { mutableStateOf<String?>(null) }
     var destinationSuggestions by remember { mutableStateOf(emptyList<RidePlaceSuggestion>()) }
+    var destinationSearchLoading by remember { mutableStateOf(false) }
+    var destinationSearchFailed by remember { mutableStateOf(false) }
     var stops by remember { mutableStateOf(emptyList<RideStopSnapshot>()) }
     var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
     val placeSearchProvider = remember {
         PhotonRidePlaceSearchProvider(BuildConfig.RIDE_GEOCODER_URL)
     }
+    val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
+    var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
 
-    var offerPrice by remember { mutableStateOf(2500.0) }
+    var offerPrice by remember { mutableStateOf(2_400.0) }
     var isUsd by remember { mutableStateOf(false) }
 
     // Passenger verification state
@@ -262,13 +286,19 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
             return@LaunchedEffect
         }
         delay(350)
-        destinationSuggestions = runCatching {
+        destinationSearchLoading = true
+        destinationSearchFailed = false
+        val searchResult = runCatching {
             placeSearchProvider.search(
                 query = destAddress,
                 biasLatitude = currentGps?.latitude,
                 biasLongitude = currentGps?.longitude,
             )
-        }.getOrDefault(emptyList())
+        }
+        destinationSuggestions = searchResult.getOrDefault(emptyList())
+            .sortedBy { it.distanceKmFrom(currentGps?.latitude, currentGps?.longitude) ?: Double.MAX_VALUE }
+        destinationSearchFailed = searchResult.isFailure
+        destinationSearchLoading = false
     }
 
     LazyColumn(
@@ -487,6 +517,31 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    if (savedPlaces.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(savedPlaces, key = RideSavedPlace::slot) { place ->
+                                AssistChip(
+                                    onClick = {
+                                        destAddress = place.address
+                                        destLatitude = place.latitude
+                                        destLongitude = place.longitude
+                                        destinationPlaceId = place.providerId
+                                        destinationSuggestions = emptyList()
+                                    },
+                                    label = { Text("${place.label} · ${place.address}", maxLines = 1) },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (place.slot == "HOME") Icons.Default.Home else Icons.Default.Star,
+                                            null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
                     OutlinedTextField(
                         value = destAddress,
                         onValueChange = {
@@ -504,6 +559,12 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         ),
                         singleLine = true
                     )
+                    if (destinationSearchLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MeetColors.cyberCyan,
+                        )
+                    }
                     destinationSuggestions.forEach { suggestion ->
                         Surface(
                             modifier = Modifier
@@ -519,13 +580,24 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.25f)),
                         ) {
-                            Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-                                Text(
-                                    suggestion.primaryLabel,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
+                            Row(
+                                Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Default.Place,
+                                    contentDescription = null,
+                                    tint = MeetColors.cyberCyan,
+                                    modifier = Modifier.size(20.dp),
                                 )
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        suggestion.primaryLabel,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 if (suggestion.secondaryLabel.isNotBlank()) {
                                     Text(
                                         suggestion.secondaryLabel,
@@ -535,9 +607,36 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
+                                }
+                                suggestion.distanceKmFrom(
+                                    currentGps?.latitude,
+                                    currentGps?.longitude,
+                                )?.let { distance ->
+                                    Text(
+                                        String.format(Locale.getDefault(), "%.1f km", distance),
+                                        color = MeetColors.textMuted,
+                                        fontSize = 10.sp,
+                                    )
+                                }
                             }
                         }
                         Spacer(Modifier.height(5.dp))
+                    }
+                    if (
+                        !destinationSearchLoading &&
+                        destAddress.trim().length >= 3 &&
+                        destinationPlaceId == null &&
+                        destinationSuggestions.isEmpty()
+                    ) {
+                        Text(
+                            if (destinationSearchFailed) {
+                                "No se pudo consultar el mapa. Revisa internet e inténtalo de nuevo."
+                            } else {
+                                "Sin coincidencias. Escribe lugar + cantón o fija el punto en el mapa."
+                            },
+                            color = MeetColors.warning,
+                            fontSize = 10.sp,
+                        )
                     }
                     if (destinationPlaceId != null) {
                         Text(
@@ -545,6 +644,31 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             color = MeetColors.neonGreen,
                             fontSize = 9.sp,
                         )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Triple("HOME", "Casa", "Casa"),
+                                Triple("WORK", "Trabajo", "Trabajo"),
+                                Triple("FAVORITE", "Favorito", "Favorito"),
+                            ).forEach { (slot, label, button) ->
+                                TextButton(
+                                    onClick = {
+                                        savedPlaces = savedPlacesStore.save(
+                                            RideSavedPlace(
+                                                slot = slot,
+                                                label = label,
+                                                address = destAddress,
+                                                latitude = destLatitude,
+                                                longitude = destLongitude,
+                                                providerId = requireNotNull(destinationPlaceId),
+                                            ),
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 5.dp),
+                                ) {
+                                    Text("Guardar $button", fontSize = 9.sp)
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -676,7 +800,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "💰 Tu Oferta (Subasta InDriver)",
+                            text = "OFERTA ELYSIUM · SUBASTA JUSTA",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = MeetColors.textPrimary
@@ -714,14 +838,30 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
 
                     Slider(
                         value = offerPrice.toFloat(),
-                        onValueChange = { offerPrice = it.toDouble() },
-                        valueRange = 1000f..30000f,
-                        steps = 29,
+                        onValueChange = {
+                            offerPrice = RideFareBidPolicy.normalize(
+                                it.toDouble(),
+                                "CRC",
+                            )
+                        },
+                        valueRange = 900f..30000f,
+                        steps = 96,
                         colors = SliderDefaults.colors(
                             thumbColor = MeetColors.neonGreen,
                             activeTrackColor = MeetColors.neonGreen,
                             inactiveTrackColor = MeetColors.borderSubtle
                         )
+                    )
+                    Text(
+                        if (isUsd) {
+                            "Equivalencia referencial; la base se ajusta en saltos de ₡300"
+                        } else {
+                            "Ajuste exacto en saltos de ₡300"
+                        },
+                        color = MeetColors.textMuted,
+                        fontSize = 10.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -1755,7 +1895,7 @@ fun ActiveRidePanel(
 
     if (showCancellationDialog) {
         RideCancellationDialog(
-            actorLabel = if (isDriver) "Conductor" else "Pasajero",
+            actorRole = if (isDriver) RideActorRole.DRIVER else RideActorRole.PASSENGER,
             onDismiss = { showCancellationDialog = false },
             onConfirm = { reason, detail ->
                 viewModel.cancelRide(
@@ -3001,7 +3141,7 @@ fun PassengerLiveOffersPanel(
                     fontWeight = FontWeight.Medium
                 )
 
-                // Price Stepper (InDriver-style interactive)
+                // Elysium Vanguard fare stepper
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -3009,10 +3149,10 @@ fun PassengerLiveOffersPanel(
                 ) {
                     IconButton(
                         onClick = {
-                            val step = if (ride.currency == "USD") 1.0 else 500.0
-                            if (ride.priceOffer > step) {
-                                viewModel.updateRidePrice(ride.requestId, ride.priceOffer - step)
-                            }
+                            viewModel.updateRidePrice(
+                                ride.requestId,
+                                RideFareBidPolicy.adjust(ride.priceOffer, ride.currency, -1),
+                            )
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
                     ) {
@@ -3028,8 +3168,10 @@ fun PassengerLiveOffersPanel(
 
                     IconButton(
                         onClick = {
-                            val step = if (ride.currency == "USD") 1.0 else 500.0
-                            viewModel.updateRidePrice(ride.requestId, ride.priceOffer + step)
+                            viewModel.updateRidePrice(
+                                ride.requestId,
+                                RideFareBidPolicy.adjust(ride.priceOffer, ride.currency, 1),
+                            )
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
                     ) {
@@ -3050,7 +3192,7 @@ fun PassengerLiveOffersPanel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    listOf(500.0, 1000.0, 2000.0).forEach { amount ->
+                    listOf(300.0, 900.0, 1500.0).forEach { amount ->
                         val label = if (ride.currency == "USD") "+$${(amount / 500).toInt()}" else "+₡${amount.toInt()}"
                         val valToAdd = if (ride.currency == "USD") amount / 500.0 else amount
                         Button(

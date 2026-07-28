@@ -55,4 +55,17 @@ class RideCancellationTest {
             ),
         )
     }
+
+    @Test
+    fun `passenger and driver only receive cancellation reasons for their role`() {
+        val passenger = RideCancellationPolicy.reasonsFor(RideActorRole.PASSENGER)
+        val driver = RideCancellationPolicy.reasonsFor(RideActorRole.DRIVER)
+
+        assertTrue(RideCancellationReason.DRIVER_NO_SHOW in passenger)
+        assertFalse(RideCancellationReason.PASSENGER_NO_SHOW in passenger)
+        assertTrue(RideCancellationReason.PASSENGER_NO_SHOW in driver)
+        assertFalse(RideCancellationReason.DRIVER_NO_SHOW in driver)
+        assertFalse(RideCancellationReason.UNACCOMPANIED_MINOR in passenger)
+        assertTrue(RideCancellationReason.UNACCOMPANIED_MINOR in driver)
+    }
 }

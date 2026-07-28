@@ -181,7 +181,7 @@ fun WorkshopDashboardScreen(
             // ── Nearby Service Requests List ──
             item {
                 Text(
-                    text = "SOLICITUDES CERCANAS (MÓDULO INDRIVER)",
+                    text = "SOLICITUDES CERCANAS · RED ELYSIUM",
                     color = MeetColors.cyberCyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,

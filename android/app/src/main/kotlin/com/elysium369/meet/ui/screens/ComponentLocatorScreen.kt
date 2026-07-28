@@ -2,6 +2,7 @@ package com.elysium369.meet.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -107,7 +108,8 @@ enum class ComponentCategory(val label: String, val color: Color) {
 fun ComponentLocatorScreen(
     navController: NavController,
     viewModel: ObdViewModel,
-    initialPartId: String? = null
+    initialPartId: String? = null,
+    initialDtcCode: String? = null,
 ) {
     val context = LocalContext.current
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
@@ -250,34 +252,41 @@ fun ComponentLocatorScreen(
         }
     }
     
+    val initialDtcComponent = remember(initialDtcCode, engineComponents) {
+        engineComponents.firstOrNull { component ->
+            component.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) }
+        }
+    }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedComponent by remember(initialPartId, suspensionComponents, initialProprietaryEntity) {
+    var selectedComponent by remember(initialPartId, initialDtcCode, suspensionComponents, initialProprietaryEntity) {
         mutableStateOf(
             initialProprietaryEntity?.toComponentInfo(proprietaryRepository, includeLiteralContext = true)
                 ?: suspensionComponents.firstOrNull { it.id == initialPartId }
+                ?: initialDtcComponent
         )
     }
     var selectedCategory by remember { mutableStateOf<ComponentCategory?>(null) }
     var aiContextPreview by remember { mutableStateOf<String?>(null) }
     
-    var currentScene by remember(initialPartId, initialProprietaryEntity) {
+    var currentScene by remember(initialPartId, initialDtcCode, initialProprietaryEntity) {
         mutableStateOf(
             when {
                 initialProprietaryEntity != null -> SceneType.UNIVERSAL_CATALOG
                 initialPartId != null -> SceneType.SUSPENSION
+                initialDtcCode != null -> SceneType.ENGINE_BLOCK
                 else -> SceneType.UNIVERSAL_CATALOG
             }
         )
     }
     var explodedServiceView by remember { mutableStateOf(false) }
     var selectedPlatform by remember { mutableStateOf(MeetPlatformCatalog.default) }
-    var twinViewportState by remember(initialProprietaryEntity) {
+    var twinViewportState by remember(initialProprietaryEntity, initialDtcComponent) {
         mutableStateOf(
             VehicleTwinViewportState(
-                focusMode = if (initialProprietaryEntity == null) {
-                    TwinFocusMode.COMPLETE_VEHICLE
-                } else {
+                focusMode = if (initialProprietaryEntity != null || initialDtcComponent != null) {
                     TwinFocusMode.COMPONENT
+                } else {
+                    TwinFocusMode.COMPLETE_VEHICLE
                 }
             )
         )
@@ -314,10 +323,11 @@ fun ComponentLocatorScreen(
         }
     }
 
-    val filteredComponents = remember(searchQuery, selectedCategory, components) {
+    val filteredComponents = remember(searchQuery, selectedCategory, components, initialDtcCode) {
         components.filter { c ->
             (searchQuery.isBlank() || c.name.contains(searchQuery, ignoreCase = true)) &&
-            (selectedCategory == null || c.category == selectedCategory)
+            (selectedCategory == null || c.category == selectedCategory) &&
+            (initialDtcCode == null || c.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) })
         }
     }
     val pageScrollState = rememberScrollState()
@@ -1170,6 +1180,22 @@ fun ComponentLocatorScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            if (filteredComponents.isEmpty() && initialDtcCode != null) {
+                item {
+                    Surface(
+                        color = MeetColors.warning.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(
+                            "No existe una pieza con vínculo estructurado para $initialDtcCode. No se abrirá un atlas general sin relación; vuelve a la guía y confirma con pruebas físicas.",
+                            color = MeetColors.warning,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
+                }
+            }
             items(filteredComponents, key = { it.id }) { comp ->
                 val isSelected = selectedComponent?.id == comp.id
                 val hasDtc = comp.relatedDtcs.any { allActiveDtcs.contains(it) }

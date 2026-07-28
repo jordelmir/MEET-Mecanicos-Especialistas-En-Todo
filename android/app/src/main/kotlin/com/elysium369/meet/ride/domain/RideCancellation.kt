@@ -44,4 +44,37 @@ object RideCancellationPolicy {
         if (normalized.length > MAX_DETAIL_LENGTH) return false
         return reason != RideCancellationReason.OTHER || normalized.isNotEmpty()
     }
+
+    fun reasonsFor(role: RideActorRole): List<RideCancellationReason> =
+        when (role) {
+            RideActorRole.PASSENGER -> listOf(
+                RideCancellationReason.SAFETY_CONCERN,
+                RideCancellationReason.VEHICLE_MISMATCH,
+                RideCancellationReason.DRIVER_NO_SHOW,
+                RideCancellationReason.EXCESSIVE_WAIT,
+                RideCancellationReason.INCORRECT_PICKUP,
+                RideCancellationReason.INCORRECT_DESTINATION,
+                RideCancellationReason.CHANGE_OF_PLANS,
+                RideCancellationReason.DUPLICATE_OR_ACCIDENTAL,
+                RideCancellationReason.MEDICAL_EMERGENCY,
+                RideCancellationReason.OTHER,
+            )
+            RideActorRole.DRIVER -> listOf(
+                RideCancellationReason.SAFETY_CONCERN,
+                RideCancellationReason.UNACCOMPANIED_MINOR,
+                RideCancellationReason.CHILD_SEAT_REQUIRED,
+                RideCancellationReason.TOO_MANY_PASSENGERS,
+                RideCancellationReason.IDENTITY_MISMATCH,
+                RideCancellationReason.HARASSMENT,
+                RideCancellationReason.PROHIBITED_ITEM_OR_ACTIVITY,
+                RideCancellationReason.DANGEROUS_PICKUP,
+                RideCancellationReason.PASSENGER_NO_SHOW,
+                RideCancellationReason.UNSAFE_VEHICLE_CONDITION,
+                RideCancellationReason.MEDICAL_EMERGENCY,
+                RideCancellationReason.OTHER,
+            )
+            RideActorRole.SYSTEM,
+            RideActorRole.SAFETY_OPERATOR,
+            -> listOf(RideCancellationReason.OTHER)
+        }
 }

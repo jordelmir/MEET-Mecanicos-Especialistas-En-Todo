@@ -85,7 +85,7 @@ private val providerTypes = listOf(
         type = "RIDE_DRIVER",
         icon = "🚗",
         label = "Chofer de Viajes",
-        subtitle = "Ofrece servicios de transporte estilo Uber / InDriver",
+        subtitle = "Ofrece servicios de transporte con la red Elysium Vanguard",
         accentColor = MeetColors.electricBlue,
         specialtiesPlaceholder = "Ej: Sedán, SUV, Van, Premium…"
     )

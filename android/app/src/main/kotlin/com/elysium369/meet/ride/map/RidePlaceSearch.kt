@@ -3,6 +3,10 @@ package com.elysium369.meet.ride.map
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -30,6 +34,8 @@ interface RidePlaceSearchProvider {
     ): List<RidePlaceSuggestion>
 }
 
+class RidePlaceSearchException(message: String) : Exception(message)
+
 class PhotonRidePlaceSearchProvider(
     private val endpoint: String,
 ) : RidePlaceSearchProvider {
@@ -45,10 +51,11 @@ class PhotonRidePlaceSearchProvider(
         val params = buildList {
             add("q=${URLEncoder.encode(query.trim(), Charsets.UTF_8.name())}")
             add("limit=${limit.coerceIn(1, 10)}")
-            add("lang=es")
             if (biasLatitude != null && biasLongitude != null) {
                 add("lat=$biasLatitude")
                 add("lon=$biasLongitude")
+                add("zoom=12")
+                add("location_bias_scale=0.15")
             }
         }.joinToString("&")
         val separator = if (endpoint.contains('?')) "&" else "?"
@@ -59,13 +66,34 @@ class PhotonRidePlaceSearchProvider(
             connection.connectTimeout = 5_000
             connection.readTimeout = 7_000
             connection.setRequestProperty("Accept", "application/json")
+            // photon public instances may not support `lang=es`. Omitting the
+            // query parameter lets the server use this header and then the
+            // local OSM name instead of failing the whole request with 400.
+            connection.setRequestProperty("Accept-Language", "es-CR,es;q=0.9,en;q=0.6")
             connection.setRequestProperty("User-Agent", "MEET-Rides-Android/1.0")
-            if (connection.responseCode !in 200..299) return@withContext emptyList()
+            if (connection.responseCode !in 200..299) {
+                throw RidePlaceSearchException("Photon HTTP ${connection.responseCode}")
+            }
             parsePhotonResponse(connection.inputStream.bufferedReader().use { it.readText() }, json)
         } finally {
             connection.disconnect()
         }
     }
+}
+
+internal fun RidePlaceSuggestion.distanceKmFrom(
+    latitude: Double?,
+    longitude: Double?,
+): Double? {
+    if (latitude == null || longitude == null) return null
+    val earthRadiusKm = 6_371.0088
+    val dLat = Math.toRadians(this.latitude - latitude)
+    val dLon = Math.toRadians(this.longitude - longitude)
+    val originLat = Math.toRadians(latitude)
+    val destinationLat = Math.toRadians(this.latitude)
+    val a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(originLat) * cos(destinationLat) * sin(dLon / 2) * sin(dLon / 2)
+    return earthRadiusKm * 2 * atan2(sqrt(a), sqrt(1 - a))
 }
 
 @Serializable
@@ -131,4 +159,3 @@ internal fun parsePhotonResponse(
         )
     }
 }.getOrDefault(emptyList())
-

@@ -62,6 +62,8 @@ import com.elysium369.meet.core.obd.PredictiveTelemetryEstimator
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
+import com.elysium369.meet.ride.domain.RideActorRole
+import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
@@ -1084,6 +1086,7 @@ class ObdViewModel @Inject constructor(
     }
 
     val currentUserId: String? get() = currentCloudUserId()
+    val currentRideActorId: String get() = localDeviceId
 
     private fun currentProviderUserId(): String {
         return currentCloudUserId() ?: "local_device_$localDeviceId"
@@ -5342,7 +5345,7 @@ class ObdViewModel @Inject constructor(
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ████ TOW TRUCK SERVICE (Grúas) — Indriver-style bidding & GPS ████
+    // ████ TOW TRUCK SERVICE (Grúas) — Elysium bidding & GPS ████
     // ═══════════════════════════════════════════════════════════════════════════
 
     val towTruckRequests: StateFlow<List<TowTruckRequestEntity>> = towTruckDao.getRequestsFlow()
@@ -5473,7 +5476,7 @@ class ObdViewModel @Inject constructor(
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ████ RATING SYSTEM — Uber/Didi/Indriver style 5-star ratings ████
+    // ████ ELYSIUM RATING SYSTEM — verified 5-star ratings ████
     // ═══════════════════════════════════════════════════════════════════════════
 
     val allRatings: StateFlow<List<RatingEntity>> = ratingDao.getAllRatingsFlow()
@@ -5645,7 +5648,7 @@ class ObdViewModel @Inject constructor(
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // MEET Rides (Viajes InDriver-Style) Business Logic
+    // Elysium Vanguard Viajes business logic
     // ═══════════════════════════════════════════════════════════════
 
     val rideRequests = rideDao.getAllRequestsFlow()
@@ -5900,6 +5903,7 @@ class ObdViewModel @Inject constructor(
         paymentMethod: String = "CASH",
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            val normalizedFare = RideFareBidPolicy.normalize(priceOffer, currency)
             val request = RideRequestEntity(
                 requestId = UUID.randomUUID().toString(),
                 passengerId = passengerId,
@@ -5912,13 +5916,13 @@ class ObdViewModel @Inject constructor(
                 destLatitude = destLat,
                 destLongitude = destLng,
                 destAddress = destAddr,
-                priceOffer = priceOffer,
+                priceOffer = normalizedFare,
                 currency = currency,
                 estimatedDistanceKm = estDistance,
                 estimatedDurationMin = estDuration,
                 stopsJson = stopsJson,
                 paymentMethod = paymentMethod,
-                fareBreakdownJson = """{"acceptedFare":$priceOffer,"currency":"$currency"}""",
+                fareBreakdownJson = """{"acceptedFare":$normalizedFare,"currency":"$currency"}""",
                 status = "OPEN",
                 createdAt = System.currentTimeMillis()
             )
@@ -5954,7 +5958,7 @@ class ObdViewModel @Inject constructor(
                 driverRating = driverRating,
                 driverTotalTrips = driverTotalTrips,
                 vehicleDescription = vehicleDesc,
-                counterPrice = counterPrice,
+                counterPrice = RideFareBidPolicy.normalize(counterPrice, currency),
                 currency = currency,
                 estimatedArrivalMin = estArrivalMin,
                 driverLatitude = driverLat,
@@ -6107,7 +6111,11 @@ class ObdViewModel @Inject constructor(
 
     fun updateRideStatus(requestId: String, newStatus: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            rideDao.updateRequestStatus(requestId, newStatus)
+            rideDao.updateRequestStatusAndCompletedAt(
+                requestId = requestId,
+                status = newStatus,
+                completedAt = if (newStatus == "COMPLETED") System.currentTimeMillis() else null,
+            )
             
             // Insert system chat msg about state change
             val alertText = when(newStatus) {
@@ -6147,6 +6155,8 @@ class ObdViewModel @Inject constructor(
         actorRole: String,
     ) {
         if (!RideCancellationPolicy.isDetailValid(reason, detail)) return
+        val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull() ?: return
+        if (reason !in RideCancellationPolicy.reasonsFor(role)) return
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
             if (request.status !in setOf("OPEN", "ACCEPTED", "ARRIVED", "IN_PROGRESS")) {
@@ -6154,9 +6164,7 @@ class ObdViewModel @Inject constructor(
             }
             rideDao.updateRequestStatus(requestId, "CANCELLED")
             val decision = RideCancellationPolicy.evaluate(reason)
-            val normalizedRole = actorRole.uppercase().takeIf {
-                it == "DRIVER" || it == "PASSENGER"
-            } ?: "SYSTEM"
+            val normalizedRole = role.name
             val actorId = when (normalizedRole) {
                 "DRIVER" -> driverVerification.value?.driverId
                 "PASSENGER" -> passengerVerification.value?.passengerId
@@ -6250,7 +6258,8 @@ class ObdViewModel @Inject constructor(
     fun updateRidePrice(requestId: String, newPrice: Double) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            val updated = request.copy(priceOffer = newPrice)
+            val normalizedPrice = RideFareBidPolicy.normalize(newPrice, request.currency)
+            val updated = request.copy(priceOffer = normalizedPrice)
             rideDao.insertRequest(updated)
             
             val systemMsg = RideChatMessageEntity(
@@ -6260,7 +6269,7 @@ class ObdViewModel @Inject constructor(
                 senderName = "Sistema",
                 senderRole = "SYSTEM",
                 messageType = "TEXT",
-                textContent = "💵 El pasajero incrementó la oferta de tarifa a ${newPrice} ${request.currency}.",
+                textContent = "El pasajero ajustó la oferta Elysium a $normalizedPrice ${request.currency}.",
                 createdAt = System.currentTimeMillis()
             )
             rideDao.insertChatMessage(systemMsg)
