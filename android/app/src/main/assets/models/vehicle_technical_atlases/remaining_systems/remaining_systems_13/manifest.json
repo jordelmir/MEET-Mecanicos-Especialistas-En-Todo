@@ -12,7 +12,7 @@
   "oemClaim": false,
   "vehicleSpecificClaim": false,
   "generatedBy": "tools/engine-asset-generator/generate-vehicle-technical-atlases.mjs",
-  "generatorVersion": "1.0.0",
+  "generatorVersion": "1.1.0",
   "threeVersion": "185",
   "groupNodePrefix": "asset_part__",
   "meshNodePrefix": "asset_mesh__",
@@ -21,9 +21,9 @@
     1273,
     1311
   ],
-  "meshCount": 56,
-  "triangleCount": 29288,
-  "sha256": "d664a2ab485c194c2d0e53f571ef00da6bc9e27392eaf7ba0d3c4c31282432f5",
+  "meshCount": 58,
+  "triangleCount": 29348,
+  "sha256": "77ad7a24ced5a3c48a470ccff22d074500be69bcc242bab9fa2b18157377af9b",
   "license": "Original procedural reference reconstruction generated for MEET",
   "warning": "Reconstrucción técnica de referencia. Confirmar VIN, OEM, código aplicable, equipamiento, foto, conector y medidas.",
   "bindings": [
@@ -234,10 +234,10 @@
       "bounds": {
         "center": [
           0,
-          0,
+          0.1093,
           0
         ],
-        "radius": 0.7827
+        "radius": 0.8385
       },
       "directlySellable": true,
       "dimensional": false,

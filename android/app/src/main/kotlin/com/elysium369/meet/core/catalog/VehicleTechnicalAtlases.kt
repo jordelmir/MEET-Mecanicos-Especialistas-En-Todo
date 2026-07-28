@@ -250,4 +250,31 @@ class CanonicalVehiclePartRepository(context: Context) {
             element = element,
         )
     }
+
+    fun all(): List<CanonicalVehiclePart> {
+        val engineParts = g4ed.elements.map { element ->
+            CanonicalVehiclePart(
+                atlasId = g4ed.atlasId,
+                atlasDisplayName = g4ed.displayName,
+                vehicleLabel = g4ed.vehicleLabel,
+                geometryWarning = g4ed.geometryPolicy.warning,
+                section = g4ed.sections.single { it.systemId == element.systemId },
+                element = element,
+            )
+        }
+        val technicalParts = technical.all().flatMap { atlas ->
+            val sectionsById = atlas.sections.associateBy(G4edAtlasSection::systemId)
+            atlas.elements.map { element ->
+                CanonicalVehiclePart(
+                    atlasId = atlas.atlasId,
+                    atlasDisplayName = atlas.displayName,
+                    vehicleLabel = atlas.vehicleLabel,
+                    geometryWarning = atlas.geometryPolicy.warning,
+                    section = requireNotNull(sectionsById[element.systemId]),
+                    element = element,
+                )
+            }
+        }
+        return engineParts + technicalParts
+    }
 }

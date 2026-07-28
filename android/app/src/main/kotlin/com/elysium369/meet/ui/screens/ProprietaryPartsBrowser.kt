@@ -1,6 +1,5 @@
 package com.elysium369.meet.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -38,6 +37,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.catalog.PROPRIETARY_VEHICLE_LABEL
 import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
+import com.elysium369.meet.core.catalog.CatalogSystemFamilies
 import com.elysium369.meet.core.catalog.ProprietaryCatalogEntity
 import com.elysium369.meet.core.catalog.ProprietaryCatalogManifest
 import com.elysium369.meet.core.catalog.ProprietaryCatalogSystem
@@ -70,6 +72,8 @@ import com.elysium369.meet.core.catalog.ProprietaryPartsCatalogRepository
 import com.elysium369.meet.core.catalog.ProprietarySourceBlock
 import com.elysium369.meet.core.catalog.VehicleTechnicalAtlasDescriptors
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.visual3d.domain.ProprietaryInline3dExperience
+import com.elysium369.meet.visual3d.domain.ProprietaryInline3dRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -91,6 +95,7 @@ fun ProprietaryPartsBrowser(
     val manifest = catalogResult.getOrNull()?.first
     val index = catalogResult.getOrNull()?.second
     var query by remember { mutableStateOf("") }
+    var selectedFamilyId by remember { mutableStateOf<String?>(null) }
     var selectedSystemId by remember { mutableStateOf<String?>(null) }
     var selectedRole by remember { mutableStateOf(KnowledgeRoleFilter.ALL) }
     var knowledgeHits by remember { mutableStateOf<List<ProprietaryKnowledgeHit>>(emptyList()) }
@@ -109,8 +114,12 @@ fun ProprietaryPartsBrowser(
     val entityById = remember(index) { index?.entities.orEmpty().associateBy { it.id } }
     val useLiteralSearch = query.isNotBlank() || selectedRole.blockOnly
     val showLiteralResults = useLiteralSearch && searchFailure == null
-    val visibleEntities = remember(index, selectedSystemId, selectedRole, showLiteralResults, query) {
+    val selectedFamily = remember(selectedFamilyId) {
+        CatalogSystemFamilies.all.firstOrNull { it.id == selectedFamilyId }
+    }
+    val visibleEntities = remember(index, selectedFamily, selectedSystemId, selectedRole, showLiteralResults, query) {
         if (showLiteralResults) emptyList() else index?.entities.orEmpty().asSequence()
+            .filter { selectedFamily == null || it.systemId in selectedFamily.systemIds }
             .filter { selectedSystemId == null || it.systemId == selectedSystemId }
             .filter { selectedRole.entityRole == null || it.recordRole == selectedRole.entityRole }
             .filter { query.isBlank() || it.nameOriginal.contains(query, ignoreCase = true) }
@@ -118,7 +127,7 @@ fun ProprietaryPartsBrowser(
             .toList()
     }
 
-    LaunchedEffect(query, selectedSystemId, selectedRole, searchRepository) {
+    LaunchedEffect(query, selectedFamily, selectedSystemId, selectedRole, searchRepository) {
         if (!useLiteralSearch) {
             knowledgeHits = emptyList()
             searchInProgress = false
@@ -130,11 +139,20 @@ fun ProprietaryPartsBrowser(
         try {
             delay(180)
             knowledgeHits = withContext(Dispatchers.IO) {
-                if (query.isBlank()) {
-                    searchRepository.browse(selectedSystemId, selectedRole.roles, limit = 300)
-                } else {
-                    searchRepository.search(query, selectedSystemId, selectedRole.roles, limit = 300)
+                val systemIds = when {
+                    selectedSystemId != null -> listOf(selectedSystemId)
+                    selectedFamily != null -> selectedFamily.systemIds.toList()
+                    else -> listOf(null)
                 }
+                systemIds.flatMap { systemId ->
+                    if (query.isBlank()) {
+                        searchRepository.browse(systemId, selectedRole.roles, limit = 300)
+                    } else {
+                        searchRepository.search(query, systemId, selectedRole.roles, limit = 300)
+                    }
+                }.distinctBy { "${it.sourceDocumentId}:${it.blockId}" }
+                    .sortedBy(ProprietaryKnowledgeHit::sourceOrder)
+                    .take(300)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -176,7 +194,13 @@ fun ProprietaryPartsBrowser(
                         groundedContextBuilder.buildReadableBrief(activeEntity, literalBlocks)
                     },
                     onBack = { selectedEntity = null },
-                    onOpen3d = { navController.navigate("component_locator?partId=${activeEntity.id}") }
+                    onOpen3d = { canonicalId ->
+                        if (canonicalId == null) {
+                            navController.navigate("component_locator?partId=${activeEntity.id}")
+                        } else {
+                            navController.navigate("parts_repairs?partId=$canonicalId")
+                        }
+                    }
                 )
             }
             selectedStandaloneHit != null -> ProprietaryStandaloneBlockDetail(
@@ -197,11 +221,21 @@ fun ProprietaryPartsBrowser(
                 searchInProgress = searchInProgress,
                 searchFailure = searchFailure,
                 query = query,
+                selectedFamilyId = selectedFamilyId,
                 selectedSystemId = selectedSystemId,
                 selectedRole = selectedRole,
                 onBack = { navController.popBackStack() },
                 onQueryChanged = { query = it },
-                onSystemSelected = { selectedSystemId = it },
+                onFamilySelected = { familyId ->
+                    selectedFamilyId = familyId
+                    selectedSystemId = null
+                },
+                onSystemSelected = { systemId ->
+                    selectedSystemId = systemId
+                    if (systemId != null) {
+                        selectedFamilyId = CatalogSystemFamilies.familyFor(systemId)?.id
+                    }
+                },
                 onRoleSelected = { selectedRole = it },
                 onEntitySelected = { selectedEntity = it },
                 onKnowledgeHitSelected = { hit ->
@@ -253,10 +287,12 @@ private fun ProprietaryCatalogList(
     searchInProgress: Boolean,
     searchFailure: String?,
     query: String,
+    selectedFamilyId: String?,
     selectedSystemId: String?,
     selectedRole: KnowledgeRoleFilter,
     onBack: () -> Unit,
     onQueryChanged: (String) -> Unit,
+    onFamilySelected: (String?) -> Unit,
     onSystemSelected: (String?) -> Unit,
     onRoleSelected: (KnowledgeRoleFilter) -> Unit,
     onEntitySelected: (ProprietaryCatalogEntity) -> Unit,
@@ -380,13 +416,68 @@ private fun ProprietaryCatalogList(
             shape = RoundedCornerShape(6.dp)
         )
 
+        Text(
+            "SISTEMAS TÉCNICOS",
+            color = MeetColors.cyberCyan,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SystemChip(null, "Todos", selectedSystemId == null, MeetColors.cyberCyan, onSystemSelected)
-            manifest.systems.forEach { system ->
-                SystemChip(system.id, "${system.title} · ${system.entityCount}", selectedSystemId == system.id, system.color.toCatalogColor(), onSystemSelected)
+            CatalogFamilyBlock(
+                title = "Todos",
+                subtitle = "Catálogo completo",
+                count = manifest.statistics.entityCount,
+                color = MeetColors.cyberCyan,
+                selected = selectedFamilyId == null,
+                onClick = { onFamilySelected(null) },
+            )
+            CatalogSystemFamilies.all.forEach { family ->
+                val count = manifest.systems
+                    .filter { it.id in family.systemIds }
+                    .sumOf(ProprietaryCatalogSystem::entityCount)
+                CatalogFamilyBlock(
+                    title = family.title,
+                    subtitle = family.subtitle,
+                    count = count,
+                    color = family.colorHex.toCatalogColor(),
+                    selected = selectedFamilyId == family.id,
+                    onClick = { onFamilySelected(family.id) },
+                )
+            }
+        }
+
+        val activeFamily = CatalogSystemFamilies.all.firstOrNull { it.id == selectedFamilyId }
+        if (activeFamily != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SystemChip(
+                    null,
+                    "Toda la familia",
+                    selectedSystemId == null,
+                    activeFamily.colorHex.toCatalogColor(),
+                    onSystemSelected,
+                )
+                manifest.systems.filter { it.id in activeFamily.systemIds }.forEach { system ->
+                    SystemChip(
+                        system.id,
+                        "${system.title} · ${system.entityCount}",
+                        selectedSystemId == system.id,
+                        system.color.toCatalogColor(),
+                        onSystemSelected,
+                    )
+                }
             }
         }
 
@@ -412,6 +503,13 @@ private fun ProprietaryCatalogList(
             fontSize = 9.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+        val groupedEntities = remember(entities, manifest.systems) {
+            manifest.systems.mapNotNull { system ->
+                entities.filter { it.systemId == system.id }
+                    .takeIf(List<ProprietaryCatalogEntity>::isNotEmpty)
+                    ?.let { system to it }
+            }
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
@@ -421,37 +519,153 @@ private fun ProprietaryCatalogList(
                 items(knowledgeHits, key = { "${it.sourceDocumentId}:${it.blockId}" }) { hit ->
                     KnowledgeHitRow(manifest, hit, onKnowledgeHitSelected)
                 }
-            } else items(entities, key = { it.id }) { entity ->
-                val system = manifest.systems.firstOrNull { it.id == entity.systemId }
-                val color = system?.color?.toCatalogColor() ?: MeetColors.cyberCyan
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(6.dp))
-                        .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-                        .clickable { onEntitySelected(entity) }
-                        .padding(11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(34.dp).border(1.dp, color.copy(alpha = 0.65f), RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            if (entity.recordRole == "REAL_CASE") Icons.Default.CheckCircle else Icons.Default.ViewInAr,
-                            contentDescription = null,
-                            tint = color,
-                            modifier = Modifier.size(17.dp)
-                        )
+            } else {
+                groupedEntities.forEach { (system, systemEntities) ->
+                    item(key = "system-header-${system.id}") {
+                        CatalogSystemHeader(system, systemEntities.size)
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(entity.nameOriginal, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text("${system?.title.orEmpty()} · ${entity.sourceFileName} #${entity.sourceOrder}", color = MeetColors.textMuted, fontSize = 8.sp, maxLines = 1)
+                    items(systemEntities, key = { it.id }) { entity ->
+                        ProprietaryEntityRow(system, entity) { onEntitySelected(entity) }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CatalogFamilyBlock(
+    title: String,
+    subtitle: String,
+    count: Int,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier
+            .width(176.dp)
+            .height(86.dp)
+            .background(
+                if (selected) color.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.5f),
+                RoundedCornerShape(14.dp),
+            )
+            .border(
+                if (selected) 1.5.dp else 1.dp,
+                if (selected) color else color.copy(alpha = 0.28f),
+                RoundedCornerShape(14.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(9.dp)
+                    .background(color, RoundedCornerShape(50)),
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                title,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+            Spacer(Modifier.weight(1f))
+            Text("$count", color = color, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        }
+        Text(
+            subtitle,
+            color = if (selected) MeetColors.textSecondary else MeetColors.textMuted,
+            fontSize = 8.sp,
+            lineHeight = 10.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CatalogSystemHeader(system: ProprietaryCatalogSystem, visibleCount: Int) {
+    val color = system.color.toCatalogColor()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 2.dp)
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+            .border(1.dp, color.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(3.dp, 24.dp).background(color, RoundedCornerShape(50)))
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(system.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+            Text(
+                CatalogSystemFamilies.familyFor(system.id)?.title.orEmpty(),
+                color = MeetColors.textMuted,
+                fontSize = 8.sp,
+            )
+        }
+        Text("$visibleCount", color = color, fontSize = 11.sp, fontWeight = FontWeight.Black)
+    }
+}
+
+@Composable
+private fun ProprietaryEntityRow(
+    system: ProprietaryCatalogSystem,
+    entity: ProprietaryCatalogEntity,
+    onClick: () -> Unit,
+) {
+    val color = system.color.toCatalogColor()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(10.dp))
+            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(38.dp)
+                .background(color.copy(alpha = 0.08f), RoundedCornerShape(9.dp))
+                .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(9.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (entity.recordRole == "REAL_CASE") Icons.Default.CheckCircle else Icons.Default.ViewInAr,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                entity.nameOriginal,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${entity.sourceFileName} · registro #${entity.sourceOrder}",
+                color = MeetColors.textMuted,
+                fontSize = 8.sp,
+                maxLines = 1,
+            )
+        }
+        Text(
+            if (entity.recordRole == "REAL_CASE") "CASO" else "3D",
+            color = color,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Black,
+        )
     }
 }
 
@@ -462,11 +676,28 @@ private fun ProprietaryEntityDetail(
     blocks: List<ProprietarySourceBlock>,
     groundedAiContext: String,
     onBack: () -> Unit,
-    onOpen3d: () -> Unit
+    onOpen3d: (String?) -> Unit,
 ) {
+    val context = LocalContext.current
     val system = manifest.systems.firstOrNull { it.id == entity.systemId }
     val color = system?.color?.toCatalogColor() ?: MeetColors.cyberCyan
     var showAiContext by remember(entity.id) { mutableStateOf(false) }
+    val inlineRepository = remember(context) { ProprietaryInline3dRepository(context) }
+    val inline3dState by produceState<Inline3dState>(
+        initialValue = Inline3dState.Loading,
+        key1 = entity.id,
+        key2 = inlineRepository,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { inlineRepository.load(entity) }
+                .fold(
+                    onSuccess = { experience ->
+                        if (experience == null) Inline3dState.NotLinked else Inline3dState.Ready(experience)
+                    },
+                    onFailure = { Inline3dState.Failed(it.message ?: "No se pudo cargar el paquete 3D") },
+                )
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
@@ -477,61 +708,214 @@ private fun ProprietaryEntityDetail(
                 Text(entity.nameOriginal, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-
-        Box(
-            Modifier.fillMaxWidth().height(170.dp).padding(horizontal = 16.dp)
-                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-                .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            HolographicEntityGlyph(entity, color)
-            Button(
-                onClick = onOpen3d,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = color.copy(alpha = 0.22f), contentColor = color)
-            ) {
-                Icon(Icons.Default.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("MOTOR 3D", fontWeight = FontWeight.Black, fontSize = 10.sp)
-            }
-            OutlinedButton(
-                onClick = { showAiContext = !showAiContext },
-                modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
-            ) {
-                Text(if (showAiContext) "CERRAR ANALISIS" else "ANALISIS CITADO", fontWeight = FontWeight.Black, fontSize = 10.sp)
-            }
-        }
-
-        Text("INFORMACIÓN LITERAL", color = MeetColors.cyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(16.dp, 14.dp, 16.dp, 6.dp))
-        AnimatedVisibility(visible = showAiContext) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .heightIn(max = 180.dp)
-                    .background(MeetColors.neonGreen.copy(alpha = 0.06f), RoundedCornerShape(4.dp))
-                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.42f), RoundedCornerShape(4.dp))
-                    .verticalScroll(rememberScrollState())
-                    .padding(10.dp)
-            ) {
-                Text("CONOCIMIENTO PROPIETARIO CON EVIDENCIA", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    groundedAiContext,
-                    color = MeetColors.textSecondary,
-                    fontSize = 9.sp,
-                    lineHeight = 13.sp
-                )
-            }
-        }
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item(key = "inline-3d-${entity.id}") {
+                Inline3dPanel(
+                    state = inline3dState,
+                    color = color,
+                    onOpen3d = onOpen3d,
+                )
+            }
+            item(key = "detail-actions-${entity.id}") {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { showAiContext = !showAiContext },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                    ) {
+                        Text(
+                            if (showAiContext) "CERRAR ANÁLISIS" else "ANÁLISIS CITADO",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 9.sp,
+                        )
+                    }
+                    val canonicalId = (inline3dState as? Inline3dState.Ready)
+                        ?.experience
+                        ?.resolution
+                        ?.part
+                        ?.element
+                        ?.canonicalId
+                    Button(
+                        onClick = { onOpen3d(canonicalId) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = color.copy(alpha = 0.24f),
+                            contentColor = color,
+                        ),
+                    ) {
+                        Icon(Icons.Default.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("VISTA COMPLETA", fontWeight = FontWeight.Black, fontSize = 9.sp)
+                    }
+                }
+            }
+            if (showAiContext) {
+                item(key = "ai-context-${entity.id}") {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .background(MeetColors.neonGreen.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.42f), RoundedCornerShape(12.dp))
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp),
+                    ) {
+                        Text(
+                            "CONOCIMIENTO PROPIETARIO CON EVIDENCIA",
+                            color = MeetColors.neonGreen,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            groundedAiContext,
+                            color = MeetColors.textSecondary,
+                            fontSize = 9.sp,
+                            lineHeight = 13.sp,
+                        )
+                    }
+                }
+            }
+            item(key = "literal-title-${entity.id}") {
+                Text(
+                    "INFORMACIÓN LITERAL",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             items(blocks, key = { it.blockId }) { block -> LiteralBlockCard(block, color) }
             item {
                 Text("Fuente propietaria del usuario · ${entity.sourceFileName} · SHA-256 ${entity.sourceDocumentSha256}", color = MeetColors.textMuted, fontSize = 8.sp, modifier = Modifier.padding(vertical = 8.dp))
             }
+        }
+    }
+}
+
+private sealed interface Inline3dState {
+    object Loading : Inline3dState
+    object NotLinked : Inline3dState
+    data class Ready(val experience: ProprietaryInline3dExperience) : Inline3dState
+    data class Failed(val message: String) : Inline3dState
+}
+
+@Composable
+private fun Inline3dPanel(
+    state: Inline3dState,
+    color: Color,
+    onOpen3d: (String?) -> Unit,
+) {
+    when (state) {
+        Inline3dState.Loading -> Box(
+            Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .background(Color(0xFF071019), RoundedCornerShape(18.dp))
+                .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = color, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.height(12.dp))
+                Text("VINCULANDO PIEZA CON ATLAS 3D...", color = color, fontSize = 9.sp, fontWeight = FontWeight.Black)
+            }
+        }
+        is Inline3dState.Ready -> {
+            val experience = state.experience
+            val part = experience.resolution.part
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .border(1.dp, color.copy(alpha = 0.28f), RoundedCornerShape(12.dp))
+                        .padding(11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.ViewInAr, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "RECONSTRUCCIÓN TÉCNICA DE REFERENCIA · 360°",
+                            color = color,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text(
+                            part.element.nameOriginal,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Text(
+                        when (experience.resolution.method.name) {
+                            "EXACT_NAME_OR_ALIAS" -> "ENLACE DIRECTO"
+                            else -> "ENLACE NOMINAL"
+                        },
+                        color = MeetColors.textMuted,
+                        fontSize = 7.sp,
+                    )
+                }
+                G4edPartViewer(experience.manifest, experience.binding)
+                Text(
+                    "${part.section.title} · ID ${part.element.canonicalId}",
+                    color = MeetColors.textMuted,
+                    fontSize = 8.sp,
+                )
+                Text(
+                    "Forma y proporciones ilustrativas. Confirmar VIN, OEM, foto, conector y medidas antes de comprar o instalar.",
+                    color = MeetColors.warning,
+                    fontSize = 8.sp,
+                    lineHeight = 11.sp,
+                )
+            }
+        }
+        Inline3dState.NotLinked -> Inline3dUnavailablePanel(
+            title = "MODELO 3D AÚN NO VINCULADO",
+            detail = "No se encontró una identidad canónica única. Se conserva el conocimiento sin fabricar una coincidencia.",
+            color = color,
+            onClick = { onOpen3d(null) },
+        )
+        is Inline3dState.Failed -> Inline3dUnavailablePanel(
+            title = "PAQUETE 3D NO DISPONIBLE",
+            detail = state.message,
+            color = color,
+            onClick = { onOpen3d(null) },
+        )
+    }
+}
+
+@Composable
+private fun Inline3dUnavailablePanel(
+    title: String,
+    detail: String,
+    color: Color,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF071019), RoundedCornerShape(18.dp))
+            .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Default.ViewInAr, contentDescription = null, tint = color, modifier = Modifier.size(42.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(title, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        Spacer(Modifier.height(6.dp))
+        Text(detail, color = MeetColors.textMuted, fontSize = 9.sp, lineHeight = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onClick) {
+            Text("ABRIR ATLAS GENERAL", fontSize = 9.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -668,29 +1052,6 @@ private fun KnowledgeHitRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-@Composable
-private fun HolographicEntityGlyph(entity: ProprietaryCatalogEntity, color: Color) {
-    val transition = rememberInfiniteTransition(label = "entityGlyph")
-    val pulse by transition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900), repeatMode = RepeatMode.Reverse),
-        label = "entityPulse"
-    )
-    Canvas(Modifier.size(130.dp)) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        repeat(5) { ring ->
-            drawCircle(color.copy(alpha = (0.12f + ring * 0.05f) * pulse), radius = (18f + ring * 11f) * density, center = center)
-        }
-        val seed = entity.threeDimensionalBinding.seed
-        repeat(8) { index ->
-            val span = 22.dp.toPx() + ((seed shr (index % 12)) and 31).toFloat()
-            val y = center.y - 42.dp.toPx() + index * 12.dp.toPx()
-            drawLine(color.copy(alpha = pulse), Offset(center.x - span, y), Offset(center.x + span, y), 2.dp.toPx())
         }
     }
 }
