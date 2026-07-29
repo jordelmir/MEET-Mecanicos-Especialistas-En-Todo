@@ -108,6 +108,7 @@ fun RideProfileScreen(
 
 @Composable
 private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideProfileSummary) {
+    val currentLocale = rememberRideJavaLocale()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp, 18.dp, 16.dp, 80.dp),
@@ -156,7 +157,7 @@ private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideP
                     )
                     Text(
                         summary.averageRating?.let {
-                            "★ ${String.format(Locale.getDefault(), "%.2f", it)} · ${summary.capturedRatings} calificaciones"
+                            "★ ${String.format(currentLocale, "%.2f", it)} · ${summary.capturedRatings} calificaciones"
                         } ?: "Calificación: dato no capturado",
                         color = MeetColors.textSecondary,
                         fontSize = 12.sp,
@@ -191,7 +192,7 @@ private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideP
 
 @Composable
 private fun RideMetricGrid(data: RideProfileSummary, isDriver: Boolean) {
-    val money = NumberFormat.getCurrencyInstance(Locale("es", "CR"))
+    val money = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CR"))
     ProfileSection(if (isDriver) "CENTRO DE INGRESOS" else "RESUMEN ANUAL") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ProfileMetric("Viajes", data.completedTrips.toString(), Modifier.weight(1f))
@@ -250,6 +251,10 @@ private fun RatingDistribution(data: RideProfileSummary) {
 
 @Composable
 private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
+    val currentLocale = rememberRideJavaLocale()
+    val dateTimeFormat = remember(currentLocale) {
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, currentLocale)
+    }
     LazyColumn(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -265,12 +270,12 @@ private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(ride.status, color = statusColor(ride.status), fontWeight = FontWeight.Black, fontSize = 11.sp)
-                        Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(ride.createdAt)), color = MeetColors.textMuted, fontSize = 10.sp)
+                        Text(dateTimeFormat.format(Date(ride.createdAt)), color = MeetColors.textMuted, fontSize = 10.sp)
                     }
                     Text(ride.pickupAddress, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
                     Text("→ ${ride.destAddress}", color = MeetColors.cyberCyan, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
                     Text(
-                        "${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · ${String.format(Locale.getDefault(), "%.1f km", ride.estimatedDistanceKm)}",
+                        "${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · ${String.format(currentLocale, "%.1f km", ride.estimatedDistanceKm)}",
                         color = MeetColors.textSecondary,
                         fontSize = 10.sp,
                     )
@@ -282,6 +287,10 @@ private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
 
 @Composable
 private fun RideSupportPanel(summary: RideProfileSummary?, rides: List<RideRequestEntity>) {
+    val currentLocale = rememberRideJavaLocale()
+    val dateFormat = remember(currentLocale) {
+        DateFormat.getDateInstance(DateFormat.DEFAULT, currentLocale)
+    }
     LazyColumn(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -324,7 +333,7 @@ private fun RideSupportPanel(summary: RideProfileSummary?, rides: List<RideReque
                 ) {
                     Column(Modifier.padding(13.dp)) {
                         Text(
-                            "Cancelación · ${DateFormat.getDateInstance().format(Date(ride.createdAt))}",
+                            "Cancelación · ${dateFormat.format(Date(ride.createdAt))}",
                             color = MeetColors.error,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,

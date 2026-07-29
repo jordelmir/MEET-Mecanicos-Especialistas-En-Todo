@@ -33,3 +33,13 @@ rg -n --no-heading \
   $ride_files 2>/dev/null | head -40 || true
 echo "brand_leaks:"
 rg -ni --no-heading 'uber|didi|indriver' $ride_files 2>/dev/null | head -20 || true
+echo "known_ride_lint_debt:"
+if [[ -f android/app/lint-baseline.xml ]]; then
+  rg -B6 \
+    'file="src/main/kotlin/com/elysium369/meet/(ride/|ui/screens/(Ride|Trip))' \
+    android/app/lint-baseline.xml 2>/dev/null \
+    | rg 'id=|file=' \
+    | head -60 || true
+else
+  echo "lint baseline unavailable"
+fi

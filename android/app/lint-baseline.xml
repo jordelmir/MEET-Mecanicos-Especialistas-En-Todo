@@ -1973,39 +1973,6 @@
     <issue
         id="DefaultLocale"
         message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                        text = if (isUsd) &quot;$${String.format(&quot;%.2f&quot;, offerPrice / 500.0)} USD&quot; else &quot;₡${String.format(&quot;%,.0f&quot;, offerPrice)} CRC&quot;,"
-        errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="829"
-            column="47"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                        text = if (isUsd) &quot;$${String.format(&quot;%.2f&quot;, offerPrice / 500.0)} USD&quot; else &quot;₡${String.format(&quot;%,.0f&quot;, offerPrice)} CRC&quot;,"
-        errorLine2="                                                                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="829"
-            column="104"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                        text = if (ride.currency == &quot;USD&quot;) &quot;$${ride.priceOffer.toInt()}&quot; else &quot;₡${String.format(&quot;%,.0f&quot;, ride.priceOffer)} CRC&quot;,"
-        errorLine2="                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="3163"
-            column="99"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
         errorLine1="                &quot;Voltaje bajo de batería. Voltaje actual de ${String.format(&quot;%.1f&quot;, voltage)} voltios.&quot;,"
         errorLine2="                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
@@ -2765,50 +2732,6 @@
     <issue
         id="DefaultLocale"
         message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                        Text(&quot;Distancia: ${String.format(&quot;%.1f&quot;, trip.distanceKm)} km&quot;, color = Color.LightGray)"
-        errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripDetailScreen.kt"
-            line="54"
-            column="44"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                                Text(&quot;${String.format(&quot;%.1f&quot;, trip.maxSpeedKmh)} km/h&quot;, color = Color.White)"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripDetailScreen.kt"
-            line="70"
-            column="41"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                                Text(&quot;${String.format(&quot;%.1f&quot;, trip.avgSpeedKmh)} km/h&quot;, color = Color.White)"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripDetailScreen.kt"
-            line="74"
-            column="41"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="                                Text(&quot;${String.format(&quot;%.1f&quot;, trip.maxTempC)} °C&quot;, color = if (trip.maxTempC > 105) com.elysium369.meet.ui.theme.MeetColors.error else Color.White)"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripDetailScreen.kt"
-            line="85"
-            column="41"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
         errorLine1="                    value = &quot;$${String.format(&quot;%.2f&quot;, totalMaintCost)}&quot;,"
         errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
@@ -3029,28 +2952,6 @@
     <issue
         id="NonObservableLocale"
         message="Reading locale in a non-observable way in a composable function"
-        errorLine1="                        &quot;${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · ${String.format(Locale.getDefault(), &quot;%.1f km&quot;, ride.estimatedDistanceKm)}&quot;,"
-        errorLine2="                                                                                                  ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideProfileScreen.kt"
-            line="273"
-            column="99"/>
-    </issue>
-
-    <issue
-        id="NonObservableLocale"
-        message="Reading locale in a non-observable way in a composable function"
-        errorLine1="                                        String.format(Locale.getDefault(), &quot;%.1f km&quot;, distance),"
-        errorLine2="                                                      ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="616"
-            column="55"/>
-    </issue>
-
-    <issue
-        id="NonObservableLocale"
-        message="Reading locale in a non-observable way in a composable function"
         errorLine1="        val sdf = SimpleDateFormat(&quot;dd MMM yyyy, HH:mm&quot;, Locale.getDefault())"
         errorLine2="                                                         ~~~~~~~~~~~~~~~~~~~">
         <location
@@ -3068,17 +2969,6 @@
             file="src/main/kotlin/com/elysium369/meet/ui/screens/scanner/ScannerStatisticsTab.kt"
             line="1653"
             column="49"/>
-    </issue>
-
-    <issue
-        id="NonObservableLocale"
-        message="Reading locale in a non-observable way in a composable function"
-        errorLine1="    val sdf = SimpleDateFormat(&quot;dd MMM yyyy, HH:mm&quot;, Locale.getDefault())"
-        errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripDetailScreen.kt"
-            line="28"
-            column="54"/>
     </issue>
 
     <issue
@@ -10761,7 +10651,7 @@
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="2612"
+            line="2616"
             column="39"/>
     </issue>
 
@@ -10772,7 +10662,7 @@
         errorLine2="                                       ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="3461"
+            line="3470"
             column="40"/>
     </issue>
 
@@ -10783,7 +10673,7 @@
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="3462"
+            line="3471"
             column="39"/>
     </issue>
 
@@ -14426,7 +14316,7 @@
         errorLine2="                                                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="2188"
+            line="2192"
             column="77"/>
     </issue>
 
@@ -14437,7 +14327,7 @@
         errorLine2="                                                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="2296"
+            line="2300"
             column="81"/>
     </issue>
 
@@ -14448,7 +14338,7 @@
         errorLine2="                                                                                    ~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="2356"
+            line="2360"
             column="85"/>
     </issue>
 

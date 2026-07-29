@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import com.elysium369.meet.data.local.entities.TripEntity
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteButton
@@ -25,7 +24,10 @@ fun TripDetailScreen(
     onBack: () -> Unit,
     onExportPdf: () -> Unit
 ) {
-    val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+    val currentLocale = rememberRideJavaLocale()
+    val sdf = androidx.compose.runtime.remember(currentLocale) {
+        SimpleDateFormat("dd MMM yyyy, HH:mm", currentLocale)
+    }
     val durationMin = trip.durationSeconds / 60
 
     Scaffold(
@@ -51,7 +53,7 @@ fun TripDetailScreen(
                         Text("Fecha: ${sdf.format(Date(trip.startedAt))}", color = MeetColors.warning, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Duración: $durationMin minutos", color = Color.LightGray)
-                        Text("Distancia: ${String.format("%.1f", trip.distanceKm)} km", color = Color.LightGray)
+                        Text("Distancia: ${String.format(currentLocale, "%.1f", trip.distanceKm)} km", color = Color.LightGray)
                     }
                 }
             }
@@ -67,11 +69,11 @@ fun TripDetailScreen(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Column {
                                 Text("Velocidad Máxima", color = MeetColors.textSecondary)
-                                Text("${String.format("%.1f", trip.maxSpeedKmh)} km/h", color = Color.White)
+                                Text("${String.format(currentLocale, "%.1f", trip.maxSpeedKmh)} km/h", color = Color.White)
                             }
                             Column {
                                 Text("Velocidad Media", color = MeetColors.textSecondary)
-                                Text("${String.format("%.1f", trip.avgSpeedKmh)} km/h", color = Color.White)
+                                Text("${String.format(currentLocale, "%.1f", trip.avgSpeedKmh)} km/h", color = Color.White)
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -82,7 +84,7 @@ fun TripDetailScreen(
                             }
                             Column {
                                 Text("Temp Máxima", color = MeetColors.textSecondary)
-                                Text("${String.format("%.1f", trip.maxTempC)} °C", color = if (trip.maxTempC > 105) com.elysium369.meet.ui.theme.MeetColors.error else Color.White)
+                                Text("${String.format(currentLocale, "%.1f", trip.maxTempC)} °C", color = if (trip.maxTempC > 105) com.elysium369.meet.ui.theme.MeetColors.error else Color.White)
                             }
                         }
                     }
