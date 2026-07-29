@@ -10613,72 +10613,6 @@
 
     <issue
         id="AutoboxingStateCreation"
-        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
-        errorLine1="    var destLatitude by remember { mutableStateOf(0.0) }"
-        errorLine2="                                   ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="242"
-            column="36"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
-        errorLine1="    var destLongitude by remember { mutableStateOf(0.0) }"
-        errorLine2="                                    ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="243"
-            column="37"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
-        errorLine1="    var offerPrice by remember { mutableStateOf(2_400.0) }"
-        errorLine2="                                 ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="256"
-            column="34"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
-        errorLine1="        var ratingStars by remember { mutableStateOf(5.0) }"
-        errorLine2="                                      ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="2616"
-            column="39"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
-        errorLine1="        var counterPrice by remember { mutableStateOf(ride.priceOffer) }"
-        errorLine2="                                       ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="3470"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="        var selectedEta by remember { mutableStateOf(10) }"
-        errorLine2="                                      ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
-            line="3471"
-            column="39"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
         message="Prefer `mutableFloatStateOf` instead of `mutableStateOf`"
         errorLine1="        remember { mutableStateOf(0f) }"
         errorLine2="                   ~~~~~~~~~~~~~~">
@@ -10752,17 +10686,6 @@
             file="src/main/kotlin/com/elysium369/meet/ui/screens/TopologyScreen.kt"
             line="56"
             column="33"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="    var selectedTab by remember { mutableStateOf(0) }"
-        errorLine2="                                  ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/elysium369/meet/ui/screens/TripScreen.kt"
-            line="34"
-            column="35"/>
     </issue>
 
     <issue
