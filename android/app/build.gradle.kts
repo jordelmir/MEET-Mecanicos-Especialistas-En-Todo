@@ -19,6 +19,11 @@ android {
     namespace = "com.elysium369.meet"
     compileSdk = 37
 
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+    }
+
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -29,8 +34,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "4.6.0"
+        versionCode = 26
+        versionName = "4.6.1"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"

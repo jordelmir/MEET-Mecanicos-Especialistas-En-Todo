@@ -4895,7 +4895,11 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val fileName = "EV_Log_${System.currentTimeMillis()}.csv"
-                val file = java.io.File(context.getExternalFilesDir(null), fileName)
+                val exportDirectory = java.io.File(
+                    context.getExternalFilesDir(null),
+                    "TelemetryExports",
+                ).apply { mkdirs() }
+                val file = java.io.File(exportDirectory, fileName)
                 java.io.FileWriter(file).use { writer ->
                     // Header
                     val pids = data.first().values.keys.toList()

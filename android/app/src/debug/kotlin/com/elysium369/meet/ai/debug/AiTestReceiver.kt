@@ -17,7 +17,7 @@ import com.elysium369.meet.automotive.parts.ResolvedAlias
 import kotlinx.coroutines.*
 
 /**
- * Debug-only BroadcastReceiver to test the AI engine via ADB.
+ * Debug-source-set BroadcastReceiver to test the AI engine via ADB.
  *
  * Usage:
  *   adb shell am broadcast -a com.elysium369.meet.AI_TEST \

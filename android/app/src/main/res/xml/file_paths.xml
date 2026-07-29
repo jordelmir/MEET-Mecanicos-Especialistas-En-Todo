@@ -2,7 +2,7 @@
 <paths>
     <external-files-path name="reports" path="Reports/" />
     <external-files-path name="manuals" path="Manuals/" />
-    <cache-path name="cache" path="." />
-    <files-path name="files" path="." />
-    <external-path name="external" path="." />
+    <external-files-path name="telemetry_exports" path="TelemetryExports/" />
+    <cache-path name="gauge_qr_shares" path="gauge_qr_shares/" />
+    <files-path name="verification_captures" path="meet_verifications/" />
 </paths>
