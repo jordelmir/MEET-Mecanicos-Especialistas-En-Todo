@@ -31,7 +31,7 @@ fun TripScreen(
     isPremium: Boolean,
     onExportPdf: (TripEntity) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {

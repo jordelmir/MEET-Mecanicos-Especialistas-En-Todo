@@ -239,8 +239,8 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     val allRides by viewModel.rideRequests.collectAsState()
 
     var destAddress by remember { mutableStateOf("") }
-    var destLatitude by remember { mutableStateOf(0.0) }
-    var destLongitude by remember { mutableStateOf(0.0) }
+    var destLatitude by remember { mutableDoubleStateOf(0.0) }
+    var destLongitude by remember { mutableDoubleStateOf(0.0) }
     var destinationPlaceId by remember { mutableStateOf<String?>(null) }
     var destinationSuggestions by remember { mutableStateOf(emptyList<RidePlaceSuggestion>()) }
     var destinationSearchLoading by remember { mutableStateOf(false) }
@@ -253,7 +253,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
     var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
 
-    var offerPrice by remember { mutableStateOf(2_400.0) }
+    var offerPrice by remember { mutableDoubleStateOf(2_400.0) }
     var isUsd by remember { mutableStateOf(false) }
 
     // Passenger verification state
@@ -2613,7 +2613,7 @@ fun ActiveRidePanel(
     }
 
     if (showRatingDialog) {
-        var ratingStars by remember { mutableStateOf(5.0) }
+        var ratingStars by remember { mutableDoubleStateOf(5.0) }
         var ratingComment by remember { mutableStateOf("") }
 
         AlertDialog(
@@ -3467,8 +3467,8 @@ fun DriverNegotiationPanel(
         }
     } else {
         // Driver has not made an offer yet, show the auction bidding UI
-        var counterPrice by remember { mutableStateOf(ride.priceOffer) }
-        var selectedEta by remember { mutableStateOf(10) }
+        var counterPrice by remember { mutableDoubleStateOf(ride.priceOffer) }
+        var selectedEta by remember { mutableIntStateOf(10) }
         var driverMsg by remember { mutableStateOf("") }
 
         val distanceText = remember(currentGps) {

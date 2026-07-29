@@ -13,13 +13,13 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.6.2
+## Versión actual: 4.6.3
 
-La versión 4.6.2 conserva el universo técnico 3D/360, los perfiles y la
-búsqueda real de Viajes de 4.6.0, y endurece la superficie de datos Android:
-el receptor ADB de IA queda fuera de release, los respaldos genéricos se
-deshabilitan y `FileProvider` comparte solo directorios funcionales concretos.
-También introduce el loop versionado y medible de mejora de Viajes.
+La versión 4.6.3 conserva el universo técnico 3D/360, los perfiles y la
+búsqueda real de Viajes de 4.6.0, el endurecimiento de datos de 4.6.1 y el
+formato regional reactivo de 4.6.2. Además reduce asignaciones innecesarias en
+estado Compose de pasajero, conductor, calificación e historial de Viajes sin
+alterar sus reglas de negocio.
 
 El Atlas G4ED cubre un universo técnico de 6.405
 experiencias 3D/360 offline: 420 elementos de motor y 5.985 elementos de
@@ -56,6 +56,7 @@ Documentación técnica:
 - [`docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md`](docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md)
 - [`docs/security/ANDROID-DATA-SURFACE-4.6.1.md`](docs/security/ANDROID-DATA-SURFACE-4.6.1.md)
 - [`docs/releases/2026-07-28-android-4.6.2-rides-reactive-locale.md`](docs/releases/2026-07-28-android-4.6.2-rides-reactive-locale.md)
+- [`docs/releases/2026-07-29-android-4.6.3-rides-primitive-compose-state.md`](docs/releases/2026-07-29-android-4.6.3-rides-primitive-compose-state.md)
 
 ## Que es real hoy
 
