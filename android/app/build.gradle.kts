@@ -34,8 +34,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "4.6.4"
+        versionCode = 30
+        versionName = "4.6.5"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"

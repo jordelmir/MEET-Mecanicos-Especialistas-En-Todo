@@ -738,11 +738,35 @@ interface RideDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRequest(request: RideRequestEntity)
 
-    @Query("UPDATE ride_requests SET status = :status WHERE requestId = :requestId")
-    suspend fun updateRequestStatus(requestId: String, status: String)
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = :newStatus,
+            completedAt = :completedAt
+        WHERE requestId = :requestId
+          AND status = :expectedStatus
+        """
+    )
+    suspend fun transitionRequestStatus(
+        requestId: String,
+        expectedStatus: String,
+        newStatus: String,
+        completedAt: Long?,
+    ): Int
 
-    @Query("UPDATE ride_requests SET status = :status, completedAt = :completedAt WHERE requestId = :requestId")
-    suspend fun updateRequestStatusAndCompletedAt(requestId: String, status: String, completedAt: Long?)
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = 'CANCELLED',
+            completedAt = :cancelledAt
+        WHERE requestId = :requestId
+          AND status IN ('OPEN', 'ACCEPTED', 'ARRIVED', 'PASSENGER_ONBOARD', 'IN_PROGRESS')
+        """
+    )
+    suspend fun cancelActiveRequest(
+        requestId: String,
+        cancelledAt: Long,
+    ): Int
 
     @Query(
         """

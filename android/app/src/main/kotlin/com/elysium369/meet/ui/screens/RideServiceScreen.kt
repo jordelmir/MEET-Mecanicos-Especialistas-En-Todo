@@ -2128,10 +2128,6 @@ fun ActiveRidePanel(
                                 Button(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "IN_PROGRESS")
-                                        viewModel.announceRideEvent(
-                                            "Vamos a iniciar el servicio.",
-                                            "We are starting the service.",
-                                        )
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f),
@@ -3117,6 +3113,7 @@ fun PassengerLiveOffersPanel(
     offers: List<RideOfferEntity>
 ) {
     val currentLocale = rememberRideJavaLocale()
+    var showCancellationDialog by remember { mutableStateOf(false) }
     val pendingOffers = remember(offers) { offers.filter { it.status == "PENDING" } }
     val elapsedMs = System.currentTimeMillis() - ride.createdAt
     val elapsedMins = (elapsedMs / (1000 * 60)).toInt()
@@ -3222,7 +3219,7 @@ fun PassengerLiveOffersPanel(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
-                    onClick = { viewModel.updateRideStatus(ride.requestId, "CANCELLED") },
+                    onClick = { showCancellationDialog = true },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350), contentColor = Color.White),
                     modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(10.dp)
@@ -3230,6 +3227,22 @@ fun PassengerLiveOffersPanel(
                     Text("❌ CANCELAR SOLICITUD DE VIAJE", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                 }
             }
+        }
+
+        if (showCancellationDialog) {
+            RideCancellationDialog(
+                actorRole = RideActorRole.PASSENGER,
+                onDismiss = { showCancellationDialog = false },
+                onConfirm = { reason, detail ->
+                    viewModel.cancelRide(
+                        requestId = ride.requestId,
+                        reason = reason,
+                        detail = detail,
+                        actorRole = RideActorRole.PASSENGER.name,
+                    )
+                    showCancellationDialog = false
+                },
+            )
         }
 
         // Radar search indicator with elapsed time
