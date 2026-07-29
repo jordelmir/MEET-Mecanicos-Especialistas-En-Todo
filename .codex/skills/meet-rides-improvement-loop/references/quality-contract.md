@@ -13,6 +13,10 @@
 
 - One request can have at most one winning driver; acceptance must be atomic
   and idempotent server-side before production claims.
+- Critical mutations must bind the authenticated actor inside the storage
+  predicate: passenger actions match `passengerId`, and driver actions match
+  `assignedDriverId`. Missing identity fails closed and never falls back to a
+  synthetic system actor.
 - A ride starts only after the correct passenger PIN and authorized lifecycle
   transition.
 - Added stops remain ordered and visible to both actors before acceptance.

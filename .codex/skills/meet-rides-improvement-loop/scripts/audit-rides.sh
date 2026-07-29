@@ -49,7 +49,8 @@ fi
 echo "unguarded_lifecycle_mutations:"
 unguarded_lifecycle="$(
   rg -n --no-heading \
-    'rideDao\\.updateRequestStatus\\(|rideDao\\.updateRequestStatusAndCompletedAt\\(|updateRideStatus\\([^\\n]*"CANCELLED"' \
+    'rideDao\\.updateRequestStatus\\(|rideDao\\.updateRequestStatusAndCompletedAt\\(|updateRideStatus\\([^\\n]*"CANCELLED"|suspend fun transitionRequestStatus\\(|\\?: "SYSTEM"|\\?: "Sistema"' \
+    android/app/src/main/kotlin/com/elysium369/meet/data/local/dao/FeatureDaos.kt \
     android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt \
     android/app/src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt \
     2>/dev/null || true

@@ -6064,6 +6064,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun verifyRideBoardingPin(requestId: String, candidate: String) {
+        val driverId = driverVerification.value?.driverId
+            ?.takeIf(String::isNotBlank)
+            ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val challenge = rideBoardingChallenges[requestId]
             if (challenge == null) {
@@ -6078,8 +6081,9 @@ class ObdViewModel @Inject constructor(
             rideBoardingChallenges[requestId] = verification.challenge
             when (verification.status) {
                 RidePinVerificationStatus.VERIFIED -> {
-                    val transitioned = rideDao.transitionRequestStatus(
+                    val transitioned = rideDao.transitionRequestStatusAsDriver(
                         requestId = requestId,
+                        driverId = driverId,
                         expectedStatus = "ARRIVED",
                         newStatus = "PASSENGER_ONBOARD",
                         completedAt = null,
@@ -6113,6 +6117,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun updateRideStatus(requestId: String, newStatus: String) {
+        val driverId = driverVerification.value?.driverId
+            ?.takeIf(String::isNotBlank)
+            ?: return
         val expectedStatus = when (newStatus) {
             "ARRIVED" -> "ACCEPTED"
             "IN_PROGRESS" -> "PASSENGER_ONBOARD"
@@ -6120,8 +6127,9 @@ class ObdViewModel @Inject constructor(
             else -> return
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val transitioned = rideDao.transitionRequestStatus(
+            val transitioned = rideDao.transitionRequestStatusAsDriver(
                 requestId = requestId,
+                driverId = driverId,
                 expectedStatus = expectedStatus,
                 newStatus = newStatus,
                 completedAt = if (newStatus == "COMPLETED") System.currentTimeMillis() else null,
@@ -6172,25 +6180,30 @@ class ObdViewModel @Inject constructor(
     ) {
         if (!RideCancellationPolicy.isDetailValid(reason, detail)) return
         val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull() ?: return
+        if (role !in setOf(RideActorRole.PASSENGER, RideActorRole.DRIVER)) return
         if (reason !in RideCancellationPolicy.reasonsFor(role)) return
+        val (actorId, actorName) = when (role) {
+            RideActorRole.DRIVER -> {
+                val verification = driverVerification.value ?: return
+                verification.driverId to verification.fullName
+            }
+            RideActorRole.PASSENGER -> {
+                val verification = passengerVerification.value ?: return
+                verification.passengerId to verification.fullName
+            }
+            else -> return
+        }
+        if (actorId.isBlank() || actorName.isBlank()) return
         viewModelScope.launch(Dispatchers.IO) {
             val cancelled = rideDao.cancelActiveRequest(
                 requestId = requestId,
+                actorId = actorId,
+                actorRole = role.name,
                 cancelledAt = System.currentTimeMillis(),
             ) == 1
             if (!cancelled) return@launch
             val decision = RideCancellationPolicy.evaluate(reason)
             val normalizedRole = role.name
-            val actorId = when (normalizedRole) {
-                "DRIVER" -> driverVerification.value?.driverId
-                "PASSENGER" -> passengerVerification.value?.passengerId
-                else -> null
-            } ?: "SYSTEM"
-            val actorName = when (normalizedRole) {
-                "DRIVER" -> driverVerification.value?.fullName
-                "PASSENGER" -> passengerVerification.value?.fullName
-                else -> null
-            } ?: "Sistema"
             val safetyNote = if (decision.requiresSafetyReview) {
                 " Caso marcado para revisión de seguridad."
             } else {
