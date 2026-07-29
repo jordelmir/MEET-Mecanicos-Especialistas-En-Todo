@@ -46,6 +46,19 @@ if [[ -n "$unsafe_offer_acceptance" ]]; then
 else
   echo "none"
 fi
+echo "unguarded_lifecycle_mutations:"
+unguarded_lifecycle="$(
+  rg -n --no-heading \
+    'rideDao\\.updateRequestStatus\\(|rideDao\\.updateRequestStatusAndCompletedAt\\(|updateRideStatus\\([^\\n]*"CANCELLED"' \
+    android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt \
+    android/app/src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt \
+    2>/dev/null || true
+)"
+if [[ -n "$unguarded_lifecycle" ]]; then
+  printf '%s\n' "$unguarded_lifecycle"
+else
+  echo "none"
+fi
 echo "known_ride_lint_debt:"
 if [[ -f android/app/lint-baseline.xml ]]; then
   rg -B6 \

@@ -6078,8 +6078,19 @@ class ObdViewModel @Inject constructor(
             rideBoardingChallenges[requestId] = verification.challenge
             when (verification.status) {
                 RidePinVerificationStatus.VERIFIED -> {
+                    val transitioned = rideDao.transitionRequestStatus(
+                        requestId = requestId,
+                        expectedStatus = "ARRIVED",
+                        newStatus = "PASSENGER_ONBOARD",
+                        completedAt = null,
+                    ) == 1
+                    if (!transitioned) {
+                        _ridePinFeedback.emit(
+                            "El viaje cambió de estado antes de confirmar el PIN. Actualiza la pantalla.",
+                        )
+                        return@launch
+                    }
                     _rideBoardingPins.update { it - requestId }
-                    rideDao.updateRequestStatus(requestId, "PASSENGER_ONBOARD")
                     val request = rideDao.getRequestById(requestId)
                     request?.let { updated ->
                         withContext(Dispatchers.Main) { _activeRideRequest.value = updated }
@@ -6102,19 +6113,26 @@ class ObdViewModel @Inject constructor(
     }
 
     fun updateRideStatus(requestId: String, newStatus: String) {
+        val expectedStatus = when (newStatus) {
+            "ARRIVED" -> "ACCEPTED"
+            "IN_PROGRESS" -> "PASSENGER_ONBOARD"
+            "COMPLETED" -> "IN_PROGRESS"
+            else -> return
+        }
         viewModelScope.launch(Dispatchers.IO) {
-            rideDao.updateRequestStatusAndCompletedAt(
+            val transitioned = rideDao.transitionRequestStatus(
                 requestId = requestId,
-                status = newStatus,
+                expectedStatus = expectedStatus,
+                newStatus = newStatus,
                 completedAt = if (newStatus == "COMPLETED") System.currentTimeMillis() else null,
-            )
+            ) == 1
+            if (!transitioned) return@launch
             
             // Insert system chat msg about state change
             val alertText = when(newStatus) {
                 "ARRIVED" -> "🚕 ¡El conductor ha llegado a tu ubicación de recogida!"
                 "IN_PROGRESS" -> "🚗 El viaje ha comenzado oficialmente."
                 "COMPLETED" -> "🏁 Viaje finalizado con éxito."
-                "CANCELLED" -> "❌ Viaje cancelado."
                 else -> "El viaje cambió de estado a $newStatus."
             }
 
@@ -6134,8 +6152,14 @@ class ObdViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 _activeRideRequest.value = updatedRequest
             }
-            if (newStatus == "COMPLETED" || newStatus == "CANCELLED") {
+            if (newStatus == "COMPLETED") {
                 _rideSharingSelections.update { it - requestId }
+            }
+            if (newStatus == "IN_PROGRESS") {
+                voiceFeedbackManager.speak(
+                    "Vamos a iniciar el servicio.",
+                    "We are starting the service.",
+                )
             }
         }
     }
@@ -6150,11 +6174,11 @@ class ObdViewModel @Inject constructor(
         val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull() ?: return
         if (reason !in RideCancellationPolicy.reasonsFor(role)) return
         viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.status !in setOf("OPEN", "ACCEPTED", "ARRIVED", "IN_PROGRESS")) {
-                return@launch
-            }
-            rideDao.updateRequestStatus(requestId, "CANCELLED")
+            val cancelled = rideDao.cancelActiveRequest(
+                requestId = requestId,
+                cancelledAt = System.currentTimeMillis(),
+            ) == 1
+            if (!cancelled) return@launch
             val decision = RideCancellationPolicy.evaluate(reason)
             val normalizedRole = role.name
             val actorId = when (normalizedRole) {
