@@ -13,9 +13,15 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.4.0
+## Versión actual: 4.6.1
 
-La versión 4.4.0 amplía el Atlas G4ED a un universo técnico de 6.405
+La versión 4.6.1 conserva el universo técnico 3D/360, los perfiles y la
+búsqueda real de Viajes de 4.6.0, y endurece la superficie de datos Android:
+el receptor ADB de IA queda fuera de release, los respaldos genéricos se
+deshabilitan y `FileProvider` comparte solo directorios funcionales concretos.
+También introduce el loop versionado y medible de mejora de Viajes.
+
+El Atlas G4ED cubre un universo técnico de 6.405
 experiencias 3D/360 offline: 420 elementos de motor y 5.985 elementos de
 transmisión/hidráulica, sistema eléctrico, carrocería/interior, chasis y
 periféricos. Los 130 paquetes GLB comparten IDs canónicos con Motor 3D,
@@ -47,6 +53,8 @@ Documentación técnica:
 - [`docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md`](docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md)
 - [`docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md`](docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md)
 - [`docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md`](docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md)
+- [`docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md`](docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md)
+- [`docs/security/ANDROID-DATA-SURFACE-4.6.1.md`](docs/security/ANDROID-DATA-SURFACE-4.6.1.md)
 
 ## Que es real hoy
 

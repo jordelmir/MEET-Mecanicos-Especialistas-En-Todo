@@ -1,0 +1,4 @@
+interface:
+  display_name: "MEET Rides Improvement Loop"
+  short_description: "Audit and improve MEET rides safely"
+  default_prompt: "Use $meet-rides-improvement-loop to run one evidence-gated improvement cycle for passenger and driver journeys."

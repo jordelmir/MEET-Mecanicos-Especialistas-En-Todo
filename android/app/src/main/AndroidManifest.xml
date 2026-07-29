@@ -49,8 +49,8 @@
 
     <application
         android:name=".MeetApplication"
-        android:allowBackup="true"
-        android:extractNativeLibs="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="OBD2 Elysium Vanguard"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -100,14 +100,6 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Debug AI Test Receiver — invoke via: adb shell am broadcast -a com.elysium369.meet.AI_TEST -->
-        <receiver
-            android:name=".ai.debug.AiTestReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.elysium369.meet.AI_TEST" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>
