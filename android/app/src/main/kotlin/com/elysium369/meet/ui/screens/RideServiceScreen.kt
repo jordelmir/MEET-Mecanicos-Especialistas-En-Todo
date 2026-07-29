@@ -74,7 +74,6 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -235,6 +234,7 @@ private fun rideGeoPointOrNull(
 @Composable
 fun PassengerDashboard(viewModel: ObdViewModel) {
     val context = LocalContext.current
+    val currentLocale = rememberRideJavaLocale()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val allRides by viewModel.rideRequests.collectAsState()
 
@@ -613,7 +613,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                     currentGps?.longitude,
                                 )?.let { distance ->
                                     Text(
-                                        String.format(Locale.getDefault(), "%.1f km", distance),
+                                        String.format(currentLocale, "%.1f km", distance),
                                         color = MeetColors.textMuted,
                                         fontSize = 10.sp,
                                     )
@@ -826,7 +826,11 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = if (isUsd) "$${String.format("%.2f", offerPrice / 500.0)} USD" else "₡${String.format("%,.0f", offerPrice)} CRC",
+                        text = if (isUsd) {
+                            "$${String.format(currentLocale, "%.2f", offerPrice / 500.0)} USD"
+                        } else {
+                            "₡${String.format(currentLocale, "%,.0f", offerPrice)} CRC"
+                        },
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Black,
                         color = MeetColors.neonGreen,
@@ -3112,6 +3116,7 @@ fun PassengerLiveOffersPanel(
     ride: RideRequestEntity,
     offers: List<RideOfferEntity>
 ) {
+    val currentLocale = rememberRideJavaLocale()
     val pendingOffers = remember(offers) { offers.filter { it.status == "PENDING" } }
     val elapsedMs = System.currentTimeMillis() - ride.createdAt
     val elapsedMins = (elapsedMs / (1000 * 60)).toInt()
@@ -3160,7 +3165,11 @@ fun PassengerLiveOffersPanel(
                     }
 
                     Text(
-                        text = if (ride.currency == "USD") "$${ride.priceOffer.toInt()}" else "₡${String.format("%,.0f", ride.priceOffer)} CRC",
+                        text = if (ride.currency == "USD") {
+                            "$${ride.priceOffer.toInt()}"
+                        } else {
+                            "₡${String.format(currentLocale, "%,.0f", ride.priceOffer)} CRC"
+                        },
                         color = MeetColors.neonGreen,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Black
