@@ -715,6 +715,12 @@ interface ProviderProfileDao {
     suspend fun deleteProfile(profileId: String)
 }
 
+enum class RideOfferAcceptanceOutcome {
+    ACCEPTED,
+    ALREADY_ACCEPTED,
+    REJECTED,
+}
+
 @Dao
 interface RideDao {
     @Query("SELECT * FROM ride_requests ORDER BY createdAt DESC")
@@ -738,8 +744,31 @@ interface RideDao {
     @Query("UPDATE ride_requests SET status = :status, completedAt = :completedAt WHERE requestId = :requestId")
     suspend fun updateRequestStatusAndCompletedAt(requestId: String, status: String, completedAt: Long?)
 
-    @Query("UPDATE ride_requests SET status = 'ACCEPTED', acceptedOfferId = :offerId, assignedDriverId = :driverId, assignedDriverName = :driverName, assignedDriverPhone = :driverPhone, assignedDriverVehicle = :vehicle, finalPrice = :price WHERE requestId = :requestId")
-    suspend fun acceptOffer(requestId: String, offerId: String, driverId: String, driverName: String, driverPhone: String, vehicle: String, price: Double)
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = 'ACCEPTED',
+            acceptedOfferId = :offerId,
+            assignedDriverId = :driverId,
+            assignedDriverName = :driverName,
+            assignedDriverPhone = :driverPhone,
+            assignedDriverVehicle = :vehicle,
+            finalPrice = :price
+        WHERE requestId = :requestId
+          AND status = 'OPEN'
+          AND assignedDriverId IS NULL
+          AND acceptedOfferId IS NULL
+        """
+    )
+    suspend fun claimOpenRequestWithOffer(
+        requestId: String,
+        offerId: String,
+        driverId: String,
+        driverName: String,
+        driverPhone: String,
+        vehicle: String,
+        price: Double,
+    ): Int
 
     @Query(
         """
@@ -787,6 +816,43 @@ interface RideDao {
 
     @Query("UPDATE ride_offers SET status = 'REJECTED' WHERE requestId = :requestId AND offerId != :acceptedOfferId")
     suspend fun rejectOtherOffers(requestId: String, acceptedOfferId: String)
+
+    @Transaction
+    suspend fun acceptOfferAtomically(
+        requestId: String,
+        offerId: String,
+    ): RideOfferAcceptanceOutcome {
+        val offer = getOfferById(offerId) ?: return RideOfferAcceptanceOutcome.REJECTED
+        if (offer.requestId != requestId) return RideOfferAcceptanceOutcome.REJECTED
+
+        val request = getRequestById(requestId) ?: return RideOfferAcceptanceOutcome.REJECTED
+        if (request.status == "ACCEPTED") {
+            return if (
+                request.acceptedOfferId == offerId &&
+                request.assignedDriverId == offer.driverId
+            ) {
+                RideOfferAcceptanceOutcome.ALREADY_ACCEPTED
+            } else {
+                RideOfferAcceptanceOutcome.REJECTED
+            }
+        }
+        if (request.status != "OPEN") return RideOfferAcceptanceOutcome.REJECTED
+
+        val claimed = claimOpenRequestWithOffer(
+            requestId = requestId,
+            offerId = offerId,
+            driverId = offer.driverId,
+            driverName = offer.driverName,
+            driverPhone = offer.driverPhone,
+            vehicle = offer.vehicleDescription,
+            price = offer.counterPrice,
+        )
+        if (claimed != 1) return RideOfferAcceptanceOutcome.REJECTED
+
+        updateOfferStatus(offerId, "ACCEPTED")
+        rejectOtherOffers(requestId, offerId)
+        return RideOfferAcceptanceOutcome.ACCEPTED
+    }
 
     // Chat
     @Query("SELECT * FROM ride_chat_messages WHERE rideRequestId = :rideRequestId ORDER BY createdAt ASC")

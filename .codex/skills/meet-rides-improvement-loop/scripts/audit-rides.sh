@@ -33,6 +33,19 @@ rg -n --no-heading \
   $ride_files 2>/dev/null | head -40 || true
 echo "brand_leaks:"
 rg -ni --no-heading 'uber|didi|indriver' $ride_files 2>/dev/null | head -20 || true
+echo "non_atomic_offer_acceptance:"
+unsafe_offer_acceptance="$(
+  rg -n --no-heading \
+    'suspend fun acceptOffer\\(|rideDao\\.acceptOffer\\(' \
+    android/app/src/main/kotlin/com/elysium369/meet/data/local/dao/FeatureDaos.kt \
+    android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt \
+    2>/dev/null || true
+)"
+if [[ -n "$unsafe_offer_acceptance" ]]; then
+  printf '%s\n' "$unsafe_offer_acceptance"
+else
+  echo "none"
+fi
 echo "known_ride_lint_debt:"
 if [[ -f android/app/lint-baseline.xml ]]; then
   rg -B6 \

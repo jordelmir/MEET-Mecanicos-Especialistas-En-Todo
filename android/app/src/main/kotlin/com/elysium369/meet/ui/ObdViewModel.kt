@@ -5978,34 +5978,22 @@ class ObdViewModel @Inject constructor(
     fun acceptRideOffer(requestId: String, offerId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val offer = rideDao.getOfferById(offerId) ?: return@launch
-            // Update request status to ACCEPTED
-            rideDao.acceptOffer(
-                requestId = requestId,
-                offerId = offerId,
-                driverId = offer.driverId,
-                driverName = offer.driverName,
-                driverPhone = offer.driverPhone,
-                vehicle = offer.vehicleDescription,
-                price = offer.counterPrice
-            )
-            // Reject other offers
-            rideDao.updateOfferStatus(offerId, "ACCEPTED")
-            rideDao.rejectOtherOffers(requestId, offerId)
+            val outcome = rideDao.acceptOfferAtomically(requestId, offerId)
+            if (outcome == RideOfferAcceptanceOutcome.ACCEPTED) {
+                rideDao.insertChatMessage(
+                    RideChatMessageEntity(
+                        messageId = UUID.randomUUID().toString(),
+                        rideRequestId = requestId,
+                        senderId = "SYSTEM",
+                        senderName = "Sistema",
+                        senderRole = "SYSTEM",
+                        messageType = "TEXT",
+                        textContent = "Oferta de ${offer.driverName} aceptada por ${offer.counterPrice} ${offer.currency}.",
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+            }
 
-            // Insert system notification in chat
-            val systemMsg = RideChatMessageEntity(
-                messageId = UUID.randomUUID().toString(),
-                rideRequestId = requestId,
-                senderId = "SYSTEM",
-                senderName = "Sistema",
-                senderRole = "SYSTEM",
-                messageType = "TEXT",
-                textContent = "Oferta de ${offer.driverName} aceptada por ${offer.counterPrice} ${offer.currency}.",
-                createdAt = System.currentTimeMillis()
-            )
-            rideDao.insertChatMessage(systemMsg)
-
-            // Update active state flow
             val updatedRequest = rideDao.getRequestById(requestId)
             withContext(Dispatchers.Main) {
                 _activeRideRequest.value = updatedRequest
