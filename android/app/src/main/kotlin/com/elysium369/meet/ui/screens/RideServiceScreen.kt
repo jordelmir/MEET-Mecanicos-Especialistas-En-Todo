@@ -64,6 +64,7 @@ import com.elysium369.meet.ride.map.RideMarkerRole
 import com.elysium369.meet.ride.map.OsrmRideRoutingProvider
 import com.elysium369.meet.ride.map.RideRoadRoute
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
+import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
 import com.elysium369.meet.ride.traffic.RideCollaborativeEtaEstimator
@@ -128,9 +129,15 @@ fun RideServiceScreen(
         viewModel.detectCurrentLocation(context)
         viewModel.startRideProjectionSync()
     }
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.stopRideProjectionSync()
+        }
+    }
 
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
+    val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
     var showProfile by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -157,6 +164,13 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        Text(
+                            text = projectionConnectionState.rideProjectionStatusLabel(),
+                            color = projectionConnectionState.rideProjectionStatusColor(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
                         IconButton(onClick = { showProfile = true }) {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
@@ -219,6 +233,24 @@ fun RideServiceScreen(
         }
     }
 }
+
+private fun RideProjectionConnectionState.rideProjectionStatusLabel(): String =
+    when (this) {
+        RideProjectionConnectionState.IDLE -> "LOCAL"
+        RideProjectionConnectionState.CONNECTING -> "CONECTANDO"
+        RideProjectionConnectionState.LIVE -> "EN VIVO"
+        RideProjectionConnectionState.RECOVERING -> "RECUPERANDO"
+        RideProjectionConnectionState.AUTHENTICATION_REQUIRED -> "SIN SESIÓN"
+    }
+
+private fun RideProjectionConnectionState.rideProjectionStatusColor(): Color =
+    when (this) {
+        RideProjectionConnectionState.LIVE -> MeetColors.neonGreen
+        RideProjectionConnectionState.CONNECTING,
+        RideProjectionConnectionState.RECOVERING -> MeetColors.warning
+        RideProjectionConnectionState.IDLE,
+        RideProjectionConnectionState.AUTHENTICATION_REQUIRED -> MeetColors.textMuted
+    }
 
 private fun rideGeoPointOrNull(
     latitude: Double,

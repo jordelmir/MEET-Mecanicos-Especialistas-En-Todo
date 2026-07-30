@@ -200,9 +200,22 @@ class RideRemoteProjectionRepository @Inject constructor(
                 table = "ride_offers"
             }
             .map { Unit }
+        val stopChanges = channel
+            .postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "ride_request_stops"
+            }
+            .map { Unit }
+        val vehicleChanges = channel
+            .postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "ride_driver_vehicles"
+            }
+            .map { Unit }
         try {
             channel.subscribe()
-            emitAll(merge(changes, offerChanges))
+            // Subscription events are only wake-ups. Every wake-up is followed
+            // by an authenticated RLS-filtered catch-up query.
+            emit(Unit)
+            emitAll(merge(changes, offerChanges, stopChanges, vehicleChanges))
         } finally {
             channel.unsubscribe()
         }

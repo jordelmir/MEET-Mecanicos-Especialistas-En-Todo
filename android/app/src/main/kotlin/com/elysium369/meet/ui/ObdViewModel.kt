@@ -77,6 +77,8 @@ import com.elysium369.meet.ride.domain.RideVersion
 import com.elysium369.meet.ride.data.RideCommandEnqueueResult
 import com.elysium369.meet.ride.data.RideCommandRepository
 import com.elysium369.meet.ride.data.RideProjectionRefreshResult
+import com.elysium369.meet.ride.data.RideProjectionConnectionState
+import com.elysium369.meet.ride.data.RideProjectionSyncPolicy
 import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
@@ -5731,29 +5733,67 @@ class ObdViewModel @Inject constructor(
     private var jobOffersCollection: Job? = null
     private var jobChatCollection: Job? = null
     private var rideProjectionJob: Job? = null
+    private val _rideProjectionConnectionState =
+        MutableStateFlow(RideProjectionConnectionState.IDLE)
+    val rideProjectionConnectionState: StateFlow<RideProjectionConnectionState> =
+        _rideProjectionConnectionState.asStateFlow()
 
     fun startRideProjectionSync() {
         if (rideProjectionJob?.isActive == true) return
         if (currentCloudUserId() == null) {
+            _rideProjectionConnectionState.value =
+                RideProjectionConnectionState.AUTHENTICATION_REQUIRED
             Log.d("MeetRides", "Ride projection deferred until authentication")
             return
         }
         rideProjectionJob = viewModelScope.launch(Dispatchers.IO) {
-            refreshRideProjection()
-            runCatching {
-                rideRemoteProjectionRepository.realtimeWakeUps()
-                    .debounce(250)
-                    .collect {
-                        refreshRideProjection()
+            _rideProjectionConnectionState.value =
+                RideProjectionConnectionState.CONNECTING
+            val realtimeWakeUps = rideRemoteProjectionRepository
+                .realtimeWakeUps()
+                .onEach {
+                    _rideProjectionConnectionState.value =
+                        RideProjectionConnectionState.LIVE
+                }
+                .retryWhen { error, attempt ->
+                    if (currentCloudUserId() == null) {
+                        _rideProjectionConnectionState.value =
+                            RideProjectionConnectionState.AUTHENTICATION_REQUIRED
+                        false
+                    } else {
+                        val delayMs = RideProjectionSyncPolicy.reconnectDelayMs(attempt)
+                        _rideProjectionConnectionState.value =
+                            RideProjectionConnectionState.RECOVERING
+                        Log.w(
+                            "MeetRides",
+                            "Realtime wake-up interrupted; reconnecting in ${delayMs}ms",
+                            error,
+                        )
+                        delay(delayMs)
+                        _rideProjectionConnectionState.value =
+                            RideProjectionConnectionState.CONNECTING
+                        true
                     }
-            }.onFailure { error ->
-                Log.w(
-                    "MeetRides",
-                    "Realtime wake-up channel stopped; next screen entry will reconnect",
-                    error,
-                )
+                }
+            val foregroundHeartbeat = flow {
+                while (currentCoroutineContext().isActive) {
+                    delay(RideProjectionSyncPolicy.HEARTBEAT_INTERVAL_MS)
+                    emit(Unit)
+                }
             }
+            merge(realtimeWakeUps, foregroundHeartbeat)
+                .onStart { emit(Unit) }
+                .conflate()
+                .collect {
+                    refreshRideProjection()
+                }
         }
+    }
+
+    fun stopRideProjectionSync() {
+        rideProjectionJob?.cancel()
+        rideProjectionJob = null
+        _rideProjectionConnectionState.value = RideProjectionConnectionState.IDLE
     }
 
     fun refreshRideProjectionNow() {
@@ -5768,6 +5808,8 @@ class ObdViewModel @Inject constructor(
                 Log.d("MeetRides", "Remote ride projection refreshed: ${result.count}")
             }
             RideProjectionRefreshResult.AuthenticationRequired -> {
+                _rideProjectionConnectionState.value =
+                    RideProjectionConnectionState.AUTHENTICATION_REQUIRED
                 Log.d("MeetRides", "Ride projection waiting for authenticated session")
             }
             is RideProjectionRefreshResult.Failed -> {
