@@ -2453,8 +2453,9 @@ fun ActiveRidePanel(
                 activeRoadRoute != null -> {
                     val route = requireNotNull(activeRoadRoute)
                     val km = route.distanceMeters / 1_000.0
+                    val roundedKm = kotlin.math.round(km * 10.0) / 10.0
                     val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
-                    "Ruta vial ${String.format(Locale.getDefault(), "%.1f", km)} km · $minutes min · ${route.attribution}"
+                    "Ruta vial $roundedKm km · $minutes min · ${route.attribution}"
                 }
                 activeRouteUnavailable ->
                     "Ruta vial temporalmente no disponible; el mapa conserva puntos reales sin unirlos con una línea falsa."
