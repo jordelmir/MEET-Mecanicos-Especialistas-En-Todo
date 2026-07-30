@@ -387,6 +387,8 @@ data class RideRequestEntity(
     val syncState: String = "LOCAL_ONLY",
     val lastSyncedAt: Long? = null,
     val lastCorrelationId: String? = null,
+    val boardingPin: String? = null,
+    val boardingPinExpiresAt: Long? = null,
     val passengerRating: Double? = null,  // Calificación dada al conductor
     val driverRating: Double? = null,     // Calificación dada al pasajero
     val createdAt: Long,

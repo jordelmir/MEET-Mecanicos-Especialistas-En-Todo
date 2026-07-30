@@ -743,7 +743,6 @@ interface RideDao {
         UPDATE ride_requests
         SET syncState = 'PENDING'
         WHERE requestId = :requestId
-          AND syncState != 'SYNCED'
         """,
     )
     suspend fun markCommandPending(requestId: String): Int
@@ -820,6 +819,30 @@ interface RideDao {
         currentServerVersion: Long?,
         observedAt: Long,
     ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET boardingPin = :pin,
+            boardingPinExpiresAt = :expiresAt
+        WHERE requestId = :requestId
+        """,
+    )
+    suspend fun storeAuthoritativeBoardingPin(
+        requestId: String,
+        pin: String,
+        expiresAt: Long?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET boardingPin = NULL,
+            boardingPinExpiresAt = NULL
+        WHERE requestId = :requestId
+        """,
+    )
+    suspend fun clearAuthoritativeBoardingPin(requestId: String): Int
 
     @Query(
         """

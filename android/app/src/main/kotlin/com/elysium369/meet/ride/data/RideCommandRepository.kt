@@ -49,9 +49,20 @@ class RideCommandRepository @Inject constructor(
         payload: RideCommandPayload = RideCommandPayload(),
         now: Long = System.currentTimeMillis(),
     ): RideCommandEnqueueResult {
-        if (envelope.expectedVersion.value <= 0) {
+        if (
+            envelope.expectedVersion.value <= 0 &&
+            envelope.type != RideCommandType.PUBLISH
+        ) {
             return RideCommandEnqueueResult.InvalidCommand(
                 "La versión remota debe ser positiva",
+            )
+        }
+        if (
+            envelope.type == RideCommandType.PUBLISH &&
+            envelope.expectedVersion.value != 0L
+        ) {
+            return RideCommandEnqueueResult.InvalidCommand(
+                "Una solicitud nueva debe comenzar en versión cero",
             )
         }
         if (envelope.type !in SUPPORTED_COMMANDS) {
@@ -73,6 +84,14 @@ class RideCommandRepository @Inject constructor(
         ) {
             return RideCommandEnqueueResult.InvalidCommand(
                 "CANCEL requiere una razón tipada",
+            )
+        }
+        if (
+            envelope.type == RideCommandType.VERIFY_BOARDING_PIN &&
+            payload.boardingPin?.matches(Regex("[0-9]{4}")) != true
+        ) {
+            return RideCommandEnqueueResult.InvalidCommand(
+                "VERIFY_BOARDING_PIN requiere cuatro dígitos",
             )
         }
         val sessionUserId = SupabaseModule.client.auth
@@ -130,7 +149,15 @@ class RideCommandRepository @Inject constructor(
 
     private companion object {
         val SUPPORTED_COMMANDS = setOf(
+            RideCommandType.PUBLISH,
+            RideCommandType.SUBMIT_OFFER,
+            RideCommandType.ACCEPT_OFFER,
             RideCommandType.CLAIM,
+            RideCommandType.DRIVER_EN_ROUTE,
+            RideCommandType.DRIVER_ARRIVED,
+            RideCommandType.ISSUE_BOARDING_PIN,
+            RideCommandType.VERIFY_BOARDING_PIN,
+            RideCommandType.START,
             RideCommandType.CANCEL,
             RideCommandType.COMPLETE,
         )

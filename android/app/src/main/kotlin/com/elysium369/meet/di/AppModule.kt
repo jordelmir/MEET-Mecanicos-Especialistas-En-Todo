@@ -3152,6 +3152,17 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_44_45 = object : Migration(44, 45) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `boardingPin` TEXT"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `boardingPinExpiresAt` INTEGER"
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3183,7 +3194,8 @@ object AppModule {
             MIGRATION_40_41,
             MIGRATION_41_42,
             MIGRATION_42_43,
-            MIGRATION_43_44
+            MIGRATION_43_44,
+            MIGRATION_44_45
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

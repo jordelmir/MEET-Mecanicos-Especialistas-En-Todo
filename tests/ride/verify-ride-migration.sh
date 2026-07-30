@@ -5,8 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 migration="$repo_root/supabase/migrations/20260726010000_ride_platform_foundation.sql"
 ledger_migration="$repo_root/supabase/migrations/20260730010000_ride_double_entry_ledger.sql"
 command_migration="$repo_root/supabase/migrations/20260730020000_ride_command_authority.sql"
+flow_migration="$repo_root/supabase/migrations/20260730030000_ride_passenger_driver_commands.sql"
 
-if [[ ! -f "$migration" || ! -f "$ledger_migration" || ! -f "$command_migration" ]]; then
+if [[ ! -f "$migration" || ! -f "$ledger_migration" ||
+      ! -f "$command_migration" || ! -f "$flow_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
@@ -235,5 +237,38 @@ for signature in "${legacy_rpc_signatures[@]}"; do
     exit 1
   }
 done
+
+flow_functions=(
+  ride_create_request_v2
+  ride_submit_offer_v2
+  ride_accept_offer_v2
+  ride_driver_transition_v2
+  ride_issue_boarding_pin_v2
+  ride_verify_boarding_pin_v2
+)
+
+for function_name in "${flow_functions[@]}"; do
+  rg -q "create or replace function public\\.${function_name}" "$flow_migration" || {
+    echo "ride migration contract: FAIL (missing vertical RPC $function_name)" >&2
+    exit 1
+  }
+done
+
+rg -q "revoke insert on public\\.ride_requests from authenticated" "$flow_migration" || {
+  echo "ride migration contract: FAIL (direct request creation still granted)" >&2
+  exit 1
+}
+rg -q "revoke insert on public\\.ride_offers from authenticated" "$flow_migration" || {
+  echo "ride migration contract: FAIL (direct offer creation still granted)" >&2
+  exit 1
+}
+rg -q "'pin', p_pin" "$flow_migration" || {
+  echo "ride migration contract: FAIL (PIN attempt missing from request hash)" >&2
+  exit 1
+}
+rg -q "extensions\\.crypt\\(p_pin" "$flow_migration" || {
+  echo "ride migration contract: FAIL (server PIN verification missing)" >&2
+  exit 1
+}
 
 echo "ride migration contract: PASS"

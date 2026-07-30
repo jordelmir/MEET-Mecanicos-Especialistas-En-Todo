@@ -25,9 +25,11 @@ import com.elysium369.meet.ride.domain.RideIdempotencyKey
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.jan.supabase.gotrue.auth
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 
 @HiltWorker
 class RideCommandSyncWorker @AssistedInject constructor(
@@ -83,6 +85,28 @@ class RideCommandSyncWorker @AssistedInject constructor(
             when (val result = gateway.execute(command)) {
                 is RideCommandGatewayResult.Accepted -> {
                     val now = System.currentTimeMillis()
+                    result.data.text("boarding_pin")?.let { pin ->
+                        rideDao.storeAuthoritativeBoardingPin(
+                            requestId = entity.rideId,
+                            pin = pin,
+                            expiresAt = result.data.text("expires_at")
+                                ?.let { raw ->
+                                    runCatching {
+                                        Instant.parse(raw).toEpochMilli()
+                                    }.getOrNull()
+                                },
+                        )
+                    }
+                    if (
+                        result.status in setOf(
+                            "PASSENGER_ONBOARD",
+                            "IN_PROGRESS",
+                            "COMPLETED",
+                            "CANCELLED",
+                        )
+                    ) {
+                        rideDao.clearAuthoritativeBoardingPin(entity.rideId)
+                    }
                     outboxDao.acknowledge(
                         idempotencyKey = entity.idempotencyKey,
                         correlationId = result.correlationId,
@@ -229,7 +253,13 @@ class RideCommandSyncWorker @AssistedInject constructor(
         json: Json,
     ): RideQueuedCommand {
         RideIdempotencyKey.of(idempotencyKey)
-        require(expectedVersion > 0) { "Expected version must be positive" }
+        require(
+            expectedVersion > 0 ||
+                (
+                    expectedVersion == 0L &&
+                        commandType == RideCommandType.PUBLISH.name
+                )
+        ) { "Expected version is invalid for this command" }
         require(payloadVersion > 0) { "Payload version must be positive" }
         return RideQueuedCommand(
             rideId = rideId,
@@ -310,6 +340,9 @@ private fun String.toLegacyStatus(): String = when (this) {
     "ASSIGNED", "DRIVER_EN_ROUTE" -> "ACCEPTED"
     else -> this
 }
+
+private fun kotlinx.serialization.json.JsonObject.text(key: String): String? =
+    (this[key] as? JsonPrimitive)?.content
 
 private fun Throwable.safeMessage(): String =
     (message ?: this::class.simpleName ?: "Invalid local command").take(300)

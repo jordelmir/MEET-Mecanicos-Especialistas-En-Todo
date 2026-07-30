@@ -10,6 +10,7 @@ import javax.inject.Singleton
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -18,6 +19,22 @@ data class RideCommandPayload(
     val vehicleId: String? = null,
     val reasonCode: String? = null,
     val detail: String? = null,
+    val displayName: String? = null,
+    val countryCode: String? = null,
+    val pickupLatitude: String? = null,
+    val pickupLongitude: String? = null,
+    val pickupAddress: String? = null,
+    val destinationLatitude: String? = null,
+    val destinationLongitude: String? = null,
+    val destinationAddress: String? = null,
+    val offeredFareMinor: Long? = null,
+    val currency: String? = null,
+    val paymentMethod: String? = null,
+    val stopsJson: String? = null,
+    val offerId: String? = null,
+    val fareMinor: Long? = null,
+    val etaSeconds: Int? = null,
+    val boardingPin: String? = null,
 )
 
 data class RideQueuedCommand(
@@ -118,6 +135,11 @@ private data class RideCommandWireResponse(
 
 @Singleton
 class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
+    private val json = Json {
+        ignoreUnknownKeys = false
+        explicitNulls = false
+    }
+
     override suspend fun execute(
         command: RideQueuedCommand,
     ): RideCommandGatewayResult {
@@ -228,6 +250,76 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
             put("p_idempotency_key", idempotencyKey)
         }
         return when (type) {
+            RideCommandType.PUBLISH -> {
+                val displayName = payload.displayName.nonBlank() ?: return null
+                val countryCode = payload.countryCode.nonBlank() ?: return null
+                val pickupLatitude = payload.pickupLatitude.jsonNumber() ?: return null
+                val pickupLongitude = payload.pickupLongitude.jsonNumber() ?: return null
+                val pickupAddress = payload.pickupAddress.nonBlank() ?: return null
+                val destinationLatitude =
+                    payload.destinationLatitude.jsonNumber() ?: return null
+                val destinationLongitude =
+                    payload.destinationLongitude.jsonNumber() ?: return null
+                val destinationAddress =
+                    payload.destinationAddress.nonBlank() ?: return null
+                val offeredFareMinor =
+                    payload.offeredFareMinor?.takeIf { it > 0 } ?: return null
+                val currency = payload.currency.nonBlank() ?: return null
+                val paymentMethod = payload.paymentMethod.nonBlank() ?: return null
+                val stops = payload.stopsJson
+                    ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
+                    ?: return null
+                RpcInvocation(
+                    functionName = "ride_create_request_v2",
+                    parameters = buildJsonObject {
+                        put("p_request_id", rideId)
+                        put("p_display_name", displayName)
+                        put("p_country_code", countryCode)
+                        put("p_pickup_latitude", pickupLatitude)
+                        put("p_pickup_longitude", pickupLongitude)
+                        put("p_pickup_address", pickupAddress)
+                        put("p_destination_latitude", destinationLatitude)
+                        put("p_destination_longitude", destinationLongitude)
+                        put("p_destination_address", destinationAddress)
+                        put("p_offered_fare_minor", offeredFareMinor)
+                        put("p_currency", currency)
+                        put("p_payment_method", paymentMethod)
+                        put("p_stops", stops)
+                        put("p_idempotency_key", idempotencyKey)
+                    },
+                )
+            }
+            RideCommandType.SUBMIT_OFFER -> {
+                val offerId = payload.offerId.nonBlank() ?: return null
+                val vehicleId = payload.vehicleId.nonBlank() ?: return null
+                val fareMinor = payload.fareMinor?.takeIf { it > 0 } ?: return null
+                val currency = payload.currency.nonBlank() ?: return null
+                RpcInvocation(
+                    functionName = "ride_submit_offer_v2",
+                    parameters = JsonObject(
+                        common + buildJsonObject {
+                            put("p_request_id", rideId)
+                            put("p_offer_id", offerId)
+                            put("p_vehicle_id", vehicleId)
+                            put("p_fare_minor", fareMinor)
+                            put("p_currency", currency)
+                            payload.etaSeconds?.let { put("p_eta_seconds", it) }
+                        },
+                    ),
+                )
+            }
+            RideCommandType.ACCEPT_OFFER -> {
+                val offerId = payload.offerId.nonBlank() ?: return null
+                RpcInvocation(
+                    functionName = "ride_accept_offer_v2",
+                    parameters = JsonObject(
+                        common + mapOf(
+                            "p_request_id" to stringJson(rideId),
+                            "p_offer_id" to stringJson(offerId),
+                        ),
+                    ),
+                )
+            }
             RideCommandType.CLAIM -> {
                 val vehicleId = payload.vehicleId?.takeIf(String::isNotBlank)
                     ?: return null
@@ -263,6 +355,38 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                     common + mapOf("p_trip_id" to stringJson(rideId)),
                 ),
             )
+            RideCommandType.DRIVER_EN_ROUTE,
+            RideCommandType.DRIVER_ARRIVED,
+            RideCommandType.START,
+            -> RpcInvocation(
+                functionName = "ride_driver_transition_v2",
+                parameters = JsonObject(
+                    common + mapOf(
+                        "p_trip_id" to stringJson(rideId),
+                        "p_command_type" to stringJson(type.name),
+                    ),
+                ),
+            )
+            RideCommandType.ISSUE_BOARDING_PIN -> RpcInvocation(
+                functionName = "ride_issue_boarding_pin_v2",
+                parameters = JsonObject(
+                    common + mapOf("p_trip_id" to stringJson(rideId)),
+                ),
+            )
+            RideCommandType.VERIFY_BOARDING_PIN -> {
+                val pin = payload.boardingPin
+                    ?.takeIf { it.matches(Regex("[0-9]{4}")) }
+                    ?: return null
+                RpcInvocation(
+                    functionName = "ride_verify_boarding_pin_v2",
+                    parameters = JsonObject(
+                        common + mapOf(
+                            "p_trip_id" to stringJson(rideId),
+                            "p_pin" to stringJson(pin),
+                        ),
+                    ),
+                )
+            }
             else -> null
         }
     }
@@ -271,6 +395,18 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
         val functionName: String,
         val parameters: JsonObject,
     )
+}
+
+private fun String?.nonBlank(): String? = this?.trim()?.takeIf(String::isNotEmpty)
+
+private fun String?.jsonNumber(): kotlinx.serialization.json.JsonElement? {
+    val normalized = nonBlank() ?: return null
+    if (!normalized.matches(Regex("-?([0-9]+([.][0-9]+)?|[.][0-9]+)"))) {
+        return null
+    }
+    return runCatching {
+        Json.parseToJsonElement(normalized)
+    }.getOrNull()
 }
 
 private fun stringJson(value: String) =

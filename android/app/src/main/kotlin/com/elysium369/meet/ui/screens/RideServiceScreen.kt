@@ -123,6 +123,7 @@ fun RideServiceScreen(
     LaunchedEffect(Unit) {
         permissionsLauncher.launch(permissionsToRequest)
         viewModel.detectCurrentLocation(context)
+        viewModel.startRideProjectionSync()
     }
 
     val driverMode by viewModel.rideDriverMode.collectAsState()
@@ -935,6 +936,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 passengerId = verifiedPassenger.passengerId,
                                 passengerName = verifiedPassenger.fullName,
                                 passengerPhone = verifiedPassenger.phone,
+                                countryCode = gps.countryCode,
                                 pickupLat = gps.latitude,
                                 pickupLng = gps.longitude,
                                 pickupAddr = safePickupAddress,
@@ -1154,13 +1156,17 @@ fun DriverDashboard(viewModel: ObdViewModel) {
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     val driverVer by viewModel.driverVerification.collectAsState()
-    val myDriverId = driverVer?.driverId
+    val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
 
     LaunchedEffect(viewModel) {
         viewModel.rideClaimFeedback.collect { feedback ->
             Toast.makeText(
                 context,
-                if (feedback.won) "🎉 ${feedback.message}" else "⚡ ${feedback.message}",
+                when {
+                    feedback.won -> "🎉 ${feedback.message}"
+                    feedback.pending -> "⏳ ${feedback.message}"
+                    else -> "⚡ ${feedback.message}"
+                },
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -1652,7 +1658,6 @@ fun ActiveRidePanel(
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
     val roadIncidents by viewModel.rideRoadIncidents.collectAsState()
     val speedSamplesByTrip by viewModel.rideSpeedSamples.collectAsState()
-    val boardingPins by viewModel.rideBoardingPins.collectAsState()
 
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
@@ -2058,7 +2063,7 @@ fun ActiveRidePanel(
                     }
                 }
                 if (!isDriver && ride.status in listOf("ACCEPTED", "ARRIVED")) {
-                    boardingPins[ride.requestId]?.let { pin ->
+                    ride.boardingPin?.let { pin ->
                         Surface(
                             color = MeetColors.neonGreen.copy(alpha = 0.12f),
                             border = BorderStroke(1.dp, MeetColors.neonGreen),
@@ -2095,10 +2100,20 @@ fun ActiveRidePanel(
                             "ACCEPTED" -> {
                                 Button(
                                     onClick = { viewModel.updateRideStatus(ride.requestId, "ARRIVED") },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
-                                    Text("Ya Llegué 🚕", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (ride.serverState == "ASSIGNED") {
+                                            "INICIAR RUTA 🚗"
+                                        } else {
+                                            "YA LLEGUÉ 🚕"
+                                        },
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 }
                                 Button(
                                     onClick = { showCancellationDialog = true },
@@ -2111,6 +2126,8 @@ fun ActiveRidePanel(
                             "ARRIVED" -> {
                                 Button(
                                     onClick = { showPinDialog = true },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
@@ -2129,6 +2146,8 @@ fun ActiveRidePanel(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "IN_PROGRESS")
                                     },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -2139,8 +2158,9 @@ fun ActiveRidePanel(
                                 Button(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "COMPLETED")
-                                        showRatingDialog = true
                                     },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -2157,6 +2177,25 @@ fun ActiveRidePanel(
                                 modifier = Modifier.weight(1.2f),
                             ) {
                                 Text("Cancelar solicitud", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (ride.status == "ARRIVED" && ride.boardingPin == null) {
+                            Button(
+                                onClick = {
+                                    viewModel.issueRideBoardingPin(ride.requestId)
+                                },
+                                enabled = ride.syncState != "PENDING" &&
+                                    ride.serverVersion > 0L,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MeetColors.neonGreen,
+                                ),
+                                modifier = Modifier.weight(1.2f),
+                            ) {
+                                Text(
+                                    "GENERAR PIN 🔐",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
                             }
                         }
                         if (ride.status == "COMPLETED" && ride.passengerRating == null) {
