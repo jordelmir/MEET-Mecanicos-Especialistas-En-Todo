@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.elysium369.meet.data.local.dao.*
 import com.elysium369.meet.data.local.entities.*
+import com.elysium369.meet.ride.data.local.RideCommandOutboxDao
+import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
 
 @Database(
     entities = [
@@ -83,6 +85,7 @@ import com.elysium369.meet.data.local.entities.*
         RideRequestEntity::class,
         RideOfferEntity::class,
         RideChatMessageEntity::class,
+        RideCommandOutboxEntity::class,
 
         // IDENTITY VERIFICATION
         DriverVerificationEntity::class,
@@ -118,7 +121,7 @@ import com.elysium369.meet.data.local.entities.*
         ReportSignatureEntity::class,
         DiagnosticSnapshotEntity::class,
     ],
-    version = 43,
+    version = 44,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -163,6 +166,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // MEET RIDES DAO
     abstract fun rideDao(): RideDao
+    abstract fun rideCommandOutboxDao(): RideCommandOutboxDao
 
     // ELYSIUM VANGUARD TELEMETRY DAO
     abstract fun vanguardTelemetryDao(): VanguardTelemetryDao

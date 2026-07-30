@@ -47,6 +47,7 @@ En cada release:
 ```text
 bash tests/ride/verify-ride-migration.sh
 bash tests/ride/verify-ride-command-authority-postgres.sh
+bash tests/ride/verify-ride-android-authority.sh
 bash .codex/skills/meet-rides-improvement-loop/scripts/verify-rides.sh full
 bash tests/parity/ci-verify.sh
 ./gradlew --no-daemon --no-parallel :app:assembleRelease

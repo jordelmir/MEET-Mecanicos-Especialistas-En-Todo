@@ -741,6 +741,89 @@ interface RideDao {
     @Query(
         """
         UPDATE ride_requests
+        SET syncState = 'PENDING'
+        WHERE requestId = :requestId
+          AND syncState != 'SYNCED'
+        """,
+    )
+    suspend fun markCommandPending(requestId: String): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = :legacyStatus,
+            serverState = :serverState,
+            serverVersion = :serverVersion,
+            finalPriceMinor = COALESCE(:finalPriceMinor, finalPriceMinor),
+            syncState = 'SYNCED',
+            lastSyncedAt = :syncedAt,
+            lastCorrelationId = :correlationId
+        WHERE requestId = :requestId
+          AND serverVersion <= :serverVersion
+        """,
+    )
+    suspend fun applyServerProjection(
+        requestId: String,
+        legacyStatus: String,
+        serverState: String,
+        serverVersion: Long,
+        finalPriceMinor: Long?,
+        syncedAt: Long,
+        correlationId: String?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = :legacyStatus,
+            serverState = :serverState,
+            serverVersion = :serverVersion,
+            priceOfferMinor = :offeredFareMinor,
+            finalPriceMinor = :finalFareMinor,
+            assignedDriverId = :assignedDriverId,
+            serverAssignedVehicleId = :assignedVehicleId,
+            syncState = :syncState,
+            lastSyncedAt = :syncedAt,
+            lastCorrelationId = COALESCE(:correlationId, lastCorrelationId)
+        WHERE requestId = :requestId
+          AND serverVersion <= :serverVersion
+        """,
+    )
+    suspend fun reconcileServerSnapshot(
+        requestId: String,
+        legacyStatus: String,
+        serverState: String,
+        serverVersion: Long,
+        offeredFareMinor: Long,
+        finalFareMinor: Long?,
+        assignedDriverId: String?,
+        assignedVehicleId: String?,
+        syncState: String,
+        syncedAt: Long,
+        correlationId: String?,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET syncState = 'CONFLICT',
+            lastSyncedAt = :observedAt,
+            serverVersion = CASE
+                WHEN :currentServerVersion IS NULL THEN serverVersion
+                ELSE MAX(serverVersion, :currentServerVersion)
+            END
+        WHERE requestId = :requestId
+        """,
+    )
+    suspend fun markServerConflict(
+        requestId: String,
+        currentServerVersion: Long?,
+        observedAt: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
         SET status = :newStatus,
             completedAt = :completedAt
         WHERE requestId = :requestId

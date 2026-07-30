@@ -68,3 +68,20 @@ inicia OBD, bases 3D ni trabajos automotrices innecesarios.
 5. Realtime acelera la proyección; catch-up autoritativo repara eventos perdidos.
 6. El mapa distingue una ruta vial confirmada de puntos sin ruta.
 7. Los proveedores externos se encapsulan detrás de interfaces y errores tipados.
+
+## Outbox de comandos
+
+`ride_command_outbox` persiste cada mutación con actor de sesión, versión
+esperada, payload versionado e idempotency key como clave primaria. El worker:
+
+1. exige una sesión Supabase;
+2. recupera leases interrumpidos;
+3. adquiere un lote con transición condicional a `IN_FLIGHT`;
+4. ejecuta únicamente RPC actor-bound soportadas;
+5. almacena ACK, correlation ID o error tipado;
+6. reconcilia la proyección Room desde `ride_requests` bajo RLS;
+7. aplica backoff determinista y dead-letter acotado.
+
+Una mutación pendiente nunca se presenta como éxito remoto. Una versión en
+conflicto deja de reintentarse y exige refrescar el snapshot antes de crear un
+nuevo comando.
