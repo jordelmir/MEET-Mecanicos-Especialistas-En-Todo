@@ -6,9 +6,11 @@ migration="$repo_root/supabase/migrations/20260726010000_ride_platform_foundatio
 ledger_migration="$repo_root/supabase/migrations/20260730010000_ride_double_entry_ledger.sql"
 command_migration="$repo_root/supabase/migrations/20260730020000_ride_command_authority.sql"
 flow_migration="$repo_root/supabase/migrations/20260730030000_ride_passenger_driver_commands.sql"
+enrollment_migration="$repo_root/supabase/migrations/20260730040000_ride_driver_pilot_enrollment.sql"
 
 if [[ ! -f "$migration" || ! -f "$ledger_migration" ||
-      ! -f "$command_migration" || ! -f "$flow_migration" ]]; then
+      ! -f "$command_migration" || ! -f "$flow_migration" ||
+      ! -f "$enrollment_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
@@ -268,6 +270,28 @@ rg -q "'pin', p_pin" "$flow_migration" || {
 }
 rg -q "extensions\\.crypt\\(p_pin" "$flow_migration" || {
   echo "ride migration contract: FAIL (server PIN verification missing)" >&2
+  exit 1
+}
+
+rg -q "create or replace function public\\.ride_enroll_driver_pilot_v2" \
+  "$enrollment_migration" || {
+  echo "ride migration contract: FAIL (pilot enrollment RPC missing)" >&2
+  exit 1
+}
+rg -q "PILOT_EVIDENCE_ATTESTATION" "$enrollment_migration" || {
+  echo "ride migration contract: FAIL (honest pilot authority missing)" >&2
+  exit 1
+}
+rg -q "document_review_status" "$enrollment_migration" || {
+  echo "ride migration contract: FAIL (document review lifecycle missing)" >&2
+  exit 1
+}
+rg -q "pilot_access_expires_at > now" "$enrollment_migration" || {
+  echo "ride migration contract: FAIL (pilot expiry gate missing)" >&2
+  exit 1
+}
+rg -q "ride_guard_dispatch_vehicle" "$enrollment_migration" || {
+  echo "ride migration contract: FAIL (server dispatch guard missing)" >&2
   exit 1
 }
 

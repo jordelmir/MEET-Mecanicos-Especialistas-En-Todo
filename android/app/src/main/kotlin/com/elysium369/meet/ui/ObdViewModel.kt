@@ -79,6 +79,8 @@ import com.elysium369.meet.ride.data.RideCommandRepository
 import com.elysium369.meet.ride.data.RideProjectionRefreshResult
 import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
+import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
+import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
@@ -86,6 +88,8 @@ import com.elysium369.meet.ride.traffic.RideGeoCell
 import com.elysium369.meet.ride.traffic.RideSegmentSpeedSample
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.security.MessageDigest
+import java.time.Instant
 
 @Serializable
 private data class RemotePartsStore(
@@ -293,6 +297,10 @@ private fun PartRequestEntity.toRemote(customerId: String) = RemotePartRequest(
 @Serializable
 private data class RemoteActiveRideVehicle(
     val id: String,
+    @kotlinx.serialization.SerialName("verification_method")
+    val verificationMethod: String = "LEGACY_REVIEW",
+    @kotlinx.serialization.SerialName("pilot_access_expires_at")
+    val pilotAccessExpiresAt: String? = null,
 )
 
 private fun PartsStoreEntity.toRemote(ownerId: String) = RemotePartsStore(
@@ -5979,7 +5987,13 @@ class ObdViewModel @Inject constructor(
         val userId = currentCloudUserId() ?: return null
         return runCatching {
             SupabaseManager.client.postgrest["ride_driver_vehicles"]
-                .select(columns = Columns.list("id")) {
+                .select(
+                    columns = Columns.list(
+                        "id",
+                        "verification_method",
+                        "pilot_access_expires_at",
+                    ),
+                ) {
                     filter {
                         eq("driver_id", userId)
                         eq("is_active", true)
@@ -5988,7 +6002,15 @@ class ObdViewModel @Inject constructor(
                     limit(1)
                 }
                 .decodeList<RemoteActiveRideVehicle>()
-                .firstOrNull()
+                .firstOrNull { vehicle ->
+                    vehicle.verificationMethod != "PILOT_EVIDENCE_ATTESTATION" ||
+                        vehicle.pilotAccessExpiresAt
+                            ?.let { expiresAt ->
+                                runCatching { Instant.parse(expiresAt) }
+                                    .getOrNull()
+                                    ?.isAfter(Instant.now()) == true
+                            } == true
+                }
                 ?.id
         }.getOrNull()
     }
@@ -6775,6 +6797,12 @@ class ObdViewModel @Inject constructor(
                         )
                     }
                 }
+                if (
+                    verification?.status == RideVerificationPolicy.PILOT_APPROVED &&
+                    evaluateDriverEvidence(verification).isReady
+                ) {
+                    enqueueDriverPilotEnrollment(verification)
+                }
             }
             .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
@@ -6865,6 +6893,7 @@ class ObdViewModel @Inject constructor(
         vehicleYear = verification.vehicleYear,
         vehicleColor = verification.vehicleColor,
         vehiclePlate = verification.vehiclePlate,
+        vehicleSeats = verification.vehicleSeats,
         currentYear = Calendar.getInstance().get(Calendar.YEAR),
         files = listOf(
             verificationFileEvidence("license_front", verification.pathLicenciaFront),
@@ -6899,6 +6928,7 @@ class ObdViewModel @Inject constructor(
         vehicleYear: Int,
         vehicleColor: String,
         vehiclePlate: String,
+        vehicleSeats: Int,
         pathLicenciaFront: String,
         pathLicenciaBack: String,
         pathCedulaFront: String,
@@ -6916,6 +6946,22 @@ class ObdViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
+            val evidenceFiles = listOf(
+                verificationFileEvidence("license_front", pathLicenciaFront),
+                verificationFileEvidence("license_back", pathLicenciaBack),
+                verificationFileEvidence("id_front", pathCedulaFront),
+                verificationFileEvidence("id_back", pathCedulaBack),
+                verificationFileEvidence("criminal_record", pathHojaDelincuencia),
+                verificationFileEvidence("marchamo", pathMarchamo),
+                verificationFileEvidence("inspection", pathDekra),
+                verificationFileEvidence("insurance", pathSeguro),
+                verificationFileEvidence("profile", pathSelfieProfile),
+                verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
+                verificationFileEvidence("selfie_with_license", pathSelfieWithLicencia),
+                verificationFileEvidence("vehicle_front", pathVehicleFront),
+                verificationFileEvidence("vehicle_back", pathVehicleBack),
+                verificationFileEvidence("vehicle_interior", pathVehicleInterior),
+            )
             val evidence = RideVerificationEvidencePolicy.evaluateDriver(
                 fullName = fullName,
                 phone = phone,
@@ -6926,23 +6972,9 @@ class ObdViewModel @Inject constructor(
                 vehicleYear = vehicleYear,
                 vehicleColor = vehicleColor,
                 vehiclePlate = vehiclePlate,
+                vehicleSeats = vehicleSeats,
                 currentYear = Calendar.getInstance().get(Calendar.YEAR),
-                files = listOf(
-                    verificationFileEvidence("license_front", pathLicenciaFront),
-                    verificationFileEvidence("license_back", pathLicenciaBack),
-                    verificationFileEvidence("id_front", pathCedulaFront),
-                    verificationFileEvidence("id_back", pathCedulaBack),
-                    verificationFileEvidence("criminal_record", pathHojaDelincuencia),
-                    verificationFileEvidence("marchamo", pathMarchamo),
-                    verificationFileEvidence("inspection", pathDekra),
-                    verificationFileEvidence("insurance", pathSeguro),
-                    verificationFileEvidence("profile", pathSelfieProfile),
-                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
-                    verificationFileEvidence("selfie_with_license", pathSelfieWithLicencia),
-                    verificationFileEvidence("vehicle_front", pathVehicleFront),
-                    verificationFileEvidence("vehicle_back", pathVehicleBack),
-                    verificationFileEvidence("vehicle_interior", pathVehicleInterior),
-                ),
+                files = evidenceFiles,
             )
             val verificationDecision = RideVerificationPolicy.decide(
                 localAutoApprovalEnabled = BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE,
@@ -6970,6 +7002,7 @@ class ObdViewModel @Inject constructor(
                 vehicleYear = vehicleYear,
                 vehicleColor = vehicleColor,
                 vehiclePlate = vehiclePlate,
+                vehicleSeats = vehicleSeats,
                 pathLicenciaFront = pathLicenciaFront,
                 pathLicenciaBack = pathLicenciaBack,
                 pathCedulaFront = pathCedulaFront,
@@ -6990,11 +7023,119 @@ class ObdViewModel @Inject constructor(
                 approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertDriverVerification(entity)
+            enqueueDriverPilotEnrollment(entity, evidenceFiles)
+            _rideVerificationNotice.emit(
+                "Acceso piloto local habilitado. El alta remota quedó en revisión y se sincronizará automáticamente.",
+            )
             android.util.Log.i(
                 "MeetRides",
                 "Driver verification submitted; status=${verificationDecision.status}",
             )
         }
+    }
+
+    private suspend fun enqueueDriverPilotEnrollment(
+        verification: com.elysium369.meet.data.local.entities.DriverVerificationEntity,
+        evidenceFiles: List<VerificationFileEvidence> = listOf(
+            verificationFileEvidence("license_front", verification.pathLicenciaFront),
+            verificationFileEvidence("license_back", verification.pathLicenciaBack),
+            verificationFileEvidence("id_front", verification.pathCedulaFront),
+            verificationFileEvidence("id_back", verification.pathCedulaBack),
+            verificationFileEvidence("criminal_record", verification.pathHojaDelincuencia),
+            verificationFileEvidence("marchamo", verification.pathMarchamo),
+            verificationFileEvidence("inspection", verification.pathDekra),
+            verificationFileEvidence("insurance", verification.pathSeguro),
+            verificationFileEvidence("profile", verification.pathSelfieProfile),
+            verificationFileEvidence("selfie_with_id", verification.pathSelfieWithCedula),
+            verificationFileEvidence("selfie_with_license", verification.pathSelfieWithLicencia),
+            verificationFileEvidence("vehicle_front", verification.pathVehicleFront),
+            verificationFileEvidence("vehicle_back", verification.pathVehicleBack),
+            verificationFileEvidence("vehicle_interior", verification.pathVehicleInterior),
+        ),
+    ) {
+        val evidenceManifest = buildDriverEvidenceManifestSha256(
+            verification = verification,
+            evidenceFiles = evidenceFiles,
+        )
+        val countryCode = _currentGpsLocation.value?.countryCode
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it.matches(Regex("[A-Z]{2}")) }
+            ?: "CR"
+        val currency = if (countryCode == "CR") "CRC" else "USD"
+        RideDriverEnrollmentWorker.enqueue(
+            context = context,
+            enrollment = RideDriverPilotEnrollment(
+                driverDisplayName = verification.fullName.trim(),
+                countryCode = countryCode,
+                currency = currency,
+                vehicleReference = sha256Hex(
+                    listOf(
+                        "vehicle",
+                        verification.vehicleMake.trim().uppercase(),
+                        verification.vehicleModel.trim().uppercase(),
+                        verification.vehicleYear.toString(),
+                        verification.vehiclePlate.trim().uppercase(),
+                    ).joinToString("|").toByteArray(),
+                ),
+                vehicleDisplayName = listOf(
+                    verification.vehicleMake.trim(),
+                    verification.vehicleModel.trim(),
+                    verification.vehicleYear.toString(),
+                    verification.vehicleColor.trim(),
+                ).joinToString(" "),
+                seats = verification.vehicleSeats,
+                evidenceManifestSha256 = evidenceManifest,
+            ),
+        )
+    }
+
+    private suspend fun buildDriverEvidenceManifestSha256(
+        verification: com.elysium369.meet.data.local.entities.DriverVerificationEntity,
+        evidenceFiles: List<VerificationFileEvidence>,
+    ): String = withContext(Dispatchers.IO) {
+        val manifestDigest = MessageDigest.getInstance("SHA-256")
+        fun append(value: String) {
+            manifestDigest.update(value.toByteArray(Charsets.UTF_8))
+            manifestDigest.update(0)
+        }
+        append("meet-rides-driver-evidence-v1")
+        append(verification.fullName.trim())
+        append(verification.dateOfBirth.trim())
+        append(verification.vehicleMake.trim())
+        append(verification.vehicleModel.trim())
+        append(verification.vehicleYear.toString())
+        append(verification.vehicleColor.trim())
+        append(verification.vehiclePlate.trim())
+        append(verification.vehicleSeats.toString())
+        evidenceFiles.sortedBy(VerificationFileEvidence::label).forEach { evidence ->
+            append(evidence.label)
+            append(evidence.byteCount.toString())
+            val file = java.io.File(evidence.path)
+            val contentHash = if (file.isFile) {
+                file.inputStream().buffered().use { input ->
+                    val fileDigest = MessageDigest.getInstance("SHA-256")
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        fileDigest.update(buffer, 0, read)
+                    }
+                    fileDigest.digest().toHex()
+                }
+            } else {
+                "missing"
+            }
+            append(contentHash)
+        }
+        manifestDigest.digest().toHex()
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
+
+    private fun ByteArray.toHex(): String = joinToString("") { byte ->
+        (byte.toInt() and 0xff).toString(16).padStart(2, '0')
     }
 
     /**

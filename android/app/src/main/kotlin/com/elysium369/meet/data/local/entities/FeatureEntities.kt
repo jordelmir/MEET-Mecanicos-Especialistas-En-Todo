@@ -465,6 +465,7 @@ data class DriverVerificationEntity(
     val vehicleYear: Int,                       // Año
     val vehicleColor: String,                   // Color
     val vehiclePlate: String,                   // Placa
+    val vehicleSeats: Int = 1,                  // Capacidad declarada; nunca inferida
     // ── Mandatory Documents (local file paths) ──
     val pathLicenciaFront: String,              // Licencia de conducir — frente
     val pathLicenciaBack: String,               // Licencia de conducir — reverso

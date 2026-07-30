@@ -3163,6 +3163,17 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_45_46 = object : Migration(45, 46) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Existing records have no trustworthy capacity source. One seat
+            // is the conservative fallback until the driver edits onboarding.
+            db.execSQL(
+                "ALTER TABLE driver_verifications " +
+                    "ADD COLUMN vehicleSeats INTEGER NOT NULL DEFAULT 1"
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3195,7 +3206,8 @@ object AppModule {
             MIGRATION_41_42,
             MIGRATION_42_43,
             MIGRATION_43_44,
-            MIGRATION_44_45
+            MIGRATION_44_45,
+            MIGRATION_45_46
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3388,6 +3400,12 @@ object AppModule {
     fun provideRideCommandGateway(
         gateway: com.elysium369.meet.ride.data.remote.SupabaseRideCommandGateway
     ): com.elysium369.meet.ride.data.remote.RideCommandGateway = gateway
+
+    @Provides
+    @Singleton
+    fun provideRideDriverEnrollmentGateway(
+        gateway: com.elysium369.meet.ride.data.remote.SupabaseRideDriverEnrollmentGateway
+    ): com.elysium369.meet.ride.data.remote.RideDriverEnrollmentGateway = gateway
 
     @Provides
     fun provideVanguardTelemetryDao(db: MeetDatabase): VanguardTelemetryDao = db.vanguardTelemetryDao()

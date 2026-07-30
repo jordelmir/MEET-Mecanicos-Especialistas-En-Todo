@@ -8,9 +8,14 @@ entity="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/loc
 dao="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/local/RideCommandOutboxDao.kt"
 gateway="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/remote/RideCommandGateway.kt"
 worker="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/work/RideCommandSyncWorker.kt"
+enrollment_worker="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/work/RideDriverEnrollmentWorker.kt"
+enrollment_gateway="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/remote/RideDriverEnrollmentGateway.kt"
 projection="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/RideRemoteProjectionRepository.kt"
 
-required_files=("$database" "$module" "$entity" "$dao" "$gateway" "$worker" "$projection")
+required_files=(
+  "$database" "$module" "$entity" "$dao" "$gateway" "$worker" "$projection"
+  "$enrollment_worker" "$enrollment_gateway"
+)
 for path in "${required_files[@]}"; do
   [[ -f "$path" ]] || {
     echo "ride Android authority contract: FAIL (missing $path)" >&2
@@ -18,12 +23,16 @@ for path in "${required_files[@]}"; do
   }
 done
 
-rg -q "version = 45" "$database" || {
+rg -q "version = 46" "$database" || {
   echo "ride Android authority contract: FAIL (Room version not advanced)" >&2
   exit 1
 }
 rg -q "MIGRATION_44_45" "$module" || {
   echo "ride Android authority contract: FAIL (Room migration missing)" >&2
+  exit 1
+}
+rg -q "MIGRATION_45_46" "$module" || {
+  echo "ride Android authority contract: FAIL (driver capacity migration missing)" >&2
   exit 1
 }
 rg -q 'CREATE TABLE IF NOT EXISTS `ride_command_outbox`' "$module" || {
@@ -94,6 +103,19 @@ rg -q "RemoteRideOfferProjection" "$projection" || {
 }
 rg -q 'table = "ride_offers"' "$projection" || {
   echo "ride Android authority contract: FAIL (offer Realtime wake-up missing)" >&2
+  exit 1
+}
+rg -q "ride_enroll_driver_pilot_v2" "$enrollment_gateway" || {
+  echo "ride Android authority contract: FAIL (pilot enrollment gateway missing)" >&2
+  exit 1
+}
+rg -Fq "setRequiredNetworkType(NetworkType.CONNECTED)" "$enrollment_worker" || {
+  echo "ride Android authority contract: FAIL (durable enrollment delivery missing)" >&2
+  exit 1
+}
+rg -q "PILOT_EVIDENCE_ATTESTATION" "$projection" \
+  "$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt" || {
+  echo "ride Android authority contract: FAIL (pilot expiry read guard missing)" >&2
   exit 1
 }
 
