@@ -13,10 +13,12 @@ enrollment_gateway="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/r
 projection="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/RideRemoteProjectionRepository.kt"
 routing="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/map/RideRouting.kt"
 map_factory="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/map/RideMapStateFactory.kt"
+ride_screen="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/RideServiceScreen.kt"
 
 required_files=(
   "$database" "$module" "$entity" "$dao" "$gateway" "$worker" "$projection"
   "$enrollment_worker" "$enrollment_gateway" "$routing" "$map_factory"
+  "$ride_screen"
 )
 for path in "${required_files[@]}"; do
   [[ -f "$path" ]] || {
@@ -75,7 +77,9 @@ for rpc in \
   ride_issue_boarding_pin_v2 \
   ride_verify_boarding_pin_v2 \
   ride_cancel_trip_v2 \
-  ride_complete_trip_v2
+  ride_complete_trip_v2 \
+  ride_signal_safety_v2 \
+  ride_open_support_case_v2
 do
   rg -q "\"${rpc}\"" "$gateway" || {
     echo "ride Android authority contract: FAIL (missing RPC $rpc)" >&2
@@ -126,6 +130,11 @@ rg -q "geometries=geojson" "$routing" || {
 }
 if rg -q "listOf\\(pickup\\).*destination" "$map_factory"; then
   echo "ride Android authority contract: FAIL (straight-line route fallback restored)" >&2
+  exit 1
+fi
+if rg -Fq 'Uri.parse("tel:' "$ride_screen" ||
+   rg -Fq 'Teléfono: ${ride.passengerPhone}' "$ride_screen"; then
+  echo "ride Android authority contract: FAIL (raw participant phone exposed)" >&2
   exit 1
 fi
 

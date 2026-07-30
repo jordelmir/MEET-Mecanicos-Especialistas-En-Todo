@@ -13,15 +13,18 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.6.6
+## Versión actual: 4.7.0
 
-La versión 4.6.6 conserva el universo técnico 3D/360, los perfiles y la
-búsqueda real de Viajes de 4.6.0, el endurecimiento de datos de 4.6.1 y el
-formato regional reactivo de 4.6.2. Además reduce asignaciones innecesarias en
-estado Compose de Viajes y garantiza que la aceptación de una oferta sea
-atómica. El ciclo de vida persistido también queda protegido contra acciones
-atrasadas y estados saltados; ahora cada cancelación y transición crítica queda
-ligada al pasajero propietario o al conductor realmente asignado.
+La versión 4.7.0 convierte Viajes en un vertical distribuido verificable:
+PostgreSQL es autoridad de asignación, PIN, ciclo de vida y comisión; Room es
+proyección y outbox. Implementa dinero entero, comisión exacta de 500 basis
+points, ledger de doble entrada, concurso transaccional, flujo pasajero/chofer,
+routing vial, Realtime recuperable, alta piloto honesta, Elysium Guardian,
+casos de soporte, aislamiento tenant y observabilidad sin PII.
+
+El flujo no inventa ruta, verificación, saldo, contacto con autoridades ni
+éxito remoto. La app ya no revela teléfonos reales durante el viaje y redacta
+el payload sensible del outbox después del acuse del servidor.
 
 El Atlas G4ED cubre un universo técnico de 6.405
 experiencias 3D/360 offline: 420 elementos de motor y 5.985 elementos de
@@ -62,6 +65,7 @@ Documentación técnica:
 - [`docs/releases/2026-07-29-android-4.6.4-rides-atomic-offer-acceptance.md`](docs/releases/2026-07-29-android-4.6.4-rides-atomic-offer-acceptance.md)
 - [`docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md`](docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md)
 - [`docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md`](docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md)
+- [`docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md`](docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md)
 
 ## Que es real hoy
 

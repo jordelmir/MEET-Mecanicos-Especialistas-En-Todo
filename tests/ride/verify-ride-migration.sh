@@ -7,13 +7,50 @@ ledger_migration="$repo_root/supabase/migrations/20260730010000_ride_double_entr
 command_migration="$repo_root/supabase/migrations/20260730020000_ride_command_authority.sql"
 flow_migration="$repo_root/supabase/migrations/20260730030000_ride_passenger_driver_commands.sql"
 enrollment_migration="$repo_root/supabase/migrations/20260730040000_ride_driver_pilot_enrollment.sql"
+guardian_migration="$repo_root/supabase/migrations/20260730050000_ride_guardian_safety.sql"
+support_migration="$repo_root/supabase/migrations/20260730060000_ride_support_cases.sql"
+tenant_migration="$repo_root/supabase/migrations/20260730070000_ride_tenant_boundary.sql"
 
 if [[ ! -f "$migration" || ! -f "$ledger_migration" ||
       ! -f "$command_migration" || ! -f "$flow_migration" ||
-      ! -f "$enrollment_migration" ]]; then
+      ! -f "$enrollment_migration" || ! -f "$guardian_migration" ||
+      ! -f "$support_migration" || ! -f "$tenant_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
+
+rg -q "create table if not exists public\\.ride_safety_events" \
+  "$guardian_migration" || {
+  echo "ride migration contract: FAIL (Guardian events missing)" >&2
+  exit 1
+}
+rg -q "function public\\.ride_signal_safety_v2" "$guardian_migration" || {
+  echo "ride migration contract: FAIL (Guardian RPC missing)" >&2
+  exit 1
+}
+rg -q "authorities_contacted boolean not null default false" \
+  "$guardian_migration" || {
+  echo "ride migration contract: FAIL (Guardian authority honesty missing)" >&2
+  exit 1
+}
+rg -q "create table if not exists public\\.ride_support_cases" \
+  "$support_migration" || {
+  echo "ride migration contract: FAIL (support cases missing)" >&2
+  exit 1
+}
+rg -q "function public\\.ride_open_support_case_v2" "$support_migration" || {
+  echo "ride migration contract: FAIL (support RPC missing)" >&2
+  exit 1
+}
+rg -q "create table if not exists public\\.ride_tenants" \
+  "$tenant_migration" || {
+  echo "ride migration contract: FAIL (tenant boundary missing)" >&2
+  exit 1
+}
+rg -q "RIDE_TENANT_MISMATCH" "$tenant_migration" || {
+  echo "ride migration contract: FAIL (tenant assignment guard missing)" >&2
+  exit 1
+}
 
 required_tables=(
   ride_profiles
