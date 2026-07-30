@@ -3,8 +3,9 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 migration="$repo_root/supabase/migrations/20260726010000_ride_platform_foundation.sql"
+ledger_migration="$repo_root/supabase/migrations/20260730010000_ride_double_entry_ledger.sql"
 
-if [[ ! -f "$migration" ]]; then
+if [[ ! -f "$migration" || ! -f "$ledger_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
@@ -88,6 +89,54 @@ rg -q "raise exception 'Ride transition denied'" "$migration" || {
 }
 rg -q "500::numeric / 10000::numeric" "$migration" || {
   echo "ride migration contract: FAIL (exact 5 percent computation missing)" >&2
+  exit 1
+}
+
+double_entry_tables=(
+  ride_ledger_transactions
+  ride_ledger_postings
+  ride_commission_calculations
+  ride_revenue_split_rule_sets
+  ride_revenue_split_rules
+)
+
+for table in "${double_entry_tables[@]}"; do
+  rg -q "create table if not exists public\\.${table}" "$ledger_migration" || {
+    echo "ride migration contract: FAIL (missing double-entry table $table)" >&2
+    exit 1
+  }
+  rg -q "alter table public\\.${table} enable row level security" "$ledger_migration" || {
+    echo "ride migration contract: FAIL (RLS missing for $table)" >&2
+    exit 1
+  }
+  rg -q "revoke all on public\\.${table} from anon, authenticated" "$ledger_migration" || {
+    echo "ride migration contract: FAIL (client access not revoked for $table)" >&2
+    exit 1
+  }
+done
+
+rg -q "create constraint trigger ride_ledger_postings_balance" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (deferred journal balance missing)" >&2
+  exit 1
+}
+rg -q "v_signed_total <> 0" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (journal equality check missing)" >&2
+  exit 1
+}
+rg -q "create constraint trigger ride_revenue_split_rules_total" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (revenue split total guard missing)" >&2
+  exit 1
+}
+rg -q "v_total <> 500" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (exact 500 bps split missing)" >&2
+  exit 1
+}
+rg -q "create trigger ride_wallet_ledger_double_entry_mirror" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (legacy wallet mirror missing)" >&2
+  exit 1
+}
+rg -q "source_entry_id" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (ledger backfill provenance missing)" >&2
   exit 1
 }
 
