@@ -3050,6 +3050,130 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_43_44 = object : Migration(43, 44) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `priceOfferMinor` INTEGER NOT NULL DEFAULT 0"
+            )
+            db.execSQL(
+                """
+                UPDATE `ride_requests`
+                SET `priceOfferMinor` = CAST(
+                    ROUND(
+                        CASE
+                            WHEN UPPER(`currency`) = 'CRC' THEN `priceOffer`
+                            ELSE `priceOffer` * 100.0
+                        END
+                    ) AS INTEGER
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `finalPriceMinor` INTEGER"
+            )
+            db.execSQL(
+                """
+                UPDATE `ride_requests`
+                SET `finalPriceMinor` = CASE
+                    WHEN `finalPrice` IS NULL THEN NULL
+                    ELSE CAST(
+                        ROUND(
+                            CASE
+                                WHEN UPPER(`currency`) = 'CRC' THEN `finalPrice`
+                                ELSE `finalPrice` * 100.0
+                            END
+                        ) AS INTEGER
+                    )
+                END
+                """.trimIndent()
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `serverState` TEXT"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `serverVersion` INTEGER NOT NULL DEFAULT 0"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `serverAssignedVehicleId` TEXT"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `syncState` TEXT NOT NULL DEFAULT 'LOCAL_ONLY'"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `lastSyncedAt` INTEGER"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `lastCorrelationId` TEXT"
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `ride_command_outbox` (
+                    `idempotencyKey` TEXT NOT NULL,
+                    `rideId` TEXT NOT NULL,
+                    `actorSessionUserId` TEXT NOT NULL,
+                    `commandType` TEXT NOT NULL,
+                    `expectedVersion` INTEGER NOT NULL,
+                    `payloadVersion` INTEGER NOT NULL,
+                    `payloadJson` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `attemptCount` INTEGER NOT NULL,
+                    `nextAttemptAt` INTEGER NOT NULL,
+                    `leaseStartedAt` INTEGER,
+                    `lastErrorCode` TEXT,
+                    `lastErrorMessage` TEXT,
+                    `correlationId` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`idempotencyKey`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS
+                `index_ride_command_outbox_rideId_createdAt`
+                ON `ride_command_outbox` (`rideId`, `createdAt`)
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS
+                `index_ride_command_outbox_status_nextAttemptAt`
+                ON `ride_command_outbox` (`status`, `nextAttemptAt`)
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS
+                `index_ride_command_outbox_actorSessionUserId_status`
+                ON `ride_command_outbox` (`actorSessionUserId`, `status`)
+                """.trimIndent()
+            )
+        }
+    }
+
+    private val MIGRATION_44_45 = object : Migration(44, 45) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `boardingPin` TEXT"
+            )
+            db.execSQL(
+                "ALTER TABLE `ride_requests` ADD COLUMN `boardingPinExpiresAt` INTEGER"
+            )
+        }
+    }
+
+    private val MIGRATION_45_46 = object : Migration(45, 46) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Existing records have no trustworthy capacity source. One seat
+            // is the conservative fallback until the driver edits onboarding.
+            db.execSQL(
+                "ALTER TABLE driver_verifications " +
+                    "ADD COLUMN vehicleSeats INTEGER NOT NULL DEFAULT 1"
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3080,7 +3204,10 @@ object AppModule {
             MIGRATION_39_40,
             MIGRATION_40_41,
             MIGRATION_41_42,
-            MIGRATION_42_43
+            MIGRATION_42_43,
+            MIGRATION_43_44,
+            MIGRATION_44_45,
+            MIGRATION_45_46
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3261,6 +3388,24 @@ object AppModule {
 
     @Provides
     fun provideRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.RideDao = db.rideDao()
+
+    @Provides
+    fun provideRideCommandOutboxDao(
+        db: MeetDatabase
+    ): com.elysium369.meet.ride.data.local.RideCommandOutboxDao =
+        db.rideCommandOutboxDao()
+
+    @Provides
+    @Singleton
+    fun provideRideCommandGateway(
+        gateway: com.elysium369.meet.ride.data.remote.SupabaseRideCommandGateway
+    ): com.elysium369.meet.ride.data.remote.RideCommandGateway = gateway
+
+    @Provides
+    @Singleton
+    fun provideRideDriverEnrollmentGateway(
+        gateway: com.elysium369.meet.ride.data.remote.SupabaseRideDriverEnrollmentGateway
+    ): com.elysium369.meet.ride.data.remote.RideDriverEnrollmentGateway = gateway
 
     @Provides
     fun provideVanguardTelemetryDao(db: MeetDatabase): VanguardTelemetryDao = db.vanguardTelemetryDao()

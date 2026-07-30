@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +40,8 @@ import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
 import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideConsentPolicy
+import com.elysium369.meet.ride.domain.RideGuardianPolicy
+import com.elysium369.meet.ride.domain.RideSafetySignalType
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
@@ -338,6 +341,140 @@ fun RideCancellationDialog(
             }
         },
     )
+}
+
+@Composable
+fun RideGuardianDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (RideSafetySignalType, String?) -> Unit,
+    onShareTrip: () -> Unit,
+    onOpenEmergencyDialer: () -> Unit,
+) {
+    var selected by remember { mutableStateOf<RideSafetySignalType?>(null) }
+    var detail by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF071019),
+        title = {
+            Column {
+                Text(
+                    "ELYSIUM GUARDIAN",
+                    color = Color(0xFFFF496C),
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Seguridad prioritaria del viaje",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .height(480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Selecciona la señal real. Se registrará para revisión humana; esta acción no llama automáticamente a policías, emergencias ni contactos.",
+                    color = MeetColors.warning,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                )
+                RideSafetySignalType.entries.forEach { type ->
+                    val severity = RideGuardianPolicy.severity(type)
+                    OutlinedButton(
+                        onClick = { selected = type },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            when {
+                                selected == type -> Color(0xFFFF496C)
+                                severity == "CRITICAL" -> Color(0xFFFF496C).copy(alpha = 0.6f)
+                                severity == "URGENT" -> MeetColors.warning.copy(alpha = 0.55f)
+                                else -> MeetColors.borderSubtle
+                            },
+                        ),
+                    ) {
+                        Text(
+                            "${type.guardianLabel()} · ${severity.guardianSeverityLabel()}",
+                            color = if (severity == "CRITICAL") Color(0xFFFF6B81) else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = detail,
+                    onValueChange = { detail = it.take(500) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Detalle privado opcional") },
+                    supportingText = { Text("${detail.length}/500") },
+                    minLines = 2,
+                )
+                HorizontalDivider(color = MeetColors.borderSubtle)
+                OutlinedButton(
+                    onClick = onShareTrip,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text("COMPARTIR ESTADO DEL VIAJE", fontWeight = FontWeight.Black)
+                }
+                OutlinedButton(
+                    onClick = onOpenEmergencyDialer,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF496C)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF6B81)),
+                ) {
+                    Text("ABRIR MARCADOR DE EMERGENCIA", fontWeight = FontWeight.Black)
+                }
+                Text(
+                    "El marcador se abre vacío: la persona decide el número y confirma la llamada según su ubicación.",
+                    color = MeetColors.textMuted,
+                    fontSize = 9.sp,
+                    lineHeight = 13.sp,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    selected?.let { type ->
+                        onConfirm(type, detail.trim().takeIf(String::isNotEmpty))
+                    }
+                },
+                enabled = selected != null,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD41445)),
+            ) {
+                Text("REGISTRAR SEÑAL", fontWeight = FontWeight.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("VOLVER")
+            }
+        },
+    )
+}
+
+private fun RideSafetySignalType.guardianLabel(): String = when (this) {
+    RideSafetySignalType.SOS -> "SOS"
+    RideSafetySignalType.CHECK_IN_REQUEST -> "Solicitar check-in"
+    RideSafetySignalType.ROUTE_DEVIATION -> "Desvío inesperado"
+    RideSafetySignalType.LONG_STOP -> "Parada prolongada"
+    RideSafetySignalType.POSSIBLE_COLLISION -> "Posible colisión"
+    RideSafetySignalType.SIGNAL_LOSS -> "Pérdida de señal"
+    RideSafetySignalType.VEHICLE_MISMATCH -> "Vehículo no coincide"
+    RideSafetySignalType.PERSON_MISMATCH -> "Persona no coincide"
+    RideSafetySignalType.HARASSMENT -> "Acoso o conducta peligrosa"
+    RideSafetySignalType.MEDICAL_CONCERN -> "Situación médica"
+}
+
+private fun String.guardianSeverityLabel(): String = when (this) {
+    "CRITICAL" -> "CRÍTICO"
+    "URGENT" -> "URGENTE"
+    else -> "VERIFICAR"
 }
 
 private fun RideShareCategory.rideLabel(): String =

@@ -34,8 +34,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "4.6.6"
+        versionCode = 32
+        versionName = "4.7.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -85,6 +85,11 @@ android {
             "https://photon.komoot.io/api/",
         )
         buildConfigField("String", "RIDE_GEOCODER_URL", "\"$rideGeocoderUrl\"")
+        val rideRouterUrl = localProps.getProperty(
+            "RIDE_ROUTER_URL",
+            "https://router.project-osrm.org",
+        )
+        buildConfigField("String", "RIDE_ROUTER_URL", "\"$rideRouterUrl\"")
 
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
@@ -191,6 +196,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:storage-kt:2.2.3")
+    implementation("io.github.jan-tennert.supabase:realtime-kt:2.2.3")
     implementation(platform("io.ktor:ktor-bom:2.3.13"))
     implementation("io.ktor:ktor-client-android")
     implementation("io.ktor:ktor-client-okhttp")

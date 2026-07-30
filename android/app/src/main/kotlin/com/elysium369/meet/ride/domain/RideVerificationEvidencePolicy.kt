@@ -52,6 +52,7 @@ object RideVerificationEvidencePolicy {
         vehicleYear: Int,
         vehicleColor: String,
         vehiclePlate: String,
+        vehicleSeats: Int,
         currentYear: Int,
         files: List<VerificationFileEvidence>,
     ): RideVerificationEvidenceResult {
@@ -63,6 +64,7 @@ object RideVerificationEvidencePolicy {
         if (vehicleModel.isBlank()) issues += "MISSING_VEHICLE_MODEL"
         if (vehicleColor.isBlank()) issues += "MISSING_VEHICLE_COLOR"
         if (vehiclePlate.isBlank()) issues += "MISSING_VEHICLE_PLATE"
+        if (vehicleSeats !in 1..16) issues += "INVALID_VEHICLE_SEATS"
         if (vehicleYear !in 1900..(currentYear + 1)) issues += "INVALID_VEHICLE_YEAR"
         validateFiles(
             files = files,

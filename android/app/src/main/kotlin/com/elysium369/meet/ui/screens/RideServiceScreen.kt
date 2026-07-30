@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,7 +60,10 @@ import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideMapStateFactory
 import com.elysium369.meet.ride.map.RideMapMarker
 import com.elysium369.meet.ride.map.RideMarkerRole
+import com.elysium369.meet.ride.map.OsrmRideRoutingProvider
+import com.elysium369.meet.ride.map.RideRoadRoute
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
+import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
 import com.elysium369.meet.ride.traffic.RideCollaborativeEtaEstimator
@@ -74,6 +76,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -123,10 +126,17 @@ fun RideServiceScreen(
     LaunchedEffect(Unit) {
         permissionsLauncher.launch(permissionsToRequest)
         viewModel.detectCurrentLocation(context)
+        viewModel.startRideProjectionSync()
+    }
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.stopRideProjectionSync()
+        }
     }
 
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
+    val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
     var showProfile by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -153,6 +163,13 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        Text(
+                            text = projectionConnectionState.rideProjectionStatusLabel(),
+                            color = projectionConnectionState.rideProjectionStatusColor(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
                         IconButton(onClick = { showProfile = true }) {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
@@ -216,6 +233,24 @@ fun RideServiceScreen(
     }
 }
 
+private fun RideProjectionConnectionState.rideProjectionStatusLabel(): String =
+    when (this) {
+        RideProjectionConnectionState.IDLE -> "LOCAL"
+        RideProjectionConnectionState.CONNECTING -> "CONECTANDO"
+        RideProjectionConnectionState.LIVE -> "EN VIVO"
+        RideProjectionConnectionState.RECOVERING -> "RECUPERANDO"
+        RideProjectionConnectionState.AUTHENTICATION_REQUIRED -> "SIN SESIÓN"
+    }
+
+private fun RideProjectionConnectionState.rideProjectionStatusColor(): Color =
+    when (this) {
+        RideProjectionConnectionState.LIVE -> MeetColors.neonGreen
+        RideProjectionConnectionState.CONNECTING,
+        RideProjectionConnectionState.RECOVERING -> MeetColors.warning
+        RideProjectionConnectionState.IDLE,
+        RideProjectionConnectionState.AUTHENTICATION_REQUIRED -> MeetColors.textMuted
+    }
+
 private fun rideGeoPointOrNull(
     latitude: Double,
     longitude: Double,
@@ -250,6 +285,12 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     val placeSearchProvider = remember {
         PhotonRidePlaceSearchProvider(BuildConfig.RIDE_GEOCODER_URL)
     }
+    val routingProvider = remember {
+        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+    }
+    var previewRoadRoute by remember { mutableStateOf<RideRoadRoute?>(null) }
+    var routeSearchLoading by remember { mutableStateOf(false) }
+    var routeSearchFailed by remember { mutableStateOf(false) }
     val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
     var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
 
@@ -299,6 +340,57 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
             .sortedBy { it.distanceKmFrom(currentGps?.latitude, currentGps?.longitude) ?: Double.MAX_VALUE }
         destinationSearchFailed = searchResult.isFailure
         destinationSearchLoading = false
+    }
+
+    LaunchedEffect(
+        currentGps?.latitude,
+        currentGps?.longitude,
+        destinationPlaceId,
+        destLatitude,
+        destLongitude,
+        stops,
+    ) {
+        val gps = currentGps
+        val resolvedStops = stops.mapNotNull { stop ->
+            if (!stop.isResolved) null else rideGeoPointOrNull(
+                latitude = requireNotNull(stop.latitude),
+                longitude = requireNotNull(stop.longitude),
+                accuracyMeters = null,
+                capturedAtEpochMs = System.currentTimeMillis(),
+            )
+        }
+        if (
+            gps == null ||
+            destinationPlaceId == null ||
+            (destLatitude == 0.0 && destLongitude == 0.0) ||
+            resolvedStops.size != stops.size
+        ) {
+            previewRoadRoute = null
+            routeSearchLoading = false
+            routeSearchFailed = false
+            return@LaunchedEffect
+        }
+        val pickup = rideGeoPointOrNull(
+            latitude = gps.latitude,
+            longitude = gps.longitude,
+            accuracyMeters = gps.accuracy,
+            capturedAtEpochMs = gps.timestamp.coerceAtLeast(0L),
+        )
+        val destination = rideGeoPointOrNull(
+            latitude = destLatitude,
+            longitude = destLongitude,
+            accuracyMeters = null,
+            capturedAtEpochMs = System.currentTimeMillis(),
+        )
+        if (pickup == null || destination == null) return@LaunchedEffect
+        routeSearchLoading = true
+        routeSearchFailed = false
+        val result = runCatching {
+            routingProvider.route(listOf(pickup) + resolvedStops + destination)
+        }
+        previewRoadRoute = result.getOrNull()
+        routeSearchFailed = result.isFailure
+        routeSearchLoading = false
     }
 
     LazyColumn(
@@ -775,6 +867,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         null,
                         System.currentTimeMillis(),
                     ),
+                    route = previewRoadRoute?.geometry,
                 )
                 Card(
                     Modifier.fillMaxWidth().height(280.dp),
@@ -783,6 +876,23 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 ) {
                     RideMapPanel(state = previewState, modifier = Modifier.fillMaxSize())
                 }
+                Text(
+                    text = when {
+                        routeSearchLoading -> "Calculando ruta vial real…"
+                        previewRoadRoute != null -> {
+                            val route = requireNotNull(previewRoadRoute)
+                            val km = route.distanceMeters / 1_000.0
+                            val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                            "Ruta vial: ${String.format(currentLocale, "%.1f", km)} km · $minutes min · ${route.attribution}"
+                        }
+                        routeSearchFailed ->
+                            "Ruta vial no disponible. No se dibujará una línea falsa ni se inventará un ETA."
+                        else -> "Selecciona destino y paradas para calcular la ruta vial."
+                    },
+                    color = if (routeSearchFailed) MeetColors.warning else MeetColors.textMuted,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                )
             }
         }
 
@@ -921,20 +1031,22 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             // (RISK-3 GPS leak: lat/lon no debe ir en strings user-facing).
                             val safePickupAddress = sanitizeGpsAddress(gps.addressName)
 
-                            // Calcular distancia estimada simple (Haversine).
-                            // Si el usuario no ingreso destino, distancia = 0 (no usamos
-                            // el truco "+0.05" que filtra coords raw).
-                            val distance = if (destLatitude != 0.0 && destLongitude != 0.0) {
-                                calculateDistance(
-                                    gps.latitude, gps.longitude,
-                                    destLatitude, destLongitude
-                                )
-                            } else 0.0
+                            val distance = previewRoadRoute
+                                ?.distanceMeters
+                                ?.div(1_000.0)
+                                ?: 0.0
+                            val durationMinutes = previewRoadRoute
+                                ?.durationSeconds
+                                ?.div(60.0)
+                                ?.let { kotlin.math.ceil(it) }
+                                ?.toInt()
+                                ?: 0
 
                             viewModel.createRideRequest(
                                 passengerId = verifiedPassenger.passengerId,
                                 passengerName = verifiedPassenger.fullName,
                                 passengerPhone = verifiedPassenger.phone,
+                                countryCode = gps.countryCode,
                                 pickupLat = gps.latitude,
                                 pickupLng = gps.longitude,
                                 pickupAddr = safePickupAddress,
@@ -945,7 +1057,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 priceOffer = if (isUsd) offerPrice / 500.0 else offerPrice,
                                 currency = if (isUsd) "USD" else "CRC",
                                 estDistance = distance,
-                                estDuration = (distance * 2.5).toInt().coerceAtLeast(3),
+                                estDuration = durationMinutes,
                                 stopsJson = Json.encodeToString(stops),
                                 paymentMethod = paymentMethod.name,
                             )
@@ -1154,13 +1266,17 @@ fun DriverDashboard(viewModel: ObdViewModel) {
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     val driverVer by viewModel.driverVerification.collectAsState()
-    val myDriverId = driverVer?.driverId
+    val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
 
     LaunchedEffect(viewModel) {
         viewModel.rideClaimFeedback.collect { feedback ->
             Toast.makeText(
                 context,
-                if (feedback.won) "🎉 ${feedback.message}" else "⚡ ${feedback.message}",
+                when {
+                    feedback.won -> "🎉 ${feedback.message}"
+                    feedback.pending -> "⏳ ${feedback.message}"
+                    else -> "⚡ ${feedback.message}"
+                },
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -1652,11 +1768,11 @@ fun ActiveRidePanel(
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
     val roadIncidents by viewModel.rideRoadIncidents.collectAsState()
     val speedSamplesByTrip by viewModel.rideSpeedSamples.collectAsState()
-    val boardingPins by viewModel.rideBoardingPins.collectAsState()
 
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
     var showCancellationDialog by remember { mutableStateOf(false) }
+    var showGuardianDialog by remember { mutableStateOf(false) }
     var showRoadReportDialog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -1676,6 +1792,11 @@ fun ActiveRidePanel(
 
     LaunchedEffect(viewModel) {
         viewModel.ridePinFeedback.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.rideSafetyFeedback.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
@@ -1769,6 +1890,41 @@ fun ActiveRidePanel(
                 capturedAtEpochMs = it.createdAt,
             )
         }
+    val routingProvider = remember {
+        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+    }
+    var activeRoadRoute by remember(ride.requestId) {
+        mutableStateOf<RideRoadRoute?>(null)
+    }
+    var activeRouteUnavailable by remember(ride.requestId) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(ride.requestId, pickupPoint, orderedStops, destinationPoint) {
+        val pickup = pickupPoint
+        val destination = destinationPoint
+        val resolvedStops = orderedStops.mapNotNull { stop ->
+            if (!stop.isResolved) null else rideGeoPointOrNull(
+                latitude = requireNotNull(stop.latitude),
+                longitude = requireNotNull(stop.longitude),
+                accuracyMeters = null,
+                capturedAtEpochMs = ride.createdAt,
+            )
+        }
+        if (
+            pickup == null ||
+            destination == null ||
+            resolvedStops.size != orderedStops.size
+        ) {
+            activeRoadRoute = null
+            activeRouteUnavailable = false
+            return@LaunchedEffect
+        }
+        val result = runCatching {
+            routingProvider.route(listOf(pickup) + resolvedStops + destination)
+        }
+        activeRoadRoute = result.getOrNull()
+        activeRouteUnavailable = result.isFailure
+    }
     val mapState = remember(
         isDriver,
         pickupPoint,
@@ -1777,6 +1933,7 @@ fun ActiveRidePanel(
         localPoint,
         acceptedDriverPoint,
         roadIncidents,
+        activeRoadRoute,
     ) {
         val baseState = RideMapStateFactory.create(
             passengerGps = if (isDriver) null else localPoint,
@@ -1791,6 +1948,7 @@ fun ActiveRidePanel(
             },
             destination = destinationPoint,
             driverGps = if (isDriver) localPoint else acceptedDriverPoint,
+            route = activeRoadRoute?.geometry,
         )
         baseState.copy(
             markers = baseState.markers + roadIncidents
@@ -1813,11 +1971,14 @@ fun ActiveRidePanel(
     val collaborativeEta = remember(
         ride.estimatedDistanceKm,
         ride.estimatedDurationMin,
+        activeRoadRoute,
         roadIncidents,
         speedSamplesByTrip,
     ) {
-        val distanceMeters = ride.estimatedDistanceKm.coerceAtLeast(0.0) * 1_000.0
-        val baselineSeconds = ride.estimatedDurationMin.coerceAtLeast(1) * 60.0
+        val distanceMeters = activeRoadRoute?.distanceMeters
+            ?: ride.estimatedDistanceKm.coerceAtLeast(0.0) * 1_000.0
+        val baselineSeconds = activeRoadRoute?.durationSeconds
+            ?: ride.estimatedDurationMin.coerceAtLeast(1) * 60.0
         if (distanceMeters <= 0.0) {
             null
         } else {
@@ -1913,11 +2074,57 @@ fun ActiveRidePanel(
             },
         )
     }
+    if (showGuardianDialog) {
+        RideGuardianDialog(
+            onDismiss = { showGuardianDialog = false },
+            onConfirm = { signalType, detail ->
+                viewModel.activateRideGuardian(
+                    requestId = ride.requestId,
+                    signalType = signalType,
+                    detail = detail,
+                )
+                showGuardianDialog = false
+            },
+            onShareTrip = {
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Elysium Guardian · Viaje ${ride.requestId.take(8)} · Estado ${ride.status}. " +
+                            "No contiene teléfono ni ubicación exacta.",
+                    )
+                }
+                runCatching {
+                    context.startActivity(
+                        Intent.createChooser(shareIntent, "Compartir estado del viaje"),
+                    )
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        "No hay una aplicación disponible para compartir.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
+            onOpenEmergencyDialer = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_DIAL))
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        "No se pudo abrir el marcador del dispositivo.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDark)
+            .verticalScroll(rememberScrollState())
     ) {
         // Ride Status Header
         val statusColor = when (ride.status) {
@@ -2058,7 +2265,7 @@ fun ActiveRidePanel(
                     }
                 }
                 if (!isDriver && ride.status in listOf("ACCEPTED", "ARRIVED")) {
-                    boardingPins[ride.requestId]?.let { pin ->
+                    ride.boardingPin?.let { pin ->
                         Surface(
                             color = MeetColors.neonGreen.copy(alpha = 0.12f),
                             border = BorderStroke(1.dp, MeetColors.neonGreen),
@@ -2095,10 +2302,20 @@ fun ActiveRidePanel(
                             "ACCEPTED" -> {
                                 Button(
                                     onClick = { viewModel.updateRideStatus(ride.requestId, "ARRIVED") },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
-                                    Text("Ya Llegué 🚕", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (ride.serverState == "ASSIGNED") {
+                                            "INICIAR RUTA 🚗"
+                                        } else {
+                                            "YA LLEGUÉ 🚕"
+                                        },
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 }
                                 Button(
                                     onClick = { showCancellationDialog = true },
@@ -2111,6 +2328,8 @@ fun ActiveRidePanel(
                             "ARRIVED" -> {
                                 Button(
                                     onClick = { showPinDialog = true },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
@@ -2129,6 +2348,8 @@ fun ActiveRidePanel(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "IN_PROGRESS")
                                     },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -2139,8 +2360,9 @@ fun ActiveRidePanel(
                                 Button(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "COMPLETED")
-                                        showRatingDialog = true
                                     },
+                                    enabled = ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -2157,6 +2379,25 @@ fun ActiveRidePanel(
                                 modifier = Modifier.weight(1.2f),
                             ) {
                                 Text("Cancelar solicitud", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (ride.status == "ARRIVED" && ride.boardingPin == null) {
+                            Button(
+                                onClick = {
+                                    viewModel.issueRideBoardingPin(ride.requestId)
+                                },
+                                enabled = ride.syncState != "PENDING" &&
+                                    ride.serverVersion > 0L,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MeetColors.neonGreen,
+                                ),
+                                modifier = Modifier.weight(1.2f),
+                            ) {
+                                Text(
+                                    "GENERAR PIN 🔐",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
                             }
                         }
                         if (ride.status == "COMPLETED" && ride.passengerRating == null) {
@@ -2179,37 +2420,6 @@ fun ActiveRidePanel(
                         }
                     }
 
-                    // In-app phone call (Intent)
-                    val phoneToCall = if (isDriver) ride.passengerPhone else ride.assignedDriverPhone
-                    if (!phoneToCall.isNullOrBlank()) {
-                        IconButton(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneToCall"))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "No se pudo realizar la llamada", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.cardBackground)
-                        ) {
-                            Icon(imageVector = Icons.Default.Phone, contentDescription = "Llamar", tint = MeetColors.cyberCyan)
-                        }
-                    }
-
-                    // Waze link shortcut for driver
-                    if (isDriver) {
-                        IconButton(
-                            onClick = { viewModel.openWaze(context, ride.pickupLatitude, ride.pickupLongitude) },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.cardBackground)
-                        ) {
-                            Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Waze", tint = MeetColors.neonGreen)
-                        }
-                    }
                 }
             }
         }
@@ -2238,6 +2448,24 @@ fun ActiveRidePanel(
             fontSize = 10.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
         )
+        Text(
+            text = when {
+                activeRoadRoute != null -> {
+                    val route = requireNotNull(activeRoadRoute)
+                    val km = route.distanceMeters / 1_000.0
+                    val roundedKm = kotlin.math.round(km * 10.0) / 10.0
+                    val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                    "Ruta vial $roundedKm km · $minutes min · ${route.attribution}"
+                }
+                activeRouteUnavailable ->
+                    "Ruta vial temporalmente no disponible; el mapa conserva puntos reales sin unirlos con una línea falsa."
+                else -> "Esperando puntos suficientes para calcular la ruta vial."
+            },
+            color = if (activeRouteUnavailable) MeetColors.warning else MeetColors.textMuted,
+            fontSize = 10.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
+        )
         if (isDriver) {
             OutlinedButton(
                 onClick = { showRoadReportDialog = true },
@@ -2251,6 +2479,27 @@ fun ActiveRidePanel(
                 Spacer(Modifier.width(8.dp))
                 Text("REPORTAR CONDICIÓN DE LA VÍA", fontWeight = FontWeight.Black, fontSize = 11.sp)
             }
+        }
+        OutlinedButton(
+            onClick = { showGuardianDialog = true },
+            enabled = ride.serverVersion > 0L &&
+                ride.serverState in setOf(
+                    "ASSIGNED",
+                    "DRIVER_EN_ROUTE",
+                    "ARRIVED",
+                    "PASSENGER_ONBOARD",
+                    "IN_PROGRESS",
+                ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            border = BorderStroke(1.dp, Color(0xFFFF2D55)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF6B81)),
+        ) {
+            Icon(Icons.Default.Security, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("ELYSIUM GUARDIAN · SEGURIDAD", fontWeight = FontWeight.Black, fontSize = 11.sp)
         }
 
         // Partner Info Card (Visible if ride is ACCEPTED or later status)
@@ -2272,40 +2521,17 @@ fun ActiveRidePanel(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = ride.passengerName,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Text(
-                                    text = "Teléfono: ${ride.passengerPhone}",
-                                    color = MeetColors.textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.passengerPhone}"))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Error al llamar", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
-                            ) {
-                                Icon(Icons.Default.Phone, null, tint = MeetColors.cyberCyan)
-                            }
-                        }
+                        Text(
+                            text = ride.passengerName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            text = "Contacto protegido: usa chat o nota de voz dentro del viaje.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                        )
                     } else {
                         // Pasajero viendo chofer
                         Text(
@@ -2348,25 +2574,12 @@ fun ActiveRidePanel(
                                 }
                             }
 
-                            val phone = ride.assignedDriverPhone
-                            if (!phone.isNullOrBlank()) {
-                                IconButton(
-                                    onClick = {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error al llamar", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
-                                ) {
-                                    Icon(Icons.Default.Phone, null, tint = MeetColors.cyberCyan)
-                                }
-                            }
                         }
+                        Text(
+                            text = "Contacto protegido: usa chat o nota de voz dentro del viaje.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                        )
                     }
                 }
             }
@@ -2403,7 +2616,7 @@ fun ActiveRidePanel(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(420.dp)
                     .background(MeetColors.backgroundDark)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

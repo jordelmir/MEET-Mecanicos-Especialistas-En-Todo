@@ -141,6 +141,19 @@ con atribución OpenStreetMap y la URL se configura en `RIDE_GEOCODER_URL`.
 Antes del lanzamiento abierto se requiere una instancia propia o contratada
 con SLA, límites, caché y política de privacidad.
 
+La ruta vial se abstrae mediante `RideRoutingProvider`. El piloto usa el
+contrato OSRM `route/v1` con geometría GeoJSON y la URL se configura en:
+
+```text
+RIDE_ROUTER_URL
+```
+
+El valor por defecto apunta al servidor demostrativo de OSRM únicamente para
+pruebas. No tiene SLA de producto. Antes del lanzamiento abierto se debe operar
+una instancia propia o contratada y definir disponibilidad, cuotas, privacidad
+y conmutación. Si el ruteo falla, la APK muestra marcadores reales sin unirlos
+con una línea recta y no inventa distancia ni ETA.
+
 ## Tráfico colaborativo y ETA
 
 - La app toma velocidad solo durante un viaje activo del conductor.

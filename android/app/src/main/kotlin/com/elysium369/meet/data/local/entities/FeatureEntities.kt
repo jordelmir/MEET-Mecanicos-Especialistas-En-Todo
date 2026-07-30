@@ -365,6 +365,7 @@ data class RideRequestEntity(
     val destLongitude: Double,
     val destAddress: String,
     val priceOffer: Double,              // Precio propuesto por el pasajero
+    val priceOfferMinor: Long = 0L,      // Canonical integer amount; Double is legacy display only
     val currency: String,                // CRC o USD
     val estimatedDistanceKm: Double,     // Distancia calculada
     val estimatedDurationMin: Int,       // Duración aproximada
@@ -379,6 +380,15 @@ data class RideRequestEntity(
     val assignedDriverPhone: String? = null,
     val assignedDriverVehicle: String? = null,
     val finalPrice: Double? = null,
+    val finalPriceMinor: Long? = null,
+    val serverState: String? = null,
+    val serverVersion: Long = 0L,
+    val serverAssignedVehicleId: String? = null,
+    val syncState: String = "LOCAL_ONLY",
+    val lastSyncedAt: Long? = null,
+    val lastCorrelationId: String? = null,
+    val boardingPin: String? = null,
+    val boardingPinExpiresAt: Long? = null,
     val passengerRating: Double? = null,  // Calificación dada al conductor
     val driverRating: Double? = null,     // Calificación dada al pasajero
     val createdAt: Long,
@@ -455,6 +465,7 @@ data class DriverVerificationEntity(
     val vehicleYear: Int,                       // Año
     val vehicleColor: String,                   // Color
     val vehiclePlate: String,                   // Placa
+    val vehicleSeats: Int = 1,                  // Capacidad declarada; nunca inferida
     // ── Mandatory Documents (local file paths) ──
     val pathLicenciaFront: String,              // Licencia de conducir — frente
     val pathLicenciaBack: String,               // Licencia de conducir — reverso

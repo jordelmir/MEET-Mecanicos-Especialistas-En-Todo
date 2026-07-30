@@ -293,13 +293,13 @@ fun ProviderRegistrationScreen(
         DriverOnboardingDialog(
             existingVerification = driverVerification,
             onDismiss = { showDriverOnboarding = false },
-            onSubmit = { name, phone, email, dob, make, model, year, color, plate,
+            onSubmit = { name, phone, email, dob, make, model, year, color, plate, seats,
                          licF, licB, cedF, cedB, hoja, marchamo, dekra, seguro,
                          selfie, selfieCed, selfieLic, vehF, vehB, vehI ->
                 viewModel.submitDriverVerification(
                     fullName = name, phone = phone, email = email, dateOfBirth = dob,
                     vehicleMake = make, vehicleModel = model, vehicleYear = year,
-                    vehicleColor = color, vehiclePlate = plate,
+                    vehicleColor = color, vehiclePlate = plate, vehicleSeats = seats,
                     pathLicenciaFront = licF, pathLicenciaBack = licB,
                     pathCedulaFront = cedF, pathCedulaBack = cedB,
                     pathHojaDelincuencia = hoja, pathMarchamo = marchamo,
@@ -1200,6 +1200,7 @@ private fun DriverOnboardingDialog(
     onSubmit: (
         name: String, phone: String, email: String, dob: String,
         make: String, model: String, year: Int, color: String, plate: String,
+        seats: Int,
         licF: String, licB: String, cedF: String, cedB: String, hoja: String,
         marchamo: String, dekra: String, seguro: String,
         selfie: String, selfieCed: String, selfieLic: String,
@@ -1246,7 +1247,7 @@ private fun DriverOnboardingDialog(
                                 )
                                 Text(
                                     if (isPilotAccess) {
-                                        "Puedes usar Viajes sin esperar una revisión remota. Tus documentos quedaron guardados para una validación posterior."
+                                        "Tu evidencia está completa y el permiso piloto se sincroniza automáticamente. La revisión documental remota continúa pendiente."
                                     } else {
                                         "Tu cuenta de chofer está aprobada. Ya puedes recibir solicitudes de viaje."
                                     },
@@ -1385,6 +1386,7 @@ private fun DriverOnboardingDialog(
     var vYear by remember { mutableStateOf("") }
     var vColor by remember { mutableStateOf("") }
     var vPlate by remember { mutableStateOf("") }
+    var vSeats by remember { mutableStateOf("") }
 
     val launchVerificationPhoto = rememberVerificationPhotoCapture()
 
@@ -1414,7 +1416,9 @@ private fun DriverOnboardingDialog(
 
     val canAdvance = when (currentStep) {
         0 -> fullName.isNotBlank() && phone.isNotBlank() && email.isNotBlank() && dob.isNotBlank()
-        1 -> vMake.isNotBlank() && vModel.isNotBlank() && vYear.isNotBlank() && vColor.isNotBlank() && vPlate.isNotBlank()
+        1 -> vMake.isNotBlank() && vModel.isNotBlank() && vYear.isNotBlank() &&
+            vColor.isNotBlank() && vPlate.isNotBlank() &&
+            (vSeats.toIntOrNull() in 1..16)
         2 -> pathMarchamo.isNotBlank() && pathDekra.isNotBlank() && pathSeguro.isNotBlank()
         3 -> pathLicF.isNotBlank() && pathLicB.isNotBlank() && pathCedF.isNotBlank() && pathCedB.isNotBlank() && pathHoja.isNotBlank()
         4 -> pathSelfie.isNotBlank() && pathSelfieCed.isNotBlank() && pathSelfieLic.isNotBlank()
@@ -1536,6 +1540,7 @@ private fun DriverOnboardingDialog(
                                 item { OnboardField(vYear, { vYear = it }, "Año", "2022", accent, Icons.Filled.CalendarMonth, KeyboardType.Number) }
                                 item { OnboardField(vColor, { vColor = it }, "Color", "Blanco", accent, Icons.Filled.Palette) }
                                 item { OnboardField(vPlate, { vPlate = it }, "Número de Placa", "ABC-123", accent, Icons.Filled.Pin) }
+                                item { OnboardField(vSeats, { vSeats = it }, "Asientos habilitados", "4", accent, Icons.Filled.EventSeat, KeyboardType.Number) }
                             }
                             2 -> {
                                 item {
@@ -1671,7 +1676,8 @@ private fun DriverOnboardingDialog(
                             onClick = {
                                 onSubmit(
                                     fullName, phone, email, dob,
-                                    vMake, vModel, vYear.toIntOrNull() ?: 2024, vColor, vPlate,
+                                    vMake, vModel, vYear.toIntOrNull() ?: 0, vColor, vPlate,
+                                    vSeats.toIntOrNull() ?: 0,
                                     pathLicF, pathLicB, pathCedF, pathCedB, pathHoja,
                                     pathMarchamo, pathDekra, pathSeguro,
                                     pathSelfie, pathSelfieCed, pathSelfieLic,

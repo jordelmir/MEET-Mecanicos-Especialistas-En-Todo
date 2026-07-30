@@ -63,6 +63,7 @@ class RideVerificationEvidencePolicyTest {
             vehicleYear = 2005,
             vehicleColor = "Gris",
             vehiclePlate = "ABC123",
+            vehicleSeats = 4,
             currentYear = 2026,
             files = validFiles,
         )
@@ -76,6 +77,7 @@ class RideVerificationEvidencePolicyTest {
             vehicleYear = 1800,
             vehicleColor = "",
             vehiclePlate = "",
+            vehicleSeats = 0,
             currentYear = 2026,
             files = validFiles.dropLast(1),
         )
@@ -87,6 +89,7 @@ class RideVerificationEvidencePolicyTest {
         assertTrue("INVALID_EMAIL" in invalid.issues)
         assertTrue("INVALID_DATE_OF_BIRTH" in invalid.issues)
         assertTrue("INVALID_VEHICLE_YEAR" in invalid.issues)
+        assertTrue("INVALID_VEHICLE_SEATS" in invalid.issues)
         assertTrue("REQUIRED_FILE_COUNT:14" in invalid.issues)
     }
 }

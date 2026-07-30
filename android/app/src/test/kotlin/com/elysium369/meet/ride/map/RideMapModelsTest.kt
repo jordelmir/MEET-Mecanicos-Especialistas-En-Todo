@@ -92,7 +92,22 @@ class RideMapModelsTest {
         assertEquals(pickup, state.marker(RideMarkerRole.PICKUP)?.point)
         assertEquals(destination, state.marker(RideMarkerRole.DESTINATION)?.point)
         assertEquals(driver, state.marker(RideMarkerRole.DRIVER)?.point)
-        assertEquals(listOf(pickup, destination), state.route)
+        assertEquals(emptyList<RideGeoPoint>(), state.route)
+    }
+
+    @Test
+    fun `factory renders only provider road geometry`() {
+        val pickup = RideGeoPoint(9.9281, -84.0907, null, 9_000)
+        val roadPoint = RideGeoPoint(9.9300, -84.0860, null, 9_100)
+        val destination = RideGeoPoint(9.9350, -84.0800, null, 9_200)
+
+        val state = RideMapStateFactory.create(
+            pickup = pickup,
+            destination = destination,
+            route = listOf(pickup, roadPoint, destination),
+        )
+
+        assertEquals(listOf(pickup, roadPoint, destination), state.route)
     }
 
     @Test

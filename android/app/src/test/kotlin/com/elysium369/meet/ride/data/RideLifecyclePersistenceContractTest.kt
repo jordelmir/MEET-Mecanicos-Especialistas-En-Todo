@@ -35,18 +35,20 @@ class RideLifecyclePersistenceContractTest {
     }
 
     @Test
-    fun `cancellation is bound to an authenticated trip party`() {
-        val dao = projectFile(
-            "src/main/kotlin/com/elysium369/meet/data/local/dao/FeatureDaos.kt",
-        ).readText()
+    fun `cancellation is delegated to actor bound command authority`() {
         val viewModel = projectFile(
             "src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt",
         ).readText()
+        val gateway = projectFile(
+            "src/main/kotlin/com/elysium369/meet/ride/data/remote/RideCommandGateway.kt",
+        ).readText()
 
-        assertTrue(dao.contains("(:actorRole = 'PASSENGER' AND passengerId = :actorId)"))
-        assertTrue(dao.contains("(:actorRole = 'DRIVER' AND assignedDriverId = :actorId)"))
-        assertTrue(viewModel.contains("actorId = actorId"))
-        assertTrue(viewModel.contains("actorRole = role.name"))
+        assertTrue(viewModel.contains("type = RideCommandType.CANCEL"))
+        assertTrue(viewModel.contains("reasonCode = reason.name"))
+        assertTrue(viewModel.contains("expectedVersion: Long = request.serverVersion"))
+        assertFalse(viewModel.contains("rideDao.cancelActiveRequest("))
+        assertTrue(gateway.contains("\"ride_cancel_trip_v2\""))
+        assertFalse(gateway.contains("p_actor_id"))
         assertFalse(viewModel.contains("""?: "SYSTEM""""))
         assertFalse(viewModel.contains("""?: "Sistema""""))
     }
