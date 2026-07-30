@@ -4,8 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 migration="$repo_root/supabase/migrations/20260726010000_ride_platform_foundation.sql"
 ledger_migration="$repo_root/supabase/migrations/20260730010000_ride_double_entry_ledger.sql"
+command_migration="$repo_root/supabase/migrations/20260730020000_ride_command_authority.sql"
 
-if [[ ! -f "$migration" || ! -f "$ledger_migration" ]]; then
+if [[ ! -f "$migration" || ! -f "$ledger_migration" || ! -f "$command_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
@@ -139,5 +140,100 @@ rg -q "source_entry_id" "$ledger_migration" || {
   echo "ride migration contract: FAIL (ledger backfill provenance missing)" >&2
   exit 1
 }
+rg -q "commissionable_base_minor" "$ledger_migration" || {
+  echo "ride migration contract: FAIL (commission base provenance missing)" >&2
+  exit 1
+}
+
+command_tables=(
+  ride_command_receipts
+  ride_fare_quotes
+  ride_operational_holds
+)
+
+for table in "${command_tables[@]}"; do
+  rg -q "create table if not exists public\\.${table}" "$command_migration" || {
+    echo "ride migration contract: FAIL (missing command table $table)" >&2
+    exit 1
+  }
+  rg -q "alter table public\\.${table} enable row level security" "$command_migration" || {
+    echo "ride migration contract: FAIL (command RLS missing for $table)" >&2
+    exit 1
+  }
+  rg -q "revoke all on public\\.${table} from anon, authenticated" "$command_migration" || {
+    echo "ride migration contract: FAIL (command client writes not revoked for $table)" >&2
+    exit 1
+  }
+done
+
+command_functions=(
+  ride_claim_request_v2
+  ride_cancel_trip_v2
+  ride_complete_trip_v2
+)
+
+for function_name in "${command_functions[@]}"; do
+  rg -q "create or replace function public\\.${function_name}" "$command_migration" || {
+    echo "ride migration contract: FAIL (missing command RPC $function_name)" >&2
+    exit 1
+  }
+done
+
+rg -q "p_expected_version bigint" "$command_migration" || {
+  echo "ride migration contract: FAIL (optimistic version contract missing)" >&2
+  exit 1
+}
+rg -q "pg_advisory_xact_lock" "$command_migration" || {
+  echo "ride migration contract: FAIL (idempotency serialization missing)" >&2
+  exit 1
+}
+rg -q "for update" "$command_migration" || {
+  echo "ride migration contract: FAIL (row lock missing)" >&2
+  exit 1
+}
+rg -q "IDEMPOTENCY_CONFLICT" "$command_migration" || {
+  echo "ride migration contract: FAIL (stable idempotency error missing)" >&2
+  exit 1
+}
+rg -q "VERSION_CONFLICT" "$command_migration" || {
+  echo "ride migration contract: FAIL (stable version error missing)" >&2
+  exit 1
+}
+rg -q "ride-commission-v1" "$command_migration" || {
+  echo "ride migration contract: FAIL (commission policy provenance missing)" >&2
+  exit 1
+}
+rg -q "tip_minor_excluded" "$command_migration" || {
+  echo "ride migration contract: FAIL (non-commissionable tip evidence missing)" >&2
+  exit 1
+}
+rg -q "platform_promotion_minor_excluded" "$command_migration" || {
+  echo "ride migration contract: FAIL (promotion exclusion evidence missing)" >&2
+  exit 1
+}
+
+state_constraint="$(
+  sed -n \
+    '/add constraint ride_requests_state_check check (/,/^    );/p' \
+    "$command_migration"
+)"
+if [[ -z "$state_constraint" ]] || grep -q "SAFETY_HOLD" <<<"$state_constraint"; then
+  echo "ride migration contract: FAIL (safety hold still encoded as lifecycle state)" >&2
+  exit 1
+fi
+
+legacy_rpc_signatures=(
+  "ride_claim_request(uuid, uuid, text)"
+  "ride_accept_offer(uuid, uuid, text)"
+  "ride_cancel_trip(uuid, text, text, text)"
+  "ride_complete_trip(uuid, bigint, text)"
+)
+
+for signature in "${legacy_rpc_signatures[@]}"; do
+  rg -Fq "revoke execute on function public.${signature}" "$command_migration" || {
+    echo "ride migration contract: FAIL (legacy RPC still executable: $signature)" >&2
+    exit 1
+  }
+done
 
 echo "ride migration contract: PASS"

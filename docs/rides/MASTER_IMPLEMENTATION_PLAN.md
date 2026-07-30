@@ -44,7 +44,7 @@ repuestos, reportes y contratos de paridad permanecen intactos.
 | Observabilidad | Logs generales | Mixta | Aplicación | Sin correlación viaje-command-ledger | Parcial | correlation IDs, métricas y auditoría |
 | UI pasajero/conductor | 3.961 LOC en una pantalla | Compose local | N/A | God screen, difícil de probar | Prototipo avanzado | Flujos y componentes por rol |
 | Shell contextual | Inicio automotriz global | Aplicación | Rol visual | Viajes carga recursos irrelevantes | Ausente | Resolver backend de rol/capacidad |
-| SQL tests | Migraciones presentes | N/A | N/A | Docker no disponible localmente | Bloqueado local | CI PostgreSQL/pgTAP obligatorio |
+| SQL tests | Runner PostgreSQL efímero + contrato estático | PostgreSQL local desechable | Sin datos productivos | Falta ejecutar en CI/Supabase staging | Verificado local | Añadir el mismo gate a CI |
 
 ## Evidencia del baseline
 
@@ -55,8 +55,10 @@ repuestos, reportes y contratos de paridad permanecen intactos.
 - SHA-256 APK base:
   `aff8ef9e2cbc8c7b7a1296885f4c52b805300ebb247e9f20fcf766f8e85a36c8`.
 - CI de la base: paridad cross-runtime verde.
-- Limitación reproducible: no hay Docker local; los tests SQL ejecutables se
-  trasladan a CI PostgreSQL y a un proyecto Supabase de pruebas.
+- PostgreSQL 18 de Homebrew permitió ejecutar las cuatro migraciones de Viajes
+  en un cluster efímero aislado. Docker sigue sin ser una dependencia.
+- Falta repetir el runner en CI y en un proyecto Supabase de pruebas antes de
+  activar las nuevas RPC en producción.
 
 ## Riesgos y mitigaciones
 

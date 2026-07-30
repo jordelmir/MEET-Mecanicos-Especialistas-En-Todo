@@ -3,9 +3,9 @@
 ## Estado
 
 Implementada la fundación de doble entrada en Kotlin y PostgreSQL. La migración
-es aditiva y mantiene el wallet anterior como proyección compatible. La
-activación productiva continúa bloqueada hasta ejecutar las pruebas SQL contra
-PostgreSQL real.
+es aditiva y mantiene el wallet anterior como proyección compatible. Después
+de este informe inicial se habilitó PostgreSQL 18 local y la migración ya fue
+ejecutada dentro del runner efímero de la fase 3.
 
 ## Cambios
 
@@ -47,12 +47,12 @@ Resultados:
 - contrato estático de migraciones: `PASS`;
 - paridad TypeScript/Kotlin: `OK`.
 
-## Limitación honesta
+## Evidencia SQL posterior
 
-No se ejecutó la migración contra PostgreSQL en esta máquina: `psql` está
-instalado, pero no existe un servidor local y Docker no está disponible. El
-constraint diferido, backfill, RLS y concurrencia siguen requiriendo CI o un
-proyecto Supabase de pruebas antes de activar la comisión.
+`tests/ride/verify-ride-command-authority-postgres.sh` levanta un cluster
+PostgreSQL desechable, aplica fundación, inteligencia vial, ledger y autoridad
+de comandos, y comprueba journals balanceados. Falta repetir la evidencia en
+CI/Supabase staging; no se afirma despliegue productivo.
 
 ## Siguiente dependencia
 

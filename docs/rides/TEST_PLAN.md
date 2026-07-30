@@ -46,14 +46,17 @@ En cada release:
 
 ```text
 bash tests/ride/verify-ride-migration.sh
+bash tests/ride/verify-ride-command-authority-postgres.sh
 bash .codex/skills/meet-rides-improvement-loop/scripts/verify-rides.sh full
 bash tests/parity/ci-verify.sh
 ./gradlew --no-daemon --no-parallel :app:assembleRelease
 ```
 
-Los tests SQL deben correr contra PostgreSQL real en CI. La máquina local
-auditada no dispone de Docker; no se reportará pgTAP local como ejecutado hasta
-contar con el runner.
+El runner SQL levanta PostgreSQL efímero, aplica las migraciones reales y
+destruye el cluster al finalizar. Verifica cálculo, autorización, idempotencia,
+inmutabilidad, journals balanceados y 100 reclamantes con exactamente un
+ganador. Debe ejecutarse también en CI y contra Supabase staging antes del
+rollout productivo.
 
 ## Evidencia de dispositivo
 

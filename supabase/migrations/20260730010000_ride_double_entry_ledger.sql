@@ -382,6 +382,7 @@ begin
         currency,
         commission_policy_version,
         commission_basis_points,
+        commissionable_base_minor,
         commission_amount_minor,
         rounding_mode,
         metadata
@@ -393,11 +394,50 @@ begin
         v_entry.currency,
         case
             when v_entry.entry_type like 'COMMISSION_%'
-                then 'legacy-flat-fare-v0'
+                then coalesce(
+                    case
+                        when char_length(
+                            v_entry.metadata ->> 'commission_policy_version'
+                        ) between 1 and 100
+                        then v_entry.metadata ->> 'commission_policy_version'
+                        else null
+                    end,
+                    'legacy-flat-fare-v0'
+                )
             else null
         end,
         case
-            when v_entry.entry_type like 'COMMISSION_%' then 500
+            when v_entry.entry_type like 'COMMISSION_%' then
+                case
+                    when coalesce(
+                        v_entry.metadata ->> 'commission_basis_points',
+                        ''
+                    ) ~ '^[0-9]{1,5}$'
+                    and (
+                        v_entry.metadata ->> 'commission_basis_points'
+                    )::integer between 0 and 10000
+                    then (
+                        v_entry.metadata ->> 'commission_basis_points'
+                    )::integer
+                    else 500
+                end
+            else null
+        end,
+        case
+            when v_entry.entry_type like 'COMMISSION_%'
+                 and coalesce(
+                     v_entry.metadata ->> 'commissionable_base_minor',
+                     ''
+                 ) ~ '^[0-9]{1,19}$'
+                then case
+                    when (
+                        v_entry.metadata ->> 'commissionable_base_minor'
+                    )::numeric <= 9223372036854775807::numeric
+                    then (
+                        v_entry.metadata ->> 'commissionable_base_minor'
+                    )::bigint
+                    else null
+                end
             else null
         end,
         case
@@ -406,10 +446,15 @@ begin
             else null
         end,
         case
+            when v_entry.entry_type like 'COMMISSION_%'
+                 and v_entry.metadata ->> 'rounding_mode' in (
+                     'HALF_UP', 'FLOOR'
+                 )
+                then v_entry.metadata ->> 'rounding_mode'
             when v_entry.entry_type like 'COMMISSION_%' then 'HALF_UP'
             else null
         end,
-        jsonb_build_object(
+        v_entry.metadata || jsonb_build_object(
             'source', 'ride_wallet_ledger',
             'source_entry_id', v_entry.id,
             'source_entry_type', v_entry.entry_type,
