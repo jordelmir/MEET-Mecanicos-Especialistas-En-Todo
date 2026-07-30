@@ -11,10 +11,12 @@ worker="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/work/Rid
 enrollment_worker="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/work/RideDriverEnrollmentWorker.kt"
 enrollment_gateway="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/remote/RideDriverEnrollmentGateway.kt"
 projection="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/data/RideRemoteProjectionRepository.kt"
+routing="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/map/RideRouting.kt"
+map_factory="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/map/RideMapStateFactory.kt"
 
 required_files=(
   "$database" "$module" "$entity" "$dao" "$gateway" "$worker" "$projection"
-  "$enrollment_worker" "$enrollment_gateway"
+  "$enrollment_worker" "$enrollment_gateway" "$routing" "$map_factory"
 )
 for path in "${required_files[@]}"; do
   [[ -f "$path" ]] || {
@@ -118,5 +120,13 @@ rg -q "PILOT_EVIDENCE_ATTESTATION" "$projection" \
   echo "ride Android authority contract: FAIL (pilot expiry read guard missing)" >&2
   exit 1
 }
+rg -q "geometries=geojson" "$routing" || {
+  echo "ride Android authority contract: FAIL (road geometry provider missing)" >&2
+  exit 1
+}
+if rg -q "listOf\\(pickup\\).*destination" "$map_factory"; then
+  echo "ride Android authority contract: FAIL (straight-line route fallback restored)" >&2
+  exit 1
+fi
 
 echo "ride Android authority contract: PASS"

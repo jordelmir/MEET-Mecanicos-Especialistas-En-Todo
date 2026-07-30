@@ -85,6 +85,11 @@ android {
             "https://photon.komoot.io/api/",
         )
         buildConfigField("String", "RIDE_GEOCODER_URL", "\"$rideGeocoderUrl\"")
+        val rideRouterUrl = localProps.getProperty(
+            "RIDE_ROUTER_URL",
+            "https://router.project-osrm.org",
+        )
+        buildConfigField("String", "RIDE_ROUTER_URL", "\"$rideRouterUrl\"")
 
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")

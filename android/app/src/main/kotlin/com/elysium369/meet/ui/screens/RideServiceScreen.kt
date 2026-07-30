@@ -61,6 +61,8 @@ import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideMapStateFactory
 import com.elysium369.meet.ride.map.RideMapMarker
 import com.elysium369.meet.ride.map.RideMarkerRole
+import com.elysium369.meet.ride.map.OsrmRideRoutingProvider
+import com.elysium369.meet.ride.map.RideRoadRoute
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
@@ -74,6 +76,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -251,6 +254,12 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     val placeSearchProvider = remember {
         PhotonRidePlaceSearchProvider(BuildConfig.RIDE_GEOCODER_URL)
     }
+    val routingProvider = remember {
+        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+    }
+    var previewRoadRoute by remember { mutableStateOf<RideRoadRoute?>(null) }
+    var routeSearchLoading by remember { mutableStateOf(false) }
+    var routeSearchFailed by remember { mutableStateOf(false) }
     val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
     var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
 
@@ -300,6 +309,57 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
             .sortedBy { it.distanceKmFrom(currentGps?.latitude, currentGps?.longitude) ?: Double.MAX_VALUE }
         destinationSearchFailed = searchResult.isFailure
         destinationSearchLoading = false
+    }
+
+    LaunchedEffect(
+        currentGps?.latitude,
+        currentGps?.longitude,
+        destinationPlaceId,
+        destLatitude,
+        destLongitude,
+        stops,
+    ) {
+        val gps = currentGps
+        val resolvedStops = stops.mapNotNull { stop ->
+            if (!stop.isResolved) null else rideGeoPointOrNull(
+                latitude = requireNotNull(stop.latitude),
+                longitude = requireNotNull(stop.longitude),
+                accuracyMeters = null,
+                capturedAtEpochMs = System.currentTimeMillis(),
+            )
+        }
+        if (
+            gps == null ||
+            destinationPlaceId == null ||
+            (destLatitude == 0.0 && destLongitude == 0.0) ||
+            resolvedStops.size != stops.size
+        ) {
+            previewRoadRoute = null
+            routeSearchLoading = false
+            routeSearchFailed = false
+            return@LaunchedEffect
+        }
+        val pickup = rideGeoPointOrNull(
+            latitude = gps.latitude,
+            longitude = gps.longitude,
+            accuracyMeters = gps.accuracy,
+            capturedAtEpochMs = gps.timestamp.coerceAtLeast(0L),
+        )
+        val destination = rideGeoPointOrNull(
+            latitude = destLatitude,
+            longitude = destLongitude,
+            accuracyMeters = null,
+            capturedAtEpochMs = System.currentTimeMillis(),
+        )
+        if (pickup == null || destination == null) return@LaunchedEffect
+        routeSearchLoading = true
+        routeSearchFailed = false
+        val result = runCatching {
+            routingProvider.route(listOf(pickup) + resolvedStops + destination)
+        }
+        previewRoadRoute = result.getOrNull()
+        routeSearchFailed = result.isFailure
+        routeSearchLoading = false
     }
 
     LazyColumn(
@@ -776,6 +836,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         null,
                         System.currentTimeMillis(),
                     ),
+                    route = previewRoadRoute?.geometry,
                 )
                 Card(
                     Modifier.fillMaxWidth().height(280.dp),
@@ -784,6 +845,23 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 ) {
                     RideMapPanel(state = previewState, modifier = Modifier.fillMaxSize())
                 }
+                Text(
+                    text = when {
+                        routeSearchLoading -> "Calculando ruta vial real…"
+                        previewRoadRoute != null -> {
+                            val route = requireNotNull(previewRoadRoute)
+                            val km = route.distanceMeters / 1_000.0
+                            val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                            "Ruta vial: ${String.format(currentLocale, "%.1f", km)} km · $minutes min · ${route.attribution}"
+                        }
+                        routeSearchFailed ->
+                            "Ruta vial no disponible. No se dibujará una línea falsa ni se inventará un ETA."
+                        else -> "Selecciona destino y paradas para calcular la ruta vial."
+                    },
+                    color = if (routeSearchFailed) MeetColors.warning else MeetColors.textMuted,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                )
             }
         }
 
@@ -922,15 +1000,16 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             // (RISK-3 GPS leak: lat/lon no debe ir en strings user-facing).
                             val safePickupAddress = sanitizeGpsAddress(gps.addressName)
 
-                            // Calcular distancia estimada simple (Haversine).
-                            // Si el usuario no ingreso destino, distancia = 0 (no usamos
-                            // el truco "+0.05" que filtra coords raw).
-                            val distance = if (destLatitude != 0.0 && destLongitude != 0.0) {
-                                calculateDistance(
-                                    gps.latitude, gps.longitude,
-                                    destLatitude, destLongitude
-                                )
-                            } else 0.0
+                            val distance = previewRoadRoute
+                                ?.distanceMeters
+                                ?.div(1_000.0)
+                                ?: 0.0
+                            val durationMinutes = previewRoadRoute
+                                ?.durationSeconds
+                                ?.div(60.0)
+                                ?.let { kotlin.math.ceil(it) }
+                                ?.toInt()
+                                ?: 0
 
                             viewModel.createRideRequest(
                                 passengerId = verifiedPassenger.passengerId,
@@ -947,7 +1026,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 priceOffer = if (isUsd) offerPrice / 500.0 else offerPrice,
                                 currency = if (isUsd) "USD" else "CRC",
                                 estDistance = distance,
-                                estDuration = (distance * 2.5).toInt().coerceAtLeast(3),
+                                estDuration = durationMinutes,
                                 stopsJson = Json.encodeToString(stops),
                                 paymentMethod = paymentMethod.name,
                             )
@@ -1774,6 +1853,41 @@ fun ActiveRidePanel(
                 capturedAtEpochMs = it.createdAt,
             )
         }
+    val routingProvider = remember {
+        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+    }
+    var activeRoadRoute by remember(ride.requestId) {
+        mutableStateOf<RideRoadRoute?>(null)
+    }
+    var activeRouteUnavailable by remember(ride.requestId) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(ride.requestId, pickupPoint, orderedStops, destinationPoint) {
+        val pickup = pickupPoint
+        val destination = destinationPoint
+        val resolvedStops = orderedStops.mapNotNull { stop ->
+            if (!stop.isResolved) null else rideGeoPointOrNull(
+                latitude = requireNotNull(stop.latitude),
+                longitude = requireNotNull(stop.longitude),
+                accuracyMeters = null,
+                capturedAtEpochMs = ride.createdAt,
+            )
+        }
+        if (
+            pickup == null ||
+            destination == null ||
+            resolvedStops.size != orderedStops.size
+        ) {
+            activeRoadRoute = null
+            activeRouteUnavailable = false
+            return@LaunchedEffect
+        }
+        val result = runCatching {
+            routingProvider.route(listOf(pickup) + resolvedStops + destination)
+        }
+        activeRoadRoute = result.getOrNull()
+        activeRouteUnavailable = result.isFailure
+    }
     val mapState = remember(
         isDriver,
         pickupPoint,
@@ -1782,6 +1896,7 @@ fun ActiveRidePanel(
         localPoint,
         acceptedDriverPoint,
         roadIncidents,
+        activeRoadRoute,
     ) {
         val baseState = RideMapStateFactory.create(
             passengerGps = if (isDriver) null else localPoint,
@@ -1796,6 +1911,7 @@ fun ActiveRidePanel(
             },
             destination = destinationPoint,
             driverGps = if (isDriver) localPoint else acceptedDriverPoint,
+            route = activeRoadRoute?.geometry,
         )
         baseState.copy(
             markers = baseState.markers + roadIncidents
@@ -1818,11 +1934,14 @@ fun ActiveRidePanel(
     val collaborativeEta = remember(
         ride.estimatedDistanceKm,
         ride.estimatedDurationMin,
+        activeRoadRoute,
         roadIncidents,
         speedSamplesByTrip,
     ) {
-        val distanceMeters = ride.estimatedDistanceKm.coerceAtLeast(0.0) * 1_000.0
-        val baselineSeconds = ride.estimatedDurationMin.coerceAtLeast(1) * 60.0
+        val distanceMeters = activeRoadRoute?.distanceMeters
+            ?: ride.estimatedDistanceKm.coerceAtLeast(0.0) * 1_000.0
+        val baselineSeconds = activeRoadRoute?.durationSeconds
+            ?: ride.estimatedDurationMin.coerceAtLeast(1) * 60.0
         if (distanceMeters <= 0.0) {
             null
         } else {
@@ -2276,6 +2395,23 @@ fun ActiveRidePanel(
             color = MeetColors.textMuted,
             fontSize = 10.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+        )
+        Text(
+            text = when {
+                activeRoadRoute != null -> {
+                    val route = requireNotNull(activeRoadRoute)
+                    val km = route.distanceMeters / 1_000.0
+                    val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                    "Ruta vial ${String.format(Locale.getDefault(), "%.1f", km)} km · $minutes min · ${route.attribution}"
+                }
+                activeRouteUnavailable ->
+                    "Ruta vial temporalmente no disponible; el mapa conserva puntos reales sin unirlos con una línea falsa."
+                else -> "Esperando puntos suficientes para calcular la ruta vial."
+            },
+            color = if (activeRouteUnavailable) MeetColors.warning else MeetColors.textMuted,
+            fontSize = 10.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
         )
         if (isDriver) {
             OutlinedButton(

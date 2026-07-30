@@ -63,7 +63,6 @@ object RideMapStateFactory {
         }
         val resolvedRoute = when {
             route != null && route.size >= 2 -> route
-            pickup != null && destination != null -> listOf(pickup) + stops + destination
             else -> emptyList()
         }
         return RideMapState(markers = markers, route = resolvedRoute)
