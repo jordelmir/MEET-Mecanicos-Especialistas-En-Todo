@@ -94,6 +94,14 @@ class RideCommandRepository @Inject constructor(
                 "VERIFY_BOARDING_PIN requiere cuatro dígitos",
             )
         }
+        if (
+            envelope.type == RideCommandType.SAFETY_SIGNAL &&
+            payload.safetySignalType.isNullOrBlank()
+        ) {
+            return RideCommandEnqueueResult.InvalidCommand(
+                "SAFETY_SIGNAL requiere una señal tipada",
+            )
+        }
         val sessionUserId = SupabaseModule.client.auth
             .currentUserOrNull()
             ?.id
@@ -160,6 +168,7 @@ class RideCommandRepository @Inject constructor(
             RideCommandType.START,
             RideCommandType.CANCEL,
             RideCommandType.COMPLETE,
+            RideCommandType.SAFETY_SIGNAL,
         )
     }
 }

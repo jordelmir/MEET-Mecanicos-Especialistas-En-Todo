@@ -67,6 +67,7 @@ interface RideCommandOutboxDao {
         """
         UPDATE ride_command_outbox
         SET status = 'ACKNOWLEDGED',
+            payloadJson = '{"redacted_after_ack":true}',
             leaseStartedAt = NULL,
             lastErrorCode = NULL,
             lastErrorMessage = NULL,

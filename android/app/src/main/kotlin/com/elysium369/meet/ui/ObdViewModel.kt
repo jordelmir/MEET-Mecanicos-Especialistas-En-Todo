@@ -65,6 +65,8 @@ import com.elysium369.meet.ride.domain.RideCancellationReason
 import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideShareCategory
+import com.elysium369.meet.ride.domain.RideGuardianPolicy
+import com.elysium369.meet.ride.domain.RideSafetySignalType
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.VerificationFileEvidence
@@ -5720,6 +5722,8 @@ class ObdViewModel @Inject constructor(
 
     private val _ridePinFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val ridePinFeedback: SharedFlow<String> = _ridePinFeedback.asSharedFlow()
+    private val _rideSafetyFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val rideSafetyFeedback: SharedFlow<String> = _rideSafetyFeedback.asSharedFlow()
 
     private val _driverPresetMessages = MutableStateFlow<List<String>>(listOf(
         "Ya me encuentro en la ubicación",
@@ -6507,6 +6511,43 @@ class ObdViewModel @Inject constructor(
                 acceptedMessage =
                     "Cancelación enviada. El servidor aplicará estado, seguridad y liberación de saldo.",
             )
+        }
+    }
+
+    fun activateRideGuardian(
+        requestId: String,
+        signalType: RideSafetySignalType,
+        detail: String?,
+    ) {
+        if (detail != null && detail.length > 500) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (!RideGuardianPolicy.canSignal(request.serverState, request.serverVersion)) {
+                _rideSafetyFeedback.emit(
+                    "Guardian requiere un viaje activo confirmado por el servidor.",
+                )
+                return@launch
+            }
+            val result = enqueueAuthoritativeRideCommand(
+                request = request,
+                type = RideCommandType.SAFETY_SIGNAL,
+                payload = RideCommandPayload(
+                    safetySignalType = signalType.name,
+                    detail = detail?.trim()?.takeIf(String::isNotEmpty),
+                ),
+            )
+            val message = when (result) {
+                RideCommandEnqueueResult.Enqueued ->
+                    "Guardian envió la señal para registro y revisión. La app no llamó automáticamente a autoridades."
+                RideCommandEnqueueResult.AlreadyQueued ->
+                    "Esta señal de Guardian ya está pendiente de confirmación."
+                RideCommandEnqueueResult.AuthenticationRequired ->
+                    "Guardian necesita una sesión autenticada para proteger el historial."
+                is RideCommandEnqueueResult.IdempotencyConflict ->
+                    "La señal no se duplicó porque existe un conflicto local."
+                is RideCommandEnqueueResult.InvalidCommand -> result.message
+            }
+            _rideSafetyFeedback.emit(message)
         }
     }
 

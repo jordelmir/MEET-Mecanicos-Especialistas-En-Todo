@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1773,6 +1772,7 @@ fun ActiveRidePanel(
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
     var showCancellationDialog by remember { mutableStateOf(false) }
+    var showGuardianDialog by remember { mutableStateOf(false) }
     var showRoadReportDialog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -1792,6 +1792,11 @@ fun ActiveRidePanel(
 
     LaunchedEffect(viewModel) {
         viewModel.ridePinFeedback.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.rideSafetyFeedback.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
@@ -2069,11 +2074,57 @@ fun ActiveRidePanel(
             },
         )
     }
+    if (showGuardianDialog) {
+        RideGuardianDialog(
+            onDismiss = { showGuardianDialog = false },
+            onConfirm = { signalType, detail ->
+                viewModel.activateRideGuardian(
+                    requestId = ride.requestId,
+                    signalType = signalType,
+                    detail = detail,
+                )
+                showGuardianDialog = false
+            },
+            onShareTrip = {
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Elysium Guardian · Viaje ${ride.requestId.take(8)} · Estado ${ride.status}. " +
+                            "No contiene teléfono ni ubicación exacta.",
+                    )
+                }
+                runCatching {
+                    context.startActivity(
+                        Intent.createChooser(shareIntent, "Compartir estado del viaje"),
+                    )
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        "No hay una aplicación disponible para compartir.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
+            onOpenEmergencyDialer = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_DIAL))
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        "No se pudo abrir el marcador del dispositivo.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MeetColors.backgroundDark)
+            .verticalScroll(rememberScrollState())
     ) {
         // Ride Status Header
         val statusColor = when (ride.status) {
@@ -2369,37 +2420,6 @@ fun ActiveRidePanel(
                         }
                     }
 
-                    // In-app phone call (Intent)
-                    val phoneToCall = if (isDriver) ride.passengerPhone else ride.assignedDriverPhone
-                    if (!phoneToCall.isNullOrBlank()) {
-                        IconButton(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneToCall"))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "No se pudo realizar la llamada", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.cardBackground)
-                        ) {
-                            Icon(imageVector = Icons.Default.Phone, contentDescription = "Llamar", tint = MeetColors.cyberCyan)
-                        }
-                    }
-
-                    // Waze link shortcut for driver
-                    if (isDriver) {
-                        IconButton(
-                            onClick = { viewModel.openWaze(context, ride.pickupLatitude, ride.pickupLongitude) },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.cardBackground)
-                        ) {
-                            Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Waze", tint = MeetColors.neonGreen)
-                        }
-                    }
                 }
             }
         }
@@ -2459,6 +2479,27 @@ fun ActiveRidePanel(
                 Text("REPORTAR CONDICIÓN DE LA VÍA", fontWeight = FontWeight.Black, fontSize = 11.sp)
             }
         }
+        OutlinedButton(
+            onClick = { showGuardianDialog = true },
+            enabled = ride.serverVersion > 0L &&
+                ride.serverState in setOf(
+                    "ASSIGNED",
+                    "DRIVER_EN_ROUTE",
+                    "ARRIVED",
+                    "PASSENGER_ONBOARD",
+                    "IN_PROGRESS",
+                ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            border = BorderStroke(1.dp, Color(0xFFFF2D55)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF6B81)),
+        ) {
+            Icon(Icons.Default.Security, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("ELYSIUM GUARDIAN · SEGURIDAD", fontWeight = FontWeight.Black, fontSize = 11.sp)
+        }
 
         // Partner Info Card (Visible if ride is ACCEPTED or later status)
         if (ride.status != "OPEN") {
@@ -2479,40 +2520,17 @@ fun ActiveRidePanel(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = ride.passengerName,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Text(
-                                    text = "Teléfono: ${ride.passengerPhone}",
-                                    color = MeetColors.textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.passengerPhone}"))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Error al llamar", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
-                            ) {
-                                Icon(Icons.Default.Phone, null, tint = MeetColors.cyberCyan)
-                            }
-                        }
+                        Text(
+                            text = ride.passengerName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            text = "Contacto protegido: usa chat o nota de voz dentro del viaje.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                        )
                     } else {
                         // Pasajero viendo chofer
                         Text(
@@ -2555,25 +2573,12 @@ fun ActiveRidePanel(
                                 }
                             }
 
-                            val phone = ride.assignedDriverPhone
-                            if (!phone.isNullOrBlank()) {
-                                IconButton(
-                                    onClick = {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error al llamar", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
-                                ) {
-                                    Icon(Icons.Default.Phone, null, tint = MeetColors.cyberCyan)
-                                }
-                            }
                         }
+                        Text(
+                            text = "Contacto protegido: usa chat o nota de voz dentro del viaje.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                        )
                     }
                 }
             }
@@ -2610,7 +2615,7 @@ fun ActiveRidePanel(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(420.dp)
                     .background(MeetColors.backgroundDark)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

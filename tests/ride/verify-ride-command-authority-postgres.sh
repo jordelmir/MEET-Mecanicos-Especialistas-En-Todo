@@ -68,6 +68,7 @@ migrations=(
   "$repo_root/supabase/migrations/20260730020000_ride_command_authority.sql"
   "$repo_root/supabase/migrations/20260730030000_ride_passenger_driver_commands.sql"
   "$repo_root/supabase/migrations/20260730040000_ride_driver_pilot_enrollment.sql"
+  "$repo_root/supabase/migrations/20260730050000_ride_guardian_safety.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -85,6 +86,10 @@ psql \
 psql \
   "${psql_args[@]}" \
   -f "$repo_root/tests/ride/ride-driver-pilot-enrollment-integration.sql"
+
+psql \
+  "${psql_args[@]}" \
+  -f "$repo_root/tests/ride/ride-guardian-safety-integration.sql"
 
 psql \
   "${psql_args[@]}" \

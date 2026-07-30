@@ -35,6 +35,7 @@ data class RideCommandPayload(
     val fareMinor: Long? = null,
     val etaSeconds: Int? = null,
     val boardingPin: String? = null,
+    val safetySignalType: String? = null,
 )
 
 data class RideQueuedCommand(
@@ -384,6 +385,21 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                             "p_trip_id" to stringJson(rideId),
                             "p_pin" to stringJson(pin),
                         ),
+                    ),
+                )
+            }
+            RideCommandType.SAFETY_SIGNAL -> {
+                val signalType = payload.safetySignalType.nonBlank() ?: return null
+                RpcInvocation(
+                    functionName = "ride_signal_safety_v2",
+                    parameters = JsonObject(
+                        common + buildJsonObject {
+                            put("p_trip_id", rideId)
+                            put("p_signal_type", signalType)
+                            payload.detail?.takeIf(String::isNotBlank)?.let {
+                                put("p_detail", it)
+                            }
+                        },
                     ),
                 )
             }
