@@ -22,6 +22,8 @@ import com.elysium369.meet.ride.data.remote.RideQueuedCommand
 import com.elysium369.meet.ride.data.remote.RideSnapshotResult
 import com.elysium369.meet.ride.domain.RideCommandType
 import com.elysium369.meet.ride.domain.RideIdempotencyKey
+import com.elysium369.meet.ride.observability.RideObservability
+import com.elysium369.meet.ride.observability.RideTelemetryEventType
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.jan.supabase.gotrue.auth
@@ -57,6 +59,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
 
         var retryNeeded = false
         commands.forEach { entity ->
+            val commandStartedAt = System.currentTimeMillis()
             if (entity.actorSessionUserId != sessionUserId) {
                 retryNeeded = true
                 finishRetry(
@@ -85,6 +88,28 @@ class RideCommandSyncWorker @AssistedInject constructor(
             when (val result = gateway.execute(command)) {
                 is RideCommandGatewayResult.Accepted -> {
                     val now = System.currentTimeMillis()
+                    RideObservability.record(
+                        RideObservability.event(
+                            type = entity.commandType.successTelemetryType(),
+                            commandId = entity.idempotencyKey,
+                            tripId = entity.rideId,
+                            version = result.serverVersion,
+                            latencyMs = now - commandStartedAt,
+                            correlationId = result.correlationId,
+                        ),
+                    )
+                    if (entity.attemptCount > 1) {
+                        RideObservability.record(
+                            RideObservability.event(
+                                type = RideTelemetryEventType.SYNC_RECOVERED,
+                                commandId = entity.idempotencyKey,
+                                tripId = entity.rideId,
+                                version = result.serverVersion,
+                                latencyMs = now - commandStartedAt,
+                                correlationId = result.correlationId,
+                            ),
+                        )
+                    }
                     result.data.text("boarding_pin")?.let { pin ->
                         rideDao.storeAuthoritativeBoardingPin(
                             requestId = entity.rideId,
@@ -132,6 +157,17 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     }
                 }
                 is RideCommandGatewayResult.Rejected -> {
+                    RideObservability.record(
+                        RideObservability.event(
+                            type = result.rejectionTelemetryType(),
+                            commandId = entity.idempotencyKey,
+                            tripId = entity.rideId,
+                            version = result.currentServerVersion,
+                            latencyMs = System.currentTimeMillis() - commandStartedAt,
+                            correlationId = result.correlationId,
+                            errorCode = result.code,
+                        ),
+                    )
                     val isConflict = result.code in CONFLICT_CODES
                     if (isConflict) {
                         rideDao.markServerConflict(
@@ -175,6 +211,16 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     }
                 }
                 is RideCommandGatewayResult.TransportFailure -> {
+                    RideObservability.record(
+                        RideObservability.event(
+                            type = RideTelemetryEventType.SYNC_FAILED,
+                            commandId = entity.idempotencyKey,
+                            tripId = entity.rideId,
+                            version = entity.expectedVersion,
+                            latencyMs = System.currentTimeMillis() - commandStartedAt,
+                            errorCode = result.code,
+                        ),
+                    )
                     if (entity.attemptCount < MAX_ATTEMPTS) {
                         retryNeeded = true
                         finishRetry(
@@ -309,6 +355,29 @@ class RideCommandSyncWorker @AssistedInject constructor(
         }
     }
 }
+
+private fun String.successTelemetryType(): RideTelemetryEventType = when (this) {
+    RideCommandType.PUBLISH.name -> RideTelemetryEventType.RIDE_PUBLISHED
+    RideCommandType.SUBMIT_OFFER.name -> RideTelemetryEventType.OFFER_SUBMITTED
+    RideCommandType.ACCEPT_OFFER.name -> RideTelemetryEventType.OFFER_ACCEPTED
+    RideCommandType.CLAIM.name -> RideTelemetryEventType.ASSIGNMENT_WON
+    RideCommandType.DRIVER_EN_ROUTE.name -> RideTelemetryEventType.DRIVER_EN_ROUTE
+    RideCommandType.DRIVER_ARRIVED.name -> RideTelemetryEventType.DRIVER_ARRIVED
+    RideCommandType.ISSUE_BOARDING_PIN.name -> RideTelemetryEventType.PIN_ISSUED
+    RideCommandType.VERIFY_BOARDING_PIN.name -> RideTelemetryEventType.PIN_VERIFIED
+    RideCommandType.START.name -> RideTelemetryEventType.RIDE_STARTED
+    RideCommandType.COMPLETE.name -> RideTelemetryEventType.RIDE_COMPLETED
+    RideCommandType.CANCEL.name -> RideTelemetryEventType.RIDE_CANCELLED
+    RideCommandType.SAFETY_SIGNAL.name -> RideTelemetryEventType.SAFETY_CHECK_TRIGGERED
+    RideCommandType.OPEN_SUPPORT_CASE.name -> RideTelemetryEventType.SUPPORT_CASE_OPENED
+    else -> RideTelemetryEventType.RIDE_CREATED
+}
+
+private fun RideCommandGatewayResult.Rejected.rejectionTelemetryType():
+    RideTelemetryEventType = when (code) {
+        "ALREADY_ASSIGNED" -> RideTelemetryEventType.ASSIGNMENT_LOST
+        else -> RideTelemetryEventType.SYNC_FAILED
+    }
 
 object RideCommandRetryPolicy {
     private const val BASE_DELAY_MS = 15_000L
