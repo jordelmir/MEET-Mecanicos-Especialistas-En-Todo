@@ -24,7 +24,7 @@ class RideLifecycleTest {
             request(
                 RideState.ARRIVED,
                 RideState.PASSENGER_ONBOARD,
-                passenger,
+                driver,
                 pinVerified = true,
             ),
             request(RideState.PASSENGER_ONBOARD, RideState.IN_PROGRESS, driver),
@@ -39,11 +39,14 @@ class RideLifecycleTest {
     @Test
     fun `boarding is denied until trip pin is verified`() {
         val decision = RideLifecyclePolicy.decide(
-            request(RideState.ARRIVED, RideState.PASSENGER_ONBOARD, passenger),
+            request(RideState.ARRIVED, RideState.PASSENGER_ONBOARD, driver),
         )
 
         assertTrue(decision is TransitionDecision.Denied)
-        assertEquals("PIN de viaje requerido", (decision as TransitionDecision.Denied).reason)
+        assertEquals(
+            RideDomainErrorCode.PIN_REQUIRED,
+            (decision as TransitionDecision.Denied).error.code,
+        )
     }
 
     @Test
@@ -55,8 +58,8 @@ class RideLifecycleTest {
         )
 
         assertEquals(
-            TransitionDecision.Denied("Actor no autorizado para este viaje"),
-            decision,
+            RideDomainErrorCode.FORBIDDEN,
+            (decision as TransitionDecision.Denied).error.code,
         )
     }
 
@@ -75,12 +78,78 @@ class RideLifecycleTest {
     }
 
     @Test
-    fun `a participant may request a safety hold during an active trip`() {
-        val decision = RideLifecyclePolicy.decide(
-            request(RideState.IN_PROGRESS, RideState.SAFETY_HOLD, passenger),
+    fun `safety hold is operational metadata and never replaces canonical ride state`() {
+        val hold = RideOperationalHold(
+            rideId = "ride-1",
+            type = RideOperationalHoldType.SAFETY_REVIEW,
+            requestedBy = passenger,
+            reasonCode = "PASSENGER_REQUESTED_REVIEW",
         )
 
-        assertEquals(TransitionDecision.Allowed, decision)
+        assertEquals("ride-1", hold.rideId)
+        assertEquals(RideOperationalHoldType.SAFETY_REVIEW, hold.type)
+        assertEquals(RideState.IN_PROGRESS, RideState.IN_PROGRESS)
+    }
+
+    @Test
+    fun `stale expected version is rejected with a stable conflict code`() {
+        val decision = RideLifecyclePolicy.decide(
+            request(
+                from = RideState.ASSIGNED,
+                to = RideState.DRIVER_EN_ROUTE,
+                actor = driver,
+                expectedVersion = 6,
+                currentVersion = 7,
+            ),
+        )
+
+        assertEquals(
+            RideDomainErrorCode.VERSION_CONFLICT,
+            (decision as TransitionDecision.Denied).error.code,
+        )
+    }
+
+    @Test
+    fun `system or dispatcher can assign a searching ride directly`() {
+        val system = RideActor("system", RideActorRole.SYSTEM)
+        val dispatcher = RideActor("dispatcher-1", RideActorRole.DISPATCHER)
+
+        assertEquals(
+            TransitionDecision.Allowed,
+            RideLifecyclePolicy.decide(
+                request(RideState.SEARCHING, RideState.ASSIGNED, system),
+            ),
+        )
+        assertEquals(
+            TransitionDecision.Allowed,
+            RideLifecyclePolicy.decide(
+                request(RideState.SEARCHING, RideState.ASSIGNED, dispatcher),
+            ),
+        )
+    }
+
+    @Test
+    fun `cancelled or completed rides can open a dispute but cannot become active`() {
+        assertEquals(
+            TransitionDecision.Allowed,
+            RideLifecyclePolicy.decide(
+                request(RideState.CANCELLED, RideState.DISPUTED, passenger),
+            ),
+        )
+        assertEquals(
+            TransitionDecision.Allowed,
+            RideLifecyclePolicy.decide(
+                request(RideState.COMPLETED, RideState.DISPUTED, driver),
+            ),
+        )
+        assertEquals(
+            RideDomainErrorCode.TERMINAL_STATE,
+            (
+                RideLifecyclePolicy.decide(
+                    request(RideState.CANCELLED, RideState.SEARCHING, passenger),
+                ) as TransitionDecision.Denied
+                ).error.code,
+        )
     }
 
     private fun request(
@@ -88,11 +157,15 @@ class RideLifecycleTest {
         to: RideState,
         actor: RideActor,
         pinVerified: Boolean = false,
+        expectedVersion: Long = 7,
+        currentVersion: Long = 7,
     ) = RideTransitionRequest(
         from = from,
         to = to,
         actor = actor,
         parties = parties,
         pinVerified = pinVerified,
+        expectedVersion = RideVersion.of(expectedVersion),
+        currentVersion = RideVersion.of(currentVersion),
     )
 }

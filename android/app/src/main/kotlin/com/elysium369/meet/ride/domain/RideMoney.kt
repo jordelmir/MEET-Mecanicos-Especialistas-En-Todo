@@ -39,20 +39,11 @@ data class RideMoney(
     }
 
     fun commission(basisPoints: Int = DEFAULT_COMMISSION_BASIS_POINTS): RideMoney {
-        require(basisPoints in 0..BASIS_POINTS_SCALE) {
-            "Commission basis points must be between 0 and $BASIS_POINTS_SCALE"
-        }
-
-        // Splitting quotient and remainder prevents Long overflow for valid fares.
-        val wholeUnits = minorUnits / BASIS_POINTS_SCALE
-        val fractionalUnits = minorUnits % BASIS_POINTS_SCALE
-        val wholeCommission = Math.multiplyExact(wholeUnits, basisPoints.toLong())
-        val fractionalCommission = (
-            fractionalUnits * basisPoints.toLong() + HALF_BASIS_POINT_SCALE
-            ) / BASIS_POINTS_SCALE
-
         return copy(
-            minorUnits = Math.addExact(wholeCommission, fractionalCommission),
+            minorUnits = CommissionCalculator.calculate(
+                base = AmountMinor.of(minorUnits),
+                rate = BasisPoints.of(basisPoints),
+            ).value,
         )
     }
 
@@ -63,9 +54,8 @@ data class RideMoney(
     }
 
     companion object {
-        const val DEFAULT_COMMISSION_BASIS_POINTS = 500
-        private const val BASIS_POINTS_SCALE = 10_000L
-        private const val HALF_BASIS_POINT_SCALE = BASIS_POINTS_SCALE / 2
+        const val DEFAULT_COMMISSION_BASIS_POINTS =
+            RideCommissionPolicy.PLATFORM_RATE_BASIS_POINTS
 
         fun of(minorUnits: Long, currency: String): RideMoney =
             RideMoney(minorUnits, CurrencyCode.of(currency))

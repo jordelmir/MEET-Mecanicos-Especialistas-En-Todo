@@ -73,6 +73,7 @@ object RideCancellationPolicy {
                 RideCancellationReason.MEDICAL_EMERGENCY,
                 RideCancellationReason.OTHER,
             )
+            RideActorRole.DISPATCHER,
             RideActorRole.SYSTEM,
             RideActorRole.SAFETY_OPERATOR,
             -> listOf(RideCancellationReason.OTHER)
