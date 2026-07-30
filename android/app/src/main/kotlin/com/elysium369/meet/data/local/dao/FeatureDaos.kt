@@ -745,10 +745,12 @@ interface RideDao {
             completedAt = :completedAt
         WHERE requestId = :requestId
           AND status = :expectedStatus
+          AND assignedDriverId = :driverId
         """
     )
-    suspend fun transitionRequestStatus(
+    suspend fun transitionRequestStatusAsDriver(
         requestId: String,
+        driverId: String,
         expectedStatus: String,
         newStatus: String,
         completedAt: Long?,
@@ -761,10 +763,16 @@ interface RideDao {
             completedAt = :cancelledAt
         WHERE requestId = :requestId
           AND status IN ('OPEN', 'ACCEPTED', 'ARRIVED', 'PASSENGER_ONBOARD', 'IN_PROGRESS')
+          AND (
+              (:actorRole = 'PASSENGER' AND passengerId = :actorId)
+              OR (:actorRole = 'DRIVER' AND assignedDriverId = :actorId)
+          )
         """
     )
     suspend fun cancelActiveRequest(
         requestId: String,
+        actorId: String,
+        actorRole: String,
         cancelledAt: Long,
     ): Int
 
