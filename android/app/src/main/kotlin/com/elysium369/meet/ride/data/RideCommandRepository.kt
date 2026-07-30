@@ -102,6 +102,17 @@ class RideCommandRepository @Inject constructor(
                 "SAFETY_SIGNAL requiere una señal tipada",
             )
         }
+        if (
+            envelope.type == RideCommandType.OPEN_SUPPORT_CASE &&
+            (
+                payload.supportCategory.isNullOrBlank() ||
+                    payload.supportSummary?.trim()?.length !in 10..1_000
+            )
+        ) {
+            return RideCommandEnqueueResult.InvalidCommand(
+                "OPEN_SUPPORT_CASE requiere categoría y descripción válida",
+            )
+        }
         val sessionUserId = SupabaseModule.client.auth
             .currentUserOrNull()
             ?.id
@@ -169,6 +180,7 @@ class RideCommandRepository @Inject constructor(
             RideCommandType.CANCEL,
             RideCommandType.COMPLETE,
             RideCommandType.SAFETY_SIGNAL,
+            RideCommandType.OPEN_SUPPORT_CASE,
         )
     }
 }

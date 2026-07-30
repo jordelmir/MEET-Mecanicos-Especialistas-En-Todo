@@ -36,6 +36,9 @@ data class RideCommandPayload(
     val etaSeconds: Int? = null,
     val boardingPin: String? = null,
     val safetySignalType: String? = null,
+    val supportCategory: String? = null,
+    val supportSummary: String? = null,
+    val evidenceManifestSha256: String? = null,
 )
 
 data class RideQueuedCommand(
@@ -399,6 +402,23 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                             payload.detail?.takeIf(String::isNotBlank)?.let {
                                 put("p_detail", it)
                             }
+                        },
+                    ),
+                )
+            }
+            RideCommandType.OPEN_SUPPORT_CASE -> {
+                val category = payload.supportCategory.nonBlank() ?: return null
+                val summary = payload.supportSummary.nonBlank() ?: return null
+                RpcInvocation(
+                    functionName = "ride_open_support_case_v2",
+                    parameters = JsonObject(
+                        common + buildJsonObject {
+                            put("p_trip_id", rideId)
+                            put("p_category", category)
+                            put("p_issue_summary", summary)
+                            payload.evidenceManifestSha256
+                                ?.takeIf(String::isNotBlank)
+                                ?.let { put("p_evidence_manifest_sha256", it) }
                         },
                     ),
                 )

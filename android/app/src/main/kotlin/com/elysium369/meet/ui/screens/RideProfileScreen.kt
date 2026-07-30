@@ -1,10 +1,13 @@
 package com.elysium369.meet.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ride.domain.RideProfileAnalytics
 import com.elysium369.meet.ride.domain.RideProfileSummary
+import com.elysium369.meet.ride.domain.RideSupportCategory
+import com.elysium369.meet.ride.domain.RideSupportPolicy
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.DateFormat
@@ -39,6 +45,7 @@ fun RideProfileScreen(
     isDriver: Boolean,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val rides by viewModel.rideRequests.collectAsState()
     val driver by viewModel.driverVerification.collectAsState()
     val passenger by viewModel.passengerVerification.collectAsState()
@@ -49,7 +56,7 @@ fun RideProfileScreen(
     }
     val name = if (isDriver) driver?.fullName else passenger?.fullName
     val roleRides = remember(rides, id, isDriver) {
-        if (id == null) emptyList() else if (isDriver) {
+        if (isDriver) {
             rides.filter { it.assignedDriverId == id }
         } else {
             rides.filter { it.passengerId == id }
@@ -63,6 +70,24 @@ fun RideProfileScreen(
         }
     }
     var tab by remember { mutableIntStateOf(0) }
+    var supportRide by remember { mutableStateOf<RideRequestEntity?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.rideSupportFeedback.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    supportRide?.let { ride ->
+        RideSupportCaseDialog(
+            ride = ride,
+            onDismiss = { supportRide = null },
+            onSubmit = { category, summary ->
+                viewModel.openRideSupportCase(ride.requestId, category, summary)
+                supportRide = null
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -100,7 +125,11 @@ fun RideProfileScreen(
             when (tab) {
                 0 -> RideProfileOverview(name, isDriver, summary)
                 1 -> RideHistoryPanel(roleRides)
-                else -> RideSupportPanel(summary, roleRides)
+                else -> RideSupportPanel(
+                    summary = summary,
+                    rides = roleRides,
+                    onOpenCase = { supportRide = it },
+                )
             }
         }
     }
@@ -286,7 +315,11 @@ private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
 }
 
 @Composable
-private fun RideSupportPanel(summary: RideProfileSummary?, rides: List<RideRequestEntity>) {
+private fun RideSupportPanel(
+    summary: RideProfileSummary?,
+    rides: List<RideRequestEntity>,
+    onOpenCase: (RideRequestEntity) -> Unit,
+) {
     val currentLocale = rememberRideJavaLocale()
     val dateFormat = remember(currentLocale) {
         DateFormat.getDateInstance(DateFormat.DEFAULT, currentLocale)
@@ -314,6 +347,47 @@ private fun RideSupportPanel(summary: RideProfileSummary?, rides: List<RideReque
                     color = MeetColors.textMuted,
                     fontSize = 10.sp,
                 )
+            }
+        }
+        if (rides.isNotEmpty()) {
+            item {
+                Text(
+                    "ABRIR CASO POR VIAJE",
+                    color = MeetColors.cyberCyan,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                )
+            }
+            items(rides.sortedByDescending { it.createdAt }.take(10)) { ride ->
+                OutlinedButton(
+                    onClick = { onOpenCase(ride) },
+                    enabled = ride.serverVersion > 0L,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.45f)),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start,
+                    ) {
+                        Text(
+                            "${dateFormat.format(Date(ride.createdAt))} · ${ride.status}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        )
+                        Text(
+                            if (ride.serverVersion > 0L) {
+                                "${ride.pickupAddress} → ${ride.destAddress}"
+                            } else {
+                                "Pendiente de confirmación remota; soporte no disponible todavía."
+                            },
+                            color = MeetColors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 9.sp,
+                        )
+                    }
+                }
             }
         }
         val cancelled = rides.filter { it.status == "CANCELLED" }.sortedByDescending { it.createdAt }
@@ -355,6 +429,111 @@ private fun RideSupportPanel(summary: RideProfileSummary?, rides: List<RideReque
             }
         }
     }
+}
+
+@Composable
+private fun RideSupportCaseDialog(
+    ride: RideRequestEntity,
+    onDismiss: () -> Unit,
+    onSubmit: (RideSupportCategory, String) -> Unit,
+) {
+    var category by remember { mutableStateOf<RideSupportCategory?>(null) }
+    var summary by remember { mutableStateOf("") }
+    val valid = category != null && RideSupportPolicy.isValidSummary(summary)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF071019),
+        title = {
+            Column {
+                Text(
+                    "NUEVO CASO DE SOPORTE",
+                    color = MeetColors.cyberCyan,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Viaje ${ride.requestId.take(8)} · ${ride.status}",
+                    color = MeetColors.textMuted,
+                    fontSize = 10.sp,
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .height(460.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Elige la categoría real. Un caso financiero podrá referenciar un ajuste compensatorio aprobado, pero soporte nunca edita el ledger.",
+                    color = MeetColors.warning,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                )
+                RideSupportCategory.entries.forEach { item ->
+                    OutlinedButton(
+                        onClick = { category = item },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            if (category == item) MeetColors.cyberCyan else MeetColors.borderSubtle,
+                        ),
+                    ) {
+                        Text(
+                            item.supportLabel(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = summary,
+                    onValueChange = { summary = it.take(RideSupportPolicy.MAX_SUMMARY_LENGTH) },
+                    label = { Text("Describe lo ocurrido") },
+                    supportingText = {
+                        Text(
+                            "${summary.trim().length}/${RideSupportPolicy.MAX_SUMMARY_LENGTH} · mínimo ${RideSupportPolicy.MIN_SUMMARY_LENGTH}",
+                        )
+                    },
+                    minLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    category?.let { onSubmit(it, summary.trim()) }
+                },
+                enabled = valid,
+                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+            ) {
+                Text("ENVIAR CASO", fontWeight = FontWeight.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("VOLVER")
+            }
+        },
+    )
+}
+
+private fun RideSupportCategory.supportLabel(): String = when (this) {
+    RideSupportCategory.LOST_ITEM -> "Objeto perdido"
+    RideSupportCategory.WRONG_CHARGE -> "Cobro incorrecto"
+    RideSupportCategory.WRONG_DRIVER -> "Conductor no coincide"
+    RideSupportCategory.WRONG_PASSENGER -> "Pasajero no coincide"
+    RideSupportCategory.ROUTE_ISSUE -> "Problema con la ruta"
+    RideSupportCategory.ACCIDENT -> "Accidente"
+    RideSupportCategory.CANCELLATION -> "Cancelación"
+    RideSupportCategory.PAYMENT -> "Pago"
+    RideSupportCategory.COMMISSION -> "Comisión"
+    RideSupportCategory.DOCUMENT -> "Documento"
+    RideSupportCategory.BEHAVIOR -> "Comportamiento"
+    RideSupportCategory.OTHER -> "Otro"
 }
 
 @Composable

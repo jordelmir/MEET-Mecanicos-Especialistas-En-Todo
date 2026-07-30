@@ -67,6 +67,8 @@ import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ride.domain.RideGuardianPolicy
 import com.elysium369.meet.ride.domain.RideSafetySignalType
+import com.elysium369.meet.ride.domain.RideSupportCategory
+import com.elysium369.meet.ride.domain.RideSupportPolicy
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.VerificationFileEvidence
@@ -5724,6 +5726,8 @@ class ObdViewModel @Inject constructor(
     val ridePinFeedback: SharedFlow<String> = _ridePinFeedback.asSharedFlow()
     private val _rideSafetyFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val rideSafetyFeedback: SharedFlow<String> = _rideSafetyFeedback.asSharedFlow()
+    private val _rideSupportFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val rideSupportFeedback: SharedFlow<String> = _rideSupportFeedback.asSharedFlow()
 
     private val _driverPresetMessages = MutableStateFlow<List<String>>(listOf(
         "Ya me encuentro en la ubicación",
@@ -6548,6 +6552,43 @@ class ObdViewModel @Inject constructor(
                 is RideCommandEnqueueResult.InvalidCommand -> result.message
             }
             _rideSafetyFeedback.emit(message)
+        }
+    }
+
+    fun openRideSupportCase(
+        requestId: String,
+        category: RideSupportCategory,
+        summary: String,
+    ) {
+        if (!RideSupportPolicy.isValidSummary(summary)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (request.serverVersion <= 0L) {
+                _rideSupportFeedback.emit(
+                    "Este viaje aún no tiene una versión confirmada por el servidor.",
+                )
+                return@launch
+            }
+            val result = enqueueAuthoritativeRideCommand(
+                request = request,
+                type = RideCommandType.OPEN_SUPPORT_CASE,
+                payload = RideCommandPayload(
+                    supportCategory = category.name,
+                    supportSummary = summary.trim(),
+                ),
+            )
+            val message = when (result) {
+                RideCommandEnqueueResult.Enqueued ->
+                    "Caso enviado. Soporte lo confirmará con un identificador autoritativo."
+                RideCommandEnqueueResult.AlreadyQueued ->
+                    "Este caso ya está pendiente de confirmación."
+                RideCommandEnqueueResult.AuthenticationRequired ->
+                    "Inicia sesión para abrir un caso protegido."
+                is RideCommandEnqueueResult.IdempotencyConflict ->
+                    "El caso no se duplicó porque existe un conflicto local."
+                is RideCommandEnqueueResult.InvalidCommand -> result.message
+            }
+            _rideSupportFeedback.emit(message)
         }
     }
 

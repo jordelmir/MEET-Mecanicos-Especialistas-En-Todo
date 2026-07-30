@@ -75,6 +75,7 @@ enum class RideCommandType {
     RATE,
     BLOCK_COUNTERPARTY,
     SAFETY_SIGNAL,
+    OPEN_SUPPORT_CASE,
 }
 
 data class RideCommandEnvelope(
