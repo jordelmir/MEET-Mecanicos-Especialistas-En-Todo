@@ -103,6 +103,31 @@ repuestos, reportes y contratos de paridad permanecen intactos.
 | 10 | Safety, soporte, disputas, privacidad, accesibilidad y fraude | F7/F9 | Pruebas negativas y UX |
 | 11 | Observabilidad, SLO, operación, rollout CR, APK y evidencia | Todas | Release checklist completo |
 
+## Estado de ejecución — Android 4.7.0
+
+Este estado distingue el vertical verificable que ya existe de las capacidades
+que todavía requieren infraestructura o validación de producción. No se marca
+como terminada una integración externa por existir una pantalla.
+
+| Fase | Estado 4.7.0 | Evidencia / pendiente |
+|---:|---|---|
+| 0 | Completa local | Auditoría, arquitectura, trazabilidad y baseline documentados |
+| 1 | Completa local | Dinero entero, moneda, comisión de 500 bps y bordes probados |
+| 2 | Completa local | Journal/postings balanceados, reserva, captura y reverso |
+| 3 | Completa local | Commands actor-bound, CAS, idempotencia, RLS y concurrencia 100→1 |
+| 4 | Completa local | Gateway remoto, outbox durable, ACK/retry/dead-letter y reconciliación |
+| 5 | Completa para piloto | Solicitud, paradas, oferta, PIN y recibo usan autoridad remota |
+| 6 | Completa para piloto | Alta honesta, disponibilidad, claim, ciclo y liquidación del conductor |
+| 7 | Completa para piloto | Realtime autenticado, catch-up, reconexión y heartbeat foreground |
+| 8 | Completa para piloto | Ruta vial OSRM; ausencia del proveedor se muestra sin línea falsa |
+| 9 | Frontera completa; producto avanzado pendiente | `tenant_id`, memberships y RLS probada; faltan consola de federación/dispatcher y programados |
+| 10 | Núcleo completo; extensiones pendientes | Guardian, hold operativo, soporte y privacidad; faltan proveedor real de contactos/autoridades y antifraude avanzado |
+| 11 | Gate local completo; producción pendiente | Observabilidad sin PII, APK y documentación; faltan colector externo, SLO medidos, staging y rollout controlado |
+
+La activación comercial mundial sigue condicionada a regulación por
+jurisdicción, Supabase de staging/producción, proveedores con SLA, pruebas de
+carga, operación de soporte y validación física multidispositivo.
+
 ## Trazabilidad de las 51 secciones
 
 | Orden | Capacidad | Fase | Identificador |
