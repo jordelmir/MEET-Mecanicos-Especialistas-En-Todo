@@ -87,6 +87,7 @@ fun RideMapPanel(
     var userControlsCamera by remember { mutableStateOf(false) }
     var lastCameraSignature by remember { mutableStateOf<String?>(null) }
     var pinSelectionPoint by remember { mutableStateOf(pinSelectionInitialPoint) }
+    var pinCameraInitialized by remember { mutableStateOf(false) }
     var recenterRequest by remember { mutableIntStateOf(0) }
     val currentPinSelectionEnabled by rememberUpdatedState(pinSelectionEnabled)
     val currentOnPinSelectionChanged by rememberUpdatedState(onPinSelectionChanged)
@@ -119,11 +120,14 @@ fun RideMapPanel(
         }
     }
 
-    LaunchedEffect(pinSelectionEnabled, pinSelectionInitialPoint, latestMap, styleReady) {
+    val pinInitialPointAvailable = pinSelectionInitialPoint != null
+    LaunchedEffect(pinSelectionEnabled, pinInitialPointAvailable, latestMap, styleReady) {
         if (!pinSelectionEnabled) return@LaunchedEffect
+        if (pinCameraInitialized) return@LaunchedEffect
         val map = latestMap ?: return@LaunchedEffect
         if (!styleReady) return@LaunchedEffect
         pinSelectionInitialPoint?.let { point ->
+            pinCameraInitialized = true
             pinSelectionPoint = point
             userControlsCamera = true
             map.animateCamera(
