@@ -15,7 +15,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,12 +49,21 @@ fun RideMapPanel(
     state: RideMapState,
     modifier: Modifier = Modifier,
     styleUrl: String = BuildConfig.RIDE_MAP_STYLE_URL,
+    fallbackStyleUrl: String = BuildConfig.RIDE_MAP_STYLE_FALLBACK_URL,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var styleRequested by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
     var mapError by remember { mutableStateOf<String?>(null) }
+    var selectedStyleIndex by remember { mutableIntStateOf(0) }
+    var latestMap by remember { mutableStateOf<MapLibreMap?>(null) }
+    val styleCandidates = remember(styleUrl, fallbackStyleUrl) {
+        listOf(styleUrl, fallbackStyleUrl)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+    }
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
         MapView(context).apply { onCreate(null) }
@@ -60,6 +71,19 @@ fun RideMapPanel(
     val failureListener = remember {
         MapView.OnDidFailLoadingMapListener { error ->
             mapError = error.ifBlank { "El proveedor de mapas no respondió" }
+        }
+    }
+
+    LaunchedEffect(mapError, latestMap, selectedStyleIndex, styleCandidates) {
+        val map = latestMap ?: return@LaunchedEffect
+        if (mapError == null || selectedStyleIndex >= styleCandidates.lastIndex) return@LaunchedEffect
+        selectedStyleIndex += 1
+        styleRequested = true
+        styleReady = false
+        map.setStyle(styleCandidates[selectedStyleIndex]) {
+            styleReady = true
+            mapError = null
+            renderRideState(context, map, state)
         }
     }
 
@@ -105,11 +129,12 @@ fun RideMapPanel(
             modifier = Modifier.fillMaxSize(),
             update = { view ->
                 view.getMapAsync { map ->
+                    latestMap = map
                     when {
                         styleReady -> renderRideState(context, map, state)
-                        !styleRequested -> {
+                        !styleRequested && styleCandidates.isNotEmpty() -> {
                             styleRequested = true
-                            map.setStyle(styleUrl) {
+                            map.setStyle(styleCandidates[selectedStyleIndex]) {
                                 styleReady = true
                                 mapError = null
                                 renderRideState(context, map, state)
@@ -128,7 +153,11 @@ fun RideMapPanel(
         }
         mapError?.let { error ->
             RideMapStatus(
-                message = "Mapa no disponible. Los datos del viaje siguen visibles.\n$error",
+                message = if (selectedStyleIndex < styleCandidates.lastIndex) {
+                    "Cambiando a mapa de respaldo. Los datos del viaje siguen visibles.\n$error"
+                } else {
+                    "Mapa no disponible. Los datos del viaje siguen visibles.\n$error"
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }

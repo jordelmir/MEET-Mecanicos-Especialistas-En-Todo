@@ -12,6 +12,7 @@ data class RideRoadRoute(
     val distanceMeters: Double,
     val durationSeconds: Double,
     val attribution: String,
+    val source: RideMapDataSource = RideMapDataSource.NETWORK,
 ) {
     init {
         require(geometry.size >= 2) { "Road route requires at least two points" }
@@ -29,6 +30,7 @@ class RideRoutingException(message: String) : Exception(message)
 
 class OsrmRideRoutingProvider(
     private val endpoint: String,
+    private val providerLabel: String = "OSRM",
 ) : RideRoutingProvider {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -65,6 +67,7 @@ class OsrmRideRoutingProvider(
                 raw = connection.inputStream.bufferedReader().use { it.readText() },
                 capturedAtEpochMs = System.currentTimeMillis(),
                 json = json,
+                providerLabel = providerLabel,
             )
         } finally {
             connection.disconnect()
@@ -96,6 +99,7 @@ internal fun parseOsrmRoute(
     raw: String,
     capturedAtEpochMs: Long,
     json: Json = Json { ignoreUnknownKeys = true },
+    providerLabel: String = "OSRM",
 ): RideRoadRoute {
     val response = runCatching {
         json.decodeFromString<OsrmRouteResponse>(raw)
@@ -132,6 +136,6 @@ internal fun parseOsrmRoute(
         geometry = points,
         distanceMeters = route.distance,
         durationSeconds = route.duration,
-        attribution = "Ruta OSRM · © OpenStreetMap contributors",
+        attribution = "Ruta $providerLabel · © OpenStreetMap contributors",
     )
 }

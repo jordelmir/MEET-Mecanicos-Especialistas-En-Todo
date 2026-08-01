@@ -48,7 +48,6 @@ import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ride.domain.RideTripPlanPolicy
-import com.elysium369.meet.ride.map.PhotonRidePlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSuggestion
 import com.elysium369.meet.ride.map.distanceKmFrom
@@ -60,8 +59,10 @@ import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideMapStateFactory
 import com.elysium369.meet.ride.map.RideMapMarker
 import com.elysium369.meet.ride.map.RideMarkerRole
-import com.elysium369.meet.ride.map.OsrmRideRoutingProvider
 import com.elysium369.meet.ride.map.RideRoadRoute
+import com.elysium369.meet.ride.map.RideMapDataSource
+import com.elysium369.meet.ride.map.resilientRidePlaceSearchProvider
+import com.elysium369.meet.ride.map.resilientRideRoutingProvider
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
@@ -283,10 +284,16 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     var stops by remember { mutableStateOf(emptyList<RideStopSnapshot>()) }
     var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
     val placeSearchProvider = remember {
-        PhotonRidePlaceSearchProvider(BuildConfig.RIDE_GEOCODER_URL)
+        resilientRidePlaceSearchProvider(
+            primaryEndpoint = BuildConfig.RIDE_GEOCODER_URL,
+            fallbackEndpoint = BuildConfig.RIDE_GEOCODER_FALLBACK_URL,
+        )
     }
     val routingProvider = remember {
-        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+        resilientRideRoutingProvider(
+            primaryEndpoint = BuildConfig.RIDE_ROUTER_URL,
+            fallbackEndpoint = BuildConfig.RIDE_ROUTER_FALLBACK_URL,
+        )
     }
     var previewRoadRoute by remember { mutableStateOf<RideRoadRoute?>(null) }
     var routeSearchLoading by remember { mutableStateOf(false) }
@@ -697,6 +704,14 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                         fontSize = 10.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (suggestion.source == RideMapDataSource.CACHE) {
+                                    Text(
+                                        "Caché local reciente",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                                 }
@@ -1891,7 +1906,10 @@ fun ActiveRidePanel(
             )
         }
     val routingProvider = remember {
-        OsrmRideRoutingProvider(BuildConfig.RIDE_ROUTER_URL)
+        resilientRideRoutingProvider(
+            primaryEndpoint = BuildConfig.RIDE_ROUTER_URL,
+            fallbackEndpoint = BuildConfig.RIDE_ROUTER_FALLBACK_URL,
+        )
     }
     var activeRoadRoute by remember(ride.requestId) {
         mutableStateOf<RideRoadRoute?>(null)
