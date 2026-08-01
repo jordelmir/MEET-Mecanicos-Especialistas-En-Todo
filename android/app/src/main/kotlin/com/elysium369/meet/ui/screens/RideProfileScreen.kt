@@ -3,7 +3,9 @@ package com.elysium369.meet.ui.screens
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.*
@@ -22,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,6 +38,12 @@ import com.elysium369.meet.ride.domain.RideProfileSummary
 import com.elysium369.meet.ride.domain.RideDriverVehicleSummary
 import com.elysium369.meet.ride.domain.RideSupportCategory
 import com.elysium369.meet.ride.domain.RideSupportPolicy
+import com.elysium369.meet.ride.map.RideDriverAvatar
+import com.elysium369.meet.ride.map.RideMapAvatarRenderer
+import com.elysium369.meet.ride.map.RideMapAvatarSelection
+import com.elysium369.meet.ride.map.RideMapAvatarStore
+import com.elysium369.meet.ride.map.RideMarkerRole
+import com.elysium369.meet.ride.map.RidePassengerAvatar
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.DateFormat
@@ -80,7 +90,7 @@ fun RideProfileScreen(
             RideProfileAnalytics.passenger(roleRides, id)
         }
     }
-    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
+    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
     var supportRide by remember { mutableStateOf<RideRequestEntity?>(null) }
     var showAddVehicle by remember { mutableStateOf(false) }
 
@@ -138,6 +148,7 @@ fun RideProfileScreen(
                     Icons.Default.Person to "Perfil",
                     Icons.Default.History to "Historial",
                     Icons.Default.SupportAgent to "Soporte",
+                    Icons.Default.LocationOn to "Iconos",
                 ).forEachIndexed { index, item ->
                     Tab(
                         selected = tab == index,
@@ -159,12 +170,179 @@ fun RideProfileScreen(
                     onActivateVehicle = viewModel::activateRideDriverVehicle,
                 )
                 1 -> RideHistoryPanel(roleRides)
-                else -> RideSupportPanel(
+                2 -> RideSupportPanel(
                     summary = summary,
                     rides = roleRides,
                     onOpenCase = { supportRide = it },
                 )
+                else -> RideMapAvatarPanel(isDriver = isDriver)
             }
+        }
+    }
+}
+
+@Composable
+private fun RideMapAvatarPanel(isDriver: Boolean) {
+    val context = LocalContext.current
+    val store = remember(context) { RideMapAvatarStore(context) }
+    var selection by remember(context) { mutableStateOf(store.load()) }
+    val role = if (isDriver) RideMarkerRole.DRIVER else RideMarkerRole.PASSENGER_GPS
+    val preview = remember(context, selection, role) {
+        RideMapAvatarRenderer.render(context, role, selection, sizeDp = 112)
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp, 18.dp, 16.dp, 80.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = .5f)),
+                shape = RoundedCornerShape(24.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF071A28), Color(0xFF160B2B), Color(0xFF071019)),
+                            ),
+                        )
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "IDENTIDAD EN EL MAPA",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.5.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        modifier = Modifier.size(132.dp),
+                        shape = CircleShape,
+                        color = Color(0xFF02080E).copy(alpha = .72f),
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = .5f)),
+                    ) {
+                        Image(
+                            bitmap = preview.asImageBitmap(),
+                            contentDescription = "Vista previa del icono seleccionado",
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        if (isDriver) selection.driver.displayName else selection.passenger.displayName,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        "Se usa en el mapa activo de Elysium Vanguard y no cambia datos de seguridad ni ubicación.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp,
+                    )
+                }
+            }
+        }
+        item {
+            Text(
+                if (isDriver) "ELIGE TU EMBLEMA DE CONDUCTOR" else "ELIGE TU AVATAR DE PASAJERO",
+                color = MeetColors.cyberCyan,
+                fontWeight = FontWeight.Black,
+                fontSize = 11.sp,
+                letterSpacing = 1.1.sp,
+            )
+        }
+        if (isDriver) {
+            items(RideDriverAvatar.entries, key = { it.storageId }) { avatar ->
+                val candidate = selection.copy(driver = avatar)
+                RideAvatarChoice(
+                    title = avatar.displayName,
+                    description = avatar.description,
+                    selected = selection.driver == avatar,
+                    preview = remember(context, avatar) {
+                        RideMapAvatarRenderer.render(context, RideMarkerRole.DRIVER, candidate, sizeDp = 72)
+                    },
+                    onClick = {
+                        selection = candidate
+                        store.save(candidate)
+                    },
+                )
+            }
+        } else {
+            items(RidePassengerAvatar.entries, key = { it.storageId }) { avatar ->
+                val candidate = selection.copy(passenger = avatar)
+                RideAvatarChoice(
+                    title = avatar.displayName,
+                    description = avatar.description,
+                    selected = selection.passenger == avatar,
+                    preview = remember(context, avatar) {
+                        RideMapAvatarRenderer.render(context, RideMarkerRole.PASSENGER_GPS, candidate, sizeDp = 72)
+                    },
+                    onClick = {
+                        selection = candidate
+                        store.save(candidate)
+                    },
+                )
+            }
+        }
+        item {
+            Text(
+                "Todos los diseños son originales de Elysium Vanguard. El catálogo queda preparado para añadir nuevas colecciones sin alterar el motor del mapa.",
+                color = MeetColors.textMuted,
+                fontSize = 10.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RideAvatarChoice(
+    title: String,
+    description: String,
+    selected: Boolean,
+    preview: android.graphics.Bitmap,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        color = if (selected) Color(0xFF0B2630) else Color(0xFF08141F),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MeetColors.neonGreen else MeetColors.borderSubtle,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                modifier = Modifier.size(72.dp),
+                shape = CircleShape,
+                color = Color(0xFF02080E),
+            ) {
+                Image(
+                    bitmap = preview.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                Text(description, color = MeetColors.textSecondary, fontSize = 10.sp)
+            }
+            Text(
+                if (selected) "ACTIVO" else "ELEGIR",
+                color = if (selected) MeetColors.neonGreen else MeetColors.cyberCyan,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+            )
         }
     }
 }
