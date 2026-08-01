@@ -20,6 +20,7 @@ data class RidePlaceSuggestion(
     val latitude: Double,
     val longitude: Double,
     val attribution: String,
+    val source: RideMapDataSource = RideMapDataSource.NETWORK,
 ) {
     val displayLabel: String =
         listOf(primaryLabel, secondaryLabel).filter(String::isNotBlank).distinct().joinToString(", ")
@@ -38,6 +39,7 @@ class RidePlaceSearchException(message: String) : Exception(message)
 
 class PhotonRidePlaceSearchProvider(
     private val endpoint: String,
+    private val providerLabel: String = "Photon",
 ) : RidePlaceSearchProvider {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -74,7 +76,11 @@ class PhotonRidePlaceSearchProvider(
             if (connection.responseCode !in 200..299) {
                 throw RidePlaceSearchException("Photon HTTP ${connection.responseCode}")
             }
-            parsePhotonResponse(connection.inputStream.bufferedReader().use { it.readText() }, json)
+            parsePhotonResponse(
+                raw = connection.inputStream.bufferedReader().use { it.readText() },
+                json = json,
+                providerLabel = providerLabel,
+            )
         } finally {
             connection.disconnect()
         }
@@ -129,6 +135,7 @@ private data class PhotonGeometry(
 internal fun parsePhotonResponse(
     raw: String,
     json: Json = Json { ignoreUnknownKeys = true },
+    providerLabel: String = "Photon",
 ): List<RidePlaceSuggestion> = runCatching {
     json.decodeFromString<PhotonResponse>(raw).features.mapNotNull { feature ->
         val longitude = feature.geometry.coordinates.getOrNull(0) ?: return@mapNotNull null
@@ -155,7 +162,7 @@ internal fun parsePhotonResponse(
             secondaryLabel = secondary,
             latitude = latitude,
             longitude = longitude,
-            attribution = "© OpenStreetMap contributors · Photon",
+            attribution = "© OpenStreetMap contributors · $providerLabel",
         )
     }
 }.getOrDefault(emptyList())

@@ -39,6 +39,10 @@ data class RideCommandPayload(
     val supportCategory: String? = null,
     val supportSummary: String? = null,
     val evidenceManifestSha256: String? = null,
+    val driverLatitude: String? = null,
+    val driverLongitude: String? = null,
+    val driverAccuracyMeters: String? = null,
+    val driverCapturedAt: String? = null,
 )
 
 data class RideQueuedCommand(
@@ -359,8 +363,25 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                     common + mapOf("p_trip_id" to stringJson(rideId)),
                 ),
             )
+            RideCommandType.DRIVER_ARRIVED -> {
+                val latitude = payload.driverLatitude.jsonNumber() ?: return null
+                val longitude = payload.driverLongitude.jsonNumber() ?: return null
+                val accuracy = payload.driverAccuracyMeters.jsonNumber() ?: return null
+                val capturedAt = payload.driverCapturedAt.nonBlank() ?: return null
+                RpcInvocation(
+                    functionName = "ride_driver_arrived_v3",
+                    parameters = JsonObject(
+                        common + buildJsonObject {
+                            put("p_trip_id", rideId)
+                            put("p_driver_latitude", latitude)
+                            put("p_driver_longitude", longitude)
+                            put("p_accuracy_meters", accuracy)
+                            put("p_captured_at", capturedAt)
+                        },
+                    ),
+                )
+            }
             RideCommandType.DRIVER_EN_ROUTE,
-            RideCommandType.DRIVER_ARRIVED,
             RideCommandType.START,
             -> RpcInvocation(
                 functionName = "ride_driver_transition_v2",

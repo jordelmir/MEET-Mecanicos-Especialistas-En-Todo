@@ -22,6 +22,7 @@ import com.elysium369.meet.core.blackbox.EvidenceCompiler
 import com.elysium369.meet.core.parts.PartsMarketplaceContract
 import com.elysium369.meet.core.services.WorkshopServiceCatalog
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.query.Columns
 import com.elysium369.meet.data.local.dao.TripDao
 import com.elysium369.meet.data.local.dao.MaintenanceAlertDao
@@ -44,6 +45,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.Calendar
 import java.util.UUID
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
@@ -63,6 +66,8 @@ import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
 import com.elysium369.meet.ride.domain.RideActorRole
+import com.elysium369.meet.ride.domain.RideArrivalPolicy
+import com.elysium369.meet.ride.domain.RideDriverVehicleSummary
 import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ride.domain.RideGuardianPolicy
@@ -85,6 +90,7 @@ import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.data.RideProjectionSyncPolicy
 import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
+import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.traffic.RideRoadIncident
@@ -140,6 +146,26 @@ private data class RemoteRideRoadIncident(
     val created_at: String? = null,
     val expires_at: String,
 )
+
+@Serializable
+private data class RemoteRideDriverVehicleSummary(
+    val id: String,
+    @kotlinx.serialization.SerialName("display_name") val displayName: String,
+    val make: String? = null,
+    val model: String? = null,
+    @kotlinx.serialization.SerialName("model_year") val modelYear: Int? = null,
+    val color: String? = null,
+    @kotlinx.serialization.SerialName("plate_masked") val plateMasked: String? = null,
+    @kotlinx.serialization.SerialName("fleet_name") val fleetName: String? = null,
+    val seats: Int,
+    @kotlinx.serialization.SerialName("verification_status") val verificationStatus: String,
+    @kotlinx.serialization.SerialName("is_active") val active: Boolean,
+) {
+    fun toDomain() = RideDriverVehicleSummary(
+        id, displayName, make, model, modelYear, color, plateMasked,
+        fleetName, seats, verificationStatus, active,
+    )
+}
 
 @Serializable
 private data class RemoteRideSpeedObservation(
@@ -5704,6 +5730,8 @@ class ObdViewModel @Inject constructor(
 
     private val _rideDriverMode = MutableStateFlow(false)
     val rideDriverMode: StateFlow<Boolean> = _rideDriverMode.asStateFlow()
+    private val _rideDriverVehicles = MutableStateFlow<List<RideDriverVehicleSummary>>(emptyList())
+    val rideDriverVehicles: StateFlow<List<RideDriverVehicleSummary>> = _rideDriverVehicles.asStateFlow()
 
     private val _rideSharingSelections =
         MutableStateFlow<Map<String, Set<RideShareCategory>>>(emptyMap())
@@ -5830,6 +5858,84 @@ class ObdViewModel @Inject constructor(
         _rideDriverMode.value = !_rideDriverMode.value
     }
 
+    fun recordDriverLiveness(evidenceSha256: String, capturedAtEpochMs: Long) {
+        if (!evidenceSha256.matches(Regex("[0-9a-f]{64}"))) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                SupabaseManager.client.postgrest.rpc(
+                    "ride_record_driver_liveness_v1",
+                    buildJsonObject {
+                        put("p_evidence_sha256", evidenceSha256)
+                        put("p_captured_at", Instant.ofEpochMilli(capturedAtEpochMs).toString())
+                    },
+                )
+            }.onFailure { error ->
+                Log.w("MeetRides", "Liveness evidence pending remote confirmation", error)
+                _rideVerificationNotice.emit(
+                    "Presencia validada en el dispositivo; la nube la confirmará al recuperar conexión.",
+                )
+            }
+        }
+    }
+
+    fun refreshRideDriverVehicles() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = currentCloudUserId() ?: return@launch
+            runCatching {
+                SupabaseManager.client.postgrest["ride_driver_vehicles"]
+                    .select {
+                        filter { eq("driver_id", userId) }
+                    }
+                    .decodeList<RemoteRideDriverVehicleSummary>()
+                    .map(RemoteRideDriverVehicleSummary::toDomain)
+            }.onSuccess { _rideDriverVehicles.value = it }
+                .onFailure { Log.w("MeetRides", "Vehicle fleet refresh failed", it) }
+        }
+    }
+
+    fun addRideDriverVehicle(
+        make: String,
+        model: String,
+        year: Int,
+        color: String,
+        plate: String,
+        fleetName: String?,
+    ) {
+        val normalized = listOf(make, model, color, plate).map(String::trim)
+        if (normalized.any(String::isBlank) || year !in 1900..2200) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                SupabaseManager.client.postgrest.rpc(
+                    "ride_upsert_driver_vehicle_v1",
+                    buildJsonObject {
+                        put("p_vehicle_id", UUID.randomUUID().toString())
+                        put("p_display_name", "$make $model $year $color")
+                        put("p_seats", 4)
+                        put("p_make", make.trim())
+                        put("p_model", model.trim())
+                        put("p_model_year", year)
+                        put("p_color", color.trim())
+                        put("p_plate_masked", plate.trim().uppercase())
+                        fleetName?.trim()?.takeIf(String::isNotBlank)?.let { put("p_fleet_name", it) }
+                    },
+                )
+            }.onSuccess { refreshRideDriverVehicles() }
+                .onFailure { _rideVerificationNotice.emit("No se pudo guardar el vehículo en la nube.") }
+        }
+    }
+
+    fun activateRideDriverVehicle(vehicleId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                SupabaseManager.client.postgrest.rpc(
+                    "ride_set_active_vehicle_v1",
+                    buildJsonObject { put("p_vehicle_id", vehicleId) },
+                )
+            }.onSuccess { refreshRideDriverVehicles() }
+                .onFailure { _rideVerificationNotice.emit("Sólo puedes activar un vehículo verificado.") }
+        }
+    }
+
     fun selectActiveRide(request: RideRequestEntity?) {
         _activeRideRequest.value = request
         jobOffersCollection?.cancel()
@@ -5883,7 +5989,10 @@ class ObdViewModel @Inject constructor(
         val gps = _currentGpsLocation.value ?: return
         val now = System.currentTimeMillis()
         val lifetimeMs = when (type) {
-            RideRoadIncidentType.POLICE_PRESENCE -> 20 * 60 * 1000L
+            RideRoadIncidentType.POLICE_PRESENCE,
+            RideRoadIncidentType.PUBLIC_POLICE,
+            RideRoadIncidentType.TRAFFIC_POLICE,
+            -> 20 * 60 * 1000L
             RideRoadIncidentType.TRAFFIC_CONTROL,
             RideRoadIncidentType.SLOW_TRAFFIC,
             RideRoadIncidentType.VERY_SLOW_TRAFFIC,
@@ -5893,7 +6002,10 @@ class ObdViewModel @Inject constructor(
             RideRoadIncidentType.STALLED_VEHICLE,
             RideRoadIncidentType.OBSTACLE,
             -> 90 * 60 * 1000L
-            RideRoadIncidentType.POTHOLE -> 6 * 60 * 60 * 1000L
+            RideRoadIncidentType.POTHOLE,
+            RideRoadIncidentType.SPEED_BUMP,
+            RideRoadIncidentType.FLOODING,
+            -> 6 * 60 * 60 * 1000L
         }
         val coarseCell = RideGeoCell.encode(gps.latitude, gps.longitude)
         val incident = RideRoadIncident(
@@ -6447,10 +6559,46 @@ class ObdViewModel @Inject constructor(
                 )
                 return@launch
             }
+            val commandPayload = if (command == RideCommandType.DRIVER_ARRIVED) {
+                val gps = _currentGpsLocation.value
+                val pickup = RideGeoPoint(
+                    latitude = request.pickupLatitude,
+                    longitude = request.pickupLongitude,
+                    accuracyMeters = request.pickupAccuracy,
+                    capturedAtEpochMs = request.createdAt,
+                )
+                val driverPoint = gps?.let {
+                    RideGeoPoint(
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        accuracyMeters = it.accuracy,
+                        capturedAtEpochMs = it.timestamp.coerceAtLeast(0L),
+                    )
+                }
+                val arrival = RideArrivalPolicy.evaluate(
+                    driver = driverPoint,
+                    pickup = pickup,
+                    nowEpochMs = System.currentTimeMillis(),
+                )
+                if (!arrival.allowed || gps == null) {
+                    val distance = arrival.distanceMeters?.let { " · ${it.toInt()} m" }.orEmpty()
+                    _rideVerificationNotice.emit(arrival.reason + distance)
+                    return@launch
+                }
+                RideCommandPayload(
+                    driverLatitude = gps.latitude.toString(),
+                    driverLongitude = gps.longitude.toString(),
+                    driverAccuracyMeters = gps.accuracy.toString(),
+                    driverCapturedAt = Instant.ofEpochMilli(gps.timestamp).toString(),
+                )
+            } else {
+                RideCommandPayload()
+            }
             val queued = reportRideCommandEnqueue(
                 result = enqueueAuthoritativeRideCommand(
                     request = request,
                     type = command,
+                    payload = commandPayload,
                 ),
                 acceptedMessage = when (command) {
                     RideCommandType.DRIVER_EN_ROUTE ->

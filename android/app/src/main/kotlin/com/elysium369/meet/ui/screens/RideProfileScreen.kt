@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -26,9 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ride.domain.RideProfileAnalytics
 import com.elysium369.meet.ride.domain.RideProfileSummary
+import com.elysium369.meet.ride.domain.RideDriverVehicleSummary
 import com.elysium369.meet.ride.domain.RideSupportCategory
 import com.elysium369.meet.ride.domain.RideSupportPolicy
 import com.elysium369.meet.ui.ObdViewModel
@@ -43,18 +46,26 @@ import java.util.Locale
 fun RideProfileScreen(
     viewModel: ObdViewModel,
     isDriver: Boolean,
+    initialTab: Int = 0,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val rides by viewModel.rideRequests.collectAsState()
     val driver by viewModel.driverVerification.collectAsState()
     val passenger by viewModel.passengerVerification.collectAsState()
+    val fleetVehicles by viewModel.rideDriverVehicles.collectAsState()
     val id = if (isDriver) {
         driver?.driverId ?: viewModel.currentRideActorId
     } else {
         passenger?.passengerId ?: viewModel.currentRideActorId
     }
     val name = if (isDriver) driver?.fullName else passenger?.fullName
+    val driverVehicleSummary = driver?.let {
+        listOf(it.vehicleMake, it.vehicleModel, it.vehicleYear.toString(), it.vehicleColor)
+            .filter(String::isNotBlank)
+            .joinToString(" ")
+    }
+    val driverPlate = driver?.vehiclePlate
     val roleRides = remember(rides, id, isDriver) {
         if (isDriver) {
             rides.filter { it.assignedDriverId == id }
@@ -69,8 +80,13 @@ fun RideProfileScreen(
             RideProfileAnalytics.passenger(roleRides, id)
         }
     }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
     var supportRide by remember { mutableStateOf<RideRequestEntity?>(null) }
+    var showAddVehicle by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isDriver) {
+        if (isDriver) viewModel.refreshRideDriverVehicles()
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.rideSupportFeedback.collect { message ->
@@ -85,6 +101,15 @@ fun RideProfileScreen(
             onSubmit = { category, summary ->
                 viewModel.openRideSupportCase(ride.requestId, category, summary)
                 supportRide = null
+            },
+        )
+    }
+    if (showAddVehicle) {
+        RideAddVehicleDialog(
+            onDismiss = { showAddVehicle = false },
+            onSubmit = { make, model, year, color, plate, fleet ->
+                viewModel.addRideDriverVehicle(make, model, year, color, plate, fleet)
+                showAddVehicle = false
             },
         )
     }
@@ -123,7 +148,16 @@ fun RideProfileScreen(
                 }
             }
             when (tab) {
-                0 -> RideProfileOverview(name, isDriver, summary)
+                0 -> RideProfileOverview(
+                    name = name,
+                    isDriver = isDriver,
+                    summary = summary,
+                    driverVehicleSummary = driverVehicleSummary,
+                    driverPlate = driverPlate,
+                    fleetVehicles = fleetVehicles,
+                    onAddVehicle = { showAddVehicle = true },
+                    onActivateVehicle = viewModel::activateRideDriverVehicle,
+                )
                 1 -> RideHistoryPanel(roleRides)
                 else -> RideSupportPanel(
                     summary = summary,
@@ -136,7 +170,16 @@ fun RideProfileScreen(
 }
 
 @Composable
-private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideProfileSummary) {
+private fun RideProfileOverview(
+    name: String?,
+    isDriver: Boolean,
+    summary: RideProfileSummary,
+    driverVehicleSummary: String?,
+    driverPlate: String?,
+    fleetVehicles: List<RideDriverVehicleSummary>,
+    onAddVehicle: () -> Unit,
+    onActivateVehicle: (String) -> Unit,
+) {
     val currentLocale = rememberRideJavaLocale()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -195,6 +238,83 @@ private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideP
             }
         }
         item { RideMetricGrid(summary, isDriver) }
+        if (isDriver) {
+            item {
+                ProfileSection("AUTOS Y FLOTILLAS") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MeetColors.neonGreen.copy(alpha = 0.14f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("◆", color = MeetColors.neonGreen, fontSize = 20.sp)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                driverVehicleSummary ?: "Sin vehículo activo confirmado",
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                            )
+                            Text(
+                                driverPlate?.takeIf(String::isNotBlank)?.let { "Placa: $it · ACTIVO" }
+                                    ?: "Placa: dato no capturado",
+                                color = MeetColors.textMuted,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
+                    Text(
+                        "La cuenta admite flotillas; la autoridad garantiza que sólo un vehículo quede activo por conductor.",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 10.sp,
+                    )
+                    Text(
+                        "Marca, modelo, año, color, placa y revisión documental se validan antes de recibir viajes.",
+                        color = MeetColors.textMuted,
+                        fontSize = 9.sp,
+                    )
+                    fleetVehicles.forEach { vehicle ->
+                        Surface(
+                            color = Color(0xFF0B1722),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(
+                                1.dp,
+                                if (vehicle.active) MeetColors.neonGreen else MeetColors.borderSubtle,
+                            ),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(vehicle.displayName, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        listOfNotNull(vehicle.plateMasked, vehicle.fleetName, vehicle.verificationStatus)
+                                            .joinToString(" · "),
+                                        color = MeetColors.textMuted,
+                                        fontSize = 9.sp,
+                                    )
+                                }
+                                if (!vehicle.active) {
+                                    TextButton(
+                                        onClick = { onActivateVehicle(vehicle.id) },
+                                        enabled = vehicle.verificationStatus == "VERIFIED",
+                                    ) { Text("ACTIVAR") }
+                                } else {
+                                    Text("ACTIVO", color = MeetColors.neonGreen, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = onAddVehicle, modifier = Modifier.fillMaxWidth()) {
+                        Text("AGREGAR VEHÍCULO A LA FLOTILLA")
+                    }
+                }
+            }
+        }
         item { RatingDistribution(summary) }
         item {
             ProfileSection("RECONOCIMIENTOS") {
@@ -220,6 +340,52 @@ private fun RideProfileOverview(name: String?, isDriver: Boolean, summary: RideP
 }
 
 @Composable
+private fun RideAddVehicleDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (String, String, Int, String, String, String?) -> Unit,
+) {
+    var make by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("") }
+    var year by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf("") }
+    var plate by remember { mutableStateOf("") }
+    var fleet by remember { mutableStateOf("") }
+    val valid = make.isNotBlank() && model.isNotBlank() &&
+        year.toIntOrNull()?.let { it in 1900..2200 } == true &&
+        color.isNotBlank() && plate.isNotBlank()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF071019),
+        title = { Text("AGREGAR AUTO", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(make, { make = it.take(60) }, label = { Text("Marca") })
+                OutlinedTextField(model, { model = it.take(60) }, label = { Text("Modelo") })
+                OutlinedTextField(year, { year = it.filter(Char::isDigit).take(4) }, label = { Text("Año") })
+                OutlinedTextField(color, { color = it.take(40) }, label = { Text("Color") })
+                OutlinedTextField(plate, { plate = it.take(20) }, label = { Text("Placa") })
+                OutlinedTextField(fleet, { fleet = it.take(80) }, label = { Text("Nombre de flotilla (opcional)") })
+                Text(
+                    "El auto se agrega como pendiente. No podrá activarse ni recibir viajes hasta completar revisión.",
+                    color = MeetColors.warning,
+                    fontSize = 10.sp,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSubmit(make, model, requireNotNull(year.toIntOrNull()), color, plate, fleet.ifBlank { null }) },
+                enabled = valid,
+            ) { Text("GUARDAR PARA REVISIÓN") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } },
+    )
+}
+
+@Composable
 private fun RideMetricGrid(data: RideProfileSummary, isDriver: Boolean) {
     val money = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CR"))
     ProfileSection(if (isDriver) "CENTRO DE INGRESOS" else "RESUMEN ANUAL") {
@@ -229,6 +395,20 @@ private fun RideMetricGrid(data: RideProfileSummary, isDriver: Boolean) {
             ProfileMetric("Cancelados", data.cancelledTrips.toString(), Modifier.weight(1f))
         }
         if (isDriver) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProfileMetric(
+                    "Aceptación",
+                    data.acceptanceRatePercent?.let { String.format(Locale.ROOT, "%.0f%%", it) }
+                        ?: "Pendiente servidor",
+                    Modifier.weight(1f),
+                )
+                ProfileMetric(
+                    "Viajes finalizados",
+                    data.completionRatePercent?.let { String.format(Locale.ROOT, "%.0f%%", it) }
+                        ?: "Sin base suficiente",
+                    Modifier.weight(1f),
+                )
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ProfileMetric("Hoy", money.format(data.money.today), Modifier.weight(1f))
                 ProfileMetric("Semana", money.format(data.money.week), Modifier.weight(1f))
@@ -320,6 +500,7 @@ private fun RideSupportPanel(
     rides: List<RideRequestEntity>,
     onOpenCase: (RideRequestEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     val currentLocale = rememberRideJavaLocale()
     val dateFormat = remember(currentLocale) {
         DateFormat.getDateInstance(DateFormat.DEFAULT, currentLocale)
@@ -333,6 +514,34 @@ private fun RideSupportPanel(
                 Text("Emergencia o riesgo inmediato: usa primero los servicios oficiales de emergencia de tu localidad.", color = MeetColors.warning, fontSize = 11.sp)
                 Text("Viajes activos: abre el viaje para reportar seguridad, identidad, vehículo, ruta o incidente vial.", color = Color.White, fontSize = 12.sp)
                 Text("Privacidad: las ubicaciones exactas y la telemetría solo se comparten con autorización voluntaria.", color = MeetColors.textSecondary, fontSize = 11.sp)
+            }
+        }
+        item {
+            ProfileSection("ACCIONES RÁPIDAS") {
+                Button(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, "tel:".toUri()))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.error),
+                ) {
+                    Text("EMERGENCIA · ABRIR MARCADOR", fontWeight = FontWeight.Black)
+                }
+                OutlinedButton(
+                    onClick = { rides.maxByOrNull(RideRequestEntity::createdAt)?.let(onOpenCase) },
+                    enabled = rides.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("OBJETO PERDIDO / COBRO / CONDUCTA")
+                }
+                Text(
+                    "1. Selecciona el viaje. 2. Elige la categoría. 3. Describe hechos verificables. 4. Conserva el número del caso.",
+                    color = MeetColors.textMuted,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                )
             }
         }
         item {

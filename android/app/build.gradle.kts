@@ -34,8 +34,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "4.7.0"
+        versionCode = 34
+        versionName = "4.8.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -77,19 +77,46 @@ android {
         )
         val rideMapStyleUrl = localProps.getProperty(
             "RIDE_MAP_STYLE_URL",
-            "https://tiles.openfreemap.org/styles/liberty",
+            "https://tiles.openfreemap.org/styles/dark",
         )
         buildConfigField("String", "RIDE_MAP_STYLE_URL", "\"$rideMapStyleUrl\"")
+        val rideMapStyleFallbackUrl = localProps.getProperty(
+            "RIDE_MAP_STYLE_FALLBACK_URL",
+            "https://tiles.openfreemap.org/styles/liberty",
+        )
+        buildConfigField(
+            "String",
+            "RIDE_MAP_STYLE_FALLBACK_URL",
+            "\"$rideMapStyleFallbackUrl\"",
+        )
         val rideGeocoderUrl = localProps.getProperty(
             "RIDE_GEOCODER_URL",
             "https://photon.komoot.io/api/",
         )
         buildConfigField("String", "RIDE_GEOCODER_URL", "\"$rideGeocoderUrl\"")
+        val rideGeocoderFallbackUrl = localProps.getProperty(
+            "RIDE_GEOCODER_FALLBACK_URL",
+            "",
+        )
+        buildConfigField(
+            "String",
+            "RIDE_GEOCODER_FALLBACK_URL",
+            "\"$rideGeocoderFallbackUrl\"",
+        )
         val rideRouterUrl = localProps.getProperty(
             "RIDE_ROUTER_URL",
             "https://router.project-osrm.org",
         )
         buildConfigField("String", "RIDE_ROUTER_URL", "\"$rideRouterUrl\"")
+        val rideRouterFallbackUrl = localProps.getProperty(
+            "RIDE_ROUTER_FALLBACK_URL",
+            "",
+        )
+        buildConfigField(
+            "String",
+            "RIDE_ROUTER_FALLBACK_URL",
+            "\"$rideRouterFallbackUrl\"",
+        )
 
         // MiniMax Debug configurations
         buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
@@ -230,6 +257,8 @@ dependencies {
     // QR Code and Barcode Processing
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    // Bundled on-device face detector: liveness blink works offline and stores no face template.
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
     // Google Location Services (Uber-grade GPS precision)
     implementation("com.google.android.gms:play-services-location:21.3.0")

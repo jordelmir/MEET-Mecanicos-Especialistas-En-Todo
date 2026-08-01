@@ -15,6 +15,11 @@ enum class RidePositionFreshness {
     CLOCK_SKEW,
 }
 
+enum class RideMapDataSource {
+    NETWORK,
+    CACHE,
+}
+
 data class RideGeoPoint(
     val latitude: Double,
     val longitude: Double,
