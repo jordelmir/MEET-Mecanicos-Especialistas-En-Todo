@@ -34,8 +34,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "4.7.1"
+        versionCode = 34
+        versionName = "4.8.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -257,6 +257,8 @@ dependencies {
     // QR Code and Barcode Processing
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    // Bundled on-device face detector: liveness blink works offline and stores no face template.
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
     // Google Location Services (Uber-grade GPS precision)
     implementation("com.google.android.gms:play-services-location:21.3.0")

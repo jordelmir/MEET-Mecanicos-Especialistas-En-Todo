@@ -95,6 +95,19 @@ class RideCommandRepository @Inject constructor(
             )
         }
         if (
+            envelope.type == RideCommandType.DRIVER_ARRIVED &&
+            listOf(
+                payload.driverLatitude,
+                payload.driverLongitude,
+                payload.driverAccuracyMeters,
+                payload.driverCapturedAt,
+            ).any { it.isNullOrBlank() }
+        ) {
+            return RideCommandEnqueueResult.InvalidCommand(
+                "DRIVER_ARRIVED requiere una prueba GPS reciente",
+            )
+        }
+        if (
             envelope.type == RideCommandType.SAFETY_SIGNAL &&
             payload.safetySignalType.isNullOrBlank()
         ) {

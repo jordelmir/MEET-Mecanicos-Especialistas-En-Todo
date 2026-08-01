@@ -24,6 +24,8 @@ data class RideProfileSummary(
     val money: RideMoneyWindows,
     val firstTripAt: Long?,
     val recognitions: List<String>,
+    val acceptanceRatePercent: Double?,
+    val completionRatePercent: Double?,
 )
 
 object RideProfileAnalytics {
@@ -79,6 +81,7 @@ object RideProfileAnalytics {
         )
         val average = capturedRatings.takeIf(List<Double>::isNotEmpty)?.average()
         val cancelled = rides.count { it.status == "CANCELLED" }
+        val completionDenominator = completed.size + cancelled
         val recognition = buildList {
             if (completed.size >= 5) add("Primeros 5 viajes completados")
             if (completed.size >= 100) add("100 viajes verificados")
@@ -102,6 +105,12 @@ object RideProfileAnalytics {
             money = money,
             firstTripAt = rides.minOfOrNull(RideRequestEntity::createdAt),
             recognitions = recognition,
+            acceptanceRatePercent = null,
+            completionRatePercent = if (recognitionsForDriver && completionDenominator > 0) {
+                completed.size * 100.0 / completionDenominator
+            } else {
+                null
+            },
         )
     }
 }

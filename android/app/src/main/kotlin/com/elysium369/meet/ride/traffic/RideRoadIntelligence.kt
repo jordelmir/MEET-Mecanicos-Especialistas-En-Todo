@@ -15,6 +15,10 @@ enum class RideRoadIncidentType {
     WRONG_WAY_HAZARD,
     POLICE_PRESENCE,
     TRAFFIC_CONTROL,
+    PUBLIC_POLICE,
+    TRAFFIC_POLICE,
+    SPEED_BUMP,
+    FLOODING,
 }
 
 enum class RideRoadSide {
@@ -110,6 +114,7 @@ object RideRoadIncidentPolicy {
         val hardHazard = incident.type in setOf(
             RideRoadIncidentType.ROAD_CLOSED,
             RideRoadIncidentType.WRONG_WAY_HAZARD,
+            RideRoadIncidentType.FLOODING,
         )
         val corroborated = incident.independentConfirmations >= 2
         return RideRoadIncidentEvidence(
@@ -243,6 +248,9 @@ object RideCollaborativeEtaEstimator {
         RideRoadIncidentType.WRONG_WAY_HAZARD -> 0.18
         RideRoadIncidentType.POLICE_PRESENCE -> 0.92
         RideRoadIncidentType.TRAFFIC_CONTROL -> 0.70
+        RideRoadIncidentType.PUBLIC_POLICE -> 0.92
+        RideRoadIncidentType.TRAFFIC_POLICE -> 0.84
+        RideRoadIncidentType.SPEED_BUMP -> 0.72
+        RideRoadIncidentType.FLOODING -> 0.16
     }.let { base -> (base - (incident.severity - 1) * 0.08).coerceAtLeast(0.10) }
 }
-

@@ -38,7 +38,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.elysium369.meet.data.local.entities.RideChatMessageEntity
 import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
@@ -46,6 +49,7 @@ import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.domain.RidePaymentMethod
 import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideActorRole
+import com.elysium369.meet.ride.domain.RideArrivalPolicy
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ride.domain.RideTripPlanPolicy
 import com.elysium369.meet.ride.map.RidePlaceSearchProvider
@@ -64,12 +68,14 @@ import com.elysium369.meet.ride.map.RideMapDataSource
 import com.elysium369.meet.ride.map.resilientRidePlaceSearchProvider
 import com.elysium369.meet.ride.map.resilientRideRoutingProvider
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
+import com.elysium369.meet.ride.domain.RideDriverPresencePolicy
 import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
 import com.elysium369.meet.ride.traffic.RideCollaborativeEtaEstimator
 import com.elysium369.meet.ride.traffic.RideEtaEvidenceLevel
 import com.elysium369.meet.ride.traffic.RideEtaSegment
+import com.elysium369.meet.ride.notification.RideNotificationCoordinator
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.serialization.encodeToString
@@ -138,7 +144,44 @@ fun RideServiceScreen(
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
     val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
+    val driverVerification by viewModel.driverVerification.collectAsState()
     var showProfile by rememberSaveable { mutableStateOf(false) }
+    var profileInitialTab by rememberSaveable { mutableIntStateOf(0) }
+    var showRideMenu by remember { mutableStateOf(false) }
+    val presencePreferences = remember(context) {
+        context.getSharedPreferences("elysium_ride_driver_presence", Context.MODE_PRIVATE)
+    }
+    var showLiveness by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(driverMode, driverVerification?.status) {
+        if (
+            driverMode &&
+            RideVerificationPolicy.grantsAccess(driverVerification?.status) &&
+            RideDriverPresencePolicy.requiresChallenge(
+                lastVerifiedAtEpochMs = presencePreferences
+                    .getLong("last_verified_at", 0L)
+                    .takeIf { it > 0L },
+                nowEpochMs = System.currentTimeMillis(),
+            )
+        ) {
+            showLiveness = true
+        }
+    }
+
+    if (showLiveness) {
+        RideLivenessDialog(
+            onVerified = { evidenceHash ->
+                val now = System.currentTimeMillis()
+                presencePreferences.edit { putLong("last_verified_at", now) }
+                viewModel.recordDriverLiveness(evidenceHash, now)
+                showLiveness = false
+            },
+            onCancel = {
+                showLiveness = false
+                if (driverMode) viewModel.toggleRideDriverMode()
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -151,12 +194,65 @@ fun RideServiceScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Atrás",
-                            tint = Color.White
-                        )
+                    Box {
+                        IconButton(onClick = { showRideMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menú de Viajes",
+                                tint = MeetColors.cyberCyan,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showRideMenu,
+                            onDismissRequest = { showRideMenu = false },
+                            containerColor = Color(0xFF07131E),
+                        ) {
+                            listOf(
+                                Triple(Icons.Default.Person, "Perfil", 0),
+                                Triple(Icons.Default.History, "Historial de viajes", 1),
+                                Triple(Icons.Default.SupportAgent, "Soporte", 2),
+                            ).forEach { (icon, label, destinationTab) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = Color.White) },
+                                    leadingIcon = { Icon(icon, null, tint = MeetColors.cyberCyan) },
+                                    onClick = {
+                                        profileInitialTab = destinationTab
+                                        showProfile = true
+                                        showRideMenu = false
+                                    },
+                                )
+                            }
+                            if (driverMode) {
+                                HorizontalDivider(color = MeetColors.borderSubtle)
+                                DropdownMenuItem(
+                                    text = { Text("Autos y flotillas", color = Color.White) },
+                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = MeetColors.neonGreen) },
+                                    onClick = {
+                                        profileInitialTab = 0
+                                        showProfile = true
+                                        showRideMenu = false
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Ganancias", color = Color.White) },
+                                    leadingIcon = { Icon(Icons.Default.Payments, null, tint = MeetColors.neonGreen) },
+                                    onClick = {
+                                        profileInitialTab = 0
+                                        showProfile = true
+                                        showRideMenu = false
+                                    },
+                                )
+                            }
+                            HorizontalDivider(color = MeetColors.borderSubtle)
+                            DropdownMenuItem(
+                                text = { Text("Volver a PRO", color = MeetColors.textMuted) },
+                                leadingIcon = { Icon(Icons.Default.ArrowBack, null) },
+                                onClick = {
+                                    showRideMenu = false
+                                    onNavigateBack()
+                                },
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -171,13 +267,6 @@ fun RideServiceScreen(
                             fontWeight = FontWeight.Black,
                             modifier = Modifier.padding(end = 4.dp),
                         )
-                        IconButton(onClick = { showProfile = true }) {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "Abrir perfil e historial",
-                                tint = MeetColors.cyberCyan,
-                            )
-                        }
                         Text(
                             text = if (driverMode) "Modo Chofer" else "Modo Pasajero",
                             color = if (driverMode) MeetColors.cyberCyan else MeetColors.neonGreen,
@@ -213,6 +302,7 @@ fun RideServiceScreen(
                 RideProfileScreen(
                     viewModel = viewModel,
                     isDriver = driverMode,
+                    initialTab = profileInitialTab,
                     onBack = { showProfile = false },
                 )
             } else if (activeRide != null) {
@@ -267,6 +357,8 @@ private fun rideGeoPointOrNull(
         )
     }.getOrNull()
 
+private enum class RidePinTarget { PICKUP, DESTINATION }
+
 @Composable
 fun PassengerDashboard(viewModel: ObdViewModel) {
     val context = LocalContext.current
@@ -281,6 +373,9 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     var destinationSuggestions by remember { mutableStateOf(emptyList<RidePlaceSuggestion>()) }
     var destinationSearchLoading by remember { mutableStateOf(false) }
     var destinationSearchFailed by remember { mutableStateOf(false) }
+    var pinTarget by remember { mutableStateOf<RidePinTarget?>(null) }
+    var pickupPin by remember { mutableStateOf<RideGeoPoint?>(null) }
+    var pendingMapPin by remember { mutableStateOf<RideGeoPoint?>(null) }
     var stops by remember { mutableStateOf(emptyList<RideStopSnapshot>()) }
     var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
     val placeSearchProvider = remember {
@@ -352,6 +447,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     LaunchedEffect(
         currentGps?.latitude,
         currentGps?.longitude,
+        pickupPin,
         destinationPlaceId,
         destLatitude,
         destLongitude,
@@ -377,7 +473,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
             routeSearchFailed = false
             return@LaunchedEffect
         }
-        val pickup = rideGeoPointOrNull(
+        val pickup = pickupPin ?: rideGeoPointOrNull(
             latitude = gps.latitude,
             longitude = gps.longitude,
             accuracyMeters = gps.accuracy,
@@ -595,6 +691,27 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Actualizar Localización Satelital", fontSize = 12.sp)
                     }
+                    OutlinedButton(
+                        onClick = {
+                            val initial = pickupPin ?: currentGps?.let {
+                                rideGeoPointOrNull(
+                                    it.latitude,
+                                    it.longitude,
+                                    it.accuracy,
+                                    it.timestamp.coerceAtLeast(0L),
+                                )
+                            }
+                            pendingMapPin = initial
+                            pinTarget = RidePinTarget.PICKUP
+                        },
+                        enabled = currentGps != null,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                    ) {
+                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (pickupPin == null) "AJUSTAR RECOGIDA EN MAPA" else "RECOGIDA FIJADA · CAMBIAR PIN")
+                    }
                 }
             }
         }
@@ -778,6 +895,27 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                         }
                     }
 
+                    OutlinedButton(
+                        onClick = {
+                            val initial = rideGeoPointOrNull(
+                                latitude = destLatitude.takeIf { it != 0.0 }
+                                    ?: currentGps?.latitude ?: 9.9281,
+                                longitude = destLongitude.takeIf { it != 0.0 }
+                                    ?: currentGps?.longitude ?: -84.0907,
+                                accuracyMeters = null,
+                                capturedAtEpochMs = System.currentTimeMillis(),
+                            )
+                            pendingMapPin = initial
+                            pinTarget = RidePinTarget.DESTINATION
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                    ) {
+                        Icon(Icons.Default.Place, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("FIJAR DESTINO CON PIN")
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
@@ -811,6 +949,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 }
             }
         }
+
 
         item {
             RideStopsEditor(
@@ -869,7 +1008,7 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                     )
                 }
                 val previewState = RideMapStateFactory.create(
-                    pickup = rideGeoPointOrNull(
+                    pickup = pickupPin ?: rideGeoPointOrNull(
                         currentGps!!.latitude,
                         currentGps!!.longitude,
                         currentGps!!.accuracy,
@@ -1044,7 +1183,12 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                             // como "Ubicación GPS (lat, lng)" — eso filtra coords exactas al
                             // backend. Si detectamos ese patrón, usamos genérico.
                             // (RISK-3 GPS leak: lat/lon no debe ir en strings user-facing).
-                            val safePickupAddress = sanitizeGpsAddress(gps.addressName)
+                            val selectedPickup = pickupPin
+                            val safePickupAddress = if (selectedPickup != null) {
+                                "Punto de recogida fijado por el pasajero"
+                            } else {
+                                sanitizeGpsAddress(gps.addressName)
+                            }
 
                             val distance = previewRoadRoute
                                 ?.distanceMeters
@@ -1062,10 +1206,10 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                                 passengerName = verifiedPassenger.fullName,
                                 passengerPhone = verifiedPassenger.phone,
                                 countryCode = gps.countryCode,
-                                pickupLat = gps.latitude,
-                                pickupLng = gps.longitude,
+                                pickupLat = selectedPickup?.latitude ?: gps.latitude,
+                                pickupLng = selectedPickup?.longitude ?: gps.longitude,
                                 pickupAddr = safePickupAddress,
-                                pickupAcc = gps.accuracy,
+                                pickupAcc = selectedPickup?.accuracyMeters ?: gps.accuracy,
                                 destLat = destLatitude,
                                 destLng = destLongitude,
                                 destAddr = destAddress,
@@ -1116,6 +1260,56 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     }
     }
 
+    pinTarget?.let { target ->
+        val mapPinState = RideMapStateFactory.create(
+            pickup = pickupPin ?: currentGps?.let {
+                rideGeoPointOrNull(
+                    it.latitude,
+                    it.longitude,
+                    it.accuracy,
+                    it.timestamp.coerceAtLeast(0L),
+                )
+            },
+            destination = if (destLatitude == 0.0 && destLongitude == 0.0) {
+                null
+            } else {
+                rideGeoPointOrNull(
+                    destLatitude,
+                    destLongitude,
+                    null,
+                    System.currentTimeMillis(),
+                )
+            },
+        )
+        RidePinPickerDialog(
+            targetLabel = if (target == RidePinTarget.PICKUP) {
+                "PUNTO EXACTO DE RECOGIDA"
+            } else {
+                "DESTINO EXACTO"
+            },
+            state = mapPinState,
+            initialPoint = pendingMapPin,
+            onPinChanged = { pendingMapPin = it },
+            onDismiss = {
+                pendingMapPin = null
+                pinTarget = null
+            },
+            onConfirm = { point ->
+                if (target == RidePinTarget.PICKUP) {
+                    pickupPin = point
+                } else {
+                    destLatitude = point.latitude
+                    destLongitude = point.longitude
+                    destAddress = "Punto seleccionado en el mapa"
+                    destinationPlaceId = "elysium-map-pin"
+                    destinationSuggestions = emptyList()
+                }
+                pendingMapPin = null
+                pinTarget = null
+            },
+        )
+    }
+
     if (showPaxVerification) {
         PaxVerificationDialog(
             paxName = paxName,
@@ -1139,6 +1333,71 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 showPaxVerification = false
             }
         )
+    }
+}
+
+@Composable
+private fun RidePinPickerDialog(
+    targetLabel: String,
+    state: com.elysium369.meet.ride.map.RideMapState,
+    initialPoint: RideGeoPoint?,
+    onPinChanged: (RideGeoPoint) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: (RideGeoPoint) -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MeetColors.backgroundDark,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Surface(
+                    color = MeetColors.backgroundDeep,
+                    shadowElevation = 14.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, "Cerrar selector", tint = MeetColors.cyberCyan)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                targetLabel,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 15.sp,
+                            )
+                            Text(
+                                "Arrastra el mapa bajo el pin. Pellizca o usa + / − para afinar.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
+                }
+                RideMapPanel(
+                    state = state,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    pinSelectionEnabled = true,
+                    pinSelectionLabel = "El pin permanece fijo; mueve el mapa",
+                    pinSelectionInitialPoint = initialPoint,
+                    onPinSelectionChanged = onPinChanged,
+                    onPinSelectionCancelled = onDismiss,
+                    onPinSelectionConfirmed = onConfirm,
+                )
+            }
+        }
     }
 }
 
@@ -1282,6 +1541,19 @@ fun DriverDashboard(viewModel: ObdViewModel) {
 
     val driverVer by viewModel.driverVerification.collectAsState()
     val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
+    val driverPrefs = remember(context) {
+        context.getSharedPreferences("elysium_ride_driver_ops", Context.MODE_PRIVATE)
+    }
+    val rideNotifications = remember(context) { RideNotificationCoordinator(context) }
+    var destinationHomeEnabled by remember {
+        mutableStateOf(driverPrefs.getBoolean("destination_home_enabled", false))
+    }
+    var homeLatitude by remember {
+        mutableStateOf(driverPrefs.getString("home_latitude", null)?.toDoubleOrNull())
+    }
+    var homeLongitude by remember {
+        mutableStateOf(driverPrefs.getString("home_longitude", null)?.toDoubleOrNull())
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.rideClaimFeedback.collect { feedback ->
@@ -1303,6 +1575,29 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                 it.assignedDriverId == driverId &&
                     it.status in listOf("ACCEPTED", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
             }
+        }
+    }
+    val rankedOpenRides = remember(openRides, destinationHomeEnabled, homeLatitude, homeLongitude) {
+        if (!destinationHomeEnabled || homeLatitude == null || homeLongitude == null) {
+            openRides
+        } else {
+            openRides.sortedBy { ride ->
+                calculateDistance(
+                    ride.destLatitude,
+                    ride.destLongitude,
+                    requireNotNull(homeLatitude),
+                    requireNotNull(homeLongitude),
+                )
+            }
+        }
+    }
+    LaunchedEffect(driverVer?.status, activeRideForDriver, rankedOpenRides.isEmpty()) {
+        if (
+            RideVerificationPolicy.grantsAccess(driverVer?.status) &&
+            activeRideForDriver == null &&
+            rankedOpenRides.isEmpty()
+        ) {
+            rideNotifications.notifyIdleDriver()
         }
     }
 
@@ -1355,6 +1650,62 @@ fun DriverDashboard(viewModel: ObdViewModel) {
         } else {
             item {
                 RideWalletStatusCard()
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
+                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.55f)),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Home, null, tint = MeetColors.neonGreen)
+                            Spacer(Modifier.width(9.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("DESTINO CASA", color = Color.White, fontWeight = FontWeight.Black)
+                                Text(
+                                    "Prioriza solicitudes cuyo destino se acerque a tu hogar.",
+                                    color = MeetColors.textMuted,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                            Switch(
+                                checked = destinationHomeEnabled,
+                                onCheckedChange = { enabled ->
+                                    destinationHomeEnabled = enabled && homeLatitude != null
+                                    driverPrefs.edit {
+                                        putBoolean("destination_home_enabled", destinationHomeEnabled)
+                                    }
+                                },
+                                enabled = homeLatitude != null,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                currentGps?.let { gps ->
+                                    homeLatitude = gps.latitude
+                                    homeLongitude = gps.longitude
+                                    driverPrefs.edit {
+                                        putString("home_latitude", gps.latitude.toString())
+                                        putString("home_longitude", gps.longitude.toString())
+                                    }
+                                }
+                            },
+                            enabled = currentGps != null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (homeLatitude == null) "FIJAR CASA EN MI GPS" else "ACTUALIZAR UBICACIÓN DE CASA")
+                        }
+                        if (destinationHomeEnabled) {
+                            Text(
+                                "Recomendación activa · la asignación sigue siendo autoritativa y de un solo conductor.",
+                                color = MeetColors.neonGreen,
+                                fontSize = 9.sp,
+                            )
+                        }
+                    }
+                }
             }
 
             // Banner de viaje asignado activo
@@ -1436,7 +1787,7 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                 }
             }
 
-            if (openRides.isEmpty()) {
+            if (rankedOpenRides.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -1452,7 +1803,7 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                     }
                 }
             } else {
-                items(openRides) { request ->
+                items(rankedOpenRides) { request ->
                     DriverRideItem(
                         ride = request,
                         currentGps = currentGps,
@@ -1783,6 +2134,7 @@ fun ActiveRidePanel(
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
     val roadIncidents by viewModel.rideRoadIncidents.collectAsState()
     val speedSamplesByTrip by viewModel.rideSpeedSamples.collectAsState()
+    val rideNotifications = remember(context) { RideNotificationCoordinator(context) }
 
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
@@ -1815,6 +2167,11 @@ fun ActiveRidePanel(
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
+    LaunchedEffect(isDriver, ride.requestId, ride.status, ride.boardingPin) {
+        if (!isDriver && ride.status == "ARRIVED" && ride.boardingPin == null) {
+            viewModel.issueRideBoardingPin(ride.requestId)
+        }
+    }
     LaunchedEffect(isDriver, ride.requestId, ride.status) {
         if (isDriver && ride.status in setOf(
                 "ACCEPTED",
@@ -1824,6 +2181,9 @@ fun ActiveRidePanel(
             )
         ) {
             while (true) {
+                // Arrival authorization requires a fresh fix; keep the shared
+                // trip position current instead of trusting the entry snapshot.
+                viewModel.detectCurrentLocation(context)
                 viewModel.recordRideSpeedObservation(ride.requestId)
                 delay(5_000)
             }
@@ -1905,6 +2265,15 @@ fun ActiveRidePanel(
                 capturedAtEpochMs = it.createdAt,
             )
         }
+    val arrivalDecision = remember(localPoint, pickupPoint, ride.status) {
+        pickupPoint?.let {
+            RideArrivalPolicy.evaluate(
+                driver = localPoint,
+                pickup = it,
+                nowEpochMs = System.currentTimeMillis(),
+            )
+        }
+    }
     val routingProvider = remember {
         resilientRideRoutingProvider(
             primaryEndpoint = BuildConfig.RIDE_ROUTER_URL,
@@ -1917,10 +2286,11 @@ fun ActiveRidePanel(
     var activeRouteUnavailable by remember(ride.requestId) {
         mutableStateOf(false)
     }
-    LaunchedEffect(ride.requestId, pickupPoint, orderedStops, destinationPoint) {
-        val pickup = pickupPoint
+    LaunchedEffect(ride.requestId, ride.status, pickupPoint, localPoint, orderedStops, destinationPoint) {
+        val pickup = if (ride.status == "IN_PROGRESS") localPoint else pickupPoint
         val destination = destinationPoint
-        val resolvedStops = orderedStops.mapNotNull { stop ->
+        val relevantStops = orderedStops
+        val resolvedStops = relevantStops.mapNotNull { stop ->
             if (!stop.isResolved) null else rideGeoPointOrNull(
                 latitude = requireNotNull(stop.latitude),
                 longitude = requireNotNull(stop.longitude),
@@ -1931,7 +2301,7 @@ fun ActiveRidePanel(
         if (
             pickup == null ||
             destination == null ||
-            resolvedStops.size != orderedStops.size
+            resolvedStops.size != relevantStops.size
         ) {
             activeRoadRoute = null
             activeRouteUnavailable = false
@@ -2016,6 +2386,13 @@ fun ActiveRidePanel(
                 ),
                 nowEpochMs = System.currentTimeMillis(),
             )
+        }
+    }
+    LaunchedEffect(isDriver, ride.requestId, ride.status, collaborativeEta?.durationSeconds) {
+        if (isDriver && ride.status == "IN_PROGRESS") {
+            collaborativeEta?.durationSeconds?.let { seconds ->
+                rideNotifications.notifyDestinationEtaSevenMinutes(ride.requestId, seconds)
+            }
         }
     }
 
@@ -2305,6 +2682,24 @@ fun ActiveRidePanel(
                             }
                         }
                     }
+                    if (ride.boardingPin == null && ride.status == "ACCEPTED") {
+                        Surface(
+                            color = MeetColors.cyberCyan.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.45f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
+                            Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("PIN DE ABORDAJE PROTEGIDO", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+                                Text(
+                                    "Se mostrará automáticamente cuando el conductor llegue al pin de recogida.",
+                                    color = MeetColors.textMuted,
+                                    fontSize = 9.sp,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -2321,7 +2716,8 @@ fun ActiveRidePanel(
                                 Button(
                                     onClick = { viewModel.updateRideStatus(ride.requestId, "ARRIVED") },
                                     enabled = ride.syncState != "PENDING" &&
-                                        ride.serverVersion > 0L,
+                                        ride.serverVersion > 0L &&
+                                        (ride.serverState == "ASSIGNED" || arrivalDecision?.allowed == true),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
@@ -2329,10 +2725,19 @@ fun ActiveRidePanel(
                                         if (ride.serverState == "ASSIGNED") {
                                             "INICIAR RUTA 🚗"
                                         } else {
-                                            "YA LLEGUÉ 🚕"
+                                            arrivalDecision?.distanceMeters?.let { "YA LLEGUÉ · ${it.toInt()} m" }
+                                                ?: "YA LLEGUÉ · GPS"
                                         },
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                                if (ride.serverState == "DRIVER_EN_ROUTE" && arrivalDecision?.allowed != true) {
+                                    Text(
+                                        arrivalDecision?.reason ?: "Acércate al pin de recogida",
+                                        color = MeetColors.warning,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.weight(0.8f),
                                     )
                                 }
                                 Button(
@@ -2451,10 +2856,35 @@ fun ActiveRidePanel(
             border = BorderStroke(1.dp, MeetColors.borderSubtle),
             shape = RoundedCornerShape(14.dp),
         ) {
-            RideMapPanel(
-                state = mapState,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Box(Modifier.fillMaxSize()) {
+                RideMapPanel(
+                    state = mapState,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp)
+                        .size(68.dp),
+                    shape = CircleShape,
+                    color = Color(0xEE07131E),
+                    border = BorderStroke(2.dp, MeetColors.cyberCyan),
+                    shadowElevation = 10.dp,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            ((currentGps?.speed ?: 0f) * 3.6f).toInt().toString(),
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text("km/h", color = MeetColors.cyberCyan, fontSize = 9.sp)
+                    }
+                }
+            }
         }
         Text(
             text = if (isDriver && mapState.marker(com.elysium369.meet.ride.map.RideMarkerRole.PASSENGER_GPS) == null) {
@@ -2921,6 +3351,10 @@ private fun RideRoadIncidentType.rideRoadLabel(): String = when (this) {
     RideRoadIncidentType.WRONG_WAY_HAZARD -> "Riesgo de contravía"
     RideRoadIncidentType.POLICE_PRESENCE -> "Presencia policial"
     RideRoadIncidentType.TRAFFIC_CONTROL -> "Control de tránsito"
+    RideRoadIncidentType.PUBLIC_POLICE -> "Policía pública"
+    RideRoadIncidentType.TRAFFIC_POLICE -> "Policía de tránsito"
+    RideRoadIncidentType.SPEED_BUMP -> "Reductor / muerto"
+    RideRoadIncidentType.FLOODING -> "Calle inundada"
 }
 
 @Composable
@@ -2935,6 +3369,8 @@ private fun RideRoadReportDialog(
         RideRoadIncidentType.STALLED_VEHICLE,
         RideRoadIncidentType.OBSTACLE,
         RideRoadIncidentType.POTHOLE,
+        RideRoadIncidentType.SPEED_BUMP,
+        RideRoadIncidentType.FLOODING,
     )
 
     AlertDialog(
@@ -2969,6 +3405,8 @@ private fun RideRoadReportDialog(
                                     RideRoadIncidentType.STALLED_VEHICLE,
                                     RideRoadIncidentType.OBSTACLE,
                                     RideRoadIncidentType.POTHOLE,
+                                    RideRoadIncidentType.SPEED_BUMP,
+                                    RideRoadIncidentType.FLOODING,
                                 )
                             ) side = RideRoadSide.NOT_APPLICABLE
                         },
