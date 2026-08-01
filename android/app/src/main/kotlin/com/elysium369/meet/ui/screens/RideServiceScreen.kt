@@ -211,6 +211,7 @@ fun RideServiceScreen(
                                 Triple(Icons.Default.Person, "Perfil", 0),
                                 Triple(Icons.Default.History, "Historial de viajes", 1),
                                 Triple(Icons.Default.SupportAgent, "Soporte", 2),
+                                Triple(Icons.Default.LocationOn, "Iconos del mapa", 3),
                             ).forEach { (icon, label, destinationTab) ->
                                 DropdownMenuItem(
                                     text = { Text(label, color = Color.White) },

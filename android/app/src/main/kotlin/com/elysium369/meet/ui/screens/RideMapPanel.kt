@@ -4,11 +4,7 @@ package com.elysium369.meet.ui.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
 import android.view.MotionEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -48,6 +44,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.ride.map.RideGeoPoint
+import com.elysium369.meet.ride.map.RideMapAvatarRenderer
+import com.elysium369.meet.ride.map.RideMapAvatarSelection
+import com.elysium369.meet.ride.map.RideMapAvatarStore
 import com.elysium369.meet.ride.map.RideMapState
 import com.elysium369.meet.ride.map.RideMarkerRole
 import org.maplibre.android.MapLibre
@@ -78,6 +77,7 @@ fun RideMapPanel(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val avatarSelection = remember(context) { RideMapAvatarStore(context).load() }
     var styleRequested by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
     var mapError by remember { mutableStateOf<String?>(null) }
@@ -116,7 +116,7 @@ fun RideMapPanel(
         map.setStyle(styleCandidates[selectedStyleIndex]) {
             styleReady = true
             mapError = null
-            renderRideState(context, map, state, moveCamera = false)
+            renderRideState(context, map, state, avatarSelection, moveCamera = false)
         }
     }
 
@@ -236,7 +236,7 @@ fun RideMapPanel(
                             val shouldMoveCamera = !pinSelectionEnabled &&
                                 (!userControlsCamera || recenterRequest > 0) &&
                                 signature != lastCameraSignature
-                            renderRideState(context, map, state, shouldMoveCamera)
+                            renderRideState(context, map, state, avatarSelection, shouldMoveCamera)
                             if (shouldMoveCamera) lastCameraSignature = signature
                         }
                         !styleRequested && styleCandidates.isNotEmpty() -> {
@@ -245,7 +245,7 @@ fun RideMapPanel(
                                 styleReady = true
                                 mapError = null
                                 val signature = state.cameraSignature()
-                                renderRideState(context, map, state, moveCamera = true)
+                                renderRideState(context, map, state, avatarSelection, moveCamera = true)
                                 lastCameraSignature = signature
                             }
                         }
@@ -377,7 +377,7 @@ fun RideMapPanel(
                     lastCameraSignature = null
                     recenterRequest += 1
                     latestMap?.let { map ->
-                        renderRideState(context, map, state, moveCamera = true)
+                        renderRideState(context, map, state, avatarSelection, moveCamera = true)
                         lastCameraSignature = state.cameraSignature()
                     }
                 },
@@ -434,12 +434,13 @@ private fun renderRideState(
     context: Context,
     map: MapLibreMap,
     state: RideMapState,
+    avatarSelection: RideMapAvatarSelection,
     moveCamera: Boolean,
 ) {
     map.clear()
     val iconFactory = IconFactory.getInstance(context)
     val icons = RideMarkerRole.entries.associateWith { role ->
-        createMarkerIcon(context, iconFactory, role)
+        createMarkerIcon(context, iconFactory, role, avatarSelection)
     }
 
     state.route
@@ -511,99 +512,7 @@ private fun createMarkerIcon(
     context: Context,
     iconFactory: IconFactory,
     role: RideMarkerRole,
+    selection: RideMapAvatarSelection,
 ): Icon {
-    val density = context.resources.displayMetrics.density
-    val size = (52 * density).toInt().coerceAtLeast(52)
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = role.color()
-        style = Paint.Style.FILL
-        setShadowLayer(5f * density, 0f, 2f * density, Color.BLACK)
-    }
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        textSize = 17f * density
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-    }
-    val center = size / 2f
-    when (role) {
-        RideMarkerRole.DRIVER -> drawElysiumDragon(canvas, markerPaint, size.toFloat())
-        RideMarkerRole.PASSENGER_GPS -> drawPassengerSilhouette(canvas, markerPaint, size.toFloat())
-        else -> {
-            canvas.drawCircle(center, center, size * 0.39f, markerPaint)
-            val baseline = center - (textPaint.ascent() + textPaint.descent()) / 2f
-            canvas.drawText(role.shortLabel(), center, baseline, textPaint)
-        }
-    }
-    return iconFactory.fromBitmap(bitmap)
+    return iconFactory.fromBitmap(RideMapAvatarRenderer.render(context, role, selection))
 }
-
-/** Proprietary Elysium fire-dragon silhouette; intentionally not based on a licensed character. */
-private fun drawElysiumDragon(canvas: Canvas, paint: Paint, size: Float) {
-    paint.color = Color.rgb(255, 23, 68)
-    val path = Path().apply {
-        moveTo(size * 0.50f, size * 0.10f)
-        lineTo(size * 0.61f, size * 0.26f)
-        lineTo(size * 0.82f, size * 0.18f)
-        lineTo(size * 0.72f, size * 0.40f)
-        lineTo(size * 0.89f, size * 0.49f)
-        lineTo(size * 0.68f, size * 0.54f)
-        cubicTo(size * 0.72f, size * 0.76f, size * 0.61f, size * 0.90f, size * 0.50f, size * 0.92f)
-        cubicTo(size * 0.39f, size * 0.90f, size * 0.28f, size * 0.76f, size * 0.32f, size * 0.54f)
-        lineTo(size * 0.11f, size * 0.49f)
-        lineTo(size * 0.28f, size * 0.40f)
-        lineTo(size * 0.18f, size * 0.18f)
-        lineTo(size * 0.39f, size * 0.26f)
-        close()
-    }
-    canvas.drawPath(path, paint)
-    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(255, 214, 0)
-        style = Paint.Style.FILL
-    }.also { eyePaint ->
-        canvas.drawCircle(size * 0.43f, size * 0.43f, size * 0.035f, eyePaint)
-        canvas.drawCircle(size * 0.57f, size * 0.43f, size * 0.035f, eyePaint)
-    }
-}
-
-private fun drawPassengerSilhouette(canvas: Canvas, paint: Paint, size: Float) {
-    paint.color = Color.rgb(0, 229, 255)
-    canvas.drawCircle(size * 0.50f, size * 0.27f, size * 0.14f, paint)
-    val body = Path().apply {
-        moveTo(size * 0.34f, size * 0.44f)
-        cubicTo(size * 0.22f, size * 0.48f, size * 0.20f, size * 0.69f, size * 0.24f, size * 0.78f)
-        lineTo(size * 0.39f, size * 0.78f)
-        lineTo(size * 0.39f, size * 0.94f)
-        lineTo(size * 0.48f, size * 0.94f)
-        lineTo(size * 0.50f, size * 0.75f)
-        lineTo(size * 0.52f, size * 0.94f)
-        lineTo(size * 0.61f, size * 0.94f)
-        lineTo(size * 0.61f, size * 0.78f)
-        lineTo(size * 0.76f, size * 0.78f)
-        cubicTo(size * 0.80f, size * 0.69f, size * 0.78f, size * 0.48f, size * 0.66f, size * 0.44f)
-        close()
-    }
-    canvas.drawPath(body, paint)
-}
-
-private fun RideMarkerRole.color(): Int =
-    when (this) {
-        RideMarkerRole.PASSENGER_GPS -> Color.rgb(0, 188, 212)
-        RideMarkerRole.PICKUP -> Color.rgb(0, 200, 83)
-        RideMarkerRole.STOP -> Color.rgb(255, 214, 0)
-        RideMarkerRole.DESTINATION -> Color.rgb(213, 0, 249)
-        RideMarkerRole.DRIVER -> Color.rgb(255, 23, 68)
-        RideMarkerRole.ROAD_INCIDENT -> Color.rgb(255, 45, 85)
-    }
-
-private fun RideMarkerRole.shortLabel(): String =
-    when (this) {
-        RideMarkerRole.PASSENGER_GPS -> "U"
-        RideMarkerRole.PICKUP -> "R"
-        RideMarkerRole.STOP -> "P"
-        RideMarkerRole.DESTINATION -> "D"
-        RideMarkerRole.DRIVER -> "C"
-        RideMarkerRole.ROAD_INCIDENT -> "!"
-    }

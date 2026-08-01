@@ -13,7 +13,14 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.7.0
+## Versión actual: 4.9.0
+
+La versión 4.9.0 añade identidad visual personalizable al mapa de Viajes: cuatro
+emblemas originales para conductor y cuatro avatares originales para pasajero,
+con selector accesible desde Perfil e Iconos del mapa. La preferencia se guarda
+localmente y el renderizador procedural mantiene bordes, neón y sombras nítidos
+en distintas densidades de pantalla sin alterar ubicación, seguridad ni datos
+del viaje.
 
 La versión 4.7.0 convierte Viajes en un vertical distribuido verificable:
 PostgreSQL es autoridad de asignación, PIN, ciclo de vida y comisión; Room es
@@ -66,6 +73,7 @@ Documentación técnica:
 - [`docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md`](docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md)
 - [`docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md`](docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md)
 - [`docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md`](docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md)
+- [`docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md`](docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md)
 
 ## Que es real hoy
 
