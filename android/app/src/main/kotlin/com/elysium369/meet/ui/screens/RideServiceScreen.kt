@@ -72,6 +72,7 @@ import com.elysium369.meet.ride.domain.RideDriverPresencePolicy
 import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
+import com.elysium369.meet.ride.traffic.RideRoadReportAvailabilityPolicy
 import com.elysium369.meet.ride.traffic.RideCollaborativeEtaEstimator
 import com.elysium369.meet.ride.traffic.RideEtaEvidenceLevel
 import com.elysium369.meet.ride.traffic.RideEtaSegment
@@ -2168,6 +2169,11 @@ fun ActiveRidePanel(
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
+    LaunchedEffect(viewModel) {
+        viewModel.rideRoadReportFeedback.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
     LaunchedEffect(isDriver, ride.requestId, ride.status, ride.boardingPin) {
         if (!isDriver && ride.status == "ARRIVED" && ride.boardingPin == null) {
             viewModel.issueRideBoardingPin(ride.requestId)
@@ -2396,8 +2402,26 @@ fun ActiveRidePanel(
             }
         }
     }
+    val roadReportAvailability = remember(
+        isDriver,
+        ride.status,
+        ride.serverState,
+        ride.serverVersion,
+        currentGps != null,
+    ) {
+        RideRoadReportAvailabilityPolicy.evaluate(
+            isDriver = isDriver,
+            localStatus = ride.status,
+            serverState = ride.serverState,
+            serverVersion = ride.serverVersion,
+            hasCurrentGps = currentGps != null,
+        )
+    }
+    LaunchedEffect(roadReportAvailability.allowed) {
+        if (!roadReportAvailability.allowed) showRoadReportDialog = false
+    }
 
-    if (showRoadReportDialog) {
+    if (showRoadReportDialog && roadReportAvailability.allowed) {
         RideRoadReportDialog(
             onDismiss = { showRoadReportDialog = false },
             onReport = { type, side, severity ->
@@ -2406,10 +2430,6 @@ fun ActiveRidePanel(
                     type = type,
                     side = side,
                     severity = severity,
-                )
-                viewModel.announceRideEvent(
-                    "Incidencia vial reportada. Gracias por ayudar a la comunidad.",
-                    "Road incident reported. Thank you for helping the community.",
                 )
                 showRoadReportDialog = false
             },
@@ -2915,7 +2935,7 @@ fun ActiveRidePanel(
             lineHeight = 14.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
         )
-        if (isDriver) {
+        if (roadReportAvailability.allowed) {
             OutlinedButton(
                 onClick = { showRoadReportDialog = true },
                 modifier = Modifier
@@ -2928,6 +2948,13 @@ fun ActiveRidePanel(
                 Spacer(Modifier.width(8.dp))
                 Text("REPORTAR CONDICIÓN DE LA VÍA", fontWeight = FontWeight.Black, fontSize = 11.sp)
             }
+        } else if (isDriver && ride.status in setOf("ARRIVED", "PASSENGER_ONBOARD")) {
+            Text(
+                text = "Los reportes viales aparecerán al iniciar la ruta confirmada.",
+                color = MeetColors.textMuted,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+            )
         }
         OutlinedButton(
             onClick = { showGuardianDialog = true },
