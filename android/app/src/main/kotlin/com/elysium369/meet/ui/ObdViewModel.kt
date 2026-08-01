@@ -96,6 +96,7 @@ import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
+import com.elysium369.meet.ride.traffic.RideRoadReportAvailabilityPolicy
 import com.elysium369.meet.ride.traffic.RideGeoCell
 import com.elysium369.meet.ride.traffic.RideSegmentSpeedSample
 import java.math.BigDecimal
@@ -5754,6 +5755,8 @@ class ObdViewModel @Inject constructor(
     val ridePinFeedback: SharedFlow<String> = _ridePinFeedback.asSharedFlow()
     private val _rideSafetyFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val rideSafetyFeedback: SharedFlow<String> = _rideSafetyFeedback.asSharedFlow()
+    private val _rideRoadReportFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val rideRoadReportFeedback: SharedFlow<String> = _rideRoadReportFeedback.asSharedFlow()
     private val _rideSupportFeedback = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val rideSupportFeedback: SharedFlow<String> = _rideSupportFeedback.asSharedFlow()
 
@@ -5981,61 +5984,89 @@ class ObdViewModel @Inject constructor(
     }
 
     fun reportRideRoadIncident(
-        tripId: String?,
+        tripId: String,
         type: RideRoadIncidentType,
         side: RideRoadSide,
         severity: Int,
     ) {
-        val gps = _currentGpsLocation.value ?: return
-        val now = System.currentTimeMillis()
-        val lifetimeMs = when (type) {
-            RideRoadIncidentType.POLICE_PRESENCE,
-            RideRoadIncidentType.PUBLIC_POLICE,
-            RideRoadIncidentType.TRAFFIC_POLICE,
-            -> 20 * 60 * 1000L
-            RideRoadIncidentType.TRAFFIC_CONTROL,
-            RideRoadIncidentType.SLOW_TRAFFIC,
-            RideRoadIncidentType.VERY_SLOW_TRAFFIC,
-            -> 30 * 60 * 1000L
-            RideRoadIncidentType.ROAD_CLOSED,
-            RideRoadIncidentType.WRONG_WAY_HAZARD,
-            RideRoadIncidentType.STALLED_VEHICLE,
-            RideRoadIncidentType.OBSTACLE,
-            -> 90 * 60 * 1000L
-            RideRoadIncidentType.POTHOLE,
-            RideRoadIncidentType.SPEED_BUMP,
-            RideRoadIncidentType.FLOODING,
-            -> 6 * 60 * 60 * 1000L
-        }
-        val coarseCell = RideGeoCell.encode(gps.latitude, gps.longitude)
-        val incident = RideRoadIncident(
-            id = UUID.randomUUID().toString(),
-            roadSegmentId = "cell:$coarseCell",
-            type = type,
-            side = side,
-            severity = severity.coerceIn(1, 3),
-            latitude = gps.latitude,
-            longitude = gps.longitude,
-            bearingDegrees = gps.bearing,
-            accuracyMeters = gps.accuracy,
-            reporterReliability = 0.50,
-            independentConfirmations = 0,
-            independentDenials = 0,
-            observedSpeedRatio = null,
-            createdAtEpochMs = now,
-            expiresAtEpochMs = now + lifetimeMs,
-        )
-        _rideRoadIncidents.update { current ->
-            (current.filterNot { it.isExpired(now) } + incident).takeLast(100)
-        }
-
+        if (tripId.isBlank()) return
         viewModelScope.launch(Dispatchers.IO) {
-            val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return@launch
+            val request = rideDao.getRequestById(tripId)
+            if (request == null) {
+                _rideRoadReportFeedback.emit("No se encontró el viaje activo para registrar el reporte.")
+                return@launch
+            }
+            val gps = _currentGpsLocation.value
+            val availability = RideRoadReportAvailabilityPolicy.evaluate(
+                isDriver = _rideDriverMode.value,
+                localStatus = request.status,
+                serverState = request.serverState,
+                serverVersion = request.serverVersion,
+                hasCurrentGps = gps != null,
+            )
+            if (!availability.allowed || gps == null) {
+                _rideRoadReportFeedback.emit(availability.message)
+                return@launch
+            }
+            val now = System.currentTimeMillis()
+            val lifetimeMs = when (type) {
+                RideRoadIncidentType.POLICE_PRESENCE,
+                RideRoadIncidentType.PUBLIC_POLICE,
+                RideRoadIncidentType.TRAFFIC_POLICE,
+                -> 20 * 60 * 1000L
+                RideRoadIncidentType.TRAFFIC_CONTROL,
+                RideRoadIncidentType.SLOW_TRAFFIC,
+                RideRoadIncidentType.VERY_SLOW_TRAFFIC,
+                -> 30 * 60 * 1000L
+                RideRoadIncidentType.ROAD_CLOSED,
+                RideRoadIncidentType.WRONG_WAY_HAZARD,
+                RideRoadIncidentType.STALLED_VEHICLE,
+                RideRoadIncidentType.OBSTACLE,
+                -> 90 * 60 * 1000L
+                RideRoadIncidentType.POTHOLE,
+                RideRoadIncidentType.SPEED_BUMP,
+                RideRoadIncidentType.FLOODING,
+                -> 6 * 60 * 60 * 1000L
+            }
+            val coarseCell = RideGeoCell.encode(gps.latitude, gps.longitude)
+            val incident = RideRoadIncident(
+                id = UUID.randomUUID().toString(),
+                roadSegmentId = "cell:$coarseCell",
+                type = type,
+                side = side,
+                severity = severity.coerceIn(1, 3),
+                latitude = gps.latitude,
+                longitude = gps.longitude,
+                bearingDegrees = gps.bearing,
+                accuracyMeters = gps.accuracy,
+                reporterReliability = 0.50,
+                independentConfirmations = 0,
+                independentDenials = 0,
+                observedSpeedRatio = null,
+                createdAtEpochMs = now,
+                expiresAtEpochMs = now + lifetimeMs,
+            )
+            _rideRoadIncidents.update { current ->
+                (current.filterNot { it.isExpired(now) } + incident).takeLast(100)
+            }
+            _rideRoadReportFeedback.emit(
+                "Condición vial registrada durante la ruta. Gracias por ayudar a la comunidad.",
+            )
+            voiceFeedbackManager.speak(
+                "Incidencia vial reportada. Gracias por ayudar a la comunidad.",
+                "Road incident reported. Thank you for helping the community.",
+            )
+
+            val userId = SupabaseManager.client.auth.currentUserOrNull()?.id
+            if (userId == null) {
+                Log.w("ObdViewModel", "Road report retained locally; authenticated sync unavailable")
+                return@launch
+            }
             val isoExpiry = java.time.Instant.ofEpochMilli(incident.expiresAtEpochMs).toString()
             val remoteReport = RemoteRideRoadIncident(
                 id = incident.id,
                 reporter_id = userId,
-                trip_id = tripId,
+                trip_id = request.requestId,
                 road_segment_id = incident.roadSegmentId,
                 incident_type = incident.type.name,
                 road_side = incident.side.name,
@@ -6051,20 +6082,12 @@ class ObdViewModel @Inject constructor(
                 SupabaseManager.client.postgrest["ride_road_incidents"].insert(
                     remoteReport,
                 )
-            }.onFailure {
-                // A local Room request may not yet exist in the authoritative
-                // cloud. Preserve the safety signal without claiming a trip FK.
-                runCatching {
-                    SupabaseManager.client.postgrest["ride_road_incidents"].insert(
-                        remoteReport.copy(trip_id = null),
-                    )
-                }.onFailure { fallbackError ->
-                    Log.w(
-                        "ObdViewModel",
-                        "Road report queued locally; cloud sync unavailable",
-                        fallbackError,
-                    )
-                }
+            }.onFailure { error ->
+                Log.w(
+                    "ObdViewModel",
+                    "Road report retained locally; cloud sync unavailable",
+                    error,
+                )
             }
         }
     }

@@ -28,6 +28,49 @@ enum class RideRoadSide {
     NOT_APPLICABLE,
 }
 
+data class RideRoadReportAvailability(
+    val allowed: Boolean,
+    val message: String,
+)
+
+/**
+ * Fail-closed gate for collaborative road reports.
+ *
+ * A report is operational evidence, so a local screen state is not enough:
+ * the driver role, local lifecycle and authoritative server projection must all
+ * confirm that the trip is currently moving toward its final destination.
+ */
+object RideRoadReportAvailabilityPolicy {
+    fun evaluate(
+        isDriver: Boolean,
+        localStatus: String,
+        serverState: String?,
+        serverVersion: Long,
+        hasCurrentGps: Boolean,
+    ): RideRoadReportAvailability = when {
+        !isDriver -> RideRoadReportAvailability(
+            allowed = false,
+            message = "Los reportes viales están reservados al conductor asignado.",
+        )
+        localStatus != "IN_PROGRESS" -> RideRoadReportAvailability(
+            allowed = false,
+            message = "Los reportes viales se habilitan únicamente después de iniciar la ruta.",
+        )
+        serverVersion <= 0L || serverState != "IN_PROGRESS" -> RideRoadReportAvailability(
+            allowed = false,
+            message = "Esperando confirmación del servidor para habilitar reportes en ruta.",
+        )
+        !hasCurrentGps -> RideRoadReportAvailability(
+            allowed = false,
+            message = "Se necesita una ubicación GPS actual para situar el reporte.",
+        )
+        else -> RideRoadReportAvailability(
+            allowed = true,
+            message = "Reporte vial disponible durante la ruta activa.",
+        )
+    }
+}
+
 data class RideRoadIncident(
     val id: String,
     val roadSegmentId: String,
