@@ -1,6 +1,6 @@
 # Mapa preciso, abordaje y operación del conductor
 
-**Versión Android:** 4.8.0  
+**Versión Android:** 4.8.1
 **Fecha:** 2026-08-01
 
 ## Cámara y selección por pin
@@ -11,6 +11,7 @@
 - Recogida y destino se editan en un selector de pantalla completa; la lista del formulario ya no compite por los gestos del mapa.
 - El pin permanece fijo y el usuario arrastra el mapa por debajo. Pellizco, doble toque y botones `+`, `−` y `◎` permiten afinar o volver al punto inicial.
 - Las coordenadas con seis decimales se actualizan al terminar cada movimiento y se confirman de forma explícita.
+- La cámara de selección se inicializa una sola vez. Las coordenadas vivas del pin nunca vuelven a ejecutar el zoom inicial; el nivel elegido por pellizco o `−` permanece bajo control del usuario.
 - Las coordenadas manuales dejan de ser el flujo principal; el usuario conserva búsqueda, lugares guardados y pin.
 
 ## Llegada y abordaje autoritativos
@@ -68,3 +69,5 @@ cd android
 La prueba de aceptación exige además: zoom manual sin salto, pin confirmado, bloqueo fuera de 100 m, PIN inválido rechazado, inicio posterior a PIN válido, permiso de notificación y prueba de parpadeo en un dispositivo físico.
 
 Prueba física 2026-08-01 en Honor VER-N49: el arrastre cambió el centro de `9.919699, -84.117038` a `9.924807, -84.114659`; el botón `+` respondió, `CONFIRMAR PIN` cerró el selector y el formulario mostró `RECOGIDA FIJADA · CAMBIAR PIN`. El proceso permaneció activo sin `FATAL EXCEPTION`.
+
+Regresión 4.8.1: seis pulsaciones consecutivas en `−` alejaron desde calles locales hasta la vista regional de Costa Rica. Tras mover el mapa y esperar 12 segundos, el nivel de zoom permaneció intacto y la coordenada central cambió a `9.919129, -83.884088`, sin recentrado automático.
