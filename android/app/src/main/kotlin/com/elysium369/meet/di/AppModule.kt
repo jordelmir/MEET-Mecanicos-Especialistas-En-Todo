@@ -3174,6 +3174,16 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_46_47 = object : Migration(46, 47) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE ride_chat_messages ADD COLUMN imageFilePath TEXT")
+            db.execSQL("ALTER TABLE ride_chat_messages ADD COLUMN remoteMediaPath TEXT")
+            db.execSQL("ALTER TABLE ride_chat_messages ADD COLUMN mediaMimeType TEXT")
+            db.execSQL("ALTER TABLE ride_chat_messages ADD COLUMN syncState TEXT NOT NULL DEFAULT 'LOCAL_ONLY'")
+            db.execSQL("ALTER TABLE service_bids ADD COLUMN providerPhone TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3207,7 +3217,8 @@ object AppModule {
             MIGRATION_42_43,
             MIGRATION_43_44,
             MIGRATION_44_45,
-            MIGRATION_45_46
+            MIGRATION_45_46,
+            MIGRATION_46_47
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

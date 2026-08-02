@@ -24,6 +24,7 @@ import com.elysium369.meet.core.services.WorkshopServiceCatalog
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.storage.storage
 import com.elysium369.meet.data.local.dao.TripDao
 import com.elysium369.meet.data.local.dao.MaintenanceAlertDao
 import com.elysium369.meet.data.local.dao.CustomPidDao
@@ -44,6 +45,7 @@ import android.content.Intent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -1016,14 +1018,18 @@ class ObdViewModel @Inject constructor(
         price: Double,
         estimatedHours: Double,
         warrantyDays: Int,
-        message: String
+        message: String,
+        providerPhone: String = "",
+        providerName: String = "Mecánica Elite Pro",
+        providerId: String? = null,
     ) {
         val bid = ServiceBidEntity(
             bidId = UUID.randomUUID().toString(),
             requestId = requestId,
-            shopId = _shopId.value ?: "unknown_shop",
-            shopName = "Mecánica Elite Pro",
+            shopId = providerId ?: _shopId.value ?: "unknown_shop",
+            shopName = providerName,
             shopRating = 4.9,
+            providerPhone = providerPhone,
             price = price,
             estimatedHours = estimatedHours,
             warrantyDays = warrantyDays,
@@ -1046,10 +1052,11 @@ class ObdViewModel @Inject constructor(
     fun acceptBid(requestId: String, bidId: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val bid = marketplaceDao.getBidById(bidId)
                 val accepted = marketplaceDao.acceptBidAtomically(
                     requestId = requestId,
                     bidId = bidId,
-                    mechanicPhone = "+506 8888-8888" // Teléfono del taller para contacto inmediato
+                    mechanicPhone = bid?.providerPhone.orEmpty(),
                 )
                 if (!accepted) {
                     withContext(Dispatchers.Main) {
@@ -5771,6 +5778,7 @@ class ObdViewModel @Inject constructor(
 
     private var jobOffersCollection: Job? = null
     private var jobChatCollection: Job? = null
+    private var jobChatRemoteSync: Job? = null
     private var rideProjectionJob: Job? = null
     private val _rideProjectionConnectionState =
         MutableStateFlow(RideProjectionConnectionState.IDLE)
@@ -5943,6 +5951,7 @@ class ObdViewModel @Inject constructor(
         _activeRideRequest.value = request
         jobOffersCollection?.cancel()
         jobChatCollection?.cancel()
+        jobChatRemoteSync?.cancel()
 
         if (request != null) {
             _rideSharingSelections.update { current ->
@@ -5964,9 +5973,113 @@ class ObdViewModel @Inject constructor(
                     _rideChatMessages.value = it
                 }
             }
+            jobChatRemoteSync = viewModelScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    syncRideChat(request.requestId)
+                    delay(4_000)
+                }
+            }
         } else {
             _rideOffers.value = emptyList()
             _rideChatMessages.value = emptyList()
+        }
+    }
+
+    @Serializable
+    private data class RideChatWireMessage(
+        val id: String,
+        @SerialName("ride_request_id") val rideRequestId: String,
+        @SerialName("sender_id") val senderId: String,
+        @SerialName("sender_name") val senderName: String,
+        @SerialName("sender_role") val senderRole: String,
+        @SerialName("message_type") val messageType: String,
+        @SerialName("text_content") val textContent: String? = null,
+        @SerialName("media_path") val mediaPath: String? = null,
+        @SerialName("media_mime_type") val mediaMimeType: String? = null,
+        @SerialName("audio_duration_ms") val audioDurationMs: Long? = null,
+        @SerialName("created_at_epoch_ms") val createdAtEpochMs: Long,
+    )
+
+    private suspend fun syncRideChat(requestId: String) {
+        val cloudUserId = currentCloudUserId() ?: return
+        runCatching {
+            rideDao.getPendingChatMessages().filter {
+                it.rideRequestId == requestId && it.senderRole in setOf("PASSENGER", "DRIVER")
+            }.forEach { local ->
+                var remotePath = local.remoteMediaPath
+                val localMediaPath = local.imageFilePath ?: local.audioFilePath
+                if (remotePath == null && localMediaPath != null) {
+                    val file = java.io.File(localMediaPath)
+                    if (file.exists()) {
+                        val extension = file.extension.ifBlank { if (local.messageType == "AUDIO") "m4a" else "jpg" }
+                        remotePath = "$requestId/$cloudUserId/${local.messageId}.$extension"
+                        SupabaseManager.client.storage.from("ride-media").upload(remotePath, file.readBytes())
+                    }
+                }
+                SupabaseManager.client.postgrest["ride_messages"].upsert(
+                    RideChatWireMessage(
+                        id = local.messageId,
+                        rideRequestId = local.rideRequestId,
+                        senderId = cloudUserId,
+                        senderName = local.senderName,
+                        senderRole = local.senderRole,
+                        messageType = local.messageType,
+                        textContent = local.textContent,
+                        mediaPath = remotePath,
+                        mediaMimeType = local.mediaMimeType,
+                        audioDurationMs = local.audioDurationMs,
+                        createdAtEpochMs = local.createdAt,
+                    ),
+                )
+                rideDao.updateChatMessageSyncState(local.messageId, "SYNCED", remotePath)
+            }
+
+            val remoteMessages = SupabaseManager.client.postgrest["ride_messages"].select {
+                filter { eq("ride_request_id", requestId) }
+            }.decodeList<RideChatWireMessage>()
+            remoteMessages.forEach { remote ->
+                val localMediaFile = remote.mediaPath?.let { path ->
+                    val extension = path.substringAfterLast('.', "bin")
+                    val directory = java.io.File(
+                        context.filesDir,
+                        if (remote.messageType == "AUDIO") "meet_rides_audio" else "meet_rides_images",
+                    ).apply { mkdirs() }
+                    java.io.File(directory, "remote_${remote.id}.$extension").also { target ->
+                        if (!target.exists()) {
+                            target.writeBytes(
+                                SupabaseManager.client.storage.from("ride-media").downloadAuthenticated(path),
+                            )
+                        }
+                    }
+                }
+                val localSenderId = if (remote.senderId == cloudUserId) {
+                    if (remote.senderRole == "DRIVER") {
+                        driverVerification.value?.driverId ?: remote.senderId
+                    } else {
+                        passengerVerification.value?.passengerId ?: remote.senderId
+                    }
+                } else remote.senderId
+                rideDao.insertChatMessage(
+                    RideChatMessageEntity(
+                        messageId = remote.id,
+                        rideRequestId = remote.rideRequestId,
+                        senderId = localSenderId,
+                        senderName = remote.senderName,
+                        senderRole = remote.senderRole,
+                        messageType = remote.messageType,
+                        textContent = remote.textContent,
+                        audioFilePath = localMediaFile?.takeIf { remote.messageType == "AUDIO" }?.absolutePath,
+                        imageFilePath = localMediaFile?.takeIf { remote.messageType == "IMAGE" }?.absolutePath,
+                        remoteMediaPath = remote.mediaPath,
+                        mediaMimeType = remote.mediaMimeType,
+                        audioDurationMs = remote.audioDurationMs,
+                        syncState = "SYNCED",
+                        createdAt = remote.createdAtEpochMs,
+                    ),
+                )
+            }
+        }.onFailure { error ->
+            Log.w("MeetRides", "Ride chat sync deferred", error)
         }
     }
 
@@ -6861,6 +6974,7 @@ class ObdViewModel @Inject constructor(
                 senderRole = role,
                 messageType = "TEXT",
                 textContent = text,
+                syncState = initialRideChatSyncState(),
                 createdAt = System.currentTimeMillis()
             )
             rideDao.insertChatMessage(msg)
@@ -6877,9 +6991,72 @@ class ObdViewModel @Inject constructor(
                 senderRole = role,
                 messageType = "PRESET",
                 textContent = presetText,
+                syncState = initialRideChatSyncState(),
                 createdAt = System.currentTimeMillis()
             )
             rideDao.insertChatMessage(msg)
+        }
+    }
+
+    fun sendRideChatImage(
+        context: Context,
+        requestId: String,
+        senderId: String,
+        senderName: String,
+        role: String,
+        source: android.net.Uri,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val imageDirectory = java.io.File(context.filesDir, "meet_rides_images").apply { mkdirs() }
+            val mimeType = context.contentResolver.getType(source) ?: "image/jpeg"
+            val extension = when (mimeType.lowercase()) {
+                "image/png" -> "png"
+                "image/webp" -> "webp"
+                else -> "jpg"
+            }
+            val destination = java.io.File(
+                imageDirectory,
+                "ride_${requestId.take(12)}_${System.currentTimeMillis()}.$extension",
+            )
+            try {
+                context.contentResolver.openInputStream(source)?.use { input ->
+                    destination.outputStream().use(input::copyTo)
+                } ?: error("No fue posible abrir la imagen seleccionada")
+                rideDao.insertChatMessage(
+                    RideChatMessageEntity(
+                        messageId = UUID.randomUUID().toString(),
+                        rideRequestId = requestId,
+                        senderId = senderId,
+                        senderName = senderName,
+                        senderRole = role,
+                        messageType = "IMAGE",
+                        imageFilePath = destination.absolutePath,
+                        mediaMimeType = mimeType,
+                        syncState = initialRideChatSyncState(),
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+            } catch (error: Exception) {
+                destination.delete()
+                Log.e("ObdViewModel", "Failed to persist ride chat image", error)
+            }
+        }
+    }
+
+    fun openRideCallDialer(context: Context, phone: String?): Boolean {
+        val normalized = phone.orEmpty().filter { it.isDigit() || it == '+' }
+        if (normalized.count(Char::isDigit) < 7) return false
+        return try {
+            context.startActivity(
+                android.content.Intent(
+                    android.content.Intent.ACTION_DIAL,
+                    android.net.Uri.parse("tel:${android.net.Uri.encode(normalized)}"),
+                ),
+            )
+            true
+        } catch (error: Exception) {
+            Log.e("ObdViewModel", "No dialer is available for ride call", error)
+            false
         }
     }
 
@@ -6956,7 +7133,9 @@ class ObdViewModel @Inject constructor(
                             senderRole = role,
                             messageType = "AUDIO",
                             audioFilePath = file.absolutePath,
+                            mediaMimeType = "audio/mp4",
                             audioDurationMs = duration,
+                            syncState = initialRideChatSyncState(),
                             createdAt = System.currentTimeMillis()
                         )
                         rideDao.insertChatMessage(msg)
@@ -7006,6 +7185,9 @@ class ObdViewModel @Inject constructor(
         mediaPlayer = null
         _isPlayingAudio.value = null
     }
+
+    private fun initialRideChatSyncState(): String =
+        if (currentCloudUserId() == null) "LOCAL_ONLY" else "PENDING"
 
 
     /** Open Waze with navigation to coordinates. Explicitly targets package com.waze to bypass prompt issues */

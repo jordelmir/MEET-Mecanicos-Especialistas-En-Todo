@@ -4,8 +4,12 @@ package com.elysium369.meet.ui.screens
 
 import android.annotation.SuppressLint
 import android.animation.ValueAnimator
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.view.MotionEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,9 +67,29 @@ import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconOpacity
+import org.maplibre.android.style.layers.PropertyFactory.iconPitchAlignment
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
+import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineBlur
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
+import org.maplibre.android.style.layers.PropertyFactory.symbolPlacement
+import org.maplibre.android.style.layers.PropertyFactory.symbolSpacing
+import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.textColor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloBlur
+import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
+import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
 import java.util.Locale
 
 @SuppressLint("ClickableViewAccessibility")
@@ -506,6 +530,7 @@ private fun renderRideState(
         .takeIf { it.size >= 2 }
         ?.map { LatLng(it.latitude, it.longitude) }
         ?.let { route ->
+            updateRouteDirectionLayer(map, route)
             map.addPolyline(
                 PolylineOptions()
                     .addAll(route)
@@ -527,6 +552,10 @@ private fun renderRideState(
             )
             routePulseController.bind(map, pulse)
         }
+
+    if (state.route.size < 2) {
+        clearRouteDirectionLayer(map)
+    }
 
     state.markers.forEach { marker ->
         val accuracy = marker.point.accuracyMeters?.let {
@@ -627,6 +656,121 @@ private fun applyVanguardRoadHierarchy(map: MapLibreMap) {
             )
         }
     }
+    applyVanguardLabelSystem(style.layers.filterIsInstance<SymbolLayer>())
+}
+
+private fun applyVanguardLabelSystem(layers: List<SymbolLayer>) {
+    layers.forEach { layer ->
+        val id = layer.id.lowercase(Locale.ROOT)
+        val isRoadName = id.contains("road") ||
+            id.contains("street") ||
+            id.contains("transport") ||
+            id.contains("highway")
+        val isPlaceName = id.contains("place") ||
+            id.contains("city") ||
+            id.contains("town") ||
+            id.contains("village") ||
+            id.contains("settlement") ||
+            id.contains("label") ||
+            id.contains("poi")
+        if (!isRoadName && !isPlaceName) return@forEach
+
+        runCatching {
+            // OpenFreeMap styles commonly stop labels at zoom 18. Over-zoomed
+            // vector tiles still contain the names, so keeping the style layer
+            // alive prevents them from vanishing precisely when the user needs
+            // street-level confirmation.
+            layer.setMaxZoom(24f)
+            layer.setProperties(
+                textColor(
+                    if (isRoadName) Color.rgb(25, 255, 221)
+                    else Color.rgb(200, 92, 255),
+                ),
+                textHaloColor(Color.argb(245, 1, 7, 18)),
+                textHaloWidth(if (isRoadName) 1.45f else 1.2f),
+                textHaloBlur(0.35f),
+                // Road names are sparse at close zoom and must remain readable.
+                // POIs keep collision detection to avoid an unusable wall of text.
+                textAllowOverlap(isRoadName),
+                textIgnorePlacement(false),
+            )
+        }
+    }
+}
+
+private const val ROUTE_DIRECTION_SOURCE = "elysium-route-direction-source"
+private const val ROUTE_DIRECTION_LAYER = "elysium-route-direction-layer"
+private const val ROUTE_DIRECTION_IMAGE = "elysium-route-direction-chevron"
+
+private fun updateRouteDirectionLayer(map: MapLibreMap, route: List<LatLng>) {
+    val style = map.style ?: return
+    val geometry = LineString.fromLngLats(
+        route.map { Point.fromLngLat(it.longitude, it.latitude) },
+    )
+    val source = style.getSourceAs<GeoJsonSource>(ROUTE_DIRECTION_SOURCE)
+    if (source == null) {
+        style.addSource(GeoJsonSource(ROUTE_DIRECTION_SOURCE, Feature.fromGeometry(geometry)))
+    } else {
+        source.setGeoJson(geometry)
+    }
+    if (style.getLayer(ROUTE_DIRECTION_LAYER) == null) {
+        style.addImage(ROUTE_DIRECTION_IMAGE, createRouteChevronBitmap())
+        style.addLayer(
+            SymbolLayer(ROUTE_DIRECTION_LAYER, ROUTE_DIRECTION_SOURCE).withProperties(
+                symbolPlacement("line"),
+                symbolSpacing(82f),
+                iconImage(ROUTE_DIRECTION_IMAGE),
+                iconSize(0.72f),
+                iconOpacity(0.96f),
+                iconAllowOverlap(true),
+                iconIgnorePlacement(true),
+                iconRotationAlignment("map"),
+                iconPitchAlignment("map"),
+            ),
+        )
+    }
+}
+
+private fun clearRouteDirectionLayer(map: MapLibreMap) {
+    val style = map.style ?: return
+    // Keep the style objects allocated and feed them an empty feature set on
+    // the next valid route. Removing a source while a layer references it is
+    // invalid in MapLibre, so both are removed in dependency order.
+    if (style.getLayer(ROUTE_DIRECTION_LAYER) != null) {
+        style.removeLayer(ROUTE_DIRECTION_LAYER)
+    }
+    if (style.getSource(ROUTE_DIRECTION_SOURCE) != null) {
+        style.removeSource(ROUTE_DIRECTION_SOURCE)
+    }
+}
+
+private fun createRouteChevronBitmap(): Bitmap {
+    val bitmap = Bitmap.createBitmap(46, 28, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(115, 0, 229, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 9f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val core = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(224, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 3.6f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    // Point right: line-placement rotates the sprite with the ordered route,
+    // so every chevron follows the real origin -> destination direction.
+    val path = Path().apply {
+        moveTo(8f, 5f)
+        lineTo(28f, 14f)
+        lineTo(8f, 23f)
+    }
+    canvas.drawPath(path, glow)
+    canvas.drawPath(path, core)
+    return bitmap
 }
 
 private class RoutePulseController {

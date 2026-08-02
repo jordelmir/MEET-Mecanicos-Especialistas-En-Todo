@@ -258,6 +258,7 @@ fun RepairNetworkScreen(
                     onOpenTowTruck = { navController.navigate("tow_truck_service") },
                     onOpenParts = { navController.navigate("part_request") },
                     onOpenRide = { navController.navigate("ride_service") },
+                    onOpenUniversalServices = { navController.navigate("universal_services") },
                     onOpenCommunityCases = { navController.navigate("community_cases") }
                 )
             }
@@ -1661,6 +1662,7 @@ private fun RepairNetworkWorkflowGuide(
     onOpenTowTruck: () -> Unit,
     onOpenParts: () -> Unit,
     onOpenRide: () -> Unit,
+    onOpenUniversalServices: () -> Unit,
     onOpenCommunityCases: () -> Unit
 ) {
     EliteCard(
@@ -1747,6 +1749,15 @@ private fun RepairNetworkWorkflowGuide(
             }
 
             // 5th full-width action
+            RepairNetworkQuickActionCard(
+                title = "Servicios Elysium",
+                subtitle = "A domicilio · remoto · híbrido · ofertas y contratos",
+                icon = "✦",
+                accentColor = Color(0xFFC85CFF),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenUniversalServices
+            )
+
             RepairNetworkQuickActionCard(
                 title = "Casos Comunitarios",
                 subtitle = "StackOverflow de problemas mecánicos",
