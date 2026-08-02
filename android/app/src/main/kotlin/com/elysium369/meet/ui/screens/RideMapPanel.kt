@@ -3,10 +3,12 @@
 package com.elysium369.meet.ui.screens
 
 import android.annotation.SuppressLint
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.view.MotionEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,6 +62,10 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory.lineBlur
+import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import java.util.Locale
 
 @SuppressLint("ClickableViewAccessibility")
@@ -78,6 +85,7 @@ fun RideMapPanel(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val avatarSelection = remember(context) { RideMapAvatarStore(context).load() }
+    val routePulseController = remember { RoutePulseController() }
     var styleRequested by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
     var mapError by remember { mutableStateOf<String?>(null) }
@@ -114,9 +122,10 @@ fun RideMapPanel(
         styleRequested = true
         styleReady = false
         map.setStyle(styleCandidates[selectedStyleIndex]) {
+            applyVanguardRoadHierarchy(map)
             styleReady = true
             mapError = null
-            renderRideState(context, map, state, avatarSelection, moveCamera = false)
+            renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = false)
         }
     }
 
@@ -173,6 +182,7 @@ fun RideMapPanel(
             if (!mapView.isDestroyed) {
                 mapView.onDestroy()
             }
+            routePulseController.release()
         }
     }
 
@@ -236,16 +246,17 @@ fun RideMapPanel(
                             val shouldMoveCamera = !pinSelectionEnabled &&
                                 (!userControlsCamera || recenterRequest > 0) &&
                                 signature != lastCameraSignature
-                            renderRideState(context, map, state, avatarSelection, shouldMoveCamera)
+                            renderRideState(context, map, state, avatarSelection, routePulseController, shouldMoveCamera)
                             if (shouldMoveCamera) lastCameraSignature = signature
                         }
                         !styleRequested && styleCandidates.isNotEmpty() -> {
                             styleRequested = true
                             map.setStyle(styleCandidates[selectedStyleIndex]) {
+                                applyVanguardRoadHierarchy(map)
                                 styleReady = true
                                 mapError = null
                                 val signature = state.cameraSignature()
-                                renderRideState(context, map, state, avatarSelection, moveCamera = true)
+                                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = true)
                                 lastCameraSignature = signature
                             }
                         }
@@ -377,7 +388,7 @@ fun RideMapPanel(
                     lastCameraSignature = null
                     recenterRequest += 1
                     latestMap?.let { map ->
-                        renderRideState(context, map, state, avatarSelection, moveCamera = true)
+                        renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = true)
                         lastCameraSignature = state.cameraSignature()
                     }
                 },
@@ -392,6 +403,52 @@ fun RideMapPanel(
                 Text("◎", fontWeight = FontWeight.Black)
             }
         }
+
+        if (!pinSelectionEnabled && state.route.size >= 2) {
+            VanguardRouteLegend(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VanguardRouteLegend(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .background(
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        ComposeColor(0xE607131E),
+                        ComposeColor(0xD9121530),
+                        ComposeColor(0xE607131E),
+                    ),
+                ),
+                shape = MaterialTheme.shapes.medium,
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        ComposeColor(0xFF00F5D4),
+                        ComposeColor(0xFF00B8FF),
+                        ComposeColor(0xFFB026FF),
+                    ),
+                ),
+                shape = MaterialTheme.shapes.medium,
+            )
+            .padding(horizontal = 11.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("◈", color = ComposeColor(0xFF00F5D4), fontWeight = FontWeight.Black)
+        Text(
+            text = "  VANGUARD NAV  •  RUTA ACTIVA",
+            color = ComposeColor.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Black,
+        )
     }
 }
 
@@ -435,8 +492,10 @@ private fun renderRideState(
     map: MapLibreMap,
     state: RideMapState,
     avatarSelection: RideMapAvatarSelection,
+    routePulseController: RoutePulseController,
     moveCamera: Boolean,
 ) {
+    routePulseController.bind(null, null)
     map.clear()
     val iconFactory = IconFactory.getInstance(context)
     val icons = RideMarkerRole.entries.associateWith { role ->
@@ -450,10 +509,23 @@ private fun renderRideState(
             map.addPolyline(
                 PolylineOptions()
                     .addAll(route)
-                    .color(Color.rgb(0, 229, 255))
-                    .alpha(0.9f)
-                    .width(7f),
+                    .color(Color.argb(210, 0, 2, 12))
+                    .width(17f),
             )
+            val pulse = map.addPolyline(
+                PolylineOptions()
+                    .addAll(route)
+                    .color(Color.argb(92, 0, 229, 255))
+                    .width(12f),
+            )
+            addNeonRouteSegments(map, route)
+            map.addPolyline(
+                PolylineOptions()
+                    .addAll(route)
+                    .color(Color.argb(220, 222, 255, 255))
+                    .width(2.1f),
+            )
+            routePulseController.bind(map, pulse)
         }
 
     state.markers.forEach { marker ->
@@ -497,6 +569,89 @@ private fun renderRideState(
             )
         }
     }
+}
+
+private fun addNeonRouteSegments(map: MapLibreMap, route: List<LatLng>) {
+    val palette = intArrayOf(
+        Color.rgb(0, 245, 212),
+        Color.rgb(0, 184, 255),
+        Color.rgb(46, 91, 255),
+        Color.rgb(124, 77, 255),
+        Color.rgb(176, 38, 255),
+        Color.rgb(255, 23, 145),
+    )
+    val segmentCount = minOf(18, route.lastIndex)
+    if (segmentCount <= 0) return
+    repeat(segmentCount) { segment ->
+        val start = (segment * route.lastIndex) / segmentCount
+        val end = ((segment + 1) * route.lastIndex) / segmentCount
+        if (end <= start) return@repeat
+        val colorIndex = (segment * palette.lastIndex / segmentCount).coerceIn(palette.indices)
+        map.addPolyline(
+            PolylineOptions()
+                .addAll(route.subList(start, end + 1))
+                .color(palette[colorIndex])
+                .width(7.2f),
+        )
+    }
+}
+
+private fun applyVanguardRoadHierarchy(map: MapLibreMap) {
+    val style = map.style ?: return
+    style.layers.filterIsInstance<LineLayer>().forEach { layer ->
+        val id = layer.id.lowercase(Locale.ROOT)
+        val roadLevel = when {
+            id.contains("motorway") || id.contains("freeway") || id.contains("trunk") -> 3
+            id.contains("primary") || id.contains("highway") -> 2
+            id.contains("secondary") || id.contains("tertiary") -> 1
+            id.contains("road") || id.contains("street") || id.contains("transportation") -> 0
+            else -> return@forEach
+        }
+        val color = when (roadLevel) {
+            3 -> Color.rgb(0, 184, 255)
+            2 -> Color.rgb(0, 245, 212)
+            1 -> Color.rgb(78, 96, 180)
+            else -> Color.rgb(36, 68, 90)
+        }
+        val opacity = when (roadLevel) {
+            3 -> 0.92f
+            2 -> 0.78f
+            1 -> 0.58f
+            else -> 0.38f
+        }
+        runCatching {
+            layer.setProperties(
+                lineColor(color),
+                lineOpacity(opacity),
+                lineBlur(if (roadLevel >= 2) 0.35f else 0f),
+            )
+        }
+    }
+}
+
+private class RoutePulseController {
+    private var animator: ValueAnimator? = null
+
+    fun bind(map: MapLibreMap?, polyline: org.maplibre.android.annotations.Polyline?) {
+        animator?.cancel()
+        animator = null
+        if (map == null || polyline == null) return
+        animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1_800L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { animation ->
+                val phase = animation.animatedValue as Float
+                val alpha = (58 + 86 * phase).toInt()
+                polyline.color = Color.argb(alpha, 0, 229, 255)
+                polyline.width = 11f + phase * 3f
+                runCatching { map.updatePolyline(polyline) }
+            }
+            start()
+        }
+    }
+
+    fun release() = bind(null, null)
 }
 
 private fun RideMapState.cameraSignature(): String = buildString {
