@@ -103,7 +103,8 @@ import androidx.compose.ui.text.font.FontStyle
 fun RideServiceScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onOpenDriverRegistration: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -146,9 +147,11 @@ fun RideServiceScreen(
     val activeRide by viewModel.activeRideRequest.collectAsState()
     val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
     val driverVerification by viewModel.driverVerification.collectAsState()
+    val passengerVerification by viewModel.passengerVerification.collectAsState()
     var showProfile by rememberSaveable { mutableStateOf(false) }
     var profileInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var showRideMenu by remember { mutableStateOf(false) }
+    var firstAccessRole by rememberSaveable { mutableStateOf<String?>(null) }
     val presencePreferences = remember(context) {
         context.getSharedPreferences("elysium_ride_driver_presence", Context.MODE_PRIVATE)
     }
@@ -300,7 +303,16 @@ fun RideServiceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (showProfile) {
+            if (
+                passengerVerification == null &&
+                driverVerification == null &&
+                firstAccessRole == null
+            ) {
+                RideFirstAccessGateway(
+                    onPassengerRegistration = { firstAccessRole = "PASSENGER" },
+                    onDriverRegistration = onOpenDriverRegistration,
+                )
+            } else if (showProfile) {
                 RideProfileScreen(
                     viewModel = viewModel,
                     isDriver = driverMode,
@@ -317,10 +329,112 @@ fun RideServiceScreen(
                 )
             } else {
                 if (driverMode) {
-                    DriverDashboard(viewModel = viewModel)
+                    DriverDashboard(
+                        viewModel = viewModel,
+                        onRegisterDriver = onOpenDriverRegistration,
+                    )
                 } else {
-                    PassengerDashboard(viewModel = viewModel)
+                    PassengerDashboard(
+                        viewModel = viewModel,
+                        forceRegistration = firstAccessRole == "PASSENGER",
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RideFirstAccessGateway(
+    onPassengerRegistration: () -> Unit,
+    onDriverRegistration: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF030712), Color(0xFF071527), Color(0xFF09051A)),
+                ),
+            )
+            .padding(20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xD90A1726)),
+            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = .58f)),
+            shape = RoundedCornerShape(26.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 18.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(82.dp)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(MeetColors.cyberCyan.copy(alpha = .42f), Color.Transparent),
+                            ),
+                            CircleShape,
+                        )
+                        .border(1.dp, MeetColors.neonGreen.copy(alpha = .65f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Route,
+                        contentDescription = null,
+                        tint = MeetColors.neonGreen,
+                        modifier = Modifier.size(42.dp),
+                    )
+                }
+                Text(
+                    "ACTIVA TU CUENTA DE VIAJES",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "Antes de mostrar el mapa necesitamos saber cómo usarás Elysium Vanguard. El registro protege viajes, pagos y soporte.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Button(
+                    onClick = onPassengerRegistration,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.neonGreen,
+                        contentColor = Color(0xFF02100B),
+                    ),
+                ) {
+                    Icon(Icons.Default.Person, null)
+                    Spacer(Modifier.width(9.dp))
+                    Text("REGISTRARME PARA VIAJAR", fontWeight = FontWeight.Black)
+                }
+                OutlinedButton(
+                    onClick = onDriverRegistration,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, MeetColors.cyberCyan),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                ) {
+                    Icon(Icons.Default.DirectionsCar, null)
+                    Spacer(Modifier.width(9.dp))
+                    Text("REGISTRARME COMO CHOFER", fontWeight = FontWeight.Black)
+                }
+                Text(
+                    "La documentación de conductor se revisa por separado antes de permitir recibir solicitudes.",
+                    color = MeetColors.textMuted,
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }
@@ -362,7 +476,10 @@ private fun rideGeoPointOrNull(
 private enum class RidePinTarget { PICKUP, DESTINATION }
 
 @Composable
-fun PassengerDashboard(viewModel: ObdViewModel) {
+fun PassengerDashboard(
+    viewModel: ObdViewModel,
+    forceRegistration: Boolean = false,
+) {
     val context = LocalContext.current
     val currentLocale = rememberRideJavaLocale()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
@@ -424,6 +541,12 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
     var paxProfilePhoto by remember { mutableStateOf("") }
     var paxCedulaFront by remember { mutableStateOf("") }
     var paxSelfieWithCedula by remember { mutableStateOf("") }
+
+    LaunchedEffect(forceRegistration, passengerVer) {
+        if (forceRegistration && passengerVer == null) {
+            showPaxVerification = true
+        }
+    }
 
     LaunchedEffect(destAddress, destinationPlaceId, currentGps) {
         if (destinationPlaceId != null || destAddress.trim().length < 3) {
@@ -1027,8 +1150,10 @@ fun PassengerDashboard(viewModel: ObdViewModel) {
                 )
                 Card(
                     Modifier.fillMaxWidth().height(280.dp),
-                    colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
-                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xCC06121F)),
+                    border = BorderStroke(1.5.dp, MeetColors.cyberCyan.copy(alpha = 0.82f)),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
                 ) {
                     RideMapPanel(state = previewState, modifier = Modifier.fillMaxSize())
                 }
@@ -1531,7 +1656,10 @@ private fun RideStopField(
 }
 
 @Composable
-fun DriverDashboard(viewModel: ObdViewModel) {
+fun DriverDashboard(
+    viewModel: ObdViewModel,
+    onRegisterDriver: () -> Unit = {},
+) {
     val context = LocalContext.current
     val openRides by viewModel.openRideRequests.collectAsState()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
@@ -1646,6 +1774,21 @@ fun DriverDashboard(viewModel: ObdViewModel) {
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
+                        if (driverVer == null) {
+                            Button(
+                                onClick = onRegisterDriver,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MeetColors.cyberCyan,
+                                    contentColor = Color(0xFF02131E),
+                                ),
+                                shape = RoundedCornerShape(14.dp),
+                            ) {
+                                Icon(Icons.Default.Badge, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("COMPLETAR REGISTRO DE CHOFER", fontWeight = FontWeight.Black)
+                            }
+                        }
                     }
                 }
             }
@@ -2874,8 +3017,9 @@ fun ActiveRidePanel(
                 .height(220.dp)
                 .padding(horizontal = 16.dp),
             colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
-            border = BorderStroke(1.dp, MeetColors.borderSubtle),
-            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.5.dp, MeetColors.cyberCyan.copy(alpha = .72f)),
+            shape = RoundedCornerShape(22.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
         ) {
             Box(Modifier.fillMaxSize()) {
                 RideMapPanel(

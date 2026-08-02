@@ -13,7 +13,13 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.9.1
+## Versión actual: 4.10.0
+
+La versión 4.10.0 estrena `Vanguard Neon Navigation`: jerarquía vial de alto
+contraste, ruta multicapa animada, pines procedurales con volumen y avatares con
+halo de vidrio, conservando gestos y control manual de cámara. Si no existe un
+perfil de pasajero ni de conductor, Viajes muestra primero el registro por rol
+y conecta cada opción con su flujo real de verificación.
 
 La versión 4.9.1 restringe los reportes colaborativos de tránsito a una ruta
 realmente iniciada. El botón sólo aparece al conductor durante `IN_PROGRESS`,
@@ -81,6 +87,7 @@ Documentación técnica:
 - [`docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md`](docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md)
 - [`docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md`](docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md)
 - [`docs/releases/2026-08-01-android-4.9.1-route-only-road-reports.md`](docs/releases/2026-08-01-android-4.9.1-route-only-road-reports.md)
+- [`docs/releases/2026-08-01-android-4.10.0-vanguard-neon-navigation.md`](docs/releases/2026-08-01-android-4.10.0-vanguard-neon-navigation.md)
 
 ## Que es real hoy
 

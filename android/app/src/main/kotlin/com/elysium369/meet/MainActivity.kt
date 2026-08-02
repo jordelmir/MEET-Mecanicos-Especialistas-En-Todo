@@ -767,7 +767,10 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             composable("ride_service") {
                 com.elysium369.meet.ui.screens.RideServiceScreen(
                     viewModel = obdViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenDriverRegistration = {
+                        navController.navigate("provider_registration")
+                    },
                 )
             }
         }
