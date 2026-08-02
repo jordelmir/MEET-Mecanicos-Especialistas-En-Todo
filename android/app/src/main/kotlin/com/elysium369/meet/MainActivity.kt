@@ -638,6 +638,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     obdViewModel = obdViewModel
                 )
             }
+            composable("universal_services") {
+                UniversalServicesScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable("provider_registration") {
                 ProviderRegistrationScreen(
                     viewModel = obdViewModel,

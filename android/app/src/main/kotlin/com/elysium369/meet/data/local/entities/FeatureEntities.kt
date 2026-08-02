@@ -141,6 +141,7 @@ data class ServiceBidEntity(
     val shopId: String,
     val shopName: String,
     val shopRating: Double,
+    val providerPhone: String = "",
     val price: Double,
     val estimatedHours: Double,
     val warrantyDays: Int,
@@ -438,7 +439,11 @@ data class RideChatMessageEntity(
     val messageType: String,             // TEXT, AUDIO, PRESET
     val textContent: String? = null,
     val audioFilePath: String? = null,
+    val imageFilePath: String? = null,
+    val remoteMediaPath: String? = null,
+    val mediaMimeType: String? = null,
     val audioDurationMs: Long? = null,
+    val syncState: String = "LOCAL_ONLY", // PENDING, SYNCED, FAILED, LOCAL_ONLY
     val isRead: Boolean = false,
     val createdAt: Long
 )

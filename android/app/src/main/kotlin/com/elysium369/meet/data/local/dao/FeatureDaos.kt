@@ -999,6 +999,16 @@ interface RideDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChatMessage(message: RideChatMessageEntity)
 
+    @Query("SELECT * FROM ride_chat_messages WHERE syncState IN ('PENDING', 'FAILED', 'LOCAL_ONLY') ORDER BY createdAt ASC LIMIT :limit")
+    suspend fun getPendingChatMessages(limit: Int = 50): List<RideChatMessageEntity>
+
+    @Query("UPDATE ride_chat_messages SET syncState = :syncState, remoteMediaPath = :remoteMediaPath WHERE messageId = :messageId")
+    suspend fun updateChatMessageSyncState(
+        messageId: String,
+        syncState: String,
+        remoteMediaPath: String? = null,
+    )
+
     @Query("UPDATE ride_chat_messages SET isRead = 1 WHERE rideRequestId = :rideRequestId AND senderId != :userId")
     suspend fun markMessagesAsRead(rideRequestId: String, userId: String)
 

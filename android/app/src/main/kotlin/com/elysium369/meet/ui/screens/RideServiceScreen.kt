@@ -42,6 +42,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import coil.compose.AsyncImage
 import com.elysium369.meet.data.local.entities.RideChatMessageEntity
 import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
@@ -1464,7 +1465,7 @@ fun PassengerDashboard(
 }
 
 @Composable
-private fun RidePinPickerDialog(
+fun RidePinPickerDialog(
     targetLabel: String,
     state: com.elysium369.meet.ride.map.RideMapState,
     initialPoint: RideGeoPoint?,
@@ -2299,6 +2300,28 @@ fun ActiveRidePanel(
                 "El micrófono solo es necesario para enviar mensajes de voz.",
                 Toast.LENGTH_LONG,
             ).show()
+        }
+    }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        uri?.let {
+            viewModel.sendRideChatImage(
+                context = context,
+                requestId = ride.requestId,
+                senderId = if (isDriver) {
+                    viewModel.driverVerification.value?.driverId.orEmpty()
+                } else {
+                    viewModel.passengerVerification.value?.passengerId.orEmpty()
+                },
+                senderName = if (isDriver) {
+                    viewModel.driverVerification.value?.fullName.orEmpty()
+                } else {
+                    viewModel.passengerVerification.value?.fullName.orEmpty()
+                },
+                role = if (isDriver) "DRIVER" else "PASSENGER",
+                source = it,
+            )
         }
     }
 
@@ -3201,6 +3224,32 @@ fun ActiveRidePanel(
                             fontSize = 11.sp,
                         )
                     }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val phone = if (isDriver) ride.passengerPhone else ride.assignedDriverPhone
+                            if (!viewModel.openRideCallDialer(context, phone)) {
+                                Toast.makeText(
+                                    context,
+                                    "Número de contacto no disponible. Usa el chat del viaje.",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = .75f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
+                    ) {
+                        Icon(Icons.Default.Call, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("LLAMAR CON EL TELÉFONO", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    }
+                    Text(
+                        text = "Abre el marcador del dispositivo; la llamada no se presenta como anónima ni enmascarada.",
+                        color = MeetColors.textMuted,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                    )
                 }
             }
         }
@@ -3310,8 +3359,8 @@ fun ActiveRidePanel(
                                                     }
                                                 ) {
                                                     Icon(
-                                                        imageVector = if (isPlaying) Icons.Default.PlayArrow else Icons.Default.PlayArrow,
-                                                        contentDescription = null,
+                                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                        contentDescription = if (isPlaying) "Pausar audio" else "Reproducir audio",
                                                         tint = MeetColors.neonGreen
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
@@ -3322,7 +3371,37 @@ fun ActiveRidePanel(
                                                     )
                                                 }
                                             }
+                                            "IMAGE" -> {
+                                                val imagePath = message.imageFilePath
+                                                if (imagePath != null) {
+                                                    AsyncImage(
+                                                        model = java.io.File(imagePath),
+                                                        contentDescription = "Imagen enviada en el chat del viaje",
+                                                        modifier = Modifier
+                                                            .widthIn(max = 260.dp)
+                                                            .heightIn(min = 120.dp, max = 240.dp)
+                                                            .clip(RoundedCornerShape(12.dp)),
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        "Imagen pendiente de descarga",
+                                                        color = MeetColors.warning,
+                                                        fontSize = 12.sp,
+                                                    )
+                                                }
+                                            }
                                         }
+                                        Text(
+                                            text = when (message.syncState) {
+                                                "SYNCED" -> "Entregado"
+                                                "FAILED" -> "No sincronizado · toca para reintentar"
+                                                "LOCAL_ONLY" -> "Guardado en este dispositivo"
+                                                else -> "Pendiente de sincronización"
+                                            },
+                                            color = MeetColors.textMuted,
+                                            fontSize = 8.sp,
+                                            modifier = Modifier.padding(top = 4.dp),
+                                        )
                                     }
                                 }
                             }
@@ -3367,6 +3446,19 @@ fun ActiveRidePanel(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            IconButton(
+                                onClick = { imagePickerLauncher.launch("image/*") },
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MeetColors.cardBackground),
+                            ) {
+                                Icon(
+                                    Icons.Default.AddPhotoAlternate,
+                                    contentDescription = "Enviar imagen",
+                                    tint = Color(0xFFC85CFF),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
                             // Hold-to-record voice message button
                             IconButton(
                                 onClick = {
@@ -3388,8 +3480,8 @@ fun ActiveRidePanel(
                                     .background(if (isRecording) MeetColors.error else MeetColors.cardBackground)
                             ) {
                                 Icon(
-                                    imageVector = if (isRecording) Icons.Default.PlayArrow else Icons.Default.PlayArrow,
-                                    contentDescription = "Grabar audio",
+                                    imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                                    contentDescription = if (isRecording) "Detener y enviar audio" else "Grabar audio",
                                     tint = if (isRecording) Color.White else MeetColors.cyberCyan
                                 )
                             }
