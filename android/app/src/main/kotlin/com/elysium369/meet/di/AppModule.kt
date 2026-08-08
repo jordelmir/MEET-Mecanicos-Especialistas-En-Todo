@@ -3184,6 +3184,17 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_47_48 = object : Migration(47, 48) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN fareMode TEXT NOT NULL DEFAULT 'OPEN_BID'")
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN distanceRateMinorPerKm INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN timeRateMinorPerMinute INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN estimatedFareMinor INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN fareRateCardVersion INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN allowsInTripStops INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3218,7 +3229,8 @@ object AppModule {
             MIGRATION_43_44,
             MIGRATION_44_45,
             MIGRATION_45_46,
-            MIGRATION_46_47
+            MIGRATION_46_47,
+            MIGRATION_47_48
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

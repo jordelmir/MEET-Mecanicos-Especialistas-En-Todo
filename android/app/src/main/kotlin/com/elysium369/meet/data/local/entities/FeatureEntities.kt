@@ -372,6 +372,12 @@ data class RideRequestEntity(
     val estimatedDurationMin: Int,       // Duración aproximada
     val stopsJson: String = "[]",        // Ordered stop snapshots; never inferred
     val paymentMethod: String = "CASH",  // CASH or SINPE (declared, not settlement proof)
+    val fareMode: String = "OPEN_BID",
+    val distanceRateMinorPerKm: Long = 0L,
+    val timeRateMinorPerMinute: Long = 0L,
+    val estimatedFareMinor: Long = 0L,
+    val fareRateCardVersion: Long = 1L,
+    val allowsInTripStops: Boolean = false,
     val quoteVersion: Long = 1L,
     val fareBreakdownJson: String = "{}",
     val status: String,                  // OPEN, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED

@@ -71,6 +71,8 @@ import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideArrivalPolicy
 import com.elysium369.meet.ride.domain.RideDriverVehicleSummary
 import com.elysium369.meet.ride.domain.RideFareBidPolicy
+import com.elysium369.meet.ride.domain.RideFareEngine
+import com.elysium369.meet.ride.domain.RideFareMode
 import com.elysium369.meet.ride.domain.RideShareCategory
 import com.elysium369.meet.ride.domain.RideGuardianPolicy
 import com.elysium369.meet.ride.domain.RideSafetySignalType
@@ -6363,8 +6365,11 @@ class ObdViewModel @Inject constructor(
         currency: String,
         estDistance: Double,
         estDuration: Int,
+        estimatedDistanceMeters: Long = (estDistance * 1_000.0).toLong(),
+        estimatedDurationSeconds: Long = estDuration * 60L,
         stopsJson: String = "[]",
         paymentMethod: String = "CASH",
+        fareMode: RideFareMode = RideFareMode.OPEN_BID,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val normalizedCountryCode = countryCode
@@ -6377,7 +6382,26 @@ class ObdViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val normalizedFare = RideFareBidPolicy.normalize(priceOffer, currency)
+            val meteredQuote = if (fareMode == RideFareMode.METERED_TIME_DISTANCE) {
+                runCatching {
+                    require(currency.equals("CRC", ignoreCase = true)) {
+                        "La tarifa por tiempo y distancia inicia en CRC"
+                    }
+                    RideFareEngine.quoteCostaRica(
+                        distanceMeters = estimatedDistanceMeters,
+                        durationSeconds = estimatedDurationSeconds,
+                    )
+                }.getOrElse {
+                    _rideVerificationNotice.emit(
+                        it.message ?: "No se pudo calcular la tarifa por tiempo y distancia.",
+                    )
+                    return@launch
+                }
+            } else {
+                null
+            }
+            val normalizedFare = meteredQuote?.estimatedTotalMinor?.toDouble()
+                ?: RideFareBidPolicy.normalize(priceOffer, currency)
             val offeredFareMinor = runCatching {
                 rideFareToMinorUnits(normalizedFare, currency)
             }.getOrElse {
@@ -6407,7 +6431,17 @@ class ObdViewModel @Inject constructor(
                 estimatedDurationMin = estDuration,
                 stopsJson = stopsJson,
                 paymentMethod = paymentMethod,
-                fareBreakdownJson = """{"acceptedFare":$normalizedFare,"currency":"$currency"}""",
+                fareMode = fareMode.name,
+                distanceRateMinorPerKm = meteredQuote?.distanceRateMinorPerKm ?: 0L,
+                timeRateMinorPerMinute = meteredQuote?.timeRateMinorPerMinute ?: 0L,
+                estimatedFareMinor = offeredFareMinor,
+                fareRateCardVersion = meteredQuote?.rateCardVersion ?: 1L,
+                allowsInTripStops = RideFareEngine.allowsStopsDuringTrip(fareMode),
+                fareBreakdownJson = if (meteredQuote == null) {
+                    """{"mode":"OPEN_BID","acceptedFareMinor":$offeredFareMinor,"currency":"${currency.uppercase()}"}"""
+                } else {
+                    """{"mode":"METERED_TIME_DISTANCE","distanceFareMinor":${meteredQuote.distanceFareMinor},"timeFareMinor":${meteredQuote.timeFareMinor},"estimatedTotalMinor":${meteredQuote.estimatedTotalMinor},"currency":"CRC","rateCardVersion":${meteredQuote.rateCardVersion}}"""
+                },
                 status = "OPEN",
                 serverState = "SEARCHING",
                 serverVersion = 0L,
@@ -6434,6 +6468,13 @@ class ObdViewModel @Inject constructor(
                     currency = currency.uppercase(),
                     paymentMethod = paymentMethod.uppercase(),
                     stopsJson = stopsJson,
+                    fareMode = fareMode.name,
+                    distanceRateMinorPerKm = meteredQuote?.distanceRateMinorPerKm ?: 0L,
+                    timeRateMinorPerMinute = meteredQuote?.timeRateMinorPerMinute ?: 0L,
+                    estimatedDistanceMeters = estimatedDistanceMeters,
+                    estimatedDurationSeconds = estimatedDurationSeconds,
+                    fareRateCardVersion = meteredQuote?.rateCardVersion ?: 1L,
+                    allowsInTripStops = RideFareEngine.allowsStopsDuringTrip(fareMode),
                 ),
             )
             val queued = reportRideCommandEnqueue(
@@ -6448,6 +6489,36 @@ class ObdViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 selectActiveRide(request)
             }
+        }
+    }
+
+    fun replaceRideStops(
+        requestId: String,
+        stopsJson: String,
+        estimatedDistanceMeters: Long,
+        estimatedDurationSeconds: Long,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (request.fareMode != RideFareMode.METERED_TIME_DISTANCE.name) {
+                _rideVerificationNotice.emit(
+                    "Pon tu precio bloquea las paradas después de publicar la solicitud.",
+                )
+                return@launch
+            }
+            val result = enqueueAuthoritativeRideCommand(
+                request = request,
+                type = RideCommandType.UPDATE_ROUTE,
+                payload = RideCommandPayload(
+                    stopsJson = stopsJson,
+                    estimatedDistanceMeters = estimatedDistanceMeters,
+                    estimatedDurationSeconds = estimatedDurationSeconds,
+                ),
+            )
+            reportRideCommandEnqueue(
+                result,
+                "Cambio de paradas enviado. El servidor recalculará el estimado.",
+            )
         }
     }
 

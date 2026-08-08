@@ -31,6 +31,13 @@ data class RideCommandPayload(
     val currency: String? = null,
     val paymentMethod: String? = null,
     val stopsJson: String? = null,
+    val fareMode: String? = null,
+    val distanceRateMinorPerKm: Long? = null,
+    val timeRateMinorPerMinute: Long? = null,
+    val estimatedDistanceMeters: Long? = null,
+    val estimatedDurationSeconds: Long? = null,
+    val fareRateCardVersion: Long? = null,
+    val allowsInTripStops: Boolean? = null,
     val offerId: String? = null,
     val fareMinor: Long? = null,
     val etaSeconds: Int? = null,
@@ -277,8 +284,20 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                 val stops = payload.stopsJson
                     ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
                     ?: return null
+                val fareMode = payload.fareMode.nonBlank() ?: return null
+                val distanceRate = payload.distanceRateMinorPerKm
+                    ?.takeIf { it >= 0L } ?: return null
+                val timeRate = payload.timeRateMinorPerMinute
+                    ?.takeIf { it >= 0L } ?: return null
+                val estimatedDistance = payload.estimatedDistanceMeters
+                    ?.takeIf { it >= 0L } ?: return null
+                val estimatedDuration = payload.estimatedDurationSeconds
+                    ?.takeIf { it >= 0L } ?: return null
+                val rateCardVersion = payload.fareRateCardVersion
+                    ?.takeIf { it > 0L } ?: return null
+                val allowsInTripStops = payload.allowsInTripStops ?: return null
                 RpcInvocation(
-                    functionName = "ride_create_request_v2",
+                    functionName = "ride_create_request_v3",
                     parameters = buildJsonObject {
                         put("p_request_id", rideId)
                         put("p_display_name", displayName)
@@ -293,6 +312,13 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                         put("p_currency", currency)
                         put("p_payment_method", paymentMethod)
                         put("p_stops", stops)
+                        put("p_fare_mode", fareMode)
+                        put("p_distance_rate_minor_per_km", distanceRate)
+                        put("p_time_rate_minor_per_minute", timeRate)
+                        put("p_estimated_distance_meters", estimatedDistance)
+                        put("p_estimated_duration_seconds", estimatedDuration)
+                        put("p_fare_rate_card_version", rateCardVersion)
+                        put("p_allows_in_trip_stops", allowsInTripStops)
                         put("p_idempotency_key", idempotencyKey)
                     },
                 )
@@ -440,6 +466,26 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                             payload.evidenceManifestSha256
                                 ?.takeIf(String::isNotBlank)
                                 ?.let { put("p_evidence_manifest_sha256", it) }
+                        },
+                    ),
+                )
+            }
+            RideCommandType.UPDATE_ROUTE -> {
+                val stops = payload.stopsJson
+                    ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
+                    ?: return null
+                val distanceMeters = payload.estimatedDistanceMeters
+                    ?.takeIf { it >= 0L } ?: return null
+                val durationSeconds = payload.estimatedDurationSeconds
+                    ?.takeIf { it >= 0L } ?: return null
+                RpcInvocation(
+                    functionName = "ride_replace_stops_v3",
+                    parameters = JsonObject(
+                        common + buildJsonObject {
+                            put("p_trip_id", rideId)
+                            put("p_stops", stops)
+                            put("p_estimated_distance_meters", distanceMeters)
+                            put("p_estimated_duration_seconds", durationSeconds)
                         },
                     ),
                 )

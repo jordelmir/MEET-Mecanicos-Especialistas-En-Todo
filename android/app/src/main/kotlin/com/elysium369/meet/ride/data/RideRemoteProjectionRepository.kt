@@ -61,6 +61,18 @@ private data class RemoteRideRequestProjection(
     val version: Long,
     @SerialName("payment_method")
     val paymentMethod: String? = null,
+    @SerialName("fare_mode")
+    val fareMode: String = "OPEN_BID",
+    @SerialName("distance_rate_minor_per_km")
+    val distanceRateMinorPerKm: Long = 0L,
+    @SerialName("time_rate_minor_per_minute")
+    val timeRateMinorPerMinute: Long = 0L,
+    @SerialName("estimated_fare_minor")
+    val estimatedFareMinor: Long = 0L,
+    @SerialName("fare_rate_card_version")
+    val fareRateCardVersion: Long = 1L,
+    @SerialName("allows_in_trip_stops")
+    val allowsInTripStops: Boolean = false,
     @SerialName("quote_version")
     val quoteVersion: Long = 1L,
     @SerialName("fare_breakdown")
@@ -251,6 +263,12 @@ class RideRemoteProjectionRepository @Inject constructor(
                 json.encodeToString(stops)
             },
             paymentMethod = paymentMethod ?: existing?.paymentMethod ?: "CASH",
+            fareMode = fareMode,
+            distanceRateMinorPerKm = distanceRateMinorPerKm,
+            timeRateMinorPerMinute = timeRateMinorPerMinute,
+            estimatedFareMinor = estimatedFareMinor,
+            fareRateCardVersion = fareRateCardVersion,
+            allowsInTripStops = allowsInTripStops,
             quoteVersion = quoteVersion,
             fareBreakdownJson = fareBreakdown.toString(),
             status = state.toLegacyStatus(),
