@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
@@ -6,6 +7,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.dagger.hilt.android")
+}
+
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.incremental", "true")
+    }
 }
 
 // Load local.properties for secrets
@@ -33,9 +41,9 @@ android {
     defaultConfig {
         applicationId = "com.elysium369.meet"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 40
-        versionName = "4.12.0"
+        targetSdk = 36
+        versionCode = 41
+        versionName = "4.13.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -69,7 +77,7 @@ android {
         )
         val rideLocalVerificationAutoApprove = providers.gradleProperty(
             "RIDE_LOCAL_VERIFICATION_AUTO_APPROVE",
-        ).orElse("true").get().toBoolean()
+        ).orElse("false").get().toBooleanStrictOrNull() ?: false
         buildConfigField(
             "boolean",
             "RIDE_LOCAL_VERIFICATION_AUTO_APPROVE",
@@ -129,23 +137,29 @@ android {
         }
     }
 
+    val releaseSigningValues = mapOf(
+        "KEYSTORE_PATH" to ((project.findProperty("KEYSTORE_PATH") as String?)
+            ?: localProps.getProperty("KEYSTORE_PATH")),
+        "KEYSTORE_PASSWORD" to ((project.findProperty("KEYSTORE_PASSWORD") as String?)
+            ?: localProps.getProperty("KEYSTORE_PASSWORD")),
+        "KEY_ALIAS" to ((project.findProperty("KEY_ALIAS") as String?)
+            ?: localProps.getProperty("KEY_ALIAS")),
+        "KEY_PASSWORD" to ((project.findProperty("KEY_PASSWORD") as String?)
+            ?: localProps.getProperty("KEY_PASSWORD")),
+    )
+    val missingReleaseSigningKeys = releaseSigningValues
+        .filterValues { it.isNullOrBlank() }
+        .keys
+    val releaseSigningConfigured = missingReleaseSigningKeys.isEmpty()
+
     signingConfigs {
-        create("release") {
-            val keystorePath = project.findProperty("KEYSTORE_PATH") as String?
-                ?: localProps.getProperty("KEYSTORE_PATH")
-            storeFile = keystorePath?.let { file(it) } ?: signingConfigs.getByName("debug").storeFile
-
-            storePassword = project.findProperty("KEYSTORE_PASSWORD") as String?
-                ?: localProps.getProperty("KEYSTORE_PASSWORD")
-                ?: "android"
-
-            keyAlias = project.findProperty("KEY_ALIAS") as String?
-                ?: localProps.getProperty("KEY_ALIAS")
-                ?: "androiddebugkey"
-
-            keyPassword = project.findProperty("KEY_PASSWORD") as String?
-                ?: localProps.getProperty("KEY_PASSWORD")
-                ?: "android"
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(requireNotNull(releaseSigningValues["KEYSTORE_PATH"]))
+                storePassword = requireNotNull(releaseSigningValues["KEYSTORE_PASSWORD"])
+                keyAlias = requireNotNull(releaseSigningValues["KEY_ALIAS"])
+                keyPassword = requireNotNull(releaseSigningValues["KEY_PASSWORD"])
+            }
         }
     }
 
@@ -157,7 +171,30 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
+    // A production artifact must never silently inherit the Android debug key.
+    // Debug builds remain available without release secrets; any release task
+    // fails before compilation when the complete production key set is absent.
+    gradle.taskGraph.whenReady {
+        val requestsReleaseArtifact = allTasks.any { task ->
+            task.project == project &&
+                task.name.contains("release", ignoreCase = true) &&
+                (task.name.startsWith("assemble", ignoreCase = true) ||
+                    task.name.startsWith("bundle", ignoreCase = true) ||
+                    task.name.startsWith("package", ignoreCase = true) ||
+                    task.name.startsWith("sign", ignoreCase = true))
+        }
+        if (requestsReleaseArtifact && !releaseSigningConfigured) {
+            throw GradleException(
+                "Release signing is not configured. Missing: " +
+                    missingReleaseSigningKeys.sorted().joinToString(", ") +
+                    ". Debug-key fallback is forbidden.",
+            )
         }
     }
     compileOptions {

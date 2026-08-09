@@ -68,18 +68,25 @@ class CertifiedReportRepositoryTest {
             rows.map { it.values.filter { row -> row.vehicleId == vehicleId }.sortedByDescending { it.generatedAt } }
 
         override suspend fun listForVehicleAsc(vehicleId: String): List<CertifiedReportEntity> =
-            rows.value.values.filter { it.vehicleId == vehicleId }.sortedBy { it.generatedAt }
+            rows.value.values
+                .filter { it.vehicleId == vehicleId && it.integrityHash != "UNSIGNED" }
+                .sortedWith(compareBy<CertifiedReportEntity> { it.signedAt }.thenBy { it.reportId })
 
         override suspend fun listByStatus(status: ReportStatus, limit: Int): List<CertifiedReportEntity> =
             rows.value.values.filter { it.status == status }.sortedByDescending { it.generatedAt }.take(limit)
 
-        override suspend fun latestHashForVehicle(vehicleId: String): String? =
+        override suspend fun latestHashForVehicle(vehicleId: String, excludeReportId: String): String? =
             rows.value.values
-                .filter { it.vehicleId == vehicleId && it.integrityHash != "UNSIGNED" }
-                .maxByOrNull { it.generatedAt }
+                .filter {
+                    it.vehicleId == vehicleId &&
+                        it.reportId != excludeReportId &&
+                        it.integrityHash != "UNSIGNED"
+                }
+                .maxWithOrNull(compareBy<CertifiedReportEntity> { it.signedAt }.thenBy { it.reportId })
                 ?.integrityHash
 
-        override suspend fun upsert(report: CertifiedReportEntity) {
+        override suspend fun insert(report: CertifiedReportEntity) {
+            require(report.reportId !in rows.value)
             rows.value = rows.value + (report.reportId to report)
         }
 
@@ -168,7 +175,7 @@ class CertifiedReportRepositoryTest {
     // ── tests ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `createDraft wires previousHash to the latest signed report`(): Unit = runBlocking {
+    fun `sign resolves previousHash from the latest signed report`(): Unit = runBlocking {
         val (repo, _) = newRepo()
         val first = repo.createDraft(
             reportId = "r1", vehicleId = "v-accent", userId = "u1",
@@ -193,7 +200,10 @@ class CertifiedReportRepositoryTest {
             snapshot = null, evidence = emptyList(), repairActions = emptyList(), notes = "",
             nowMs = 3000L,
         )
-        assertEquals(signed1.integrityHash, second.previousHash)
+        assertNull(second.previousHash)
+        val signed2 = repo.sign("r2", signerName = "operador", signerRole = "mecánico",
+            signatureImageUri = "file://sig2", deviceId = "dev-1", nowMs = 4000L)
+        assertEquals(signed1.integrityHash, signed2.previousHash)
     }
 
     @Test

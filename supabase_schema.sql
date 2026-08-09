@@ -1,4 +1,18 @@
--- MEET OBD2 CLOUD INFRASTRUCTURE
+-- LEGACY SNAPSHOT — DEPLOYMENT IS INTENTIONALLY BLOCKED.
+--
+-- This historical all-in-one schema contains permissive development RLS
+-- policies and is retained only to explain old installations. Production and
+-- local databases MUST be created with `supabase/migrations/` in timestamp
+-- order. The exception below prevents an accidental paste/run from opening
+-- private vehicle, diagnostic, workshop or fleet data.
+DO $$
+BEGIN
+  RAISE EXCEPTION
+    'supabase_schema.sql is a blocked legacy snapshot; deploy supabase/migrations instead';
+END
+$$;
+
+-- MEET OBD2 CLOUD INFRASTRUCTURE (HISTORICAL, NON-DEPLOYABLE)
 
 CREATE TABLE IF NOT EXISTS oem_pids (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -733,4 +747,3 @@ CREATE INDEX IF NOT EXISTS idx_fleet_maintenance_vehicle ON fleet_maintenance_ta
 CREATE INDEX IF NOT EXISTS idx_fleet_work_orders_vehicle ON fleet_work_orders (vehicle_id, status);
 CREATE INDEX IF NOT EXISTS idx_fleet_cost_entries_vehicle ON fleet_cost_entries (vehicle_id, type);
 CREATE INDEX IF NOT EXISTS idx_fleet_trips_driver ON fleet_trips (driver_id, started_at DESC);
-

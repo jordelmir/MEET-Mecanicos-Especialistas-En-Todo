@@ -16,9 +16,56 @@ enum class DtcStatusFlag {
     INTERMITTENT,
     TEST_FAILED,
     TEST_FAILED_THIS_CYCLE,
+    TEST_NOT_COMPLETED_SINCE_LAST_CLEAR,
+    TEST_FAILED_SINCE_LAST_CLEAR,
+    TEST_NOT_COMPLETED_THIS_CYCLE,
     WARNING_INDICATOR_REQUESTED,
     UNKNOWN
 }
+
+enum class ModuleScanOutcome {
+    COMPLETE,
+    NO_DTC,
+    NO_RESPONSE,
+    UNSUPPORTED_SERVICE,
+    NEGATIVE_RESPONSE,
+    TIMEOUT,
+    MALFORMED_RESPONSE,
+    PARTIAL_RESPONSE,
+    CANCELLED,
+    FAILED;
+
+    val provesBucketWasRead: Boolean
+        get() = this == COMPLETE || this == NO_DTC
+}
+
+enum class ScanCompleteness {
+    COMPLETE,
+    PARTIAL,
+    INCONCLUSIVE,
+    FAILED,
+}
+
+data class DtcServiceRead(
+    val command: String,
+    val bucket: DtcBucket?,
+    val outcome: ModuleScanOutcome,
+)
+
+enum class FreezeFrameOutcome {
+    MATCHED,
+    BELONGS_TO_ANOTHER_DTC,
+    NO_RESPONSE,
+    MALFORMED_RESPONSE,
+}
+
+data class FreezeFrameReadResult(
+    val requestedDtc: String,
+    val actualDtc: String?,
+    val outcome: FreezeFrameOutcome,
+    val values: Map<String, String> = emptyMap(),
+    val identityRawResponse: String = "",
+)
 
 data class DtcRecord(
     val code: String,
@@ -38,6 +85,7 @@ data class DtcRawExchange(
     val targetAddress: String?,
     val rawResponse: String,
     val parsedRecordCount: Int,
+    val outcome: ModuleScanOutcome = ModuleScanOutcome.COMPLETE,
     val timestampMs: Long = System.currentTimeMillis()
 )
 
@@ -47,8 +95,15 @@ data class DtcModuleReport(
     val moduleName: String,
     val isAlive: Boolean,
     val dtcs: List<DtcRecord>,
-    val rawExchanges: List<DtcRawExchange>
-)
+    val rawExchanges: List<DtcRawExchange>,
+    val serviceReads: List<DtcServiceRead> = emptyList(),
+    val outcome: ModuleScanOutcome = ModuleScanOutcome.FAILED,
+) {
+    fun completedBucket(bucket: DtcBucket): Boolean =
+        serviceReads.any {
+            (it.bucket == bucket || it.bucket == null) && it.outcome.provesBucketWasRead
+        }
+}
 
 data class DtcScanReport(
     val startedAtMs: Long,
@@ -56,10 +111,29 @@ data class DtcScanReport(
     val protocol: String,
     val records: List<DtcRecord>,
     val modules: List<DtcModuleReport>,
-    val rawExchanges: List<DtcRawExchange>
+    val rawExchanges: List<DtcRawExchange>,
+    val completeness: ScanCompleteness = ScanCompleteness.INCONCLUSIVE,
+    val warnings: List<String> = emptyList(),
 ) {
     fun codesForBucket(bucket: DtcBucket): List<String> =
         records.filter { it.bucket == bucket }.map { it.code }.distinct()
+}
+
+object DtcObservationPolicy {
+    /**
+     * A missing code is meaningful only when the same live module completed
+     * the service/bucket that could have returned it. It is still not proof
+     * of repair; callers may mark it as not observed, never resolved.
+     */
+    fun canMarkNotObserved(
+        module: DtcModuleReport?,
+        bucket: DtcBucket,
+        code: String,
+        records: List<DtcRecord>,
+    ): Boolean = module != null &&
+        module.isAlive &&
+        module.completedBucket(bucket) &&
+        records.none { it.bucket == bucket && it.code.equals(code, ignoreCase = true) }
 }
 
 object DtcScanEngine {
@@ -248,27 +322,72 @@ object DtcScanEngine {
         else -> setOf(DtcStatusFlag.CONFIRMED, DtcStatusFlag.CURRENT)
     }
 
-    private fun flagsForUdsStatus(statusByte: Int): Set<DtcStatusFlag> {
+    internal fun flagsForUdsStatus(statusByte: Int): Set<DtcStatusFlag> {
         val flags = mutableSetOf<DtcStatusFlag>()
         if (statusByte and 0x01 != 0) {
             flags += DtcStatusFlag.TEST_FAILED
-            flags += DtcStatusFlag.CURRENT
         }
         if (statusByte and 0x02 != 0) flags += DtcStatusFlag.TEST_FAILED_THIS_CYCLE
         if (statusByte and 0x04 != 0) flags += DtcStatusFlag.PENDING
         if (statusByte and 0x08 != 0) flags += DtcStatusFlag.CONFIRMED
-        if (statusByte and 0x20 != 0) flags += DtcStatusFlag.HISTORY
+        if (statusByte and 0x10 != 0) flags += DtcStatusFlag.TEST_NOT_COMPLETED_SINCE_LAST_CLEAR
+        if (statusByte and 0x20 != 0) flags += DtcStatusFlag.TEST_FAILED_SINCE_LAST_CLEAR
+        if (statusByte and 0x40 != 0) flags += DtcStatusFlag.TEST_NOT_COMPLETED_THIS_CYCLE
         if (statusByte and 0x80 != 0) flags += DtcStatusFlag.WARNING_INDICATOR_REQUESTED
-        if (statusByte and 0x20 != 0 && statusByte and 0x01 == 0) flags += DtcStatusFlag.INTERMITTENT
         if (flags.isEmpty()) flags += DtcStatusFlag.UNKNOWN
         return flags
     }
 
     private fun bucketForUdsFlags(flags: Set<DtcStatusFlag>): DtcBucket = when {
-        DtcStatusFlag.CONFIRMED in flags || DtcStatusFlag.CURRENT in flags || DtcStatusFlag.TEST_FAILED in flags -> DtcBucket.ACTIVE
+        DtcStatusFlag.TEST_FAILED in flags -> DtcBucket.ACTIVE
         DtcStatusFlag.PENDING in flags -> DtcBucket.PENDING
-        DtcStatusFlag.HISTORY in flags || DtcStatusFlag.INTERMITTENT in flags -> DtcBucket.HISTORY
+        DtcStatusFlag.CONFIRMED in flags || DtcStatusFlag.TEST_FAILED_SINCE_LAST_CLEAR in flags -> DtcBucket.HISTORY
         else -> DtcBucket.HISTORY
+    }
+
+    fun classifyExchange(
+        rawResponse: String,
+        positiveResponseService: String,
+        parsedRecordCount: Int,
+        failed: Boolean = false,
+    ): ModuleScanOutcome {
+        if (failed) return ModuleScanOutcome.FAILED
+        val compact = rawResponse.uppercase().replace(Regex("[^0-9A-Z?]"), "")
+        if (compact.isBlank()) return ModuleScanOutcome.NO_RESPONSE
+        if (compact.contains("STOPPED")) return ModuleScanOutcome.CANCELLED
+        if (compact.contains("UNABLETOCONNECT") || compact.contains("BUSERROR") || compact.contains("CANERROR")) {
+            return ModuleScanOutcome.NO_RESPONSE
+        }
+        if (compact.contains("NODATA") || compact == "?") return ModuleScanOutcome.UNSUPPORTED_SERVICE
+        val requestService = when (positiveResponseService) {
+            "43" -> "03"
+            "47" -> "07"
+            "4A" -> "0A"
+            "59" -> "19"
+            else -> positiveResponseService
+        }
+        if (compact.contains("7F$requestService")) {
+            return ModuleScanOutcome.NEGATIVE_RESPONSE
+        }
+        if (compact.contains(positiveResponseService)) {
+            return if (parsedRecordCount > 0) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_DTC
+        }
+        if (compact.contains("ERROR")) return ModuleScanOutcome.FAILED
+        return ModuleScanOutcome.MALFORMED_RESPONSE
+    }
+
+    /** Parses Mode 02 PID 02 and deliberately skips the echoed frame byte. */
+    fun parseFreezeFrameIdentity(rawResponse: String): String? {
+        val clean = CanMultiFrameParser.parse(rawResponse)
+            .replace(Regex("[^0-9A-Fa-f]"), "")
+            .uppercase()
+        val marker = "4202"
+        val index = clean.indexOf(marker)
+        if (index < 0) return null
+        val dataWithFrame = clean.substring(index + marker.length)
+        if (dataWithFrame.length < 6) return null
+        val dtcBytes = dataWithFrame.substring(2, 6)
+        return DtcDecoder.hexToDtcOrNull(dtcBytes)
     }
 
     private fun isNoiseLine(line: String): Boolean {

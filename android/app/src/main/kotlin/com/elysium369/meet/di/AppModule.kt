@@ -3195,6 +3195,14 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_48_49 = object : Migration(48, 49) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE dtc_events ADD COLUMN observationState TEXT NOT NULL DEFAULT 'OBSERVED'"
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3230,7 +3238,8 @@ object AppModule {
             MIGRATION_44_45,
             MIGRATION_45_46,
             MIGRATION_46_47,
-            MIGRATION_47_48
+            MIGRATION_47_48,
+            MIGRATION_48_49
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3450,6 +3459,13 @@ object AppModule {
 
     @Provides
     fun provideDiagnosticSnapshotDao(db: MeetDatabase): DiagnosticSnapshotDao = db.diagnosticSnapshotDao()
+
+    @Provides
+    @Singleton
+    fun provideReportTransactionRunner(
+        db: MeetDatabase,
+    ): com.elysium369.meet.data.local.ReportTransactionRunner =
+        com.elysium369.meet.data.local.RoomReportTransactionRunner(db)
 
     @Provides
     @Singleton

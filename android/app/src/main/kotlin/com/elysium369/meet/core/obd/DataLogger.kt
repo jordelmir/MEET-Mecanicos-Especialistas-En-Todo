@@ -119,6 +119,20 @@ class DataLogger @Inject constructor() {
                 writer.write("Ended: ${Date(report.endedAtMs)}\n")
                 writer.write("Protocol: ${report.protocol}\n")
                 writer.write("Records: ${report.records.size}\n")
+                writer.write("Completeness: ${report.completeness}\n")
+                if (report.warnings.isNotEmpty()) {
+                    writer.write("Warnings: ${report.warnings.joinToString(" | ")}\n")
+                }
+                writer.write("\n== Module Coverage ==\n")
+                report.modules.forEach { module ->
+                    writer.write(
+                        "module=${module.moduleName}, target=${module.targetAddress ?: "-"}, " +
+                            "response=${module.responseAddress ?: "-"}, alive=${module.isAlive}, outcome=${module.outcome}\n"
+                    )
+                    module.serviceReads.forEach { read ->
+                        writer.write("  command=${read.command}, bucket=${read.bucket ?: "ALL"}, outcome=${read.outcome}\n")
+                    }
+                }
                 writer.write("\n== Parsed DTCs ==\n")
                 report.records.forEach { record ->
                     writer.write(
@@ -139,7 +153,7 @@ class DataLogger @Inject constructor() {
 
                 writer.write("\n== Raw OBD Exchanges ==\n")
                 report.rawExchanges.forEach { exchange ->
-                    writer.write("[${Date(exchange.timestampMs)}] target=${exchange.targetAddress ?: "-"} cmd=${exchange.command} parsed=${exchange.parsedRecordCount}\n")
+                    writer.write("[${Date(exchange.timestampMs)}] target=${exchange.targetAddress ?: "-"} cmd=${exchange.command} parsed=${exchange.parsedRecordCount} outcome=${exchange.outcome}\n")
                     writer.write(exchange.rawResponse.ifBlank { "<empty>" }.trim())
                     writer.write("\n---\n")
                 }

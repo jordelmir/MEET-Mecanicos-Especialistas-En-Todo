@@ -35,17 +35,31 @@ interface CertifiedReportDao {
     @Query("SELECT * FROM certified_reports WHERE vehicleId = :vehicleId ORDER BY generatedAt DESC")
     fun observeForVehicle(vehicleId: String): Flow<List<CertifiedReportEntity>>
 
-    @Query("SELECT * FROM certified_reports WHERE vehicleId = :vehicleId ORDER BY generatedAt ASC")
+    @Query(
+        """SELECT * FROM certified_reports
+           WHERE vehicleId = :vehicleId
+             AND status IN ('SIGNED', 'EXPORTED', 'SHARED', 'VOIDED')
+             AND integrityHash != 'UNSIGNED'
+           ORDER BY signedAt ASC, generatedAt ASC, reportId ASC""",
+    )
     suspend fun listForVehicleAsc(vehicleId: String): List<CertifiedReportEntity>
 
     @Query("SELECT * FROM certified_reports WHERE status = :status ORDER BY generatedAt DESC LIMIT :limit")
     suspend fun listByStatus(status: ReportStatus, limit: Int = 50): List<CertifiedReportEntity>
 
-    @Query("SELECT integrityHash FROM certified_reports WHERE vehicleId = :vehicleId ORDER BY generatedAt DESC LIMIT 1")
-    suspend fun latestHashForVehicle(vehicleId: String): String?
+    @Query(
+        """SELECT integrityHash FROM certified_reports
+           WHERE vehicleId = :vehicleId
+             AND reportId != :excludeReportId
+             AND status IN ('SIGNED', 'EXPORTED', 'SHARED', 'VOIDED')
+             AND integrityHash != 'UNSIGNED'
+           ORDER BY signedAt DESC, generatedAt DESC, reportId DESC
+           LIMIT 1""",
+    )
+    suspend fun latestHashForVehicle(vehicleId: String, excludeReportId: String): String?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(report: CertifiedReportEntity)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(report: CertifiedReportEntity)
 
     /**
      * Hard status guard. Only allows:
@@ -64,7 +78,11 @@ interface CertifiedReportDao {
     suspend fun update(report: CertifiedReportEntity)
 
     @Transaction
-    suspend fun updateStatus(report: CertifiedReportEntity, newStatus: ReportStatus) {
+    suspend fun updateStatus(
+        report: CertifiedReportEntity,
+        newStatus: ReportStatus,
+        nowMs: Long = System.currentTimeMillis(),
+    ) {
         val current = getById(report.reportId) ?: return
         val ok = when (current.status) {
             ReportStatus.DRAFT -> newStatus in setOf(ReportStatus.READY, ReportStatus.SIGNED, ReportStatus.VOIDED)
@@ -79,7 +97,7 @@ interface CertifiedReportDao {
                 "Illegal status transition for report ${report.reportId}: ${current.status} → $newStatus"
             )
         }
-        update(report.copy(status = newStatus, updatedAt = System.currentTimeMillis()))
+        update(report.copy(status = newStatus, updatedAt = nowMs))
     }
 }
 

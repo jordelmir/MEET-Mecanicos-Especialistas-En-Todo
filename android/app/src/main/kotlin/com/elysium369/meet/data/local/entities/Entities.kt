@@ -54,6 +54,8 @@ data class DtcEventEntity(
     val resolvedAt: Long?,
     val occurrenceCount: Int,
     val freezeFrameJson: String?,
+    /** Observation truth is separate from repair/closure truth. */
+    val observationState: String = "OBSERVED",
     val synced: Boolean = false
 )
 

@@ -1,5 +1,6 @@
 package com.elysium369.meet.data.local
 
+import androidx.room.withTransaction
 import com.elysium369.meet.core.reports.EvidenceType
 import com.elysium369.meet.core.reports.HashEngine
 import com.elysium369.meet.core.reports.ReportHashingService
@@ -54,14 +55,16 @@ class CertifiedReportRepository @Inject constructor(
     private val signatureDao: ReportSignatureDao,
     private val snapshotDao: DiagnosticSnapshotDao,
     private val hashing: ReportHashingService,
+    private val transactions: ReportTransactionRunner = DirectReportTransactionRunner,
 ) {
 
     // ── draft lifecycle ──────────────────────────────────────────────────
 
     /**
-     * Creates a DRAFT report. Returns the row including the
-     * `previousHash` link to the prior signed report for the same
-     * vehicle (or null if this is the first report).
+     * Creates a DRAFT report. The chain predecessor is intentionally
+     * unresolved while the row
+     * is editable. [sign] resolves it inside the signing transaction,
+     * preventing two long-lived drafts from claiming the same stale tip.
      *
      * The `integrityHash` field is filled with a placeholder
      * ("UNSIGNED") until [sign] is called. Do not read it before signing.
@@ -81,22 +84,6 @@ class CertifiedReportRepository @Inject constructor(
         @Suppress("UNUSED_PARAMETER") notes: String,
         nowMs: Long = System.currentTimeMillis(),
     ): CertifiedReportEntity {
-        val previousHash = reportDao.latestHashForVehicle(vehicleId)
-
-        // Bind the snapshot to the future reportId from the start.
-        // The SQL FK uses `ON DELETE SET NULL`, so the snapshot only
-        // becomes "orphan" if the parent report is later deleted or
-        // voided — never during the draft phase. Persisting it eagerly
-        // ensures the snapshot's hash is recoverable from local DB
-        // even if the user never signs the report.
-        if (snapshot != null) {
-            snapshotDao.upsert(ReportMappers.snapshotToEntity(snapshot, reportId = reportId))
-        }
-        // Persist evidence + repair actions under the future reportId
-        // so foreign keys resolve.
-        if (evidence.isNotEmpty()) evidenceDao.upsertAll(evidence.map { it.copy(reportId = reportId) })
-        if (repairActions.isNotEmpty()) repairDao.upsertAll(repairActions.map { it.copy(reportId = reportId) })
-
         val draft = CertifiedReportEntity(
             reportId = reportId,
             vehicleId = vehicleId,
@@ -112,12 +99,25 @@ class CertifiedReportRepository @Inject constructor(
             pdfUri = null,
             qrVerificationUrl = null,
             integrityHash = "UNSIGNED",
-            previousHash = previousHash,
+            previousHash = null,
             createdAt = nowMs,
             updatedAt = nowMs,
         )
-        reportDao.upsert(draft)
-        return draft
+        return transactions.run {
+            // Parent first: every following entity has a real Room FK to
+            // certified_reports and must never be persisted speculatively.
+            reportDao.insert(draft)
+            if (snapshot != null) {
+                snapshotDao.upsert(ReportMappers.snapshotToEntity(snapshot, reportId = reportId))
+            }
+            if (evidence.isNotEmpty()) {
+                evidenceDao.upsertAll(evidence.map { it.copy(reportId = reportId) })
+            }
+            if (repairActions.isNotEmpty()) {
+                repairDao.upsertAll(repairActions.map { it.copy(reportId = reportId) })
+            }
+            draft
+        }
     }
 
     /**
@@ -141,91 +141,94 @@ class CertifiedReportRepository @Inject constructor(
     ): CertifiedReportEntity {
         require(signerName.isNotBlank()) { "signerName cannot be blank" }
 
-        val report = reportDao.getById(reportId)
-            ?: throw IllegalStateException("Report $reportId does not exist")
+        return transactions.run {
+            val report = reportDao.getById(reportId)
+                ?: throw IllegalStateException("Report $reportId does not exist")
 
-        if (report.status.isImmutable) {
-            throw IllegalStateException(
-                "Cannot sign report $reportId in terminal status ${report.status}"
-            )
-        }
-        if (signatureDao.countForReport(reportId) > 0) {
-            throw IllegalStateException(
-                "Report $reportId already carries a signature. Void it first to re-sign."
-            )
-        }
+            if (report.status.isImmutable) {
+                throw IllegalStateException(
+                    "Cannot sign report $reportId in terminal status ${report.status}"
+                )
+            }
+            if (signatureDao.countForReport(reportId) > 0) {
+                throw IllegalStateException(
+                    "Report $reportId already carries a signature. Void it first to re-sign."
+                )
+            }
 
-        val evidences = evidenceDao.listForReport(reportId)
-        val repairs = repairDao.listForReport(reportId)
-        val snapshotHash = snapshotDao.listForReport(reportId)
-            .map { it.hashSha256 }
-            .firstOrNull()
+            val evidences = evidenceDao.listForReport(reportId)
+            val repairs = repairDao.listForReport(reportId)
+            val snapshots = snapshotDao.listForReport(reportId)
+            val snapshotHash = snapshots.firstOrNull()?.hashSha256
+            val currentPreviousHash = reportDao.latestHashForVehicle(report.vehicleId, reportId)
 
         // The honest-phrases rule: if there is no snapshot, we pass
         // null and the renderer will display "Snapshot OBD no
         // disponible. Reporte basado en datos manuales/offline." We
         // never invent a snapshot or fabricate DTCs.
-        val evidenceHashes = evidences.mapNotNull { it.hash }
-        val repairHashes = repairs.map { it.hashForChain() }
+            val evidenceHashes = evidences.mapNotNull { it.hash }
+            val repairHashes = repairs.map { it.hashForChain() }
 
-        val signed = hashing.signDraftReport(
-            vehicleId = report.vehicleId,
-            userId = report.userId,
-            reportType = report.reportType.wireValue,
-            title = report.title,
-            odometerKm = report.odometerKm?.toLong(),
-            vin = report.vin,
-            plate = report.plate,
-            privacyRedactVin = false,
-            privacyRedactPlate = false,
-            privacyRedactLocation = false,
-            privacyPublicShare = false,
-            snapshotHash = snapshotHash,
-            evidenceHashes = evidenceHashes,
-            repairActionHashes = repairHashes,
-            peritajeHash = null,
-            previousHash = report.previousHash,
-            notes = "", // notes are evidence rows, not header notes
-            expectedHash = null,
-        )
+            val signed = hashing.signDraftReport(
+                vehicleId = report.vehicleId,
+                userId = report.userId,
+                reportType = report.reportType.wireValue,
+                title = report.title,
+                odometerKm = report.odometerKm?.toLong(),
+                vin = report.vin,
+                plate = report.plate,
+                privacyRedactVin = false,
+                privacyRedactPlate = false,
+                privacyRedactLocation = false,
+                privacyPublicShare = false,
+                snapshotHash = snapshotHash,
+                evidenceHashes = evidenceHashes,
+                repairActionHashes = repairHashes,
+                peritajeHash = null,
+                previousHash = currentPreviousHash,
+                notes = "", // notes are evidence rows, not header notes
+                expectedHash = null,
+            )
 
         // Bind the snapshot to this report (if any).
-        snapshotDao.listForReport(reportId).forEach { snap ->
-            snapshotDao.attachToReport(snap.snapshotId, reportId)
-        }
+            snapshots.forEach { snap ->
+                snapshotDao.attachToReport(snap.snapshotId, reportId)
+            }
 
-        val signedReport = report.copy(
-            status = ReportStatus.SIGNED,
-            signedAt = nowMs,
-            integrityHash = signed.hash,
-            updatedAt = nowMs,
-        )
-        reportDao.upsert(signedReport)
-
-        val deviceIdHash = HashEngine.hashDeviceId(deviceId)
-        val signatureIntegrity = HashEngine.sha256Hex(
-            listOf(
-                signed.hash,
-                signerName,
-                signerRole,
-                nowMs.toString(),
-                deviceIdHash,
-            ).joinToString("|")
-        )
-        signatureDao.insert(
-            ReportMappers.signatureToEntity(
-                signatureId = "sig-${reportId}-${nowMs}",
-                reportId = reportId,
-                signerName = signerName,
-                signerRole = signerRole,
-                signatureImageUri = signatureImageUri,
+            val signedReport = report.copy(
+                status = ReportStatus.SIGNED,
                 signedAt = nowMs,
-                deviceIdHash = deviceIdHash,
-                integrityHash = signatureIntegrity,
+                integrityHash = signed.hash,
+                previousHash = currentPreviousHash,
+                updatedAt = nowMs,
             )
-        )
+            reportDao.update(signedReport)
 
-        return signedReport
+            val deviceIdHash = HashEngine.hashDeviceId(deviceId)
+            val signatureIntegrity = HashEngine.sha256Hex(
+                listOf(
+                    signed.hash,
+                    signerName,
+                    signerRole,
+                    nowMs.toString(),
+                    deviceIdHash,
+                ).joinToString("|")
+            )
+            signatureDao.insert(
+                ReportMappers.signatureToEntity(
+                    signatureId = "sig-${reportId}-${nowMs}",
+                    reportId = reportId,
+                    signerName = signerName,
+                    signerRole = signerRole,
+                    signatureImageUri = signatureImageUri,
+                    signedAt = nowMs,
+                    deviceIdHash = deviceIdHash,
+                    integrityHash = signatureIntegrity,
+                )
+            )
+
+            signedReport
+        }
     }
 
     // ── reads ─────────────────────────────────────────────────────────────
@@ -259,13 +262,29 @@ class CertifiedReportRepository @Inject constructor(
      * reason elsewhere (audit log, repair case note, etc.).
      */
     suspend fun voidReport(reportId: String, nowMs: Long = System.currentTimeMillis()) {
-        val report = reportDao.getById(reportId)
-            ?: throw IllegalStateException("Report $reportId does not exist")
-        reportDao.updateStatus(report, ReportStatus.VOIDED)
-        // The updatedAt bump is set inside updateStatus; we also touch
-        // the row again to record void timestamp on the chain.
-        reportDao.upsert(reportDao.getById(reportId)!!.copy(updatedAt = nowMs))
+        transactions.run {
+            val report = reportDao.getById(reportId)
+                ?: throw IllegalStateException("Report $reportId does not exist")
+            reportDao.updateStatus(report, ReportStatus.VOIDED, nowMs)
+        }
     }
+}
+
+/** Executes the complete report aggregate mutation atomically. */
+interface ReportTransactionRunner {
+    suspend fun <T> run(block: suspend () -> T): T
+}
+
+/** JVM-test fallback; production binds [RoomReportTransactionRunner]. */
+private object DirectReportTransactionRunner : ReportTransactionRunner {
+    override suspend fun <T> run(block: suspend () -> T): T = block()
+}
+
+class RoomReportTransactionRunner(
+    private val database: MeetDatabase,
+) : ReportTransactionRunner {
+    override suspend fun <T> run(block: suspend () -> T): T =
+        database.withTransaction { block() }
 }
 
 /**

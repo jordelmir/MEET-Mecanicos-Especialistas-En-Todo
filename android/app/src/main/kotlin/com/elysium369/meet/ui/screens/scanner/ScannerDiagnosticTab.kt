@@ -180,8 +180,12 @@ fun ScannerDiagnosticTab(
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 AnimatedNeonGlyph("✅", contentDescription = null, fontSize = 48.sp)
-                                Text("No se detectaron fallas", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
-                                Text("El sistema está operando correctamente", color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
+                                Text("Sin DTC detectados", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "Los módulos cubiertos no reportaron códigos. Esto no descarta fallas fuera del monitoreo OBD.",
+                                    color = MeetColors.textSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
                         }
                     }

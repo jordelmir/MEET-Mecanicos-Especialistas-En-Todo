@@ -1722,6 +1722,8 @@ class ObdViewModel @Inject constructor(
 
     private val _freezeFrameData = MutableStateFlow<Map<String, String>>(emptyMap())
     val freezeFrameData: StateFlow<Map<String, String>> = _freezeFrameData.asStateFlow()
+    private val _freezeFrameStatus = MutableStateFlow("")
+    val freezeFrameStatus: StateFlow<String> = _freezeFrameStatus.asStateFlow()
 
     private val _clearDtcResult = MutableStateFlow<String?>(null)
     val clearDtcResult: StateFlow<String?> = _clearDtcResult.asStateFlow()
@@ -3690,14 +3692,36 @@ class ObdViewModel @Inject constructor(
 
             val total = allCodes.size
             if (total == 0) {
-                voiceFeedbackManager.speak("Escaneo completado. No se encontraron códigos de error en el vehículo.", "Scan complete. No fault codes found in the vehicle.")
+                when (professionalReport.completeness) {
+                    com.elysium369.meet.core.obd.ScanCompleteness.COMPLETE ->
+                        voiceFeedbackManager.speak(
+                            "Escaneo completado. Los módulos cubiertos no reportaron códigos. Esto no descarta fallas no monitorizadas.",
+                            "Scan complete. Covered modules reported no codes. This does not rule out unmonitored faults.",
+                        )
+                    com.elysium369.meet.core.obd.ScanCompleteness.PARTIAL ->
+                        voiceFeedbackManager.speak(
+                            "Escaneo parcial. Los módulos que respondieron no reportaron códigos, pero quedan módulos sin verificar.",
+                            "Partial scan. Responding modules reported no codes, but some modules remain unverified.",
+                        )
+                    else -> voiceFeedbackManager.speak(
+                        "Escaneo no concluyente. No hay evidencia suficiente para afirmar ausencia de códigos.",
+                        "Inconclusive scan. There is not enough evidence to claim no fault codes.",
+                    )
+                }
             } else if (total == 1) {
                 voiceFeedbackManager.speak("Escaneo completado. Se detectó un código de error en el sistema.", "Scan complete. One fault code detected in the system.")
             } else {
                 voiceFeedbackManager.speak("Escaneo completado. Se detectaron $total códigos de error en el sistema.", "Scan complete. $total fault codes detected in the system.")
             }
             updateHealthScore()
-            addTerminalLog("──── ESCANEO COMPLETADO — $total códigos en total ────", TerminalLineType.SYSTEM)
+            addTerminalLog(
+                "──── ESCANEO ${professionalReport.completeness.name} — $total códigos en total ────",
+                if (professionalReport.completeness == com.elysium369.meet.core.obd.ScanCompleteness.COMPLETE) {
+                    TerminalLineType.SYSTEM
+                } else {
+                    TerminalLineType.WARNING
+                },
+            )
         } catch (e: Exception) {
             android.util.Log.e("ObdVM", "Failed to refresh diagnostics", e)
             addTerminalLog("✗ Error en escaneo: ${e.message}", TerminalLineType.ERROR)
@@ -3709,12 +3733,18 @@ class ObdViewModel @Inject constructor(
 
     private fun addProfessionalDtcReportLogs(report: DtcScanReport) {
         val moduleLines = report.modules
-            .filter { it.isAlive }
             .take(12)
             .map { module ->
-                val codes = module.dtcs.map { it.code }.distinct().joinToString(", ").ifBlank { "sin DTC" }
+                val codes = module.dtcs.map { it.code }.distinct().joinToString(", ").ifBlank {
+                    if (module.outcome == com.elysium369.meet.core.obd.ModuleScanOutcome.NO_DTC) {
+                        "sin DTC en lectura completa"
+                    } else {
+                        "sin hallazgo verificable"
+                    }
+                }
                 TerminalLine(
-                    "[MOD] ${module.moduleName} ${module.responseAddress ?: module.targetAddress ?: ""} -> $codes",
+                    "[MOD] ${module.moduleName} ${module.responseAddress ?: module.targetAddress ?: ""} " +
+                        "[${module.outcome}] -> $codes",
                     TerminalLineType.DECODED
                 )
             }
@@ -3749,6 +3779,7 @@ class ObdViewModel @Inject constructor(
                         occurrenceCount = if (isNewSession) existing.occurrenceCount + 1 else existing.occurrenceCount,
                         sessionId = currentSessionId,
                         freezeFrameJson = metadata,
+                        observationState = "OBSERVED",
                         synced = false
                     )
                 )
@@ -3786,13 +3817,12 @@ class ObdViewModel @Inject constructor(
             }
         }
 
-        // Smart Auto-Resolution:
-        // Get all unresolved DTCs in Room for this vehicle
+        // Absence is an observation, not proof of repair. A prior DTC can only
+        // become NOT_OBSERVED when the same module and status bucket completed
+        // successfully; resolvedAt remains reserved for explicit clear or a
+        // future verified post-scan/drive-cycle workflow.
         val unresolvedEvents = dtcDao.getUnresolvedDtcsList(vehicle.id)
         val isCan = report.protocol.uppercase().contains("CAN") || report.protocol.uppercase().contains("ISO15765")
-
-        // Find which modules were alive in the current scan
-        val aliveModules = report.modules.filter { it.isAlive }
 
         unresolvedEvents.forEach { event ->
             val (origTarget, origResponse, origModuleName) = try {
@@ -3808,35 +3838,38 @@ class ObdViewModel @Inject constructor(
                 Triple("", "", "")
             }
 
-            // Check if this DTC's module was actively scanned in the current session
-            val wasScanned = if (isCan) {
-                // For CAN, the module is scanned if there is an alive module matching target, response, or moduleName
-                aliveModules.any { activeModule ->
+            val bucket = when (event.status) {
+                "PENDING" -> DtcBucket.PENDING
+                "PERMANENT" -> DtcBucket.PERMANENT
+                "HISTORY", "INTERMITTENT" -> DtcBucket.HISTORY
+                else -> DtcBucket.ACTIVE
+            }
+
+            // A live probe is insufficient: require a successful DTC service
+            // read covering the same bucket and matching diagnostic module.
+            val matchedModule = if (isCan) {
+                report.modules.firstOrNull { activeModule ->
                     (origTarget.isNotBlank() && origTarget == activeModule.targetAddress) ||
                     (origResponse.isNotBlank() && origResponse == activeModule.responseAddress) ||
                     (origResponse.isNotBlank() && origResponse == activeModule.targetAddress) ||
                     (origModuleName.isNotBlank() && origModuleName == activeModule.moduleName)
                 }
             } else {
-                // For legacy protocols, any DTC with no CAN headers (null or blank) or labeled "Standard OBD-II" was scanned
-                origTarget.isBlank() && origResponse.isBlank()
+                report.modules.firstOrNull { it.moduleName == "Standard OBD-II" }
             }
 
-            if (wasScanned) {
-                // If it was scanned, but is NOT present in the current scan records with the same status, resolve it
+            if (DtcObservationPolicy.canMarkNotObserved(matchedModule, bucket, event.code, records)) {
                 val status = event.status // ACTIVE, PENDING, PERMANENT, HISTORY, INTERMITTENT
-                val stillPresent = records.any { record ->
-                    record.code == event.code && storageStatusForDtcRecord(record) == status
-                }
-                if (!stillPresent) {
-                    dtcDao.insertDtc(
-                        event.copy(
-                            resolvedAt = now,
-                            synced = false
-                        )
+                dtcDao.insertDtc(
+                    event.copy(
+                        observationState = "NOT_OBSERVED_LAST_SCAN",
+                        synced = false
                     )
-                    addTerminalLog("[RESOLVED] Falla ${event.code} ($status) ya no está presente en el módulo. Marcada como resuelta.", TerminalLineType.SYSTEM)
-                }
+                )
+                addTerminalLog(
+                    "[NOT_OBSERVED] ${event.code} ($status) no apareció en la lectura completa; resolución aún no verificada.",
+                    TerminalLineType.SYSTEM,
+                )
             }
         }
 
@@ -4132,8 +4165,20 @@ class ObdViewModel @Inject constructor(
                 _cloudSyncState.value = "Capturando Cuadro Congelado Histórico..."
                 val firstDtc = activeDtcs.value.first()
                 val ff = obdSession.readFreezeFrame(firstDtc)
-                val scoped = ff.mapKeys { (key, _) -> "$firstDtc:$key" }
-                _freezeFrameData.value = _freezeFrameData.value + scoped
+                if (ff.outcome == com.elysium369.meet.core.obd.FreezeFrameOutcome.MATCHED) {
+                    val scoped = ff.values.mapKeys { (key, _) -> "$firstDtc:$key" }
+                    _freezeFrameData.value = _freezeFrameData.value + scoped
+                }
+                _freezeFrameStatus.value = when (ff.outcome) {
+                    com.elysium369.meet.core.obd.FreezeFrameOutcome.MATCHED ->
+                        "Cuadro Congelado de $firstDtc capturado."
+                    com.elysium369.meet.core.obd.FreezeFrameOutcome.BELONGS_TO_ANOTHER_DTC ->
+                        "El freeze frame 0 pertenece a ${ff.actualDtc}, no a $firstDtc. No se asoció."
+                    com.elysium369.meet.core.obd.FreezeFrameOutcome.NO_RESPONSE ->
+                        "La ECU no devolvió freeze frame para $firstDtc."
+                    com.elysium369.meet.core.obd.FreezeFrameOutcome.MALFORMED_RESPONSE ->
+                        "La identidad del freeze frame no fue verificable."
+                }
             }
 
             // 3. Check Battery Voltage & Alternator health
@@ -4197,25 +4242,32 @@ class ObdViewModel @Inject constructor(
 
     suspend fun refreshFreezeFrame(dtc: String): Boolean {
         if (connectionState.value != ObdState.CONNECTED) {
-            _cloudSyncState.value = "Conecta el OBD para volver a leer el freeze frame de $dtc."
+            _freezeFrameStatus.value = "Conecta el OBD para volver a leer el freeze frame de $dtc."
             return false
         }
-        _cloudSyncState.value = "Refrescando Cuadro Congelado..."
+        _freezeFrameStatus.value = "Refrescando Cuadro Congelado..."
         return try {
             val ff = obdSession.readFreezeFrame(dtc)
-            val scoped = ff.mapKeys { (key, _) -> "$dtc:$key" }
-            _freezeFrameData.value = _freezeFrameData.value + scoped
-            _cloudSyncState.value = if (ff.isEmpty()) {
-                "La ECU no devolvio freeze frame para $dtc."
-            } else {
-                "Cuadro Congelado actualizado."
+            if (ff.outcome == com.elysium369.meet.core.obd.FreezeFrameOutcome.MATCHED) {
+                val scoped = ff.values.mapKeys { (key, _) -> "$dtc:$key" }
+                _freezeFrameData.value = _freezeFrameData.value + scoped
             }
-            ff.isNotEmpty()
+            _freezeFrameStatus.value = when (ff.outcome) {
+                com.elysium369.meet.core.obd.FreezeFrameOutcome.MATCHED ->
+                    "Cuadro Congelado de $dtc actualizado."
+                com.elysium369.meet.core.obd.FreezeFrameOutcome.BELONGS_TO_ANOTHER_DTC ->
+                    "El freeze frame 0 pertenece a ${ff.actualDtc}, no a $dtc. No se asoció."
+                com.elysium369.meet.core.obd.FreezeFrameOutcome.NO_RESPONSE ->
+                    "La ECU no devolvió freeze frame para $dtc."
+                com.elysium369.meet.core.obd.FreezeFrameOutcome.MALFORMED_RESPONSE ->
+                    "La ECU devolvió una identidad de freeze frame no verificable."
+            }
+            ff.outcome == com.elysium369.meet.core.obd.FreezeFrameOutcome.MATCHED
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
             Log.e("ObdViewModel", "Freeze frame refresh failed for $dtc", error)
-            _cloudSyncState.value = "No se pudo releer el freeze frame de $dtc: ${error.message ?: "respuesta OBD no disponible"}."
+            _freezeFrameStatus.value = "No se pudo releer el freeze frame de $dtc: ${error.message ?: "respuesta OBD no disponible"}."
             false
         }
     }

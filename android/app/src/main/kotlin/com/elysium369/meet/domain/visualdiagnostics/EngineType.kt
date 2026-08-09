@@ -1,6 +1,7 @@
 package com.elysium369.meet.domain.visualdiagnostics
 
 enum class EngineType {
+    UNKNOWN, // Educational generic view; exact powertrain architecture is not established
     // Inline/Straight
     L3,     // 3 cylinders (Smart, Mitsubishi Mirage, Ford EcoBoost 1.0)
     L4,     // 4 cylinders (most common)

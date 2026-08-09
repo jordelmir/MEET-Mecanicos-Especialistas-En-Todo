@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.*
 
 enum class EngineType(val label: String) {
+    UNKNOWN("Esquema educativo — arquitectura exacta no identificada"),
     INLINE_3("3 Cilindros en Línea (L3)"),
     INLINE_4("4 Cilindros en Línea (L4)"),
     INLINE_5("5 Cilindros en Línea (L5)"),
@@ -543,7 +544,7 @@ object ElysiumProceduralModels {
             EngineType.HYBRID, EngineType.PHEV -> listOf(-38f, -13f, 13f, 38f).mapIndexed { index, x ->
                 index to Vector3D(x, 5f, 0f)
             }
-            EngineType.ELECTRIC -> emptyList()
+            EngineType.UNKNOWN, EngineType.ELECTRIC -> emptyList()
         }
     }
 
