@@ -84,6 +84,18 @@ bash tests/parity/ci-verify.sh
 Device proof requires install, launch, foreground/process confirmation and a
 crash-focused log review. Build success alone is not device proof.
 
+### Android device proof — 2026-08-09
+
+The exact v4.14.0 APK published in GitHub was installed on a real HONOR
+`VER-N49`. Android reported package `com.elysium369.meet`, version code `42`
+and version name `4.14.0`. A cold `MainActivity` launch completed successfully
+in 1666 ms, remained the top resumed/focused activity with a live process, and
+produced no fatal exception or ANR in the post-launch log review. Home and DTC
+screens were visually inspected; Quick/Full Scan controls rendered correctly.
+
+This proves the Android artifact launches and navigates. It does not prove a
+physical ECU exchange because no OBD adapter was connected during the check.
+
 ## Explicitly deferred capability packs
 
 KWP2000/OEM and OBDonUDS capability packs require source-backed, vehicle/OEM-
