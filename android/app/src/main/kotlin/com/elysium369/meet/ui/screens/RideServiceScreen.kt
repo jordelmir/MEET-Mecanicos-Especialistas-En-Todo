@@ -160,6 +160,12 @@ fun RideServiceScreen(
     }
     var showLiveness by rememberSaveable { mutableStateOf(false) }
 
+    val openPassengerRegistration: () -> Unit = {
+        if (driverMode) viewModel.toggleRideDriverMode()
+        showProfile = false
+        firstAccessRole = "PASSENGER"
+    }
+
     LaunchedEffect(driverMode, driverVerification?.status) {
         if (
             driverMode &&
@@ -214,6 +220,36 @@ fun RideServiceScreen(
                             onDismissRequest = { showRideMenu = false },
                             containerColor = Color(0xFF07131E),
                         ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (passengerVerification == null) {
+                                            "Registrarme como usuario"
+                                        } else {
+                                            "Cuenta de pasajero"
+                                        },
+                                        color = Color.White,
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.PersonAdd,
+                                        contentDescription = null,
+                                        tint = MeetColors.neonGreen,
+                                    )
+                                },
+                                onClick = {
+                                    showRideMenu = false
+                                    if (passengerVerification == null) {
+                                        openPassengerRegistration()
+                                    } else {
+                                        if (driverMode) viewModel.toggleRideDriverMode()
+                                        profileInitialTab = 0
+                                        showProfile = true
+                                        firstAccessRole = null
+                                    }
+                                },
+                            )
                             listOf(
                                 Triple(Icons.Default.Person, "Perfil", 0),
                                 Triple(Icons.Default.History, "Historial de viajes", 1),
@@ -306,13 +342,14 @@ fun RideServiceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (
-                passengerVerification == null &&
-                driverVerification == null &&
-                firstAccessRole == null
+            if (requiresRideRoleRegistration(
+                    driverMode = driverMode,
+                    passengerRegistrationExists = passengerVerification != null,
+                    driverRegistrationExists = driverVerification != null,
+                ) && firstAccessRole == null
             ) {
                 RideFirstAccessGateway(
-                    onPassengerRegistration = { firstAccessRole = "PASSENGER" },
+                    onPassengerRegistration = openPassengerRegistration,
                     onDriverRegistration = onOpenDriverRegistration,
                 )
             } else if (showProfile) {
@@ -419,7 +456,7 @@ private fun RideFirstAccessGateway(
                 ) {
                     Icon(Icons.Default.Person, null)
                     Spacer(Modifier.width(9.dp))
-                    Text("REGISTRARME PARA VIAJAR", fontWeight = FontWeight.Black)
+                    Text("REGISTRARME COMO USUARIO", fontWeight = FontWeight.Black)
                 }
                 OutlinedButton(
                     onClick = onDriverRegistration,
@@ -433,7 +470,7 @@ private fun RideFirstAccessGateway(
                     Text("REGISTRARME COMO CHOFER", fontWeight = FontWeight.Black)
                 }
                 Text(
-                    "La documentación de conductor se revisa por separado antes de permitir recibir solicitudes.",
+                    "Puedes tener ambos perfiles en la misma cuenta. La verificación de usuario y la documentación de chofer se administran por separado.",
                     color = MeetColors.textMuted,
                     fontSize = 10.sp,
                     textAlign = TextAlign.Center,
@@ -451,6 +488,16 @@ private fun RideProjectionConnectionState.rideProjectionStatusLabel(): String =
         RideProjectionConnectionState.RECOVERING -> "RECUPERANDO"
         RideProjectionConnectionState.AUTHENTICATION_REQUIRED -> "SIN SESIÓN"
     }
+
+internal fun requiresRideRoleRegistration(
+    driverMode: Boolean,
+    passengerRegistrationExists: Boolean,
+    driverRegistrationExists: Boolean,
+): Boolean = if (driverMode) {
+    !driverRegistrationExists
+} else {
+    !passengerRegistrationExists
+}
 
 private fun RideProjectionConnectionState.rideProjectionStatusColor(): Color =
     when (this) {
