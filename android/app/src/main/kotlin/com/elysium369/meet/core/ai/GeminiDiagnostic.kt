@@ -184,10 +184,12 @@ class GeminiDiagnostic(
             val prompt = "Analiza estos datos OBD2 y da una conclusión técnica de MÁXIMO 10 PALABRAS en español: $snapshot"
             
             try {
-                val response = callGemini(endpoint, prompt) ?: "ESTADO NOMINAL"
+                val response = callGemini(endpoint, prompt)
+                    ?: return@withContext "ANÁLISIS IA NO DISPONIBLE"
                 return@withContext response.trim().replace(".", "").uppercase()
             } catch (e: Exception) {
-                "MONITOREANDO FLUJO"
+                Log.e("GeminiDiag", "Quick AI analysis unavailable", e)
+                "ANÁLISIS IA NO DISPONIBLE"
             }
         }
     }

@@ -121,7 +121,8 @@ class BluetoothPrinterManager(private val context: Context) {
             escPos.boldOff()
             
             if (data.dtcs.isEmpty()) {
-                escPos.printLine("No se detectaron fallas activas.")
+                escPos.printLine("Sin DTC activos detectados en los módulos cubiertos.")
+                escPos.printLine("Esto no descarta fallas no monitorizadas por OBD.")
             } else {
                 data.dtcs.forEach { dtc ->
                     escPos.printLine("- $dtc")

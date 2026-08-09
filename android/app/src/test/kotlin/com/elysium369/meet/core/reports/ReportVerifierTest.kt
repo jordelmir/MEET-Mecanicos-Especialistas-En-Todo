@@ -40,14 +40,21 @@ class ReportVerifierTest {
                 override fun observeForVehicle(vehicleId: String) = kotlinx.coroutines.flow.flowOf(emptyList<CertifiedReportEntity>())
                 override suspend fun listForVehicleAsc(vehicleId: String) = rows.filter { it.vehicleId == vehicleId }
                 override suspend fun listByStatus(status: ReportStatus, limit: Int) = rows.filter { it.status == status }
-                override suspend fun latestHashForVehicle(vehicleId: String) =
-                    rows.filter { it.vehicleId == vehicleId && it.integrityHash != "UNSIGNED" }
-                        .maxByOrNull { it.generatedAt }?.integrityHash
-                override suspend fun upsert(report: CertifiedReportEntity) {
+                override suspend fun latestHashForVehicle(vehicleId: String, excludeReportId: String) =
+                    rows.filter {
+                        it.vehicleId == vehicleId &&
+                            it.reportId != excludeReportId &&
+                            it.integrityHash != "UNSIGNED"
+                    }.maxWithOrNull(compareBy<CertifiedReportEntity> { it.signedAt }.thenBy { it.reportId })
+                        ?.integrityHash
+                override suspend fun insert(report: CertifiedReportEntity) {
+                    require(rows.none { it.reportId == report.reportId })
+                    rows.add(report)
+                }
+                override suspend fun update(report: CertifiedReportEntity) {
                     rows.removeAll { it.reportId == report.reportId }
                     rows.add(report)
                 }
-                override suspend fun update(report: CertifiedReportEntity) = upsert(report)
             },
             evidenceDao = object : ReportEvidenceDao {
                 override suspend fun listForReport(reportId: String) = emptyList<ReportEvidenceEntity>()

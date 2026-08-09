@@ -645,7 +645,40 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                         when (selectedTab) {
                             0 -> {
                                 if (activeDtcs.isEmpty()) {
-                                    item { HolographicEmptyState("SISTEMA OK", "No hay códigos de falla activos detectados.", MeetColors.neonGreen, isCompact) }
+                                    item {
+                                        val emptyTitle: String
+                                        val emptyDetail: String
+                                        val emptyColor: Color
+                                        when (lastScanReport?.completeness) {
+                                            com.elysium369.meet.core.obd.ScanCompleteness.COMPLETE -> {
+                                                emptyTitle = "SIN DTC ACTIVOS EN EL ÚLTIMO ESCANEO"
+                                                emptyDetail = "Los módulos cubiertos completaron la lectura sin reportar códigos activos. Esto no descarta fallas no monitorizadas."
+                                                emptyColor = MeetColors.neonGreen
+                                            }
+                                            com.elysium369.meet.core.obd.ScanCompleteness.PARTIAL -> {
+                                                emptyTitle = "ESCANEO PARCIAL · SIN DTC ACTIVOS OBSERVADOS"
+                                                emptyDetail = "Los módulos que respondieron no reportaron códigos activos; otros módulos o servicios quedaron sin verificar."
+                                                emptyColor = MeetColors.warning
+                                            }
+                                            com.elysium369.meet.core.obd.ScanCompleteness.INCONCLUSIVE,
+                                            com.elysium369.meet.core.obd.ScanCompleteness.FAILED -> {
+                                                emptyTitle = "ESCANEO NO CONCLUYENTE"
+                                                emptyDetail = "No existe evidencia suficiente para afirmar ausencia de DTC. Revisa conexión, protocolo y cobertura antes de diagnosticar."
+                                                emptyColor = MeetColors.warning
+                                            }
+                                            null -> {
+                                                emptyTitle = "SIN ESCANEO DTC VERIFICABLE"
+                                                emptyDetail = "Conecta el adaptador y ejecuta un escaneo. La lista vacía aún no demuestra que el vehículo no tenga códigos."
+                                                emptyColor = MeetColors.cyberCyan
+                                            }
+                                        }
+                                        HolographicEmptyState(
+                                            emptyTitle,
+                                            emptyDetail,
+                                            emptyColor,
+                                            isCompact,
+                                        )
+                                    }
                                 } else {
                                     item {
                                         RepairKnowledgeEvidencePanel(
@@ -1258,7 +1291,7 @@ private fun HoloDtcCard(
 
                     // Freeze Frame
                     val freezeFrame by viewModel.freezeFrameData.collectAsState()
-                    val freezeFrameStatus by viewModel.cloudSyncState.collectAsState()
+                    val freezeFrameStatus by viewModel.freezeFrameStatus.collectAsState()
                     val scopedFrame = freezeFrame.filter { it.key.startsWith("$dtc:") }
                     if (scopedFrame.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(14.dp))
@@ -1299,8 +1332,14 @@ private fun HoloDtcCard(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Buttons
+                    val openDtcRelations3d = {
+                        navController.navigate(
+                            "component_locator?dtcCode=${java.net.URLEncoder.encode(dtc, "UTF-8")}"
+                        )
+                    }
                     if (isCompact) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EliteButton("◈ VER RELACIONES EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.fillMaxWidth())
                             EliteButton("🛠️ CÓMO REPARAR (PASO A PASO)", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.fillMaxWidth())
                             EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.fillMaxWidth())
                             val cs = rememberCoroutineScope()
@@ -1308,12 +1347,24 @@ private fun HoloDtcCard(
                         }
                     } else {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            EliteButton("◈ VER EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
                             EliteButton("🛠️ CÓMO REPARAR", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.weight(1f))
                             val cs = rememberCoroutineScope()
                             EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
                         }
                     }
+
+                    Text(
+                        "Las piezas resaltadas son relaciones diagnósticas; no confirman por sí solas una pieza dañada.",
+                        color = MeetColors.warning,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                        modifier = Modifier.fillMaxWidth().padding(top = 7.dp)
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
                     DtcGoogleSearchButton(
@@ -1440,23 +1491,6 @@ private fun Vehicle?.toDtcGoogleSearchVehicleContext(): DtcGoogleSearchVehicleCo
 // HOLOGRAPHIC SCAN OVERLAY
 // ═══════════════════════════════════════════════════════════════
 
-// Radar Blip definition
-private data class RadarBlip(
-    val xOffset: Float,
-    val yOffset: Float,
-    val color: Color,
-    val size: Float,
-    val label: String
-)
-
-private val radarBlips = listOf(
-    RadarBlip(-0.35f, -0.4f, MeetColors.neonGreen, 4f, "ECU"),
-    RadarBlip(0.4f, -0.3f, MeetColors.neonGreen, 4f, "TCU"),
-    RadarBlip(-0.5f, 0.35f, MeetColors.neonGreen, 4f, "ABS"),
-    RadarBlip(0.35f, 0.45f, MeetColors.error, 5f, "MIL"),
-    RadarBlip(-0.1f, 0.5f, MeetColors.warning, 4f, "SRS")
-)
-
 @Composable
 private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<TerminalLine>, isCompact: Boolean) {
     val infiniteTransition = rememberInfiniteTransition(label = "scanOvr")
@@ -1464,7 +1498,6 @@ private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<T
     val pulseAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sp")
     val scanY by infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "sy")
     val glowPulse by infiniteTransition.animateFloat(0.7f, 1.3f, infiniteRepeatable(tween(1200, easing = FastOutLinearInEasing), RepeatMode.Reverse), label = "sg")
-    val phase by infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "phase")
 
     Box(
         modifier = Modifier
@@ -1553,48 +1586,11 @@ private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<T
                         drawLine(MeetColors.neonGreen.copy(alpha = 0.5f), pos, Offset(pos.x, pos.y + markSize * dir.second), 1.5f)
                     }
 
-                    // Render decaying radar blips
-                    radarBlips.forEach { blip ->
-                        val bx = c.x + r * blip.xOffset
-                        val by = c.y + r * blip.yOffset
-                        
-                        // Angle of blip relative to center (in degrees, 0 to 360)
-                        val dx = blip.xOffset
-                        val dy = blip.yOffset
-                        var blipAngleRad = kotlin.math.atan2(dy, dx)
-                        if (blipAngleRad < 0) blipAngleRad += (2 * PI).toFloat()
-                        val blipAngleDeg = blipAngleRad * (180f / PI.toFloat())
-                        
-                        // Calculate sweep angle difference to establish decay
-                        val currentSweepDeg = rotation % 360f
-                        var angleDiff = currentSweepDeg - blipAngleDeg
-                        if (angleDiff < 0) angleDiff += 360f
-                        
-                        // Decaying brightness based on sweep pass
-                        val decay = if (angleDiff < 90f) {
-                            1f - (angleDiff / 90f) // brightest right after sweep, fading over 90 degrees
-                        } else {
-                            0.15f // base ambient glow
-                        }
-                        
-                        // Draw glowing halo around blip
-                        drawCircle(
-                            color = blip.color.copy(alpha = 0.45f * decay),
-                            radius = (blip.size * 2.2f).dp.toPx() * (0.8f + 0.2f * sin(phase * 10f)),
-                            center = Offset(bx, by)
-                        )
-                        // Draw core point
-                        drawCircle(
-                            color = blip.color.copy(alpha = 0.9f * decay + 0.1f),
-                            radius = blip.size.dp.toPx(),
-                            center = Offset(bx, by)
-                        )
-                    }
                 }
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("SCAN", color = MeetColors.neonGreen.copy(alpha = pulseAlpha), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black, fontSize = if (isCompact) 14.sp else 18.sp, letterSpacing = 6.sp, style = LocalTextStyle.current.copy(shadow = androidx.compose.ui.graphics.Shadow(color = MeetColors.neonGreen.copy(alpha = 0.8f), offset = Offset(0f,0f), blurRadius = 8f)))
-                    Text("ECU", color = Color.White.copy(alpha = 0.3f), fontFamily = FontFamily.Monospace, fontSize = 8.sp, letterSpacing = 4.sp)
+                    Text("OBD", color = Color.White.copy(alpha = 0.3f), fontFamily = FontFamily.Monospace, fontSize = 8.sp, letterSpacing = 4.sp)
                 }
             }
 

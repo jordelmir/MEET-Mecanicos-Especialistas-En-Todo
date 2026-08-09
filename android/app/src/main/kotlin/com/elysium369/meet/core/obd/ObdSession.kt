@@ -1996,15 +1996,36 @@ class ObdSession(
      * Reads Freeze Frame data for a specific DTC (Mode 02).
      * @param dtc The fault code to query.
      */
-    suspend fun readFreezeFrame(dtc: String): Map<String, String> {
+    suspend fun readFreezeFrame(dtc: String): FreezeFrameReadResult {
         val results = mutableMapOf<String, String>()
+        val requestedDtc = dtc.trim().uppercase()
 
         // Mode 02 PID 02: DTC that caused freeze frame
         val dtcResp = sendRawCommand("020200") // Frame 0
-        if (dtcResp.contains("NODATA") || dtcResp.contains("?")) return emptyMap()
-
-        // NOTE: "DTC" key removed — ViewModel now uses scoped keys (dtc:param).
-        // The DTC identity is managed by the caller, not embedded in the frame map.
+        val normalizedIdentityResponse = dtcResp.uppercase().replace(" ", "")
+        if (normalizedIdentityResponse.contains("NODATA") || normalizedIdentityResponse.contains("?")) {
+            return FreezeFrameReadResult(
+                requestedDtc = requestedDtc,
+                actualDtc = null,
+                outcome = FreezeFrameOutcome.NO_RESPONSE,
+                identityRawResponse = dtcResp,
+            )
+        }
+        val actualDtc = DtcScanEngine.parseFreezeFrameIdentity(dtcResp)
+            ?: return FreezeFrameReadResult(
+                requestedDtc = requestedDtc,
+                actualDtc = null,
+                outcome = FreezeFrameOutcome.MALFORMED_RESPONSE,
+                identityRawResponse = dtcResp,
+            )
+        if (actualDtc != requestedDtc) {
+            return FreezeFrameReadResult(
+                requestedDtc = requestedDtc,
+                actualDtc = actualDtc,
+                outcome = FreezeFrameOutcome.BELONGS_TO_ANOTHER_DTC,
+                identityRawResponse = dtcResp,
+            )
+        }
 
         // Common PIDs for engine snapshot
         val pids = listOf(
@@ -2027,7 +2048,13 @@ class ObdSession(
         }
 
         _freezeFrame.value = results
-        return results
+        return FreezeFrameReadResult(
+            requestedDtc = requestedDtc,
+            actualDtc = actualDtc,
+            outcome = FreezeFrameOutcome.MATCHED,
+            values = results,
+            identityRawResponse = dtcResp,
+        )
     }
 
     private fun parseMode02Response(pid: String, response: String): String {
@@ -2036,8 +2063,10 @@ class ObdSession(
         val idx = clean.uppercase().indexOf(prefix)
         if (idx < 0) return "N/A"
 
-        val data = clean.substring(idx + prefix.length)
-        if (data.length < 2) return "N/A"
+        val dataWithFrame = clean.substring(idx + prefix.length)
+        // Every Mode 02 response echoes the freeze-frame number before PID data.
+        if (dataWithFrame.length < 4) return "N/A"
+        val data = dataWithFrame.substring(2)
 
         return when(pid) {
             "02" -> {
@@ -2070,33 +2099,86 @@ class ObdSession(
     suspend fun readProfessionalDtcScan(): DtcScanReport {
         val startedAt = System.currentTimeMillis()
         if (_state.value != ObdState.CONNECTED) {
-            return DtcScanReport(startedAt, System.currentTimeMillis(), detectedProtocol, emptyList(), emptyList(), emptyList())
+            return DtcScanReport(
+                startedAtMs = startedAt,
+                endedAtMs = System.currentTimeMillis(),
+                protocol = detectedProtocol,
+                records = emptyList(),
+                modules = emptyList(),
+                rawExchanges = emptyList(),
+                completeness = ScanCompleteness.FAILED,
+                warnings = listOf("OBD no conectado; ningún módulo fue consultado."),
+            )
         }
 
         val records = mutableListOf<DtcRecord>()
         val rawExchanges = mutableListOf<DtcRawExchange>()
         val aliveModules = linkedMapOf<String, String>()
+        val moduleReads = linkedMapOf<String, MutableList<DtcServiceRead>>()
+        val attemptedModules = linkedMapOf<String, String>()
 
         fun normalizeRecord(record: DtcRecord, fallbackName: String?): DtcRecord {
             val responseName = moduleNameForResponse(record.responseAddress)
             return record.copy(moduleName = record.moduleName ?: fallbackName ?: responseName)
         }
 
-        suspend fun queryStandard(command: String, mode: String, target: String?, moduleName: String?) {
-            val raw = runCatching { sendRawCommand(command, priority = 999) }.getOrDefault("")
+        suspend fun queryStandard(command: String, mode: String, target: String?, moduleName: String?): DtcServiceRead {
+            var failed = false
+            var forcedOutcome: ModuleScanOutcome? = null
+            val raw = try {
+                sendRawCommand(command, priority = 999)
+            } catch (_: TimeoutCancellationException) {
+                forcedOutcome = ModuleScanOutcome.TIMEOUT
+                ""
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                failed = true
+                ""
+            }
             val parsed = DtcScanEngine.parseStandardByEcu(raw, mode, target, moduleName)
                 .map { normalizeRecord(it, moduleName) }
-            rawExchanges += DtcRawExchange(command, target, raw, parsed.size)
+            val positiveService = when (mode) {
+                "03" -> "43"
+                "07" -> "47"
+                "0A" -> "4A"
+                else -> "4$mode"
+            }
+            val outcome = forcedOutcome ?: DtcScanEngine.classifyExchange(raw, positiveService, parsed.size, failed)
+            rawExchanges += DtcRawExchange(command, target, raw, parsed.size, outcome)
             records += parsed
+            val bucket = when (mode) {
+                "07" -> DtcBucket.PENDING
+                "0A" -> DtcBucket.PERMANENT
+                else -> DtcBucket.ACTIVE
+            }
+            val read = DtcServiceRead(command, bucket, outcome)
+            moduleReads.getOrPut(target ?: "LEGACY") { mutableListOf() } += read
+            return read
         }
 
-        suspend fun queryUds(command: String, target: String?, moduleName: String?): List<DtcRecord> {
-            val raw = runCatching { sendRawCommand(command, priority = 999) }.getOrDefault("")
+        suspend fun queryUds(command: String, target: String?, moduleName: String?): Pair<List<DtcRecord>, DtcServiceRead> {
+            var failed = false
+            var forcedOutcome: ModuleScanOutcome? = null
+            val raw = try {
+                sendRawCommand(command, priority = 999)
+            } catch (_: TimeoutCancellationException) {
+                forcedOutcome = ModuleScanOutcome.TIMEOUT
+                ""
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                failed = true
+                ""
+            }
             val parsed = DtcScanEngine.parseUdsService19ByEcu(raw, target, moduleName)
                 .map { normalizeRecord(it, moduleName) }
-            rawExchanges += DtcRawExchange(command, target, raw, parsed.size)
+            val outcome = forcedOutcome ?: DtcScanEngine.classifyExchange(raw, "59", parsed.size, failed)
+            rawExchanges += DtcRawExchange(command, target, raw, parsed.size, outcome)
             records += parsed
-            return parsed
+            val read = DtcServiceRead(command, null, outcome)
+            moduleReads.getOrPut(target ?: "LEGACY") { mutableListOf() } += read
+            return parsed to read
         }
 
         fun isAliveResponse(raw: String): Boolean {
@@ -2124,12 +2206,14 @@ class ObdSession(
 
                 // Phase 1: functional broadcast with headers.
                 runCatching { sendRawCommand("ATSH7DF", priority = 999) }
+                attemptedModules["7DF"] = "Functional Broadcast"
                 queryStandard("03", "03", "7DF", "Functional Broadcast")
                 queryStandard("07", "07", "7DF", "Functional Broadcast")
                 queryStandard("0A", "0A", "7DF", "Functional Broadcast")
 
                 // Phase 2: physical module sweep
                 for ((target, moduleName) in professionalDtcTargets()) {
+                    attemptedModules[target] = moduleName
                     _statusMessage.value = "Escaneando $moduleName ($target)..."
                     runCatching { sendRawCommand("ATSH$target", priority = 999) }
                     target.toIntOrNull(16)?.let { requestHex ->
@@ -2140,20 +2224,26 @@ class ObdSession(
                     try {
                         val probeRaw = runCatching { sendRawCommand("0100", priority = 999) }.getOrDefault("")
                         var alive = isAliveResponse(probeRaw)
-                        rawExchanges += DtcRawExchange("0100", target, probeRaw, 0)
+                        rawExchanges += DtcRawExchange(
+                            "0100", target, probeRaw, 0,
+                            if (alive) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_RESPONSE,
+                        )
 
                         if (!alive) {
                             val testerRaw = runCatching { sendRawCommand("3E00", priority = 999) }.getOrDefault("")
                             alive = isAliveResponse(testerRaw)
-                            rawExchanges += DtcRawExchange("3E00", target, testerRaw, 0)
+                            rawExchanges += DtcRawExchange(
+                                "3E00", target, testerRaw, 0,
+                                if (alive) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_RESPONSE,
+                            )
                         }
 
                         if (!alive) continue
                         aliveModules[target] = moduleName
 
                         runCatching { sendRawCommand("1003", priority = 999) }
-                        val udsAll = queryUds("1902FF", target, moduleName)
-                        if (udsAll.isEmpty()) {
+                        val (_, udsAllRead) = queryUds("1902FF", target, moduleName)
+                        if (!udsAllRead.outcome.provesBucketWasRead) {
                             queryUds("19020D", target, moduleName)
                         }
                         queryStandard("03", "03", target, moduleName)
@@ -2166,6 +2256,8 @@ class ObdSession(
             } else {
                 _statusMessage.value = "Escaneo DTC estándar: consultando protocolo legado..."
                 runCatching { sendRawCommand("ATH0", priority = 999) }
+                attemptedModules["LEGACY"] = "Standard OBD-II"
+                aliveModules["LEGACY"] = "Standard OBD-II"
                 // Consult standard Modes globally without CAN addressing
                 queryStandard("03", "03", null, "Standard OBD-II")
                 queryStandard("07", "07", null, "Standard OBD-II")
@@ -2182,18 +2274,46 @@ class ObdSession(
         val distinctRecords = records.distinctBy {
             "${it.code}|${it.bucket}|${it.responseAddress}|${it.targetAddress}|${it.udsStatusByte}|${it.udsFailureType}"
         }
-        val moduleKeys = (aliveModules.keys + distinctRecords.mapNotNull { it.responseAddress ?: it.targetAddress }).distinct()
+        val moduleKeys = (attemptedModules.keys + distinctRecords.mapNotNull { it.targetAddress }).distinct()
         val modules = moduleKeys.map { key ->
-            val moduleRecords = distinctRecords.filter { it.responseAddress == key || (it.responseAddress == null && it.targetAddress == key) }
+            val expectedResponse = key.toIntOrNull(16)?.let { String.format("%03X", it + 8) }
+            val moduleRecords = distinctRecords.filter {
+                it.targetAddress == key || it.responseAddress == key || it.responseAddress == expectedResponse
+            }
+            val reads = moduleReads[key].orEmpty()
+            val moduleOutcome = when {
+                reads.isEmpty() -> ModuleScanOutcome.NO_RESPONSE
+                reads.all { it.outcome.provesBucketWasRead } ->
+                    if (moduleRecords.isEmpty()) ModuleScanOutcome.NO_DTC else ModuleScanOutcome.COMPLETE
+                reads.any { it.outcome.provesBucketWasRead } -> ModuleScanOutcome.PARTIAL_RESPONSE
+                else -> reads.first().outcome
+            }
             DtcModuleReport(
-                targetAddress = aliveModules.keys.firstOrNull { it == key },
-                responseAddress = if (key in aliveModules.keys) null else key,
-                moduleName = aliveModules[key] ?: moduleNameForResponse(key) ?: "ECU $key",
-                isAlive = true,
+                targetAddress = key.takeUnless { it == "LEGACY" },
+                responseAddress = expectedResponse,
+                moduleName = attemptedModules[key] ?: aliveModules[key] ?: moduleNameForResponse(key) ?: "ECU $key",
+                isAlive = key in aliveModules,
                 dtcs = moduleRecords,
-                rawExchanges = rawExchanges.filter { it.targetAddress == key || it.targetAddress == "7DF" }
+                rawExchanges = rawExchanges.filter { it.targetAddress == key },
+                serviceReads = reads,
+                outcome = moduleOutcome,
             )
         }
+
+        val attemptedDiagnosticReads = modules.filter { it.serviceReads.isNotEmpty() }
+        val completeReads = attemptedDiagnosticReads.count {
+            it.outcome == ModuleScanOutcome.COMPLETE || it.outcome == ModuleScanOutcome.NO_DTC
+        }
+        val completeness = when {
+            attemptedDiagnosticReads.isEmpty() -> ScanCompleteness.FAILED
+            completeReads == attemptedDiagnosticReads.size && modules.all { it.isAlive || it.targetAddress == "7DF" } -> ScanCompleteness.COMPLETE
+            completeReads > 0 -> ScanCompleteness.PARTIAL
+            modules.any { it.isAlive } -> ScanCompleteness.INCONCLUSIVE
+            else -> ScanCompleteness.FAILED
+        }
+        val warnings = modules.filter {
+            it.outcome !in setOf(ModuleScanOutcome.COMPLETE, ModuleScanOutcome.NO_DTC)
+        }.map { "${it.moduleName}: ${it.outcome.name}" }
 
         val report = DtcScanReport(
             startedAtMs = startedAt,
@@ -2201,11 +2321,13 @@ class ObdSession(
             protocol = detectedProtocol,
             records = distinctRecords,
             modules = modules,
-            rawExchanges = rawExchanges
+            rawExchanges = rawExchanges,
+            completeness = completeness,
+            warnings = warnings,
         )
         _lastDtcScanReport.value = report
         _allDetectedDtcs.value = _allDetectedDtcs.value + distinctRecords.map { it.code }
-        _statusMessage.value = "Escaneo DTC profesional completado: ${distinctRecords.size} hallazgos."
+        _statusMessage.value = "Escaneo DTC ${completeness.name.lowercase()}: ${distinctRecords.size} hallazgos."
         return report
     }
 

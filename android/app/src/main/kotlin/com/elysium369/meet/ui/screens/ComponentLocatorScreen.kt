@@ -118,6 +118,9 @@ fun ComponentLocatorScreen(
     val detectedEngineType = remember(selectedVehicle) {
         val eng = selectedVehicle?.engine?.lowercase().orEmpty()
         val fuel = selectedVehicle?.fuel_type?.lowercase().orEmpty()
+        val make = selectedVehicle?.make?.lowercase().orEmpty()
+        val model = selectedVehicle?.model?.lowercase().orEmpty()
+        val year = selectedVehicle?.year
         when {
             fuel.contains("electric") || fuel.contains("ev") -> EngineType.ELECTRIC
             fuel.contains("phev") || fuel.contains("plug-in") -> EngineType.PHEV
@@ -135,7 +138,10 @@ fun ComponentLocatorScreen(
             eng.contains("l6") || eng.contains("i6") || eng.contains("inline 6") || eng.contains("straight 6") -> EngineType.INLINE_6
             eng.contains("l5") || eng.contains("i5") || eng.contains("5 cil") -> EngineType.INLINE_5
             eng.contains("l3") || eng.contains("i3") || eng.contains("3 cil") || eng.contains("1.0") -> EngineType.INLINE_3
-            else -> EngineType.INLINE_4
+            eng.contains("g4ed") || eng.contains("l4") || eng.contains("i4") || eng.contains("inline 4") || eng.contains("4 cil") -> EngineType.INLINE_4
+            make.contains("hyundai") && (model.contains("accent") || model.contains("verna")) &&
+                year == 2005 && (eng.contains("1.6") || eng.contains("dohc")) -> EngineType.INLINE_4
+            else -> EngineType.UNKNOWN
         }
     }
 
@@ -252,8 +258,8 @@ fun ComponentLocatorScreen(
         }
     }
     
-    val initialDtcComponent = remember(initialDtcCode, engineComponents) {
-        engineComponents.firstOrNull { component ->
+    val initialDtcComponents = remember(initialDtcCode, engineComponents) {
+        engineComponents.filter { component ->
             component.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) }
         }
     }
@@ -262,7 +268,6 @@ fun ComponentLocatorScreen(
         mutableStateOf(
             initialProprietaryEntity?.toComponentInfo(proprietaryRepository, includeLiteralContext = true)
                 ?: suspensionComponents.firstOrNull { it.id == initialPartId }
-                ?: initialDtcComponent
         )
     }
     var selectedCategory by remember { mutableStateOf<ComponentCategory?>(null) }
@@ -280,13 +285,13 @@ fun ComponentLocatorScreen(
     }
     var explodedServiceView by remember { mutableStateOf(false) }
     var selectedPlatform by remember { mutableStateOf(MeetPlatformCatalog.default) }
-    var twinViewportState by remember(initialProprietaryEntity, initialDtcComponent) {
+    var twinViewportState by remember(initialProprietaryEntity, initialPartId, initialDtcCode) {
         mutableStateOf(
             VehicleTwinViewportState(
-                focusMode = if (initialProprietaryEntity != null || initialDtcComponent != null) {
-                    TwinFocusMode.COMPONENT
-                } else {
-                    TwinFocusMode.COMPLETE_VEHICLE
+                focusMode = when {
+                    initialProprietaryEntity != null || initialPartId != null -> TwinFocusMode.COMPONENT
+                    initialDtcCode != null -> TwinFocusMode.SYSTEM
+                    else -> TwinFocusMode.COMPLETE_VEHICLE
                 }
             )
         )
@@ -311,7 +316,9 @@ fun ComponentLocatorScreen(
     // Obtener códigos DTC activos del escáner en tiempo real
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
-    val allActiveDtcs = remember(activeDtcs, pendingDtcs) { activeDtcs + pendingDtcs }
+    val allActiveDtcs = remember(activeDtcs, pendingDtcs, initialDtcCode) {
+        (activeDtcs + pendingDtcs + listOfNotNull(initialDtcCode?.uppercase())).distinct()
+    }
     val liveData by viewModel.liveData.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val isObdConnected = connectionState == ObdState.CONNECTED
@@ -355,6 +362,7 @@ fun ComponentLocatorScreen(
     // Grouped engine types for selector
     data class EngineGroup(val label: String, val types: List<Pair<EngineType, String>>)
     val engineGroups = listOf(
+        EngineGroup("◌ Genérico", listOf(EngineType.UNKNOWN to "N/D")),
         EngineGroup("⛽ Gas", listOf(
             EngineType.INLINE_3 to "L3", EngineType.INLINE_4 to "L4", EngineType.INLINE_5 to "L5",
             EngineType.INLINE_6 to "L6", EngineType.V6 to "V6", EngineType.V8 to "V8",
@@ -834,6 +842,24 @@ fun ComponentLocatorScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                    if (selectedEngineType == EngineType.UNKNOWN && currentScene != SceneType.UNIVERSAL_CATALOG) {
+                        Text(
+                            text = "CONFIGURACIÓN NO CONFIRMADA · NO ES GEOMETRÍA OEM",
+                            color = MeetColors.warning,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 2
+                        )
+                    }
+                    if (initialDtcCode != null && currentScene != SceneType.UNIVERSAL_CATALOG) {
+                        Text(
+                            text = "${initialDtcComponents.size} RELACIONES PARA ${initialDtcCode.uppercase()} · NO CONFIRMAN PIEZA DAÑADA",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2
+                        )
                     }
                 }
                 Box(
@@ -1961,6 +1987,7 @@ private fun ComponentInfo.defaultSafetyNotes(): List<String> {
 
 private fun EngineType.toVisualEngineType(): VisualEngineType {
     return when (this) {
+        EngineType.UNKNOWN -> VisualEngineType.UNKNOWN
         EngineType.INLINE_3 -> VisualEngineType.L3
         EngineType.INLINE_4 -> VisualEngineType.L4
         EngineType.INLINE_5 -> VisualEngineType.L5

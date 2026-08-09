@@ -121,8 +121,8 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         ReportSignatureEntity::class,
         DiagnosticSnapshotEntity::class,
     ],
-    version = 48,
-    exportSchema = false
+    version = 49,
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class MeetDatabase : RoomDatabase() {
