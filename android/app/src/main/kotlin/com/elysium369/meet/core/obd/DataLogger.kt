@@ -130,7 +130,11 @@ class DataLogger @Inject constructor() {
                             "response=${module.responseAddress ?: "-"}, alive=${module.isAlive}, outcome=${module.outcome}\n"
                     )
                     module.serviceReads.forEach { read ->
-                        writer.write("  command=${read.command}, bucket=${read.bucket ?: "ALL"}, outcome=${read.outcome}\n")
+                        writer.write(
+                            "  command=${read.command}, namespace=${read.coverage.namespace}, " +
+                                "semantics=${read.coverage.semantics.joinToString("|")}, " +
+                                "outcome=${read.outcome}, nrc=${read.negativeResponse?.responseCode ?: "-"}\n"
+                        )
                     }
                 }
                 writer.write("\n== Parsed DTCs ==\n")

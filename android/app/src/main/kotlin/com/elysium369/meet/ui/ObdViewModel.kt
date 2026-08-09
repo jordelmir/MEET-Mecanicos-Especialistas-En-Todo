@@ -1713,6 +1713,7 @@ class ObdViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val lastDtcScanReport: StateFlow<DtcScanReport?> = obdSession.lastDtcScanReport
+    val diagnosticScanEvents: SharedFlow<DiagnosticScanEvent> = obdSession.diagnosticScanEvents
 
     private val _readinessMonitors = MutableStateFlow<ReadinessResult?>(null)
     val readinessMonitors: StateFlow<ReadinessResult?> = _readinessMonitors.asStateFlow()
@@ -3633,9 +3634,19 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    suspend fun refreshDiagnostics(manageState: Boolean = true) {
+    fun cancelDiagnosticScan() {
+        obdSession.cancelDiagnosticScan()
+    }
+
+    suspend fun refreshDiagnostics(
+        manageState: Boolean = true,
+        mode: DiagnosticScanMode = DiagnosticScanMode.FULL_VEHICLE,
+    ) {
         if (manageState) _isScanning.value = true
-        addTerminalLog("──── INICIO ESCANEO DTC PROFESIONAL ────", TerminalLineType.SYSTEM)
+        addTerminalLog(
+            "──── INICIO ${if (mode == DiagnosticScanMode.QUICK) "QUICK SCAN" else "FULL VEHICLE SCAN"} ────",
+            TerminalLineType.SYSTEM,
+        )
         if (connectionState.value != ObdState.CONNECTED) {
             addTerminalLog(
                 "⚠ Conecta un vehículo real para escanear DTCs. Elysium Vanguard ya no genera resultados simulados.",
@@ -3653,8 +3664,15 @@ class ObdViewModel @Inject constructor(
             obdSession.clearCommandQueue()
             voiceFeedbackManager.speak("Iniciando escaneo de códigos de error.", "Starting fault code scan.")
 
-            addTerminalLog("[SCAN] DTC primero: Service 19/UDS + Mode 03/07/0A + módulos CAN...", TerminalLineType.SYSTEM)
-            val professionalReport = obdSession.readProfessionalDtcScan()
+            addTerminalLog(
+                if (mode == DiagnosticScanMode.QUICK) {
+                    "[SCAN] Lectura rápida: Mode 03/07/0A por broadcast funcional..."
+                } else {
+                    "[SCAN] Cobertura completa: Service 19/UDS + Mode 03/07/0A + módulos confirmados/candidatos..."
+                },
+                TerminalLineType.SYSTEM,
+            )
+            val professionalReport = obdSession.readProfessionalDtcScan(mode)
             addProfessionalDtcReportLogs(professionalReport)
 
             val freshActive = professionalReport.codesForBucket(DtcBucket.ACTIVE)
@@ -3682,9 +3700,16 @@ class ObdViewModel @Inject constructor(
                 )
             }
 
-            // Mode 01 PID 01 → I/M Readiness Monitors
-            addTerminalLog("[SCAN] Leyendo Monitores I/M (Mode 01 PID 01)...", TerminalLineType.SYSTEM)
-            _readinessMonitors.value = obdSession.readReadinessMonitors()
+            if (!professionalReport.wasCancelled) {
+                // Mode 01 PID 01 → I/M Readiness Monitors
+                addTerminalLog("[SCAN] Leyendo Monitores I/M (Mode 01 PID 01)...", TerminalLineType.SYSTEM)
+                _readinessMonitors.value = obdSession.readReadinessMonitors()
+            } else {
+                addTerminalLog(
+                    "[SCAN] Detenido por usuario; evidencia parcial preservada (${professionalReport.modules.count { it.serviceReads.isNotEmpty() }} módulos).",
+                    TerminalLineType.WARNING,
+                )
+            }
 
             // Fetch definitions for all discovered DTCs from local DB
             val allCodes = (freshActive + freshPending + freshPermanent + freshHistory).distinct()
@@ -3765,10 +3790,39 @@ class ObdViewModel @Inject constructor(
         val vehicle = _selectedVehicle.value ?: return
         val now = System.currentTimeMillis()
         val records = report.records
+        val distinctFindings = records.distinctBy { it.findingKey(vehicle.id) }
+        val legacyCandidates = dtcDao.getUnresolvedDtcsList(vehicle.id)
+            .filter { it.diagnosticNamespace.isBlank() || it.moduleIdentity.isBlank() }
+            .toMutableList()
 
-        records.distinctBy { "${it.code}|${storageStatusForDtcRecord(it)}" }.forEach { record ->
+        distinctFindings.forEach { record ->
             val status = storageStatusForDtcRecord(record)
-            val existing = dtcDao.getUnresolvedDtc(vehicle.id, record.code, status)
+            val findingKey = record.findingKey(vehicle.id)
+            val exactExisting = dtcDao.getUnresolvedFinding(
+                vehicleId = vehicle.id,
+                namespace = findingKey.namespace.name,
+                moduleIdentity = findingKey.moduleIdentity,
+                code = findingKey.code,
+                observationSemantic = findingKey.observationSemantic.name,
+            )
+            val sameLegacyIdentityCount = distinctFindings.count {
+                it.code.equals(record.code, ignoreCase = true) &&
+                    storageStatusForDtcRecord(it) == status
+            }
+            val legacyExisting = if (exactExisting == null) {
+                legacyCandidates.firstOrNull { candidate ->
+                    candidate.code.equals(record.code, ignoreCase = true) &&
+                        candidate.status == status &&
+                        legacyEventMatchesFinding(
+                            event = candidate,
+                            findingKey = findingKey,
+                            allowMissingModule = sameLegacyIdentityCount == 1,
+                        )
+                }?.also(legacyCandidates::remove)
+            } else {
+                null
+            }
+            val existing = exactExisting ?: legacyExisting
             val metadata = dtcRecordMetadata(record)
 
             if (existing != null) {
@@ -3780,6 +3834,14 @@ class ObdViewModel @Inject constructor(
                         sessionId = currentSessionId,
                         freezeFrameJson = metadata,
                         observationState = "OBSERVED",
+                        diagnosticNamespace = findingKey.namespace.name,
+                        moduleIdentity = findingKey.moduleIdentity,
+                        moduleName = record.moduleName.orEmpty(),
+                        targetAddress = record.targetAddress.orEmpty(),
+                        responseAddress = record.responseAddress.orEmpty(),
+                        sourceService = record.sourceService,
+                        statusByte = record.udsStatusByte,
+                        observationSemantic = findingKey.observationSemantic.name,
                         synced = false
                     )
                 )
@@ -3807,6 +3869,14 @@ class ObdViewModel @Inject constructor(
                         resolvedAt = null,
                         occurrenceCount = 1,
                         freezeFrameJson = metadata,
+                        diagnosticNamespace = findingKey.namespace.name,
+                        moduleIdentity = findingKey.moduleIdentity,
+                        moduleName = record.moduleName.orEmpty(),
+                        targetAddress = record.targetAddress.orEmpty(),
+                        responseAddress = record.responseAddress.orEmpty(),
+                        sourceService = record.sourceService,
+                        statusByte = record.udsStatusByte,
+                        observationSemantic = findingKey.observationSemantic.name,
                         synced = false
                     )
                 )
@@ -3825,18 +3895,24 @@ class ObdViewModel @Inject constructor(
         val isCan = report.protocol.uppercase().contains("CAN") || report.protocol.uppercase().contains("ISO15765")
 
         unresolvedEvents.forEach { event ->
-            val (origTarget, origResponse, origModuleName) = try {
+            val legacyMetadata = try {
                 event.freezeFrameJson?.let {
                     val obj = org.json.JSONObject(it)
-                    Triple(
-                        obj.optString("targetAddress", ""),
-                        obj.optString("responseAddress", ""),
-                        obj.optString("moduleName", "")
+                    mapOf(
+                        "targetAddress" to obj.optString("targetAddress", ""),
+                        "responseAddress" to obj.optString("responseAddress", ""),
+                        "moduleName" to obj.optString("moduleName", ""),
+                        "sourceService" to obj.optString("sourceService", ""),
+                        "namespace" to obj.optString("namespace", ""),
+                        "observationSemantic" to obj.optString("observationSemantic", ""),
                     )
-                } ?: Triple("", "", "")
+                }.orEmpty()
             } catch (_: Exception) {
-                Triple("", "", "")
+                emptyMap()
             }
+            val origTarget = event.targetAddress.ifBlank { legacyMetadata["targetAddress"].orEmpty() }
+            val origResponse = event.responseAddress.ifBlank { legacyMetadata["responseAddress"].orEmpty() }
+            val origModuleName = event.moduleName.ifBlank { legacyMetadata["moduleName"].orEmpty() }
 
             val bucket = when (event.status) {
                 "PENDING" -> DtcBucket.PENDING
@@ -3847,18 +3923,46 @@ class ObdViewModel @Inject constructor(
 
             // A live probe is insufficient: require a successful DTC service
             // read covering the same bucket and matching diagnostic module.
+            val namespace = runCatching {
+                DiagnosticNamespace.valueOf(
+                    event.diagnosticNamespace.ifBlank {
+                        legacyMetadata["namespace"].orEmpty().ifBlank {
+                            val service = event.sourceService.ifBlank {
+                                legacyMetadata["sourceService"].orEmpty()
+                            }
+                            if (service.startsWith("19")) "UDS" else "SAE_OBD"
+                        }
+                    },
+                )
+            }.getOrDefault(DiagnosticNamespace.SAE_OBD)
+            val eventModuleIdentity = event.moduleIdentity.ifBlank {
+                DiagnosticModuleIdentity.canonical(origTarget, origResponse, origModuleName)
+            }
+            val semantics = event.observationSemantic.ifBlank {
+                legacyMetadata["observationSemantic"].orEmpty()
+            }.takeIf { it.isNotBlank() }
+                ?.let { semantic -> runCatching { DiagnosticSemantic.valueOf(semantic) }.getOrNull() }
+                ?.let(::setOf)
+                ?: DtcObservationPolicy.defaultSemantics(namespace, bucket)
+
             val matchedModule = if (isCan) {
                 report.modules.firstOrNull { activeModule ->
-                    (origTarget.isNotBlank() && origTarget == activeModule.targetAddress) ||
-                    (origResponse.isNotBlank() && origResponse == activeModule.responseAddress) ||
-                    (origResponse.isNotBlank() && origResponse == activeModule.targetAddress) ||
-                    (origModuleName.isNotBlank() && origModuleName == activeModule.moduleName)
+                    activeModule.moduleIdentity == eventModuleIdentity
                 }
             } else {
                 report.modules.firstOrNull { it.moduleName == "Standard OBD-II" }
             }
 
-            if (DtcObservationPolicy.canMarkNotObserved(matchedModule, bucket, event.code, records)) {
+            if (DtcObservationPolicy.canMarkNotObserved(
+                    module = matchedModule,
+                    bucket = bucket,
+                    code = event.code,
+                    records = records,
+                    namespace = namespace,
+                    moduleIdentity = eventModuleIdentity,
+                    semantics = semantics,
+                )
+            ) {
                 val status = event.status // ACTIVE, PENDING, PERMANENT, HISTORY, INTERMITTENT
                 dtcDao.insertDtc(
                     event.copy(
@@ -3884,17 +3988,51 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun dtcRecordMetadata(record: DtcRecord): String {
+        val moduleIdentity = DiagnosticModuleIdentity.canonical(
+            record.targetAddress,
+            record.responseAddress,
+            record.moduleName,
+        )
         val data = mapOf(
+            "namespace" to record.namespace.name,
+            "moduleIdentity" to moduleIdentity,
             "moduleName" to (record.moduleName ?: ""),
             "targetAddress" to (record.targetAddress ?: ""),
             "responseAddress" to (record.responseAddress ?: ""),
             "sourceService" to record.sourceService,
             "bucket" to record.bucket.name,
+            "observationSemantic" to record.primaryObservationSemantic().name,
             "statusFlags" to record.statusFlags.joinToString("|") { it.name },
             "udsStatusByte" to (record.udsStatusByte?.let { String.format("0x%02X", it) } ?: ""),
             "udsFailureType" to (record.udsFailureType ?: "")
         )
         return Json.encodeToString(data)
+    }
+
+    private fun legacyEventMatchesFinding(
+        event: DtcEventEntity,
+        findingKey: DiagnosticFindingKey,
+        allowMissingModule: Boolean,
+    ): Boolean {
+        val metadata = runCatching {
+            event.freezeFrameJson?.let { org.json.JSONObject(it) }
+        }.getOrNull()
+        val namespace = event.diagnosticNamespace.ifBlank {
+            metadata?.optString("namespace").orEmpty().ifBlank {
+                val service = event.sourceService.ifBlank {
+                    metadata?.optString("sourceService").orEmpty()
+                }
+                if (service.startsWith("19")) DiagnosticNamespace.UDS.name else DiagnosticNamespace.SAE_OBD.name
+            }
+        }
+        if (namespace != findingKey.namespace.name) return false
+
+        val target = event.targetAddress.ifBlank { metadata?.optString("targetAddress").orEmpty() }
+        val response = event.responseAddress.ifBlank { metadata?.optString("responseAddress").orEmpty() }
+        val module = event.moduleName.ifBlank { metadata?.optString("moduleName").orEmpty() }
+        val hasModuleEvidence = target.isNotBlank() || response.isNotBlank() || module.isNotBlank()
+        if (!hasModuleEvidence) return allowMissingModule
+        return DiagnosticModuleIdentity.canonical(target, response, module) == findingKey.moduleIdentity
     }
 
     private suspend fun saveDetectedDtcs(codes: List<String>, status: String) {

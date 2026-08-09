@@ -54,6 +54,10 @@ import com.elysium369.meet.core.search.DtcBrowserLaunchResult
 import com.elysium369.meet.core.search.DtcBrowserSearchLauncher
 import com.elysium369.meet.core.search.DtcGoogleSearch
 import com.elysium369.meet.core.search.DtcGoogleSearchVehicleContext
+import com.elysium369.meet.core.obd.DiagnosticScanMode
+import com.elysium369.meet.core.obd.DiagnosticScanEvent
+import com.elysium369.meet.core.obd.DtcBucket
+import com.elysium369.meet.core.obd.DtcRecord
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
@@ -351,10 +355,39 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val terminalOutput by viewModel.terminalSessionLogs.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val lastScanReport by viewModel.lastDtcScanReport.collectAsState()
+    val activeFindingRecords = remember(lastScanReport) {
+        lastScanReport?.records.orEmpty().filter { it.bucket == DtcBucket.ACTIVE }
+    }
+    val pendingFindingRecords = remember(lastScanReport) {
+        lastScanReport?.records.orEmpty().filter { it.bucket == DtcBucket.PENDING }
+    }
+    val permanentFindingRecords = remember(lastScanReport) {
+        lastScanReport?.records.orEmpty().filter { it.bucket == DtcBucket.PERMANENT }
+    }
+    val activeFindingItems = remember(activeFindingRecords, activeDtcs) {
+        if (activeFindingRecords.isNotEmpty()) activeFindingRecords.map { it.code to it }
+        else activeDtcs.map { it to null }
+    }
+    val pendingFindingItems = remember(pendingFindingRecords, pendingDtcs) {
+        if (pendingFindingRecords.isNotEmpty()) pendingFindingRecords.map { it.code to it }
+        else pendingDtcs.map { it to null }
+    }
+    val permanentFindingItems = remember(permanentFindingRecords, permanentDtcs) {
+        if (permanentFindingRecords.isNotEmpty()) permanentFindingRecords.map { it.code to it }
+        else permanentDtcs.map { it to null }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showClearDialog by remember { mutableStateOf(false) }
+    val scanEvents = remember { mutableStateListOf<DiagnosticScanEvent>() }
+    LaunchedEffect(viewModel) {
+        viewModel.diagnosticScanEvents.collect { event ->
+            if (event is DiagnosticScanEvent.ScanStarted) scanEvents.clear()
+            scanEvents += event
+            while (scanEvents.size > 16) scanEvents.removeAt(0)
+        }
+    }
 
     if (showClearDialog) {
         EliteDialog(
@@ -479,19 +512,48 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     MeetColors.neonGreen.copy(alpha = if (isScanning) 0.2f else 0.4f),
                                     RoundedCornerShape(8.dp)
                                 )
-                                .clickable(enabled = !isScanning) {
-                                    coroutineScope.launch { viewModel.refreshDiagnostics() }
+                                .clickable {
+                                    if (isScanning) {
+                                        viewModel.cancelDiagnosticScan()
+                                    } else {
+                                        coroutineScope.launch {
+                                            viewModel.refreshDiagnostics(mode = DiagnosticScanMode.QUICK)
+                                        }
+                                    }
                                 }
                                 .padding(horizontal = if (isCompact) 10.dp else 14.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                if (isCompact) "SCAN" else "ESCANEAR",
-                                color = if (isScanning) MeetColors.textMuted else MeetColors.neonGreen,
+                                if (isScanning) "DETENER" else if (isCompact) "QUICK" else "RÁPIDO",
+                                color = if (isScanning) MeetColors.error else MeetColors.neonGreen,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = if (isCompact) 10.sp else 12.sp,
                                 letterSpacing = 1.sp
                             )
+                        }
+                        if (!isScanning) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MeetColors.electricBlue.copy(alpha = 0.1f))
+                                    .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            viewModel.refreshDiagnostics(mode = DiagnosticScanMode.FULL_VEHICLE)
+                                        }
+                                    }
+                                    .padding(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    if (isCompact) "FULL" else "COMPLETO",
+                                    color = MeetColors.electricBlue,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = if (isCompact) 10.sp else 12.sp,
+                                    letterSpacing = 1.sp,
+                                )
+                            }
                         }
                         // BORRAR button
                         Box(
@@ -644,7 +706,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 
                         when (selectedTab) {
                             0 -> {
-                                if (activeDtcs.isEmpty()) {
+                                if (activeFindingItems.isEmpty()) {
                                     item {
                                         val emptyTitle: String
                                         val emptyDetail: String
@@ -686,45 +748,51 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                             accentColor = MeetColors.cyberCyan
                                         )
                                     }
-                                    itemsIndexed(activeDtcs) { index, dtc ->
+                                    itemsIndexed(activeFindingItems) { index, item ->
+                                        val (dtc, finding) = item
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
-                                                }
+                                                },
+                                                finding = finding,
                                             )
                                         }
                                     }
                                 }
                             }
                             1 -> {
-                                if (pendingDtcs.isEmpty()) {
+                                if (pendingFindingItems.isEmpty()) {
                                     item { HolographicEmptyState("SIN PENDIENTES", "No hay anomalías en proceso de confirmación.", MeetColors.warning, isCompact) }
                                 } else {
-                                    itemsIndexed(pendingDtcs) { index, dtc ->
+                                    itemsIndexed(pendingFindingItems) { index, item ->
+                                        val (dtc, finding) = item
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
-                                                }
+                                                },
+                                                finding = finding,
                                             )
                                         }
                                     }
                                 }
                             }
                             2 -> {
-                                if (permanentDtcs.isEmpty()) {
+                                if (permanentFindingItems.isEmpty()) {
                                     item { HolographicEmptyState("HISTORIAL LIMPIO", "No se encontraron códigos permanentes.", MeetColors.cyberCyan, isCompact) }
                                 } else {
-                                    itemsIndexed(permanentDtcs) { index, dtc ->
+                                    itemsIndexed(permanentFindingItems) { index, item ->
+                                        val (dtc, finding) = item
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
                                                 onRequestService = { code, desc ->
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
-                                                }
+                                                },
+                                                finding = finding,
                                             )
                                         }
                                     }
@@ -742,7 +810,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                         enter = fadeIn(tween(400)),
                         exit = fadeOut(tween(300))
                     ) {
-                        HolographicScanOverlay(statusMessage, terminalOutput, isCompact)
+                        HolographicScanOverlay(statusMessage, terminalOutput, scanEvents, isCompact)
                     }
                 }
             }
@@ -1123,7 +1191,8 @@ private fun HoloDtcCard(
     viewModel: ObdViewModel,
     isCompact: Boolean,
     googleSearchVehicle: DtcGoogleSearchVehicleContext?,
-    onRequestService: (String, String) -> Unit = { _, _ -> }
+    onRequestService: (String, String) -> Unit = { _, _ -> },
+    finding: DtcRecord? = null,
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
     val definition = dtcDefinitions[dtc]
@@ -1226,6 +1295,22 @@ private fun HoloDtcCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
+
+            finding?.let { evidence ->
+                Text(
+                    text = listOfNotNull(
+                        evidence.moduleName,
+                        evidence.responseAddress?.let { "ECU $it" },
+                        evidence.sourceService.takeIf { it.isNotBlank() }?.let { "SERVICIO $it" },
+                        evidence.namespace.name,
+                    ).joinToString(" · "),
+                    color = MeetColors.cyberCyan,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
             Text(
                 text = desc,
@@ -1334,7 +1419,8 @@ private fun HoloDtcCard(
                     // Buttons
                     val openDtcRelations3d = {
                         navController.navigate(
-                            "component_locator?dtcCode=${java.net.URLEncoder.encode(dtc, "UTF-8")}"
+                            "component_locator?dtcCode=${java.net.URLEncoder.encode(dtc, "UTF-8")}" +
+                                "&dtcStatus=${java.net.URLEncoder.encode(severity, "UTF-8")}"
                         )
                     }
                     if (isCompact) {
@@ -1492,7 +1578,12 @@ private fun Vehicle?.toDtcGoogleSearchVehicleContext(): DtcGoogleSearchVehicleCo
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<TerminalLine>, isCompact: Boolean) {
+private fun HolographicScanOverlay(
+    statusMessage: String,
+    terminalOutput: List<TerminalLine>,
+    scanEvents: List<DiagnosticScanEvent>,
+    isCompact: Boolean,
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "scanOvr")
     val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(2500, easing = LinearEasing)), label = "sr")
     val pulseAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sp")
@@ -1608,7 +1699,31 @@ private fun HolographicScanOverlay(statusMessage: String, terminalOutput: List<T
             )
             Spacer(Modifier.height(10.dp))
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(if (isCompact) 0.8f else 0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)), color = MeetColors.neonGreen, trackColor = MeetColors.borderSubtle)
-            Spacer(Modifier.height(if (isCompact) 14.dp else 20.dp))
+            Spacer(Modifier.height(10.dp))
+            scanEvents.filter {
+                it is DiagnosticScanEvent.ModuleReading ||
+                    it is DiagnosticScanEvent.ModuleCompleted ||
+                    it is DiagnosticScanEvent.FindingDiscovered
+            }.takeLast(4).forEach { event ->
+                val eventText = when (event) {
+                    is DiagnosticScanEvent.ModuleReading -> "… ${event.moduleName} · LEYENDO"
+                    is DiagnosticScanEvent.ModuleCompleted ->
+                        "${if (event.outcome.provesBucketWasRead) "✓" else "○"} ${event.moduleName} · ${event.findingCount} DTC · ${event.outcome.name}"
+                    is DiagnosticScanEvent.FindingDiscovered ->
+                        "● ${event.finding.moduleName ?: event.finding.responseAddress ?: "ECU"} · ${event.finding.code}"
+                    else -> ""
+                }
+                Text(
+                    eventText,
+                    color = MeetColors.cyberCyan,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = if (isCompact) 8.sp else 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(if (isCompact) 0.9f else 0.7f),
+                )
+            }
+            Spacer(Modifier.height(if (isCompact) 10.dp else 14.dp))
 
             // Terminal
             Box(

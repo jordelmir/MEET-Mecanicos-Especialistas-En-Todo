@@ -40,6 +40,8 @@ import androidx.navigation.NavController
 import com.elysium369.meet.ai.DiagnosticAiContextBuilder
 import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.diagnostics.DiagnosticSpatialSystem
+import com.elysium369.meet.core.diagnostics.DtcSpatialResolver
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
@@ -110,6 +112,7 @@ fun ComponentLocatorScreen(
     viewModel: ObdViewModel,
     initialPartId: String? = null,
     initialDtcCode: String? = null,
+    initialDtcStatus: String? = null,
 ) {
     val context = LocalContext.current
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
@@ -258,8 +261,31 @@ fun ComponentLocatorScreen(
         }
     }
     
-    val initialDtcComponents = remember(initialDtcCode, engineComponents) {
-        engineComponents.filter { component ->
+    val initialDtcProjection = remember(initialDtcCode) {
+        DtcSpatialResolver.resolve(initialDtcCode)
+    }
+    val initialDtcScene = remember(initialDtcProjection) {
+        when (initialDtcProjection.primarySystem) {
+            DiagnosticSpatialSystem.POWERTRAIN_ENGINE -> SceneType.ENGINE_BLOCK
+            DiagnosticSpatialSystem.TRANSMISSION -> SceneType.TRANSMISSION
+            DiagnosticSpatialSystem.CHASSIS,
+            DiagnosticSpatialSystem.BRAKES_STEERING -> SceneType.BRAKES_STEERING
+            DiagnosticSpatialSystem.BODY_ELECTRICAL,
+            DiagnosticSpatialSystem.RESTRAINTS -> SceneType.RELAY_FUSE_BOX
+            DiagnosticSpatialSystem.COMMUNICATION_NETWORK -> SceneType.WIRING_HARNESS
+            DiagnosticSpatialSystem.UNIVERSAL -> SceneType.UNIVERSAL_CATALOG
+        }
+    }
+    val dtcRelationCandidates = remember(
+        engineComponents,
+        suspensionComponents,
+        proprietaryComponentsBySystem,
+    ) {
+        (engineComponents + suspensionComponents + proprietaryComponentsBySystem.values.flatten())
+            .distinctBy(ComponentInfo::id)
+    }
+    val initialDtcComponents = remember(initialDtcCode, dtcRelationCandidates) {
+        dtcRelationCandidates.filter { component ->
             component.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) }
         }
     }
@@ -278,7 +304,7 @@ fun ComponentLocatorScreen(
             when {
                 initialProprietaryEntity != null -> SceneType.UNIVERSAL_CATALOG
                 initialPartId != null -> SceneType.SUSPENSION
-                initialDtcCode != null -> SceneType.ENGINE_BLOCK
+                initialDtcCode != null -> initialDtcScene
                 else -> SceneType.UNIVERSAL_CATALOG
             }
         )
@@ -316,8 +342,14 @@ fun ComponentLocatorScreen(
     // Obtener códigos DTC activos del escáner en tiempo real
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
-    val allActiveDtcs = remember(activeDtcs, pendingDtcs, initialDtcCode) {
-        (activeDtcs + pendingDtcs + listOfNotNull(initialDtcCode?.uppercase())).distinct()
+    val allActiveDtcs = remember(activeDtcs, pendingDtcs, initialDtcCode, initialDtcStatus) {
+        val selectedIsObservedNow = initialDtcStatus.equals("ACTIVO", ignoreCase = true) ||
+            initialDtcStatus.equals("PENDIENTE", ignoreCase = true)
+        (activeDtcs + pendingDtcs + if (selectedIsObservedNow) {
+            listOfNotNull(initialDtcCode?.uppercase())
+        } else {
+            emptyList()
+        }).distinct()
     }
     val liveData by viewModel.liveData.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -854,7 +886,9 @@ fun ComponentLocatorScreen(
                     }
                     if (initialDtcCode != null && currentScene != SceneType.UNIVERSAL_CATALOG) {
                         Text(
-                            text = "${initialDtcComponents.size} RELACIONES PARA ${initialDtcCode.uppercase()} · NO CONFIRMAN PIEZA DAÑADA",
+                            text = "${initialDtcStatus?.uppercase() ?: "ESTADO NO INFORMADO"} · " +
+                                "${initialDtcComponents.size} RELACIONES PARA ${initialDtcCode.uppercase()} · " +
+                                "${initialDtcProjection.primarySystem.name.replace('_', ' ')} · NO CONFIRMAN PIEZA DAÑADA",
                             color = MeetColors.cyberCyan,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,

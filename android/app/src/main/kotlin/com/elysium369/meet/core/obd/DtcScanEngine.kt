@@ -46,11 +46,62 @@ enum class ScanCompleteness {
     FAILED,
 }
 
+enum class DiagnosticScanMode {
+    QUICK,
+    FULL_VEHICLE,
+}
+
+sealed interface DiagnosticScanEvent {
+    val occurredAtMs: Long
+
+    data class ScanStarted(
+        val mode: DiagnosticScanMode,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ModuleReading(
+        val moduleIdentity: String,
+        val moduleName: String,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class FindingDiscovered(
+        val finding: DtcRecord,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ModuleCompleted(
+        val moduleIdentity: String,
+        val moduleName: String,
+        val findingCount: Int,
+        val outcome: ModuleScanOutcome,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ScanCancelled(
+        val coveredModuleCount: Int,
+        val findingCount: Int,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ScanCompleted(
+        val report: DtcScanReport,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+}
+
 data class DtcServiceRead(
     val command: String,
-    val bucket: DtcBucket?,
+    val coverage: DiagnosticCoverage,
     val outcome: ModuleScanOutcome,
+    val negativeResponse: NegativeDiagnosticResponse? = null,
 )
+
+enum class DiagnosticModuleDiscoveryState {
+    DISCOVERY_CANDIDATE,
+    EXPECTED,
+    CONFIRMED,
+}
 
 enum class FreezeFrameOutcome {
     MATCHED,
@@ -72,6 +123,7 @@ data class DtcRecord(
     val bucket: DtcBucket,
     val statusFlags: Set<DtcStatusFlag>,
     val sourceService: String,
+    val namespace: DiagnosticNamespace = DiagnosticNamespace.SAE_OBD,
     val targetAddress: String? = null,
     val responseAddress: String? = null,
     val moduleName: String? = null,
@@ -86,6 +138,7 @@ data class DtcRawExchange(
     val rawResponse: String,
     val parsedRecordCount: Int,
     val outcome: ModuleScanOutcome = ModuleScanOutcome.COMPLETE,
+    val negativeResponse: NegativeDiagnosticResponse? = null,
     val timestampMs: Long = System.currentTimeMillis()
 )
 
@@ -98,11 +151,25 @@ data class DtcModuleReport(
     val rawExchanges: List<DtcRawExchange>,
     val serviceReads: List<DtcServiceRead> = emptyList(),
     val outcome: ModuleScanOutcome = ModuleScanOutcome.FAILED,
+    val discoveryState: DiagnosticModuleDiscoveryState = if (isAlive) {
+        DiagnosticModuleDiscoveryState.CONFIRMED
+    } else {
+        DiagnosticModuleDiscoveryState.DISCOVERY_CANDIDATE
+    },
+    val requiredForCompleteness: Boolean = isAlive,
 ) {
     fun completedBucket(bucket: DtcBucket): Boolean =
         serviceReads.any {
-            (it.bucket == bucket || it.bucket == null) && it.outcome.provesBucketWasRead
+            it.coverage.covers(bucket) && it.outcome.provesBucketWasRead
         }
+
+    fun completedSemantics(semantics: Set<DiagnosticSemantic>): Boolean =
+        serviceReads.any {
+            it.coverage.coversAny(semantics) && it.outcome.provesBucketWasRead
+        }
+
+    val moduleIdentity: String
+        get() = DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName)
 }
 
 data class DtcScanReport(
@@ -114,6 +181,8 @@ data class DtcScanReport(
     val rawExchanges: List<DtcRawExchange>,
     val completeness: ScanCompleteness = ScanCompleteness.INCONCLUSIVE,
     val warnings: List<String> = emptyList(),
+    val mode: DiagnosticScanMode = DiagnosticScanMode.FULL_VEHICLE,
+    val wasCancelled: Boolean = false,
 ) {
     fun codesForBucket(bucket: DtcBucket): List<String> =
         records.filter { it.bucket == bucket }.map { it.code }.distinct()
@@ -130,10 +199,69 @@ object DtcObservationPolicy {
         bucket: DtcBucket,
         code: String,
         records: List<DtcRecord>,
-    ): Boolean = module != null &&
-        module.isAlive &&
-        module.completedBucket(bucket) &&
-        records.none { it.bucket == bucket && it.code.equals(code, ignoreCase = true) }
+        namespace: DiagnosticNamespace = DiagnosticNamespace.SAE_OBD,
+        moduleIdentity: String? = module?.moduleIdentity,
+        semantics: Set<DiagnosticSemantic> = defaultSemantics(namespace, bucket),
+    ): Boolean {
+        if (module == null || !module.isAlive) return false
+        val covered = when (namespace) {
+            DiagnosticNamespace.SAE_OBD -> module.completedBucket(bucket)
+            DiagnosticNamespace.UDS,
+            DiagnosticNamespace.KWP2000,
+            DiagnosticNamespace.OEM -> module.completedSemantics(semantics)
+        }
+        if (!covered) return false
+        val expectedModule = moduleIdentity ?: module.moduleIdentity
+        return records.none { record ->
+            record.code.equals(code, ignoreCase = true) &&
+                record.namespace == namespace &&
+                DiagnosticModuleIdentity.canonical(
+                    record.targetAddress,
+                    record.responseAddress,
+                    record.moduleName,
+                ) == expectedModule &&
+                record.observationSemantics().any(semantics::contains)
+        }
+    }
+
+    fun defaultSemantics(
+        namespace: DiagnosticNamespace,
+        bucket: DtcBucket,
+    ): Set<DiagnosticSemantic> = when (namespace) {
+        DiagnosticNamespace.SAE_OBD -> setOf(
+            when (bucket) {
+                DtcBucket.ACTIVE -> DiagnosticSemantic.SAE_ACTIVE_DTC
+                DtcBucket.PENDING -> DiagnosticSemantic.SAE_PENDING_DTC
+                DtcBucket.PERMANENT -> DiagnosticSemantic.SAE_PERMANENT_DTC
+                DtcBucket.HISTORY -> return emptySet()
+            },
+        )
+        DiagnosticNamespace.UDS -> when (bucket) {
+            DtcBucket.ACTIVE -> setOf(DiagnosticSemantic.UDS_TEST_FAILED)
+            DtcBucket.PENDING -> setOf(DiagnosticSemantic.UDS_PENDING)
+            DtcBucket.PERMANENT -> emptySet()
+            DtcBucket.HISTORY -> setOf(
+                DiagnosticSemantic.UDS_CONFIRMED,
+                DiagnosticSemantic.UDS_FAILED_SINCE_CLEAR,
+            )
+        }
+        DiagnosticNamespace.KWP2000,
+        DiagnosticNamespace.OEM -> emptySet()
+    }
+}
+
+fun DtcRecord.observationSemantics(): Set<DiagnosticSemantic> = when (namespace) {
+    DiagnosticNamespace.SAE_OBD -> DtcObservationPolicy.defaultSemantics(namespace, bucket)
+    DiagnosticNamespace.UDS -> buildSet {
+        if (DtcStatusFlag.TEST_FAILED in statusFlags) add(DiagnosticSemantic.UDS_TEST_FAILED)
+        if (DtcStatusFlag.PENDING in statusFlags) add(DiagnosticSemantic.UDS_PENDING)
+        if (DtcStatusFlag.CONFIRMED in statusFlags) add(DiagnosticSemantic.UDS_CONFIRMED)
+        if (DtcStatusFlag.TEST_FAILED_SINCE_LAST_CLEAR in statusFlags) {
+            add(DiagnosticSemantic.UDS_FAILED_SINCE_CLEAR)
+        }
+    }
+    DiagnosticNamespace.KWP2000,
+    DiagnosticNamespace.OEM -> emptySet()
 }
 
 object DtcScanEngine {
@@ -160,6 +288,7 @@ object DtcScanEngine {
                     bucket = bucket,
                     statusFlags = flags,
                     sourceService = mode.uppercase(),
+                    namespace = DiagnosticNamespace.SAE_OBD,
                     targetAddress = targetAddress,
                     responseAddress = targetAddress,
                     moduleName = moduleName,
@@ -177,6 +306,7 @@ object DtcScanEngine {
                     bucket = bucket,
                     statusFlags = flags,
                     sourceService = mode.uppercase(),
+                    namespace = DiagnosticNamespace.SAE_OBD,
                     targetAddress = targetAddress,
                     responseAddress = responseAddress,
                     moduleName = moduleName,
@@ -262,52 +392,43 @@ object DtcScanEngine {
         responseAddress: String?,
         moduleName: String?
     ): List<DtcRecord> {
-        val clean = payload.replace(Regex("[^0-9A-Fa-f]"), "").uppercase()
-        if (clean.isBlank() || clean.contains("7F19")) return emptyList()
-
-        val records = mutableListOf<DtcRecord>()
-        var idx = clean.indexOf("59")
-        while (idx >= 0 && idx + 6 <= clean.length) {
-            val subFunction = clean.substring(idx + 2, idx + 4)
-            if (subFunction !in setOf("02", "07", "08", "0A", "0B", "0C", "0D", "0E", "0F", "14")) {
-                idx = clean.indexOf("59", idx + 2)
-                continue
-            }
-
-            var pos = idx + 6 // 59 + sub-function + availability mask
-            while (pos + 8 <= clean.length) {
-                val dtcBytes = clean.substring(pos, pos + 6)
-                val statusByte = clean.substring(pos + 6, pos + 8).toIntOrNull(16) ?: break
-                if (dtcBytes == "000000" || dtcBytes == "FFFFFF") {
-                    pos += 8
-                    continue
-                }
-
-                val code = DtcDecoder.hexToDtcOrNull(dtcBytes.substring(0, 4))
-                if (code != null) {
-                    val flags = flagsForUdsStatus(statusByte)
-                    records.add(
-                        DtcRecord(
-                            code = code,
-                            bucket = bucketForUdsFlags(flags),
-                            statusFlags = flags,
-                            sourceService = "19$subFunction",
-                            targetAddress = targetAddress,
-                            responseAddress = responseAddress,
-                            moduleName = moduleName,
-                            rawPayload = rawPayload,
-                            udsStatusByte = statusByte,
-                            udsFailureType = dtcBytes.substring(4, 6)
-                        )
-                    )
-                }
-                pos += 8
-            }
-
-            idx = clean.indexOf("59", idx + 2)
+        val responses = DiagnosticPduDecoder.decodeResponses(
+            rawResponse = rawPayload.ifBlank { payload },
+            expectedPositiveService = 0x59,
+            requestedService = 0x19,
+        )
+        val positive = responses.filterIsInstance<ProtocolResponse.Positive>().firstOrNull()
+            ?: return emptyList()
+        val data = positive.payload
+        if (data.size < 2) return emptyList()
+        val subFunction = data[0].toInt() and 0xFF
+        if (subFunction !in setOf(0x02, 0x07, 0x08, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x14)) {
+            return emptyList()
         }
+        // byte 1 is DTCStatusAvailabilityMask. Remaining bytes must be complete 4-byte records.
+        val recordsPayload = data.copyOfRange(2, data.size)
+        if (recordsPayload.size % 4 != 0) return emptyList()
 
-        return records
+        return recordsPayload.asList().chunked(4).mapNotNull { recordBytes ->
+            val dtcHex = recordBytes.take(3).joinToString("") { "%02X".format(it.toInt() and 0xFF) }
+            if (dtcHex == "000000" || dtcHex == "FFFFFF") return@mapNotNull null
+            val statusByte = recordBytes[3].toInt() and 0xFF
+            val code = DtcDecoder.hexToDtcOrNull(dtcHex.substring(0, 4)) ?: return@mapNotNull null
+            val flags = flagsForUdsStatus(statusByte)
+            DtcRecord(
+                code = code,
+                bucket = bucketForUdsFlags(flags),
+                statusFlags = flags,
+                sourceService = "19%02X".format(subFunction),
+                namespace = DiagnosticNamespace.UDS,
+                targetAddress = targetAddress,
+                responseAddress = responseAddress,
+                moduleName = moduleName,
+                rawPayload = rawPayload,
+                udsStatusByte = statusByte,
+                udsFailureType = dtcHex.substring(4, 6),
+            )
+        }
     }
 
     private fun bucketForMode(mode: String): DtcBucket = when (mode.uppercase()) {
@@ -350,30 +471,60 @@ object DtcScanEngine {
         positiveResponseService: String,
         parsedRecordCount: Int,
         failed: Boolean = false,
-    ): ModuleScanOutcome {
-        if (failed) return ModuleScanOutcome.FAILED
+    ): ModuleScanOutcome = classifyExchangeDetailed(
+        rawResponse = rawResponse,
+        positiveResponseService = positiveResponseService,
+        parsedRecordCount = parsedRecordCount,
+        failed = failed,
+    ).outcome
+
+    fun classifyExchangeDetailed(
+        rawResponse: String,
+        positiveResponseService: String,
+        parsedRecordCount: Int,
+        failed: Boolean = false,
+    ): DiagnosticExchangeClassification {
+        if (failed) return DiagnosticExchangeClassification(ModuleScanOutcome.FAILED)
         val compact = rawResponse.uppercase().replace(Regex("[^0-9A-Z?]"), "")
-        if (compact.isBlank()) return ModuleScanOutcome.NO_RESPONSE
-        if (compact.contains("STOPPED")) return ModuleScanOutcome.CANCELLED
+        if (compact.isBlank()) return DiagnosticExchangeClassification(ModuleScanOutcome.NO_RESPONSE)
+        if (compact.contains("STOPPED")) return DiagnosticExchangeClassification(ModuleScanOutcome.CANCELLED)
         if (compact.contains("UNABLETOCONNECT") || compact.contains("BUSERROR") || compact.contains("CANERROR")) {
-            return ModuleScanOutcome.NO_RESPONSE
+            return DiagnosticExchangeClassification(ModuleScanOutcome.NO_RESPONSE)
         }
-        if (compact.contains("NODATA") || compact == "?") return ModuleScanOutcome.UNSUPPORTED_SERVICE
-        val requestService = when (positiveResponseService) {
-            "43" -> "03"
-            "47" -> "07"
-            "4A" -> "0A"
-            "59" -> "19"
-            else -> positiveResponseService
+        if (compact.contains("NODATA") || compact == "?") {
+            return DiagnosticExchangeClassification(ModuleScanOutcome.UNSUPPORTED_SERVICE)
         }
-        if (compact.contains("7F$requestService")) {
-            return ModuleScanOutcome.NEGATIVE_RESPONSE
+        val positiveService = positiveResponseService.toIntOrNull(16)
+            ?: return DiagnosticExchangeClassification(ModuleScanOutcome.MALFORMED_RESPONSE)
+        val requestService = when (positiveService) {
+            0x43 -> 0x03
+            0x47 -> 0x07
+            0x4A -> 0x0A
+            0x59 -> 0x19
+            else -> positiveService
         }
-        if (compact.contains(positiveResponseService)) {
-            return if (parsedRecordCount > 0) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_DTC
+        val grouped = groupRawByEcu(rawResponse)
+        val responseInputs = if (grouped.isEmpty()) {
+            listOf(rawResponse)
+        } else {
+            grouped.values.map { it.joinToString("\n") }
         }
-        if (compact.contains("ERROR")) return ModuleScanOutcome.FAILED
-        return ModuleScanOutcome.MALFORMED_RESPONSE
+        val responses = responseInputs.flatMap { input ->
+            DiagnosticPduDecoder.decodeResponses(input, positiveService, requestService)
+        }
+        if (responses.any { it is ProtocolResponse.Positive }) {
+            return DiagnosticExchangeClassification(
+                if (parsedRecordCount > 0) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_DTC,
+            )
+        }
+        responses.filterIsInstance<ProtocolResponse.Negative>().firstOrNull()?.let {
+            return DiagnosticExchangeClassification(
+                outcome = ModuleScanOutcome.NEGATIVE_RESPONSE,
+                negativeResponse = it.response,
+            )
+        }
+        if (compact.contains("ERROR")) return DiagnosticExchangeClassification(ModuleScanOutcome.FAILED)
+        return DiagnosticExchangeClassification(ModuleScanOutcome.MALFORMED_RESPONSE)
     }
 
     /** Parses Mode 02 PID 02 and deliberately skips the echoed frame byte. */

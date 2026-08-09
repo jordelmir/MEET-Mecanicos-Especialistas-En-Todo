@@ -51,6 +51,24 @@ interface DtcDao {
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND code = :code AND status = :status AND resolvedAt IS NULL LIMIT 1")
     suspend fun getUnresolvedDtc(vehicleId: String, code: String, status: String): DtcEventEntity?
 
+    @Query(
+        """SELECT * FROM dtc_events
+           WHERE vehicleId = :vehicleId
+             AND diagnosticNamespace = :namespace
+             AND moduleIdentity = :moduleIdentity
+             AND code = :code
+             AND observationSemantic = :observationSemantic
+             AND resolvedAt IS NULL
+           LIMIT 1"""
+    )
+    suspend fun getUnresolvedFinding(
+        vehicleId: String,
+        namespace: String,
+        moduleIdentity: String,
+        code: String,
+        observationSemantic: String,
+    ): DtcEventEntity?
+
     @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, synced = 0 WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
     suspend fun resolveAllDtcsForVehicle(vehicleId: String, resolvedAt: Long)
 

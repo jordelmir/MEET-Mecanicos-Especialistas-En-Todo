@@ -151,6 +151,8 @@ fun RideServiceScreen(
     val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
     val driverVerification by viewModel.driverVerification.collectAsState()
     val passengerVerification by viewModel.passengerVerification.collectAsState()
+    val passengerRegistrationMissing = passengerVerification == null
+    val driverRegistrationMissing = driverVerification == null
     var showProfile by rememberSaveable { mutableStateOf(false) }
     var profileInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var showRideMenu by remember { mutableStateOf(false) }
@@ -344,8 +346,8 @@ fun RideServiceScreen(
         ) {
             if (requiresRideRoleRegistration(
                     driverMode = driverMode,
-                    passengerRegistrationExists = passengerVerification != null,
-                    driverRegistrationExists = driverVerification != null,
+                    passengerRegistrationExists = !passengerRegistrationMissing,
+                    driverRegistrationExists = !driverRegistrationMissing,
                 ) && firstAccessRole == null
             ) {
                 RideFirstAccessGateway(
@@ -456,7 +458,7 @@ private fun RideFirstAccessGateway(
                 ) {
                     Icon(Icons.Default.Person, null)
                     Spacer(Modifier.width(9.dp))
-                    Text("REGISTRARME COMO USUARIO", fontWeight = FontWeight.Black)
+                    Text("REGISTRARME PARA VIAJAR", fontWeight = FontWeight.Black)
                 }
                 OutlinedButton(
                     onClick = onDriverRegistration,
