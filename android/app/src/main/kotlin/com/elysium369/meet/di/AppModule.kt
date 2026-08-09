@@ -3203,6 +3203,23 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_49_50 = object : Migration(49, 50) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN diagnosticNamespace TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN moduleIdentity TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN moduleName TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN targetAddress TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN responseAddress TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN sourceService TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN statusByte INTEGER")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN observationSemantic TEXT NOT NULL DEFAULT ''")
+            db.execSQL(
+                """CREATE INDEX IF NOT EXISTS index_dtc_events_finding_identity
+                   ON dtc_events(vehicleId, diagnosticNamespace, moduleIdentity, code, observationSemantic)"""
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3239,7 +3256,8 @@ object AppModule {
             MIGRATION_45_46,
             MIGRATION_46_47,
             MIGRATION_47_48,
-            MIGRATION_48_49
+            MIGRATION_48_49,
+            MIGRATION_49_50
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

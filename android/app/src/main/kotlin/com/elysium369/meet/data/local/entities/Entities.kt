@@ -1,6 +1,7 @@
 package com.elysium369.meet.data.local.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "vehicles")
@@ -40,7 +41,21 @@ data class DiagnosticSessionEntity(
     val synced: Boolean
 )
 
-@Entity(tableName = "dtc_events")
+@Entity(
+    tableName = "dtc_events",
+    indices = [
+        Index(
+            value = [
+                "vehicleId",
+                "diagnosticNamespace",
+                "moduleIdentity",
+                "code",
+                "observationSemantic",
+            ],
+            name = "index_dtc_events_finding_identity",
+        ),
+    ],
+)
 data class DtcEventEntity(
     @PrimaryKey val id: String,
     val sessionId: String,
@@ -56,6 +71,15 @@ data class DtcEventEntity(
     val freezeFrameJson: String?,
     /** Observation truth is separate from repair/closure truth. */
     val observationState: String = "OBSERVED",
+    /** First-class diagnostic identity; do not hide join/decision fields in JSON. */
+    val diagnosticNamespace: String = "",
+    val moduleIdentity: String = "",
+    val moduleName: String = "",
+    val targetAddress: String = "",
+    val responseAddress: String = "",
+    val sourceService: String = "",
+    val statusByte: Int? = null,
+    val observationSemantic: String = "",
     val synced: Boolean = false
 )
 

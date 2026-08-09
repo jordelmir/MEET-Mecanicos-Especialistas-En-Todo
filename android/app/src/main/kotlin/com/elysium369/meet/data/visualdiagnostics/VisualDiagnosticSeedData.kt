@@ -14,7 +14,7 @@ import com.elysium369.meet.domain.visualdiagnostics.SafetyWarning
 object VisualDiagnosticSeedData {
     fun components(engineType: EngineType): List<DiagnosticComponent> {
         return when (engineType) {
-            EngineType.UNKNOWN -> l4Components() + universalComponents()
+            EngineType.UNKNOWN -> universalComponents()
             EngineType.EV -> evComponents()
             EngineType.HYBRID, EngineType.PHEV -> l4Components() + hybridComponents() + universalComponents()
             EngineType.DIESEL_L4 -> l4Components() + dieselComponents(4) + universalComponents()

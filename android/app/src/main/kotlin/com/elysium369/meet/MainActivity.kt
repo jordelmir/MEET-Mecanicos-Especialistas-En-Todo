@@ -513,12 +513,16 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable(
-                route = "component_locator?partId={partId}&dtcCode={dtcCode}",
+                route = "component_locator?partId={partId}&dtcCode={dtcCode}&dtcStatus={dtcStatus}",
                 arguments = listOf(navArgument("partId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
                 }, navArgument("dtcCode") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }, navArgument("dtcStatus") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -529,6 +533,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel,
                     initialPartId = backStack.arguments?.getString("partId"),
                     initialDtcCode = backStack.arguments?.getString("dtcCode"),
+                    initialDtcStatus = backStack.arguments?.getString("dtcStatus"),
                 )
             }
             composable(
