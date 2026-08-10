@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 import org.gradle.api.GradleException
 
 plugins {
@@ -206,7 +207,7 @@ android {
         val jwtPayload = runCatching {
             val segments = releaseSupabaseKey.split('.')
             if (segments.size == 3) {
-                String(java.util.Base64.getUrlDecoder().decode(segments[1]), Charsets.UTF_8)
+                String(Base64.getUrlDecoder().decode(segments[1]), Charsets.UTF_8)
             } else {
                 ""
             }
