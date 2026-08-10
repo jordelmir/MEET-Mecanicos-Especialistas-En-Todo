@@ -3220,6 +3220,116 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_50_51 = object : Migration(50, 51) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN rawDtcIdentity TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN rawDtc24 INTEGER")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN failureType INTEGER")
+            db.execSQL("ALTER TABLE dtc_events ADD COLUMN dtcFormat TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            db.execSQL("UPDATE dtc_events SET rawDtcIdentity = UPPER(code) WHERE rawDtcIdentity = ''")
+            db.execSQL("DROP INDEX IF EXISTS index_dtc_events_finding_identity")
+            db.execSQL(
+                """CREATE INDEX IF NOT EXISTS index_dtc_events_finding_identity
+                   ON dtc_events(vehicleId, diagnosticNamespace, moduleIdentity, rawDtcIdentity)"""
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS diagnostic_exchanges (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    sessionId TEXT NOT NULL,
+                    timestampMs INTEGER NOT NULL,
+                    transport TEXT NOT NULL,
+                    applicationProtocol TEXT NOT NULL,
+                    requestScope TEXT NOT NULL,
+                    requestAddress TEXT,
+                    responseAddress TEXT,
+                    service TEXT NOT NULL,
+                    rawRequest TEXT NOT NULL,
+                    rawResponse TEXT NOT NULL,
+                    decodedOutcome TEXT NOT NULL,
+                    latencyMs INTEGER,
+                    retryCount INTEGER NOT NULL,
+                    negativeResponseCode INTEGER,
+                    adapterConfiguration TEXT NOT NULL,
+                    parserVersion TEXT NOT NULL
+                )"""
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_exchanges_sessionId_timestampMs ON diagnostic_exchanges(sessionId, timestampMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_exchanges_responseAddress_service ON diagnostic_exchanges(responseAddress, service)")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS diagnostic_findings (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    vehicleId TEXT NOT NULL,
+                    ecuEndpointId TEXT NOT NULL,
+                    diagnosticNamespace TEXT NOT NULL,
+                    rawDtcIdentity TEXT NOT NULL,
+                    displayCode TEXT NOT NULL,
+                    createdAtMs INTEGER NOT NULL,
+                    resolutionState TEXT NOT NULL DEFAULT 'OPEN',
+                    resolvedAtMs INTEGER
+                )"""
+            )
+            db.execSQL(
+                """CREATE UNIQUE INDEX IF NOT EXISTS index_diagnostic_findings_stable_identity
+                   ON diagnostic_findings(vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity)"""
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO diagnostic_findings(
+                    id, vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity,
+                    displayCode, createdAtMs, resolutionState, resolvedAtMs
+                )
+                SELECT id, vehicleId,
+                       CASE WHEN moduleIdentity = '' THEN 'LEGACY' ELSE moduleIdentity END,
+                       CASE WHEN diagnosticNamespace = '' THEN 'SAE_OBD' ELSE diagnosticNamespace END,
+                       rawDtcIdentity, code, firstSeenAt,
+                       CASE WHEN resolvedAt IS NULL THEN 'OPEN' ELSE 'VERIFIED_RESOLVED' END,
+                       resolvedAt
+                FROM dtc_events"""
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS diagnostic_observations (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    findingId TEXT NOT NULL,
+                    sessionId TEXT NOT NULL,
+                    observedAt INTEGER NOT NULL,
+                    observationState TEXT NOT NULL,
+                    semantics TEXT NOT NULL,
+                    statusByte INTEGER,
+                    sourceService TEXT NOT NULL,
+                    exchangeId TEXT,
+                    rawPayloadHash TEXT NOT NULL
+                )"""
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_observations_findingId_observedAt ON diagnostic_observations(findingId, observedAt)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_observations_sessionId_observedAt ON diagnostic_observations(sessionId, observedAt)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_observations_exchangeId ON diagnostic_observations(exchangeId)")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS finding_diagnostic_snapshots (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    findingId TEXT NOT NULL,
+                    moduleIdentity TEXT NOT NULL,
+                    capturedAtMs INTEGER NOT NULL,
+                    source TEXT NOT NULL,
+                    parametersJson TEXT NOT NULL,
+                    rawExchangeIdsJson TEXT NOT NULL
+                )"""
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_finding_diagnostic_snapshots_findingId_capturedAtMs ON finding_diagnostic_snapshots(findingId, capturedAtMs)")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN origin TEXT NOT NULL DEFAULT 'DERIVED'")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN confidence REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN inputPidsJson TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN formulaVersion TEXT NOT NULL DEFAULT 'UNVERSIONED'")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN diagnosticNamespace TEXT NOT NULL DEFAULT 'SAE_OBD'")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN dtcFormat TEXT NOT NULL DEFAULT 'SAE_J2012_2_BYTE'")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN failureType INTEGER")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN ecuFamily TEXT")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN calibration TEXT")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN sourceAuthority TEXT NOT NULL DEFAULT 'UNVERIFIED'")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN sourceVersion TEXT")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN vehicleApplicabilityJson TEXT NOT NULL DEFAULT '{}'")
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN verificationStatus TEXT NOT NULL DEFAULT 'UNVERIFIED'")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3257,7 +3367,8 @@ object AppModule {
             MIGRATION_46_47,
             MIGRATION_47_48,
             MIGRATION_48_49,
-            MIGRATION_49_50
+            MIGRATION_49_50,
+            MIGRATION_50_51
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3298,6 +3409,12 @@ object AppModule {
 
     @Provides
     fun provideDtcDao(db: MeetDatabase): DtcDao = db.dtcDao()
+
+    @Provides
+    fun provideDiagnosticEvidenceDao(db: MeetDatabase): DiagnosticEvidenceDao = db.diagnosticEvidenceDao()
+
+    @Provides
+    fun provideDiagnosticFindingDao(db: MeetDatabase): DiagnosticFindingDao = db.diagnosticFindingDao()
 
     @Provides
     fun provideTripDao(db: MeetDatabase): TripDao = db.tripDao()

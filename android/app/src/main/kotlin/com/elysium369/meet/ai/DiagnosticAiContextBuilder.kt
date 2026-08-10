@@ -2,8 +2,9 @@ package com.elysium369.meet.ai
 
 import com.elysium369.meet.domain.visualdiagnostics.DiagnosticComponent
 import com.elysium369.meet.domain.visualdiagnostics.EngineType
+import javax.inject.Inject
 
-class DiagnosticAiContextBuilder {
+class DiagnosticAiContextBuilder @Inject constructor() {
     fun build(
         vehicleLabel: String?,
         engineType: EngineType,
@@ -37,4 +38,3 @@ class DiagnosticAiContextBuilder {
 interface DiagnosticAiClient {
     suspend fun ask(context: String): Result<String>
 }
-

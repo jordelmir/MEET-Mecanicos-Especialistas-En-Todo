@@ -78,9 +78,9 @@ object DtcUtils {
         } else ""
 
         return if (isSpanish) {
-            "Código $genericStr para $systemName$subsys. Circuito bajo monitoreo activo de rendimiento."
+            "Código $genericStr de la familia $systemName$subsys. Definición exacta no verificada para esta configuración; confirma fabricante, ECU, software y documentación técnica."
         } else {
-            "$genericStr code for $systemName$subsys. Circuit under active performance monitoring."
+            "$genericStr code in the $systemName$subsys family. Exact definition is not verified for this vehicle configuration; confirm manufacturer, ECU, software and technical documentation."
         }
     }
 
@@ -107,7 +107,7 @@ object DtcUtils {
         val normalizedCode = code.trim().uppercase()
         val raw = rawCauses?.trim().orEmpty()
         if (raw.isBlank() || raw.equals("Consult manufacturer manual.", ignoreCase = true) || raw.equals("--", ignoreCase = true)) {
-            return defaultSpanishCauses(normalizedCode)
+            return "Causas específicas no verificadas para esta configuración. No sustituyas piezas sin pruebas físicas, eléctricas o de señal respaldadas por evidencia."
         }
 
         if (!looksEnglishDiagnosticText(raw)) return raw

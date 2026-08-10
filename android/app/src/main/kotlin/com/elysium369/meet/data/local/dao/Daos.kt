@@ -45,19 +45,18 @@ interface DtcDao {
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
     fun getUnresolvedDtcsForVehicle(vehicleId: String): Flow<List<DtcEventEntity>>
 
+    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NOT NULL ORDER BY resolvedAt DESC")
+    fun getVerifiedResolvedDtcsForVehicle(vehicleId: String): Flow<List<DtcEventEntity>>
+
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
     suspend fun getUnresolvedDtcsList(vehicleId: String): List<DtcEventEntity>
     
-    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND code = :code AND status = :status AND resolvedAt IS NULL LIMIT 1")
-    suspend fun getUnresolvedDtc(vehicleId: String, code: String, status: String): DtcEventEntity?
-
     @Query(
         """SELECT * FROM dtc_events
            WHERE vehicleId = :vehicleId
              AND diagnosticNamespace = :namespace
              AND moduleIdentity = :moduleIdentity
-             AND code = :code
-             AND observationSemantic = :observationSemantic
+             AND rawDtcIdentity = :rawDtcIdentity
              AND resolvedAt IS NULL
            LIMIT 1"""
     )
@@ -65,12 +64,14 @@ interface DtcDao {
         vehicleId: String,
         namespace: String,
         moduleIdentity: String,
-        code: String,
-        observationSemantic: String,
+        rawDtcIdentity: String,
     ): DtcEventEntity?
 
-    @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, synced = 0 WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
-    suspend fun resolveAllDtcsForVehicle(vehicleId: String, resolvedAt: Long)
+    @Query("SELECT * FROM dtc_events WHERE id = :findingId LIMIT 1")
+    suspend fun getFindingById(findingId: String): DtcEventEntity?
+
+    @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, observationState = 'VERIFIED_ABSENT', synced = 0 WHERE id IN (:findingIds) AND resolvedAt IS NULL")
+    suspend fun resolveVerifiedFindings(findingIds: List<String>, resolvedAt: Long)
 
     @Query("SELECT * FROM dtc_events WHERE synced = 0")
     suspend fun getPendingSyncDtcs(): List<DtcEventEntity>
@@ -116,6 +117,25 @@ interface AdapterProfileDao {
 interface DtcDefinitionDao {
     @Query("SELECT * FROM dtc_definitions WHERE code = :code AND (manufacturer = :manufacturer OR manufacturer = 'GENERIC') ORDER BY CASE WHEN manufacturer = :manufacturer THEN 0 ELSE 1 END LIMIT 1")
     suspend fun getDefinitionForCode(code: String, manufacturer: String): DtcDefinitionEntity?
+
+    @Query(
+        """SELECT * FROM dtc_definitions
+           WHERE code = :code
+             AND diagnosticNamespace = :namespace
+             AND (manufacturer = :manufacturer OR manufacturer = 'GENERIC')
+             AND (failureType = :failureType OR failureType IS NULL)
+           ORDER BY
+             CASE WHEN manufacturer = :manufacturer THEN 0 ELSE 1 END,
+             CASE WHEN failureType = :failureType THEN 0 ELSE 1 END,
+             CASE verificationStatus WHEN 'VERIFIED' THEN 0 WHEN 'REVIEWED' THEN 1 ELSE 2 END
+           LIMIT 1"""
+    )
+    suspend fun getDefinitionForFinding(
+        code: String,
+        manufacturer: String,
+        namespace: String,
+        failureType: Int?,
+    ): DtcDefinitionEntity?
 
     @Query("SELECT * FROM dtc_definitions WHERE code = :code")
     suspend fun getDefinitions(code: String): List<DtcDefinitionEntity>

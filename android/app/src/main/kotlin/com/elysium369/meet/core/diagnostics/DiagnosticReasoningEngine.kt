@@ -166,6 +166,9 @@ data class RecommendedTest(
     val nextIfFail: String,
     val relatedHypothesisId: String,
     val status: TestStatus,
+    val expectedInformationGain: Int = 0,
+    val executionCostScore: Int = 50,
+    val selectionRationale: String = "",
 )
 
 @Serializable
@@ -684,6 +687,15 @@ class DiagnosticReasoningEngine(
             .distinctBy { (_, template) -> template.id }
             .take(12)
         return templates.map { (hypothesis, template) ->
+            val informationGain = (hypothesis.probabilityPercent +
+                hypothesis.supportingEvidence.size * 4 -
+                hypothesis.contradictingEvidence.size * 3).coerceIn(5, 100)
+            val costScore = when (template.difficulty) {
+                TestDifficulty.EASY -> 20
+                TestDifficulty.MEDIUM -> 45
+                TestDifficulty.HARD -> 70
+                TestDifficulty.EXPERT_ONLY -> 90
+            } + if (template.safetyLevel == SafetyLevel.CRITICAL_SYSTEM) 10 else 0
             RecommendedTest(
                 id = template.id,
                 caseId = caseId,
@@ -701,8 +713,15 @@ class DiagnosticReasoningEngine(
                 } else {
                     TestStatus.NOT_STARTED
                 },
+                expectedInformationGain = informationGain,
+                executionCostScore = costScore.coerceAtMost(100),
+                selectionRationale = "Prioridad por reducción esperada de incertidumbre, seguridad y costo de ejecución.",
             )
-        }
+        }.sortedWith(
+            compareByDescending<RecommendedTest> { it.expectedInformationGain - it.executionCostScore / 2 }
+                .thenBy { it.safetyLevel == SafetyLevel.CRITICAL_SYSTEM }
+                .thenBy(RecommendedTest::name),
+        )
     }
 
     private fun buildMissingData(

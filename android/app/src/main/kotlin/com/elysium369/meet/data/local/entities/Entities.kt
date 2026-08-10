@@ -49,8 +49,7 @@ data class DiagnosticSessionEntity(
                 "vehicleId",
                 "diagnosticNamespace",
                 "moduleIdentity",
-                "code",
-                "observationSemantic",
+                "rawDtcIdentity",
             ],
             name = "index_dtc_events_finding_identity",
         ),
@@ -80,6 +79,11 @@ data class DtcEventEntity(
     val sourceService: String = "",
     val statusByte: Int? = null,
     val observationSemantic: String = "",
+    /** Stable binary identity; display code and changing status are not part of finding identity. */
+    val rawDtcIdentity: String = "",
+    val rawDtc24: Int? = null,
+    val failureType: Int? = null,
+    val dtcFormat: String = "UNKNOWN",
     val synced: Boolean = false
 )
 
@@ -162,7 +166,16 @@ data class DtcDefinitionEntity(
     val obd2Protocol: String? = null,
     val countryRegulation: String? = null,
     val obd2DiagnosticMode: String? = null,
-    val tsbBulletins: String? = null
+    val tsbBulletins: String? = null,
+    val diagnosticNamespace: String = "SAE_OBD",
+    val dtcFormat: String = "SAE_J2012_2_BYTE",
+    val failureType: Int? = null,
+    val ecuFamily: String? = null,
+    val calibration: String? = null,
+    val sourceAuthority: String = "UNVERIFIED",
+    val sourceVersion: String? = null,
+    val vehicleApplicabilityJson: String = "{}",
+    val verificationStatus: String = "UNVERIFIED",
 )
 
 @Entity(tableName = "maintenance_alerts")

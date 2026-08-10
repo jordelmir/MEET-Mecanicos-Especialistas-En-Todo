@@ -51,11 +51,37 @@ enum class DiagnosticScanMode {
     FULL_VEHICLE,
 }
 
+data class ScanProgressState(
+    val modulesCompleted: Int,
+    val modulesPlanned: Int,
+    val servicesCompleted: Int,
+    val servicesPlanned: Int,
+) {
+    val fraction: Float
+        get() {
+            val totalPlanned = modulesPlanned.coerceAtLeast(0) + servicesPlanned.coerceAtLeast(0)
+            val totalCompleted = modulesCompleted.coerceAtLeast(0) + servicesCompleted.coerceAtLeast(0)
+            return if (totalPlanned == 0) 0f
+            else (totalCompleted.toFloat() / totalPlanned).coerceIn(0f, 1f)
+        }
+}
+
 sealed interface DiagnosticScanEvent {
     val occurredAtMs: Long
 
     data class ScanStarted(
         val mode: DiagnosticScanMode,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ScanPlanCompiled(
+        val modulesPlanned: Int,
+        val servicesPlanned: Int,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ProgressUpdated(
+        val state: ScanProgressState,
         override val occurredAtMs: Long = System.currentTimeMillis(),
     ) : DiagnosticScanEvent
 
@@ -65,7 +91,40 @@ sealed interface DiagnosticScanEvent {
         override val occurredAtMs: Long = System.currentTimeMillis(),
     ) : DiagnosticScanEvent
 
+    data class ModuleDiscovered(
+        val endpoint: EcuEndpoint,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ServiceStarted(
+        val moduleIdentity: String,
+        val command: String,
+        val serviceIndex: Int,
+        val servicesPlanned: Int,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class ServiceCompleted(
+        val moduleIdentity: String,
+        val command: String,
+        val outcome: ModuleScanOutcome,
+        val serviceIndex: Int,
+        val servicesPlanned: Int,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class CoverageUpdated(
+        val moduleIdentity: String,
+        val coverage: DiagnosticCoverage,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
     data class FindingDiscovered(
+        val finding: DtcRecord,
+        override val occurredAtMs: Long = System.currentTimeMillis(),
+    ) : DiagnosticScanEvent
+
+    data class FindingObserved(
         val finding: DtcRecord,
         override val occurredAtMs: Long = System.currentTimeMillis(),
     ) : DiagnosticScanEvent
@@ -116,6 +175,7 @@ data class FreezeFrameReadResult(
     val outcome: FreezeFrameOutcome,
     val values: Map<String, String> = emptyMap(),
     val identityRawResponse: String = "",
+    val rawExchanges: Map<String, String> = emptyMap(),
 )
 
 data class DtcRecord(
@@ -129,8 +189,25 @@ data class DtcRecord(
     val moduleName: String? = null,
     val rawPayload: String,
     val udsStatusByte: Int? = null,
-    val udsFailureType: String? = null
-)
+    val udsFailureType: String? = null,
+    val rawDtc24: Int? = null,
+    val dtcFormat: DtcFormat = when (namespace) {
+        DiagnosticNamespace.SAE_OBD -> DtcFormat.SAE_J2012_2_BYTE
+        DiagnosticNamespace.UDS -> DtcFormat.ISO_14229_3_BYTE
+        DiagnosticNamespace.KWP2000 -> DtcFormat.KWP2000
+        DiagnosticNamespace.OEM -> DtcFormat.OEM
+    },
+) {
+    val codeIdentity: DiagnosticCodeIdentity
+        get() = DiagnosticCodeIdentity(
+            displayCode = code.uppercase(),
+            rawCode = rawDtc24?.let { "%06X".format(it and 0xFFFFFF) } ?: code.uppercase(),
+            rawDtc24 = rawDtc24,
+            failureType = udsFailureType?.toIntOrNull(16),
+            format = dtcFormat,
+            namespace = namespace,
+        )
+}
 
 data class DtcRawExchange(
     val command: String,
@@ -139,7 +216,14 @@ data class DtcRawExchange(
     val parsedRecordCount: Int,
     val outcome: ModuleScanOutcome = ModuleScanOutcome.COMPLETE,
     val negativeResponse: NegativeDiagnosticResponse? = null,
-    val timestampMs: Long = System.currentTimeMillis()
+    val timestampMs: Long = System.currentTimeMillis(),
+    val sessionId: String = "",
+    val transport: DiagnosticTransport = DiagnosticTransport.UNKNOWN,
+    val requestScope: DiagnosticRequestScope = DiagnosticRequestScope.LegacyUnaddressed,
+    val responseAddress: String? = null,
+    val latencyMs: Long? = null,
+    val retryCount: Int = 0,
+    val parserVersion: String = "diagnostic-pdu-v2",
 )
 
 data class DtcModuleReport(
@@ -165,7 +249,7 @@ data class DtcModuleReport(
 
     fun completedSemantics(semantics: Set<DiagnosticSemantic>): Boolean =
         serviceReads.any {
-            it.coverage.coversAny(semantics) && it.outcome.provesBucketWasRead
+            it.coverage.fullyCovers(semantics) && it.outcome.provesBucketWasRead
         }
 
     val moduleIdentity: String
@@ -202,6 +286,7 @@ object DtcObservationPolicy {
         namespace: DiagnosticNamespace = DiagnosticNamespace.SAE_OBD,
         moduleIdentity: String? = module?.moduleIdentity,
         semantics: Set<DiagnosticSemantic> = defaultSemantics(namespace, bucket),
+        rawDtcIdentity: String = code.uppercase(),
     ): Boolean {
         if (module == null || !module.isAlive) return false
         val covered = when (namespace) {
@@ -213,7 +298,7 @@ object DtcObservationPolicy {
         if (!covered) return false
         val expectedModule = moduleIdentity ?: module.moduleIdentity
         return records.none { record ->
-            record.code.equals(code, ignoreCase = true) &&
+            record.codeIdentity.stableRawIdentity.equals(rawDtcIdentity, ignoreCase = true) &&
                 record.namespace == namespace &&
                 DiagnosticModuleIdentity.canonical(
                     record.targetAddress,
@@ -427,6 +512,8 @@ object DtcScanEngine {
                 rawPayload = rawPayload,
                 udsStatusByte = statusByte,
                 udsFailureType = dtcHex.substring(4, 6),
+                rawDtc24 = dtcHex.toInt(16),
+                dtcFormat = DtcFormat.ISO_14229_3_BYTE,
             )
         }
     }

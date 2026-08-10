@@ -56,10 +56,16 @@ import com.elysium369.meet.core.search.DtcGoogleSearch
 import com.elysium369.meet.core.search.DtcGoogleSearchVehicleContext
 import com.elysium369.meet.core.obd.DiagnosticScanMode
 import com.elysium369.meet.core.obd.DiagnosticScanEvent
+import com.elysium369.meet.core.obd.DiagnosticModuleIdentity
 import com.elysium369.meet.core.obd.DtcBucket
 import com.elysium369.meet.core.obd.DtcRecord
 import com.elysium369.meet.data.supabase.Vehicle
+import com.elysium369.meet.data.local.entities.DtcEventEntity
+import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.models.DiagnosticFindingUiModel
+import com.elysium369.meet.ui.models.FindingCoverageState
+import com.elysium369.meet.ui.models.FindingObservationState
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
 import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
@@ -93,23 +99,43 @@ private val backgroundParticles = List(30) { index ->
     )
 }
 
+@Composable
+private fun systemMotionEnabled(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // HOLOGRAPHIC BACKGROUND — Animated ambient light + grid + particles
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
 private fun HolographicBackground(modifier: Modifier = Modifier) {
-    val infiniteTransition = rememberInfiniteTransition(label = "holoBg")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing)),
-        label = "bgPhase"
-    )
-    val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "bgGlow"
-    )
+    val motionEnabled = systemMotionEnabled()
+    val phase: Float
+    val glowPulse: Float
+    if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "holoBg")
+        phase = infiniteTransition.animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing)),
+            label = "bgPhase"
+        ).value
+        glowPulse = infiniteTransition.animateFloat(
+            initialValue = 0.3f, targetValue = 0.7f,
+            animationSpec = infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "bgGlow"
+        ).value
+    } else {
+        phase = 0f
+        glowPulse = 0.3f
+    }
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
@@ -199,39 +225,12 @@ private fun HoloCard(
     glowIntensity: Float = 0.15f,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "holoCard")
-    val borderPhase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
-        label = "borderPhase"
-    )
-
-    // Gentle 3D float oscillation
-    val rotX by infiniteTransition.animateFloat(
-        initialValue = -2.5f, targetValue = 2.5f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotX"
-    )
-    val rotY by infiniteTransition.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(5000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "rotY"
-    )
-    val translationYAnim by infiniteTransition.animateFloat(
-        initialValue = -4f, targetValue = 4f,
-        animationSpec = infiniteRepeatable(tween(4500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "transY"
-    )
+    // Finding cards are intentionally static. Continuous per-card animation caused
+    // avoidable recomposition/GPU load during Bluetooth, Room and parser activity.
+    val borderPhase = 0.35f
 
     Box(
         modifier = modifier
-            // Apply 3D rotation and translation
-            .graphicsLayer {
-                rotationX = rotX
-                rotationY = rotY
-                translationY = translationYAnim
-                cameraDistance = 12f * density
-            }
             // Shadow layer 1 — deep ambient glow
             .shadow(
                 elevation = 16.dp,
@@ -338,6 +337,10 @@ private fun HoloCard(
 @Composable
 fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val activeDtcs by viewModel.activeDtcs.collectAsState()
+    val activeDtcEvents by viewModel.activeDtcEvents.collectAsState()
+    val pendingDtcEvents by viewModel.pendingDtcEvents.collectAsState()
+    val permanentDtcEvents by viewModel.permanentDtcEvents.collectAsState()
+    val historicalDtcEvents by viewModel.historicalDtcEvents.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val googleSearchVehicle = remember(selectedVehicle) {
         selectedVehicle.toDtcGoogleSearchVehicleContext()
@@ -349,6 +352,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val permanentDtcs by viewModel.permanentDtcs.collectAsState()
     val historicalDtcs by viewModel.historicalDtcs.collectAsState()
+    val verifiedResolvedDtcEvents by viewModel.verifiedResolvedDtcEvents.collectAsState()
     val readiness by viewModel.readinessMonitors.collectAsState()
     val clearResult by viewModel.clearDtcResult.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -376,6 +380,37 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
         if (permanentFindingRecords.isNotEmpty()) permanentFindingRecords.map { it.code to it }
         else permanentDtcs.map { it to null }
     }
+    val persistedEvents = remember(activeDtcEvents, pendingDtcEvents, permanentDtcEvents, historicalDtcEvents) {
+        activeDtcEvents + pendingDtcEvents + permanentDtcEvents + historicalDtcEvents
+    }
+    val notVerifiedThisScan = remember(persistedEvents, lastScanReport) {
+        val identitiesObservedNow = lastScanReport?.records.orEmpty()
+            .map { it.stableUiIdentity() }
+            .toSet()
+        persistedEvents
+            .filter { event ->
+                lastScanReport != null && (
+                    event.observationState == "NOT_OBSERVED_LAST_SCAN" ||
+                        event.stableUiIdentity() !in identitiesObservedNow
+                    )
+            }
+            .distinctBy { it.stableUiIdentity() }
+            .map { event ->
+            event.toFindingUiModel(FindingObservationState.NOT_VERIFIED_THIS_SCAN)
+        }
+    }
+    val activeFindingCount = remember(activeFindingRecords, activeDtcEvents) {
+        (activeFindingRecords.map { it.stableUiIdentity() } + activeDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    }
+    val pendingFindingCount = remember(pendingFindingRecords, pendingDtcEvents) {
+        (pendingFindingRecords.map { it.stableUiIdentity() } + pendingDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    }
+    val permanentFindingCount = remember(permanentFindingRecords, permanentDtcEvents) {
+        (permanentFindingRecords.map { it.stableUiIdentity() } + permanentDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    }
+    val totalFindingCount = remember(lastScanReport, persistedEvents) {
+        (lastScanReport?.records.orEmpty().map { it.stableUiIdentity() } + persistedEvents.map { it.stableUiIdentity() }).distinct().size
+    }
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -385,7 +420,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
         viewModel.diagnosticScanEvents.collect { event ->
             if (event is DiagnosticScanEvent.ScanStarted) scanEvents.clear()
             scanEvents += event
-            while (scanEvents.size > 16) scanEvents.removeAt(0)
+            while (scanEvents.size > 256) scanEvents.removeAt(0)
         }
     }
 
@@ -658,10 +693,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                     ) {
                         val tabFontSize = if (isCompact) 10.sp else 12.sp
                         val tabData = listOf(
-                            Triple("ACTIVOS (${activeDtcs.size})", MeetColors.error, 0),
-                            Triple("PEND. (${pendingDtcs.size})", MeetColors.warning, 1),
-                            Triple("PERM. (${permanentDtcs.size})", MeetColors.cyberCyan, 2),
-                            Triple("HALLAZGOS (${historicalDtcs.size + (lastScanReport?.records?.size ?: 0)})", MeetColors.electricBlue, 3),
+                            Triple("ACTIVOS ($activeFindingCount)", MeetColors.error, 0),
+                            Triple("PEND. ($pendingFindingCount)", MeetColors.warning, 1),
+                            Triple("PERM. ($permanentFindingCount)", MeetColors.cyberCyan, 2),
+                            Triple("HALLAZGOS ($totalFindingCount)", MeetColors.electricBlue, 3),
                             Triple("MONITORES", MeetColors.neonGreen, 4),
                             Triple("BÚSQUEDA", Color.White, 5)
                         )
@@ -706,7 +741,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 
                         when (selectedTab) {
                             0 -> {
-                                if (activeFindingItems.isEmpty()) {
+                                if (activeFindingItems.isEmpty() && notVerifiedThisScan.isEmpty()) {
                                     item {
                                         val emptyTitle: String
                                         val emptyDetail: String
@@ -748,6 +783,27 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                             accentColor = MeetColors.cyberCyan
                                         )
                                     }
+                                    if (notVerifiedThisScan.isNotEmpty()) {
+                                        item {
+                                            FindingTruthSectionHeader(
+                                                title = "NO VERIFICADO EN ESTE ESCANEO",
+                                                detail = "Persisten como hallazgos abiertos; el módulo o servicio no tuvo cobertura suficiente.",
+                                                color = MeetColors.warning,
+                                            )
+                                        }
+                                        itemsIndexed(notVerifiedThisScan) { _, finding ->
+                                            PersistedFindingTruthCard(finding, MeetColors.warning)
+                                        }
+                                        if (activeFindingItems.isNotEmpty()) {
+                                            item {
+                                                FindingTruthSectionHeader(
+                                                    title = "OBSERVADO AHORA",
+                                                    detail = "Identidades confirmadas por la evidencia del escaneo actual.",
+                                                    color = MeetColors.error,
+                                                )
+                                            }
+                                        }
+                                    }
                                     itemsIndexed(activeFindingItems) { index, item ->
                                         val (dtc, finding) = item
                                         StaggeredEntrance(index) {
@@ -782,7 +838,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                             }
                             2 -> {
                                 if (permanentFindingItems.isEmpty()) {
-                                    item { HolographicEmptyState("HISTORIAL LIMPIO", "No se encontraron códigos permanentes.", MeetColors.cyberCyan, isCompact) }
+                                    item { HolographicEmptyState("SIN DTC PERMANENTES OBSERVADOS", "La lectura no observó códigos permanentes; esto no demuestra un historial limpio.", MeetColors.cyberCyan, isCompact) }
                                 } else {
                                     itemsIndexed(permanentFindingItems) { index, item ->
                                         val (dtc, finding) = item
@@ -798,7 +854,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     }
                                 }
                             }
-                            3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, navController, isCompact) } }
+                            3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, historicalDtcEvents, verifiedResolvedDtcEvents, navController, isCompact) } }
                             4 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
                             5 -> { item { ManualSearchTab(navController, viewModel, isCompact, googleSearchVehicle) } }
                         }
@@ -825,11 +881,13 @@ private fun DtcFindingsTab(
     pendingDtcs: List<String>,
     permanentDtcs: List<String>,
     historicalDtcs: List<String>,
+    historicalEvents: List<DtcEventEntity>,
+    verifiedResolvedEvents: List<DtcEventEntity>,
     navController: NavController,
     isCompact: Boolean
 ) {
     val totalCodes = (activeDtcs + pendingDtcs + permanentDtcs + historicalDtcs).distinct().size
-    if (report == null && totalCodes == 0) {
+    if (report == null && totalCodes == 0 && historicalEvents.isEmpty() && verifiedResolvedEvents.isEmpty()) {
         HolographicEmptyState(
             "SIN HALLAZGOS",
             "Toca ESCANEAR para capturar DTCs, módulos que respondieron y evidencia técnica del último barrido.",
@@ -868,6 +926,32 @@ private fun DtcFindingsTab(
                 )
             }
         }
+        if (historicalEvents.isNotEmpty()) {
+            FindingTruthSectionHeader(
+                title = "HISTÓRICOS",
+                detail = "Observados anteriormente; permanecen abiertos hasta una verificación autoritativa.",
+                color = MeetColors.textSecondary,
+            )
+            historicalEvents.distinctBy { it.stableUiIdentity() }.forEach { event ->
+                PersistedFindingTruthCard(
+                    event.toFindingUiModel(FindingObservationState.HISTORICAL),
+                    MeetColors.textSecondary,
+                )
+            }
+        }
+        if (verifiedResolvedEvents.isNotEmpty()) {
+            FindingTruthSectionHeader(
+                title = "RESUELTOS / VERIFICADOS",
+                detail = "Ausencia verificada por ECU, servicio e identidad DTC; el historial de evidencia permanece intacto.",
+                color = MeetColors.neonGreen,
+            )
+            verifiedResolvedEvents.distinctBy { it.stableUiIdentity() }.forEach { event ->
+                PersistedFindingTruthCard(
+                    event.toFindingUiModel(FindingObservationState.VERIFIED_RESOLVED),
+                    MeetColors.neonGreen,
+                )
+            }
+        }
 
         val reportRecords = report?.records.orEmpty()
         if (reportRecords.isNotEmpty()) {
@@ -886,7 +970,7 @@ private fun DtcFindingsTab(
                         letterSpacing = 1.sp
                     )
                     reportRecords
-                        .distinctBy { "${it.code}|${it.bucket}|${it.moduleName}|${it.responseAddress}" }
+                        .distinctBy { it.stableUiIdentity() }
                         .take(12)
                         .forEach { record ->
                             val bucketLabel = when (record.bucket) {
@@ -907,7 +991,7 @@ private fun DtcFindingsTab(
                                 Column(Modifier.weight(1f)) {
                                     Text(record.code, color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black, fontSize = 14.sp)
                                     Text(
-                                        "${record.moduleName ?: "Módulo OBD-II"} · ${record.sourceService} · $bucketLabel",
+                                        "${record.moduleName ?: "Módulo OBD-II"} · ${record.codeIdentity.stableRawIdentity} · ${record.sourceService} · $bucketLabel",
                                         color = MeetColors.textSecondary,
                                         fontSize = 10.sp,
                                         maxLines = 1,
@@ -976,32 +1060,26 @@ private fun FindingMetric(label: String, value: Int, color: Color, modifier: Mod
 
 @Composable
 private fun HolographicEmptyState(title: String, subtitle: String, color: Color, isCompact: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "holoEmpty")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing)),
-        label = "emptyRot"
-    )
-    val innerRotation by infiniteTransition.animateFloat(
-        initialValue = 360f, targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing)),
-        label = "emptyInnerRot"
-    )
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f, targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "emptyPulse"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f, targetValue = 0.6f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "emptyGlow"
-    )
-    val floatY by infiniteTransition.animateFloat(
-        initialValue = -5f, targetValue = 5f,
-        animationSpec = infiniteRepeatable(tween(2500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "emptyFloat"
-    )
+    val motionEnabled = systemMotionEnabled()
+    val rotation: Float
+    val innerRotation: Float
+    val pulseScale: Float
+    val glowAlpha: Float
+    val floatY: Float
+    if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "holoEmpty")
+        rotation = infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "emptyRot").value
+        innerRotation = infiniteTransition.animateFloat(360f, 0f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "emptyInnerRot").value
+        pulseScale = infiniteTransition.animateFloat(0.85f, 1.15f, infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "emptyPulse").value
+        glowAlpha = infiniteTransition.animateFloat(0.2f, 0.6f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "emptyGlow").value
+        floatY = infiniteTransition.animateFloat(-5f, 5f, infiniteRepeatable(tween(2500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "emptyFloat").value
+    } else {
+        rotation = 0f
+        innerRotation = 0f
+        pulseScale = 1f
+        glowAlpha = 0.35f
+        floatY = 0f
+    }
 
     Box(
         modifier = Modifier
@@ -1178,6 +1256,81 @@ private fun HolographicEmptyState(title: String, subtitle: String, color: Color,
     }
 }
 
+private fun DtcRecord.stableUiIdentity(): String = listOf(
+    namespace.name,
+    DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName),
+    codeIdentity.stableRawIdentity,
+).joinToString("|")
+
+private fun DtcEventEntity.stableUiIdentity(): String = listOf(
+    diagnosticNamespace.ifBlank { "UNKNOWN" },
+    moduleIdentity.ifBlank { DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName) },
+    rawDtcIdentity.ifBlank { code.uppercase() },
+).joinToString("|")
+
+private fun DtcEventEntity.toFindingUiModel(
+    observation: FindingObservationState,
+): DiagnosticFindingUiModel = DiagnosticFindingUiModel(
+    findingId = id,
+    stableIdentity = stableUiIdentity(),
+    displayCode = code,
+    rawDtcIdentity = rawDtcIdentity.ifBlank { code.uppercase() },
+    module = moduleName.ifBlank { "Módulo no identificado" },
+    moduleAddress = responseAddress.ifBlank { targetAddress.ifBlank { moduleIdentity } },
+    observationState = observation,
+    status = status,
+    severity = severity,
+    urgency = "REQUIERE REVISIÓN",
+    lastSeenAt = lastSeenAt,
+    evidenceStrength = if (sourceService.isNotBlank()) "ECU + servicio $sourceService" else "Evidencia heredada limitada",
+    coverageState = if (observation == FindingObservationState.NOT_VERIFIED_THIS_SCAN) {
+        FindingCoverageState.NOT_COVERED
+    } else {
+        FindingCoverageState.UNKNOWN
+    },
+    definitionVerification = "Aplicabilidad por vehículo pendiente de confirmar",
+)
+
+@Composable
+private fun FindingTruthSectionHeader(title: String, detail: String, color: Color) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 4.dp),
+    ) {
+        Text(title, color = color, fontWeight = FontWeight.Black, fontSize = 12.sp, letterSpacing = 0.8.sp)
+        Text(detail, color = MeetColors.textSecondary, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun PersistedFindingTruthCard(finding: DiagnosticFindingUiModel, color: Color) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF07101C))
+            .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(finding.displayCode, color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text("SIN COBERTURA", color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        Text(
+            "${finding.module} ${finding.moduleAddress}".trim(),
+            color = MeetColors.cyberCyan,
+            fontSize = 11.sp,
+        )
+        Text(
+            "Visto anteriormente · ${finding.evidenceStrength}. No se declara ausente ni reparado.",
+            color = MeetColors.textSecondary,
+            fontSize = 11.sp,
+        )
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // HOLOGRAPHIC DTC CARD — 3D with shadows + animated glow
 // ═══════════════════════════════════════════════════════════════
@@ -1185,7 +1338,7 @@ private fun HolographicEmptyState(title: String, subtitle: String, color: Color,
 @Composable
 private fun HoloDtcCard(
     dtc: String,
-    severity: String,
+    observationState: String,
     accentColor: Color,
     navController: NavController,
     viewModel: ObdViewModel,
@@ -1195,7 +1348,13 @@ private fun HoloDtcCard(
     finding: DtcRecord? = null,
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
-    val definition = dtcDefinitions[dtc]
+    var scopedDefinition by remember(dtc, finding?.codeIdentity?.stableRawIdentity, finding?.namespace) {
+        mutableStateOf<DtcDefinitionEntity?>(null)
+    }
+    LaunchedEffect(dtc, finding?.codeIdentity?.stableRawIdentity, finding?.namespace) {
+        scopedDefinition = finding?.let { viewModel.getDtcDefinition(it) }
+    }
+    val definition = scopedDefinition ?: dtcDefinitions[dtc]
     val desc = if (definition != null) {
         com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(definition, dtc)
     } else {
@@ -1205,6 +1364,14 @@ private fun HoloDtcCard(
         )
     }
     val causes = com.elysium369.meet.ui.components.DtcUtils.getSpanishPossibleCauses(dtc, definition?.possibleCauses)
+    val riskSeverity = definition?.severity?.takeIf { it.isNotBlank() && it != "UNKNOWN" }
+        ?: com.elysium369.meet.ui.components.DtcUtils.getDynamicSeverity(dtc)
+    val urgency = definition?.urgency?.takeIf { it.isNotBlank() } ?: "REQUIERE DIAGNÓSTICO"
+    val definitionAuthority = when (definition?.verificationStatus) {
+        "VERIFIED" -> "DEFINICIÓN VERIFICADA · ${definition.sourceAuthority}"
+        "REVIEWED" -> "DEFINICIÓN REVISADA · CONFIRMAR APLICABILIDAD"
+        else -> "DEFINICIÓN NO VERIFICADA PARA ESTA CONFIGURACIÓN"
+    }
     var expanded by remember { mutableStateOf(false) }
 
     HoloCard(
@@ -1243,7 +1410,7 @@ private fun HoloDtcCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            severity,
+                            observationState,
                             color = accentColor,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,
@@ -1294,6 +1461,17 @@ private fun HoloDtcCard(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("RIESGO: $riskSeverity", color = MeetColors.warning, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text("URGENCIA: $urgency", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                definitionAuthority,
+                color = if (definition?.verificationStatus == "VERIFIED") MeetColors.neonGreen else MeetColors.warning,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+            )
             Spacer(modifier = Modifier.height(10.dp))
 
             finding?.let { evidence ->
@@ -1418,9 +1596,19 @@ private fun HoloDtcCard(
 
                     // Buttons
                     val openDtcRelations3d = {
+                        val rawIdentity = finding?.codeIdentity?.stableRawIdentity ?: dtc.uppercase()
+                        val moduleIdentity = finding?.let {
+                            DiagnosticModuleIdentity.canonical(it.targetAddress, it.responseAddress, it.moduleName)
+                        }.orEmpty()
+                        val namespace = finding?.namespace?.name.orEmpty()
+                        val stableKey = listOf(namespace, moduleIdentity, rawIdentity).joinToString("~")
                         navController.navigate(
                             "component_locator?dtcCode=${java.net.URLEncoder.encode(dtc, "UTF-8")}" +
-                                "&dtcStatus=${java.net.URLEncoder.encode(severity, "UTF-8")}"
+                                "&dtcStatus=${java.net.URLEncoder.encode(observationState, "UTF-8")}" +
+                                "&findingKey=${java.net.URLEncoder.encode(stableKey, "UTF-8")}" +
+                                "&dtcModule=${java.net.URLEncoder.encode(finding?.moduleName.orEmpty(), "UTF-8")}" +
+                                "&dtcNamespace=${java.net.URLEncoder.encode(namespace, "UTF-8")}" +
+                                "&dtcRaw=${java.net.URLEncoder.encode(rawIdentity, "UTF-8")}"
                         )
                     }
                     if (isCompact) {
@@ -1584,11 +1772,23 @@ private fun HolographicScanOverlay(
     scanEvents: List<DiagnosticScanEvent>,
     isCompact: Boolean,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "scanOvr")
-    val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(2500, easing = LinearEasing)), label = "sr")
-    val pulseAlpha by infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sp")
-    val scanY by infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "sy")
-    val glowPulse by infiniteTransition.animateFloat(0.7f, 1.3f, infiniteRepeatable(tween(1200, easing = FastOutLinearInEasing), RepeatMode.Reverse), label = "sg")
+    val motionEnabled = systemMotionEnabled()
+    val rotation: Float
+    val pulseAlpha: Float
+    val scanY: Float
+    val glowPulse: Float
+    if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "scanOvr")
+        rotation = infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(2500, easing = LinearEasing)), label = "sr").value
+        pulseAlpha = infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sp").value
+        scanY = infiniteTransition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "sy").value
+        glowPulse = infiniteTransition.animateFloat(0.7f, 1.3f, infiniteRepeatable(tween(1200, easing = FastOutLinearInEasing), RepeatMode.Reverse), label = "sg").value
+    } else {
+        rotation = 0f
+        pulseAlpha = 0.75f
+        scanY = 0.5f
+        glowPulse = 1f
+    }
 
     Box(
         modifier = Modifier
@@ -1698,18 +1898,33 @@ private fun HolographicScanOverlay(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(10.dp))
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(if (isCompact) 0.8f else 0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)), color = MeetColors.neonGreen, trackColor = MeetColors.borderSubtle)
+            val plan = scanEvents.filterIsInstance<DiagnosticScanEvent.ScanPlanCompiled>().lastOrNull()
+            val progressState = scanEvents.filterIsInstance<DiagnosticScanEvent.ProgressUpdated>().lastOrNull()?.state
+            val completedServices = progressState?.servicesCompleted ?: 0
+            val scanProgress = progressState?.fraction ?: 0f
+            LinearProgressIndicator(
+                progress = { scanProgress },
+                modifier = Modifier.fillMaxWidth(if (isCompact) 0.8f else 0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)),
+                color = MeetColors.neonGreen,
+                trackColor = MeetColors.borderSubtle,
+            )
+            Text(
+                "${completedServices}/${progressState?.servicesPlanned ?: plan?.servicesPlanned ?: 0} servicios · ${progressState?.modulesCompleted ?: 0}/${progressState?.modulesPlanned ?: plan?.modulesPlanned ?: 0} módulos",
+                color = MeetColors.textSecondary,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+            )
             Spacer(Modifier.height(10.dp))
             scanEvents.filter {
                 it is DiagnosticScanEvent.ModuleReading ||
                     it is DiagnosticScanEvent.ModuleCompleted ||
-                    it is DiagnosticScanEvent.FindingDiscovered
+                    it is DiagnosticScanEvent.FindingObserved
             }.takeLast(4).forEach { event ->
                 val eventText = when (event) {
                     is DiagnosticScanEvent.ModuleReading -> "… ${event.moduleName} · LEYENDO"
                     is DiagnosticScanEvent.ModuleCompleted ->
                         "${if (event.outcome.provesBucketWasRead) "✓" else "○"} ${event.moduleName} · ${event.findingCount} DTC · ${event.outcome.name}"
-                    is DiagnosticScanEvent.FindingDiscovered ->
+                    is DiagnosticScanEvent.FindingObserved ->
                         "● ${event.finding.moduleName ?: event.finding.responseAddress ?: "ECU"} · ${event.finding.code}"
                     else -> ""
                 }

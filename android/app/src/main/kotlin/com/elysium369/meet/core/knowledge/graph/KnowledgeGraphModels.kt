@@ -20,7 +20,14 @@ enum class KnowledgeNodeType {
     PART_CANDIDATE,
     VEHICLE_PROFILE,
     SOURCE_BLOCK,
-    VISUAL_TARGET
+    VISUAL_TARGET,
+    FAILURE_MODE,
+    ECU,
+    SIGNAL,
+    CIRCUIT,
+    PID,
+    REPAIR,
+    VERIFICATION,
 }
 
 @Serializable
@@ -42,7 +49,14 @@ enum class KnowledgeEdgeType {
     APPLIES_TO,
     EXCLUDED_FROM,
     SUPPORTED_BY_SOURCE,
-    VISUALIZED_BY
+    VISUALIZED_BY,
+    HAS_FAILURE_MODE,
+    INVOLVES_ECU,
+    CARRIED_BY_SIGNAL,
+    ROUTES_THROUGH_CIRCUIT,
+    OBSERVED_BY_PID,
+    REPAIRED_BY,
+    VERIFIED_BY,
 }
 
 @Serializable
@@ -151,7 +165,9 @@ data class KnowledgeEdge(
     val requiresOemConfirmation: Boolean = false,
     val requiresPhysicalConfirmation: Boolean = false,
     val sequenceId: String? = null,
-    val sequenceOrder: Int? = null
+    val sequenceOrder: Int? = null,
+    val sourceVersion: String? = null,
+    val vehicleConstraints: List<String> = emptyList(),
 )
 
 @Serializable

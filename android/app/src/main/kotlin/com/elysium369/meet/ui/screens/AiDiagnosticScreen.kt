@@ -1,7 +1,7 @@
 package com.elysium369.meet.ui.screens
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
-import com.elysium369.meet.core.diagnostics.DiagnosticReasoningEngine
+import com.elysium369.meet.core.diagnostics.DiagnosticHypothesisEngine
 import com.elysium369.meet.core.diagnostics.DiagnosticReasoningInput
 import com.elysium369.meet.core.diagnostics.DiagnosticReasoningResult
 import com.elysium369.meet.core.diagnostics.PartRecommendationState
@@ -104,7 +104,7 @@ fun AiDiagnosticScreen(
             groundedRepairContext?.takeIf(String::isNotBlank),
         ).joinToString("\n\n").takeIf(String::isNotBlank)
     }
-    val reasoningEngine = remember { DiagnosticReasoningEngine() }
+    val hypothesisEngine = remember { DiagnosticHypothesisEngine() }
     var completedLocalTests by remember(dtcCode) { mutableStateOf<Set<String>>(emptySet()) }
     val localReasoning = remember(
         dtcCode,
@@ -125,7 +125,7 @@ fun AiDiagnosticScreen(
                 .joinToString(" ")
         }
         val hasRealObd = telemetrySamples.values.any { it.hasRealValue }
-        reasoningEngine.analyze(
+        hypothesisEngine.analyze(
             DiagnosticReasoningInput(
                 vehicleId = selectedVehicle?.id,
                 vehicleLabel = vehicleLabel,
@@ -136,7 +136,7 @@ fun AiDiagnosticScreen(
                 livePids = telemetrySamples,
                 completedTests = completedLocalTests.toList()
             )
-        )
+        ).result
     }
     val hasLocalCase = localReasoning.case.hypotheses.isNotEmpty()
 
