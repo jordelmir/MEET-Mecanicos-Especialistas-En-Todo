@@ -37,12 +37,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.elysium369.meet.ai.DiagnosticAiContextBuilder
 import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.diagnostics.DiagnosticSpatialSystem
 import com.elysium369.meet.core.diagnostics.DtcSpatialResolver
+import com.elysium369.meet.core.diagnostics.DiagnosticSpatialFindingContext
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.ComponentLocatorViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.core.engine3d.EngineType
@@ -65,6 +68,11 @@ import com.elysium369.meet.visual3d.ui.TwinFocusMode
 import com.elysium369.meet.visual3d.ui.VehicleTwinViewportState
 import com.elysium369.meet.domain.visualdiagnostics.ComponentCategory as VisualComponentCategory
 import com.elysium369.meet.domain.visualdiagnostics.EngineType as VisualEngineType
+import com.elysium369.meet.domain.visualdiagnostics.CombustionType
+import com.elysium369.meet.domain.visualdiagnostics.CylinderLayout
+import com.elysium369.meet.domain.visualdiagnostics.PowertrainElectrification
+import com.elysium369.meet.domain.visualdiagnostics.VehicleDataProvenance
+import com.elysium369.meet.domain.visualdiagnostics.VehiclePowertrainTopologyResolver
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT LOCATOR 3D — Interactive Graphics Engine & Part Finder
@@ -110,48 +118,64 @@ enum class ComponentCategory(val label: String, val color: Color) {
 fun ComponentLocatorScreen(
     navController: NavController,
     viewModel: ObdViewModel,
+    locatorViewModel: ComponentLocatorViewModel = hiltViewModel(),
     initialPartId: String? = null,
     initialDtcCode: String? = null,
     initialDtcStatus: String? = null,
+    initialFindingKey: String? = null,
+    initialDtcModule: String? = null,
+    initialDtcNamespace: String? = null,
+    initialDtcRawIdentity: String? = null,
 ) {
     val context = LocalContext.current
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     
-    // Auto-detectar el tipo de motor del OBD2 del vehículo
-    val detectedEngineType = remember(selectedVehicle) {
-        val eng = selectedVehicle?.engine?.lowercase().orEmpty()
-        val fuel = selectedVehicle?.fuel_type?.lowercase().orEmpty()
-        val make = selectedVehicle?.make?.lowercase().orEmpty()
-        val model = selectedVehicle?.model?.lowercase().orEmpty()
-        val year = selectedVehicle?.year
-        when {
-            fuel.contains("electric") || fuel.contains("ev") -> EngineType.ELECTRIC
-            fuel.contains("phev") || fuel.contains("plug-in") -> EngineType.PHEV
-            fuel.contains("hybrid") || fuel.contains("híbrido") -> EngineType.HYBRID
-            fuel.contains("diesel") && eng.contains("v8") -> EngineType.DIESEL_V8
-            fuel.contains("diesel") && eng.contains("v6") -> EngineType.DIESEL_V6
-            fuel.contains("diesel") -> EngineType.DIESEL_L4
-            eng.contains("v12") || eng.contains("12 cil") -> EngineType.V12
-            eng.contains("v10") || eng.contains("10 cil") -> EngineType.V10
-            eng.contains("v8") || eng.contains("8 cil") -> EngineType.V8
-            eng.contains("v6") || eng.contains("6 cil") -> EngineType.V6
-            eng.contains("h6") || eng.contains("boxer 6") || eng.contains("flat 6") -> EngineType.BOXER_6
-            eng.contains("h4") || eng.contains("boxer") || eng.contains("flat 4") -> EngineType.BOXER_4
-            eng.contains("rotary") || eng.contains("wankel") || eng.contains("rx-") -> EngineType.ROTARY
-            eng.contains("l6") || eng.contains("i6") || eng.contains("inline 6") || eng.contains("straight 6") -> EngineType.INLINE_6
-            eng.contains("l5") || eng.contains("i5") || eng.contains("5 cil") -> EngineType.INLINE_5
-            eng.contains("l3") || eng.contains("i3") || eng.contains("3 cil") || eng.contains("1.0") -> EngineType.INLINE_3
-            eng.contains("g4ed") || eng.contains("l4") || eng.contains("i4") || eng.contains("inline 4") || eng.contains("4 cil") -> EngineType.INLINE_4
-            make.contains("hyundai") && (model.contains("accent") || model.contains("verna")) &&
-                year == 2005 && (eng.contains("1.6") || eng.contains("dohc")) -> EngineType.INLINE_4
-            else -> EngineType.UNKNOWN
+    val detectedPowertrainTopology = remember(selectedVehicle) {
+        VehiclePowertrainTopologyResolver.resolve(
+            engineDescription = listOfNotNull(selectedVehicle?.engine, selectedVehicle?.engine_tech)
+                .joinToString(" "),
+            fuelDescription = selectedVehicle?.fuel_type,
+            transmissionDescription = listOfNotNull(
+                selectedVehicle?.transmission_type,
+                selectedVehicle?.transmission_subtype,
+            ).joinToString(" "),
+            displacementCc = selectedVehicle?.displacement_cc,
+            provenance = VehicleDataProvenance.USER_CONFIRMED,
+        )
+    }
+    // EngineType remains a rendering profile only; topology above is the authority.
+    val detectedEngineType = remember(detectedPowertrainTopology) {
+        val topology = detectedPowertrainTopology
+        val count = topology.cylinderCount.value
+        val layout = topology.cylinderLayout.value
+        when (topology.electrification.value) {
+            PowertrainElectrification.PHEV -> EngineType.PHEV
+            PowertrainElectrification.HEV, PowertrainElectrification.MHEV -> EngineType.HYBRID
+            PowertrainElectrification.BEV -> EngineType.ELECTRIC
+            else -> when {
+                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.V && count == 8 -> EngineType.DIESEL_V8
+                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.V && count == 6 -> EngineType.DIESEL_V6
+                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.INLINE && count == 4 -> EngineType.DIESEL_L4
+                layout == CylinderLayout.V && count == 12 -> EngineType.V12
+                layout == CylinderLayout.V && count == 10 -> EngineType.V10
+                layout == CylinderLayout.V && count == 8 -> EngineType.V8
+                layout == CylinderLayout.V && count == 6 -> EngineType.V6
+                layout == CylinderLayout.BOXER && count == 6 -> EngineType.BOXER_6
+                layout == CylinderLayout.BOXER && count == 4 -> EngineType.BOXER_4
+                layout == CylinderLayout.ROTARY -> EngineType.ROTARY
+                layout == CylinderLayout.INLINE && count == 6 -> EngineType.INLINE_6
+                layout == CylinderLayout.INLINE && count == 5 -> EngineType.INLINE_5
+                layout == CylinderLayout.INLINE && count == 4 -> EngineType.INLINE_4
+                layout == CylinderLayout.INLINE && count == 3 -> EngineType.INLINE_3
+                else -> EngineType.UNKNOWN
+            }
         }
     }
 
     var selectedEngineType by remember(detectedEngineType) { mutableStateOf(detectedEngineType) }
-    val visualRepository = remember { VisualDiagnosticRepositoryImpl() }
-    val aiContextBuilder = remember { DiagnosticAiContextBuilder() }
-    val proprietaryAiContextBuilder = remember { ProprietaryGroundedContextBuilder() }
+    val visualRepository = locatorViewModel.visualRepository
+    val aiContextBuilder = locatorViewModel.diagnosticAiContextBuilder
+    val proprietaryAiContextBuilder = locatorViewModel.proprietaryGroundedContextBuilder
     val visualEngineType = remember(selectedEngineType) { selectedEngineType.toVisualEngineType() }
     
     // Base profesional de componentes filtrada por tipo de motor.
@@ -261,8 +285,27 @@ fun ComponentLocatorScreen(
         }
     }
     
-    val initialDtcProjection = remember(initialDtcCode) {
-        DtcSpatialResolver.resolve(initialDtcCode)
+    val initialDtcProjection = remember(
+        initialDtcCode,
+        initialFindingKey,
+        initialDtcModule,
+        initialDtcNamespace,
+        initialDtcRawIdentity,
+    ) {
+        if (!initialFindingKey.isNullOrBlank()) {
+            DtcSpatialResolver.resolve(
+                DiagnosticSpatialFindingContext(
+                    stableFindingKey = initialFindingKey,
+                    displayCode = initialDtcCode.orEmpty(),
+                    rawDtcIdentity = initialDtcRawIdentity.orEmpty(),
+                    namespace = initialDtcNamespace.orEmpty(),
+                    moduleIdentity = initialFindingKey.split("~").getOrNull(1).orEmpty(),
+                    moduleName = initialDtcModule.orEmpty(),
+                ),
+            )
+        } else {
+            DtcSpatialResolver.resolve(initialDtcCode, initialDtcModule)
+        }
     }
     val initialDtcScene = remember(initialDtcProjection) {
         when (initialDtcProjection.primarySystem) {

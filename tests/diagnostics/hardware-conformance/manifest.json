@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "suite": "MEET Diagnostic Hardware Conformance Lab",
+  "truthPolicy": "No trace may be marked VERIFIED without physical capture and reference-scanner comparison.",
+  "status": "PENDING_PHYSICAL_CAPTURE",
+  "requiredTransports": [
+    "CAN_11_BIT",
+    "CAN_29_BIT",
+    "ISO_TP_MULTI_FRAME",
+    "ISO_9141",
+    "KWP2000",
+    "DOIP"
+  ],
+  "requiredPowertrains": [
+    "GASOLINE",
+    "DIESEL",
+    "HEV",
+    "PHEV",
+    "BEV"
+  ],
+  "requiredAdapters": [
+    "ELM_CLONE",
+    "QUALITY_ELM",
+    "STN_OBDLINK_CLASS",
+    "BLE",
+    "WIFI",
+    "DOIP"
+  ],
+  "acceptance": {
+    "inventedDtcCount": 0,
+    "falseCleanClaimCount": 0,
+    "requiresCorrectEcuAttribution": true,
+    "requiresCorrectStatusAndService": true,
+    "requiresCorrectSnapshotAssociation": true,
+    "requiresEvidenceScopedClearVerification": true,
+    "requiresCancellationRecovery": true,
+    "requiresTrustedReferenceScannerComparison": true
+  },
+  "fixtures": []
+}

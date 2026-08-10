@@ -513,7 +513,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable(
-                route = "component_locator?partId={partId}&dtcCode={dtcCode}&dtcStatus={dtcStatus}",
+                route = "component_locator?partId={partId}&dtcCode={dtcCode}&dtcStatus={dtcStatus}&findingKey={findingKey}&dtcModule={dtcModule}&dtcNamespace={dtcNamespace}&dtcRaw={dtcRaw}",
                 arguments = listOf(navArgument("partId") {
                     type = NavType.StringType
                     nullable = true
@@ -526,6 +526,22 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                }, navArgument("findingKey") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }, navArgument("dtcModule") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }, navArgument("dtcNamespace") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }, navArgument("dtcRaw") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 })
             ) { backStack ->
                 ComponentLocatorScreen(
@@ -534,6 +550,10 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     initialPartId = backStack.arguments?.getString("partId"),
                     initialDtcCode = backStack.arguments?.getString("dtcCode"),
                     initialDtcStatus = backStack.arguments?.getString("dtcStatus"),
+                    initialFindingKey = backStack.arguments?.getString("findingKey"),
+                    initialDtcModule = backStack.arguments?.getString("dtcModule"),
+                    initialDtcNamespace = backStack.arguments?.getString("dtcNamespace"),
+                    initialDtcRawIdentity = backStack.arguments?.getString("dtcRaw"),
                 )
             }
             composable(

@@ -42,8 +42,8 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 42
-        versionName = "4.14.0"
+        versionCode = 43
+        versionName = "4.15.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -164,9 +164,19 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Privileged provider credentials are permitted only in explicitly local debug builds.
+            buildConfigField("String", "CAR2DB_API_KEY", "\"${localProps.getProperty("CAR2DB_API_KEY", "")}\"")
+            buildConfigField("boolean", "CAR2DB_ENABLED", localProps.getProperty("CAR2DB_API_KEY", "").isNotBlank().toString())
+            buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
+        }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Release APKs never carry provider credentials. Production access must use backend/BYOK.
+            buildConfigField("String", "CAR2DB_API_KEY", "\"\"")
+            buildConfigField("boolean", "CAR2DB_ENABLED", "false")
+            buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -188,6 +198,32 @@ android {
                     task.name.startsWith("bundle", ignoreCase = true) ||
                     task.name.startsWith("package", ignoreCase = true) ||
                     task.name.startsWith("sign", ignoreCase = true))
+        }
+        val supabaseKeyRole = localProps.getProperty("ELYSIUM_SUPABASE_KEY_ROLE", "UNDECLARED").uppercase()
+        val legacySupabaseApiKey = "M" + "EET_SUPABASE_KEY"
+        val releaseSupabaseKey = localProps.getProperty("ELYSIUM_SUPABASE_KEY")
+            ?: localProps.getProperty(legacySupabaseApiKey, "")
+        val jwtPayload = runCatching {
+            val segments = releaseSupabaseKey.split('.')
+            if (segments.size == 3) {
+                String(java.util.Base64.getUrlDecoder().decode(segments[1]), Charsets.UTF_8)
+            } else {
+                ""
+            }
+        }.getOrDefault("")
+        val privilegedSupabaseCredential =
+            releaseSupabaseKey.startsWith("sb_secret_", ignoreCase = true) ||
+                jwtPayload.contains("\"role\":\"service_role\"", ignoreCase = true) ||
+                jwtPayload.contains("\"role\": \"service_role\"", ignoreCase = true)
+        if (requestsReleaseArtifact && supabaseKeyRole !in setOf("ANON", "PUBLISHABLE")) {
+            throw GradleException(
+                "Release requires ELYSIUM_SUPABASE_KEY_ROLE=ANON or PUBLISHABLE. Service-role and undeclared keys are forbidden.",
+            )
+        }
+        if (requestsReleaseArtifact && privilegedSupabaseCredential) {
+            throw GradleException(
+                "Release credential is privileged (service-role/secret). Only anon or publishable Supabase keys may be embedded.",
+            )
         }
         if (requestsReleaseArtifact && !releaseSigningConfigured) {
             throw GradleException(

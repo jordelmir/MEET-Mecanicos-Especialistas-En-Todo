@@ -128,7 +128,11 @@ data class DerivedMetric(
     val name: String = "",
     val value: Float? = null,
     val unit: String = "",
-    val isDisplayable: Boolean = true
+    val isDisplayable: Boolean = true,
+    val origin: String = "DERIVED",
+    val confidence: Double = 0.0,
+    val inputPids: List<String> = emptyList(),
+    val formulaVersion: String = "UNVERSIONED",
 ) {
     /** Accesor Double para callers que esperan precisión decimal. */
     val valueAsDouble: Double?

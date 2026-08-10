@@ -145,7 +145,11 @@ data class DerivedMetricEntity(
     val metricName: String,           // e.g. "instant_fuel_consumption"
     val value: Double,
     val unit: String,
-    val computedAt: Long
+    val computedAt: Long,
+    val origin: String = "DERIVED",
+    val confidence: Double = 0.0,
+    val inputPidsJson: String = "[]",
+    val formulaVersion: String = "UNVERSIONED",
 )
 
 @Entity(tableName = "health_scores", indices = [Index("vehicleId"), Index("computedAt")])

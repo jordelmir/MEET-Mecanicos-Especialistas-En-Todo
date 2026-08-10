@@ -14,8 +14,44 @@ enum class DiagnosticSpatialSystem {
 data class DiagnosticSpatialProjection(
     val primarySystem: DiagnosticSpatialSystem,
     val relatedSystems: Set<DiagnosticSpatialSystem>,
+    val candidateComponents: List<SpatialCandidateComponent> = emptyList(),
+    val signalPaths: List<String> = emptyList(),
+    val electricalPaths: List<String> = emptyList(),
+    val communicationPaths: List<String> = emptyList(),
+    val fluidPaths: List<String> = emptyList(),
+    val mechanicalPaths: List<String> = emptyList(),
+    val confidence: Double = 0.0,
+    val explanation: String = "Proyección orientativa sin evidencia suficiente.",
     val relationNotice: String =
         "Relación diagnóstica orientativa: no confirma por sí sola una pieza dañada.",
+)
+
+data class SpatialCandidateComponent(
+    val componentId: String,
+    val relationship: String,
+    val confidence: Double,
+    val requiredEvidence: String,
+)
+
+data class DiagnosticSpatialFindingContext(
+    val stableFindingKey: String,
+    val displayCode: String,
+    val rawDtcIdentity: String,
+    val namespace: String,
+    val moduleIdentity: String,
+    val moduleName: String,
+    val failureType: Int? = null,
+    val knowledgeRelations: List<SpatialKnowledgeRelation> = emptyList(),
+)
+
+data class SpatialKnowledgeRelation(
+    val componentId: String,
+    val relationship: String,
+    val pathType: String,
+    val pathDescription: String,
+    val confidence: Double,
+    val source: String,
+    val requiredEvidence: String,
 )
 
 /**
@@ -51,6 +87,51 @@ object DtcSpatialResolver {
             DiagnosticSpatialSystem.CHASSIS -> setOf(DiagnosticSpatialSystem.BRAKES_STEERING)
             else -> emptySet()
         }
-        return DiagnosticSpatialProjection(primary, related)
+        return DiagnosticSpatialProjection(
+            primarySystem = primary,
+            relatedSystems = related,
+            confidence = if (module.isNotBlank()) 0.72 else if (normalizedCode.isNotBlank()) 0.48 else 0.0,
+            explanation = if (module.isNotBlank()) {
+                "Sistema priorizado por evidencia del módulo $module y familia del DTC $normalizedCode."
+            } else {
+                "Sistema aproximado por familia del DTC; falta identidad de ECU para elevar confianza."
+            },
+        )
+    }
+
+    fun resolve(finding: DiagnosticSpatialFindingContext): DiagnosticSpatialProjection {
+        val base = resolve(finding.displayCode, finding.moduleName.ifBlank { finding.moduleIdentity })
+        val networkPath = finding.knowledgeRelations.filter { it.pathType == "COMMUNICATION" }
+            .map { it.pathDescription }
+            .ifEmpty { if (base.primarySystem == DiagnosticSpatialSystem.COMMUNICATION_NETWORK) {
+            listOf("${finding.moduleIdentity} → bus de comunicación → módulos relacionados")
+        } else {
+            emptyList()
+        } }
+        val graphConfidence = finding.knowledgeRelations.maxOfOrNull { it.confidence }
+        return base.copy(
+            candidateComponents = finding.knowledgeRelations.map { relation ->
+                SpatialCandidateComponent(
+                    componentId = relation.componentId,
+                    relationship = relation.relationship,
+                    confidence = relation.confidence,
+                    requiredEvidence = relation.requiredEvidence,
+                )
+            },
+            signalPaths = finding.knowledgeRelations.filter { it.pathType == "SIGNAL" }.map { it.pathDescription },
+            electricalPaths = finding.knowledgeRelations.filter { it.pathType == "ELECTRICAL" }.map { it.pathDescription },
+            communicationPaths = networkPath,
+            fluidPaths = finding.knowledgeRelations.filter { it.pathType == "FLUID" }.map { it.pathDescription },
+            mechanicalPaths = finding.knowledgeRelations.filter { it.pathType == "MECHANICAL" }.map { it.pathDescription },
+            confidence = (graphConfidence ?: (base.confidence + if (finding.rawDtcIdentity.isNotBlank()) 0.12 else 0.0))
+                .coerceAtMost(0.9),
+            explanation = if (finding.knowledgeRelations.isNotEmpty()) {
+                "Proyección trazada desde ${finding.knowledgeRelations.map { it.source }.distinct().joinToString()} " +
+                    "para ${finding.stableFindingKey}; son relaciones candidatas, no piezas confirmadas."
+            } else {
+                "${base.explanation} Identidad estable ${finding.stableFindingKey}; falta una relación de grafo " +
+                    "aplicable al vehículo, por lo que la proyección conserva confianza limitada."
+            },
+        )
     }
 }

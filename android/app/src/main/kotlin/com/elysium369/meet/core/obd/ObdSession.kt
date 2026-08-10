@@ -140,9 +140,8 @@ class ObdSession(
 
     private val commandQueue = ObdCommandQueue()
     private val communicationMutex = Mutex()
-    private val exclusiveBusMutex = Mutex()
-    private val _physicalBusOwner = MutableStateFlow(PhysicalBusOwner.IDLE)
-    val physicalBusOwner: StateFlow<PhysicalBusOwner> = _physicalBusOwner.asStateFlow()
+    private val physicalBusActor = PhysicalBusActor()
+    val physicalBusOwner: StateFlow<PhysicalBusOwner> = physicalBusActor.owner
     private val keepAliveManager = KeepAliveManager(this)
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
@@ -194,16 +193,17 @@ class ObdSession(
     private suspend fun <T> withExclusivePhysicalBus(
         owner: PhysicalBusOwner,
         block: suspend () -> T,
-    ): T = exclusiveBusMutex.withLock {
+    ): T {
         val pollingWasPaused = isPollingPaused
-        _physicalBusOwner.value = owner
-        pauseLivePolling()
-        clearCommandQueue()
-        try {
+        return physicalBusActor.withLease(
+            owner = owner,
+            onAcquire = {
+                pauseLivePolling()
+                clearCommandQueue()
+            },
+            onRelease = { if (!pollingWasPaused) resumeLivePolling() },
+        ) {
             withContext(PhysicalBusLeaseContext(owner)) { block() }
-        } finally {
-            _physicalBusOwner.value = PhysicalBusOwner.IDLE
-            if (!pollingWasPaused) resumeLivePolling()
         }
     }
     private var currentJob: Job? = null
@@ -275,7 +275,7 @@ class ObdSession(
     private var diagnosticScanCancellationRequested = false
 
     fun cancelDiagnosticScan() {
-        if (_physicalBusOwner.value == PhysicalBusOwner.DIAGNOSTIC_SCAN) {
+        if (physicalBusActor.currentOwner == PhysicalBusOwner.DIAGNOSTIC_SCAN) {
             diagnosticScanCancellationRequested = true
             _statusMessage.value = "Deteniendo escaneo de forma segura; conservando evidencia parcial..."
         }
@@ -341,6 +341,7 @@ class ObdSession(
 
     private var targetAddress: String? = null
     private var isDoIpMode = false
+    private var doIpTargetLogicalAddress: Int = 0x1000
     private val bluetoothMacRegex = Regex("(?i)^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     fun setTargetAddress(address: String) {
@@ -2066,10 +2067,12 @@ class ObdSession(
      */
     suspend fun readFreezeFrame(dtc: String): FreezeFrameReadResult {
         val results = mutableMapOf<String, String>()
+        val rawExchanges = linkedMapOf<String, String>()
         val requestedDtc = dtc.trim().uppercase()
 
         // Mode 02 PID 02: DTC that caused freeze frame
         val dtcResp = sendRawCommand("020200") // Frame 0
+        rawExchanges["020200"] = dtcResp
         val normalizedIdentityResponse = dtcResp.uppercase().replace(" ", "")
         if (normalizedIdentityResponse.contains("NODATA") || normalizedIdentityResponse.contains("?")) {
             return FreezeFrameReadResult(
@@ -2077,6 +2080,7 @@ class ObdSession(
                 actualDtc = null,
                 outcome = FreezeFrameOutcome.NO_RESPONSE,
                 identityRawResponse = dtcResp,
+                rawExchanges = rawExchanges,
             )
         }
         val actualDtc = DtcScanEngine.parseFreezeFrameIdentity(dtcResp)
@@ -2085,6 +2089,7 @@ class ObdSession(
                 actualDtc = null,
                 outcome = FreezeFrameOutcome.MALFORMED_RESPONSE,
                 identityRawResponse = dtcResp,
+                rawExchanges = rawExchanges,
             )
         if (actualDtc != requestedDtc) {
             return FreezeFrameReadResult(
@@ -2092,6 +2097,7 @@ class ObdSession(
                 actualDtc = actualDtc,
                 outcome = FreezeFrameOutcome.BELONGS_TO_ANOTHER_DTC,
                 identityRawResponse = dtcResp,
+                rawExchanges = rawExchanges,
             )
         }
 
@@ -2110,6 +2116,7 @@ class ObdSession(
         for (cmd in pids) {
             val pid = cmd.substring(2, 4)
             val res = sendRawCommand(cmd)
+            rawExchanges[cmd] = res
             if (!res.contains("NODATA") && !res.contains("?")) {
                 results[pid] = parseMode02Response(pid, res)
             }
@@ -2122,6 +2129,7 @@ class ObdSession(
             outcome = FreezeFrameOutcome.MATCHED,
             values = results,
             identityRawResponse = dtcResp,
+            rawExchanges = rawExchanges,
         )
     }
 
@@ -2197,13 +2205,58 @@ class ObdSession(
         val aliveModules = linkedMapOf<String, String>()
         val moduleReads = linkedMapOf<String, MutableList<DtcServiceRead>>()
         val attemptedModules = linkedMapOf<String, String>()
+        val modulesCompletedDuringScan = linkedSetOf<String>()
+        val protocolWarnings = mutableListOf<String>()
+        var modulesPlanned = 0
+        var modulesCompleted = 0
+        var servicesPlanned = 0
+        var servicesCompleted = 0
+
+        fun emitProgress() {
+            _diagnosticScanEvents.tryEmit(
+                DiagnosticScanEvent.ProgressUpdated(
+                    ScanProgressState(modulesCompleted, modulesPlanned, servicesCompleted, servicesPlanned),
+                ),
+            )
+        }
 
         fun normalizeRecord(record: DtcRecord, fallbackName: String?): DtcRecord {
             val responseName = moduleNameForResponse(record.responseAddress)
             return record.copy(moduleName = responseName ?: record.moduleName ?: fallbackName)
         }
 
+        fun diagnosticRequestScope(target: String?, moduleName: String?): DiagnosticRequestScope = when {
+            target == "7DF" -> DiagnosticRequestScope.Functional("7DF")
+            target.isNullOrBlank() || target == "LEGACY" -> DiagnosticRequestScope.LegacyUnaddressed
+            isDoIpMode -> DiagnosticRequestScope.Logical(
+                EcuEndpoint(
+                    busId = "DOIP",
+                    networkType = DiagnosticTransport.DOIP,
+                    addressingMode = DiagnosticAddressingMode.LOGICAL,
+                    requestAddress = null,
+                    responseAddress = null,
+                    logicalAddress = target,
+                    moduleRole = moduleName,
+                    discoveryProvenance = "DOIP_ROUTING_ACTIVATION",
+                ),
+            )
+            else -> DiagnosticRequestScope.Physical(
+                EcuEndpoint(
+                    busId = "CAN0",
+                    networkType = DiagnosticTransport.CAN,
+                    addressingMode = DiagnosticAddressingMode.PHYSICAL,
+                    requestAddress = target,
+                    responseAddress = null,
+                    moduleRole = moduleName,
+                    discoveryProvenance = "SCAN_PLAN",
+                ),
+            )
+        }
+
         suspend fun queryStandard(command: String, mode: String, target: String?, moduleName: String?): DtcServiceRead {
+            val moduleIdentity = DiagnosticModuleIdentity.canonical(target, null, moduleName)
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ServiceStarted(moduleIdentity, command, 1, 3))
+            val requestStartedAt = System.currentTimeMillis()
             var failed = false
             var forcedOutcome: ModuleScanOutcome? = null
             val raw = try {
@@ -2238,9 +2291,23 @@ class ObdSession(
                 parsed.size,
                 outcome,
                 classification.negativeResponse,
+                sessionId = startedAt.toString(),
+                transport = when {
+                    isDoIpMode -> DiagnosticTransport.DOIP
+                    detectedProtocol.contains("CAN", ignoreCase = true) -> DiagnosticTransport.CAN
+                    else -> DiagnosticTransport.K_LINE
+                },
+                requestScope = when {
+                    target == "7DF" -> DiagnosticRequestScope.Functional("7DF")
+                    target.isNullOrBlank() || target == "LEGACY" -> DiagnosticRequestScope.LegacyUnaddressed
+                    else -> DiagnosticRequestScope.Physical(
+                        EcuEndpoint("CAN0", DiagnosticTransport.CAN, DiagnosticAddressingMode.PHYSICAL, target, null, moduleRole = moduleName, discoveryProvenance = "SCAN_PLAN"),
+                    )
+                },
+                latencyMs = System.currentTimeMillis() - requestStartedAt,
             )
             records += parsed
-            parsed.forEach { _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.FindingDiscovered(it)) }
+            parsed.forEach { _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.FindingObserved(it)) }
             val bucket = when (mode) {
                 "07" -> DtcBucket.PENDING
                 "0A" -> DtcBucket.PERMANENT
@@ -2253,22 +2320,128 @@ class ObdSession(
                 negativeResponse = classification.negativeResponse,
             )
             moduleReads.getOrPut(target ?: "LEGACY") { mutableListOf() } += read
+            if (target == "7DF") {
+                DtcScanEngine.groupRawByEcu(raw).forEach { (responseAddress, responseLines) ->
+                    val requestAddress = responseAddress.toIntOrNull(16)
+                        ?.minus(8)
+                        ?.takeIf { it >= 0 }
+                        ?.let { String.format("%03X", it) }
+                        ?: return@forEach
+                    val discoveredName = moduleNameForResponse(responseAddress) ?: "ECU $responseAddress"
+                    attemptedModules.putIfAbsent(requestAddress, discoveredName)
+                    aliveModules.putIfAbsent(requestAddress, discoveredName)
+                    val perEcuRaw = responseLines.joinToString("\n")
+                    val perEcuRecordCount = parsed.count { it.responseAddress == responseAddress }
+                    val perEcuClassification = DtcScanEngine.classifyExchangeDetailed(
+                        rawResponse = perEcuRaw,
+                        positiveResponseService = positiveService,
+                        parsedRecordCount = perEcuRecordCount,
+                    )
+                    val perEcuRead = read.copy(
+                        outcome = perEcuClassification.outcome,
+                        negativeResponse = perEcuClassification.negativeResponse,
+                    )
+                    moduleReads.getOrPut(requestAddress) { mutableListOf() } += perEcuRead
+                    rawExchanges += DtcRawExchange(
+                        command = command,
+                        targetAddress = "7DF",
+                        rawResponse = perEcuRaw,
+                        parsedRecordCount = perEcuRecordCount,
+                        outcome = perEcuClassification.outcome,
+                        negativeResponse = perEcuClassification.negativeResponse,
+                        sessionId = startedAt.toString(),
+                        transport = DiagnosticTransport.CAN,
+                        requestScope = DiagnosticRequestScope.Functional("7DF"),
+                        responseAddress = responseAddress,
+                        latencyMs = System.currentTimeMillis() - requestStartedAt,
+                    )
+                    _diagnosticScanEvents.tryEmit(
+                        DiagnosticScanEvent.ModuleDiscovered(
+                            EcuEndpoint(
+                                busId = "CAN0",
+                                networkType = DiagnosticTransport.CAN,
+                                addressingMode = DiagnosticAddressingMode.PHYSICAL,
+                                requestAddress = requestAddress,
+                                responseAddress = responseAddress,
+                                moduleRole = discoveredName,
+                                discoveryProvenance = "FUNCTIONAL_RESPONSE",
+                            ),
+                        ),
+                    )
+                }
+            }
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.CoverageUpdated(moduleIdentity, read.coverage))
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ServiceCompleted(moduleIdentity, command, outcome, 1, 3))
+            servicesCompleted++
+            emitProgress()
             return read
         }
 
         suspend fun queryUds(command: String, target: String?, moduleName: String?): Pair<List<DtcRecord>, DtcServiceRead> {
+            val moduleIdentity = DiagnosticModuleIdentity.canonical(target, null, moduleName)
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ServiceStarted(moduleIdentity, command, 1, 1))
             var failed = false
             var forcedOutcome: ModuleScanOutcome? = null
-            val raw = try {
-                sendRawCommand(command, priority = 999)
-            } catch (_: TimeoutCancellationException) {
-                forcedOutcome = ModuleScanOutcome.TIMEOUT
-                ""
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Throwable) {
-                failed = true
-                ""
+            var retryCount = 0
+            var raw = ""
+            var requestStartedAt = System.currentTimeMillis()
+            var awaitPendingResponse = false
+            var pendingResponseTimeoutMs = 1_500L
+            while (true) {
+                requestStartedAt = System.currentTimeMillis()
+                raw = try {
+                    if (awaitPendingResponse) {
+                        awaitDiagnosticResponseWithoutRequest(timeoutMs = pendingResponseTimeoutMs)
+                    } else {
+                        sendRawCommand(command, priority = 999)
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    forcedOutcome = ModuleScanOutcome.TIMEOUT
+                    ""
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    failed = true
+                    ""
+                }
+                awaitPendingResponse = false
+                if (forcedOutcome != null || failed) break
+                val negative = DiagnosticPduDecoder.decodeResponses(raw, 0x59, 0x19)
+                    .filterIsInstance<ProtocolResponse.Negative>()
+                    .firstOrNull()
+                    ?.response
+                    ?: break
+                val action = UdsNegativeResponsePolicy.actionFor(negative, retryCount + 1)
+                when (action) {
+                    is UdsNrcAction.AwaitFinalResponse -> {
+                        if (retryCount >= 2) break
+                        rawExchanges += DtcRawExchange(
+                            command, target, raw, 0, ModuleScanOutcome.NEGATIVE_RESPONSE, negative,
+                            sessionId = startedAt.toString(),
+                            transport = if (isDoIpMode) DiagnosticTransport.DOIP else DiagnosticTransport.CAN,
+                            requestScope = diagnosticRequestScope(target, moduleName),
+                            latencyMs = System.currentTimeMillis() - requestStartedAt,
+                            retryCount = retryCount,
+                        )
+                        retryCount++
+                        pendingResponseTimeoutMs = action.p2StarDelayMs.coerceAtLeast(500L)
+                        awaitPendingResponse = true
+                    }
+                    is UdsNrcAction.RetryAfterDelay -> {
+                        if (action.remainingAttempts <= 0) break
+                        rawExchanges += DtcRawExchange(
+                            command, target, raw, 0, ModuleScanOutcome.NEGATIVE_RESPONSE, negative,
+                            sessionId = startedAt.toString(),
+                            transport = if (isDoIpMode) DiagnosticTransport.DOIP else DiagnosticTransport.CAN,
+                            requestScope = diagnosticRequestScope(target, moduleName),
+                            latencyMs = System.currentTimeMillis() - requestStartedAt,
+                            retryCount = retryCount,
+                        )
+                        delay(action.delayMs)
+                        retryCount++
+                    }
+                    else -> break
+                }
             }
             val parsed = DtcScanEngine.parseUdsService19ByEcu(raw, target, moduleName)
                 .map { normalizeRecord(it, moduleName) }
@@ -2285,9 +2458,14 @@ class ObdSession(
                 parsed.size,
                 outcome,
                 classification.negativeResponse,
+                sessionId = startedAt.toString(),
+                transport = if (isDoIpMode) DiagnosticTransport.DOIP else DiagnosticTransport.CAN,
+                requestScope = diagnosticRequestScope(target, moduleName),
+                latencyMs = System.currentTimeMillis() - requestStartedAt,
+                retryCount = retryCount,
             )
             records += parsed
-            parsed.forEach { _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.FindingDiscovered(it)) }
+            parsed.forEach { _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.FindingObserved(it)) }
             val statusMask = command.takeLast(2).toIntOrNull(16) ?: 0xFF
             val read = DtcServiceRead(
                 command = command,
@@ -2296,6 +2474,10 @@ class ObdSession(
                 negativeResponse = classification.negativeResponse,
             )
             moduleReads.getOrPut(target ?: "LEGACY") { mutableListOf() } += read
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.CoverageUpdated(moduleIdentity, read.coverage))
+            _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ServiceCompleted(moduleIdentity, command, outcome, 1, 1))
+            servicesCompleted++
+            emitProgress()
             return parsed to read
         }
 
@@ -2314,32 +2496,107 @@ class ObdSession(
                 u.contains("59")
         }
 
-        val isCan = detectedProtocol.uppercase().contains("CAN") || detectedProtocol.uppercase().contains("ISO15765")
+        fun emitModuleCompletedNow(
+            target: String,
+            moduleName: String,
+            responseAddress: String? = null,
+            readsOverride: List<DtcServiceRead>? = null,
+        ) {
+            val identity = DiagnosticModuleIdentity.canonical(target, responseAddress, moduleName)
+            if (!modulesCompletedDuringScan.add(identity)) return
+            val reads = readsOverride ?: moduleReads[target].orEmpty()
+            val moduleRecords = records.filter {
+                DiagnosticModuleIdentity.canonical(it.targetAddress, it.responseAddress, it.moduleName) == identity
+            }
+            val outcome = when {
+                reads.isEmpty() -> ModuleScanOutcome.NO_RESPONSE
+                reads.all { it.outcome.provesBucketWasRead } ->
+                    if (moduleRecords.isEmpty()) ModuleScanOutcome.NO_DTC else ModuleScanOutcome.COMPLETE
+                reads.any { it.outcome.provesBucketWasRead } -> ModuleScanOutcome.PARTIAL_RESPONSE
+                else -> reads.first().outcome
+            }
+            _diagnosticScanEvents.tryEmit(
+                DiagnosticScanEvent.ModuleCompleted(identity, moduleName, moduleRecords.size, outcome),
+            )
+        }
+
+        val diagnosticStack = DiagnosticProtocolRegistry.resolve(detectedProtocol, isDoIpMode)
+        val isCan = diagnosticStack.transport == DiagnosticTransport.CAN
         var wasCancelled = false
         try {
-            if (isCan) {
+            if (diagnosticStack.transport == DiagnosticTransport.DOIP) {
+                val doIpPlan = DiagnosticStrategyRegistry.forStack(diagnosticStack)
+                    .compileDtcPlan(mode)
+                if (!doIpPlan.isSupported) {
+                    throw IllegalStateException(doIpPlan.unsupportedReason ?: "DoIP UDS no disponible")
+                }
+                modulesPlanned = 1
+                servicesPlanned = doIpPlan.primaryRequests.size + doIpPlan.fallbackRequests.size
+                _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ScanPlanCompiled(1, servicesPlanned))
+                emitProgress()
+                val logicalTarget = "%04X".format(doIpTargetLogicalAddress)
+                val moduleName = "DoIP Diagnostic Server"
+                attemptedModules[logicalTarget] = moduleName
+                aliveModules[logicalTarget] = moduleName
+                _diagnosticScanEvents.tryEmit(
+                    DiagnosticScanEvent.ModuleDiscovered(
+                        EcuEndpoint(
+                            busId = "DOIP",
+                            networkType = DiagnosticTransport.DOIP,
+                            addressingMode = DiagnosticAddressingMode.LOGICAL,
+                            requestAddress = null,
+                            responseAddress = null,
+                            logicalAddress = logicalTarget,
+                            moduleRole = moduleName,
+                            discoveryProvenance = "ISO13400_ROUTING_ACTIVATION",
+                        ),
+                    ),
+                )
+                _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ModuleReading(logicalTarget, moduleName))
+                val (_, allRead) = queryUds(doIpPlan.primaryRequests.first(), logicalTarget, moduleName)
+                if (!allRead.outcome.provesBucketWasRead && !diagnosticScanCancellationRequested) {
+                    doIpPlan.fallbackRequests.forEach { fallback ->
+                        if (!diagnosticScanCancellationRequested) queryUds(fallback, logicalTarget, moduleName)
+                    }
+                }
+                emitModuleCompletedNow(logicalTarget, moduleName)
+                modulesCompleted = 1
+                emitProgress()
+                wasCancelled = diagnosticScanCancellationRequested
+            } else if (isCan) {
                 _statusMessage.value = "Escaneo DTC profesional: configurando bus CAN..."
                 runCatching { sendRawCommand("ATH1", priority = 999) }
                 runCatching { sendRawCommand("ATAL", priority = 999) }
                 runCatching { sendRawCommand("ATCAF1", priority = 999) }
 
-                // Phase 1: functional broadcast with headers.
-                runCatching { sendRawCommand("ATSH7DF", priority = 999) }
-                attemptedModules["7DF"] = "Functional Broadcast"
-                _diagnosticScanEvents.tryEmit(
-                    DiagnosticScanEvent.ModuleReading("7DF", "Functional Broadcast"),
-                )
-                queryStandard("03", "03", "7DF", "Functional Broadcast")
-                if (!diagnosticScanCancellationRequested) queryStandard("07", "07", "7DF", "Functional Broadcast")
-                if (!diagnosticScanCancellationRequested) queryStandard("0A", "0A", "7DF", "Functional Broadcast")
-                if (diagnosticScanCancellationRequested) wasCancelled = true
-
-                // Phase 2: physical module sweep
                 val physicalTargets = DiagnosticScanPlanCompiler.compile(
                     mode = mode,
                     confirmedModules = _networkTopology.value,
                     discoveryCandidates = professionalDtcTargets(),
                 )
+                modulesPlanned = physicalTargets.size.coerceAtLeast(1)
+                // Functional SAE reads plus at most three evidence services
+                // per physical endpoint (SAE 03/07/0A or UDS primary/fallback).
+                servicesPlanned = 3 + physicalTargets.size * 3
+                _diagnosticScanEvents.tryEmit(
+                    DiagnosticScanEvent.ScanPlanCompiled(
+                        modulesPlanned = modulesPlanned,
+                        servicesPlanned = servicesPlanned,
+                    ),
+                )
+                emitProgress()
+
+                // Phase 1: functional broadcast with headers.
+                runCatching { sendRawCommand("ATSH7DF", priority = 999) }
+                _diagnosticScanEvents.tryEmit(
+                    DiagnosticScanEvent.ModuleReading("7DF", "Solicitud funcional CAN"),
+                )
+                queryStandard("03", "03", "7DF", "Respuesta ECU")
+                if (!diagnosticScanCancellationRequested) queryStandard("07", "07", "7DF", "Respuesta ECU")
+                if (!diagnosticScanCancellationRequested) queryStandard("0A", "0A", "7DF", "Respuesta ECU")
+                if (diagnosticScanCancellationRequested) wasCancelled = true
+
+                // Phase 2: physical module sweep
                 for (scanTarget in physicalTargets) {
                     val target = scanTarget.requestAddress
                     val moduleName = scanTarget.moduleName
@@ -2360,7 +2617,11 @@ class ObdSession(
 
                     try {
                         val probeRaw = runCatching { sendRawCommand("0100", priority = 999) }.getOrDefault("")
-                        var alive = isAliveResponse(probeRaw)
+                        val saeObdCapable = isAliveResponse(probeRaw) &&
+                            DiagnosticPduDecoder.decodeResponses(probeRaw, 0x41, 0x01)
+                                .any { it is ProtocolResponse.Positive }
+                        var udsCapable = false
+                        var alive = saeObdCapable
                         rawExchanges += DtcRawExchange(
                             "0100", target, probeRaw, 0,
                             if (alive) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_RESPONSE,
@@ -2368,7 +2629,9 @@ class ObdSession(
 
                         if (!alive) {
                             val testerRaw = runCatching { sendRawCommand("3E00", priority = 999) }.getOrDefault("")
-                            alive = isAliveResponse(testerRaw)
+                            udsCapable = DiagnosticPduDecoder.decodeResponses(testerRaw, 0x7E, 0x3E)
+                                .any { it is ProtocolResponse.Positive || it is ProtocolResponse.Negative }
+                            alive = udsCapable
                             rawExchanges += DtcRawExchange(
                                 "3E00", target, testerRaw, 0,
                                 if (alive) ModuleScanOutcome.COMPLETE else ModuleScanOutcome.NO_RESPONSE,
@@ -2378,20 +2641,48 @@ class ObdSession(
                         if (!alive) continue
                         aliveModules[target] = moduleName
 
-                        runCatching { sendRawCommand("1003", priority = 999) }
-                        val (_, udsAllRead) = queryUds("1902FF", target, moduleName)
-                        if (!udsAllRead.outcome.provesBucketWasRead) {
-                            queryUds("19020D", target, moduleName)
+                        if (udsCapable) {
+                            runCatching { sendRawCommand("1003", priority = 999) }
+                            val (_, udsAllRead) = queryUds("1902FF", target, moduleName)
+                            if (!udsAllRead.outcome.provesBucketWasRead) {
+                                queryUds("19020D", target, moduleName)
+                            }
+                        } else if (saeObdCapable) {
+                            queryStandard("03", "03", target, moduleName)
+                            queryStandard("07", "07", target, moduleName)
+                            queryStandard("0A", "0A", target, moduleName)
                         }
-                        queryStandard("03", "03", target, moduleName)
-                        queryStandard("07", "07", target, moduleName)
-                        queryStandard("0A", "0A", target, moduleName)
                     } finally {
+                        emitModuleCompletedNow(target, moduleName)
+                        modulesCompleted = (modulesCompleted + 1).coerceAtMost(modulesPlanned)
+                        emitProgress()
                         runCatching { sendRawCommand("ATCRA", priority = 999) }
                     }
                 }
+                if (physicalTargets.isEmpty()) {
+                    modulesCompleted = 1
+                    emitProgress()
+                }
+            } else if (diagnosticStack.applicationProtocol in setOf(
+                    DiagnosticApplicationProtocol.KWP2000,
+                    DiagnosticApplicationProtocol.OBD_ON_UDS,
+                    DiagnosticApplicationProtocol.OEM,
+                )
+            ) {
+                val unsupported = DiagnosticStrategyRegistry.forStack(diagnosticStack).compileDtcPlan(mode)
+                modulesPlanned = 0
+                servicesPlanned = 0
+                _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ScanPlanCompiled(0, 0))
+                val unsupportedReason = unsupported.unsupportedReason
+                    ?: "Protocolo detectado sin estrategia diagnóstica verificada; no se enviaron comandos especulativos."
+                protocolWarnings += unsupportedReason
+                _statusMessage.value = unsupportedReason
             } else {
                 _statusMessage.value = "Escaneo DTC estándar: consultando protocolo legado..."
+                modulesPlanned = 1
+                servicesPlanned = 3
+                _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ScanPlanCompiled(1, 3))
+                emitProgress()
                 runCatching { sendRawCommand("ATH0", priority = 999) }
                 attemptedModules["LEGACY"] = "Standard OBD-II"
                 _diagnosticScanEvents.tryEmit(
@@ -2402,6 +2693,9 @@ class ObdSession(
                 if (!diagnosticScanCancellationRequested) queryStandard("07", "07", null, "Standard OBD-II")
                 if (!diagnosticScanCancellationRequested) queryStandard("0A", "0A", null, "Standard OBD-II")
                 if (diagnosticScanCancellationRequested) wasCancelled = true
+                emitModuleCompletedNow("LEGACY", "Standard OBD-II")
+                modulesCompleted = 1
+                emitProgress()
                 if (moduleReads["LEGACY"].orEmpty().any { read ->
                         read.outcome in setOf(
                             ModuleScanOutcome.COMPLETE,
@@ -2431,17 +2725,36 @@ class ObdSession(
             "${it.namespace}|${DiagnosticModuleIdentity.canonical(it.targetAddress, it.responseAddress, it.moduleName)}|" +
                 "${it.code}|${it.bucket}|${it.udsStatusByte}|${it.udsFailureType}|${it.sourceService}"
         }
-        val moduleKeys = (attemptedModules.keys + distinctRecords.mapNotNull { it.targetAddress }).distinct()
+        val moduleKeys = (
+            attemptedModules.keys.filterNot { it == "7DF" } +
+                aliveModules.keys.filterNot { it == "7DF" } +
+                distinctRecords.mapNotNull {
+                    if (it.targetAddress == null && it.responseAddress == null) null
+                    else DiagnosticModuleIdentity.canonical(it.targetAddress, it.responseAddress, it.moduleName)
+                }.filterNot { it == "7DF" }
+            ).distinct()
         val modules = moduleKeys.map { key ->
-            val expectedResponse = key.toIntOrNull(16)?.let { String.format("%03X", it + 8) }
+            val responseOnlyEndpoint = key !in attemptedModules && distinctRecords.any { it.responseAddress == key }
+            val requestKey = if (responseOnlyEndpoint && key.length == 3) {
+                key.toIntOrNull(16)?.minus(8)?.takeIf { it >= 0 }?.let { String.format("%03X", it) } ?: key
+            } else {
+                key
+            }
+            val expectedResponse = when {
+                responseOnlyEndpoint -> key
+                key.length == 3 -> key.toIntOrNull(16)?.let { String.format("%03X", it + 8) }
+                else -> null
+            }
             val moduleRecords = distinctRecords.filter {
                 if (key == "LEGACY") {
                     it.targetAddress == null && it.responseAddress == null
                 } else {
-                    it.targetAddress == key || it.responseAddress == key || it.responseAddress == expectedResponse
+                    it.targetAddress == requestKey || it.responseAddress == key || it.responseAddress == expectedResponse
                 }
             }
-            val reads = moduleReads[key].orEmpty()
+            val reads = moduleReads[requestKey].orEmpty().ifEmpty {
+                if (responseOnlyEndpoint) moduleReads["7DF"].orEmpty() else emptyList()
+            }
             val moduleOutcome = when {
                 reads.isEmpty() -> ModuleScanOutcome.NO_RESPONSE
                 reads.all { it.outcome.provesBucketWasRead } ->
@@ -2449,7 +2762,7 @@ class ObdSession(
                 reads.any { it.outcome.provesBucketWasRead } -> ModuleScanOutcome.PARTIAL_RESPONSE
                 else -> reads.first().outcome
             }
-            val demonstratedAlive = key in aliveModules || reads.any {
+            val demonstratedAlive = key in aliveModules || requestKey in aliveModules || reads.any {
                 it.outcome in setOf(
                     ModuleScanOutcome.COMPLETE,
                     ModuleScanOutcome.NO_DTC,
@@ -2458,15 +2771,18 @@ class ObdSession(
                     ModuleScanOutcome.MALFORMED_RESPONSE,
                 )
             }
-            val requiredForCompleteness = key in aliveModules ||
-                (key == "7DF" && aliveModules.isEmpty() && demonstratedAlive)
+            val requiredForCompleteness = key in aliveModules || requestKey in aliveModules || responseOnlyEndpoint
             DtcModuleReport(
-                targetAddress = key.takeUnless { it == "LEGACY" },
+                targetAddress = requestKey.takeUnless { it == "LEGACY" },
                 responseAddress = expectedResponse,
-                moduleName = attemptedModules[key] ?: aliveModules[key] ?: moduleNameForResponse(key) ?: "ECU $key",
+                moduleName = attemptedModules[requestKey] ?: aliveModules[requestKey] ?: moduleNameForResponse(expectedResponse ?: key) ?: "ECU $key",
                 isAlive = demonstratedAlive,
                 dtcs = moduleRecords,
-                rawExchanges = rawExchanges.filter { it.targetAddress == key },
+                rawExchanges = rawExchanges.filter {
+                    it.targetAddress == requestKey ||
+                        it.responseAddress == expectedResponse ||
+                        (responseOnlyEndpoint && it.targetAddress == "7DF")
+                },
                 serviceReads = reads,
                 outcome = moduleOutcome,
                 discoveryState = when {
@@ -2497,10 +2813,13 @@ class ObdSession(
             (it.requiredForCompleteness || it.discoveryState == DiagnosticModuleDiscoveryState.CONFIRMED) &&
                 it.outcome !in setOf(ModuleScanOutcome.COMPLETE, ModuleScanOutcome.NO_DTC)
         }.map { "${it.moduleName}: ${it.outcome.name}" }.toMutableList().apply {
+            addAll(protocolWarnings)
             if (wasCancelled) add("Escaneo detenido por el usuario; resultados parciales conservados.")
         }
 
-        modules.filter { it.isAlive || it.serviceReads.isNotEmpty() }.forEach { module ->
+        modules.filter {
+            (it.isAlive || it.serviceReads.isNotEmpty()) && it.moduleIdentity !in modulesCompletedDuringScan
+        }.forEach { module ->
             _diagnosticScanEvents.tryEmit(
                 DiagnosticScanEvent.ModuleCompleted(
                     moduleIdentity = module.moduleIdentity,
@@ -2539,59 +2858,105 @@ class ObdSession(
         return report
     }
 
-    suspend fun clearDtcs(): Boolean = withExclusivePhysicalBus(PhysicalBusOwner.DTC_CLEAR) {
-        clearDtcsOwned()
+    suspend fun clearDtcs(
+        verificationPlan: ClearVerificationPlan = ClearVerificationPlan.empty(),
+    ): ClearDtcResult = withExclusivePhysicalBus(PhysicalBusOwner.DTC_CLEAR) {
+        clearDtcsOwned(verificationPlan)
     }
 
-    private suspend fun clearDtcsOwned(): Boolean {
-        if (_state.value != ObdState.CONNECTED) return false
+    private suspend fun clearDtcsOwned(verificationPlan: ClearVerificationPlan): ClearDtcResult {
+        if (_state.value != ObdState.CONNECTED) {
+            return ClearDtcResult.Rejected(
+                commandEvidence = emptyList(),
+                message = "OBD no conectado; no se envió ninguna solicitud de borrado.",
+            )
+        }
+        if (verificationPlan.targets.isEmpty()) {
+            return ClearDtcResult.Rejected(
+                commandEvidence = emptyList(),
+                message = "No existe un snapshot previo con hallazgos identificados por ECU; no se envió un borrado ciego.",
+            )
+        }
+        val commandEvidence = mutableListOf<ClearCommandEvidence>()
         return try {
-            _statusMessage.value = "Enviando borrado estándar OBD-II (Mode 04)..."
             pauseLivePolling()
             clearCommandQueue()
 
-            // Increase timeout for Mode 04 — some ECUs need up to 5 seconds to respond
-            val attempts = mutableListOf<String>()
-
-            // Try Mode 04 with extended timeout
-            val response = sendRawCommand("04", priority = 1)
-            attempts.add("04=$response")
-            var success = isPositiveClearDtcResponse(response)
-
-            if (!success) {
-                // Some ECUs need headers set to broadcast first
-                _statusMessage.value = "Mode 04 sin confirmación. Reintentando con broadcast..."
+            val targetNamespaces = verificationPlan.targets.mapTo(linkedSetOf()) {
+                it.findingKey.namespace
+            }
+            if (DiagnosticNamespace.SAE_OBD in targetNamespaces) {
+                _statusMessage.value = "Enviando borrado SAE OBD únicamente para los hallazgos SAE del plan..."
                 runCatching { sendRawCommand("ATSH7DF", priority = 1) }
-                val response2 = sendRawCommand("04", priority = 1)
-                attempts.add("7DF/04=$response2")
-                success = isPositiveClearDtcResponse(response2)
+                val response = sendRawCommand("04", priority = 1)
+                commandEvidence += decodeClearCommandEvidence(
+                    command = "04",
+                    response = response,
+                    protocol = DiagnosticApplicationProtocol.SAE_OBD,
+                    scope = DiagnosticRequestScope.Functional("7DF"),
+                )
             }
 
-            if (!success) {
-                _statusMessage.value = "Mode 04 rechazado. Probando UDS Service 14..."
-                success = tryClearDtcsWithUds(attempts)
+            if (DiagnosticNamespace.UDS in targetNamespaces) {
+                _statusMessage.value = "Enviando UDS Service 14 solo a las ECU objetivo demostradas..."
+                commandEvidence += tryClearDtcsWithUds(verificationPlan)
             }
 
-            if (success) {
-                _statusMessage.value = "Verificando eliminación física (Mode 03)..."
-                // Wait briefly for ECU to process the clear
-                kotlinx.coroutines.delay(500)
-                val checkResponse = sendRawCommand("03", priority = 1)
-                val remainingCodes = DtcDecoder.decode(checkResponse, "03")
-                if (remainingCodes.isNotEmpty()) {
-                    _statusMessage.value = "El ECU aceptó el borrado, pero ${remainingCodes.size} DTC activos siguen presentes. Repara la falla o verifica: motor APAGADO, llave en ON."
-                    return false
-                } else {
-                    _statusMessage.value = "✅ Borrado verificado exitosamente."
-                    _allDetectedDtcs.value = emptySet()
+            if (commandEvidence.none(ClearCommandEvidence::acceptedByEcu)) {
+                val message = explainClearDtcFailure(commandEvidence)
+                _statusMessage.value = message
+                return ClearDtcResult.Rejected(commandEvidence, message = message)
+            }
+
+            _statusMessage.value = "Borrado aceptado por ECU; ejecutando verificación post-borrado completa..."
+            delay(500)
+            val postClearReport = readProfessionalDtcScanOwned(DiagnosticScanMode.FULL_VEHICLE)
+            if (postClearReport.wasCancelled) {
+                val message = "Borrado aceptado; verificación cancelada. Ningún hallazgo fue resuelto."
+                _statusMessage.value = message
+                return ClearDtcResult.Cancelled(commandEvidence, postClearReport, message = message)
+            }
+
+            val evaluation = ClearVerificationEvaluator.evaluate(
+                plan = verificationPlan,
+                postClearReport = postClearReport,
+                commandEvidence = commandEvidence,
+            )
+            val verifiedIds = evaluation.verifiedFindingIds
+            val unverifiedIds = evaluation.unverifiedFindingIds
+
+            when {
+                verifiedIds.size == verificationPlan.targets.size -> {
+                    _allDetectedDtcs.value = postClearReport.records.mapTo(linkedSetOf()) { it.code }
+                    val message = "Borrado y ausencia verificados para ${verifiedIds.size} hallazgos con cobertura ECU/servicio."
+                    _statusMessage.value = message
+                    ClearDtcResult.Verified(commandEvidence, postClearReport, verifiedIds, message)
                 }
-            } else {
-                _statusMessage.value = explainClearDtcFailure(attempts)
+                verifiedIds.isNotEmpty() -> {
+                    val message = "Borrado aceptado; verificación parcial: ${verifiedIds.size} verificados, ${unverifiedIds.size} sin cobertura concluyente."
+                    _statusMessage.value = message
+                    ClearDtcResult.PartiallyVerified(
+                        commandEvidence,
+                        postClearReport,
+                        verifiedIds,
+                        unverifiedIds,
+                        message,
+                    )
+                }
+                else -> {
+                    val message = "Borrado aceptado, pero ninguna identidad obtuvo verificación post-borrado suficiente."
+                    _statusMessage.value = message
+                    ClearDtcResult.AcceptedButNotVerified(commandEvidence, postClearReport, message = message)
+                }
             }
-            success
+        } catch (cancelled: CancellationException) {
+            val message = "Borrado/verificación cancelados; la evidencia previa permanece sin resolver."
+            _statusMessage.value = message
+            ClearDtcResult.Cancelled(commandEvidence, _lastDtcScanReport.value, message = message)
         } catch (e: Exception) {
-            _statusMessage.value = "Error en borrado: ${e.message}"
-            false
+            val message = "Borrado inconcluso: ${e.message ?: "error de transporte"}. Ningún hallazgo fue resuelto."
+            _statusMessage.value = message
+            ClearDtcResult.Inconclusive(commandEvidence, _lastDtcScanReport.value, message = message)
         } finally {
             // Always restore clean state for live polling
             runCatching { sendRawCommand("ATSH7DF", priority = 1) }
@@ -2602,58 +2967,101 @@ class ObdSession(
         }
     }
 
-    private fun isPositiveClearDtcResponse(response: String): Boolean {
-        val clean = response.uppercase().replace(" ", "").replace("\r", "").replace("\n", "")
-        // 44 = Mode 04 positive response
-        // 54FFFFFF / 54 = UDS Service 14 positive response
-        // OK = some adapters return this
-        return clean.contains("44") || clean.contains("54FFFFFF") || clean.contains("54") || clean.contains("OK")
+    private fun decodeClearCommandEvidence(
+        command: String,
+        response: String,
+        protocol: DiagnosticApplicationProtocol,
+        scope: DiagnosticRequestScope,
+    ): ClearCommandEvidence {
+        val requestedService = if (protocol == DiagnosticApplicationProtocol.UDS) 0x14 else 0x04
+        val expectedPositive = requestedService + 0x40
+        val decoded = DiagnosticPduDecoder.decodeResponses(response, expectedPositive, requestedService)
+        val positive = decoded.filterIsInstance<ProtocolResponse.Positive>().firstOrNull()
+        val negative = decoded.filterIsInstance<ProtocolResponse.Negative>().firstOrNull()?.response
+        val adapterAcknowledged = response.trim().uppercase().lines().any { it.trim() == "OK" }
+        return ClearCommandEvidence(
+            protocol = protocol,
+            requestScope = scope,
+            command = command,
+            rawResponse = response,
+            positiveService = positive?.serviceId,
+            acceptedByEcu = positive != null,
+            adapterAcknowledged = adapterAcknowledged,
+            negativeResponse = negative,
+        )
     }
 
-    private suspend fun tryClearDtcsWithUds(attempts: MutableList<String>): Boolean {
+    private suspend fun tryClearDtcsWithUds(
+        verificationPlan: ClearVerificationPlan,
+    ): List<ClearCommandEvidence> {
         val isCan = detectedProtocol.contains("CAN", ignoreCase = true)
-        if (!isCan && !isDoIpMode) return false
+        if (!isCan && !isDoIpMode) return emptyList()
 
-        val targets = listOf("7DF", "7E0", "7E1", "7E2", "7E3", "7E4", "7E5")
-        return try {
+        // A destructive UDS request is only sent to endpoints demonstrated by
+        // current evidence and named by the immutable clear plan. The
+        // functional broadcast address is not an ECU.
+        val targetModuleIdentities = verificationPlan.targets
+            .filter { it.findingKey.namespace == DiagnosticNamespace.UDS }
+            .mapTo(linkedSetOf()) { it.findingKey.moduleIdentity }
+        val targets = _lastDtcScanReport.value?.modules.orEmpty()
+            .filter { it.isAlive && !it.targetAddress.isNullOrBlank() && it.targetAddress != "7DF" }
+            .filter { it.moduleIdentity in targetModuleIdentities }
+            .map { it.targetAddress!! to it.responseAddress }
+            .distinctBy { it.first }
+        val evidence = mutableListOf<ClearCommandEvidence>()
+        try {
             runCatching { sendRawCommand("ATH1", priority = 1) }
             runCatching { sendRawCommand("ATAL", priority = 1) }
             runCatching { sendRawCommand("ATCAF1", priority = 1) }
-            for (target in targets) {
+            for ((target, demonstratedResponseAddress) in targets) {
                 runCatching { sendRawCommand("ATSH$target", priority = 1) }
-                if (target != "7DF") {
-                    val responseId = when (target) {
-                        "7E0" -> "7E8"
-                        "7E1" -> "7E9"
-                        "7E2" -> "7EA"
-                        "7E3" -> "7EB"
-                        "7E4" -> "7EC"
-                        "7E5" -> "7ED"
-                        else -> ""
-                    }
-                    if (responseId.isNotBlank()) runCatching { sendRawCommand("ATCRA$responseId", priority = 1) }
-                } else {
-                    runCatching { sendRawCommand("ATCRA", priority = 1) }
+                val responseId = demonstratedResponseAddress ?: when (target) {
+                    "7E0" -> "7E8"
+                    "7E1" -> "7E9"
+                    "7E2" -> "7EA"
+                    "7E3" -> "7EB"
+                    "7E4" -> "7EC"
+                    "7E5" -> "7ED"
+                    else -> ""
                 }
+                if (responseId.isNotBlank()) runCatching { sendRawCommand("ATCRA$responseId", priority = 1) }
 
                 runCatching { sendRawCommand("1003", priority = 1) }
                     .recoverCatching { sendRawCommand("1001", priority = 1) }
 
                 val udsResponse = runCatching { sendRawCommand("14FFFFFF", priority = 1) }
                     .getOrElse { "ERR:${it.message}" }
-                attempts.add("$target/14FFFFFF=$udsResponse")
-                if (isPositiveClearDtcResponse(udsResponse)) return true
+                val endpoint = EcuEndpoint(
+                    busId = if (isDoIpMode) "DOIP" else "CAN0",
+                    networkType = if (isDoIpMode) DiagnosticTransport.DOIP else DiagnosticTransport.CAN,
+                    addressingMode = if (isDoIpMode) DiagnosticAddressingMode.LOGICAL else DiagnosticAddressingMode.PHYSICAL,
+                    requestAddress = target.takeUnless { isDoIpMode },
+                    responseAddress = responseId.ifBlank { null },
+                    logicalAddress = target.takeIf { isDoIpMode },
+                    moduleRole = null,
+                    discoveryProvenance = "CLEAR_PLAN",
+                )
+                evidence += decodeClearCommandEvidence(
+                    command = "14FFFFFF",
+                    response = udsResponse,
+                    protocol = DiagnosticApplicationProtocol.UDS,
+                    scope = if (isDoIpMode) {
+                        DiagnosticRequestScope.Logical(endpoint)
+                    } else {
+                        DiagnosticRequestScope.Physical(endpoint)
+                    },
+                )
             }
-            false
         } finally {
             runCatching { sendRawCommand("ATSH7DF", priority = 1) }
             runCatching { sendRawCommand("ATCRA", priority = 1) }
             runCatching { sendRawCommand("ATH0", priority = 1) }
         }
+        return evidence
     }
 
-    private fun explainClearDtcFailure(attempts: List<String>): String {
-        val joined = attempts.joinToString(" | ").uppercase()
+    private fun explainClearDtcFailure(evidence: List<ClearCommandEvidence>): String {
+        val joined = evidence.joinToString(" | ") { "${it.command}=${it.rawResponse}" }.uppercase()
         val reason = when {
             joined.contains("7F1433") || joined.contains("SECURITY") ->
                 "el ECU exige acceso de seguridad para UDS \$14"
@@ -2667,7 +3075,9 @@ class ObdSession(
                 "el adaptador no recibió confirmación del ECU"
             else -> "respuesta no positiva del ECU"
         }
-        return "No se pudo borrar memoria DTC: $reason. Detalle: ${attempts.takeLast(3).joinToString(" | ")}"
+        val adapterOnly = evidence.any { it.adapterAcknowledged } && evidence.none { it.acceptedByEcu }
+        val adapterNotice = if (adapterOnly) " El adaptador respondió OK, pero eso no prueba aceptación del ECU." else ""
+        return "No se pudo verificar aceptación de borrado: $reason.$adapterNotice"
     }
 
     suspend fun fetchVin(): String {
@@ -3643,6 +4053,8 @@ class ObdSession(
         val status = respBytes[12].toInt() and 0xFF
         
         if (payloadType == 0x0006 && (status == 0x10 || status == 0x00)) {
+            doIpTargetLogicalAddress = ((respBytes[10].toInt() and 0xFF) shl 8) or
+                (respBytes[11].toInt() and 0xFF)
             Log.i(TAG, "DoIP Routing Activation SUCCESS. Status: $status")
             adapterVersion = "DoIP Gateway (ISO 13400)"
             isCloneAdapter = false
@@ -3673,8 +4085,8 @@ class ObdSession(
         
         packet[8] = 0x0E.toByte()
         packet[9] = 0x00.toByte()
-        packet[10] = 0x10.toByte()
-        packet[11] = 0x00.toByte()
+        packet[10] = ((doIpTargetLogicalAddress ushr 8) and 0xFF).toByte()
+        packet[11] = (doIpTargetLogicalAddress and 0xFF).toByte()
         
         System.arraycopy(udsBytes, 0, packet, 12, udsBytes.size)
         return packet
@@ -3699,6 +4111,16 @@ class ObdSession(
         withContext(Dispatchers.IO) {
             val t = transport ?: return@withContext null
             t.read(1024, timeoutMs)
+        }
+
+    /** Continue receiving after UDS NRC 0x78 without retransmitting the request. */
+    private suspend fun awaitDiagnosticResponseWithoutRequest(timeoutMs: Long): String =
+        communicationMutex.withLock {
+            if (isDoIpMode) {
+                unwrapDoIpDiagnostics(readResponseBytes(timeoutMs))
+            } else {
+                readResponse(timeoutMs)
+            }
         }
 
 
@@ -4204,7 +4626,7 @@ class ObdSession(
     }
 
     suspend fun sendRawCommand(command: String, priority: Int = 10): String {
-        val activeOwner = _physicalBusOwner.value
+        val activeOwner = physicalBusActor.currentOwner
         val callerOwner = currentCoroutineContext()[PhysicalBusLeaseContext]?.owner
         if (!PhysicalBusLeasePolicy.allows(activeOwner, callerOwner)) {
             throw ObdBusBusyException(activeOwner)
@@ -4221,7 +4643,7 @@ class ObdSession(
      * ONLY use this for keep-alive or low-level negotiation.
      */
     suspend fun sendKeepAliveDirectly(command: String): String {
-        val activeOwner = _physicalBusOwner.value
+        val activeOwner = physicalBusActor.currentOwner
         val callerOwner = currentCoroutineContext()[PhysicalBusLeaseContext]?.owner
         if (!PhysicalBusLeasePolicy.allows(activeOwner, callerOwner)) return ""
         return sendCommandDirectly(command, timeoutMs = 1000L)

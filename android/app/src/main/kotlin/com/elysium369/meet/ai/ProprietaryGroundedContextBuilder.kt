@@ -96,9 +96,8 @@ data class RepairKnowledgeAiContext(
 )
 
 /** Builds bounded, source-cited evidence for any AI provider without changing literal blocks. */
-class ProprietaryGroundedContextBuilder(
+class ProprietaryGroundedContextBuilder @javax.inject.Inject constructor() {
     private val json: Json = Json { prettyPrint = true; encodeDefaults = true }
-) {
     fun build(
         entity: ProprietaryCatalogEntity,
         blocks: List<ProprietarySourceBlock>,

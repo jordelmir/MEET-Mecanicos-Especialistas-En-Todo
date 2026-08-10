@@ -451,9 +451,8 @@ fun ScannerDiagnosticTab(
                         text = "BORRAR CÓDIGOS DE FALLA (RESET)",
                         onClick = {
                             coroutineScope.launch {
-                                val success = viewModel.clearDtcs()
-                                if (success) snackbarHostState.showSnackbar("Códigos borrados exitosamente")
-                                else snackbarHostState.showSnackbar("Error al borrar códigos. Asegúrate de tener el motor apagado y el encendido en ON.")
+                                val result = viewModel.clearDtcs()
+                                snackbarHostState.showSnackbar(result.message)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),

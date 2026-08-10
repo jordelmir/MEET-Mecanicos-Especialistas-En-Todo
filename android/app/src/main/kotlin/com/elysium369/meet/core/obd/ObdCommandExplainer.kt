@@ -82,8 +82,20 @@ object ObdCommandExplainer {
 
                 // ── Mode 04: Clear DTCs ──
                 cmd == "04" -> {
-                    if (clean.contains("44") || clean.contains("OK")) "✅ DTCs borrados exitosamente"
-                    else "⚠️ Respuesta inesperada al borrar DTCs"
+                    val decoded = DiagnosticPduDecoder.decodeResponses(
+                        rawResponse = response,
+                        expectedPositiveService = 0x44,
+                        requestedService = 0x04,
+                    )
+                    when {
+                        decoded.any { it is ProtocolResponse.Positive } ->
+                            "⚠️ Solicitud aceptada por ECU; falta escaneo post-borrado para verificar ausencia"
+                        response.lineSequence().any { it.trim().equals("OK", ignoreCase = true) } ->
+                            "ℹ️ Adaptador respondió OK; no demuestra borrado ni ausencia de DTC"
+                        decoded.any { it is ProtocolResponse.Negative } ->
+                            "⚠️ La ECU rechazó la solicitud de borrado"
+                        else -> "⚠️ Respuesta de borrado inconclusa"
+                    }
                 }
 
                 // ── Mode 07: Pending DTCs ──

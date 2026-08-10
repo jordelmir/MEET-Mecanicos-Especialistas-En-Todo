@@ -38,7 +38,17 @@ data class DiagnosticCoverage(
         DiagnosticNamespace.OEM -> false
     }
 
-    fun coversAny(required: Set<DiagnosticSemantic>): Boolean = required.any(semantics::contains)
+    fun overlaps(required: Set<DiagnosticSemantic>): Boolean = required.any(semantics::contains)
+
+    /** Compatibility alias for presentation/discovery code. Never use for absence proof. */
+    fun coversAny(required: Set<DiagnosticSemantic>): Boolean = overlaps(required)
+
+    /**
+     * Evidence-grade coverage proof. Overlap is useful while exploring a vehicle,
+     * but absence/resolution claims require every requested semantic to have been read.
+     */
+    fun fullyCovers(required: Set<DiagnosticSemantic>): Boolean =
+        required.isNotEmpty() && semantics.containsAll(required)
 
     companion object {
         fun sae(bucket: DtcBucket): DiagnosticCoverage = DiagnosticCoverage(
@@ -68,6 +78,81 @@ data class DiagnosticCoverage(
             )
         }
     }
+}
+
+enum class DiagnosticTransport {
+    CAN,
+    DOIP,
+    K_LINE,
+    BLUETOOTH_ADAPTER,
+    BLE_ADAPTER,
+    WIFI_ADAPTER,
+    UNKNOWN,
+}
+
+enum class DiagnosticApplicationProtocol {
+    SAE_OBD,
+    UDS,
+    OBD_ON_UDS,
+    KWP2000,
+    OEM,
+    UNKNOWN,
+}
+
+enum class DiagnosticAddressingMode {
+    FUNCTIONAL,
+    PHYSICAL,
+    LOGICAL,
+    LEGACY_UNADDRESSED,
+}
+
+data class EcuEndpoint(
+    val busId: String,
+    val networkType: DiagnosticTransport,
+    val addressingMode: DiagnosticAddressingMode,
+    val requestAddress: String?,
+    val responseAddress: String?,
+    val logicalAddress: String? = null,
+    val moduleRole: String? = null,
+    val discoveryProvenance: String,
+) {
+    val stableId: String
+        get() = listOf(
+            busId.ifBlank { "UNKNOWN_BUS" },
+            networkType.name,
+            responseAddress ?: logicalAddress ?: requestAddress ?: "UNADDRESSED",
+        ).joinToString(":") { it.trim().uppercase() }
+}
+
+sealed interface DiagnosticRequestScope {
+    data class Functional(val requestAddress: String) : DiagnosticRequestScope
+    data class Physical(val endpoint: EcuEndpoint) : DiagnosticRequestScope
+    data class Logical(val endpoint: EcuEndpoint) : DiagnosticRequestScope
+    data object LegacyUnaddressed : DiagnosticRequestScope
+}
+
+enum class DtcFormat {
+    SAE_J2012_2_BYTE,
+    ISO_14229_3_BYTE,
+    KWP2000,
+    OEM,
+    UNKNOWN,
+}
+
+data class DiagnosticCodeIdentity(
+    val displayCode: String,
+    val rawCode: String,
+    val rawDtc24: Int?,
+    val failureType: Int?,
+    val format: DtcFormat,
+    val namespace: DiagnosticNamespace,
+) {
+    val stableRawIdentity: String
+        get() = when {
+            rawDtc24 != null -> "%06X".format(rawDtc24 and 0xFFFFFF)
+            rawCode.isNotBlank() -> rawCode.trim().uppercase()
+            else -> displayCode.trim().uppercase()
+        }
 }
 
 enum class NegativeResponseSemantics {
@@ -263,13 +348,34 @@ object DiagnosticModuleIdentity {
     }
 }
 
-data class DiagnosticFindingKey(
+class DiagnosticFindingKey(
     val vehicleId: String,
     val namespace: DiagnosticNamespace,
     val moduleIdentity: String,
-    val code: String,
-    val observationSemantic: DiagnosticSemantic,
-)
+    val rawDtcIdentity: String,
+    val displayCode: String,
+) {
+    /** Backwards-compatible presentation alias; never use as binary identity. */
+    val code: String get() = displayCode
+
+    override fun equals(other: Any?): Boolean =
+        other is DiagnosticFindingKey &&
+            vehicleId == other.vehicleId &&
+            namespace == other.namespace &&
+            moduleIdentity == other.moduleIdentity &&
+            rawDtcIdentity == other.rawDtcIdentity
+
+    override fun hashCode(): Int {
+        var result = vehicleId.hashCode()
+        result = 31 * result + namespace.hashCode()
+        result = 31 * result + moduleIdentity.hashCode()
+        result = 31 * result + rawDtcIdentity.hashCode()
+        return result
+    }
+
+    override fun toString(): String =
+        "$vehicleId|${namespace.name}|$moduleIdentity|$rawDtcIdentity"
+}
 
 fun DtcRecord.primaryObservationSemantic(): DiagnosticSemantic = when (namespace) {
     DiagnosticNamespace.SAE_OBD -> when (bucket) {
@@ -299,6 +405,6 @@ fun DtcRecord.findingKey(vehicleId: String): DiagnosticFindingKey = DiagnosticFi
     vehicleId = vehicleId,
     namespace = namespace,
     moduleIdentity = DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName),
-    code = code.uppercase(),
-    observationSemantic = primaryObservationSemantic(),
+    rawDtcIdentity = codeIdentity.stableRawIdentity,
+    displayCode = code.uppercase(),
 )

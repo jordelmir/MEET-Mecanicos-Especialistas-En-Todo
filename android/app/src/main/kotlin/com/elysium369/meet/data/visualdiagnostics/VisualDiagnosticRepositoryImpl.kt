@@ -5,8 +5,9 @@ import com.elysium369.meet.domain.visualdiagnostics.EngineType
 import com.elysium369.meet.domain.visualdiagnostics.VisualBomAtlas
 import com.elysium369.meet.domain.visualdiagnostics.VisualBomNode
 import com.elysium369.meet.domain.visualdiagnostics.VisualDiagnosticRepository
+import javax.inject.Inject
 
-class VisualDiagnosticRepositoryImpl : VisualDiagnosticRepository {
+class VisualDiagnosticRepositoryImpl @Inject constructor() : VisualDiagnosticRepository {
     override fun componentsForEngine(engineType: EngineType): List<DiagnosticComponent> {
         return VisualDiagnosticSeedData.components(engineType)
     }

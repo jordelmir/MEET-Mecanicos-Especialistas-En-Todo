@@ -120,8 +120,12 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         RepairActionEntity::class,
         ReportSignatureEntity::class,
         DiagnosticSnapshotEntity::class,
+        DiagnosticFindingEntity::class,
+        DiagnosticExchangeEntity::class,
+        DiagnosticObservationEntity::class,
+        FindingDiagnosticSnapshotEntity::class,
     ],
-    version = 50,
+    version = 51,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -180,4 +184,6 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun repairActionDao(): RepairActionDao
     abstract fun reportSignatureDao(): ReportSignatureDao
     abstract fun diagnosticSnapshotDao(): DiagnosticSnapshotDao
+    abstract fun diagnosticEvidenceDao(): DiagnosticEvidenceDao
+    abstract fun diagnosticFindingDao(): DiagnosticFindingDao
 }
