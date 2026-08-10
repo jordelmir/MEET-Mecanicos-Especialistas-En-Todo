@@ -3841,9 +3841,6 @@ class ObdViewModel @Inject constructor(
                 requestAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
                 service = exchange.command,
-                rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8)),
-                outcome = exchange.outcome,
-                requestScope = persistedRequestScope,
                 rawRequest = exchange.command,
                 rawResponse = exchange.rawResponse,
                 decodedOutcome = exchange.outcome.name,
@@ -3857,6 +3854,9 @@ class ObdViewModel @Inject constructor(
                 targetAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
                 service = exchange.command,
+                rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8)),
+                outcome = exchange.outcome,
+                requestScope = persistedRequestScope,
             )
         }
         diagnosticEvidenceDao.appendExchanges(exchangesWithReferences.map { it.first })
@@ -4434,7 +4434,7 @@ class ObdViewModel @Inject constructor(
             )
             _clearDtcResult.value = "Conecta el adaptador OBD y verifica ignición en ON antes de borrar DTCs reales."
             _isClearing.value = false
-            return ClearDtcResult.Rejected(emptyList(), message = _clearDtcResult.value)
+            return ClearDtcResult.Rejected(emptyList(), message = _clearDtcResult.value.orEmpty())
         }
 
         return try {
