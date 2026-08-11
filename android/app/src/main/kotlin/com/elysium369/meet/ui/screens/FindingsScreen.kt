@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
-import com.elysium369.meet.data.local.entities.DtcEventEntity
+import com.elysium369.meet.domain.diagnostics.DiagnosticFindingSummary
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
@@ -41,10 +41,10 @@ fun FindingsScreen(
     viewModel: ObdViewModel
 ) {
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
-    val activeEvents by viewModel.activeDtcEvents.collectAsState()
-    val pendingEvents by viewModel.pendingDtcEvents.collectAsState()
-    val permanentEvents by viewModel.permanentDtcEvents.collectAsState()
-    val historicalEvents by viewModel.historicalDtcEvents.collectAsState()
+    val activeEvents by viewModel.canonicalActiveFindingSummaries.collectAsState()
+    val pendingEvents by viewModel.canonicalPendingFindingSummaries.collectAsState()
+    val permanentEvents by viewModel.canonicalPermanentFindingSummaries.collectAsState()
+    val historicalEvents by viewModel.canonicalHistoricalFindingSummaries.collectAsState()
 
     // Combine all events
     val allEvents = remember(activeEvents, pendingEvents, permanentEvents, historicalEvents) {
@@ -245,7 +245,7 @@ private fun FilterChip(
 
 @Composable
 private fun FindingItemCard(
-    event: DtcEventEntity,
+    event: DiagnosticFindingSummary,
     viewModel: ObdViewModel,
     navController: NavController
 ) {
@@ -494,7 +494,11 @@ private fun FindingItemCard(
                         )
                         EliteButton(
                             text = "VER GUÍA",
-                            onClick = { navController.navigate("repair/${event.code}") },
+                            onClick = {
+                                navController.navigate(
+                                    "repair/${event.code}?findingId=${java.net.URLEncoder.encode(event.id, "UTF-8")}",
+                                )
+                            },
                             color = MeetColors.neonGreen,
                             modifier = Modifier.weight(1f)
                         )

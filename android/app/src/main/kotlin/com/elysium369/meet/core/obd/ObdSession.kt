@@ -341,6 +341,7 @@ class ObdSession(
 
     private var targetAddress: String? = null
     private var isDoIpMode = false
+    private val doIpSourceLogicalAddress: Int = 0x0E00
     private var doIpTargetLogicalAddress: Int = 0x1000
     private val bluetoothMacRegex = Regex("(?i)^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
@@ -454,15 +455,16 @@ class ObdSession(
                     }
                 }
 
-                // ── TELEMETRÍA SILENCIOSA (SUPABASE) SUCCESS ──
-                scope.launch {
-                    com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
-                        userId = "local_app_user",
-                        adapterType = adapterVersion,
-                        notes = "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)",
-                        protocol = detectedProtocol,
-                        isSuccess = true
-                    )
+                if (privacyGuard.allowsRemoteDiagnostics(context)) {
+                    scope.launch {
+                        com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
+                            userId = "anonymous_diagnostics",
+                            adapterType = privacyGuard.redactForTelemetry(adapterVersion),
+                            notes = "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)",
+                            protocol = privacyGuard.redactForTelemetry(detectedProtocol),
+                            isSuccess = true
+                        )
+                    }
                 }
 
                 startQueueProcessor()
@@ -521,15 +523,16 @@ class ObdSession(
             else -> "Error tras $MAX_CONNECT_ATTEMPTS intentos: $msg"
         }
 
-        // ── TELEMETRÍA SILENCIOSA (SUPABASE) FAILURE ──
-        scope.launch {
-            com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
-                userId = "local_app_user",
-                adapterType = adapterVersion.ifBlank { "Unknown" },
-                notes = "FAILED_CONNECTION ($MAX_CONNECT_ATTEMPTS attempts): $msg",
-                protocol = detectedProtocol,
-                isSuccess = false
-            )
+        if (privacyGuard.allowsRemoteDiagnostics(context)) {
+            scope.launch {
+                com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
+                    userId = "anonymous_diagnostics",
+                    adapterType = privacyGuard.redactForTelemetry(adapterVersion.ifBlank { "Unknown" }),
+                    notes = privacyGuard.redactForTelemetry("FAILED_CONNECTION ($MAX_CONNECT_ATTEMPTS attempts): $msg"),
+                    protocol = privacyGuard.redactForTelemetry(detectedProtocol),
+                    isSuccess = false
+                )
+            }
         }
 
         isRunning = false
@@ -1578,11 +1581,12 @@ class ObdSession(
      * Scans for active ECUs on the CAN bus by pinging standard addresses.
      * Disruptive high-end feature: Topology Mapping.
      */
-    suspend fun scanNetworkTopology() = withExclusivePhysicalBus(
-        PhysicalBusOwner.NETWORK_DISCOVERY,
-    ) {
-        scanNetworkTopologyOwned()
-    }
+    @Deprecated(
+        message = "Use DiagnosticAcquisitionEngine; legacy topology probing changes sessions and duplicates DTC parsing.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun scanNetworkTopology(): Unit =
+        error("Legacy topology scanner retired: use canonical diagnostic acquisition")
 
     private suspend fun scanNetworkTopologyOwned() {
         if (_state.value != ObdState.CONNECTED) {
@@ -1860,18 +1864,9 @@ class ObdSession(
                                         }
                                     } catch (_: Exception) { }
 
-                                    // ── Probe additional UDS services ──
-                                    // RoutineControl ($31)
-                                    try {
-                                        val rc = sendRawCommand("3101FF00")
-                                        if (rc.contains("71") || rc.contains("7F3131")) udsServices.add("31")
-                                    } catch (_: Exception) { }
-
-                                    // IOControlByIdentifier ($2F)
-                                    try {
-                                        val io = sendRawCommand("2F000003")
-                                        if (io.contains("6F") || io.contains("7F2F")) udsServices.add("2F")
-                                    } catch (_: Exception) { }
+                                    // Never probe RoutineControl ($31) or IOControl ($2F)
+                                    // during discovery. Those capabilities may only come from
+                                    // a source-backed OEM capability pack for this exact ECU.
 
                                     // Return to default session
                                     runCatching { sendRawCommand("1001") }
@@ -2008,22 +2003,19 @@ class ObdSession(
         }
     }
 
-    suspend fun readActiveDtcs(): List<String> {
-        if (_state.value != ObdState.CONNECTED) return emptyList()
-        return try {
-            val response = sendRawCommand("03", priority = 999)
-            val active = DtcDecoder.decode(response, "03")
-            _allDetectedDtcs.value = _allDetectedDtcs.value + active
-            active
-        } catch (_: Exception) { emptyList() }
-    }
+    @Deprecated(
+        message = "Use readProfessionalDtcScan(); raw List<String> loses ECU, service, status and evidence.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readActiveDtcs(): List<String> =
+        error("Legacy DTC API retired: use readProfessionalDtcScan()")
 
     /**
      * Realiza un escaneo profundo en la memoria Mode 06 (Resultados de Pruebas de Monitoreo)
      * para extraer conteos de misfire por cilindro.
      */
-    private suspend fun deepScanMisfires(): List<String> {
-        val detectedCylinders = mutableListOf<String>()
+    private suspend fun deepScanMisfires(): List<MisfireMonitorObservation> {
+        val observations = mutableListOf<MisfireMonitorObservation>()
         try {
             // Mode 06 Misfire Cylinder IDs (A2 = Cyl 1 ... A9 = Cyl 8)
             for (cyl in 1..8) {
@@ -2039,27 +2031,33 @@ class ObdSession(
                     if (clean.length >= idx + 10) {
                         // Saltamos "46" + MID + TID (6 caracteres = 3 bytes)
                         // Extraemos los siguientes 4 caracteres (2 bytes) como el valor actual.
+                        val testId = clean.substring(idx + 4, idx + 6)
                         val valueHex = clean.substring(idx + 6, idx + 10)
                         val value = valueHex.toIntOrNull(16) ?: 0
-                        if (value > 0) {
-                            detectedCylinders.add(String.format("P03%02d", cyl))
-                        }
+                        observations += MisfireMonitorObservation(
+                            cylinder = cyl,
+                            monitorId = hexMid,
+                            testId = testId,
+                            observedCount = value,
+                            rawResponse = response,
+                            capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
+                            quality = TelemetryQuality.VALID,
+                        )
                     }
                 }
             }
         } catch (e: Exception) {
             Log.w(TAG, "deepScanMisfires failed: ${e.message}")
         }
-        return detectedCylinders
+        return observations
     }
 
-    suspend fun readPendingDtcs(): List<String> {
-        if (_state.value != ObdState.CONNECTED) return emptyList()
-        return try {
-            val response = sendRawCommand("07", priority = 999)
-            DtcDecoder.decode(response, "07")
-        } catch (_: Exception) { emptyList() }
-    }
+    @Deprecated(
+        message = "Use readProfessionalDtcScan(); raw List<String> loses ECU, service, status and evidence.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readPendingDtcs(): List<String> =
+        error("Legacy DTC API retired: use readProfessionalDtcScan()")
 
     /**
      * Reads Freeze Frame data for a specific DTC (Mode 02).
@@ -2164,13 +2162,12 @@ class ObdSession(
     // Consolidated safety guard moved to line 824 area
 
 
-    suspend fun readPermanentDtcs(): List<String> {
-        if (_state.value != ObdState.CONNECTED) return emptyList()
-        return try {
-            val response = sendRawCommand("0A", priority = 999)
-            DtcDecoder.decode(response, "0A")
-        } catch (_: Exception) { emptyList() }
-    }
+    @Deprecated(
+        message = "Use readProfessionalDtcScan(); raw List<String> loses ECU, service, status and evidence.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readPermanentDtcs(): List<String> =
+        error("Legacy DTC API retired: use readProfessionalDtcScan()")
 
     suspend fun readProfessionalDtcScan(
         mode: DiagnosticScanMode = DiagnosticScanMode.FULL_VEHICLE,
@@ -2391,9 +2388,18 @@ class ObdSession(
                 requestStartedAt = System.currentTimeMillis()
                 raw = try {
                     if (awaitPendingResponse) {
-                        awaitDiagnosticResponseWithoutRequest(timeoutMs = pendingResponseTimeoutMs)
+                        awaitDiagnosticResponseWithoutRequest(
+                            timeoutMs = pendingResponseTimeoutMs,
+                            doIpTarget = target?.toIntOrNull(16),
+                        )
                     } else {
-                        sendRawCommand(command, priority = 999)
+                        if (isDoIpMode) {
+                            val logicalTarget = target?.toIntOrNull(16)
+                                ?: throw IllegalStateException("DoIP request requires an explicit logical target")
+                            sendDoIpDiagnostic(logicalTarget, command, pendingResponseTimeoutMs)
+                        } else {
+                            sendRawCommand(command, priority = 999)
+                        }
                     }
                 } catch (_: TimeoutCancellationException) {
                     forcedOutcome = ModuleScanOutcome.TIMEOUT
@@ -3010,11 +3016,13 @@ class ObdSession(
             .distinctBy { it.first }
         val evidence = mutableListOf<ClearCommandEvidence>()
         try {
-            runCatching { sendRawCommand("ATH1", priority = 1) }
-            runCatching { sendRawCommand("ATAL", priority = 1) }
-            runCatching { sendRawCommand("ATCAF1", priority = 1) }
+            if (!isDoIpMode) {
+                runCatching { sendRawCommand("ATH1", priority = 1) }
+                runCatching { sendRawCommand("ATAL", priority = 1) }
+                runCatching { sendRawCommand("ATCAF1", priority = 1) }
+            }
             for ((target, demonstratedResponseAddress) in targets) {
-                runCatching { sendRawCommand("ATSH$target", priority = 1) }
+                if (!isDoIpMode) runCatching { sendRawCommand("ATSH$target", priority = 1) }
                 val responseId = demonstratedResponseAddress ?: when (target) {
                     "7E0" -> "7E8"
                     "7E1" -> "7E9"
@@ -3024,12 +3032,27 @@ class ObdSession(
                     "7E5" -> "7ED"
                     else -> ""
                 }
-                if (responseId.isNotBlank()) runCatching { sendRawCommand("ATCRA$responseId", priority = 1) }
+                if (!isDoIpMode && responseId.isNotBlank()) {
+                    runCatching { sendRawCommand("ATCRA$responseId", priority = 1) }
+                }
 
-                runCatching { sendRawCommand("1003", priority = 1) }
-                    .recoverCatching { sendRawCommand("1001", priority = 1) }
+                val logicalTarget = target.toIntOrNull(16)
+                if (isDoIpMode && logicalTarget == null) continue
+                if (isDoIpMode) {
+                    // Exact response endpoint is checked inside sendDoIpDiagnostic.
+                    runCatching { sendDoIpDiagnostic(requireNotNull(logicalTarget), "1003") }
+                } else {
+                    runCatching { sendRawCommand("1003", priority = 1) }
+                        .recoverCatching { sendRawCommand("1001", priority = 1) }
+                }
 
-                val udsResponse = runCatching { sendRawCommand("14FFFFFF", priority = 1) }
+                val udsResponse = runCatching {
+                    if (isDoIpMode) {
+                        sendDoIpDiagnostic(requireNotNull(logicalTarget), "14FFFFFF")
+                    } else {
+                        sendRawCommand("14FFFFFF", priority = 1)
+                    }
+                }
                     .getOrElse { "ERR:${it.message}" }
                 val endpoint = EcuEndpoint(
                     busId = if (isDoIpMode) "DOIP" else "CAN0",
@@ -3053,9 +3076,11 @@ class ObdSession(
                 )
             }
         } finally {
-            runCatching { sendRawCommand("ATSH7DF", priority = 1) }
-            runCatching { sendRawCommand("ATCRA", priority = 1) }
-            runCatching { sendRawCommand("ATH0", priority = 1) }
+            if (!isDoIpMode) {
+                runCatching { sendRawCommand("ATSH7DF", priority = 1) }
+                runCatching { sendRawCommand("ATCRA", priority = 1) }
+                runCatching { sendRawCommand("ATH0", priority = 1) }
+            }
         }
         return evidence
     }
@@ -3384,43 +3409,12 @@ class ObdSession(
     /**
      * Read DTCs separated by type: Confirmed ($03), Pending ($07), Permanent ($0A).
      */
-    suspend fun readCategorizedDtcs(): CategorizedDtcs {
-        _statusMessage.value = "Clasificando códigos de falla..."
-
-        val confirmed = mutableListOf<Pair<String, String>>()
-        val pending = mutableListOf<Pair<String, String>>()
-        val permanent = mutableListOf<Pair<String, String>>()
-
-        try {
-            // Mode $03 — Confirmed/Stored DTCs
-            _statusMessage.value = "Leyendo DTCs confirmados (Mode \$03)..."
-            val mode03Response = sendRawCommand("03")
-            parseDtcResponseToList(mode03Response, "43").forEach { code ->
-                confirmed.add(code to (dtcLookup(code) ?: code))
-            }
-
-            // Mode $07 — Pending DTCs
-            _statusMessage.value = "Leyendo DTCs pendientes (Mode \$07)..."
-            val mode07Response = sendRawCommand("07")
-            parseDtcResponseToList(mode07Response, "47").forEach { code ->
-                pending.add(code to (dtcLookup(code) ?: code))
-            }
-
-            // Mode $0A — Permanent DTCs
-            _statusMessage.value = "Leyendo DTCs permanentes (Mode \$0A)..."
-            val mode0AResponse = sendRawCommand("0A")
-            parseDtcResponseToList(mode0AResponse, "4A").forEach { code ->
-                permanent.add(code to (dtcLookup(code) ?: code))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reading categorized DTCs: ${e.message}")
-        }
-
-        val result = CategorizedDtcs(confirmed, pending, permanent)
-        _categorizedDtcs.value = result
-        _statusMessage.value = "DTCs: ${confirmed.size} confirmados, ${pending.size} pendientes, ${permanent.size} permanentes."
-        return result
-    }
+    @Deprecated(
+        message = "Use RunDiagnosticScan; categorized lists are a UI projection of the canonical scan report.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readCategorizedDtcs(): CategorizedDtcs =
+        error("Legacy categorized DTC reader retired: use RunDiagnosticScan")
 
     /**
      * Parse a standard DTC response (Modes $03/$07/$0A) into a list of DTC code strings.
@@ -3549,21 +3543,10 @@ class ObdSession(
      * @return Raw hex response or null if no response / error
      */
     suspend fun sendManufacturerCommand(serviceId: String, subFunction: String = ""): String? {
-        Log.d(TAG, "Manufacturer command: SID=$serviceId, sub=$subFunction")
-        val command = "$serviceId$subFunction"
-        val response = sendRawCommand(command)
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-
-        if (clean.contains("NODATA") || clean.contains("ERROR") || clean.contains("UNABLE")) return null
-
-        // Positive response = SID + 0x40
-        val sidInt = serviceId.toIntOrNull(16) ?: return null
-        val positiveSid = String.format("%02X", sidInt + 0x40)
-        val idx = clean.indexOf(positiveSid)
-        if (idx >= 0) return clean.substring(idx)
-
-        // Some manufacturer modes don't follow standard response pattern
-        return if (clean.length > 4) clean else null
+        Log.w(TAG, "Blocked unsourced OEM command SID=$serviceId sub=$subFunction")
+        _statusMessage.value =
+            "Comando OEM bloqueado: requiere paquete firmado, ECU objetivo y respuesta esperada verificables."
+        return null
     }
 
     /**
@@ -3571,32 +3554,9 @@ class ObdSession(
      * Sends each SID with no sub-function and checks for any response.
      */
     suspend fun probeManufacturerModes(): Map<String, Boolean> {
-        val results = mutableMapOf<String, Boolean>()
-        val ranges = listOf(
-            0xB0..0xBF,  // Manufacturer enhanced
-            0xD0..0xDF,  // Manufacturer enhanced
-            0xEA..0xFF   // System supplier specific
-        )
-
-        for (range in ranges) {
-            for (sid in range) {
-                val sidHex = String.format("%02X", sid)
-                try {
-                    val response = sendRawCommand(sidHex)
-                    val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-                    val supported = !clean.contains("NODATA") &&
-                                    !clean.contains("ERROR") &&
-                                    !clean.contains("UNABLE") &&
-                                    clean.length > 2
-                    results[sidHex] = supported
-                } catch (_: Exception) {
-                    results[sidHex] = false
-                }
-            }
-        }
-
-        Log.i(TAG, "Manufacturer modes probe: ${results.count { it.value }} supported out of ${results.size}")
-        return results
+        _statusMessage.value =
+            "Sondeo OEM deshabilitado: las capacidades solo se cargan desde paquetes verificados."
+        return emptyMap()
     }
 
 
@@ -3677,174 +3637,12 @@ class ObdSession(
         else -> null
     }
 
-    suspend fun scanModules(): List<NetworkModule> {
-        if (_state.value != ObdState.CONNECTED) return emptyList()
-        val modules = mutableListOf<NetworkModule>()
-
-        _statusMessage.value = "Escaneando topología de red CAN..."
-
-        try {
-            // Detect manufacturer based on VIN
-            val vinVal = vin.value ?: ""
-            val mfr = when {
-                vinVal.startsWith("1FM") || vinVal.startsWith("1FT") || vinVal.startsWith("1FA") || vinVal.startsWith("3FA") -> "FORD"
-                vinVal.startsWith("JTD") || vinVal.startsWith("JT1") || vinVal.startsWith("JTN") || vinVal.startsWith("JTH") -> "TOYOTA"
-                vinVal.startsWith("1GC") || vinVal.startsWith("1G1") || vinVal.startsWith("1G6") || vinVal.startsWith("3G1") -> "GM"
-                vinVal.startsWith("WVW") || vinVal.startsWith("WV2") || vinVal.startsWith("WAU") || vinVal.startsWith("TRU") -> "VOLKSWAGEN"
-                else -> "GENERIC"
-            }
-
-            android.util.Log.i("ObdSession", "scanModules detected manufacturer: $mfr")
-
-            // Standard 11-bit CAN Addressing (7E0-7EF) + OEM Modules
-            val can11Targets = mutableMapOf(
-                "7E0" to "ECM (Motor)",
-                "7E1" to "TCM (Transmisión)",
-                "7E2" to "ABS/ESP/TCS",
-                "7E3" to "SRS (Airbag)",
-                "7E4" to "BCM (Carrocería)",
-                "7E5" to "IPC (Instrumentos)",
-                "7E6" to "HVAC (Climatización)",
-                "7E7" to "PSM (Asientos/Confort)"
-            )
-
-            // Add brand-specific advanced modules
-            when (mfr) {
-                "TOYOTA" -> {
-                    can11Targets["7B0"] = "Toyota ABS/VSC"
-                    can11Targets["7B4"] = "Toyota SRS Airbag"
-                    can11Targets["7C0"] = "Toyota HVAC"
-                    can11Targets["7C4"] = "Toyota BCM"
-                }
-                "GM" -> {
-                    can11Targets["7A0"] = "GM Chassis/ABS"
-                    can11Targets["7A4"] = "GM Body/BCM"
-                }
-                "VOLKSWAGEN" -> {
-                    can11Targets["721"] = "VAG Transmission"
-                    can11Targets["722"] = "VAG ABS/ESP"
-                    can11Targets["723"] = "VAG Airbag/SRS"
-                }
-                "FORD" -> {
-                    can11Targets["760"] = "Ford ABS Module"
-                    can11Targets["764"] = "Ford RCM (Airbag)"
-                }
-            }
-
-            try { sendRawCommand("ATH1") } catch (_: Exception) {}
-
-            for ((addr, label) in can11Targets) {
-                try {
-                    sendRawCommand("ATSH$addr")
-
-                    // Initialize diagnostic session for non-generic manufacturer CAN queries
-                    if (mfr != "GENERIC") {
-                        try { sendRawCommand("1003") } catch (_: Exception) {
-                            try { sendRawCommand("1001") } catch (_: Exception) {}
-                        }
-                    }
-
-                    // Probe if module is alive (0100 standard query)
-                    var isAlive = false
-                    var resp = ""
-                    try {
-                        resp = sendRawCommand("0100")
-                        if (resp.isNotBlank() && (resp.contains("41 00") || resp.contains("4100") || resp.contains("7F") || resp.contains("50"))) {
-                            isAlive = true
-                        }
-                    } catch (_: Exception) {}
-
-                    // Alternate probe for OEM modules that reject standard Mode 01
-                    if (!isAlive && mfr != "GENERIC") {
-                        try {
-                            val testerResp = sendRawCommand("3E00")
-                            if (testerResp.isNotBlank() && !testerResp.contains("UNABLE") && !testerResp.contains("ERROR")) {
-                                isAlive = true
-                            }
-                        } catch (_: Exception) {}
-                    }
-
-                    if (isAlive) {
-                        var dtcs = emptyList<String>()
-
-                        // Query DTCs using UDS Service 19 first
-                        try {
-                            val udsResp = sendRawCommand("19020D")
-                            if (udsResp.isNotBlank() && udsResp.contains("5902")) {
-                                dtcs = DtcScanEngine.parseUdsService19ByEcu(
-                                    rawResponse = udsResp,
-                                    targetAddress = addr,
-                                    moduleName = label
-                                ).map { it.code }.distinct()
-                            }
-                        } catch (_: Exception) {}
-
-                        // Fallback to Mode 03 if UDS fails or is empty
-                        if (dtcs.isEmpty()) {
-                            try {
-                                val dtcResp = sendRawCommand("03")
-                                dtcs = DtcDecoder.decode(dtcResp, "03")
-                            } catch (_: Exception) {}
-                        }
-
-                        modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Extended 29-bit CAN Addressing (Standard ISO-TP)
-            if (detectedProtocol.contains("29")) {
-                val can29Targets = mapOf(
-                    "18DAF110" to "ECM (Extended)",
-                    "18DAF118" to "TCM (Extended)",
-                    "18DAF128" to "ABS (Extended)",
-                    "18DAF158" to "SRS (Extended)"
-                )
-                for ((addr, label) in can29Targets) {
-                    try {
-                        sendRawCommand("ATSH$addr")
-
-                        if (mfr != "GENERIC") {
-                            try { sendRawCommand("1003") } catch (_: Exception) {}
-                        }
-
-                        val resp = sendRawCommand("0100")
-                        if (resp.isNotBlank() && (resp.contains("4100") || resp.contains("7F") || resp.contains("50"))) {
-                            var dtcs = emptyList<String>()
-                            try {
-                                val udsResp = sendRawCommand("19020D")
-                                if (udsResp.isNotBlank() && udsResp.contains("5902")) {
-                                    dtcs = DtcScanEngine.parseUdsService19ByEcu(
-                                        rawResponse = udsResp,
-                                        targetAddress = addr,
-                                        moduleName = label
-                                    ).map { it.code }.distinct()
-                                }
-                            } catch (_: Exception) {}
-
-                            if (dtcs.isEmpty()) {
-                                try {
-                                    val dtcResp = sendRawCommand("03")
-                                    dtcs = DtcDecoder.decode(dtcResp, "03")
-                                } catch (_: Exception) {}
-                            }
-
-                            modules.add(NetworkModule(id = addr, name = label, isAlive = true, dtcs = dtcs))
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-        } finally {
-            // Restore environment to Functional Broadcast (7DF) or Auto
-            try {
-                sendRawCommand("ATSH7DF")
-                sendRawCommand("ATH0")
-            } catch (_: Exception) {}
-            _statusMessage.value = "Escaneo completado: ${modules.size} módulos hallados."
-        }
-
-        return modules
-    }
+    @Deprecated(
+        message = "Legacy parallel module probing retired; use readProfessionalDtcScan().",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun scanModules(): List<NetworkModule> =
+        error("Legacy module scanner retired: use readProfessionalDtcScan()")
 
     /**
      * Allows manual protocol override. Essential for professional diagnostics
@@ -4053,6 +3851,8 @@ class ObdSession(
         val status = respBytes[12].toInt() and 0xFF
         
         if (payloadType == 0x0006 && (status == 0x10 || status == 0x00)) {
+            // ISO 13400 routing activation response echoes the tester address at
+            // payload bytes 0..1 and provides the entity logical address at 2..3.
             doIpTargetLogicalAddress = ((respBytes[10].toInt() and 0xFF) shl 8) or
                 (respBytes[11].toInt() and 0xFF)
             Log.i(TAG, "DoIP Routing Activation SUCCESS. Status: $status")
@@ -4067,7 +3867,10 @@ class ObdSession(
         }
     }
 
-    private fun wrapDoIpDiagnostics(udsHex: String): ByteArray {
+    private fun wrapDoIpDiagnostics(
+        targetLogicalAddress: Int,
+        udsHex: String,
+    ): ByteArray {
         val cleanHex = udsHex.replace(" ", "").replace("\r", "").replace("\n", "")
         val udsBytes = cleanHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val payloadSize = 4 + udsBytes.size
@@ -4083,19 +3886,27 @@ class ObdSession(
         packet[6] = ((payloadSize shl 8) and 0xFF).toByte()
         packet[7] = (payloadSize and 0xFF).toByte()
         
-        packet[8] = 0x0E.toByte()
-        packet[9] = 0x00.toByte()
-        packet[10] = ((doIpTargetLogicalAddress ushr 8) and 0xFF).toByte()
-        packet[11] = (doIpTargetLogicalAddress and 0xFF).toByte()
+        packet[8] = ((doIpSourceLogicalAddress ushr 8) and 0xFF).toByte()
+        packet[9] = (doIpSourceLogicalAddress and 0xFF).toByte()
+        packet[10] = ((targetLogicalAddress ushr 8) and 0xFF).toByte()
+        packet[11] = (targetLogicalAddress and 0xFF).toByte()
         
         System.arraycopy(udsBytes, 0, packet, 12, udsBytes.size)
         return packet
     }
 
-    private fun unwrapDoIpDiagnostics(doipBytes: ByteArray?): String {
+    private fun unwrapDoIpDiagnostics(
+        doipBytes: ByteArray?,
+        expectedSourceLogicalAddress: Int? = null,
+        expectedTargetLogicalAddress: Int? = null,
+    ): String {
         if (doipBytes == null || doipBytes.size < 12) return ""
         val payloadType = ((doipBytes[2].toInt() and 0xFF) shl 8) or (doipBytes[3].toInt() and 0xFF)
         if (payloadType != 0x8001) return ""
+        val sourceLogicalAddress = ((doipBytes[8].toInt() and 0xFF) shl 8) or (doipBytes[9].toInt() and 0xFF)
+        val targetLogicalAddress = ((doipBytes[10].toInt() and 0xFF) shl 8) or (doipBytes[11].toInt() and 0xFF)
+        if (expectedSourceLogicalAddress != null && sourceLogicalAddress != expectedSourceLogicalAddress) return ""
+        if (expectedTargetLogicalAddress != null && targetLogicalAddress != expectedTargetLogicalAddress) return ""
         
         val udsLength = doipBytes.size - 12
         if (udsLength <= 0) return ""
@@ -4107,6 +3918,22 @@ class ObdSession(
         return sb.toString()
     }
 
+    suspend fun sendDoIpDiagnostic(
+        targetLogicalAddress: Int,
+        payload: String,
+        timeoutMs: Long = 1_500L,
+    ): String = communicationMutex.withLock {
+        require(isDoIpMode) { "DoIP transport is not active" }
+        require(targetLogicalAddress in 0..0xFFFF) { "Invalid DoIP logical target" }
+        val t = transport ?: throw ObdConnectionException("Transport no disponible para DoIP")
+        t.write(wrapDoIpDiagnostics(targetLogicalAddress, payload))
+        unwrapDoIpDiagnostics(
+            doipBytes = t.read(4096, timeoutMs),
+            expectedSourceLogicalAddress = targetLogicalAddress,
+            expectedTargetLogicalAddress = doIpSourceLogicalAddress,
+        )
+    }
+
     private suspend fun readResponseBytes(timeoutMs: Long = 1500L): ByteArray? =
         withContext(Dispatchers.IO) {
             val t = transport ?: return@withContext null
@@ -4114,10 +3941,17 @@ class ObdSession(
         }
 
     /** Continue receiving after UDS NRC 0x78 without retransmitting the request. */
-    private suspend fun awaitDiagnosticResponseWithoutRequest(timeoutMs: Long): String =
+    private suspend fun awaitDiagnosticResponseWithoutRequest(
+        timeoutMs: Long,
+        doIpTarget: Int? = null,
+    ): String =
         communicationMutex.withLock {
             if (isDoIpMode) {
-                unwrapDoIpDiagnostics(readResponseBytes(timeoutMs))
+                unwrapDoIpDiagnostics(
+                    doipBytes = readResponseBytes(timeoutMs),
+                    expectedSourceLogicalAddress = doIpTarget,
+                    expectedTargetLogicalAddress = doIpSourceLogicalAddress,
+                )
             } else {
                 readResponse(timeoutMs)
             }
@@ -4142,20 +3976,10 @@ class ObdSession(
                     else -> "OK"
                 }
             }
-            return communicationMutex.withLock {
-                withContext(Dispatchers.IO) {
-                    val t = transport ?: throw ObdConnectionException("Transport no disponible")
-                    Log.v(TAG, "TX (DoIP Direct): '$command'")
-                    val packet = wrapDoIpDiagnostics(command)
-                    runCatching { t.drain() }
-                    t.write(packet)
-                    val respBytes = readResponseBytes(timeoutMs)
-                    val resp = unwrapDoIpDiagnostics(respBytes)
-                    Log.v(TAG, "RX (DoIP Direct): '$resp'")
-                    delay(baseDelayMs)
-                    resp
-                }
-            }
+            throw ObdConnectionException(
+                "Comando DoIP bloqueado: falta destino lógico explícito por solicitud. " +
+                    "Use sendDoIpDiagnostic(targetLogicalAddress, payload).",
+            )
         }
 
         return communicationMutex.withLock {
@@ -4278,58 +4102,44 @@ class ObdSession(
      * Professional Safety Guard: Verifies that sensitive operations
      * are only performed on high-quality adapters and under safe conditions.
      */
-    suspend fun verifySafetyForProAction(conditions: List<SafetyCondition> = emptyList()): Boolean {
-        val (ecuVolt, elmVolt) = readBatteryVoltage()
-        val voltage = if (elmVolt > 0f) elmVolt else ecuVolt
-        if (voltage < 11.5f) {
-            _statusMessage.value = "ERROR: Voltaje insuficiente (${voltage}V). Conecta un cargador."
-            return false
-        }
-
-        // Check specific conditions
-        // NOTE: Live polling stores RPM under key "010C" (Mode 01 PID 0C)
-        for (condition in conditions) {
-            when (condition) {
-                SafetyCondition.ENGINE_OFF -> {
-                    val rpm = liveData.value["010C"] ?: liveData.value["RPM"] ?: 0f
-                    if (rpm > 100f) {
-                        _statusMessage.value = "ERROR: El motor debe estar APAGADO para esta acción."
-                        return false
-                    }
-                }
-                SafetyCondition.ENGINE_RUNNING -> {
-                    val rpm = liveData.value["010C"] ?: liveData.value["RPM"] ?: 0f
-                    if (rpm < 400f) {
-                        _statusMessage.value = "ERROR: El motor debe estar ENCENDIDO para esta acción."
-                        return false
-                    }
-                }
-                SafetyCondition.VEHICLE_STATIONARY -> {
-                    val speed = liveData.value["010D"] ?: liveData.value["Speed"] ?: 0f
-                    if (speed > 3f) {
-                        _statusMessage.value = "ERROR: El vehículo debe estar DETENIDO para esta acción."
-                        return false
-                    }
-                }
-                SafetyCondition.BATTERY_ABOVE_12V -> {
-                    if (voltage < 12.0f) {
-                        _statusMessage.value = "ERROR: Batería baja (${voltage}V). Mínimo 12.0V requerido."
-                        return false
-                    }
-                }
-                SafetyCondition.TRANS_IN_PARK -> {
-                    // Cannot verify via OBD on most vehicles — log warning only
-                    Log.w(TAG, "TRANS_IN_PARK check not available via OBD — proceeding with caution")
-                }
+    suspend fun verifySafetyForProAction(test: ActiveTest): ActiveDiagnosticSafetyDecision {
+        // Refresh only the observations required by the policy. A failed read is
+        // preserved as UNKNOWN and can never silently become zero/safe.
+        test.safetyConditions.forEach { condition ->
+            val pid = when (condition) {
+                SafetyCondition.ENGINE_OFF,
+                SafetyCondition.ENGINE_RUNNING -> "010C"
+                SafetyCondition.VEHICLE_STATIONARY -> "010D"
+                SafetyCondition.BATTERY_ABOVE_12V -> "0142"
+                SafetyCondition.TRANS_IN_PARK -> null
             }
+            if (pid != null) refreshSafetyTelemetry(pid)
         }
+        val decision = ActiveDiagnosticSafetyKernel.evaluate(
+            test = test,
+            telemetry = telemetrySamples.value,
+            nowMonotonicMs = System.nanoTime() / 1_000_000L,
+        )
+        if (!decision.allowed) {
+            _statusMessage.value = decision.blockingReasons.joinToString(separator = " ")
+        }
+        return decision
+    }
 
-        if (isCloneAdapter) {
-            _statusMessage.value = "AVISO: Usando adaptador clon. Proceder con extrema cautela."
-            // We allow it but with a warning in logs, or return false to lock it
-            // return false
+    private suspend fun refreshSafetyTelemetry(pid: String) {
+        try {
+            val response = sendRawCommand(pid)
+            val value = parsePidResponse(pid, response)
+            if (value != null) {
+                updateLiveData(pid, value)
+            } else {
+                markSensorState(pid, stateForFailedResponse(response), rawValue = response)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            markSensorState(pid, SensorValueState.EcuNoResponse, rawValue = error.message)
         }
-        return true
     }
 
     /**
@@ -4351,8 +4161,18 @@ class ObdSession(
     }
 
     private suspend fun runActiveTestOwned(test: ActiveTest) {
+        var activationRequested = false
+        var activationAcknowledged = false
+        var completedMonitoring = false
+        var finalData = emptyMap<String, Float>()
         try {
-                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "Iniciando: ${test.name}...", progress = 0.1f, testId = test.id)
+                _activeTestStatus.value = ActiveTestStatus(
+                    isActive = false,
+                    message = "Verificando seguridad: ${test.name}...",
+                    progress = 0.05f,
+                    testId = test.id,
+                    phase = ActiveDiagnosticTestPhase.PRECHECK,
+                )
 
                 if (_state.value != ObdState.CONNECTED) {
                     _activeTestStatus.value = ActiveTestStatus(
@@ -4364,30 +4184,53 @@ class ObdSession(
                     return
                 }
 
-                if (!verifySafetyForProAction(test.safetyConditions)) {
-                    _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "ERROR: Condiciones de seguridad no cumplidas.")
+                val safetyDecision = verifySafetyForProAction(test)
+                if (!safetyDecision.allowed) {
+                    _activeTestStatus.value = ActiveTestStatus(
+                        isActive = false,
+                        message = safetyDecision.blockingReasons.joinToString(" "),
+                        testId = test.id,
+                        phase = ActiveDiagnosticTestPhase.ABORTED,
+                    )
                     return
                 }
 
-                // Send Start Command
+                _activeTestStatus.value = _activeTestStatus.value.copy(
+                    message = "Condiciones verificadas.",
+                    progress = 0.1f,
+                    phase = ActiveDiagnosticTestPhase.READY,
+                )
+
+                // Activation commands are never retried: an ambiguous response
+                // may still mean that the actuator moved.
                 _statusMessage.value = "Enviando comando de activación: ${test.startCommand}"
-                var startResp = sendRawCommand(test.startCommand)
-                if (startResp.contains("ERROR") || startResp.contains("NO DATA") || startResp.contains("CAN ERROR")) {
-                    _statusMessage.value = "Fallo inicial. Recuperando canal físico..."
-                    attemptSelfHealing()
-                    startResp = sendRawCommand(test.startCommand)
-                    if (startResp.contains("ERROR") || startResp.contains("NO DATA") || startResp.contains("CAN ERROR")) {
-                        _activeTestStatus.value = ActiveTestStatus(isActive = false, message = "Fallo al iniciar: $startResp")
-                        return
-                    }
+                _activeTestStatus.value = _activeTestStatus.value.copy(
+                    phase = ActiveDiagnosticTestPhase.ACTIVATION_REQUESTED,
+                )
+                activationRequested = true
+                val startResp = sendRawCommand(test.startCommand)
+                activationAcknowledged = isTypedPositiveResponse(test.startCommand, startResp)
+                if (!activationAcknowledged) {
+                    _activeTestStatus.value = ActiveTestStatus(
+                        isActive = false,
+                        message = "Activación no confirmada por una PDU positiva válida.",
+                        testId = test.id,
+                        phase = ActiveDiagnosticTestPhase.ABORTED,
+                    )
+                    return
                 }
 
-                _activeTestStatus.value = ActiveTestStatus(isActive = true, message = "PRUEBA ACTIVA: ${test.name}", progress = 0.5f, testId = test.id)
+                _activeTestStatus.value = ActiveTestStatus(
+                    isActive = true,
+                    message = "PRUEBA ACTIVA: ${test.name}",
+                    progress = 0.5f,
+                    testId = test.id,
+                    phase = ActiveDiagnosticTestPhase.ACTIVE,
+                )
 
                 // Monitor loop
                 val startTime = System.currentTimeMillis()
                 var lastTesterPresentTime = startTime
-                var finalData = emptyMap<String, Float>()
                 while (System.currentTimeMillis() - startTime < test.durationMs) {
                     if (!currentCoroutineContext().isActive) break
 
@@ -4443,53 +4286,88 @@ class ObdSession(
 
                     delay(500) // 2Hz feedback
                 }
-
-                // Send Stop Command
-                _statusMessage.value = "Deteniendo prueba: ${test.stopCommand}"
-                var stopResp = sendRawCommand(test.stopCommand)
-                if (stopResp.contains("ERROR") || stopResp.contains("NO DATA") || stopResp.contains("CAN ERROR")) {
-                    Log.w(TAG, "Failed to stop active test. Self-healing...")
-                    attemptSelfHealing()
-                    sendRawCommand(test.stopCommand)
-                }
-
-                _activeTestStatus.value = ActiveTestStatus(
-                    isActive = false,
-                    message = "Prueba completada con éxito.",
-                    progress = 1.0f,
-                    testId = test.id,
-                    currentValues = finalData
-                )
+                completedMonitoring = true
 
         } catch (cancelled: CancellationException) {
-            _activeTestStatus.value = ActiveTestStatus(
-                isActive = false,
-                message = "Prueba detenida manualmente.",
-                testId = test.id,
-                currentValues = _activeTestStatus.value.currentValues,
-            )
             throw cancelled
         } catch (e: Exception) {
             _activeTestStatus.value = ActiveTestStatus(
                 isActive = false,
                 message = "Excepción en prueba: ${e.message}",
-                testId = test.id
+                testId = test.id,
+                phase = ActiveDiagnosticTestPhase.ABORTED,
+            )
+        } finally {
+            if (activationRequested) {
+                withContext(NonCancellable) {
+                    stopAndVerifyActiveTest(
+                        test = test,
+                        activationAcknowledged = activationAcknowledged,
+                        completedMonitoring = completedMonitoring,
+                        finalData = finalData,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun isTypedPositiveResponse(command: String, rawResponse: String): Boolean {
+        val requestedService = command.take(2).toIntOrNull(16) ?: return false
+        val expectedPositiveService = (requestedService + 0x40) and 0xFF
+        return DiagnosticPduDecoder.decodeResponses(
+            rawResponse = rawResponse,
+            expectedPositiveService = expectedPositiveService,
+            requestedService = requestedService,
+        ).any { it is ProtocolResponse.Positive }
+    }
+
+    private suspend fun stopAndVerifyActiveTest(
+        test: ActiveTest,
+        activationAcknowledged: Boolean,
+        completedMonitoring: Boolean,
+        finalData: Map<String, Float>,
+    ) {
+        _activeTestStatus.value = _activeTestStatus.value.copy(
+            isActive = activationAcknowledged,
+            message = "Deteniendo prueba y verificando respuesta...",
+            phase = ActiveDiagnosticTestPhase.STOP_REQUESTED,
+        )
+        _statusMessage.value = "Deteniendo prueba: ${test.stopCommand}"
+        val stopResponse = runCatching { sendRawCommand(test.stopCommand) }.getOrNull()
+        val stopVerified = stopResponse != null && isTypedPositiveResponse(test.stopCommand, stopResponse)
+        _activeTestStatus.value = if (stopVerified) {
+            ActiveTestStatus(
+                isActive = false,
+                message = if (completedMonitoring) {
+                    "Prueba completada; detención verificada por ECU."
+                } else {
+                    "Prueba interrumpida; detención verificada por ECU."
+                },
+                progress = if (completedMonitoring) 1.0f else _activeTestStatus.value.progress,
+                testId = test.id,
+                currentValues = finalData,
+                phase = ActiveDiagnosticTestPhase.STOP_VERIFIED,
+                stopVerified = true,
+            )
+        } else {
+            ActiveTestStatus(
+                isActive = activationAcknowledged,
+                message = "CRÍTICO: detención no confirmada. Apaga el contacto y verifica físicamente el actuador.",
+                progress = _activeTestStatus.value.progress,
+                testId = test.id,
+                currentValues = finalData,
+                phase = ActiveDiagnosticTestPhase.STOP_FAILED,
+                stopVerified = false,
             )
         }
     }
 
     fun stopActiveTest() {
-        val currentTestId = _activeTestStatus.value.testId
-        val currentValues = _activeTestStatus.value.currentValues
+        _activeTestStatus.value = _activeTestStatus.value.copy(
+            message = "Solicitando detención segura...",
+            phase = ActiveDiagnosticTestPhase.STOP_REQUESTED,
+        )
         activeTestJob?.cancel()
-        scope.launch(Dispatchers.IO) {
-            _activeTestStatus.value = ActiveTestStatus(
-                isActive = false,
-                message = "Prueba detenida manualmente.",
-                testId = currentTestId,
-                currentValues = currentValues
-            )
-        }
     }
 
     fun clearActiveTestStatus() {
@@ -4552,13 +4430,9 @@ class ObdSession(
                                             cmd == "ATDP" -> "DOIP"
                                             else -> "OK"
                                         }
-                                    } else {
-                                        val packet = wrapDoIpDiagnostics(command.query)
-                                        runCatching { t.drain() }
-                                        t.write(packet)
-                                        val respBytes = readResponseBytes(timeoutMs = 2000L)
-                                        unwrapDoIpDiagnostics(respBytes)
-                                    }
+                                    } else throw ObdConnectionException(
+                                        "Cola DoIP bloqueada: el comando no incluye destino lógico explícito.",
+                                    )
                                 } else {
                                     runCatching { t.drain() }
                                     t.write("${command.query}\r".toByteArray())

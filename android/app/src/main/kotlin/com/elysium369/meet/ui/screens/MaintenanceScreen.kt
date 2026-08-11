@@ -66,8 +66,8 @@ fun MaintenanceScreen(
     val alerts by viewModel.maintenanceAlerts.collectAsState()
     val currentOdometer by viewModel.currentOdometer.collectAsState()
     val liveData by viewModel.liveData.collectAsState()
-    val activeDtcs by viewModel.activeDtcEvents.collectAsState()
-    val pendingDtcs by viewModel.pendingDtcEvents.collectAsState()
+    val activeDtcs by viewModel.canonicalActiveFindingSummaries.collectAsState()
+    val pendingDtcs by viewModel.canonicalPendingFindingSummaries.collectAsState()
     val healthScore by viewModel.healthScore.collectAsState()
     val trips by viewModel.trips.collectAsState()
 

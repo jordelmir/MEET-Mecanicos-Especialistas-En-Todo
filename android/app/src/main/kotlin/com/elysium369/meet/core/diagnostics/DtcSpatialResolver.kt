@@ -20,7 +20,7 @@ data class DiagnosticSpatialProjection(
     val communicationPaths: List<String> = emptyList(),
     val fluidPaths: List<String> = emptyList(),
     val mechanicalPaths: List<String> = emptyList(),
-    val confidence: Double = 0.0,
+    val projectionEvidenceScore: Double = 0.0,
     val explanation: String = "Proyección orientativa sin evidencia suficiente.",
     val relationNotice: String =
         "Relación diagnóstica orientativa: no confirma por sí sola una pieza dañada.",
@@ -29,7 +29,7 @@ data class DiagnosticSpatialProjection(
 data class SpatialCandidateComponent(
     val componentId: String,
     val relationship: String,
-    val confidence: Double,
+    val projectionEvidenceScore: Double,
     val requiredEvidence: String,
 )
 
@@ -49,9 +49,13 @@ data class SpatialKnowledgeRelation(
     val relationship: String,
     val pathType: String,
     val pathDescription: String,
-    val confidence: Double,
+    val evidenceScore: Double,
     val source: String,
     val requiredEvidence: String,
+    val sourceReferences: List<String> = emptyList(),
+    val reviewState: String = "REVIEW_REQUIRED",
+    val applicability: String = "NOT_DOCUMENTED",
+    val vehicleConstraints: List<String> = emptyList(),
 )
 
 /**
@@ -90,7 +94,7 @@ object DtcSpatialResolver {
         return DiagnosticSpatialProjection(
             primarySystem = primary,
             relatedSystems = related,
-            confidence = if (module.isNotBlank()) 0.72 else if (normalizedCode.isNotBlank()) 0.48 else 0.0,
+            projectionEvidenceScore = if (module.isNotBlank()) 0.72 else if (normalizedCode.isNotBlank()) 0.48 else 0.0,
             explanation = if (module.isNotBlank()) {
                 "Sistema priorizado por evidencia del módulo $module y familia del DTC $normalizedCode."
             } else {
@@ -108,13 +112,13 @@ object DtcSpatialResolver {
         } else {
             emptyList()
         } }
-        val graphConfidence = finding.knowledgeRelations.maxOfOrNull { it.confidence }
+        val graphEvidenceScore = finding.knowledgeRelations.maxOfOrNull { it.evidenceScore }
         return base.copy(
             candidateComponents = finding.knowledgeRelations.map { relation ->
                 SpatialCandidateComponent(
                     componentId = relation.componentId,
                     relationship = relation.relationship,
-                    confidence = relation.confidence,
+                    projectionEvidenceScore = relation.evidenceScore,
                     requiredEvidence = relation.requiredEvidence,
                 )
             },
@@ -123,7 +127,7 @@ object DtcSpatialResolver {
             communicationPaths = networkPath,
             fluidPaths = finding.knowledgeRelations.filter { it.pathType == "FLUID" }.map { it.pathDescription },
             mechanicalPaths = finding.knowledgeRelations.filter { it.pathType == "MECHANICAL" }.map { it.pathDescription },
-            confidence = (graphConfidence ?: (base.confidence + if (finding.rawDtcIdentity.isNotBlank()) 0.12 else 0.0))
+            projectionEvidenceScore = (graphEvidenceScore ?: (base.projectionEvidenceScore + if (finding.rawDtcIdentity.isNotBlank()) 0.12 else 0.0))
                 .coerceAtMost(0.9),
             explanation = if (finding.knowledgeRelations.isNotEmpty()) {
                 "Proyección trazada desde ${finding.knowledgeRelations.map { it.source }.distinct().joinToString()} " +

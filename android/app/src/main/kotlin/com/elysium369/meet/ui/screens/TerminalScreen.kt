@@ -466,7 +466,8 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                                     val responseType = when {
                                         response.contains("ERROR", true) ||
                                         response.contains("NO DATA", true) ||
-                                        response.contains("UNABLE", true) -> TerminalLineType.WARNING
+                                        response.contains("UNABLE", true) ||
+                                        response.contains("BLOCKED", true) -> TerminalLineType.WARNING
                                         else -> TerminalLineType.RESPONSE
                                     }
                                     responseLines.add(TerminalLine(response, responseType))

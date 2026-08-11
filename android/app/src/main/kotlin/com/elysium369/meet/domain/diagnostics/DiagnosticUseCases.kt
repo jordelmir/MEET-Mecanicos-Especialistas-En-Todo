@@ -8,27 +8,27 @@ import com.elysium369.meet.core.diagnostics.DtcSpatialResolver
 import com.elysium369.meet.core.diagnostics.HypothesisEngineDecision
 import com.elysium369.meet.core.obd.ClearDtcResult
 import com.elysium369.meet.core.obd.ClearVerificationPlan
+import com.elysium369.meet.core.obd.DiagnosticAcquisitionEngine
+import com.elysium369.meet.core.obd.DiagnosticMemoryEngine
 import com.elysium369.meet.core.obd.DiagnosticScanMode
 import com.elysium369.meet.core.obd.DtcScanReport
-import com.elysium369.meet.core.obd.ObdSession
 import com.elysium369.meet.data.local.dao.DiagnosticEvidenceDao
-import com.elysium369.meet.data.local.dao.DtcDao
 import com.elysium369.meet.data.local.entities.DiagnosticObservationEntity
-import com.elysium369.meet.data.local.entities.DtcEventEntity
 import com.elysium369.meet.data.local.entities.FindingDiagnosticSnapshotEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-class RunDiagnosticScan @Inject constructor(private val session: ObdSession) {
-    suspend operator fun invoke(mode: DiagnosticScanMode): DtcScanReport = session.readProfessionalDtcScan(mode)
+class RunDiagnosticScan @Inject constructor(private val acquisition: DiagnosticAcquisitionEngine) {
+    suspend operator fun invoke(mode: DiagnosticScanMode): DtcScanReport = acquisition.scan(mode)
 }
 
-class ClearDiagnosticMemory @Inject constructor(private val session: ObdSession) {
-    suspend operator fun invoke(plan: ClearVerificationPlan): ClearDtcResult = session.clearDtcs(plan)
+class ClearDiagnosticMemory @Inject constructor(private val memory: DiagnosticMemoryEngine) {
+    suspend operator fun invoke(plan: ClearVerificationPlan): ClearDtcResult = memory.clear(plan)
 }
 
-class ObserveDiagnosticFindings @Inject constructor(private val dtcDao: DtcDao) {
-    operator fun invoke(vehicleId: String): Flow<List<DtcEventEntity>> = dtcDao.getUnresolvedDtcsForVehicle(vehicleId)
+class ObserveDiagnosticFindings @Inject constructor(private val repository: DiagnosticFindingRepository) {
+    operator fun invoke(vehicleId: String): Flow<List<CanonicalDiagnosticFinding>> =
+        repository.observeOpenFindings(vehicleId)
 }
 
 data class FindingEvidenceStreams(

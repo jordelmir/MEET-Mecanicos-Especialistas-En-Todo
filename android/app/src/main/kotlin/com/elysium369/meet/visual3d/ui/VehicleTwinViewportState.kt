@@ -4,6 +4,7 @@ enum class TwinFocusMode {
     COMPLETE_VEHICLE,
     SYSTEM,
     COMPONENT,
+    DIAGNOSTIC_TWIN,
     REPAIR
 }
 
@@ -16,6 +17,11 @@ data class VehicleTwinViewportState(
 ) {
     fun focusSystem() = copy(focusMode = TwinFocusMode.SYSTEM)
     fun focusComponent() = copy(focusMode = TwinFocusMode.COMPONENT)
+    fun enterDiagnosticTwin() = copy(
+        focusMode = TwinFocusMode.DIAGNOSTIC_TWIN,
+        xRayEnabled = true,
+        autoRotateEnabled = false,
+    )
     fun enterRepair() = copy(
         focusMode = TwinFocusMode.REPAIR,
         autoRotateEnabled = false,

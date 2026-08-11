@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -60,7 +61,6 @@ import com.elysium369.meet.core.obd.DiagnosticModuleIdentity
 import com.elysium369.meet.core.obd.DtcBucket
 import com.elysium369.meet.core.obd.DtcRecord
 import com.elysium369.meet.data.supabase.Vehicle
-import com.elysium369.meet.data.local.entities.DtcEventEntity
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.models.DiagnosticFindingUiModel
@@ -337,10 +337,8 @@ private fun HoloCard(
 @Composable
 fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val activeDtcs by viewModel.activeDtcs.collectAsState()
-    val activeDtcEvents by viewModel.activeDtcEvents.collectAsState()
-    val pendingDtcEvents by viewModel.pendingDtcEvents.collectAsState()
-    val permanentDtcEvents by viewModel.permanentDtcEvents.collectAsState()
-    val historicalDtcEvents by viewModel.historicalDtcEvents.collectAsState()
+    val canonicalOpenFindings by viewModel.canonicalOpenFindings.collectAsState()
+    val canonicalResolvedFindings by viewModel.canonicalResolvedFindings.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val googleSearchVehicle = remember(selectedVehicle) {
         selectedVehicle.toDtcGoogleSearchVehicleContext()
@@ -352,7 +350,6 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
     val permanentDtcs by viewModel.permanentDtcs.collectAsState()
     val historicalDtcs by viewModel.historicalDtcs.collectAsState()
-    val verifiedResolvedDtcEvents by viewModel.verifiedResolvedDtcEvents.collectAsState()
     val readiness by viewModel.readinessMonitors.collectAsState()
     val clearResult by viewModel.clearDtcResult.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -380,41 +377,38 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
         if (permanentFindingRecords.isNotEmpty()) permanentFindingRecords.map { it.code to it }
         else permanentDtcs.map { it to null }
     }
-    val persistedEvents = remember(activeDtcEvents, pendingDtcEvents, permanentDtcEvents, historicalDtcEvents) {
-        activeDtcEvents + pendingDtcEvents + permanentDtcEvents + historicalDtcEvents
-    }
-    val notVerifiedThisScan = remember(persistedEvents, lastScanReport) {
-        val identitiesObservedNow = lastScanReport?.records.orEmpty()
-            .map { it.stableUiIdentity() }
-            .toSet()
-        persistedEvents
-            .filter { event ->
-                lastScanReport != null && (
-                    event.observationState == "NOT_OBSERVED_LAST_SCAN" ||
-                        event.stableUiIdentity() !in identitiesObservedNow
-                    )
-            }
-            .distinctBy { it.stableUiIdentity() }
-            .map { event ->
-            event.toFindingUiModel(FindingObservationState.NOT_VERIFIED_THIS_SCAN)
+    val canonicalHistoricalFindings = remember(canonicalOpenFindings) {
+        canonicalOpenFindings.filter { finding ->
+            finding.timeline.any { "HISTORY" in it.semantics || "INTERMITTENT" in it.semantics }
         }
     }
-    val activeFindingCount = remember(activeFindingRecords, activeDtcEvents) {
-        (activeFindingRecords.map { it.stableUiIdentity() } + activeDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    val notVerifiedThisScan = remember(canonicalOpenFindings) {
+        canonicalOpenFindings
+            .filter { it.projection.state == com.elysium369.meet.domain.diagnostics.FindingResolutionState.NOT_VERIFIED_THIS_SCAN }
+            .map { it.toFindingUiModel(FindingObservationState.NOT_VERIFIED_THIS_SCAN) }
     }
-    val pendingFindingCount = remember(pendingFindingRecords, pendingDtcEvents) {
-        (pendingFindingRecords.map { it.stableUiIdentity() } + pendingDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    val activeFindingCount = remember(activeFindingRecords, activeDtcs) {
+        if (activeFindingRecords.isNotEmpty()) activeFindingRecords.distinctBy { it.stableUiIdentity() }.size
+        else activeDtcs.map { it.uppercase() }.distinct().size
     }
-    val permanentFindingCount = remember(permanentFindingRecords, permanentDtcEvents) {
-        (permanentFindingRecords.map { it.stableUiIdentity() } + permanentDtcEvents.map { it.stableUiIdentity() }).distinct().size
+    val pendingFindingCount = remember(pendingFindingRecords, pendingDtcs) {
+        if (pendingFindingRecords.isNotEmpty()) pendingFindingRecords.distinctBy { it.stableUiIdentity() }.size
+        else pendingDtcs.map { it.uppercase() }.distinct().size
     }
-    val totalFindingCount = remember(lastScanReport, persistedEvents) {
-        (lastScanReport?.records.orEmpty().map { it.stableUiIdentity() } + persistedEvents.map { it.stableUiIdentity() }).distinct().size
+    val permanentFindingCount = remember(permanentFindingRecords, permanentDtcs) {
+        if (permanentFindingRecords.isNotEmpty()) permanentFindingRecords.distinctBy { it.stableUiIdentity() }.size
+        else permanentDtcs.map { it.uppercase() }.distinct().size
+    }
+    val totalFindingCount = remember(lastScanReport, canonicalOpenFindings, canonicalResolvedFindings) {
+        val canonical = canonicalOpenFindings + canonicalResolvedFindings
+        if (canonical.isNotEmpty()) canonical.distinctBy { it.stableUiIdentity() }.size
+        else lastScanReport?.records.orEmpty().distinctBy { it.stableUiIdentity() }.size
     }
 
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showAdvancedMenu by remember { mutableStateOf(false) }
     val scanEvents = remember { mutableStateListOf<DiagnosticScanEvent>() }
     LaunchedEffect(viewModel) {
         viewModel.diagnosticScanEvents.collect { event ->
@@ -426,14 +420,14 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
 
     if (showClearDialog) {
         EliteDialog(
-            title = "⚠️ Borrar Códigos",
-            message = "Esto enviará el Comando de Diagnóstico Mode 04 al vehículo. Se borrarán TODOS los DTCs activos y pendientes, se apagará la luz MIL (Check Engine) y se resetearán los monitores de emisiones.\n\n¿Deseas continuar?",
+            title = "⚠️ Acción avanzada: borrar memoria DTC",
+            message = "La app construirá un plan inmutable desde el último escaneo: Mode 04 únicamente para hallazgos SAE OBD y UDS Service 14 únicamente para ECU físicas demostradas por evidencia. Puede apagar la MIL, borrar datos de congelación y reiniciar monitores de preparación; no demuestra que la falla fue reparada. Después se repetirá el escaneo y solo se marcarán ausencias con cobertura ECU/servicio suficiente. Todo resultado parcial o inconcluso conservará los hallazgos sin resolver. La orden se bloquea sin sesión OBD válida o sin un plan previo verificable.\n\n¿Confirmas esta acción irreversible en el vehículo conectado?",
             onDismiss = { showClearDialog = false },
             onConfirm = {
                 showClearDialog = false
                 coroutineScope.launch { viewModel.clearDtcs() }
             },
-            confirmText = "BORRAR MEMORIA",
+            confirmText = "CONFIRMAR PLAN",
             dismissText = "CANCELAR",
             isDestructive = true
         )
@@ -590,23 +584,34 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 )
                             }
                         }
-                        // BORRAR button
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MeetColors.error.copy(alpha = 0.08f))
-                                .border(1.dp, MeetColors.error.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .clickable(enabled = !isScanning) { showClearDialog = true }
-                                .padding(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                "BORRAR",
-                                color = if (isScanning) MeetColors.textMuted else MeetColors.error,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = if (isCompact) 10.sp else 12.sp,
-                                letterSpacing = 1.sp
-                            )
+                        Box {
+                            IconButton(
+                                enabled = !isScanning,
+                                onClick = { showAdvancedMenu = true },
+                            ) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Acciones diagnósticas avanzadas",
+                                    tint = if (isScanning) MeetColors.textMuted else MeetColors.textSecondary,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showAdvancedMenu,
+                                onDismissRequest = { showAdvancedMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text("Borrar memoria DTC (plan por protocolo)", color = MeetColors.error)
+                                            Text("Avanzado · modifica el vehículo", fontSize = 10.sp, color = MeetColors.textSecondary)
+                                        }
+                                    },
+                                    onClick = {
+                                        showAdvancedMenu = false
+                                        showClearDialog = true
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -806,6 +811,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                     }
                                     itemsIndexed(activeFindingItems) { index, item ->
                                         val (dtc, finding) = item
+                                        val persistedFindingId = canonicalOpenFindings.firstOrNull { canonical ->
+                                            finding?.let { canonical.stableUiIdentity() == it.stableUiIdentity() }
+                                                ?: canonical.identity.displayCode.equals(dtc, ignoreCase = true)
+                                        }?.identity?.id
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "ACTIVO", MeetColors.error, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
@@ -813,6 +822,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 },
                                                 finding = finding,
+                                                findingId = persistedFindingId,
                                             )
                                         }
                                     }
@@ -824,6 +834,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 } else {
                                     itemsIndexed(pendingFindingItems) { index, item ->
                                         val (dtc, finding) = item
+                                        val persistedFindingId = canonicalOpenFindings.firstOrNull { canonical ->
+                                            finding?.let { canonical.stableUiIdentity() == it.stableUiIdentity() }
+                                                ?: canonical.identity.displayCode.equals(dtc, ignoreCase = true)
+                                        }?.identity?.id
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PENDIENTE", MeetColors.warning, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
@@ -831,6 +845,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 },
                                                 finding = finding,
+                                                findingId = persistedFindingId,
                                             )
                                         }
                                     }
@@ -842,6 +857,10 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                 } else {
                                     itemsIndexed(permanentFindingItems) { index, item ->
                                         val (dtc, finding) = item
+                                        val persistedFindingId = canonicalOpenFindings.firstOrNull { canonical ->
+                                            finding?.let { canonical.stableUiIdentity() == it.stableUiIdentity() }
+                                                ?: canonical.identity.displayCode.equals(dtc, ignoreCase = true)
+                                        }?.identity?.id
                                         StaggeredEntrance(index) {
                                             HoloDtcCard(dtc, "PERMANENTE", MeetColors.cyberCyan, navController, viewModel, isCompact,
                                                 googleSearchVehicle = googleSearchVehicle,
@@ -849,12 +868,13 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
                                                     navController.navigate("tow_truck_service?vehicleInfo=${java.net.URLEncoder.encode(viewModel.buildVehicleInfoForDtc(code, desc), "UTF-8")}")
                                                 },
                                                 finding = finding,
+                                                findingId = persistedFindingId,
                                             )
                                         }
                                     }
                                 }
                             }
-                            3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, historicalDtcEvents, verifiedResolvedDtcEvents, navController, isCompact) } }
+                            3 -> { item { DtcFindingsTab(lastScanReport, activeDtcs, pendingDtcs, permanentDtcs, historicalDtcs, canonicalHistoricalFindings, canonicalResolvedFindings, navController, isCompact) } }
                             4 -> { item { ReadinessMonitorsView(readiness, coroutineScope, viewModel, screenWidth, isCompact) } }
                             5 -> { item { ManualSearchTab(navController, viewModel, isCompact, googleSearchVehicle) } }
                         }
@@ -881,13 +901,13 @@ private fun DtcFindingsTab(
     pendingDtcs: List<String>,
     permanentDtcs: List<String>,
     historicalDtcs: List<String>,
-    historicalEvents: List<DtcEventEntity>,
-    verifiedResolvedEvents: List<DtcEventEntity>,
+    historicalFindings: List<com.elysium369.meet.domain.diagnostics.CanonicalDiagnosticFinding>,
+    verifiedResolvedFindings: List<com.elysium369.meet.domain.diagnostics.CanonicalDiagnosticFinding>,
     navController: NavController,
     isCompact: Boolean
 ) {
     val totalCodes = (activeDtcs + pendingDtcs + permanentDtcs + historicalDtcs).distinct().size
-    if (report == null && totalCodes == 0 && historicalEvents.isEmpty() && verifiedResolvedEvents.isEmpty()) {
+    if (report == null && totalCodes == 0 && historicalFindings.isEmpty() && verifiedResolvedFindings.isEmpty()) {
         HolographicEmptyState(
             "SIN HALLAZGOS",
             "Toca ESCANEAR para capturar DTCs, módulos que respondieron y evidencia técnica del último barrido.",
@@ -926,28 +946,28 @@ private fun DtcFindingsTab(
                 )
             }
         }
-        if (historicalEvents.isNotEmpty()) {
+        if (historicalFindings.isNotEmpty()) {
             FindingTruthSectionHeader(
                 title = "HISTÓRICOS",
                 detail = "Observados anteriormente; permanecen abiertos hasta una verificación autoritativa.",
                 color = MeetColors.textSecondary,
             )
-            historicalEvents.distinctBy { it.stableUiIdentity() }.forEach { event ->
+            historicalFindings.distinctBy { it.stableUiIdentity() }.forEach { finding ->
                 PersistedFindingTruthCard(
-                    event.toFindingUiModel(FindingObservationState.HISTORICAL),
+                    finding.toFindingUiModel(FindingObservationState.HISTORICAL),
                     MeetColors.textSecondary,
                 )
             }
         }
-        if (verifiedResolvedEvents.isNotEmpty()) {
+        if (verifiedResolvedFindings.isNotEmpty()) {
             FindingTruthSectionHeader(
                 title = "RESUELTOS / VERIFICADOS",
                 detail = "Ausencia verificada por ECU, servicio e identidad DTC; el historial de evidencia permanece intacto.",
                 color = MeetColors.neonGreen,
             )
-            verifiedResolvedEvents.distinctBy { it.stableUiIdentity() }.forEach { event ->
+            verifiedResolvedFindings.distinctBy { it.stableUiIdentity() }.forEach { finding ->
                 PersistedFindingTruthCard(
-                    event.toFindingUiModel(FindingObservationState.VERIFIED_RESOLVED),
+                    finding.toFindingUiModel(FindingObservationState.VERIFIED_RESOLVED),
                     MeetColors.neonGreen,
                 )
             }
@@ -1262,34 +1282,41 @@ private fun DtcRecord.stableUiIdentity(): String = listOf(
     codeIdentity.stableRawIdentity,
 ).joinToString("|")
 
-private fun DtcEventEntity.stableUiIdentity(): String = listOf(
-    diagnosticNamespace.ifBlank { "UNKNOWN" },
-    moduleIdentity.ifBlank { DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName) },
-    rawDtcIdentity.ifBlank { code.uppercase() },
-).joinToString("|")
+private fun com.elysium369.meet.domain.diagnostics.CanonicalDiagnosticFinding.stableUiIdentity(): String =
+    listOf(
+        identity.diagnosticNamespace,
+        identity.ecuEndpointId,
+        identity.rawDtcIdentity,
+    ).joinToString("|")
 
-private fun DtcEventEntity.toFindingUiModel(
+private fun com.elysium369.meet.domain.diagnostics.CanonicalDiagnosticFinding.toFindingUiModel(
     observation: FindingObservationState,
-): DiagnosticFindingUiModel = DiagnosticFindingUiModel(
-    findingId = id,
-    stableIdentity = stableUiIdentity(),
-    displayCode = code,
-    rawDtcIdentity = rawDtcIdentity.ifBlank { code.uppercase() },
-    module = moduleName.ifBlank { "Módulo no identificado" },
-    moduleAddress = responseAddress.ifBlank { targetAddress.ifBlank { moduleIdentity } },
-    observationState = observation,
-    status = status,
-    severity = severity,
-    urgency = "REQUIERE REVISIÓN",
-    lastSeenAt = lastSeenAt,
-    evidenceStrength = if (sourceService.isNotBlank()) "ECU + servicio $sourceService" else "Evidencia heredada limitada",
-    coverageState = if (observation == FindingObservationState.NOT_VERIFIED_THIS_SCAN) {
-        FindingCoverageState.NOT_COVERED
-    } else {
-        FindingCoverageState.UNKNOWN
-    },
-    definitionVerification = "Aplicabilidad por vehículo pendiente de confirmar",
-)
+): DiagnosticFindingUiModel {
+    val latest = projection.latestObservation
+    val semantics = latest?.semantics.orEmpty()
+    val status = when {
+        "PERMANENT" in semantics -> "PERMANENT"
+        "PENDING" in semantics -> "PENDING"
+        "HISTORY" in semantics -> "HISTORY"
+        else -> "ACTIVE"
+    }
+    return DiagnosticFindingUiModel(
+        findingId = identity.id,
+        stableIdentity = stableUiIdentity(),
+        displayCode = identity.displayCode,
+        rawDtcIdentity = identity.rawDtcIdentity,
+        module = identity.ecuEndpointId,
+        moduleAddress = identity.ecuEndpointId,
+        observationState = observation,
+        status = status,
+        severity = "NO CALIBRADA",
+        urgency = "REQUIERE REVISIÓN",
+        lastSeenAt = latest?.observedAt ?: identity.createdAtMs,
+        evidenceStrength = latest?.sourceService?.let { "ECU + servicio $it" } ?: "Evidencia limitada",
+        coverageState = FindingCoverageState.NOT_COVERED,
+        definitionVerification = "Aplicabilidad por vehículo pendiente de confirmar",
+    )
+}
 
 @Composable
 private fun FindingTruthSectionHeader(title: String, detail: String, color: Color) {
@@ -1346,6 +1373,7 @@ private fun HoloDtcCard(
     googleSearchVehicle: DtcGoogleSearchVehicleContext?,
     onRequestService: (String, String) -> Unit = { _, _ -> },
     finding: DtcRecord? = null,
+    findingId: String? = null,
 ) {
     val dtcDefinitions by viewModel.dtcDefinitions.collectAsState()
     var scopedDefinition by remember(dtc, finding?.codeIdentity?.stableRawIdentity, finding?.namespace) {
@@ -1596,33 +1624,40 @@ private fun HoloDtcCard(
 
                     // Buttons
                     val openDtcRelations3d = {
-                        val rawIdentity = finding?.codeIdentity?.stableRawIdentity ?: dtc.uppercase()
-                        val moduleIdentity = finding?.let {
-                            DiagnosticModuleIdentity.canonical(it.targetAddress, it.responseAddress, it.moduleName)
-                        }.orEmpty()
-                        val namespace = finding?.namespace?.name.orEmpty()
-                        val stableKey = listOf(namespace, moduleIdentity, rawIdentity).joinToString("~")
-                        navController.navigate(
-                            "component_locator?dtcCode=${java.net.URLEncoder.encode(dtc, "UTF-8")}" +
-                                "&dtcStatus=${java.net.URLEncoder.encode(observationState, "UTF-8")}" +
-                                "&findingKey=${java.net.URLEncoder.encode(stableKey, "UTF-8")}" +
-                                "&dtcModule=${java.net.URLEncoder.encode(finding?.moduleName.orEmpty(), "UTF-8")}" +
-                                "&dtcNamespace=${java.net.URLEncoder.encode(namespace, "UTF-8")}" +
-                                "&dtcRaw=${java.net.URLEncoder.encode(rawIdentity, "UTF-8")}"
-                        )
+                        findingId?.takeIf { it.isNotBlank() }?.let { canonicalId ->
+                            navController.navigate(
+                                "component_locator?findingId=${java.net.URLEncoder.encode(canonicalId, "UTF-8")}",
+                            )
+                        }
                     }
                     if (isCompact) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            EliteButton("◈ VER RELACIONES EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.fillMaxWidth())
-                            EliteButton("🛠️ CÓMO REPARAR (PASO A PASO)", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.fillMaxWidth())
+                            if (findingId.isNullOrBlank()) {
+                                EliteOutlinedButton("3D REQUIERE HALLAZGO GUARDADO", {}, color = MeetColors.textMuted, modifier = Modifier.fillMaxWidth())
+                            } else {
+                                EliteButton("◈ VER RELACIONES EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.fillMaxWidth())
+                            }
+                            EliteButton("🛠️ CÓMO REPARAR (PASO A PASO)", {
+                                navController.navigate(
+                                    "repair/$dtc?findingId=${java.net.URLEncoder.encode(findingId.orEmpty(), "UTF-8")}",
+                                )
+                            }, color = MeetColors.neonGreen, modifier = Modifier.fillMaxWidth())
                             EliteButton("🤖 ANALIZAR CON IA", { navController.navigate("ai/$dtc") }, color = MeetColors.electricBlue, textColor = Color.White, modifier = Modifier.fillMaxWidth())
                             val cs = rememberCoroutineScope()
                             EliteOutlinedButton("❄️ RE-LEER FF", { cs.launch { viewModel.refreshFreezeFrame(dtc) } }, color = MeetColors.cyberCyan, modifier = Modifier.fillMaxWidth())
                         }
                     } else {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            EliteButton("◈ VER EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
-                            EliteButton("🛠️ CÓMO REPARAR", { navController.navigate("repair/$dtc") }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
+                            if (findingId.isNullOrBlank()) {
+                                EliteOutlinedButton("3D REQUIERE GUARDAR", {}, color = MeetColors.textMuted, modifier = Modifier.weight(1f))
+                            } else {
+                                EliteButton("◈ VER EN 3D", openDtcRelations3d, color = MeetColors.cyberCyan, modifier = Modifier.weight(1f))
+                            }
+                            EliteButton("🛠️ CÓMO REPARAR", {
+                                navController.navigate(
+                                    "repair/$dtc?findingId=${java.net.URLEncoder.encode(findingId.orEmpty(), "UTF-8")}",
+                                )
+                            }, color = MeetColors.neonGreen, modifier = Modifier.weight(1f))
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

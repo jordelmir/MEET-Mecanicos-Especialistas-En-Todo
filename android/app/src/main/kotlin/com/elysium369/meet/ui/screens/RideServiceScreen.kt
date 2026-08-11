@@ -1855,8 +1855,8 @@ fun DriverDashboard(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val allRides by viewModel.rideRequests.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
-    val activeDtcs by viewModel.activeDtcEvents.collectAsState()
-    val historicalDtcs by viewModel.historicalDtcEvents.collectAsState()
+    val activeDtcs by viewModel.canonicalActiveFindingSummaries.collectAsState()
+    val historicalDtcs by viewModel.canonicalHistoricalFindingSummaries.collectAsState()
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     val driverVer by viewModel.driverVerification.collectAsState()

@@ -5,9 +5,22 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.elysium369.meet.data.local.entities.DiagnosticFindingEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DiagnosticFindingDao {
+    @Query("SELECT * FROM diagnostic_findings WHERE vehicleId = :vehicleId ORDER BY createdAtMs DESC")
+    fun observeForVehicle(vehicleId: String): Flow<List<DiagnosticFindingEntity>>
+
+    @Query("SELECT * FROM diagnostic_findings WHERE id = :findingId LIMIT 1")
+    fun observeById(findingId: String): Flow<DiagnosticFindingEntity?>
+
+    @Query("SELECT * FROM diagnostic_findings WHERE id = :findingId LIMIT 1")
+    suspend fun getById(findingId: String): DiagnosticFindingEntity?
+
+    @Query("SELECT * FROM diagnostic_findings WHERE vehicleId = :vehicleId ORDER BY createdAtMs DESC")
+    suspend fun getForVehicle(vehicleId: String): List<DiagnosticFindingEntity>
+
     @Query(
         """SELECT * FROM diagnostic_findings
            WHERE vehicleId = :vehicleId
@@ -31,4 +44,7 @@ interface DiagnosticFindingDao {
 
     @Query("UPDATE diagnostic_findings SET resolutionState = 'VERIFIED_RESOLVED', resolvedAtMs = :resolvedAtMs WHERE id IN (:findingIds)")
     suspend fun resolveVerified(findingIds: List<String>, resolvedAtMs: Long)
+
+    @Query("UPDATE diagnostic_findings SET resolutionState = :state, resolvedAtMs = :resolvedAtMs WHERE id = :findingId")
+    suspend fun updateProjection(findingId: String, state: String, resolvedAtMs: Long?)
 }

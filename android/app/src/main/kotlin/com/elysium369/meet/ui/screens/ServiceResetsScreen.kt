@@ -38,7 +38,6 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.eliteScrollbar
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,9 +51,9 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
     val isConnected = connectionState == com.elysium369.meet.core.obd.ObdState.CONNECTED
     
     val liveData by viewModel.liveData.collectAsState()
-    val rpm = liveData["RPM"] ?: 0f
-    val tempMotor = liveData["Temp Motor"] ?: 0f
-    val voltage = liveData["Voltaje ECU"] ?: 12.2f
+    val rpm = liveData["RPM"] ?: Float.NaN
+    val tempMotor = liveData["Temp Motor"] ?: Float.NaN
+    val voltage = liveData["Voltaje ECU"] ?: Float.NaN
     
     val aiResult by viewModel.aiServiceResetResult.collectAsState()
     val isAiLoading by viewModel.isAiServiceResetLoading.collectAsState()
@@ -279,15 +278,15 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                     ) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("RPM", fontSize = 10.sp, color = MeetColors.textSecondary)
-                                            Text("${rpm.toInt()}", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(if (rpm.isFinite()) "${rpm.toInt()}" else "SIN DATO", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("Temp. Motor", fontSize = 10.sp, color = MeetColors.textSecondary)
-                                            Text("${tempMotor.toInt()}°C", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(if (tempMotor.isFinite()) "${tempMotor.toInt()}°C" else "SIN DATO", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("Voltaje ECU", fontSize = 10.sp, color = MeetColors.textSecondary)
-                                            Text(String.format("%.1fV", voltage), fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(if (voltage.isFinite()) String.format("%.1fV", voltage) else "SIN DATO", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                     
@@ -418,88 +417,22 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        val isRunEnabled = !isRunning && isConnected && allMet
+                                        // No generic service routine is executable. A future
+                                        // capability pack must prove vehicle/ECU applicability,
+                                        // commands, preconditions and stop/postconditions first.
+                                        val isRunEnabled = false
                                         
                                         EliteButton(
-                                            text = if (!isConnected) "SIN CONEXIÓN" else if (isRunning) "EJECUTANDO..." else "EJECUTAR REINICIO",
+                                            text = if (!isConnected) "SIN CONEXIÓN" else "REQUIERE PAQUETE OEM",
                                             onClick = {
                                                 scope.launch {
                                                     isRunning = true
                                                     resultMessage = ""
                                                     logLines.clear()
-                                                    
-                                                    val logJob = launch {
-                                                        val steps = when (option.id) {
-                                                            "oil" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 2E 00 02 00", "RX: 6E 00 02 00 (Write OK)"
-                                                            )
-                                                            "brake" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 31 01 00 01 (Retract EPB)", "RX: 71 01 00 01 (Complete)"
-                                                            )
-                                                            "battery" -> listOf(
-                                                                "TX: ATSH6B10F1", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 31 01 B0 01 (Register Battery)", "RX: 71 01 B0 01 (Done)"
-                                                            )
-                                                            "sas" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 27 01 (Security Access)", "RX: 67 01 FE 4A",
-                                                                "TX: 27 02 AB 1F", "RX: 67 02 (Unlocked)",
-                                                                "TX: 31 01 00 01 (Zero Calibration)", "RX: 71 01 00 01 (Success)"
-                                                            )
-                                                            "throttle" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 31 01 00 60 (Throttle Adapt)", "RX: 71 01 00 60 (Success)"
-                                                            )
-                                                            "dpf" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 27 01 (Security Access)", "RX: 67 01 A3 C2",
-                                                                "TX: 27 02 D4 8B", "RX: 67 02 (Unlocked)",
-                                                                "TX: 31 01 00 0F (DPF Regen Start)", "RX: 71 01 00 0F (Running)"
-                                                            )
-                                                            "tpms" -> listOf(
-                                                                "TX: ATSH7E0", "RX: OK",
-                                                                "TX: 10 03 (Session)", "RX: 50 03",
-                                                                "TX: 31 01 00 0D (TPMS Reset)", "RX: 71 01 00 0D (Initialized)"
-                                                            )
-                                                            else -> emptyList()
-                                                        }
-                                                        
-                                                        logLines.add("--- INICIANDO PROTOCOLO OBD-II/UDS ---")
-                                                        for (step in steps) {
-                                                            delay(300)
-                                                            val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-                                                            logLines.add("[$timeStr] $step")
-                                                        }
-                                                    }
-                                                    
-                                                    val success = when (option.id) {
-                                                        "oil" -> viewModel.resetOilService()
-                                                        "battery" -> viewModel.registerBattery(80)
-                                                        "brake" -> viewModel.resetEPB(true)
-                                                        "sas" -> viewModel.calibrateSAS()
-                                                        "throttle" -> viewModel.relearnThrottle()
-                                                        "dpf" -> viewModel.regenerateDPF()
-                                                        "tpms" -> viewModel.resetTPMS()
-                                                        else -> false
-                                                    }
-                                                    
-                                                    logJob.join()
-                                                    
+                                                    logLines.add("NO TRANSMITIDO: falta capability pack OEM revisado y aplicable al vehículo/ECU.")
                                                     isRunning = false
-                                                    resultMessage = if (success) {
-                                                        "ÉXITO: ${option.title} completado en ${viewModel.manufacturer.value}."
-                                                    } else {
-                                                        "ERROR: Fallo al ejecutar ${option.title}. Verifica las condiciones de seguridad."
-                                                    }
-                                                    logLines.add(if (success) ">>> RUTINA COMPLETADA CON ÉXITO <<<" else ">>> ERROR: RUTINA ABORTADA POR LA ECU <<<")
+                                                    resultMessage =
+                                                        "PENDIENTE DE VALIDACIÓN: ${option.title} no se ejecutó ni se envió al vehículo."
                                                 }
                                             },
                                             isEnabled = isRunEnabled,
@@ -528,6 +461,17 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
                                             fontWeight = FontWeight.Bold,
                                             textAlign = TextAlign.Center,
                                             modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    if (isConnected && allMet) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            "Las condiciones visibles no autorizan una rutina. Se requiere paquete OEM revisado para este vehículo y ECU.",
+                                            color = MeetColors.warning,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth(),
                                         )
                                     }
                                 }

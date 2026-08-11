@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.core.obd.ObdState
-import com.elysium369.meet.data.local.entities.DtcEventEntity
 import androidx.compose.ui.draw.alpha
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
@@ -38,10 +37,10 @@ fun ScannerDiagnosticTab(
     navController: NavController? = null
 ) {
     val state by viewModel.connectionState.collectAsState()
-    val activeDtcEvents by viewModel.activeDtcEvents.collectAsState()
-    val pendingDtcEvents by viewModel.pendingDtcEvents.collectAsState()
-    val permanentDtcEvents by viewModel.permanentDtcEvents.collectAsState()
-    val historicalDtcEvents by viewModel.historicalDtcEvents.collectAsState()
+    val activeDtcEvents by viewModel.canonicalActiveFindingSummaries.collectAsState()
+    val pendingDtcEvents by viewModel.canonicalPendingFindingSummaries.collectAsState()
+    val permanentDtcEvents by viewModel.canonicalPermanentFindingSummaries.collectAsState()
+    val historicalDtcEvents by viewModel.canonicalHistoricalFindingSummaries.collectAsState()
 
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
@@ -220,7 +219,7 @@ fun ScannerDiagnosticTab(
                             isConsultingAi = consultingDtcAi[event.code] == true,
                             aiAnalysis = dtcAiResults[event.code],
                             onRepairGuideClick = {
-                                navController?.navigate("repair/${event.code}")
+                                navController?.navigate("repair/${event.code}?findingId=${java.net.URLEncoder.encode(event.id, "UTF-8")}")
                             }
                         )
                     }
@@ -253,7 +252,7 @@ fun ScannerDiagnosticTab(
                             isConsultingAi = consultingDtcAi[event.code] == true,
                             aiAnalysis = dtcAiResults[event.code],
                             onRepairGuideClick = {
-                                navController?.navigate("repair/${event.code}")
+                                navController?.navigate("repair/${event.code}?findingId=${java.net.URLEncoder.encode(event.id, "UTF-8")}")
                             }
                         )
                     }
@@ -286,7 +285,7 @@ fun ScannerDiagnosticTab(
                             isConsultingAi = consultingDtcAi[event.code] == true,
                             aiAnalysis = dtcAiResults[event.code],
                             onRepairGuideClick = {
-                                navController?.navigate("repair/${event.code}")
+                                navController?.navigate("repair/${event.code}?findingId=${java.net.URLEncoder.encode(event.id, "UTF-8")}")
                             }
                         )
                     }
@@ -319,7 +318,7 @@ fun ScannerDiagnosticTab(
                             isConsultingAi = consultingDtcAi[event.code] == true,
                             aiAnalysis = dtcAiResults[event.code],
                             onRepairGuideClick = {
-                                navController?.navigate("repair/${event.code}")
+                                navController?.navigate("repair/${event.code}?findingId=${java.net.URLEncoder.encode(event.id, "UTF-8")}")
                             }
                         )
                     }

@@ -34,7 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.BuildConfig
-import com.elysium369.meet.data.local.entities.DtcEventEntity
+import com.elysium369.meet.domain.diagnostics.DiagnosticFindingSummary
 import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
@@ -115,8 +115,8 @@ fun RideWalletStatusCard(
 fun RideSharingCenter(
     enabledCategories: Set<RideShareCategory>,
     vehicle: Vehicle?,
-    activeDtcs: List<DtcEventEntity>,
-    historicalDtcs: List<DtcEventEntity>,
+    activeDtcs: List<DiagnosticFindingSummary>,
+    historicalDtcs: List<DiagnosticFindingSummary>,
     currentGps: ObdViewModel.GpsLocationInfo?,
     onCategoryChanged: (RideShareCategory, Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -490,8 +490,8 @@ private fun RideShareCategory.rideLabel(): String =
 
 private fun RideShareCategory.preview(
     vehicle: Vehicle?,
-    activeDtcs: List<DtcEventEntity>,
-    historicalDtcs: List<DtcEventEntity>,
+    activeDtcs: List<DiagnosticFindingSummary>,
+    historicalDtcs: List<DiagnosticFindingSummary>,
     currentGps: ObdViewModel.GpsLocationInfo?,
 ): String =
     when (this) {

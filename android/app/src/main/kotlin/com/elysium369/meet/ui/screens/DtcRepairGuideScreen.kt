@@ -1169,6 +1169,7 @@ object DtcRepairDatabase {
 fun DtcRepairGuideScreen(
     navController: NavController,
     dtcCode: String,
+    findingId: String? = null,
     viewModel: ObdViewModel
 ) {
     var definition by remember { mutableStateOf<com.elysium369.meet.data.local.entities.DtcDefinitionEntity?>(null) }
@@ -1411,12 +1412,21 @@ fun DtcRepairGuideScreen(
                                     ) {
                                         Button(
                                             onClick = {
-                                                navController.navigate("component_locator?dtcCode=$dtcCode")
+                                                findingId?.takeIf { it.isNotBlank() }?.let { canonicalId ->
+                                                    navController.navigate(
+                                                        "component_locator?findingId=${java.net.URLEncoder.encode(canonicalId, "UTF-8")}",
+                                                    )
+                                                }
                                             },
+                                            enabled = !findingId.isNullOrBlank(),
                                             modifier = Modifier.weight(1f),
                                             colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                         ) {
-                                            Text("VER PIEZAS 3D", color = MeetColors.backgroundDark, fontWeight = FontWeight.Black)
+                                            Text(
+                                                if (findingId.isNullOrBlank()) "3D REQUIERE HALLAZGO GUARDADO" else "VER RUTA 3D",
+                                                color = MeetColors.backgroundDark,
+                                                fontWeight = FontWeight.Black,
+                                            )
                                         }
                                         OutlinedButton(
                                             onClick = { navController.navigate("part_request") },

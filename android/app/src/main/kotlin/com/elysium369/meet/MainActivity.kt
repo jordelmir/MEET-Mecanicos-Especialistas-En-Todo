@@ -266,11 +266,19 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
-            composable("repair/{dtcCode}") { backStack ->
+            composable(
+                route = "repair/{dtcCode}?findingId={findingId}",
+                arguments = listOf(navArgument("findingId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }),
+            ) { backStack ->
                 val dtcCode = backStack.arguments?.getString("dtcCode") ?: ""
                 DtcRepairGuideScreen(
                     navController = navController,
                     dtcCode = dtcCode,
+                    findingId = backStack.arguments?.getString("findingId"),
                     viewModel = obdViewModel
                 )
             }
@@ -513,32 +521,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 )
             }
             composable(
-                route = "component_locator?partId={partId}&dtcCode={dtcCode}&dtcStatus={dtcStatus}&findingKey={findingKey}&dtcModule={dtcModule}&dtcNamespace={dtcNamespace}&dtcRaw={dtcRaw}",
+                route = "component_locator?partId={partId}&findingId={findingId}",
                 arguments = listOf(navArgument("partId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
-                }, navArgument("dtcCode") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }, navArgument("dtcStatus") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }, navArgument("findingKey") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }, navArgument("dtcModule") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }, navArgument("dtcNamespace") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }, navArgument("dtcRaw") {
+                }, navArgument("findingId") {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -548,12 +536,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     navController = navController,
                     viewModel = obdViewModel,
                     initialPartId = backStack.arguments?.getString("partId"),
-                    initialDtcCode = backStack.arguments?.getString("dtcCode"),
-                    initialDtcStatus = backStack.arguments?.getString("dtcStatus"),
-                    initialFindingKey = backStack.arguments?.getString("findingKey"),
-                    initialDtcModule = backStack.arguments?.getString("dtcModule"),
-                    initialDtcNamespace = backStack.arguments?.getString("dtcNamespace"),
-                    initialDtcRawIdentity = backStack.arguments?.getString("dtcRaw"),
+                    initialFindingId = backStack.arguments?.getString("findingId"),
                 )
             }
             composable(

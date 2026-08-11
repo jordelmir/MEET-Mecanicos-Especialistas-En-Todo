@@ -62,7 +62,7 @@ fun ScannerStatisticsTab(
     val trips by viewModel.trips.collectAsState()
     val drivingTime by viewModel.drivingTimeSeconds.collectAsState()
     val standingTime by viewModel.standingTimeSeconds.collectAsState()
-    val activeDtcs by viewModel.activeDtcEvents.collectAsState()
+    val activeDtcs by viewModel.canonicalActiveFindingSummaries.collectAsState()
 
     // Preferences & Config Flow
     val useImperialUnits by viewModel.useImperialUnits.collectAsState()

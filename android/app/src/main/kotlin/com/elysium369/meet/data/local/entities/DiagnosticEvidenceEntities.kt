@@ -1,6 +1,8 @@
 package com.elysium369.meet.data.local.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -53,11 +55,33 @@ data class DiagnosticExchangeEntity(
     val negativeResponseCode: Int?,
     val adapterConfiguration: String,
     val parserVersion: String,
+    @ColumnInfo(defaultValue = "0") val sessionSequence: Long = 0,
+    @ColumnInfo(defaultValue = "0") val elapsedRealtimeNanos: Long = 0,
+    @ColumnInfo(defaultValue = "''") val rawRequestHash: String = "",
+    @ColumnInfo(defaultValue = "''") val rawResponseHash: String = "",
+    @ColumnInfo(defaultValue = "''") val previousExchangeHash: String = "",
+    @ColumnInfo(defaultValue = "''") val exchangeHash: String = "",
+    @ColumnInfo(defaultValue = "'RAW_FORENSIC'") val retentionClass: String = "RAW_FORENSIC",
+    val expiresAtMs: Long? = null,
 )
 
 /** Temporal state of one stable finding. Insert only; never rewrite past observations. */
 @Entity(
     tableName = "diagnostic_observations",
+    foreignKeys = [
+        ForeignKey(
+            entity = DiagnosticFindingEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["findingId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+        ForeignKey(
+            entity = DiagnosticExchangeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exchangeId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
     indices = [
         Index(value = ["findingId", "observedAt"]),
         Index(value = ["sessionId", "observedAt"]),
@@ -75,10 +99,22 @@ data class DiagnosticObservationEntity(
     val sourceService: String,
     val exchangeId: String?,
     val rawPayloadHash: String,
+    @ColumnInfo(defaultValue = "0") val sessionSequence: Long = 0,
+    @ColumnInfo(defaultValue = "0") val elapsedRealtimeNanos: Long = 0,
+    @ColumnInfo(defaultValue = "''") val previousObservationHash: String = "",
+    @ColumnInfo(defaultValue = "''") val observationHash: String = "",
 )
 
 @Entity(
     tableName = "finding_diagnostic_snapshots",
+    foreignKeys = [
+        ForeignKey(
+            entity = DiagnosticFindingEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["findingId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
     indices = [Index(value = ["findingId", "capturedAtMs"])],
 )
 data class FindingDiagnosticSnapshotEntity(
@@ -89,4 +125,21 @@ data class FindingDiagnosticSnapshotEntity(
     val source: String,
     val parametersJson: String,
     val rawExchangeIdsJson: String,
+)
+
+@Entity(
+    tableName = "diagnostic_session_integrity",
+    indices = [Index(value = ["sessionId", "finalizedAtMs"])],
+)
+data class DiagnosticSessionIntegrityEntity(
+    @PrimaryKey val scanId: String,
+    val sessionId: String,
+    val parserVersion: String,
+    val firstSequence: Long,
+    val lastSequence: Long,
+    val leafCount: Int,
+    val merkleRoot: String,
+    val finalizedAtMs: Long,
+    val hashAlgorithm: String = "SHA-256",
+    val canonicalizationVersion: String = "diagnostic-exchange-chain-v1",
 )

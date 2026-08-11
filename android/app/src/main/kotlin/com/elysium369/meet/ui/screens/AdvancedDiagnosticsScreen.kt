@@ -1161,151 +1161,46 @@ private fun UdsServiceCard(svc: UdsServiceInfo) {
 // TAB 5: MANUFACTURER / OEM MODES ($B0-$BF, $D0-$DF, $EA-$FE)
 // ═══════════════════════════════════════════════════════════
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 private fun ManufacturerModesTab(
     modes: Map<String, Boolean>,
-    viewModel: ObdViewModel
+    viewModel: ObdViewModel,
 ) {
-    var customSid by remember { mutableStateOf("") }
-    var customSub by remember { mutableStateOf("") }
-    var customResult by remember { mutableStateOf<String?>(null) }
-
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionHeader("Modos OEM / Fabricante", "Propietarios del fabricante")
-                Button(
-                    onClick = { viewModel.probeManufacturerModes() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MeetColors.electricBlue.copy(alpha = 0.15f),
-                        contentColor = MeetColors.electricBlue
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    AnimatedNeonIcon(Icons.Filled.Radar, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Sondear", fontSize = 12.sp)
-                }
-            }
-        }
-
-        // Custom command input
+        item { SectionHeader("Capacidades OEM verificadas", "Sin sondeo activo ni comandos genéricos") }
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Comando Manual OEM",
-                        color = MeetColors.textPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
+                        "Protección de hardware activa",
+                        color = MeetColors.neonGreen,
+                        fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = customSid,
-                            onValueChange = { if (it.length <= 2) customSid = it.uppercase().filter { c -> c in "0123456789ABCDEF" } },
-                            label = { Text("SID (hex)", fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                color = MeetColors.neonGreen
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MeetColors.neonGreen,
-                                unfocusedBorderColor = MeetColors.borderBlue,
-                                cursorColor = MeetColors.neonGreen
-                            )
-                        )
-                        OutlinedTextField(
-                            value = customSub,
-                            onValueChange = { customSub = it.uppercase().filter { c -> c in "0123456789ABCDEF " } },
-                            label = { Text("Sub (hex)", fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                color = MeetColors.cyberCyan
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MeetColors.neonGreen,
-                                unfocusedBorderColor = MeetColors.borderBlue,
-                                cursorColor = MeetColors.neonGreen
-                            )
-                        )
-                        IconButton(
-                            onClick = {
-                                if (customSid.length == 2) {
-                                    val resultFlow = viewModel.sendManufacturerCommand(customSid, customSub)
-                                    // Note: in real impl, collect the flow
-                                    customResult = "Enviando \$$customSid ${customSub}..."
-                                }
-                            }
-                        ) {
-                            AnimatedNeonIcon(Icons.Filled.Send, null, tint = MeetColors.neonGreen)
-                        }
-                    }
-
-                    customResult?.let { result ->
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            result,
-                            color = MeetColors.cyberCyan,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MeetColors.backgroundDeep,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .padding(8.dp)
-                        )
-                    }
+                    Text(
+                        "Elysium Vanguard no barre servicios OEM ni permite comandos manuales que puedan activar, codificar o reprogramar un módulo equivocado.",
+                        color = MeetColors.textPrimary,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Las funciones aparecerán únicamente cuando exista un paquete firmado compatible con el VIN, la ECU, su dirección y la respuesta positiva esperada.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 12.sp,
+                    )
                 }
             }
         }
-
-        // Mode ranges
-        item { ModeRangeHeader("\$B0–\$BF", "OEM Diagnostic Range 1") }
-        items((0xB0..0xBF).toList()) { sid ->
-            val hex = String.format("%02X", sid)
-            val supported = modes[hex] ?: false
-            ManufacturerModeRow(hex, supported)
-        }
-
-        item { ModeRangeHeader("\$D0–\$DF", "OEM Diagnostic Range 2") }
-        items((0xD0..0xDF).toList()) { sid ->
-            val hex = String.format("%02X", sid)
-            val supported = modes[hex] ?: false
-            ManufacturerModeRow(hex, supported)
-        }
-
-        item { ModeRangeHeader("\$EA–\$FE", "OEM Extended / Proprietary") }
-        items((0xEA..0xFE).toList()) { sid ->
-            val hex = String.format("%02X", sid)
-            val supported = modes[hex] ?: false
-            ManufacturerModeRow(hex, supported)
-        }
     }
 }
-
 @Composable
 private fun ModeRangeHeader(range: String, description: String) {
     Spacer(Modifier.height(4.dp))
