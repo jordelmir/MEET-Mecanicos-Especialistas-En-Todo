@@ -16,20 +16,71 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import android.content.Context
+import java.security.MessageDigest
 
 // ═══════════════════════════════════════════════════════════════
 // VanguardPrivacyGuard
 // ═══════════════════════════════════════════════════════════════
 
+enum class DiagnosticTelemetryConsent {
+    DISABLED,
+    ANONYMOUS_DIAGNOSTICS,
+    FULL_DIAGNOSTICS,
+}
+
+enum class DiagnosticRetentionClass {
+    RAW_TRANSIENT,
+    RAW_FORENSIC,
+    NORMALIZED_LONG_TERM,
+    CERTIFIED,
+}
+
 class VanguardPrivacyGuard {
-    /** Redact VIN/GPS coordinates before logging. Stub returns input unchanged. */
-    fun redactForLogging(input: String): String = input
+    private val vinPattern = Regex("\\b[A-HJ-NPR-Z0-9]{17}\\b", RegexOption.IGNORE_CASE)
+    private val macPattern = Regex("\\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\\b")
+    private val ipv4Pattern = Regex("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b")
+
+    fun diagnosticTelemetryConsent(context: Context): DiagnosticTelemetryConsent {
+        val stored = context.getSharedPreferences("meet_privacy", Context.MODE_PRIVATE)
+            .getString("diagnostic_telemetry_consent", DiagnosticTelemetryConsent.DISABLED.name)
+        return runCatching { DiagnosticTelemetryConsent.valueOf(stored.orEmpty()) }
+            .getOrDefault(DiagnosticTelemetryConsent.DISABLED)
+    }
+
+    fun allowsRemoteDiagnostics(context: Context): Boolean =
+        diagnosticTelemetryConsent(context) != DiagnosticTelemetryConsent.DISABLED
+
+    fun setDiagnosticTelemetryConsent(
+        context: Context,
+        consent: DiagnosticTelemetryConsent,
+    ) {
+        context.getSharedPreferences("meet_privacy", Context.MODE_PRIVATE)
+            .edit()
+            .putString("diagnostic_telemetry_consent", consent.name)
+            .apply()
+    }
+
+    fun redactForLogging(input: String): String = redact(input)
 
     /** Redact VIN/GPS coordinates before sending to remote telemetry. */
-    fun redactForTelemetry(input: String): String = input
+    fun redactForTelemetry(input: String): String = redact(input)
 
     /** Hash the VIN for privacy-preserving identification. */
-    fun vinHashOnly(vin: String?): String? = vin?.let { "stub-hash:${it.hashCode()}" }
+    fun vinHashOnly(vin: String?): String? = vin
+        ?.trim()
+        ?.uppercase()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { normalized ->
+            MessageDigest.getInstance("SHA-256")
+                .digest(normalized.toByteArray(Charsets.UTF_8))
+                .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        }
+
+    private fun redact(input: String): String = input
+        .replace(vinPattern, "[VIN_REDACTED]")
+        .replace(macPattern, "[MAC_REDACTED]")
+        .replace(ipv4Pattern, "[IP_REDACTED]")
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -3281,8 +3281,7 @@ object AppModule {
                        CASE WHEN moduleIdentity = '' THEN 'LEGACY' ELSE moduleIdentity END,
                        CASE WHEN diagnosticNamespace = '' THEN 'SAE_OBD' ELSE diagnosticNamespace END,
                        rawDtcIdentity, code, firstSeenAt,
-                       CASE WHEN resolvedAt IS NULL THEN 'OPEN' ELSE 'VERIFIED_RESOLVED' END,
-                       resolvedAt
+                       'OPEN', NULL
                 FROM dtc_events"""
             )
             db.execSQL(
@@ -3330,6 +3329,129 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_51_52 = object : Migration(51, 52) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN sessionSequence INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN elapsedRealtimeNanos INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN rawRequestHash TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN rawResponseHash TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN previousExchangeHash TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN exchangeHash TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN retentionClass TEXT NOT NULL DEFAULT 'RAW_FORENSIC'")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN expiresAtMs INTEGER")
+
+            // Preserve pre-51 lifecycle information as explicitly limited legacy evidence.
+            db.execSQL(
+                """INSERT OR IGNORE INTO diagnostic_observations(
+                       id, findingId, sessionId, observedAt, observationState, semantics,
+                       statusByte, sourceService, exchangeId, rawPayloadHash
+                   )
+                   SELECT 'legacy-import-' || event.id, event.id, event.sessionId, event.lastSeenAt,
+                          'LEGACY_IMPORTED',
+                          CASE WHEN event.observationSemantic = '' THEN 'LEGACY_LIMITED' ELSE event.observationSemantic END,
+                          event.statusByte,
+                          CASE WHEN event.sourceService = '' THEN 'LEGACY_UNKNOWN' ELSE event.sourceService END,
+                          NULL, ''
+                   FROM dtc_events event
+                   INNER JOIN diagnostic_findings finding ON finding.id = event.id
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM diagnostic_observations observation
+                       WHERE observation.findingId = event.id
+                   )"""
+            )
+
+            db.execSQL(
+                """CREATE TABLE diagnostic_observations_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    findingId TEXT NOT NULL,
+                    sessionId TEXT NOT NULL,
+                    observedAt INTEGER NOT NULL,
+                    observationState TEXT NOT NULL,
+                    semantics TEXT NOT NULL,
+                    statusByte INTEGER,
+                    sourceService TEXT NOT NULL,
+                    exchangeId TEXT,
+                    rawPayloadHash TEXT NOT NULL,
+                    sessionSequence INTEGER NOT NULL DEFAULT 0,
+                    elapsedRealtimeNanos INTEGER NOT NULL DEFAULT 0,
+                    previousObservationHash TEXT NOT NULL DEFAULT '',
+                    observationHash TEXT NOT NULL DEFAULT '',
+                    FOREIGN KEY(findingId) REFERENCES diagnostic_findings(id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(exchangeId) REFERENCES diagnostic_exchanges(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+                )"""
+            )
+            db.execSQL(
+                """INSERT INTO diagnostic_observations_new(
+                    id, findingId, sessionId, observedAt, observationState, semantics,
+                    statusByte, sourceService, exchangeId, rawPayloadHash
+                ) SELECT observation.id, observation.findingId, observation.sessionId,
+                         observation.observedAt, observation.observationState, observation.semantics,
+                         observation.statusByte, observation.sourceService,
+                         CASE WHEN observation.exchangeId IS NULL OR exchange.id IS NOT NULL
+                              THEN observation.exchangeId ELSE NULL END,
+                         observation.rawPayloadHash
+                  FROM diagnostic_observations observation
+                  INNER JOIN diagnostic_findings finding ON finding.id = observation.findingId
+                  LEFT JOIN diagnostic_exchanges exchange ON exchange.id = observation.exchangeId"""
+            )
+            db.execSQL("DROP TABLE diagnostic_observations")
+            db.execSQL("ALTER TABLE diagnostic_observations_new RENAME TO diagnostic_observations")
+            db.execSQL("CREATE INDEX index_diagnostic_observations_findingId_observedAt ON diagnostic_observations(findingId, observedAt)")
+            db.execSQL("CREATE INDEX index_diagnostic_observations_sessionId_observedAt ON diagnostic_observations(sessionId, observedAt)")
+            db.execSQL("CREATE INDEX index_diagnostic_observations_exchangeId ON diagnostic_observations(exchangeId)")
+
+            db.execSQL(
+                """CREATE TABLE finding_diagnostic_snapshots_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    findingId TEXT NOT NULL,
+                    moduleIdentity TEXT NOT NULL,
+                    capturedAtMs INTEGER NOT NULL,
+                    source TEXT NOT NULL,
+                    parametersJson TEXT NOT NULL,
+                    rawExchangeIdsJson TEXT NOT NULL,
+                    FOREIGN KEY(findingId) REFERENCES diagnostic_findings(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+                )"""
+            )
+            // Preserve orphaned legacy snapshots without inventing a DTC identity.
+            db.execSQL(
+                """INSERT OR IGNORE INTO diagnostic_findings(
+                       id, vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity,
+                       displayCode, createdAtMs, resolutionState, resolvedAtMs
+                   )
+                   SELECT snapshot.findingId, 'LEGACY_UNKNOWN',
+                          CASE WHEN snapshot.moduleIdentity = '' THEN 'LEGACY_UNKNOWN' ELSE snapshot.moduleIdentity END,
+                          'LEGACY_UNSCOPED', 'SNAPSHOT:' || snapshot.id,
+                          'Dato no capturado', snapshot.capturedAtMs, 'OPEN', NULL
+                   FROM finding_diagnostic_snapshots snapshot
+                   LEFT JOIN diagnostic_findings finding ON finding.id = snapshot.findingId
+                   WHERE finding.id IS NULL"""
+            )
+            db.execSQL(
+                """INSERT INTO finding_diagnostic_snapshots_new
+                   SELECT * FROM finding_diagnostic_snapshots"""
+            )
+            db.execSQL("DROP TABLE finding_diagnostic_snapshots")
+            db.execSQL("ALTER TABLE finding_diagnostic_snapshots_new RENAME TO finding_diagnostic_snapshots")
+            db.execSQL("CREATE INDEX index_finding_diagnostic_snapshots_findingId_capturedAtMs ON finding_diagnostic_snapshots(findingId, capturedAtMs)")
+
+            db.execSQL(
+                """CREATE TABLE diagnostic_session_integrity (
+                    scanId TEXT NOT NULL PRIMARY KEY,
+                    sessionId TEXT NOT NULL,
+                    parserVersion TEXT NOT NULL,
+                    firstSequence INTEGER NOT NULL,
+                    lastSequence INTEGER NOT NULL,
+                    leafCount INTEGER NOT NULL,
+                    merkleRoot TEXT NOT NULL,
+                    finalizedAtMs INTEGER NOT NULL,
+                    hashAlgorithm TEXT NOT NULL,
+                    canonicalizationVersion TEXT NOT NULL
+                )"""
+            )
+            db.execSQL("CREATE INDEX index_diagnostic_session_integrity_sessionId_finalizedAtMs ON diagnostic_session_integrity(sessionId, finalizedAtMs)")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3368,7 +3490,8 @@ object AppModule {
             MIGRATION_47_48,
             MIGRATION_48_49,
             MIGRATION_49_50,
-            MIGRATION_50_51
+            MIGRATION_50_51,
+            MIGRATION_51_52
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

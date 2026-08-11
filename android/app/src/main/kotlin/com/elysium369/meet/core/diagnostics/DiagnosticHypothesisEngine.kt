@@ -18,7 +18,7 @@ class DiagnosticHypothesisEngine(
         val nextTest = result.case.recommendedTests
             .filter { it.status == TestStatus.NOT_STARTED }
             .maxWithOrNull(
-                compareBy<RecommendedTest> { it.expectedInformationGain - it.executionCostScore / 2 }
+                compareBy<RecommendedTest> { it.heuristicPriorityScore - it.executionCostScore / 2 }
                     .thenBy { it.safetyLevel != SafetyLevel.CRITICAL_SYSTEM }
                     .thenBy { -it.executionCostScore },
             )

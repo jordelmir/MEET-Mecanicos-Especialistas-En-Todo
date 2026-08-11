@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.obd.*
 import com.elysium369.meet.domain.diagnostics.ClearDiagnosticMemory
+import com.elysium369.meet.domain.diagnostics.FindingResolutionState
 import com.elysium369.meet.domain.diagnostics.RunDiagnosticScan
+import com.elysium369.meet.domain.diagnostics.toSummary
 import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.core.monetization.FeatureKey
 import com.elysium369.meet.data.supabase.SubscriptionRepository
@@ -407,7 +409,7 @@ class ObdViewModel @Inject constructor(
     private val customPidDao: CustomPidDao,
     private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao,
     private val diagnosticEvidenceDao: com.elysium369.meet.data.local.dao.DiagnosticEvidenceDao,
-    private val diagnosticFindingDao: com.elysium369.meet.data.local.dao.DiagnosticFindingDao,
+    private val diagnosticFindingRepository: com.elysium369.meet.domain.diagnostics.DiagnosticFindingRepository,
     private val dtcDefinitionDao: com.elysium369.meet.data.local.dao.DtcDefinitionDao,
     private val aiConsultDao: com.elysium369.meet.data.local.dao.AiConsultDao,
     @ApplicationContext private val context: Context,
@@ -1659,67 +1661,76 @@ class ObdViewModel @Inject constructor(
     private var currentSessionId: String = UUID.randomUUID().toString()
     private val initialDtcScanMutex = Mutex()
     private val vinVehicleRecognitionMutex = Mutex()
+    private val diagnosticEvidencePersistenceMutex = Mutex()
     private var lastAutoRecognizedVin: String? = null
     @Volatile private var hasCompletedInitialDtcScan = false
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val activeDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
-        vehicle?.let {
-            dtcDao.getUnresolvedDtcsForVehicle(it.id)
-                .map { list -> list.filter { it.status == "ACTIVE" } }
-        } ?: flowOf(emptyList())
+    val canonicalOpenFindings = _selectedVehicle.flatMapLatest { vehicle ->
+        vehicle?.let { diagnosticFindingRepository.observeOpenFindings(it.id) } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val pendingDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
-        vehicle?.let {
-            dtcDao.getUnresolvedDtcsForVehicle(it.id)
-                .map { list -> list.filter { it.status == "PENDING" } }
-        } ?: flowOf(emptyList())
+    val canonicalResolvedFindings = _selectedVehicle.flatMapLatest { vehicle ->
+        vehicle?.let { diagnosticFindingRepository.observeResolvedFindings(it.id) } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val permanentDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
-        vehicle?.let {
-            dtcDao.getUnresolvedDtcsForVehicle(it.id)
-                .map { list -> list.filter { it.status == "PERMANENT" } }
-        } ?: flowOf(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val historicalDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
-        vehicle?.let {
-            dtcDao.getUnresolvedDtcsForVehicle(it.id)
-                .map { list -> list.filter { it.status in setOf("HISTORY", "INTERMITTENT") } }
-        } ?: flowOf(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val verifiedResolvedDtcEvents: StateFlow<List<DtcEventEntity>> = _selectedVehicle.flatMapLatest { vehicle ->
-        vehicle?.let { dtcDao.getVerifiedResolvedDtcsForVehicle(it.id) } ?: flowOf(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val canonicalFindingSummaries = canonicalOpenFindings
+        .map { findings -> findings.map { it.toSummary() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val canonicalActiveFindingSummaries = canonicalFindingSummaries
+        .map { findings -> findings.filter { it.status == "ACTIVE" } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val canonicalPendingFindingSummaries = canonicalFindingSummaries
+        .map { findings -> findings.filter { it.status == "PENDING" } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val canonicalPermanentFindingSummaries = canonicalFindingSummaries
+        .map { findings -> findings.filter { it.status == "PERMANENT" } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val canonicalHistoricalFindingSummaries = canonicalFindingSummaries
+        .map { findings -> findings.filter { it.status == "HISTORY" } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _latestScanActiveDtcs = MutableStateFlow<List<String>>(emptyList())
     private val _latestScanPendingDtcs = MutableStateFlow<List<String>>(emptyList())
     private val _latestScanPermanentDtcs = MutableStateFlow<List<String>>(emptyList())
     private val _latestScanHistoricalDtcs = MutableStateFlow<List<String>>(emptyList())
 
-    // Backwards compatibility for logic that only needs the strings.
-    // The latest scan bucket keeps DTCs visible even before a vehicle record is selected or Room emits.
-    val activeDtcs: StateFlow<List<String>> = combine(activeDtcEvents, _latestScanActiveDtcs) { events, latest ->
-        (events.map { it.code } + latest).distinct()
+    // Canonical finding timeline is authoritative. Latest scan data bridges the
+    // short interval before Room commits or when no vehicle has been selected.
+    val activeDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanActiveDtcs) { findings, latest ->
+        val canonical = findings.filter { finding ->
+            val semantics = finding.projection.latestObservation?.semantics.orEmpty()
+            finding.projection.latestObservation?.observationState == "OBSERVED" &&
+                ("SAE_ACTIVE_DTC" in semantics || "UDS_TEST_FAILED" in semantics)
+        }.map { it.identity.displayCode }
+        (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val pendingDtcs: StateFlow<List<String>> = combine(pendingDtcEvents, _latestScanPendingDtcs) { events, latest ->
-        (events.map { it.code } + latest).distinct()
+    val pendingDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanPendingDtcs) { findings, latest ->
+        val canonical = findings.filter { finding ->
+            val semantics = finding.projection.latestObservation?.semantics.orEmpty()
+            finding.projection.latestObservation?.observationState == "OBSERVED" &&
+                ("SAE_PENDING_DTC" in semantics || "UDS_PENDING" in semantics)
+        }.map { it.identity.displayCode }
+        (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val permanentDtcs: StateFlow<List<String>> = combine(permanentDtcEvents, _latestScanPermanentDtcs) { events, latest ->
-        (events.map { it.code } + latest).distinct()
+    val permanentDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanPermanentDtcs) { findings, latest ->
+        val canonical = findings.filter { finding ->
+            val semantics = finding.projection.latestObservation?.semantics.orEmpty()
+            finding.projection.latestObservation?.observationState == "OBSERVED" &&
+                ("SAE_PERMANENT_DTC" in semantics ||
+                    ("UDS_CONFIRMED" in semantics && "UDS_FAILED_SINCE_CLEAR" in semantics))
+        }.map { it.identity.displayCode }
+        (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val historicalDtcs: StateFlow<List<String>> = combine(historicalDtcEvents, _latestScanHistoricalDtcs) { events, latest ->
-        (events.map { it.code } + latest).distinct()
+    val historicalDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanHistoricalDtcs) { findings, latest ->
+        val canonical = findings.filter { finding ->
+            finding.timeline.any { "HISTORY" in it.semantics || "INTERMITTENT" in it.semantics }
+        }.map { it.identity.displayCode }
+        (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -1916,7 +1927,7 @@ class ObdViewModel @Inject constructor(
             _thresholdAlerts.value = newAlerts
         }
         // Run Elysium Vanguard Copilot RuleEngine check
-        ruleEngine.evaluate(data, activeDtcEvents.value.map { it.code })
+        ruleEngine.evaluate(data, canonicalActiveFindingSummaries.value.map { it.code })
     }
 
     fun getAlertHistory() = alertThresholdEngine.getAlertHistory()
@@ -2377,14 +2388,21 @@ class ObdViewModel @Inject constructor(
     val ecuName: StateFlow<String?> = obdSession.ecuName
 
     // --- Network Topology ---
-    val networkTopology: StateFlow<List<NetworkModule>> = obdSession.networkTopology
-    val isScanningTopology: StateFlow<Boolean> = obdSession.isScanningTopology
+    private val _networkTopology = MutableStateFlow<List<NetworkModule>>(emptyList())
+    val networkTopology: StateFlow<List<NetworkModule>> = _networkTopology.asStateFlow()
+    private val _isScanningTopology = MutableStateFlow(false)
+    val isScanningTopology: StateFlow<Boolean> = _isScanningTopology.asStateFlow()
     private var networkTopologyJob: Job? = null
 
     fun scanNetworkTopology() {
         networkTopologyJob?.cancel()
         networkTopologyJob = viewModelScope.launch(Dispatchers.IO) {
-            obdSession.scanNetworkTopology()
+            _isScanningTopology.value = true
+            try {
+                _networkTopology.value = scanModules()
+            } finally {
+                _isScanningTopology.value = false
+            }
         }
     }
 
@@ -2864,10 +2882,10 @@ class ObdViewModel @Inject constructor(
             launch {
                 try {
                     combine(
-                        activeDtcEvents,
-                        pendingDtcEvents,
-                        permanentDtcEvents,
-                        historicalDtcEvents
+                        canonicalActiveFindingSummaries,
+                        canonicalPendingFindingSummaries,
+                        canonicalPermanentFindingSummaries,
+                        canonicalHistoricalFindingSummaries
                     ) { active, pending, permanent, historical ->
                         (active + pending + permanent + historical).map { it.code }.distinct()
                     }.collect { codes ->
@@ -3414,12 +3432,36 @@ class ObdViewModel @Inject constructor(
     // CATEGORIZED DTCs ($03 / $07 / $0A)
     // ═══════════════════════════════════════════════
 
-    val categorizedDtcs = obdSession.categorizedDtcs
+    private val _categorizedDtcs = MutableStateFlow(CategorizedDtcs())
+    val categorizedDtcs: StateFlow<CategorizedDtcs> = _categorizedDtcs.asStateFlow()
 
     fun readCategorizedDtcs() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                obdSession.readCategorizedDtcs()
+                refreshDiagnostics(mode = DiagnosticScanMode.FULL_VEHICLE)
+                val report = lastDtcScanReport.value ?: return@launch
+                fun descriptions(bucket: DtcBucket): List<Pair<String, String>> = report.records
+                    .filter { it.bucket == bucket }
+                    .distinctBy { record ->
+                        listOf(
+                            record.namespace.name,
+                            DiagnosticModuleIdentity.canonical(
+                                record.targetAddress,
+                                record.responseAddress,
+                                record.moduleName,
+                            ),
+                            record.codeIdentity.stableRawIdentity,
+                        ).joinToString("|")
+                    }
+                    .map { record ->
+                        record.code to (runCatching { DtcDecoder.getLocalDescription(record.code) }.getOrNull()
+                            ?: "Definición pendiente de validación")
+                    }
+                _categorizedDtcs.value = CategorizedDtcs(
+                    confirmed = descriptions(DtcBucket.ACTIVE),
+                    pending = descriptions(DtcBucket.PENDING),
+                    permanent = descriptions(DtcBucket.PERMANENT),
+                )
             } catch (e: Exception) {
                 Log.e("ObdVM", "Categorized DTCs failed", e)
             }
@@ -3482,16 +3524,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun resetEcu(resetType: String = "03") {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                _lastUdsOperation.value = "Ejecutando ECU Reset..."
-                val success = udsProtocolManager.resetEcu(resetType)
-                _lastUdsOperation.value = if (success) "ECU Reset exitoso." else "ECU Reset falló."
-            } catch (e: Exception) {
-                Log.e("ObdVM", "ECU Reset failed", e)
-                _lastUdsOperation.value = "Error: ${e.message}"
-            }
-        }
+        Log.w("ObdVM", "Blocked generic ECU reset type=$resetType")
+        _lastUdsOperation.value =
+            "ECU Reset bloqueado: requiere capability pack revisado, ECU objetivo y precondiciones verificadas."
     }
 
     fun clearDtcUds() {
@@ -3510,9 +3545,11 @@ class ObdViewModel @Inject constructor(
     fun readDtcUds() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                _lastUdsOperation.value = "Leyendo DTCs vía UDS \$19..."
-                val dtcs = udsProtocolManager.readDtcByStatusMask()
-                _lastUdsOperation.value = "${dtcs.size} DTCs encontrados (UDS)."
+                _lastUdsOperation.value = "Leyendo DTCs UDS mediante adquisición canónica..."
+                refreshDiagnostics(mode = DiagnosticScanMode.FULL_VEHICLE)
+                val count = lastDtcScanReport.value?.records.orEmpty()
+                    .count { it.namespace == DiagnosticNamespace.UDS }
+                _lastUdsOperation.value = "$count hallazgos UDS adquiridos con evidencia canónica."
             } catch (e: Exception) {
                 Log.e("ObdVM", "UDS Read DTC failed", e)
             }
@@ -3532,15 +3569,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun executeRoutine(routineId: String, params: String = "") {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                _lastUdsOperation.value = "Ejecutando rutina \$$routineId..."
-                val success = udsProtocolManager.startRoutine(routineId, params)
-                _lastUdsOperation.value = if (success) "Rutina \$$routineId ejecutada." else "Rutina \$$routineId falló."
-            } catch (e: Exception) {
-                Log.e("ObdVM", "Routine failed", e)
-            }
-        }
+        Log.w("ObdVM", "Blocked unsourced UDS routine id=$routineId paramsLength=${params.length}")
+        _lastUdsOperation.value =
+            "Rutina bloqueada: requiere paquete OEM revisado, vehículo aplicable, ECU objetivo y precondiciones verificadas."
     }
 
     // ═══════════════════════════════════════════════
@@ -3809,28 +3840,102 @@ class ObdViewModel @Inject constructor(
         val requestScope: String,
     )
 
-    private suspend fun saveDiagnosticEvidence(report: DtcScanReport): List<PersistedExchangeReference> {
-        if (report.rawExchanges.isEmpty()) return emptyList()
+    private fun List<DiagnosticObservationEntity>.observedSemanticsFor(
+        namespace: DiagnosticNamespace,
+    ): Set<DiagnosticSemantic> = asSequence()
+        .filter { it.observationState == "OBSERVED" }
+        .flatMap { it.semantics.split('|').asSequence() }
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { raw -> runCatching { DiagnosticSemantic.valueOf(raw) }.getOrNull() }
+        .filter { semantic ->
+            when (namespace) {
+                DiagnosticNamespace.SAE_OBD -> semantic.name.startsWith("SAE_")
+                DiagnosticNamespace.UDS -> semantic.name.startsWith("UDS_")
+                DiagnosticNamespace.KWP2000,
+                DiagnosticNamespace.OEM -> true
+            }
+        }
+        .toSet()
+
+    private fun List<DiagnosticObservationEntity>.latestObservedSourceService(): String =
+        asSequence()
+            .filter { it.observationState == "OBSERVED" && it.sourceService.isNotBlank() }
+            .maxWithOrNull(
+                compareBy<DiagnosticObservationEntity> { it.observedAt }
+                    .thenBy { it.sessionSequence }
+                    .thenBy { it.id },
+            )
+            ?.sourceService
+            .orEmpty()
+
+    private fun Set<DiagnosticSemantic>.primaryBucketFor(
+        namespace: DiagnosticNamespace,
+    ): DtcBucket? = when (namespace) {
+        DiagnosticNamespace.SAE_OBD -> when {
+            DiagnosticSemantic.SAE_ACTIVE_DTC in this -> DtcBucket.ACTIVE
+            DiagnosticSemantic.SAE_PENDING_DTC in this -> DtcBucket.PENDING
+            DiagnosticSemantic.SAE_PERMANENT_DTC in this -> DtcBucket.PERMANENT
+            else -> null
+        }
+        DiagnosticNamespace.UDS,
+        DiagnosticNamespace.KWP2000,
+        DiagnosticNamespace.OEM -> when {
+            DiagnosticSemantic.UDS_TEST_FAILED in this -> DtcBucket.ACTIVE
+            DiagnosticSemantic.UDS_PENDING in this -> DtcBucket.PENDING
+            DiagnosticSemantic.UDS_CONFIRMED in this ||
+                DiagnosticSemantic.UDS_FAILED_SINCE_CLEAR in this -> DtcBucket.HISTORY
+            else -> null
+        }
+    }
+
+    private suspend fun saveDiagnosticEvidence(report: DtcScanReport): List<PersistedExchangeReference> =
+        diagnosticEvidencePersistenceMutex.withLock {
+        if (report.rawExchanges.isEmpty()) return@withLock emptyList()
         val transport = when {
             report.protocol.contains("DOIP", ignoreCase = true) -> DiagnosticTransport.DOIP
             report.protocol.contains("CAN", ignoreCase = true) || report.protocol.contains("15765") -> DiagnosticTransport.CAN
             report.protocol.contains("KWP", ignoreCase = true) || report.protocol.contains("9141") -> DiagnosticTransport.K_LINE
             else -> DiagnosticTransport.UNKNOWN
         }
-        val exchangesWithReferences = report.rawExchanges.map { exchange ->
+        val startingSequence = diagnosticEvidenceDao.maxExchangeSequence(currentSessionId)
+        var previousHash = diagnosticEvidenceDao.latestExchangeHash(currentSessionId).orEmpty()
+        val orderedExchanges = report.rawExchanges.withIndex().sortedWith(
+            compareBy<IndexedValue<com.elysium369.meet.core.obd.DtcRawExchange>> { it.value.timestampMs }
+                .thenBy { it.index },
+        )
+        val exchangesWithReferences = orderedExchanges.mapIndexed { offset, indexedExchange ->
+            val exchange = indexedExchange.value
             val applicationProtocol = if (exchange.command.startsWith("19") || exchange.command.startsWith("14")) {
                 DiagnosticApplicationProtocol.UDS
             } else {
                 DiagnosticApplicationProtocol.SAE_OBD
             }
             val exchangeId = UUID.randomUUID().toString()
+            val sequence = startingSequence + offset + 1L
+            val rawRequestHash = sha256Hex(exchange.command.toByteArray(Charsets.UTF_8))
+            val rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8))
             val persistedRequestScope = when (exchange.requestScope) {
                 is DiagnosticRequestScope.Functional -> "FUNCTIONAL"
                 is DiagnosticRequestScope.Physical -> "PHYSICAL"
                 is DiagnosticRequestScope.Logical -> "LOGICAL"
                 DiagnosticRequestScope.LegacyUnaddressed -> "LEGACY_UNADDRESSED"
             }
-            DiagnosticExchangeEntity(
+            val exchangeHash = canonicalHash(
+                currentSessionId,
+                sequence.toString(),
+                exchange.timestampMs.toString(),
+                persistedRequestScope,
+                exchange.targetAddress.orEmpty(),
+                exchange.responseAddress.orEmpty(),
+                exchange.command,
+                exchange.outcome.name,
+                rawRequestHash,
+                rawResponseHash,
+                previousHash,
+                exchange.parserVersion,
+            )
+            val entity = DiagnosticExchangeEntity(
                 id = exchangeId,
                 sessionId = currentSessionId,
                 timestampMs = exchange.timestampMs,
@@ -3849,18 +3954,139 @@ class ObdViewModel @Inject constructor(
                 negativeResponseCode = exchange.negativeResponse?.responseCode,
                 adapterConfiguration = report.protocol,
                 parserVersion = exchange.parserVersion,
-            ) to PersistedExchangeReference(
+                sessionSequence = sequence,
+                elapsedRealtimeNanos = System.nanoTime(),
+                rawRequestHash = rawRequestHash,
+                rawResponseHash = rawResponseHash,
+                previousExchangeHash = previousHash,
+                exchangeHash = exchangeHash,
+                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
+                    com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
+                    exchange.timestampMs,
+                ),
+            )
+            previousHash = exchangeHash
+            entity to PersistedExchangeReference(
                 exchangeId = exchangeId,
                 targetAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
                 service = exchange.command,
-                rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8)),
+                rawResponseHash = rawResponseHash,
                 outcome = exchange.outcome,
                 requestScope = persistedRequestScope,
             )
         }
         diagnosticEvidenceDao.appendExchanges(exchangesWithReferences.map { it.first })
-        return exchangesWithReferences.map { it.second }
+        val entities = exchangesWithReferences.map { it.first }
+        diagnosticEvidenceDao.appendSessionIntegrity(
+            DiagnosticSessionIntegrityEntity(
+                scanId = UUID.randomUUID().toString(),
+                sessionId = currentSessionId,
+                parserVersion = entities.map { it.parserVersion }.distinct().joinToString("+"),
+                firstSequence = entities.first().sessionSequence,
+                lastSequence = entities.last().sessionSequence,
+                leafCount = entities.size,
+                merkleRoot = merkleRootSha256(entities.map { it.exchangeHash }),
+                finalizedAtMs = System.currentTimeMillis(),
+            )
+        )
+        exchangesWithReferences.map { it.second }
+    }
+
+    private suspend fun appendDiagnosticObservation(observation: DiagnosticObservationEntity) =
+        diagnosticEvidencePersistenceMutex.withLock {
+        val sequence = diagnosticEvidenceDao.maxObservationSequence(observation.sessionId) + 1L
+        val previousHash = diagnosticEvidenceDao.latestObservationHash(observation.findingId).orEmpty()
+        val observationHash = canonicalHash(
+            observation.findingId,
+            observation.sessionId,
+            sequence.toString(),
+            observation.observedAt.toString(),
+            observation.observationState,
+            observation.semantics,
+            observation.statusByte?.toString().orEmpty(),
+            observation.sourceService,
+            observation.exchangeId.orEmpty(),
+            observation.rawPayloadHash,
+            previousHash,
+        )
+        diagnosticEvidenceDao.appendObservation(
+            observation.copy(
+                sessionSequence = sequence,
+                elapsedRealtimeNanos = System.nanoTime(),
+                previousObservationHash = previousHash,
+                observationHash = observationHash,
+            )
+        )
+    }
+
+    private suspend fun appendStandaloneDiagnosticExchange(
+        timestampMs: Long,
+        transport: String,
+        applicationProtocol: String,
+        requestScope: String,
+        requestAddress: String?,
+        responseAddress: String?,
+        service: String,
+        rawRequest: String,
+        rawResponse: String,
+        decodedOutcome: String,
+        adapterConfiguration: String,
+        parserVersion: String,
+    ): String = diagnosticEvidencePersistenceMutex.withLock {
+        val sequence = diagnosticEvidenceDao.maxExchangeSequence(currentSessionId) + 1L
+        val previousHash = diagnosticEvidenceDao.latestExchangeHash(currentSessionId).orEmpty()
+        val requestHash = sha256Hex(rawRequest.toByteArray(Charsets.UTF_8))
+        val responseHash = sha256Hex(rawResponse.toByteArray(Charsets.UTF_8))
+        val exchangeHash = canonicalHash(
+            currentSessionId,
+            sequence.toString(),
+            timestampMs.toString(),
+            requestScope,
+            requestAddress.orEmpty(),
+            responseAddress.orEmpty(),
+            service,
+            decodedOutcome,
+            requestHash,
+            responseHash,
+            previousHash,
+            parserVersion,
+        )
+        val exchangeId = UUID.randomUUID().toString()
+        diagnosticEvidenceDao.appendExchange(
+            DiagnosticExchangeEntity(
+                id = exchangeId,
+                sessionId = currentSessionId,
+                timestampMs = timestampMs,
+                transport = transport,
+                applicationProtocol = applicationProtocol,
+                requestScope = requestScope,
+                requestAddress = requestAddress,
+                responseAddress = responseAddress,
+                service = service,
+                rawRequest = rawRequest,
+                rawResponse = rawResponse,
+                decodedOutcome = decodedOutcome,
+                latencyMs = null,
+                retryCount = 0,
+                negativeResponseCode = null,
+                adapterConfiguration = adapterConfiguration,
+                parserVersion = parserVersion,
+                sessionSequence = sequence,
+                elapsedRealtimeNanos = System.nanoTime(),
+                rawRequestHash = requestHash,
+                rawResponseHash = responseHash,
+                previousExchangeHash = previousHash,
+                exchangeHash = exchangeHash,
+                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
+                    com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
+                    timestampMs,
+                ),
+            ),
+        )
+        exchangeId
     }
 
     private suspend fun saveDetectedDtcFindings(
@@ -3878,7 +4104,7 @@ class ObdViewModel @Inject constructor(
         distinctFindings.forEach { record ->
             val status = storageStatusForDtcRecord(record)
             val findingKey = record.findingKey(vehicle.id)
-            val canonicalFinding = diagnosticFindingDao.getByStableIdentity(
+            val canonicalFinding = diagnosticFindingRepository.getIdentityByStableKey(
                 vehicleId = vehicle.id,
                 ecuEndpointId = findingKey.moduleIdentity,
                 namespace = findingKey.namespace.name,
@@ -3911,7 +4137,7 @@ class ObdViewModel @Inject constructor(
             val existing = exactExisting ?: legacyExisting ?: canonicalEvent
             val metadata = dtcRecordMetadata(record)
             val findingId = canonicalFinding?.id ?: existing?.id ?: UUID.randomUUID().toString()
-            diagnosticFindingDao.insertFinding(
+            diagnosticFindingRepository.insertIdentity(
                 DiagnosticFindingEntity(
                     id = findingId,
                     vehicleId = vehicle.id,
@@ -3922,8 +4148,6 @@ class ObdViewModel @Inject constructor(
                     createdAtMs = existing?.firstSeenAt ?: now,
                 )
             )
-            diagnosticFindingDao.reopen(findingId)
-
             if (existing != null) {
                 val isNewSession = existing.sessionId != currentSessionId
                 dtcDao.insertDtc(
@@ -4000,7 +4224,7 @@ class ObdViewModel @Inject constructor(
             }
 
             records.filter { it.findingKey(vehicle.id) == findingKey }.forEach { observation ->
-                diagnosticEvidenceDao.appendObservation(
+                appendDiagnosticObservation(
                     DiagnosticObservationEntity(
                         id = UUID.randomUUID().toString(),
                         findingId = findingId,
@@ -4015,71 +4239,37 @@ class ObdViewModel @Inject constructor(
                     )
                 )
             }
+            diagnosticFindingRepository.rebuildProjection(findingId)
         }
 
         // Absence is an observation, not proof of repair. A prior DTC can only
         // become NOT_OBSERVED when the same module and status bucket completed
         // successfully; resolvedAt remains reserved for explicit clear or a
         // future verified post-scan/drive-cycle workflow.
-        val unresolvedEvents = dtcDao.getUnresolvedDtcsList(vehicle.id)
+        val unresolvedFindings = diagnosticFindingRepository.getVehicleFindings(vehicle.id).mapNotNull { finding ->
+            if (finding.projection.state == FindingResolutionState.VERIFIED_RESOLVED) {
+                null
+            } else {
+                finding.identity to finding.timeline
+            }
+        }
         val isAddressedProtocol = report.protocol.uppercase().let {
             it.contains("CAN") || it.contains("ISO15765") || it.contains("DOIP") || it.contains("13400")
         }
 
-        unresolvedEvents.forEach { event ->
-            val legacyMetadata = try {
-                event.freezeFrameJson?.let {
-                    val obj = org.json.JSONObject(it)
-                    mapOf(
-                        "targetAddress" to obj.optString("targetAddress", ""),
-                        "responseAddress" to obj.optString("responseAddress", ""),
-                        "moduleName" to obj.optString("moduleName", ""),
-                        "sourceService" to obj.optString("sourceService", ""),
-                        "namespace" to obj.optString("namespace", ""),
-                        "observationSemantic" to obj.optString("observationSemantic", ""),
-                    )
-                }.orEmpty()
-            } catch (_: Exception) {
-                emptyMap()
-            }
-            val origTarget = event.targetAddress.ifBlank { legacyMetadata["targetAddress"].orEmpty() }
-            val origResponse = event.responseAddress.ifBlank { legacyMetadata["responseAddress"].orEmpty() }
-            val origModuleName = event.moduleName.ifBlank { legacyMetadata["moduleName"].orEmpty() }
-
-            val bucket = when (event.status) {
-                "PENDING" -> DtcBucket.PENDING
-                "PERMANENT" -> DtcBucket.PERMANENT
-                "HISTORY", "INTERMITTENT" -> DtcBucket.HISTORY
-                else -> DtcBucket.ACTIVE
-            }
-
+        unresolvedFindings.forEach { (finding, timeline) ->
             // A live probe is insufficient: require a successful DTC service
             // read covering the same bucket and matching diagnostic module.
             val namespace = runCatching {
-                DiagnosticNamespace.valueOf(
-                    event.diagnosticNamespace.ifBlank {
-                        legacyMetadata["namespace"].orEmpty().ifBlank {
-                            val service = event.sourceService.ifBlank {
-                                legacyMetadata["sourceService"].orEmpty()
-                            }
-                            if (service.startsWith("19")) "UDS" else "SAE_OBD"
-                        }
-                    },
-                )
-            }.getOrDefault(DiagnosticNamespace.SAE_OBD)
-            val eventModuleIdentity = event.moduleIdentity.ifBlank {
-                DiagnosticModuleIdentity.canonical(origTarget, origResponse, origModuleName)
-            }
-            val semantics = event.observationSemantic.ifBlank {
-                legacyMetadata["observationSemantic"].orEmpty()
-            }.takeIf { it.isNotBlank() }
-                ?.let { semantic -> runCatching { DiagnosticSemantic.valueOf(semantic) }.getOrNull() }
-                ?.let(::setOf)
-                ?: DtcObservationPolicy.defaultSemantics(namespace, bucket)
+                DiagnosticNamespace.valueOf(finding.diagnosticNamespace)
+            }.getOrNull() ?: return@forEach
+            val semantics = timeline.observedSemanticsFor(namespace)
+            if (semantics.isEmpty()) return@forEach
+            val bucket = semantics.primaryBucketFor(namespace) ?: return@forEach
 
             val matchedModule = if (isAddressedProtocol) {
                 report.modules.firstOrNull { activeModule ->
-                    activeModule.moduleIdentity == eventModuleIdentity
+                    activeModule.moduleIdentity == finding.ecuEndpointId
                 }
             } else {
                 report.modules.firstOrNull { it.moduleName == "Standard OBD-II" }
@@ -4088,31 +4278,32 @@ class ObdViewModel @Inject constructor(
             if (DtcObservationPolicy.canMarkNotObserved(
                     module = matchedModule,
                     bucket = bucket,
-                    code = event.code,
+                    code = finding.displayCode,
                     records = records,
                     namespace = namespace,
-                    moduleIdentity = eventModuleIdentity,
+                    moduleIdentity = finding.ecuEndpointId,
                     semantics = semantics,
-                    rawDtcIdentity = event.rawDtcIdentity.ifBlank { event.code.uppercase() },
+                    rawDtcIdentity = finding.rawDtcIdentity,
                 )
             ) {
-                val status = event.status // ACTIVE, PENDING, PERMANENT, HISTORY, INTERMITTENT
-                dtcDao.insertDtc(
-                    event.copy(
+                // Canonical append-only evidence is authoritative. The old table
+                // is updated only as a compatibility read model when it exists.
+                dtcDao.getFindingById(finding.id)?.let { compatibilityEvent ->
+                    dtcDao.insertDtc(compatibilityEvent.copy(
                         observationState = "NOT_OBSERVED_LAST_SCAN",
                         synced = false
-                    )
-                )
+                    ))
+                }
                 val coverageEvidence = evidenceReferences.bestCoverageMatchFor(
                     module = matchedModule,
                     namespace = namespace,
                     bucket = bucket,
                     semantics = semantics,
                 )
-                diagnosticEvidenceDao.appendObservation(
+                appendDiagnosticObservation(
                     DiagnosticObservationEntity(
                         id = UUID.randomUUID().toString(),
-                        findingId = event.id,
+                        findingId = finding.id,
                         sessionId = currentSessionId,
                         observedAt = now,
                         observationState = "NOT_OBSERVED_LAST_SCAN",
@@ -4123,8 +4314,9 @@ class ObdViewModel @Inject constructor(
                         rawPayloadHash = coverageEvidence?.rawResponseHash.orEmpty(),
                     )
                 )
+                diagnosticFindingRepository.rebuildProjection(finding.id)
                 addTerminalLog(
-                    "[NOT_OBSERVED] ${event.code} ($status) no apareció en la lectura completa; resolución aún no verificada.",
+                    "[NOT_OBSERVED] ${finding.displayCode} no apareció bajo cobertura completa del módulo; resolución aún no verificada.",
                     TerminalLineType.SYSTEM,
                 )
             }
@@ -4458,7 +4650,6 @@ class ObdViewModel @Inject constructor(
                 )
             }
             dtcDao.resolveVerifiedFindings(result.verifiedFindingIds.toList(), System.currentTimeMillis())
-            diagnosticFindingDao.resolveVerified(result.verifiedFindingIds.toList(), System.currentTimeMillis())
             updateHealthScore()
             scheduleSync()
         }
@@ -4494,96 +4685,68 @@ class ObdViewModel @Inject constructor(
     ) {
         val observedAt = System.currentTimeMillis()
         findingIds.forEach { findingId ->
-            val event = dtcDao.getFindingById(findingId) ?: return@forEach
+            val canonicalFinding = diagnosticFindingRepository.getFindingSnapshot(findingId) ?: return@forEach
+            val finding = canonicalFinding.identity
+            val timeline = canonicalFinding.timeline
             val namespace = runCatching {
-                DiagnosticNamespace.valueOf(event.diagnosticNamespace.ifBlank { "SAE_OBD" })
-            }.getOrDefault(DiagnosticNamespace.SAE_OBD)
-            val bucket = when (event.status) {
-                "PENDING" -> DtcBucket.PENDING
-                "PERMANENT" -> DtcBucket.PERMANENT
-                "HISTORY", "INTERMITTENT" -> DtcBucket.HISTORY
-                else -> DtcBucket.ACTIVE
-            }
-            val semantics = runCatching { DiagnosticSemantic.valueOf(event.observationSemantic) }
-                .getOrNull()?.let(::setOf)
-                ?: DtcObservationPolicy.defaultSemantics(namespace, bucket)
-            val moduleIdentity = event.moduleIdentity.ifBlank {
-                DiagnosticModuleIdentity.canonical(event.targetAddress, event.responseAddress, event.moduleName)
-            }
-            val module = report.modules.firstOrNull { it.moduleIdentity == moduleIdentity }
+                DiagnosticNamespace.valueOf(finding.diagnosticNamespace)
+            }.getOrNull() ?: return@forEach
+            val semantics = timeline.observedSemanticsFor(namespace)
+            if (semantics.isEmpty()) return@forEach
+            val bucket = semantics.primaryBucketFor(namespace) ?: return@forEach
+            val module = report.modules.firstOrNull { it.moduleIdentity == finding.ecuEndpointId }
             val coverageEvidence = evidenceReferences.bestCoverageMatchFor(
                 module = module,
                 namespace = namespace,
                 bucket = bucket,
                 semantics = semantics,
             )
-            diagnosticEvidenceDao.appendObservation(
+            appendDiagnosticObservation(
                 DiagnosticObservationEntity(
                     id = UUID.randomUUID().toString(),
                     findingId = findingId,
                     sessionId = currentSessionId,
                     observedAt = observedAt,
-                    observationState = "VERIFIED_ABSENT",
+                    observationState = "VERIFIED_RESOLVED",
                     semantics = semantics.joinToString("|") { it.name },
                     statusByte = null,
-                    sourceService = coverageEvidence?.service ?: event.sourceService,
+                    sourceService = coverageEvidence?.service
+                        ?: timeline.latestObservedSourceService(),
                     exchangeId = coverageEvidence?.exchangeId,
                     rawPayloadHash = coverageEvidence?.rawResponseHash.orEmpty(),
                 )
             )
+            diagnosticFindingRepository.rebuildProjection(findingId)
         }
     }
 
     private suspend fun buildClearVerificationPlan(): ClearVerificationPlan {
         val vehicle = _selectedVehicle.value ?: return ClearVerificationPlan.empty()
-        val targets = dtcDao.getUnresolvedDtcsList(vehicle.id).map { event ->
-            val namespace = runCatching {
-                DiagnosticNamespace.valueOf(event.diagnosticNamespace.ifBlank { "SAE_OBD" })
-            }.getOrDefault(DiagnosticNamespace.SAE_OBD)
-            val eventSemantic = runCatching {
-                DiagnosticSemantic.valueOf(event.observationSemantic)
-            }.getOrElse {
-                val bucket = when (event.status) {
-                    "PENDING" -> DtcBucket.PENDING
-                    "PERMANENT" -> DtcBucket.PERMANENT
-                    "HISTORY", "INTERMITTENT" -> DtcBucket.HISTORY
-                    else -> DtcBucket.ACTIVE
-                }
-                DtcObservationPolicy.defaultSemantics(namespace, bucket).firstOrNull()
-                    ?: if (namespace == DiagnosticNamespace.UDS) {
-                        DiagnosticSemantic.UDS_CONFIRMED
-                    } else {
-                        DiagnosticSemantic.SAE_ACTIVE_DTC
-                    }
+        val targets = diagnosticFindingRepository.getVehicleFindings(vehicle.id).mapNotNull { canonicalFinding ->
+            val finding = canonicalFinding.identity
+            val timeline = canonicalFinding.timeline
+            if (canonicalFinding.projection.state == FindingResolutionState.VERIFIED_RESOLVED) {
+                return@mapNotNull null
             }
-            val timelineSemantics = diagnosticEvidenceDao.getFindingTimeline(event.id)
-                .asSequence()
-                .flatMap { it.semantics.split('|').asSequence() }
-                .mapNotNull { raw -> runCatching { DiagnosticSemantic.valueOf(raw) }.getOrNull() }
-                .filter { candidate ->
-                    when (namespace) {
-                        DiagnosticNamespace.SAE_OBD -> candidate.name.startsWith("SAE_")
-                        DiagnosticNamespace.UDS -> candidate.name.startsWith("UDS_")
-                        DiagnosticNamespace.KWP2000,
-                        DiagnosticNamespace.OEM -> true
-                    }
-                }
-                .toSet()
-            val requiredSemantics = (timelineSemantics + eventSemantic).ifEmpty { setOf(eventSemantic) }
+            val namespace = runCatching {
+                DiagnosticNamespace.valueOf(finding.diagnosticNamespace)
+            }.getOrNull() ?: return@mapNotNull null
+            val requiredSemantics = timeline.observedSemanticsFor(namespace)
+            // Do not guess a status bucket for imported or malformed history.
+            // Without a typed observed semantic there is no safe clear target.
+            if (requiredSemantics.isEmpty()) return@mapNotNull null
             ClearVerificationTarget(
-                findingId = event.id,
+                findingId = finding.id,
                 vehicleId = vehicle.id,
                 findingKey = DiagnosticFindingKey(
                     vehicleId = vehicle.id,
                     namespace = namespace,
-                    moduleIdentity = event.moduleIdentity.ifBlank {
-                        DiagnosticModuleIdentity.canonical(event.targetAddress, event.responseAddress, event.moduleName)
-                    },
-                    rawDtcIdentity = event.rawDtcIdentity.ifBlank { event.code.uppercase() },
-                    displayCode = event.code.uppercase(),
+                    moduleIdentity = finding.ecuEndpointId,
+                    rawDtcIdentity = finding.rawDtcIdentity,
+                    displayCode = finding.displayCode,
                 ),
                 requiredSemantics = requiredSemantics,
-                sourceService = event.sourceService,
+                sourceService = timeline.latestObservedSourceService(),
             )
         }
         return ClearVerificationPlan(
@@ -4730,10 +4893,10 @@ class ObdViewModel @Inject constructor(
     private suspend fun persistFindingSnapshot(record: DtcRecord, frame: FreezeFrameReadResult) {
         val vehicle = _selectedVehicle.value ?: return
         val key = record.findingKey(vehicle.id)
-        val finding = dtcDao.getUnresolvedFinding(
+        val finding = diagnosticFindingRepository.getIdentityByStableKey(
             vehicleId = vehicle.id,
+            ecuEndpointId = key.moduleIdentity,
             namespace = key.namespace.name,
-            moduleIdentity = key.moduleIdentity,
             rawDtcIdentity = key.rawDtcIdentity,
         ) ?: return
         val reportProtocol = lastDtcScanReport.value?.protocol.orEmpty()
@@ -4744,46 +4907,51 @@ class ObdViewModel @Inject constructor(
             else -> DiagnosticTransport.UNKNOWN
         }
         val exchangeIds = frame.rawExchanges.map { (command, rawResponse) ->
-            val exchangeId = UUID.randomUUID().toString()
-            diagnosticEvidenceDao.appendExchange(
-                DiagnosticExchangeEntity(
-                    id = exchangeId,
-                    sessionId = currentSessionId,
-                    timestampMs = System.currentTimeMillis(),
-                    transport = snapshotTransport.name,
-                    applicationProtocol = DiagnosticApplicationProtocol.SAE_OBD.name,
-                    requestScope = if (record.targetAddress.isNullOrBlank() || record.targetAddress == "LEGACY") {
-                        "LEGACY_UNADDRESSED"
-                    } else {
-                        "PHYSICAL"
-                    },
-                    requestAddress = record.targetAddress,
-                    responseAddress = record.responseAddress,
-                    service = command,
-                    rawRequest = command,
-                    rawResponse = rawResponse,
-                    decodedOutcome = if (rawResponse.isBlank()) "NO_RESPONSE" else "SNAPSHOT_CAPTURED",
-                    latencyMs = null,
-                    retryCount = 0,
-                    negativeResponseCode = null,
-                    adapterConfiguration = reportProtocol,
-                    parserVersion = "mode02-snapshot-v2",
-                )
+            appendStandaloneDiagnosticExchange(
+                timestampMs = System.currentTimeMillis(),
+                transport = snapshotTransport.name,
+                applicationProtocol = DiagnosticApplicationProtocol.SAE_OBD.name,
+                requestScope = if (record.targetAddress.isNullOrBlank() || record.targetAddress == "LEGACY") {
+                    "LEGACY_UNADDRESSED"
+                } else {
+                    "PHYSICAL"
+                },
+                requestAddress = record.targetAddress,
+                responseAddress = record.responseAddress,
+                service = command,
+                rawRequest = command,
+                rawResponse = rawResponse,
+                decodedOutcome = if (rawResponse.isBlank()) "NO_RESPONSE" else "SNAPSHOT_CAPTURED",
+                adapterConfiguration = reportProtocol,
+                parserVersion = "mode02-snapshot-v2",
             )
-            exchangeId
         }
-        val parameterEvidence = org.json.JSONObject().apply {
-            put("origin", DiagnosticValueOrigin.MEASURED.name)
-            put("confidence", if (frame.outcome == FreezeFrameOutcome.MATCHED) 1.0 else 0.0)
-            put("formulaVersion", "mode02-parser-v2")
-            put("values", org.json.JSONObject(frame.values))
-        }.toString()
+        val capturedAtMs = System.currentTimeMillis()
+        val parameterEvidence = Json.encodeToString(
+            com.elysium369.meet.domain.diagnostics.DiagnosticSnapshotPayloadV2(
+                associationMethod = "DTC_IDENTITY_MATCH_NOT_LIST_ORDER",
+                parameters = frame.values.map { (parameterId, rawValue) ->
+                    com.elysium369.meet.domain.diagnostics.DiagnosticSnapshotParameterV2(
+                        parameterId = parameterId,
+                        rawValue = rawValue,
+                        capturedAtMs = capturedAtMs,
+                        quality = if (frame.outcome == FreezeFrameOutcome.MATCHED) "PARSED_MATCHED" else "UNVERIFIED",
+                        freshness = "CAPTURED_NOW",
+                        canonicalSiUnit = null,
+                        displayUnit = null,
+                        source = DiagnosticSnapshotSource.SAE_MODE_02.name,
+                        formulaVersion = "mode02-parser-v2",
+                        inputExchangeIds = exchangeIds,
+                    )
+                },
+            ),
+        )
         diagnosticEvidenceDao.appendFindingSnapshot(
             FindingDiagnosticSnapshotEntity(
                 id = UUID.randomUUID().toString(),
                 findingId = finding.id,
                 moduleIdentity = key.moduleIdentity,
-                capturedAtMs = System.currentTimeMillis(),
+                capturedAtMs = capturedAtMs,
                 source = DiagnosticSnapshotSource.SAE_MODE_02.name,
                 parametersJson = parameterEvidence,
                 rawExchangeIdsJson = Json.encodeToString(exchangeIds),
@@ -4806,39 +4974,48 @@ class ObdViewModel @Inject constructor(
     suspend fun scanModules(): List<com.elysium369.meet.core.obd.NetworkModule> {
         _isScanning.value = true
         try {
-            obdSession.pauseLivePolling()
-            obdSession.clearCommandQueue()
             voiceFeedbackManager.speak("Escaneando topología de red del vehículo.", "Scanning vehicle network topology.")
-            // Phase 1: Topology scan — probe each ECU module individually
-            _cloudSyncState.value = "Escaneando topología de red CAN..."
-            val modules = obdSession.scanModules()
-
-            // Phase 2: topology probing can expose display codes, but it does not
-            // yet carry service/status/raw identity evidence. Keep it transient;
-            // the evidence-grade scan below is the sole persistence authority.
-            _cloudSyncState.value = "Preparando lectura diagnóstica con evidencia..."
-            val moduleDtcs = modules.flatMap { it.dtcs }.distinct()
-            if (moduleDtcs.isNotEmpty()) {
-                Log.d("ObdVM", "Topology observed ${moduleDtcs.size} display codes; awaiting evidence-grade scan")
-            }
-
-            // Phase 3: Full broadcast DTC read (Mode 03/07/0A from 7DF)
-            // This catches DTCs the per-module scan might miss and reads
-            // Pending + Permanent codes plus Readiness Monitors
-            _cloudSyncState.value = "Leyendo códigos de falla (DTCs)..."
+            _cloudSyncState.value = "Adquiriendo topología y DTCs con evidencia canónica..."
             refreshDiagnostics(manageState = false)
-
-            _cloudSyncState.value = "Escaneo completo: ${modules.size} módulos, ${activeDtcs.value.size} DTCs activos"
+            val report = lastDtcScanReport.value
+            if (report == null) {
+                _cloudSyncState.value = "Escaneo no concluyente: no se generó un informe verificable."
+                return emptyList()
+            }
+            val modules = report.modules.map { module ->
+                com.elysium369.meet.core.obd.NetworkModule(
+                    id = module.targetAddress ?: module.responseAddress ?: module.moduleIdentity,
+                    name = module.moduleName,
+                    isAlive = module.isAlive,
+                    networkType = com.elysium369.meet.core.obd.NetworkType.UNKNOWN,
+                    addressing = com.elysium369.meet.core.obd.AddressingType.UNKNOWN,
+                    dtcs = module.dtcs.map { it.code }.distinct(),
+                    responseId = module.responseAddress.orEmpty(),
+                    protocolDetected = report.protocol,
+                )
+            }
+            _cloudSyncState.value = when (report.completeness) {
+                com.elysium369.meet.core.obd.ScanCompleteness.COMPLETE ->
+                    "Escaneo completo: ${modules.size} módulos, ${report.records.size} hallazgos."
+                com.elysium369.meet.core.obd.ScanCompleteness.PARTIAL ->
+                    "Escaneo parcial: ${modules.size} módulos respondieron; quedan módulos sin verificar."
+                com.elysium369.meet.core.obd.ScanCompleteness.INCONCLUSIVE ->
+                    "Escaneo no concluyente: no afirmar ausencia de fallas."
+            }
             return modules
         } finally {
-            obdSession.resumeLivePolling()
             _isScanning.value = false
         }
     }
 
     suspend fun sendRawCommand(cmd: String): String {
+        val decision = DiagnosticRawCommandPolicy.evaluate(cmd)
+        if (!decision.allowed) {
+            Log.w("ObdViewModel", "Terminal command blocked: ${decision.reason}")
+            return "BLOCKED: ${decision.reason}"
+        }
         ensureDtcScanBeforeAction()
-        return obdSession.sendRawCommand(cmd)
+        return obdSession.sendRawCommand(decision.normalizedCommand)
     }
 
     /**
@@ -4846,22 +5023,8 @@ class ObdViewModel @Inject constructor(
      * Performs safety checks (voltage, adapter quality) before sending commands.
      */
     suspend fun runDiagnosticCommand(command: com.elysium369.meet.core.obd.ObdCommandDef): String {
-        ensureDtcScanBeforeAction()
-        // 1. Safety Guard
-        if (!obdSession.verifySafetyForProAction()) {
-            return "SAFETY_ERROR"
-        }
-
-        // 2. Execution
-        val response = obdSession.sendRawCommand(command.command)
-
-        // 3. Validation
-        val isSuccess = response.contains(command.expectedResponse) ||
-                        response.contains("OK") ||
-                        response.contains("61") || // ISO 14230-4 response prefix
-                        (command.command.startsWith("31") && response.startsWith("71")) // Routine control response
-
-        return if (isSuccess) "SUCCESS" else response
+        Log.w("ObdVM", "Blocked legacy raw diagnostic command: ${command.description}")
+        return "BLOCKED: la ejecución genérica fue retirada; usa un flujo tipado y autorizado por capability pack."
     }
 
     suspend fun consultAi(
@@ -5305,16 +5468,8 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun resetTPMS(): Boolean {
-        ensureDtcScanBeforeAction()
-        return try {
-            obdSession.sendRawCommand("ATSH7E0")
-            obdSession.sendRawCommand("1003")
-            val resp = obdSession.sendRawCommand("3101000D") // TPMS Relearn Routine
-            resp.startsWith("71")
-        } catch (e: Exception) {
-            Log.e("ObdViewModel", "TPMS reset failed", e)
-            false
-        }
+        Log.w("ObdViewModel", "Blocked generic TPMS relearn: no reviewed capability pack")
+        return false
     }
 
     fun exportTripToPdf(trip: TripEntity) {
@@ -5868,33 +6023,43 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun speakDiagnostics() {
-        val activeCount = activeDtcEvents.value.size
-        val pendingCount = pendingDtcEvents.value.size
+        val activeCount = canonicalActiveFindingSummaries.value.size
+        val pendingCount = canonicalPendingFindingSummaries.value.size
         val report = activePeritoReport.value
-        val cost = report?.estimatedRepairCost ?: (activeCount * 120.0 + pendingCount * 60.0)
-        
+        val scan = lastDtcScanReport.value
         val msgEs = if (activeCount == 0 && pendingCount == 0) {
-            "El diagnóstico indica que no hay códigos de falla activos ni pendientes en la ECU del vehículo."
+            when (scan?.completeness) {
+                ScanCompleteness.COMPLETE -> "Los módulos cubiertos no reportaron códigos activos ni pendientes. Esto no descarta fallas no monitorizadas."
+                ScanCompleteness.PARTIAL -> "El escaneo fue parcial: los módulos cubiertos no reportaron códigos activos ni pendientes, pero quedan módulos sin verificar."
+                else -> "No hay evidencia suficiente para afirmar ausencia de códigos activos o pendientes."
+            }
         } else {
-            "El diagnóstico detecta $activeCount fallas activas y $pendingCount fallas pendientes. El costo estimado de reparación es de ${cost.toInt()} dólares."
+            "El diagnóstico registra $activeCount hallazgos activos y $pendingCount pendientes." +
+                (report?.let { " El peritaje vigente estima ${it.estimatedRepairCost.toInt()} dólares; confirma cotización y alcance." } ?: " El costo aún no fue cotizado.")
         }
         val msgEn = if (activeCount == 0 && pendingCount == 0) {
-            "Diagnostics show zero active or pending fault codes in the vehicle ECU."
+            when (scan?.completeness) {
+                ScanCompleteness.COMPLETE -> "Covered modules reported no active or pending codes. This does not rule out unmonitored faults."
+                ScanCompleteness.PARTIAL -> "The scan was partial: covered modules reported no active or pending codes, but some modules remain unverified."
+                else -> "There is not enough evidence to claim the absence of active or pending codes."
+            }
         } else {
-            "Diagnostics detected $activeCount active and $pendingCount pending faults. The estimated repair cost is ${cost.toInt()} dollars."
+            "Diagnostics record $activeCount active findings and $pendingCount pending findings." +
+                (report?.let { " The current inspection estimates ${it.estimatedRepairCost.toInt()} dollars; confirm scope and quote." } ?: " Repair cost has not been quoted.")
         }
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
 
     private fun speakFuelEconomy() {
-        val economy = liveData.value["015E"] ?: liveData.value["0110"]?.let { maf ->
-            (maf / 10.7f)
-        } ?: 8.5f
-        val range = 450
-        voiceFeedbackManager.speak(
-            "El consumo estimado es de ${String.format("%.1f", economy)} litros por cada cien kilómetros, con una autonomía aproximada de $range kilómetros.",
-            "The estimated fuel economy is ${String.format("%.1f", economy)} liters per hundred kilometers, with an approximate range of $range kilometers."
-        )
+        val economy = liveData.value["015E"] ?: liveData.value["0110"]?.let { maf -> maf / 10.7f }
+        if (economy == null) {
+            voiceFeedbackManager.speak("Consumo no capturado en esta sesión.", "Fuel economy was not captured in this session.")
+        } else {
+            voiceFeedbackManager.speak(
+                "El consumo calculado con los datos disponibles es de ${String.format("%.1f", economy)} litros por cada cien kilómetros.",
+                "Calculated fuel economy from available data is ${String.format("%.1f", economy)} liters per hundred kilometers.",
+            )
+        }
     }
 
     private fun speakVehicleDna() {
@@ -5932,13 +6097,14 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun speakGeneralStatus() {
-        val temp = liveData.value["0105"]?.toInt() ?: 90
-        val volt = String.format("%.1f", liveData.value["0142"] ?: 13.8f)
-        val activeCount = activeDtcEvents.value.size
+        val temp = liveData.value["0105"]?.toInt()?.let { "$it grados centígrados" } ?: "dato no capturado"
+        val volt = liveData.value["0142"]?.let { "${String.format("%.1f", it)} voltios" } ?: "dato no capturado"
+        val activeCount = canonicalActiveFindingSummaries.value.size
         val dna = dnaResult.value
-        
-        val msgEs = "Resumen de estado del vehículo: Temperatura de refrigerante a $temp grados centígrados. Alternador cargando a $volt voltios. Hay $activeCount códigos de falla activos. Score de salud DNA al ${if (dna.isCalibrated) "${dna.healthScore} por ciento" else "noventa y cinco por ciento provisional"}."
-        val msgEn = "Vehicle summary: Coolant temperature is $temp degrees. Alternator charging at $volt volts. Active fault code count is $activeCount. DNA health score is at ${if (dna.isCalibrated) "${dna.healthScore} percent" else "ninety-five percent provisional"}."
+        val dnaEs = if (dna.isCalibrated) "score DNA ${dna.healthScore} por ciento" else "DNA no calibrado"
+        val dnaEn = if (dna.isCalibrated) "DNA score ${dna.healthScore} percent" else "DNA not calibrated"
+        val msgEs = "Resumen: refrigerante $temp; voltaje $volt; $activeCount hallazgos DTC activos; $dnaEs."
+        val msgEn = "Summary: coolant $temp; voltage $volt; $activeCount active DTC findings; $dnaEn."
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
 
@@ -6008,7 +6174,7 @@ class ObdViewModel @Inject constructor(
     /** Build a rich vehicle info string from the selected vehicle + active DTCs */
     fun buildVehicleInfoForRequest(): String {
         val v = _selectedVehicle.value
-        val dtcs = activeDtcEvents.value
+        val dtcs = canonicalActiveFindingSummaries.value
         val sb = StringBuilder()
         if (v != null) {
             sb.append("${v.year} ${v.make} ${v.model}")
@@ -6163,6 +6329,8 @@ class ObdViewModel @Inject constructor(
                 try {
                     val seventyTwoHoursAgo = System.currentTimeMillis() - (72 * 60 * 60 * 1000L)
                     towTruckDao.purgeOldRequests(seventyTwoHoursAgo)
+                    diagnosticEvidenceDao.purgeExpiredUnreferencedExchanges(System.currentTimeMillis())
+                    diagnosticEvidenceDao.purgeOrphanedSessionIntegrity()
                 } catch (e: Exception) {
                     android.util.Log.e("ObdViewModel", "Auto-cleanup failed", e)
                 }
@@ -8253,6 +8421,12 @@ class ObdViewModel @Inject constructor(
 
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
+
+    private fun canonicalHash(vararg fields: String): String =
+        com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.canonicalHash(*fields)
+
+    private fun merkleRootSha256(hashes: List<String>): String =
+        com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.merkleRootSha256(hashes)
 
     private fun ByteArray.toHex(): String = joinToString("") { byte ->
         (byte.toInt() and 0xff).toString(16).padStart(2, '0')

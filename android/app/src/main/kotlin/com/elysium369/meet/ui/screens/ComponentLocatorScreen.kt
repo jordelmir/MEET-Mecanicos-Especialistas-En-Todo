@@ -43,7 +43,6 @@ import com.elysium369.meet.ai.ProprietaryGroundedContextBuilder
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.diagnostics.DiagnosticSpatialSystem
 import com.elysium369.meet.core.diagnostics.DtcSpatialResolver
-import com.elysium369.meet.core.diagnostics.DiagnosticSpatialFindingContext
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.ComponentLocatorViewModel
 import com.elysium369.meet.ui.components.*
@@ -72,7 +71,9 @@ import com.elysium369.meet.domain.visualdiagnostics.CombustionType
 import com.elysium369.meet.domain.visualdiagnostics.CylinderLayout
 import com.elysium369.meet.domain.visualdiagnostics.PowertrainElectrification
 import com.elysium369.meet.domain.visualdiagnostics.VehicleDataProvenance
+import com.elysium369.meet.domain.visualdiagnostics.PowertrainFieldProvenance
 import com.elysium369.meet.domain.visualdiagnostics.VehiclePowertrainTopologyResolver
+import com.elysium369.meet.domain.visualdiagnostics.valueOrNull
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT LOCATOR 3D — Interactive Graphics Engine & Part Finder
@@ -120,15 +121,16 @@ fun ComponentLocatorScreen(
     viewModel: ObdViewModel,
     locatorViewModel: ComponentLocatorViewModel = hiltViewModel(),
     initialPartId: String? = null,
-    initialDtcCode: String? = null,
-    initialDtcStatus: String? = null,
-    initialFindingKey: String? = null,
-    initialDtcModule: String? = null,
-    initialDtcNamespace: String? = null,
-    initialDtcRawIdentity: String? = null,
+    initialFindingId: String? = null,
 ) {
     val context = LocalContext.current
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val canonicalFindingProjection by locatorViewModel.spatialProjection.collectAsState()
+    val canonicalFindingCode by locatorViewModel.spatialFindingCode.collectAsState()
+    LaunchedEffect(initialFindingId) {
+        initialFindingId?.takeIf(String::isNotBlank)?.let(locatorViewModel::loadFindingProjection)
+    }
+    val effectiveDtcCode = canonicalFindingCode
     
     val detectedPowertrainTopology = remember(selectedVehicle) {
         VehiclePowertrainTopologyResolver.resolve(
@@ -140,22 +142,27 @@ fun ComponentLocatorScreen(
                 selectedVehicle?.transmission_subtype,
             ).joinToString(" "),
             displacementCc = selectedVehicle?.displacement_cc,
-            provenance = VehicleDataProvenance.USER_CONFIRMED,
+            provenance = PowertrainFieldProvenance(
+                engine = if (selectedVehicle?.engine.isNullOrBlank() && selectedVehicle?.engine_tech.isNullOrBlank()) VehicleDataProvenance.UNKNOWN else VehicleDataProvenance.INFERRED,
+                fuel = if (selectedVehicle?.fuel_type.isNullOrBlank()) VehicleDataProvenance.UNKNOWN else VehicleDataProvenance.INFERRED,
+                transmission = if (selectedVehicle?.transmission_type.isNullOrBlank() && selectedVehicle?.transmission_subtype.isNullOrBlank()) VehicleDataProvenance.UNKNOWN else VehicleDataProvenance.INFERRED,
+                displacement = if ((selectedVehicle?.displacement_cc ?: 0) > 0) VehicleDataProvenance.INFERRED else VehicleDataProvenance.UNKNOWN,
+            ),
         )
     }
     // EngineType remains a rendering profile only; topology above is the authority.
     val detectedEngineType = remember(detectedPowertrainTopology) {
         val topology = detectedPowertrainTopology
-        val count = topology.cylinderCount.value
-        val layout = topology.cylinderLayout.value
-        when (topology.electrification.value) {
+        val count = topology.cylinderCount.valueOrNull
+        val layout = topology.cylinderLayout.valueOrNull
+        when (topology.electrification.valueOrNull) {
             PowertrainElectrification.PHEV -> EngineType.PHEV
             PowertrainElectrification.HEV, PowertrainElectrification.MHEV -> EngineType.HYBRID
             PowertrainElectrification.BEV -> EngineType.ELECTRIC
             else -> when {
-                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.V && count == 8 -> EngineType.DIESEL_V8
-                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.V && count == 6 -> EngineType.DIESEL_V6
-                topology.combustionType.value == CombustionType.DIESEL && layout == CylinderLayout.INLINE && count == 4 -> EngineType.DIESEL_L4
+                topology.combustionType.valueOrNull == CombustionType.DIESEL && layout == CylinderLayout.V && count == 8 -> EngineType.DIESEL_V8
+                topology.combustionType.valueOrNull == CombustionType.DIESEL && layout == CylinderLayout.V && count == 6 -> EngineType.DIESEL_V6
+                topology.combustionType.valueOrNull == CombustionType.DIESEL && layout == CylinderLayout.INLINE && count == 4 -> EngineType.DIESEL_L4
                 layout == CylinderLayout.V && count == 12 -> EngineType.V12
                 layout == CylinderLayout.V && count == 10 -> EngineType.V10
                 layout == CylinderLayout.V && count == 8 -> EngineType.V8
@@ -286,26 +293,9 @@ fun ComponentLocatorScreen(
     }
     
     val initialDtcProjection = remember(
-        initialDtcCode,
-        initialFindingKey,
-        initialDtcModule,
-        initialDtcNamespace,
-        initialDtcRawIdentity,
+        canonicalFindingProjection,
     ) {
-        if (!initialFindingKey.isNullOrBlank()) {
-            DtcSpatialResolver.resolve(
-                DiagnosticSpatialFindingContext(
-                    stableFindingKey = initialFindingKey,
-                    displayCode = initialDtcCode.orEmpty(),
-                    rawDtcIdentity = initialDtcRawIdentity.orEmpty(),
-                    namespace = initialDtcNamespace.orEmpty(),
-                    moduleIdentity = initialFindingKey.split("~").getOrNull(1).orEmpty(),
-                    moduleName = initialDtcModule.orEmpty(),
-                ),
-            )
-        } else {
-            DtcSpatialResolver.resolve(initialDtcCode, initialDtcModule)
-        }
+        canonicalFindingProjection ?: DtcSpatialResolver.resolve(null, null)
     }
     val initialDtcScene = remember(initialDtcProjection) {
         when (initialDtcProjection.primarySystem) {
@@ -327,13 +317,14 @@ fun ComponentLocatorScreen(
         (engineComponents + suspensionComponents + proprietaryComponentsBySystem.values.flatten())
             .distinctBy(ComponentInfo::id)
     }
-    val initialDtcComponents = remember(initialDtcCode, dtcRelationCandidates) {
+    val initialDtcComponents = remember(effectiveDtcCode, initialDtcProjection, dtcRelationCandidates) {
+        val graphIds = initialDtcProjection.candidateComponents.map { it.componentId }.toSet()
         dtcRelationCandidates.filter { component ->
-            component.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) }
+            component.id in graphIds
         }
     }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedComponent by remember(initialPartId, initialDtcCode, suspensionComponents, initialProprietaryEntity) {
+    var selectedComponent by remember(initialPartId, suspensionComponents, initialProprietaryEntity) {
         mutableStateOf(
             initialProprietaryEntity?.toComponentInfo(proprietaryRepository, includeLiteralContext = true)
                 ?: suspensionComponents.firstOrNull { it.id == initialPartId }
@@ -342,26 +333,28 @@ fun ComponentLocatorScreen(
     var selectedCategory by remember { mutableStateOf<ComponentCategory?>(null) }
     var aiContextPreview by remember { mutableStateOf<String?>(null) }
     
-    var currentScene by remember(initialPartId, initialDtcCode, initialProprietaryEntity) {
+    var currentScene by remember(initialPartId, effectiveDtcCode, initialProprietaryEntity) {
         mutableStateOf(
             when {
                 initialProprietaryEntity != null -> SceneType.UNIVERSAL_CATALOG
                 initialPartId != null -> SceneType.SUSPENSION
-                initialDtcCode != null -> initialDtcScene
+                effectiveDtcCode != null -> initialDtcScene
                 else -> SceneType.UNIVERSAL_CATALOG
             }
         )
     }
     var explodedServiceView by remember { mutableStateOf(false) }
     var selectedPlatform by remember { mutableStateOf(MeetPlatformCatalog.default) }
-    var twinViewportState by remember(initialProprietaryEntity, initialPartId, initialDtcCode) {
+    var twinViewportState by remember(initialProprietaryEntity, initialPartId, effectiveDtcCode) {
         mutableStateOf(
             VehicleTwinViewportState(
                 focusMode = when {
                     initialProprietaryEntity != null || initialPartId != null -> TwinFocusMode.COMPONENT
-                    initialDtcCode != null -> TwinFocusMode.SYSTEM
+                    effectiveDtcCode != null -> TwinFocusMode.DIAGNOSTIC_TWIN
                     else -> TwinFocusMode.COMPLETE_VEHICLE
-                }
+                },
+                xRayEnabled = effectiveDtcCode != null,
+                autoRotateEnabled = effectiveDtcCode == null,
             )
         )
     }
@@ -385,14 +378,8 @@ fun ComponentLocatorScreen(
     // Obtener códigos DTC activos del escáner en tiempo real
     val activeDtcs by viewModel.activeDtcs.collectAsState()
     val pendingDtcs by viewModel.pendingDtcs.collectAsState()
-    val allActiveDtcs = remember(activeDtcs, pendingDtcs, initialDtcCode, initialDtcStatus) {
-        val selectedIsObservedNow = initialDtcStatus.equals("ACTIVO", ignoreCase = true) ||
-            initialDtcStatus.equals("PENDIENTE", ignoreCase = true)
-        (activeDtcs + pendingDtcs + if (selectedIsObservedNow) {
-            listOfNotNull(initialDtcCode?.uppercase())
-        } else {
-            emptyList()
-        }).distinct()
+    val allActiveDtcs = remember(activeDtcs, pendingDtcs) {
+        (activeDtcs + pendingDtcs).distinct()
     }
     val liveData by viewModel.liveData.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -405,11 +392,12 @@ fun ComponentLocatorScreen(
         }
     }
 
-    val filteredComponents = remember(searchQuery, selectedCategory, components, initialDtcCode) {
+    val filteredComponents = remember(searchQuery, selectedCategory, components, effectiveDtcCode, initialDtcProjection) {
+        val graphIds = initialDtcProjection.candidateComponents.map { it.componentId }.toSet()
         components.filter { c ->
             (searchQuery.isBlank() || c.name.contains(searchQuery, ignoreCase = true)) &&
             (selectedCategory == null || c.category == selectedCategory) &&
-            (initialDtcCode == null || c.relatedDtcs.any { it.equals(initialDtcCode, ignoreCase = true) })
+            (effectiveDtcCode == null || c.id in graphIds)
         }
     }
     val pageScrollState = rememberScrollState()
@@ -927,10 +915,10 @@ fun ComponentLocatorScreen(
                             maxLines = 2
                         )
                     }
-                    if (initialDtcCode != null && currentScene != SceneType.UNIVERSAL_CATALOG) {
+                    if (effectiveDtcCode != null && currentScene != SceneType.UNIVERSAL_CATALOG) {
                         Text(
-                            text = "${initialDtcStatus?.uppercase() ?: "ESTADO NO INFORMADO"} · " +
-                                "${initialDtcComponents.size} RELACIONES PARA ${initialDtcCode.uppercase()} · " +
+                            text = "HALLAZGO CANÓNICO · " +
+                                "${initialDtcComponents.size} RELACIONES PARA ${effectiveDtcCode.uppercase()} · " +
                                 "${initialDtcProjection.primarySystem.name.replace('_', ' ')} · NO CONFIRMAN PIEZA DAÑADA",
                             color = MeetColors.cyberCyan,
                             fontSize = 8.sp,
@@ -1018,6 +1006,32 @@ fun ComponentLocatorScreen(
                             twinViewportState = twinViewportState.returnToVehicle()
                         }
                     )
+                }
+            }
+
+            if (effectiveDtcCode != null && initialDtcProjection.candidateComponents.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, bottom = 48.dp)
+                        .widthIn(max = 330.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.Black.copy(alpha = 0.78f))
+                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text("DIAGNOSTIC TWIN · RUTAS", color = MeetColors.cyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    (initialDtcProjection.signalPaths.map { "SEÑAL · $it" } +
+                        initialDtcProjection.electricalPaths.map { "ELÉCTRICA · $it" } +
+                        initialDtcProjection.communicationPaths.map { "RED · $it" } +
+                        initialDtcProjection.fluidPaths.map { "FLUIDO · $it" } +
+                        initialDtcProjection.mechanicalPaths.map { "MECÁNICA · $it" })
+                        .take(4)
+                        .forEach { path ->
+                            Text(path, color = Color.White, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    Text("Ruta esquemática; posición OEM pendiente de confirmar.", color = MeetColors.warning, fontSize = 8.sp)
                 }
             }
 
@@ -1283,7 +1297,35 @@ fun ComponentLocatorScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            if (filteredComponents.isEmpty() && initialDtcCode != null) {
+            if (effectiveDtcCode != null) {
+                item {
+                    Surface(
+                        color = MeetColors.cyberCyan.copy(alpha = 0.07f),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(
+                                "TRAZA CAUSAL · ${effectiveDtcCode.uppercase()}",
+                                color = MeetColors.cyberCyan,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp,
+                            )
+                            Text(initialDtcProjection.explanation, color = Color.White, fontSize = 11.sp)
+                            Text(initialDtcProjection.relationNotice, color = MeetColors.warning, fontSize = 10.sp)
+                            if (initialDtcProjection.candidateComponents.isNotEmpty()) {
+                                Text(
+                                    "Relaciones estructuradas: ${initialDtcProjection.candidateComponents.size} · " +
+                                        "evidencia ${"%.0f".format(initialDtcProjection.projectionEvidenceScore * 100)}%",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (filteredComponents.isEmpty() && effectiveDtcCode != null) {
                 item {
                     Surface(
                         color = MeetColors.warning.copy(alpha = 0.08f),
@@ -1291,7 +1333,7 @@ fun ComponentLocatorScreen(
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(
-                            "No existe una pieza con vínculo estructurado para $initialDtcCode. No se abrirá un atlas general sin relación; vuelve a la guía y confirma con pruebas físicas.",
+                            "No existe una pieza con vínculo estructurado aplicable para $effectiveDtcCode. No se abrirá un atlas general sin relación; vuelve a la guía y confirma con VIN/OEM y pruebas físicas.",
                             color = MeetColors.warning,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(14.dp),

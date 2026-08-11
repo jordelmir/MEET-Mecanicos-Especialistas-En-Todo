@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.vanguard.DiagnosticTelemetryConsent
+import com.elysium369.meet.core.vanguard.VanguardPrivacyGuard
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.AnimatedIconPreset
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -51,6 +53,10 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showThemeCustomizer by remember { mutableStateOf(false) }
+    val diagnosticPrivacyGuard = remember { VanguardPrivacyGuard() }
+    var diagnosticTelemetryConsent by remember {
+        mutableStateOf(diagnosticPrivacyGuard.diagnosticTelemetryConsent(context))
+    }
 
     // --- Live state from ViewModel ---
     val forceCloneMode by viewModel.forceCloneMode.collectAsState()
@@ -252,6 +258,65 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column {
+                    PhantomSectionHeader(label = "PRIVACIDAD DIAGNÓSTICA", accentColor = MeetColors.electricBlue)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.electricBlue,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "La evidencia OBD permanece local. El envío remoto está desactivado por defecto y solo cambia con consentimiento explícito.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
+                            )
+                            DiagnosticTelemetryConsent.entries.forEach { option ->
+                                val label = when (option) {
+                                    DiagnosticTelemetryConsent.DISABLED -> "Solo local · no enviar"
+                                    DiagnosticTelemetryConsent.ANONYMOUS_DIAGNOSTICS -> "Telemetría anónima y redactada"
+                                    DiagnosticTelemetryConsent.FULL_DIAGNOSTICS -> "Compartir diagnóstico redactado"
+                                }
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            diagnosticPrivacyGuard.setDiagnosticTelemetryConsent(context, option)
+                                            diagnosticTelemetryConsent = option
+                                        }
+                                        .border(
+                                            1.dp,
+                                            if (diagnosticTelemetryConsent == option) MeetColors.electricBlue else MeetColors.borderSubtle,
+                                            RoundedCornerShape(8.dp),
+                                        )
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RadioButton(
+                                        selected = diagnosticTelemetryConsent == option,
+                                        onClick = {
+                                            diagnosticPrivacyGuard.setDiagnosticTelemetryConsent(context, option)
+                                            diagnosticTelemetryConsent = option
+                                        },
+                                    )
+                                    Text(label, color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                            Text(
+                                "VIN, MAC e IP se redactan o transforman antes de cualquier transmisión permitida.",
+                                color = MeetColors.warning,
+                                fontSize = 10.sp,
+                            )
                         }
                     }
                 }

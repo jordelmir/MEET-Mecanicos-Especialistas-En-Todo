@@ -14,8 +14,8 @@ class VehiclePowertrainTopologyTest {
             transmissionDescription = "e-CVT",
         )
 
-        assertEquals(PowertrainElectrification.PHEV, topology.electrification.value)
-        assertEquals(VoltageArchitecture.HIGH_VOLTAGE, topology.voltageArchitecture.value)
+        assertEquals(PowertrainElectrification.PHEV, topology.electrification.valueOrNull)
+        assertEquals(VoltageArchitecture.HIGH_VOLTAGE, topology.voltageArchitecture.valueOrNull)
     }
 
     @Test
@@ -27,7 +27,7 @@ class VehiclePowertrainTopologyTest {
             displacementCc = 1600,
         )
 
-        assertNull(topology.cylinderCount.value)
-        assertEquals(1600, topology.displacementCc.value)
+        assertNull(topology.cylinderCount.valueOrNull)
+        assertEquals(1600, topology.displacementCc.valueOrNull)
     }
 }

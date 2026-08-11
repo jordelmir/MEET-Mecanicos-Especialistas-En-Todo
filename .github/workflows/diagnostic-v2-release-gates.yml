@@ -1,23 +1,60 @@
 name: Diagnostic v2 release gates
 
-# Intentionally manual until the owner explicitly authorizes running tests/builds.
 on:
+  pull_request:
+    paths:
+      - "android/**"
+      - "tests/diagnostics/**"
+      - "tests/parity/**"
+      - "tools/**"
+      - ".github/workflows/diagnostic-v2-release-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "tests/diagnostics/**"
+      - "tests/parity/**"
+      - "tools/**"
+      - ".github/workflows/diagnostic-v2-release-gates.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnostic-v2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+
   release-gates:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: 17
-      - uses: actions/setup-node@v4
+          cache: gradle
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
       - name: Release secret scan
         run: bash tools/scan-release-secrets.sh
+      - name: Git-history secret scan
+        run: bash tools/scan-git-history-secrets.sh
       - name: Production invariants
         run: bash tools/verify-production-guards.sh
       - name: Diagnostic unit and property tests
@@ -29,5 +66,28 @@ jobs:
       - name: Room migration verification and debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug
+      - name: Ephemeral release signing
+        shell: bash
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "${RUNNER_TEMP}/meet-ci-release.jks" \
+            -storepass "ci-release-only" \
+            -keypass "ci-release-only" \
+            -alias "meet-ci" \
+            -keyalg RSA -keysize 3072 -validity 1 \
+            -dname "CN=MEET CI Ephemeral,OU=CI,O=Elysium Vanguard,C=CR"
+          printf '%s\n' 'ELYSIUM_SUPABASE_KEY_ROLE=ANON' > android/local.properties
+      - name: Release R8 assembly
+        working-directory: android
+        run: >-
+          ./gradlew :app:assembleRelease
+          -PKEYSTORE_PATH="${RUNNER_TEMP}/meet-ci-release.jks"
+          -PKEYSTORE_PASSWORD=ci-release-only
+          -PKEY_ALIAS=meet-ci
+          -PKEY_PASSWORD=ci-release-only
+      - name: Built APK secret and string scan
+        env:
+          MEET_RELEASE_APK: android/app/build/outputs/apk/release/app-release.apk
+        run: bash tools/scan-release-secrets.sh
       - name: Cross-runtime parity
         run: bash tests/parity/ci-verify.sh

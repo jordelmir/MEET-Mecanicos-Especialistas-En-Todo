@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import javax.inject.Inject
 
 data class DiagnosticStackDescriptor(
     val transport: DiagnosticTransport,
@@ -88,6 +89,31 @@ object DiagnosticProtocolRegistry {
             )
         }
     }
+}
+
+/**
+ * The single application-facing acquisition authority. UI/domain features use
+ * this engine rather than calling the temporary ObdSession facade directly.
+ * Findings can only emerge from the typed scan report produced by that facade
+ * and its DiagnosticFindingFactory boundary.
+ */
+class DiagnosticAcquisitionEngine @Inject constructor(
+    private val compatibilitySession: ObdSession,
+) {
+    suspend fun scan(mode: DiagnosticScanMode): DtcScanReport =
+        compatibilitySession.readProfessionalDtcScan(mode)
+}
+
+/**
+ * Domain-facing authority for destructive diagnostic-memory operations.
+ * Keeping this boundary separate from acquisition prevents UI/use cases from
+ * growing new direct dependencies on the temporary ObdSession facade.
+ */
+class DiagnosticMemoryEngine @Inject constructor(
+    private val compatibilitySession: ObdSession,
+) {
+    suspend fun clear(plan: ClearVerificationPlan): ClearDtcResult =
+        compatibilitySession.clearDtcs(plan)
 }
 
 /** Single-owner actor for every command that touches the physical vehicle bus. */

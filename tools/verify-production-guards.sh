@@ -6,6 +6,12 @@ APP_GRADLE="$ROOT_DIR/android/app/build.gradle.kts"
 AUTH_SCREEN="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/AuthScreen.kt"
 AI_CLIENT="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/ai/GeminiDiagnostic.kt"
 LEGACY_SCHEMA="$ROOT_DIR/supabase_schema.sql"
+OBD_VIEW_MODEL="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt"
+UDS_MANAGER="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/obd/UdsProtocolManager.kt"
+COMMAND_MANAGER="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/obd/DiagnosticCommandManager.kt"
+SERVICE_RESETS="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/ServiceResetsScreen.kt"
+ADAPTATION_SCREEN="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/AdaptationScreen.kt"
+RAW_COMMAND_POLICY="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/obd/DiagnosticRawCommandPolicy.kt"
 
 fail() {
   echo "production-guard: $1" >&2
@@ -20,5 +26,25 @@ grep -q 'signUpWith(Email)' "$AUTH_SCREEN" || fail "email registration is not co
 ! grep -q 'onClick = { loading = true; onAuthSuccess() }' "$AUTH_SCREEN" || fail "authentication bypass restored"
 ! grep -q '?: "ESTADO NOMINAL"' "$AI_CLIENT" || fail "AI null response is still reported as nominal"
 grep -q 'blocked legacy snapshot' "$LEGACY_SCHEMA" || fail "legacy schema is deployable"
+! grep -q 'udsProtocolManager.readDtcByStatusMask' "$OBD_VIEW_MODEL" || fail "UI bypasses canonical DTC acquisition"
+! grep -q 'obdSession.scanNetworkTopology' "$OBD_VIEW_MODEL" || fail "UI bypasses canonical topology acquisition"
+! grep -Eq 'sendRawCommand\("?\$\{?SID_(INPUT_OUTPUT_CONTROL|ROUTINE_CONTROL)' "$UDS_MANAGER" || \
+  fail "generic UDS active service can bypass the safety kernel"
+grep -q 'getCommandsByCategory.*List<ObdCommandDef>' "$COMMAND_MANAGER" || \
+  fail "active-command compatibility boundary missing"
+grep -q 'List<ObdCommandDef> = emptyList()' "$COMMAND_MANAGER" || \
+  fail "hard-coded active-command catalog restored"
+! grep -Eq 'RX: (50|51|67|6E|6F|71)' "$SERVICE_RESETS" || \
+  fail "service-reset UI contains fabricated ECU acknowledgements"
+! grep -q 'sendRawCommand("3101000D")' "$OBD_VIEW_MODEL" || \
+  fail "generic TPMS routine bypass restored"
+! grep -q 'viewModel.sendRawCommand' "$ADAPTATION_SCREEN" || \
+  fail "adaptation UI bypasses capability packs"
+! grep -q 'commandSequence = listOf' "$ADAPTATION_SCREEN" || \
+  fail "hard-coded adaptation command catalog restored"
+grep -q 'DiagnosticRawCommandPolicy.evaluate' "$OBD_VIEW_MODEL" || \
+  fail "expert terminal bypasses raw-command policy"
+grep -q 'readOnlyServices' "$RAW_COMMAND_POLICY" || \
+  fail "read-only terminal allowlist missing"
 
 echo "production-guard: OK"

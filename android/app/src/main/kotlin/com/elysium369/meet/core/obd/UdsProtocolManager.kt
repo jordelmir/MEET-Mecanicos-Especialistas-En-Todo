@@ -3,31 +3,25 @@ package com.elysium369.meet.core.obd
 import android.util.Log
 
 /**
- * UdsProtocolManager — Professional UDS (ISO 14229) Protocol Handler
+ * UdsProtocolManager — transitional UDS (ISO 14229) compatibility facade.
  *
- * Complete implementation of Unified Diagnostic Services for advanced
- * automotive diagnostics beyond standard OBD2 (SAE J1979).
+ * Read-only identity operations remain available. DTC acquisition, memory
+ * clearing and state-changing services belong to the typed acquisition,
+ * memory and active-safety engines. Generic calls below fail closed unless a
+ * future reviewed capability-pack path replaces them.
  *
  * Implemented Services:
  *   $10 — Diagnostic Session Control ✅
- *   $11 — ECU Reset ✅
- *   $14 — Clear DTC (UDS) ✅
- *   $19 — Read DTC Information ✅
+ *   $11 — ECU Reset BLOCKED (capability required)
+ *   $14 — Direct Clear DTC BLOCKED (use ClearMemoryEngine)
+ *   $19 — Legacy List<String> reader RETIRED (use DiagnosticAcquisitionEngine)
  *   $22 — Read Data By Identifier ✅
  *   $23 — Read Memory By Address ✅
- *   $27 — Security Access (seed-key) ✅
- *   $28 — Communication Control ✅
- *   $2A — Read Data By Periodic Identifier ✅
- *   $2C — Dynamically Define Data Identifier ✅
- *   $2E — Write Data By Identifier ⚠️ (safety-gated)
- *   $2F — IO Control By Identifier (Active Tests) ✅
- *   $31 — Routine Control ✅
- *   $34 — Request Download ✅ (diagnostics only)
- *   $36 — Transfer Data ✅ (diagnostics only)
- *   $37 — Request Transfer Exit ✅
- *   $3D — Write Memory By Address ⚠️ (safety-gated)
+ *   $27/$28/$2A/$2C — generic calls BLOCKED
+ *   $2E/$2F/$31 — generic calls BLOCKED
+ *   $34/$36/$37/$3D — generic calls BLOCKED
  *   $3E — Tester Present ✅
- *   $85 — Control DTC Setting ✅
+ *   $85 — generic call BLOCKED
  *
  * KWP2000 Legacy:
  *   $81 — Start Communication ✅
@@ -139,11 +133,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
     // ═══════════════════════════════════════════════
 
     suspend fun changeDiagnosticSession(sessionType: String): Boolean {
-        Log.d(TAG, "Cambiando sesión UDS a tipo: $sessionType")
-        val command = "$SID_DIAGNOSTIC_SESSION_CONTROL$sessionType"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Session Control: $response")
-        return isPositiveResponse(response, "50", command)
+        Log.w(TAG, "Blocked generic diagnostic session transition type=$sessionType")
+        return false
     }
 
     suspend fun enterExtendedSession(): Boolean = changeDiagnosticSession(SESSION_EXTENDED)
@@ -159,11 +150,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param resetType "01"=hardReset, "02"=keyOffOnReset, "03"=softReset
      */
     suspend fun resetEcu(resetType: String = RESET_SOFT): Boolean {
-        Log.d(TAG, "Ejecutando ECU Reset tipo: $resetType")
-        val command = "$SID_ECU_RESET$resetType"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta ECU Reset: $response")
-        return isPositiveResponse(response, "51", command)
+        Log.w(TAG, "Blocked generic ECU reset type=$resetType: no reviewed capability pack")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -175,11 +163,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param groupOfDtc "FFFFFF" = all DTCs, or specific group
      */
     suspend fun clearDtcUds(groupOfDtc: String = "FFFFFF"): Boolean {
-        Log.d(TAG, "Clearing DTCs UDS, grupo: $groupOfDtc")
-        val command = "$SID_CLEAR_DTC$groupOfDtc"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Clear DTC UDS: $response")
-        return isPositiveResponse(response, "54", command)
+        Log.w(TAG, "Blocked direct UDS clear group=$groupOfDtc; use ClearMemoryEngine")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -190,29 +175,32 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * Read DTCs by Status Mask (Service $19, subFunction $02).
      * Returns raw DTC bytes for decoding by the caller.
      */
-    suspend fun readDtcByStatusMask(subFunction: String = "02", statusMask: String = "FF"): List<String> {
-        Log.d(TAG, "Leyendo DTCs UDS sub=$subFunction, mask=$statusMask")
-        val command = "$SID_READ_DTC_INFORMATION$subFunction$statusMask"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Read DTC Info: $response")
-
-        if (!isPositiveResponse(response, "59", command)) return emptyList()
-
-        return parseUdsDtcResponse(response)
-    }
+    @Deprecated(
+        message = "Use DiagnosticAcquisitionEngine; List<String> loses ECU attribution and evidence.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readDtcByStatusMask(
+        @Suppress("UNUSED_PARAMETER") subFunction: String = "02",
+        @Suppress("UNUSED_PARAMETER") statusMask: String = "FF",
+    ): List<String> = error("Legacy UDS DTC reader retired")
 
     /**
      * Report Supported DTCs ($19 $0A)
      */
-    suspend fun readSupportedDtcs(): List<String> = readDtcByStatusMask("0A", "")
+    @Deprecated(
+        message = "Use DiagnosticAcquisitionEngine; List<String> loses ECU attribution and evidence.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readSupportedDtcs(): List<String> = error("Legacy UDS DTC reader retired")
 
     /**
      * Report First/Most Recent Confirmed DTC ($19 $0E)
      */
-    suspend fun readMostRecentDtc(): String? {
-        val result = readDtcByStatusMask("0E", "")
-        return result.firstOrNull()
-    }
+    @Deprecated(
+        message = "Use DiagnosticAcquisitionEngine; presentation code is not finding authority.",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun readMostRecentDtc(): String? = error("Legacy UDS DTC reader retired")
 
     /**
      * Parse UDS DTC response bytes into DTC code strings.
@@ -309,17 +297,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param addressLength 2 or 4 bytes for address field
      */
     suspend fun readMemoryByAddress(address: String, size: String, addressLength: Int = 4): String? {
-        Log.d(TAG, "Leyendo memoria en dirección: $address, tamaño: $size")
-        // addressAndLengthFormatIdentifier: high nibble = size length, low nibble = address length
-        val sizeLength = (size.length / 2).coerceIn(1, 4)
-        val formatByte = String.format("%X%X", sizeLength, addressLength)
-        val command = "$SID_READ_MEMORY_BY_ADDRESS$formatByte$address$size"
-        val response = obdSession.sendRawCommand(command)
-
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        val idx = clean.indexOf("63")
-        if (idx < 0) return null
-        return clean.substring(idx + 2)
+        Log.w(TAG, "Blocked arbitrary memory read address=$address size=$size addressLength=$addressLength")
+        return null
     }
 
     // ═══════════════════════════════════════════════
@@ -332,16 +311,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @return Seed bytes or null if denied
      */
     suspend fun requestSecuritySeed(accessLevel: String = "01"): String? {
-        Log.d(TAG, "Solicitando seed de seguridad, nivel: $accessLevel")
-        val command = "$SID_SECURITY_ACCESS$accessLevel"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Security Seed: $response")
-
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        val marker = "67$accessLevel"
-        val idx = clean.indexOf(marker)
-        if (idx < 0) return null
-        return clean.substring(idx + marker.length)
+        Log.w(TAG, "Blocked generic security seed request level=$accessLevel")
+        return null
     }
 
     /**
@@ -350,11 +321,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param key Calculated key bytes
      */
     suspend fun sendSecurityKey(accessLevel: String = "02", key: String): Boolean {
-        Log.d(TAG, "Enviando clave de seguridad, nivel: $accessLevel")
-        val command = "$SID_SECURITY_ACCESS$accessLevel$key"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Security Key: $response")
-        return isPositiveResponse(response, "67", command)
+        Log.w(TAG, "Blocked generic security key level=$accessLevel keyLength=${key.length}")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -367,10 +335,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param communicationType "01"=normal, "02"=NM, "03"=both
      */
     suspend fun communicationControl(controlType: String, communicationType: String = "01"): Boolean {
-        Log.d(TAG, "Control de comunicación: tipo=$controlType, comm=$communicationType")
-        val command = "$SID_COMMUNICATION_CONTROL$controlType$communicationType"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "68", command)
+        Log.w(TAG, "Blocked generic communication control type=$controlType comm=$communicationType")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -383,9 +349,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param periodicDid Periodic DID (e.g. "F200")
      */
     suspend fun readDataByPeriodicIdentifier(transmissionMode: String, periodicDid: String): Boolean {
-        val command = "$SID_READ_DATA_BY_PERIODIC_ID$transmissionMode$periodicDid"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "6A", command)
+        Log.w(TAG, "Blocked generic periodic read mode=$transmissionMode did=$periodicDid")
+        return false
     }
 
     suspend fun stopPeriodicReading(periodicDid: String): Boolean {
@@ -402,19 +367,16 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param sourceDids List of source DIDs with position/size
      */
     suspend fun dynamicallyDefineDid(dynamicDid: String, sourceDid: String, position: String, size: String): Boolean {
-        // subFunction 01 = defineByIdentifier
-        val command = "${SID_DYNAMICALLY_DEFINE_DID}01$dynamicDid$sourceDid$position$size"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "6C", command)
+        Log.w(TAG, "Blocked dynamic DID=$dynamicDid source=$sourceDid position=$position size=$size")
+        return false
     }
 
     /**
      * Clear a dynamically defined DID.
      */
     suspend fun clearDynamicDid(dynamicDid: String): Boolean {
-        val command = "${SID_DYNAMICALLY_DEFINE_DID}03$dynamicDid"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "6C", command)
+        Log.w(TAG, "Blocked dynamic DID clear=$dynamicDid")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -422,24 +384,18 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
     // ═══════════════════════════════════════════════
 
     suspend fun startActiveTest(did: String, controlState: String = ""): Boolean {
-        Log.d(TAG, "Iniciando Active Test UDS. DID: $did, State: $controlState")
-        val command = "$SID_INPUT_OUTPUT_CONTROL$did$IO_SHORT_TERM_ADJUSTMENT$controlState"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta UDS Active Test: $response")
-        return isPositiveResponse(response, "6F", command)
+        Log.w(TAG, "Blocked generic IO control DID=$did stateLength=${controlState.length}")
+        return false
     }
 
     suspend fun stopActiveTest(did: String): Boolean {
-        Log.d(TAG, "Deteniendo Active Test UDS. DID: $did")
-        val command = "$SID_INPUT_OUTPUT_CONTROL$did$IO_RETURN_CONTROL_TO_ECU"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "6F", command)
+        Log.w(TAG, "Blocked generic IO stop DID=$did: no acknowledged capability-scoped activation")
+        return false
     }
 
     suspend fun freezeCurrentState(did: String): Boolean {
-        val command = "$SID_INPUT_OUTPUT_CONTROL$did$IO_FREEZE_CURRENT_STATE"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "6F", command)
+        Log.w(TAG, "Blocked generic IO freeze DID=$did: no reviewed capability pack")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -453,11 +409,11 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param routineOption Additional parameters (optional)
      */
     suspend fun executeRoutine(routineId: String, controlOption: String = ROUTINE_START, routineOption: String = ""): Boolean {
-        Log.d(TAG, "Ejecutando rutina $routineId, opción: $controlOption")
-        val command = "$SID_ROUTINE_CONTROL$controlOption$routineId$routineOption"
-        val response = obdSession.sendRawCommand(command)
-        Log.d(TAG, "Respuesta Routine Control: $response")
-        return isPositiveResponse(response, "71", command)
+        Log.w(
+            TAG,
+            "Blocked generic routine id=$routineId option=$controlOption optionLength=${routineOption.length}",
+        )
+        return false
     }
 
     suspend fun startRoutine(routineId: String, params: String = ""): Boolean =
@@ -467,13 +423,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
         executeRoutine(routineId, ROUTINE_STOP)
 
     suspend fun getRoutineResults(routineId: String): String? {
-        val command = "$SID_ROUTINE_CONTROL$ROUTINE_REQUEST_RESULTS$routineId"
-        val response = obdSession.sendRawCommand(command)
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        val marker = "71$ROUTINE_REQUEST_RESULTS${routineId.uppercase()}"
-        val idx = clean.indexOf(marker)
-        if (idx < 0) return null
-        return clean.substring(idx + marker.length)
+        Log.w(TAG, "Blocked generic routine result request id=$routineId")
+        return null
     }
 
     // ═══════════════════════════════════════════════
@@ -485,31 +436,27 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      */
     suspend fun requestDownload(compressionMethod: String = "00", encryptionMethod: String = "00",
                                  address: String, size: String): Boolean {
-        val formatByte = "44" // 4 bytes address, 4 bytes size
-        val command = "$SID_REQUEST_DOWNLOAD$compressionMethod$encryptionMethod$formatByte$address$size"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "74", command)
+        Log.w(
+            TAG,
+            "Blocked transfer request compression=$compressionMethod encryption=$encryptionMethod address=$address size=$size",
+        )
+        return false
     }
 
     /**
      * Transfer Data — read block from ECU.
      */
     suspend fun transferData(blockSequence: Int): String? {
-        val command = "$SID_TRANSFER_DATA${String.format("%02X", blockSequence)}"
-        val response = obdSession.sendRawCommand(command)
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        val idx = clean.indexOf("76")
-        if (idx < 0) return null
-        return clean.substring(idx + 4) // Skip 76 + block counter
+        Log.w(TAG, "Blocked generic transfer block=$blockSequence")
+        return null
     }
 
     /**
      * Request Transfer Exit — finalize a data transfer operation.
      */
     suspend fun requestTransferExit(): Boolean {
-        val command = SID_REQUEST_TRANSFER_EXIT
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "77", command)
+        Log.w(TAG, "Blocked generic transfer exit")
+        return false
     }
 
     // ═══════════════════════════════════════════════
@@ -531,10 +478,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * Useful during diagnostic procedures to prevent spurious DTCs.
      */
     suspend fun controlDtcSetting(onOff: String = DTC_SETTING_ON): Boolean {
-        Log.d(TAG, "Control DTC Setting: ${if (onOff == DTC_SETTING_ON) "ON" else "OFF"}")
-        val command = "$SID_CONTROL_DTC_SETTING$onOff"
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "C5", command)
+        Log.w(TAG, "Blocked generic DTC-setting control option=$onOff")
+        return false
     }
 
     suspend fun enableDtcStorage(): Boolean = controlDtcSetting(DTC_SETTING_ON)
@@ -549,18 +494,16 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * Used by older vehicles (pre-2008) for initializing diagnostic session.
      */
     suspend fun kwpStartCommunication(): Boolean {
-        val command = KWP_START_COMMUNICATION
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "C1", command)
+        Log.w(TAG, "Blocked generic KWP start; transport owner must establish a sourced session")
+        return false
     }
 
     /**
      * KWP2000 Stop Communication ($82)
      */
     suspend fun kwpStopCommunication(): Boolean {
-        val command = KWP_STOP_COMMUNICATION
-        val response = obdSession.sendRawCommand(command)
-        return isPositiveResponse(response, "C2", command)
+        Log.w(TAG, "Blocked generic KWP stop; transport owner must close its own session")
+        return false
     }
 
     /**
@@ -568,12 +511,8 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
      * @param subFunction "01"=readExtended, "02"=setDefault, "03"=readActive, "04"=setNew
      */
     suspend fun kwpAccessTimingParameter(subFunction: String = "03"): String? {
-        val command = "$KWP_ACCESS_TIMING$subFunction"
-        val response = obdSession.sendRawCommand(command)
-        val clean = response.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        val idx = clean.indexOf("C3")
-        if (idx < 0) return null
-        return clean.substring(idx + 4) // Skip C3 + subFunction
+        Log.w(TAG, "Blocked generic KWP timing access subFunction=$subFunction")
+        return null
     }
 
     // ═══════════════════════════════════════════════
@@ -630,21 +569,14 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
     // ═══════════════════════════════════════════════
 
     /**
-     * Probe the ECU for supported UDS services by attempting each one.
-     * Non-destructive — uses read-only operations.
+     * Discover only read-only identity DIDs. Potentially state-changing
+     * services (session change, IO control, routine control) are deliberately
+     * not probed; `false` below means "not proven by a capability pack".
      */
     suspend fun discoverCapabilities(): UdsCapabilities {
         Log.d(TAG, "Descubriendo capacidades UDS del ECU...")
 
-        val supportsExtended = changeDiagnosticSession(SESSION_EXTENDED)
         val supportsReadById = readDataByIdentifier("F190") != null
-        val supportsIOControl = run {
-            val resp = obdSession.sendRawCommand("${SID_INPUT_OUTPUT_CONTROL}0000$IO_RETURN_CONTROL_TO_ECU")
-            !resp.contains("NO DATA", true) && !resp.contains("ERROR", true)
-        }
-
-        // Return to default session
-        changeDiagnosticSession(SESSION_DEFAULT)
 
         val discoveredDids = mutableListOf<String>()
         if (supportsReadById) {
@@ -654,8 +586,9 @@ class UdsProtocolManager(private val obdSession: ObdSession) {
         }
 
         return UdsCapabilities(
-            supportsExtendedSession = supportsExtended,
-            supportsIOControl = supportsIOControl,
+            supportsExtendedSession = false,
+            supportsIOControl = false,
+            supportsRoutineControl = false,
             supportsReadByIdentifier = supportsReadById,
             discoveredDids = discoveredDids
         )

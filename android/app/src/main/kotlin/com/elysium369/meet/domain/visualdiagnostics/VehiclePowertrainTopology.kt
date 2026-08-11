@@ -1,22 +1,33 @@
 package com.elysium369.meet.domain.visualdiagnostics
 
 enum class VehicleDataProvenance {
-    USER_CONFIRMED,
-    VIN_DECODED,
-    OBD_REPORTED,
-    OEM_DATA,
-    INFERRED,
-    UNKNOWN,
+    USER_CONFIRMED, VIN_DECODED, OBD_REPORTED, OEM_DATA, INFERRED, UNKNOWN,
 }
 
-data class EvidencedVehicleValue<T>(
-    val value: T?,
-    val provenance: VehicleDataProvenance,
-    val confidence: Double,
-) {
-    val isEstablished: Boolean
-        get() = value != null && provenance != VehicleDataProvenance.UNKNOWN
+sealed interface EvidenceValue<out T> {
+    data class Known<T>(
+        val value: T,
+        val provenance: VehicleDataProvenance,
+        val evidenceStrength: Double,
+    ) : EvidenceValue<T> {
+        init {
+            require(provenance != VehicleDataProvenance.UNKNOWN)
+            require(evidenceStrength in 0.0..1.0)
+        }
+    }
+
+    data class Unknown(val reason: String) : EvidenceValue<Nothing>
+
+    data class Conflicted<T>(
+        val candidates: List<Known<T>>,
+        val reason: String,
+    ) : EvidenceValue<T> {
+        init { require(candidates.size >= 2) }
+    }
 }
+
+val <T> EvidenceValue<T>.valueOrNull: T?
+    get() = (this as? EvidenceValue.Known<T>)?.value
 
 enum class CombustionType { GASOLINE, DIESEL, FLEX_FUEL, HYDROGEN, NONE, UNKNOWN }
 enum class CylinderLayout { INLINE, V, BOXER, ROTARY, NONE, UNKNOWN }
@@ -27,15 +38,22 @@ enum class TransmissionArchitecture { AT, MT, CVT, DCT, ECVT, UNKNOWN }
 enum class VoltageArchitecture { V12, V24, V48, HIGH_VOLTAGE, UNKNOWN }
 
 data class VehiclePowertrainTopology(
-    val combustionType: EvidencedVehicleValue<CombustionType>,
-    val cylinderLayout: EvidencedVehicleValue<CylinderLayout>,
-    val cylinderCount: EvidencedVehicleValue<Int>,
-    val electrification: EvidencedVehicleValue<PowertrainElectrification>,
-    val forcedInduction: EvidencedVehicleValue<ForcedInduction>,
-    val displacementCc: EvidencedVehicleValue<Int>,
-    val transmission: EvidencedVehicleValue<TransmissionArchitecture>,
-    val driveLayout: EvidencedVehicleValue<DriveLayout>,
-    val voltageArchitecture: EvidencedVehicleValue<VoltageArchitecture>,
+    val combustionType: EvidenceValue<CombustionType>,
+    val cylinderLayout: EvidenceValue<CylinderLayout>,
+    val cylinderCount: EvidenceValue<Int>,
+    val electrification: EvidenceValue<PowertrainElectrification>,
+    val forcedInduction: EvidenceValue<ForcedInduction>,
+    val displacementCc: EvidenceValue<Int>,
+    val transmission: EvidenceValue<TransmissionArchitecture>,
+    val driveLayout: EvidenceValue<DriveLayout>,
+    val voltageArchitecture: EvidenceValue<VoltageArchitecture>,
+)
+
+data class PowertrainFieldProvenance(
+    val engine: VehicleDataProvenance = VehicleDataProvenance.UNKNOWN,
+    val fuel: VehicleDataProvenance = VehicleDataProvenance.UNKNOWN,
+    val transmission: VehicleDataProvenance = VehicleDataProvenance.UNKNOWN,
+    val displacement: VehicleDataProvenance = VehicleDataProvenance.UNKNOWN,
 )
 
 object VehiclePowertrainTopologyResolver {
@@ -44,13 +62,12 @@ object VehiclePowertrainTopologyResolver {
         fuelDescription: String?,
         transmissionDescription: String?,
         displacementCc: Int? = null,
-        provenance: VehicleDataProvenance = VehicleDataProvenance.USER_CONFIRMED,
+        provenance: PowertrainFieldProvenance = PowertrainFieldProvenance(),
     ): VehiclePowertrainTopology {
         val engine = engineDescription.orEmpty().trim().lowercase()
         val fuel = fuelDescription.orEmpty().trim().lowercase()
         val transmission = transmissionDescription.orEmpty().trim().lowercase()
 
-        // Specific electrified categories must be evaluated before generic "EV" tokens.
         val electrification = when {
             fuel.contains("phev") || fuel.contains("plug-in") || fuel.contains("enchufable") -> PowertrainElectrification.PHEV
             fuel.contains("mhev") || fuel.contains("mild hybrid") || fuel.contains("microhíbrido") -> PowertrainElectrification.MHEV
@@ -67,26 +84,21 @@ object VehiclePowertrainTopologyResolver {
             fuel.contains("gas") || fuel.contains("petrol") || fuel.contains("gasolina") -> CombustionType.GASOLINE
             else -> CombustionType.UNKNOWN
         }
-        val count = sequenceOf(12, 10, 8, 6, 5, 4, 3, 2)
-            .firstOrNull {
-                engine.contains("$it cil") ||
-                    Regex("(^|[^a-z0-9])[vilh]\\s*$it([^0-9]|$)").containsMatchIn(engine)
-            }
+        val count = sequenceOf(12, 10, 8, 6, 5, 4, 3, 2).firstOrNull {
+            engine.contains("$it cil") || Regex("(^|[^a-z0-9])[vilh]\\s*$it([^0-9]|$)").containsMatchIn(engine)
+        }
         val layout = when {
             combustion == CombustionType.NONE -> CylinderLayout.NONE
             engine.contains("rotary") || engine.contains("wankel") -> CylinderLayout.ROTARY
             engine.contains("boxer") || engine.contains("flat") || engine.contains("h4") || engine.contains("h6") -> CylinderLayout.BOXER
             Regex("(^|[^a-z])v(6|8|10|12)([^0-9]|$)").containsMatchIn(engine) -> CylinderLayout.V
-            engine.contains("inline") || engine.contains("straight") || engine.contains("l3") ||
-                engine.contains("l4") || engine.contains("l5") || engine.contains("l6") ||
-                engine.contains("i3") || engine.contains("i4") || engine.contains("i5") || engine.contains("i6") -> CylinderLayout.INLINE
+            listOf("inline", "straight", "l3", "l4", "l5", "l6", "i3", "i4", "i5", "i6").any(engine::contains) -> CylinderLayout.INLINE
             else -> CylinderLayout.UNKNOWN
         }
         val forced = when {
             engine.contains("twincharge") -> ForcedInduction.TWINCHARGED
             engine.contains("supercharg") || engine.contains("compresor") -> ForcedInduction.SUPERCHARGED
             engine.contains("turbo") -> ForcedInduction.TURBO
-            engine.isNotBlank() -> ForcedInduction.UNKNOWN
             else -> ForcedInduction.UNKNOWN
         }
         val transmissionType = when {
@@ -97,23 +109,28 @@ object VehiclePowertrainTopologyResolver {
             transmission.contains("automatic") || transmission.contains("automát") || transmission == "at" -> TransmissionArchitecture.AT
             else -> TransmissionArchitecture.UNKNOWN
         }
-        val inferred = VehicleDataProvenance.INFERRED
-        fun <T> evidenced(value: T, confidence: Double = 0.92) = EvidencedVehicleValue(value, provenance, confidence)
+
+        fun <T> evidence(value: T?, source: VehicleDataProvenance, strength: Double, unknown: (T) -> Boolean): EvidenceValue<T> =
+            if (value == null || source == VehicleDataProvenance.UNKNOWN || unknown(value)) {
+                EvidenceValue.Unknown("Dato no establecido con procedencia verificable.")
+            } else {
+                EvidenceValue.Known(value, source, strength)
+            }
 
         return VehiclePowertrainTopology(
-            combustionType = evidenced(combustion),
-            cylinderLayout = EvidencedVehicleValue(layout, if (layout == CylinderLayout.UNKNOWN) inferred else provenance, if (layout == CylinderLayout.UNKNOWN) 0.25 else 0.9),
-            cylinderCount = EvidencedVehicleValue(count, if (count == null) VehicleDataProvenance.UNKNOWN else provenance, if (count == null) 0.0 else 0.9),
-            electrification = evidenced(electrification),
-            forcedInduction = EvidencedVehicleValue(forced, if (forced == ForcedInduction.UNKNOWN) VehicleDataProvenance.UNKNOWN else provenance, if (forced == ForcedInduction.UNKNOWN) 0.0 else 0.85),
-            displacementCc = EvidencedVehicleValue(displacementCc?.takeIf { it > 0 }, if (displacementCc != null && displacementCc > 0) provenance else VehicleDataProvenance.UNKNOWN, if (displacementCc != null && displacementCc > 0) 0.95 else 0.0),
-            transmission = evidenced(transmissionType),
-            driveLayout = EvidencedVehicleValue(DriveLayout.UNKNOWN, VehicleDataProvenance.UNKNOWN, 0.0),
-            voltageArchitecture = EvidencedVehicleValue(
-                if (electrification in setOf(PowertrainElectrification.PHEV, PowertrainElectrification.BEV)) VoltageArchitecture.HIGH_VOLTAGE else VoltageArchitecture.UNKNOWN,
-                if (electrification in setOf(PowertrainElectrification.PHEV, PowertrainElectrification.BEV)) inferred else VehicleDataProvenance.UNKNOWN,
-                if (electrification in setOf(PowertrainElectrification.PHEV, PowertrainElectrification.BEV)) 0.6 else 0.0,
-            ),
+            combustionType = evidence(combustion, provenance.fuel, 0.9) { it == CombustionType.UNKNOWN },
+            cylinderLayout = evidence(layout, provenance.engine, 0.85) { it == CylinderLayout.UNKNOWN },
+            cylinderCount = evidence(count, provenance.engine, 0.85) { false },
+            electrification = evidence(electrification, provenance.fuel, 0.9) { it == PowertrainElectrification.UNKNOWN },
+            forcedInduction = evidence(forced, provenance.engine, 0.8) { it == ForcedInduction.UNKNOWN },
+            displacementCc = evidence(displacementCc?.takeIf { it > 0 }, provenance.displacement, 0.95) { false },
+            transmission = evidence(transmissionType, provenance.transmission, 0.9) { it == TransmissionArchitecture.UNKNOWN },
+            driveLayout = EvidenceValue.Unknown("Disposición de tracción no capturada."),
+            voltageArchitecture = if (electrification in setOf(PowertrainElectrification.PHEV, PowertrainElectrification.BEV) && provenance.fuel != VehicleDataProvenance.UNKNOWN) {
+                EvidenceValue.Known(VoltageArchitecture.HIGH_VOLTAGE, VehicleDataProvenance.INFERRED, 0.6)
+            } else {
+                EvidenceValue.Unknown("Arquitectura de voltaje no capturada.")
+            },
         )
     }
 }

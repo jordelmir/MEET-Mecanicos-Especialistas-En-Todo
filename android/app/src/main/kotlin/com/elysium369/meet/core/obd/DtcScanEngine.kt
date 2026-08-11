@@ -209,6 +209,62 @@ data class DtcRecord(
         )
 }
 
+data class DiagnosticFindingEndpoint(
+    val targetAddress: String?,
+    val responseAddress: String?,
+    val moduleName: String?,
+) {
+    val identity: String = DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName)
+}
+
+/** Sole production authority for ECU-reported diagnostic records. */
+object DiagnosticFindingFactory {
+    fun ecuReported(
+        code: String,
+        bucket: DtcBucket,
+        statusFlags: Set<DtcStatusFlag>,
+        sourceService: String,
+        namespace: DiagnosticNamespace,
+        endpoint: DiagnosticFindingEndpoint,
+        rawPayload: String,
+        validatedResponse: ProtocolResponse.Positive,
+        udsStatusByte: Int? = null,
+        udsFailureType: String? = null,
+        rawDtc24: Int? = null,
+        dtcFormat: DtcFormat = when (namespace) {
+            DiagnosticNamespace.SAE_OBD -> DtcFormat.SAE_J2012_2_BYTE
+            DiagnosticNamespace.UDS -> DtcFormat.ISO_14229_3_BYTE
+            DiagnosticNamespace.KWP2000 -> DtcFormat.KWP2000
+            DiagnosticNamespace.OEM -> DtcFormat.OEM
+        },
+    ): DtcRecord {
+        require(rawPayload.isNotBlank()) { "ECU finding requires raw evidence" }
+        require(code.isNotBlank()) { "ECU finding requires a decoded code" }
+        val requestedService = sourceService.take(2).toIntOrNull(16)
+            ?: error("Invalid source service: $sourceService")
+        val expectedPositiveService = (requestedService + 0x40) and 0xFF
+        require(validatedResponse.serviceId == expectedPositiveService) {
+            "Response service ${validatedResponse.serviceId} does not prove request $sourceService"
+        }
+        require(endpoint.identity.isNotBlank()) { "ECU endpoint identity is required" }
+        return DtcRecord(
+            code = code,
+            bucket = bucket,
+            statusFlags = statusFlags,
+            sourceService = sourceService,
+            namespace = namespace,
+            targetAddress = endpoint.targetAddress,
+            responseAddress = endpoint.responseAddress,
+            moduleName = endpoint.moduleName,
+            rawPayload = rawPayload,
+            udsStatusByte = udsStatusByte,
+            udsFailureType = udsFailureType,
+            rawDtc24 = rawDtc24,
+            dtcFormat = dtcFormat,
+        )
+    }
+}
+
 data class DtcRawExchange(
     val command: String,
     val targetAddress: String?,
@@ -365,19 +421,25 @@ object DtcScanEngine {
         val grouped = groupRawByEcu(rawResponse)
         val bucket = bucketForMode(mode)
         val flags = flagsForMode(mode)
+        val requestedService = mode.toIntOrNull(16) ?: return emptyList()
+        val expectedPositiveService = (requestedService + 0x40) and 0xFF
 
         if (grouped.isEmpty()) {
+            val positive = DiagnosticPduDecoder.decodeResponses(
+                rawResponse,
+                expectedPositiveService,
+                requestedService,
+            ).filterIsInstance<ProtocolResponse.Positive>().firstOrNull() ?: return emptyList()
             return DtcDecoder.decode(rawResponse, mode).map { code ->
-                DtcRecord(
+                DiagnosticFindingFactory.ecuReported(
                     code = code,
                     bucket = bucket,
                     statusFlags = flags,
                     sourceService = mode.uppercase(),
                     namespace = DiagnosticNamespace.SAE_OBD,
-                    targetAddress = targetAddress,
-                    responseAddress = targetAddress,
-                    moduleName = moduleName,
-                    rawPayload = rawResponse
+                    endpoint = DiagnosticFindingEndpoint(targetAddress, targetAddress, moduleName),
+                    rawPayload = rawResponse,
+                    validatedResponse = positive,
                 )
             }
         }
@@ -385,17 +447,21 @@ object DtcScanEngine {
         return grouped.flatMap { (responseAddress, lines) ->
             val perEcuRaw = lines.joinToString("\n")
             val payload = CanMultiFrameParser.parse(perEcuRaw)
+            val positive = DiagnosticPduDecoder.decodeResponses(
+                perEcuRaw,
+                expectedPositiveService,
+                requestedService,
+            ).filterIsInstance<ProtocolResponse.Positive>().firstOrNull() ?: return@flatMap emptyList()
             DtcDecoder.decode(payload, mode).map { code ->
-                DtcRecord(
+                DiagnosticFindingFactory.ecuReported(
                     code = code,
                     bucket = bucket,
                     statusFlags = flags,
                     sourceService = mode.uppercase(),
                     namespace = DiagnosticNamespace.SAE_OBD,
-                    targetAddress = targetAddress,
-                    responseAddress = responseAddress,
-                    moduleName = moduleName,
-                    rawPayload = perEcuRaw
+                    endpoint = DiagnosticFindingEndpoint(targetAddress, responseAddress, moduleName),
+                    rawPayload = perEcuRaw,
+                    validatedResponse = positive,
                 )
             }
         }.distinctBy { "${it.code}|${it.bucket}|${it.responseAddress}|${it.targetAddress}|${it.sourceService}" }
@@ -500,16 +566,15 @@ object DtcScanEngine {
             val statusByte = recordBytes[3].toInt() and 0xFF
             val code = DtcDecoder.hexToDtcOrNull(dtcHex.substring(0, 4)) ?: return@mapNotNull null
             val flags = flagsForUdsStatus(statusByte)
-            DtcRecord(
+            DiagnosticFindingFactory.ecuReported(
                 code = code,
                 bucket = bucketForUdsFlags(flags),
                 statusFlags = flags,
                 sourceService = "19%02X".format(subFunction),
                 namespace = DiagnosticNamespace.UDS,
-                targetAddress = targetAddress,
-                responseAddress = responseAddress,
-                moduleName = moduleName,
+                endpoint = DiagnosticFindingEndpoint(targetAddress, responseAddress, moduleName),
                 rawPayload = rawPayload,
+                validatedResponse = positive,
                 udsStatusByte = statusByte,
                 udsFailureType = dtcHex.substring(4, 6),
                 rawDtc24 = dtcHex.toInt(16),

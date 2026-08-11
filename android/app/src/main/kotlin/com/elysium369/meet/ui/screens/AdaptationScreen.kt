@@ -33,8 +33,6 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════════════════════════════
 // ADAPTATION SCREEN — Soft-Coding & Module Adaptation Interface
@@ -47,7 +45,7 @@ data class AdaptationProcedure(
     val category: AdaptationCategory,
     val difficulty: Difficulty,
     val requiresEngineOff: Boolean = true,
-    val commandSequence: List<String> = emptyList(),
+    val capabilityPackId: String? = null,
     val warningMessage: String? = null
 )
 
@@ -79,8 +77,6 @@ fun AdaptationScreen(
     var procedureState by remember { mutableStateOf(ProcedureState.IDLE) }
     var statusMessage by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<AdaptationCategory?>(null) }
-    val scope = rememberCoroutineScope()
-    
     val connectionState by viewModel.connectionState.collectAsState()
     val isConnected = connectionState == com.elysium369.meet.core.obd.ObdState.CONNECTED
     val logLines = remember { mutableStateListOf<String>() }
@@ -126,7 +122,7 @@ fun AdaptationScreen(
             AnimatedNeonIcon(Icons.Default.Warning, "Warning", tint = MeetColors.warning, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(
-                "Estas funciones envían comandos al ECU. Asegúrese de que el motor esté apagado y la llave en posición ON.",
+                "Catálogo educativo. No se transmite ninguna adaptación sin paquete OEM revisado para el vehículo y ECU exactos.",
                 color = MeetColors.warning, fontSize = 11.sp, lineHeight = 15.sp
             )
         }
@@ -320,61 +316,17 @@ fun AdaptationScreen(
                                 Spacer(Modifier.height(8.dp))
                                 EliteButton(
                                     text = when {
-                                        procedureState == ProcedureState.SUCCESS -> "Completado ✓"
-                                        !isConnected -> "Conecta OBD para ejecutar"
-                                        else -> "Ejecutar Procedimiento"
+                                        !isConnected -> "Conecta OBD para evaluar"
+                                        else -> "Requiere paquete OEM"
                                     },
                                     onClick = {
-                                        scope.launch {
-                                            procedureState = ProcedureState.RUNNING
-                                            logLines.clear()
-                                            
-                                            if (isConnected) {
-                                                logLines.add("--- INICIANDO ADAPTACIÓN OBD-II/UDS ---")
-                                                var isStepFailed = false
-                                                for (cmd in proc.commandSequence) {
-                                                    if (cmd.startsWith("delay:")) {
-                                                        val ms = cmd.substringAfter("delay:").toLongOrNull() ?: 1000L
-                                                        logLines.add("[RETARDO] Esperando ${ms}ms...")
-                                                        statusMessage = "Esperando ${ms}ms..."
-                                                        delay(ms)
-                                                    } else {
-                                                        logLines.add("TX: $cmd")
-                                                        statusMessage = "Enviando comando $cmd..."
-                                                        try {
-                                                            val resp = viewModel.sendRawCommand(cmd)
-                                                            logLines.add("RX: $resp")
-                                                            if (resp.contains("ERROR") || resp.contains("?") || resp.isBlank()) {
-                                                                logLines.add("ERROR: Respuesta inválida/rechazada por ECU")
-                                                                isStepFailed = true
-                                                                break
-                                                            }
-                                                        } catch (e: Exception) {
-                                                            logLines.add("ERROR: ${e.message ?: "Fallo de comunicación"}")
-                                                            isStepFailed = true
-                                                            break
-                                                        }
-                                                    }
-                                                    delay(200)
-                                                }
-                                                if (isStepFailed) {
-                                                    procedureState = ProcedureState.ERROR
-                                                    statusMessage = "Error al ejecutar la rutina de adaptación"
-                                                    logLines.add(">>> ADAPTACIÓN FALLIDA <<<")
-                                                } else {
-                                                    procedureState = ProcedureState.SUCCESS
-                                                    statusMessage = "Adaptación completada exitosamente!"
-                                                    logLines.add(">>> ADAPTACIÓN COMPLETADA CON ÉXITO <<<")
-                                                }
-                                            } else {
-                                                procedureState = ProcedureState.ERROR
-                                                statusMessage = "Conecta un vehículo real antes de ejecutar adaptaciones."
-                                                logLines.add("BLOQUEADO: las adaptaciones envían comandos UDS reales y requieren enlace OBD activo.")
-                                            }
-                                        }
+                                        procedureState = ProcedureState.ERROR
+                                        statusMessage = "No transmitido: falta capability pack OEM aplicable y revisado."
+                                        logLines.clear()
+                                        logLines.add("BLOQUEADO ANTES DEL BUS: no existe autoridad OEM para esta rutina.")
                                     },
                                     color = proc.category.color,
-                                    isEnabled = procedureState != ProcedureState.SUCCESS && isConnected,
+                                    isEnabled = false,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -395,7 +347,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Reinicia los valores de adaptación del cuerpo de aceleración electrónico (ETC). Necesario después de limpiar la mariposa, cambiar el cuerpo de aceleración, o desconectar la batería. El ECU recalibra la posición mínima y máxima de la mariposa.",
         category = AdaptationCategory.THROTTLE,
         difficulty = Difficulty.BASIC,
-        commandSequence = listOf("1003", "2F030F03FF00", "delay:3000", "2F030F0000"),
         warningMessage = "No toque el pedal del acelerador durante el proceso"
     ),
     AdaptationProcedure(
@@ -404,7 +355,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Fuerza a la PCM a recalcular las RPM de ralentí base. Realice después de limpiar el cuerpo de aceleración, reparar fugas de vacío, o cuando el ralentí sea errático.",
         category = AdaptationCategory.THROTTLE,
         difficulty = Difficulty.BASIC,
-        commandSequence = listOf("1003", "3101FF0E")
     ),
     AdaptationProcedure(
         id = "battery_register",
@@ -412,7 +362,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Informa al módulo de gestión de energía (BMS/IBS) que se instaló una batería nueva. Sin este registro, el alternador seguirá cargando como batería vieja, reduciendo la vida útil de la nueva.",
         category = AdaptationCategory.BATTERY,
         difficulty = Difficulty.INTERMEDIATE,
-        commandSequence = listOf("1003", "2EFE0C00"),
         warningMessage = "Solo realice después de instalar una batería nueva"
     ),
     AdaptationProcedure(
@@ -421,7 +370,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Reinicia el sensor inteligente de batería. Necesario cuando el sensor IBS pierde sincronización y reporta voltajes incorrectos, causando modo de protección.",
         category = AdaptationCategory.BATTERY,
         difficulty = Difficulty.INTERMEDIATE,
-        commandSequence = listOf("1003", "3101FF1E")
     ),
     AdaptationProcedure(
         id = "steering_center",
@@ -429,7 +377,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Recalibra la posición central del sensor del ángulo de dirección (SAS). Obligatorio después de alineación, cambio de cremallera, o rotación de llantas.",
         category = AdaptationCategory.STEERING,
         difficulty = Difficulty.BASIC,
-        commandSequence = listOf("1003", "3101FF80"),
         warningMessage = "Coloque el volante perfectamente centrado antes de iniciar"
     ),
     AdaptationProcedure(
@@ -438,7 +385,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Borra los valores de presión y tiempos de cambio aprendidos por el TCM. Necesario después de cambiar aceite de transmisión, reparaciones internas, o cuando los cambios son bruscos.",
         category = AdaptationCategory.TRANSMISSION,
         difficulty = Difficulty.ADVANCED,
-        commandSequence = listOf("1003", "3101FF10"),
         warningMessage = "Después del reset, conduzca 20-30 min variando velocidades para reaprender"
     ),
     AdaptationProcedure(
@@ -447,7 +393,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Recalibra los límites superior e inferior de las ventanas eléctricas con función auto-up/down. Requerido después de desconectar la batería o cambiar el regulador.",
         category = AdaptationCategory.WINDOWS,
         difficulty = Difficulty.BASIC,
-        commandSequence = listOf("1003", "3101FF30")
     ),
     AdaptationProcedure(
         id = "tpms_relearn",
@@ -455,7 +400,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Asocia los sensores de presión de neumáticos con las posiciones del vehículo. Necesario después de rotación de llantas o instalación de sensores nuevos.",
         category = AdaptationCategory.TPMS,
         difficulty = Difficulty.INTERMEDIATE,
-        commandSequence = listOf("1003", "3101FF40"),
         warningMessage = "Infle todos los neumáticos a la presión recomendada antes de iniciar"
     ),
     AdaptationProcedure(
@@ -464,7 +408,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Registra los códigos IMA/IQA de inyectores nuevos en la PCM. Cada inyector tiene una calibración individual grabada en su cuerpo. Sin esta codificación, el motor tendrá ralentí inestable y mayor emisión.",
         category = AdaptationCategory.INJECTORS,
         difficulty = Difficulty.ADVANCED,
-        commandSequence = listOf("1003", "2E010000"),
         warningMessage = "Ingrese los códigos exactos del inyector. Códigos incorrectos causan daño al motor"
     ),
     AdaptationProcedure(
@@ -473,7 +416,6 @@ private fun buildAdaptationCatalog(): List<AdaptationProcedure> = listOf(
         description = "Inicia una regeneración estática del filtro de partículas diésel (DPF). Quema el hollín acumulado elevando la temperatura del escape a ~600°C. Solo para motores diésel.",
         category = AdaptationCategory.THROTTLE,
         difficulty = Difficulty.ADVANCED,
-        commandSequence = listOf("1003", "3101FF50"),
         warningMessage = "El escape alcanzará 600°C+. Mantenga distancia. No realice en espacios cerrados"
     )
 )

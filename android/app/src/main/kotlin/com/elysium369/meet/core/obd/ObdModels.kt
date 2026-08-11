@@ -44,7 +44,11 @@ data class ActiveTest(
     val manufacturer: String? = null,
     val durationMs: Long = 10000L, // Default 10s if not manual
     val monitoredPids: List<String> = emptyList(), // PIDs to watch during test
-    val safetyConditions: List<SafetyCondition> = emptyList()
+    val safetyConditions: List<SafetyCondition> = emptyList(),
+    /** Source-backed capability pack that authorizes this exact ECU command. */
+    val capabilityPackId: String? = null,
+    /** Physical/logical ECU target validated by the capability pack. */
+    val targetAddress: String? = null,
 )
 
 enum class SafetyCondition {
@@ -60,7 +64,20 @@ data class ActiveTestStatus(
     val progress: Float = 0f,
     val message: String = "",
     val currentValues: Map<String, Float> = emptyMap(),
-    val testId: String? = null
+    val testId: String? = null,
+    val phase: ActiveDiagnosticTestPhase = ActiveDiagnosticTestPhase.IDLE,
+    val stopVerified: Boolean = false,
+)
+
+/** Mode 06 is monitor evidence, never an ECU-reported DTC. */
+data class MisfireMonitorObservation(
+    val cylinder: Int,
+    val monitorId: String,
+    val testId: String?,
+    val observedCount: Int,
+    val rawResponse: String,
+    val capturedAtMonotonicMs: Long,
+    val quality: TelemetryQuality,
 )
 
 /**

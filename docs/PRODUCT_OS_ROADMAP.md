@@ -1,5 +1,7 @@
 # Plataforma MEET / Elysium Vanguard
 
+> Autoridad y seguridad diagnóstica: [Diagnostic Safety, Causal & Conformance Kernel](architecture/DIAGNOSTIC-SAFETY-CAUSAL-KERNEL.md).
+
 MEET apunta a ser un sistema operativo automotriz: diagnostico, telemetria, reparacion, taller, marketplace, reportes y aprendizaje.
 
 ## Implementado En Esta Fase

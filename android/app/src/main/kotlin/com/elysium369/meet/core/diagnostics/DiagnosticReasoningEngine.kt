@@ -166,9 +166,13 @@ data class RecommendedTest(
     val nextIfFail: String,
     val relatedHypothesisId: String,
     val status: TestStatus,
-    val expectedInformationGain: Int = 0,
+    /** Heuristic ordering only; this is not calibrated entropy reduction. */
+    val heuristicPriorityScore: Int = 0,
     val executionCostScore: Int = 50,
     val selectionRationale: String = "",
+    val quantitativeDecisionAvailable: Boolean = false,
+    val expectedInformationGainBits: Double? = null,
+    val calibrationDatasetId: String? = null,
 )
 
 @Serializable
@@ -687,7 +691,7 @@ class DiagnosticReasoningEngine(
             .distinctBy { (_, template) -> template.id }
             .take(12)
         return templates.map { (hypothesis, template) ->
-            val informationGain = (hypothesis.probabilityPercent +
+            val heuristicPriority = (hypothesis.probabilityPercent +
                 hypothesis.supportingEvidence.size * 4 -
                 hypothesis.contradictingEvidence.size * 3).coerceIn(5, 100)
             val costScore = when (template.difficulty) {
@@ -713,12 +717,12 @@ class DiagnosticReasoningEngine(
                 } else {
                     TestStatus.NOT_STARTED
                 },
-                expectedInformationGain = informationGain,
+                heuristicPriorityScore = heuristicPriority,
                 executionCostScore = costScore.coerceAtMost(100),
-                selectionRationale = "Prioridad por reducción esperada de incertidumbre, seguridad y costo de ejecución.",
+                selectionRationale = "Prioridad heurística por evidencia disponible, seguridad y costo de ejecución; no es una probabilidad calibrada.",
             )
         }.sortedWith(
-            compareByDescending<RecommendedTest> { it.expectedInformationGain - it.executionCostScore / 2 }
+            compareByDescending<RecommendedTest> { it.heuristicPriorityScore - it.executionCostScore / 2 }
                 .thenBy { it.safetyLevel == SafetyLevel.CRITICAL_SYSTEM }
                 .thenBy(RecommendedTest::name),
         )
