@@ -5001,6 +5001,8 @@ class ObdViewModel @Inject constructor(
                     "Escaneo parcial: ${modules.size} módulos respondieron; quedan módulos sin verificar."
                 com.elysium369.meet.core.obd.ScanCompleteness.INCONCLUSIVE ->
                     "Escaneo no concluyente: no afirmar ausencia de fallas."
+                com.elysium369.meet.core.obd.ScanCompleteness.FAILED ->
+                    "Escaneo fallido: revisa conexión, protocolo y cobertura antes de diagnosticar."
             }
             return modules
         } finally {
