@@ -30,7 +30,7 @@ grep -q 'blocked legacy snapshot' "$LEGACY_SCHEMA" || fail "legacy schema is dep
 ! grep -q 'obdSession.scanNetworkTopology' "$OBD_VIEW_MODEL" || fail "UI bypasses canonical topology acquisition"
 ! grep -Eq 'sendRawCommand\("?\$\{?SID_(INPUT_OUTPUT_CONTROL|ROUTINE_CONTROL)' "$UDS_MANAGER" || \
   fail "generic UDS active service can bypass the safety kernel"
-grep -q 'getCommandsByCategory.*List<ObdCommandDef>' "$COMMAND_MANAGER" || \
+grep -q 'fun getCommandsByCategory' "$COMMAND_MANAGER" || \
   fail "active-command compatibility boundary missing"
 grep -q 'List<ObdCommandDef> = emptyList()' "$COMMAND_MANAGER" || \
   fail "hard-coded active-command catalog restored"

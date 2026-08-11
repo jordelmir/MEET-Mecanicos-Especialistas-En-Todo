@@ -6,6 +6,10 @@ MEET apunta a ser un sistema operativo automotriz: diagnostico, telemetria, repa
 
 ## Implementado En Esta Fase
 
+- Gate CI/CD 4.16.0 endurecido y verificado en debug, release R8, paridad,
+  escaneo de secretos y Android real. Evidencia completa en
+  [MEET 4.16.0 — CI/CD y verificación Android](releases/MEET-4.16.0-CI-ANDROID-VERIFICATION.md).
+
 - Onboarding con perfil de uso: usuario, mecanico, taller o flota.
 - Preferencia inicial de adaptador: Bluetooth clasico, BLE o WiFi.
 - Idioma detectado y persistido.

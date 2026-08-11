@@ -49,9 +49,11 @@ android {
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
         val legacySupabaseApiKey = "M" + "EET_SUPABASE_KEY"
-        val supabaseUrl = localProps.getProperty("ELYSIUM_SUPABASE_URL")
+        val supabaseUrl = (project.findProperty("ELYSIUM_SUPABASE_URL") as String?)
+            ?: localProps.getProperty("ELYSIUM_SUPABASE_URL")
             ?: localProps.getProperty(legacySupabaseUrlKey, "")
-        val supabaseKey = localProps.getProperty("ELYSIUM_SUPABASE_KEY")
+        val supabaseKey = (project.findProperty("ELYSIUM_SUPABASE_KEY") as String?)
+            ?: localProps.getProperty("ELYSIUM_SUPABASE_KEY")
             ?: localProps.getProperty(legacySupabaseApiKey, "")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
@@ -200,9 +202,13 @@ android {
                     task.name.startsWith("package", ignoreCase = true) ||
                     task.name.startsWith("sign", ignoreCase = true))
         }
-        val supabaseKeyRole = localProps.getProperty("ELYSIUM_SUPABASE_KEY_ROLE", "UNDECLARED").uppercase()
+        val supabaseKeyRole = (
+            (project.findProperty("ELYSIUM_SUPABASE_KEY_ROLE") as String?)
+                ?: localProps.getProperty("ELYSIUM_SUPABASE_KEY_ROLE", "UNDECLARED")
+            ).uppercase()
         val legacySupabaseApiKey = "M" + "EET_SUPABASE_KEY"
-        val releaseSupabaseKey = localProps.getProperty("ELYSIUM_SUPABASE_KEY")
+        val releaseSupabaseKey = (project.findProperty("ELYSIUM_SUPABASE_KEY") as String?)
+            ?: localProps.getProperty("ELYSIUM_SUPABASE_KEY")
             ?: localProps.getProperty(legacySupabaseApiKey, "")
         val jwtPayload = runCatching {
             val segments = releaseSupabaseKey.split('.')

@@ -12,6 +12,11 @@ class VehiclePowertrainTopologyTest {
             engineDescription = "I4 turbo",
             fuelDescription = "plug-in hybrid electric PHEV",
             transmissionDescription = "e-CVT",
+            provenance = PowertrainFieldProvenance(
+                engine = VehicleDataProvenance.USER_CONFIRMED,
+                fuel = VehicleDataProvenance.USER_CONFIRMED,
+                transmission = VehicleDataProvenance.USER_CONFIRMED,
+            ),
         )
 
         assertEquals(PowertrainElectrification.PHEV, topology.electrification.valueOrNull)
@@ -25,6 +30,12 @@ class VehiclePowertrainTopologyTest {
             fuelDescription = "gasolina",
             transmissionDescription = "automático",
             displacementCc = 1600,
+            provenance = PowertrainFieldProvenance(
+                engine = VehicleDataProvenance.USER_CONFIRMED,
+                fuel = VehicleDataProvenance.USER_CONFIRMED,
+                transmission = VehicleDataProvenance.USER_CONFIRMED,
+                displacement = VehicleDataProvenance.USER_CONFIRMED,
+            ),
         )
 
         assertNull(topology.cylinderCount.valueOrNull)

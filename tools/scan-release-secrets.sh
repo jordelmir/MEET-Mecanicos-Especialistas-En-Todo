@@ -35,15 +35,42 @@ grep -q 'buildConfigField("String", "CAR2DB_API_KEY", "\\"\\"")' android/app/bui
 
 if [[ -n "${MEET_RELEASE_APK:-}" ]]; then
   [[ -f "$MEET_RELEASE_APK" ]] || fail "release APK not found: $MEET_RELEASE_APK"
-  APK_SCAN_FILE="$(mktemp)"
-  trap 'rm -f "$APK_SCAN_FILE"' EXIT
-  while IFS= read -r entry; do
-    unzip -p "$MEET_RELEASE_APK" "$entry" 2>/dev/null | strings >> "$APK_SCAN_FILE"
-  done < <(unzip -Z1 "$MEET_RELEASE_APK" | grep -E '(^classes[0-9]*\.dex$|resources\.arsc$|^res/raw/|^assets/)' || true)
-  if grep -aEq \
-    '(sb_secret_[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9]{16,}|AIzaSy[A-Za-z0-9_-]{25,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)' \
-    "$APK_SCAN_FILE"; then
-    fail "privileged credential signature found inside release APK"
+  # Stream selected ZIP entries with bounded memory. The previous
+  # unzip|strings aggregation produced a multi-gigabyte temporary file for the
+  # large offline APK; macOS could kill grep and the shell then misreported OK.
+  # This scanner retains overlap between chunks so signatures split at a read
+  # boundary are still detected, and never prints credential material.
+  if ! python3 - "$MEET_RELEASE_APK" <<'PY'
+import re
+import sys
+import zipfile
+
+apk_path = sys.argv[1]
+entry_pattern = re.compile(r"(?:^classes[0-9]*\.dex$|^resources\.arsc$|^res/raw/|^assets/)")
+secret_pattern = re.compile(
+    rb"(?:sb_secret_[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9]{16,}|"
+    rb"AIzaSy[A-Za-z0-9_-]{25,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)"
+)
+overlap_size = 256
+
+with zipfile.ZipFile(apk_path) as archive:
+    for info in archive.infolist():
+        if info.is_dir() or not entry_pattern.search(info.filename):
+            continue
+        overlap = b""
+        with archive.open(info) as source:
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                candidate = overlap + chunk
+                if secret_pattern.search(candidate):
+                    print(f"release-secret-scan: credential signature in APK entry {info.filename}", file=sys.stderr)
+                    raise SystemExit(1)
+                overlap = candidate[-overlap_size:]
+PY
+  then
+    fail "privileged credential signature found or APK scan failed"
   fi
 fi
 

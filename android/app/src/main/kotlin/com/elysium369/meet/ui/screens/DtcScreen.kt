@@ -1623,8 +1623,9 @@ private fun HoloDtcCard(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Buttons
-                    val openDtcRelations3d = {
-                        findingId?.takeIf { it.isNotBlank() }?.let { canonicalId ->
+                    val openDtcRelations3d: () -> Unit = {
+                        val canonicalId = findingId?.takeIf { it.isNotBlank() }
+                        if (canonicalId != null) {
                             navController.navigate(
                                 "component_locator?findingId=${java.net.URLEncoder.encode(canonicalId, "UTF-8")}",
                             )
