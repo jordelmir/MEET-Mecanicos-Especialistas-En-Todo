@@ -2,6 +2,8 @@
 
 > Autoridad y seguridad diagnóstica: [Diagnostic Safety, Causal & Conformance Kernel](architecture/DIAGNOSTIC-SAFETY-CAUSAL-KERNEL.md).
 
+> Ejecución Vehicle Truth OS 4.17: [matriz de implementación y gates de evidencia](vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md).
+
 MEET apunta a ser un sistema operativo automotriz: diagnostico, telemetria, reparacion, taller, marketplace, reportes y aprendizaje.
 
 ## Implementado En Esta Fase

@@ -11,11 +11,13 @@
 
 # MEET
 
+> Vehicle Truth OS 4.17 implementation ledger: [docs/vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md](docs/vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md)
+
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual: 4.10.0
+## Versión actual publicada: 4.16.0 (`versionCode 44`)
 
-La versión 4.10.0 estrena `Vanguard Neon Navigation`: jerarquía vial de alto
+La línea 4.16.0 consolida CI/CD, diagnóstico canónico y verificación Android. La versión 4.10.0 introdujo `Vanguard Neon Navigation`: jerarquía vial de alto
 contraste, ruta multicapa animada, pines procedurales con volumen y avatares con
 halo de vidrio, conservando gestos y control manual de cámara. Si no existe un
 perfil de pasajero ni de conductor, Viajes muestra primero el registro por rol

@@ -2,6 +2,7 @@ package com.elysium369.meet.ui.screens
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 import com.elysium369.meet.core.diagnostics.DiagnosticHypothesisEngine
+import com.elysium369.meet.core.diagnostics.GuidedDiagnosisMode
 import com.elysium369.meet.core.diagnostics.DiagnosticReasoningInput
 import com.elysium369.meet.core.diagnostics.DiagnosticReasoningResult
 import com.elysium369.meet.core.diagnostics.PartRecommendationState
@@ -106,7 +107,7 @@ fun AiDiagnosticScreen(
     }
     val hypothesisEngine = remember { DiagnosticHypothesisEngine() }
     var completedLocalTests by remember(dtcCode) { mutableStateOf<Set<String>>(emptySet()) }
-    val localReasoning = remember(
+    val localDecision = remember(
         dtcCode,
         activeDtcs,
         telemetrySamples,
@@ -136,8 +137,9 @@ fun AiDiagnosticScreen(
                 livePids = telemetrySamples,
                 completedTests = completedLocalTests.toList()
             )
-        ).result
+        )
     }
+    val localReasoning = localDecision.result
     val hasLocalCase = localReasoning.case.hypotheses.isNotEmpty()
 
     val severity = remember(dtcCode) {
@@ -318,6 +320,7 @@ fun AiDiagnosticScreen(
                                     Spacer(modifier = Modifier.height(16.dp))
                                     LocalDiagnosticReasoningPanel(
                                         result = localReasoning,
+                                        diagnosisMode = localDecision.mode,
                                         completedTests = completedLocalTests,
                                         onToggleTest = { testId ->
                                             completedLocalTests = if (testId in completedLocalTests) {
@@ -432,6 +435,7 @@ fun AiDiagnosticScreen(
 @Composable
 private fun LocalDiagnosticReasoningPanel(
     result: DiagnosticReasoningResult,
+    diagnosisMode: GuidedDiagnosisMode,
     completedTests: Set<String>,
     onToggleTest: (String) -> Unit,
     onRequestMechanic: (String) -> Unit,
@@ -454,6 +458,12 @@ private fun LocalDiagnosticReasoningPanel(
                         letterSpacing = 1.sp
                     )
                     Text(
+                        if (diagnosisMode == GuidedDiagnosisMode.CALIBRATED) "MODO CALIBRADO" else "MODO HEURÍSTICO · SIN PROBABILIDADES",
+                        color = MeetColors.electricBlue,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
                         result.case.dtcCodes.joinToString().ifBlank { "Caso por sintomas" },
                         color = Color.White,
                         fontSize = 18.sp,
@@ -463,12 +473,12 @@ private fun LocalDiagnosticReasoningPanel(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(confidenceColor(result.confidenceScore.scorePercent).copy(alpha = 0.18f))
+                        .background(MeetColors.electricBlue.copy(alpha = 0.18f))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        "${result.confidenceScore.scorePercent}% ${result.confidenceScore.band.label}",
-                        color = confidenceColor(result.confidenceScore.scorePercent),
+                        result.confidenceScore.band.label.uppercase(),
+                        color = MeetColors.electricBlue,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -499,11 +509,11 @@ private fun LocalDiagnosticReasoningPanel(
                     Column {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
-                                "${hypothesis.probabilityPercent}%",
-                                color = confidenceColor(hypothesis.probabilityPercent),
-                                fontSize = 18.sp,
+                                hypothesisPriorityLabel(hypothesis.heuristicPriorityScore),
+                                color = hypothesisPriorityColor(hypothesis.heuristicPriorityScore),
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Black,
-                                modifier = Modifier.width(54.dp)
+                                modifier = Modifier.width(70.dp)
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -606,7 +616,7 @@ private fun LocalDiagnosticReasoningPanel(
                 )
                 system.children.take(3).forEach { hypothesis ->
                     Text(
-                        "   - ${hypothesis.probabilityPercent ?: 0}% ${hypothesis.title}",
+                        "   - ${hypothesis.probabilityPercent?.let { "$it% CALIBRADO" } ?: "PRIORIDAD CUALITATIVA"} ${hypothesis.title}",
                         color = MeetColors.textSecondary,
                         fontSize = 10.sp,
                         lineHeight = 15.sp
@@ -706,10 +716,16 @@ private fun SectionLabel(text: String) {
     )
 }
 
-private fun confidenceColor(value: Int): Color = when {
-    value >= 70 -> MeetColors.neonGreen
-    value >= 45 -> MeetColors.warning
-    else -> MeetColors.error
+private fun hypothesisPriorityLabel(score: Int): String = when {
+    score >= 65 -> "ALTA"
+    score >= 35 -> "MEDIA"
+    else -> "BAJA"
+}
+
+private fun hypothesisPriorityColor(score: Int): Color = when {
+    score >= 65 -> MeetColors.warning
+    score >= 35 -> MeetColors.electricBlue
+    else -> MeetColors.textSecondary
 }
 
 private fun partStateColor(state: PartRecommendationState): Color = when (state) {

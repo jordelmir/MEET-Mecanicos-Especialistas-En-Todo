@@ -4,9 +4,11 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.elysium369.meet.data.local.entities.DiagnosticExchangeEntity
 import com.elysium369.meet.data.local.entities.DiagnosticObservationEntity
 import com.elysium369.meet.data.local.entities.FindingDiagnosticSnapshotEntity
+import com.elysium369.meet.data.local.entities.FindingSnapshotExchangeRefEntity
 import com.elysium369.meet.data.local.entities.DiagnosticSessionIntegrityEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -28,6 +30,30 @@ interface DiagnosticEvidenceDao {
     suspend fun appendFindingSnapshot(snapshot: FindingDiagnosticSnapshotEntity)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun appendFindingSnapshotExchangeRefs(refs: List<FindingSnapshotExchangeRefEntity>)
+
+    @Transaction
+    suspend fun appendFindingSnapshotWithExchangeRefs(
+        snapshot: FindingDiagnosticSnapshotEntity,
+        exchangeIds: List<String>,
+    ) {
+        appendFindingSnapshot(snapshot)
+        val normalizedIds = exchangeIds.map(String::trim).filter(String::isNotEmpty).distinct()
+        if (normalizedIds.isNotEmpty()) {
+            appendFindingSnapshotExchangeRefs(
+                normalizedIds.mapIndexed { ordinal, exchangeId ->
+                    FindingSnapshotExchangeRefEntity(
+                        snapshotId = snapshot.id,
+                        exchangeId = exchangeId,
+                        ordinal = ordinal,
+                        role = "SOURCE_RAW_EXCHANGE",
+                    )
+                },
+            )
+        }
+    }
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun appendSessionIntegrity(integrity: DiagnosticSessionIntegrityEntity)
 
     @Query("SELECT COALESCE(MAX(sessionSequence), 0) FROM diagnostic_exchanges WHERE sessionId = :sessionId")
@@ -42,7 +68,7 @@ interface DiagnosticEvidenceDao {
     @Query("SELECT observationHash FROM diagnostic_observations WHERE findingId = :findingId ORDER BY observedAt DESC, sessionSequence DESC LIMIT 1")
     suspend fun latestObservationHash(findingId: String): String?
 
-    @Query("SELECT * FROM diagnostic_exchanges WHERE sessionId = :sessionId ORDER BY timestampMs ASC")
+    @Query("SELECT * FROM diagnostic_exchanges WHERE sessionId = :sessionId ORDER BY sessionSequence ASC, id ASC")
     fun observeSessionExchanges(sessionId: String): Flow<List<DiagnosticExchangeEntity>>
 
     @Query("SELECT * FROM diagnostic_observations WHERE findingId = :findingId ORDER BY observedAt ASC, sessionSequence ASC, id ASC")
@@ -59,8 +85,8 @@ interface DiagnosticEvidenceDao {
            WHERE expiresAtMs IS NOT NULL AND expiresAtMs <= :nowMs
              AND id NOT IN (SELECT exchangeId FROM diagnostic_observations WHERE exchangeId IS NOT NULL)
              AND NOT EXISTS (
-                 SELECT 1 FROM finding_diagnostic_snapshots snapshot
-                 WHERE instr(snapshot.rawExchangeIdsJson, diagnostic_exchanges.id) > 0
+                 SELECT 1 FROM finding_snapshot_exchange_refs ref
+                 WHERE ref.exchangeId = diagnostic_exchanges.id
              )""",
     )
     suspend fun purgeExpiredUnreferencedExchanges(nowMs: Long): Int

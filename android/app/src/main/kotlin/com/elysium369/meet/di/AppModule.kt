@@ -3220,7 +3220,7 @@ object AppModule {
         }
     }
 
-    private val MIGRATION_50_51 = object : Migration(50, 51) {
+    internal val MIGRATION_50_51 = object : Migration(50, 51) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE dtc_events ADD COLUMN rawDtcIdentity TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE dtc_events ADD COLUMN rawDtc24 INTEGER")
@@ -3277,12 +3277,23 @@ object AppModule {
                     id, vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity,
                     displayCode, createdAtMs, resolutionState, resolvedAtMs
                 )
-                SELECT id, vehicleId,
-                       CASE WHEN moduleIdentity = '' THEN 'LEGACY' ELSE moduleIdentity END,
-                       CASE WHEN diagnosticNamespace = '' THEN 'SAE_OBD' ELSE diagnosticNamespace END,
-                       rawDtcIdentity, code, firstSeenAt,
+                SELECT event.id, event.vehicleId,
+                       CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END,
+                       CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END,
+                       event.rawDtcIdentity, event.code, event.firstSeenAt,
                        'OPEN', NULL
-                FROM dtc_events"""
+                FROM dtc_events event
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dtc_events earlier
+                    WHERE earlier.vehicleId = event.vehicleId
+                      AND (CASE WHEN earlier.moduleIdentity = '' THEN 'LEGACY' ELSE earlier.moduleIdentity END) =
+                          (CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END)
+                      AND (CASE WHEN earlier.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE earlier.diagnosticNamespace END) =
+                          (CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END)
+                      AND UPPER(earlier.code) = UPPER(event.code)
+                      AND (earlier.firstSeenAt < event.firstSeenAt OR
+                           (earlier.firstSeenAt = event.firstSeenAt AND earlier.id < event.id))
+                )"""
             )
             db.execSQL(
                 """CREATE TABLE IF NOT EXISTS diagnostic_observations (
@@ -3329,7 +3340,7 @@ object AppModule {
         }
     }
 
-    private val MIGRATION_51_52 = object : Migration(51, 52) {
+    internal val MIGRATION_51_52 = object : Migration(51, 52) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN sessionSequence INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN elapsedRealtimeNanos INTEGER NOT NULL DEFAULT 0")
@@ -3346,17 +3357,21 @@ object AppModule {
                        id, findingId, sessionId, observedAt, observationState, semantics,
                        statusByte, sourceService, exchangeId, rawPayloadHash
                    )
-                   SELECT 'legacy-import-' || event.id, event.id, event.sessionId, event.lastSeenAt,
+                   SELECT 'legacy-import-' || event.id, finding.id, event.sessionId, event.lastSeenAt,
                           'LEGACY_IMPORTED',
                           CASE WHEN event.observationSemantic = '' THEN 'LEGACY_LIMITED' ELSE event.observationSemantic END,
                           event.statusByte,
                           CASE WHEN event.sourceService = '' THEN 'LEGACY_UNKNOWN' ELSE event.sourceService END,
                           NULL, ''
                    FROM dtc_events event
-                   INNER JOIN diagnostic_findings finding ON finding.id = event.id
+                   INNER JOIN diagnostic_findings finding
+                     ON finding.vehicleId = event.vehicleId
+                    AND finding.ecuEndpointId = CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END
+                    AND finding.diagnosticNamespace = CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END
+                    AND finding.rawDtcIdentity = event.rawDtcIdentity
                    WHERE NOT EXISTS (
                        SELECT 1 FROM diagnostic_observations observation
-                       WHERE observation.findingId = event.id
+                       WHERE observation.id = 'legacy-import-' || event.id
                    )"""
             )
 
@@ -3452,6 +3467,54 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_52_53 = object : Migration(52, 53) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS finding_snapshot_exchange_refs (
+                    snapshotId TEXT NOT NULL,
+                    exchangeId TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    PRIMARY KEY(snapshotId, exchangeId),
+                    FOREIGN KEY(snapshotId) REFERENCES finding_diagnostic_snapshots(id)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(exchangeId) REFERENCES diagnostic_exchanges(id)
+                        ON UPDATE NO ACTION ON DELETE RESTRICT
+                )""",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_finding_snapshot_exchange_refs_exchangeId " +
+                    "ON finding_snapshot_exchange_refs(exchangeId)",
+            )
+            // One-time compatibility import. Runtime retention never parses JSON.
+            db.execSQL(
+                """INSERT OR IGNORE INTO finding_snapshot_exchange_refs(snapshotId, exchangeId, ordinal, role)
+                   SELECT snapshot.id, exchange.id, exchange.sessionSequence, 'LEGACY_JSON_IMPORT'
+                   FROM finding_diagnostic_snapshots snapshot
+                   INNER JOIN diagnostic_exchanges exchange
+                     ON instr(snapshot.rawExchangeIdsJson, '"' || exchange.id || '"') > 0""",
+            )
+        }
+    }
+
+    private val MIGRATION_53_54 = object : Migration(53, 54) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN rawDtcIdentity TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+    private val MIGRATION_54_55 = object : Migration(54, 55) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN vehicleBindingId TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN appVersion TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN deviceKeyId TEXT")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signatureAlgorithm TEXT")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signatureBase64 TEXT")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signedAtMs INTEGER")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN trustState TEXT NOT NULL DEFAULT 'UNSIGNED_LEGACY'")
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3491,7 +3554,10 @@ object AppModule {
             MIGRATION_48_49,
             MIGRATION_49_50,
             MIGRATION_50_51,
-            MIGRATION_51_52
+            MIGRATION_51_52,
+            MIGRATION_52_53,
+            MIGRATION_53_54,
+            MIGRATION_54_55
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

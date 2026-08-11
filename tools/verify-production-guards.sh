@@ -12,6 +12,7 @@ COMMAND_MANAGER="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/
 SERVICE_RESETS="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/ServiceResetsScreen.kt"
 ADAPTATION_SCREEN="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/ui/screens/AdaptationScreen.kt"
 RAW_COMMAND_POLICY="$ROOT_DIR/android/app/src/main/kotlin/com/elysium369/meet/core/obd/DiagnosticRawCommandPolicy.kt"
+PRODUCTION_KOTLIN="$ROOT_DIR/android/app/src/main/kotlin"
 
 fail() {
   echo "production-guard: $1" >&2
@@ -46,5 +47,18 @@ grep -q 'DiagnosticRawCommandPolicy.evaluate' "$OBD_VIEW_MODEL" || \
   fail "expert terminal bypasses raw-command policy"
 grep -q 'readOnlyServices' "$RAW_COMMAND_POLICY" || \
   fail "read-only terminal allowlist missing"
+[[ ! -e "$PRODUCTION_KOTLIN/com/elysium369/meet/core/vanguard/VanguardCoreStubs.kt" ]] || \
+  fail "Vanguard production stub file restored"
+if rg -n --glob '*.kt' 'DtcRecord[[:space:]]*\(' "$PRODUCTION_KOTLIN" \
+  | rg -v '/core/obd/DtcScanEngine\.kt:' >/dev/null; then
+  fail "production code bypasses DiagnosticFindingFactory"
+fi
+! rg -n -i --glob '*.kt' \
+  'STUB FILE|No-op stub|vanguard-stub-|TODO:[[:space:]]*Replace stubs' \
+  "$PRODUCTION_KOTLIN" >/dev/null || \
+  fail "production Kotlin contains a forbidden stub/no-op success marker"
+! rg -n '\?:[[:space:]]*0[fFdDlL]?' \
+  "$PRODUCTION_KOTLIN/com/elysium369/meet/ui/screens/DtcRepairGuideScreen.kt" >/dev/null || \
+  fail "Repair Guide restores null-as-zero physical inference"
 
 echo "production-guard: OK"

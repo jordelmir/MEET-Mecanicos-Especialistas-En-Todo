@@ -41,7 +41,7 @@ class ReportsOutboxBridge @Inject constructor(
      * (rather than trusting a remote-replicated payload that could
      * drift from the local source of truth).
      */
-    fun enqueueSignedReport(report: CertifiedReportEntity) {
+    suspend fun enqueueSignedReport(report: CertifiedReportEntity) {
         val payload = buildString {
             append("{")
             append("\"reportId\":\"").append(jsonEscape(report.reportId)).append("\",")

@@ -15,34 +15,23 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.Signature
+import java.security.SecureRandom
+import java.security.interfaces.ECPrivateKey
+import java.security.spec.ECGenParameterSpec
 import java.text.SimpleDateFormat
 import java.util.*
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 object EvidenceCompiler {
     private const val TAG = "EvidenceCompiler"
-    private const val KEY_ALIAS = "ELYSIUM_VANGUARD_BLACK_BOX_KEY"
-
-    init {
-        // Initialize local cryptographic keys in the Android Keystore if not present
-        try {
-            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            if (!keyStore.containsAlias(KEY_ALIAS)) {
-                val kpg = KeyPairGenerator.getInstance("EC", "AndroidKeyStore")
-                val parameterSpec = android.security.keystore.KeyGenParameterSpec.Builder(
-                    KEY_ALIAS,
-                    android.security.keystore.KeyProperties.PURPOSE_SIGN or android.security.keystore.KeyProperties.PURPOSE_VERIFY
-                ).setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
-                 .build()
-                kpg.initialize(parameterSpec)
-                kpg.generateKeyPair()
-                Log.d(TAG, "Keystore signatures initialized successfully.")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize Android Keystore signature keys", e)
-        }
-    }
+    private const val KEY_ALIAS = "ELYSIUM_VANGUARD_EVIDENCE_SIGNING_V2"
+    private const val VAULT_KEY_VERSION = 2
+    private const val VAULT_KEY_ALIAS = "ELYSIUM_VANGUARD_EVIDENCE_VAULT_V$VAULT_KEY_VERSION"
 
     /**
      * Compiles, hashes, and cryptographically signs a Black Box Evidence Package.
@@ -74,37 +63,60 @@ object EvidenceCompiler {
         }
 
         // 3. Zip files together
-        val zipFile = File(outputDir, "evidence_package_$formattedDate.zip")
+        val zipFile = File(outputDir, "evidence_package_$formattedDate.zip.tmp")
         val filesToZip = mutableListOf<File>()
         filesToZip.add(pdfFile)
         filesToZip.add(jsonFile)
         if (videoFile.exists()) filesToZip.add(videoFile)
         if (audioFile != null && audioFile.exists()) filesToZip.add(audioFile)
 
-        zipFiles(filesToZip, zipFile)
+        try {
+            zipFiles(filesToZip, zipFile)
+        } catch (error: Throwable) {
+            zipFile.delete()
+            throw error
+        } finally {
+            // These two files are compiler-owned plaintext temporaries.
+            pdfFile.delete()
+            jsonFile.delete()
+        }
 
-        // Clean up temp files (except video if it's the original loop recorder)
-        pdfFile.delete()
-        jsonFile.delete()
+        // 4. Encrypt the complete package at rest before hashing/signing it.
+        val encryptedPackage = File(outputDir, "evidence_package_$formattedDate.evp")
+        try {
+            encryptIntoVault(
+                source = zipFile,
+                destination = encryptedPackage,
+                aad = "EVP2|$VAULT_KEY_VERSION|${encryptedPackage.name}".toByteArray(Charsets.UTF_8),
+            )
+        } finally {
+            if (zipFile.exists() && !zipFile.delete()) {
+                encryptedPackage.delete()
+                error("No se pudo eliminar el archivo de evidencia temporal sin cifrar")
+            }
+        }
 
-        // 4. Compute SHA-256 Hash of the compiled zip
-        val hash = calculateSha256(zipFile)
+        // 5. Hash the exact ciphertext that will be retained/exported.
+        val (hash, signature) = try {
+            val retainedHash = calculateSha256(encryptedPackage)
+            retainedHash to signHash(retainedHash)
+        } catch (error: Throwable) {
+            encryptedPackage.delete()
+            throw error
+        }
 
-        // 5. Generate Cryptographic Signature of the Hash
-        val signature = signHash(hash)
-
-        Log.i(TAG, "Evidence package successfully compiled, signed, and hashed: ${zipFile.absolutePath}")
+        Log.i(TAG, "Evidence package encrypted, signed, and hashed: ${encryptedPackage.absolutePath}")
 
         return@withContext EvidencePackageEntity(
             packageId = UUID.randomUUID().toString(),
             vehicleId = vehicleId,
             eventType = eventType,
             timestamp = timestamp,
-            gpsLocation = gpsLocation,
-            videoPath = zipFile.absolutePath,
-            audioPath = audioFile?.absolutePath ?: "",
-            pidSnapshot = telemetryJson,
-            dtcs = dtcsList.joinToString(","),
+            gpsLocation = "ENCRYPTED_IN_VAULT",
+            videoPath = encryptedPackage.absolutePath,
+            audioPath = "",
+            pidSnapshot = "ENCRYPTED_IN_VAULT",
+            dtcs = "ENCRYPTED_COUNT:${dtcsList.size}",
             hashSha256 = hash,
             signatureVersion = signature,
             createdAt = timestamp
@@ -189,7 +201,7 @@ object EvidenceCompiler {
         
         paint.color = Color.parseColor("#1E293B")
         paint.isFakeBoldText = false
-        canvas.drawText("Este documento y su correspondiente archivo de video/datos en formato .ZIP", 55f, 410f, paint)
+        canvas.drawText("Este documento y los datos se conservan dentro de un vault EVP cifrado", 55f, 410f, paint)
         canvas.drawText("han sido cifrados y firmados digitalmente en el dispositivo de origen.", 55f, 430f, paint)
         canvas.drawText("Cualquier intento de alteración invalidará el sello de verificación hash SHA-256.", 55f, 450f, paint)
 
@@ -231,19 +243,87 @@ object EvidenceCompiler {
     }
 
     private fun signHash(hash: String): String {
-        return try {
-            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            val privateKeyEntry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
-                ?: return "LocalDevSignature_v1_fallback"
-            
-            val signature = Signature.getInstance("SHA256withECDSA")
-            signature.initSign(privateKeyEntry.privateKey)
-            signature.update(hash.toByteArray(Charsets.UTF_8))
-            val sigBytes = signature.sign()
-            Base64.getEncoder().encodeToString(sigBytes)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sign evidence package hash", e)
-            "LocalDevSignature_v1_fallback"
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        if (!keyStore.containsAlias(KEY_ALIAS)) {
+            val generator = KeyPairGenerator.getInstance("EC", "AndroidKeyStore")
+            val spec = android.security.keystore.KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                android.security.keystore.KeyProperties.PURPOSE_SIGN or
+                    android.security.keystore.KeyProperties.PURPOSE_VERIFY,
+            )
+                .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                .setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
+                .setAttestationChallenge(ByteArray(32).also { SecureRandom().nextBytes(it) })
+                .build()
+            generator.initialize(spec)
+            generator.generateKeyPair()
+        }
+        val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
+            ?: error("Android Keystore no entregó una clave privada de evidencia")
+        requireHardwareProtection(entry.privateKey as ECPrivateKey)
+        val signer = Signature.getInstance("SHA256withECDSA")
+        signer.initSign(entry.privateKey)
+        signer.update(hash.toByteArray(Charsets.UTF_8))
+        val signature = Base64.getEncoder().encodeToString(signer.sign())
+        val certificateSha256 = MessageDigest.getInstance("SHA-256")
+            .digest(entry.certificate.encoded)
+            .joinToString("") { "%02x".format(Locale.ROOT, it) }
+        return "ECDSA_P256_SHA256;key=$KEY_ALIAS;certSha256=$certificateSha256;signature=$signature"
+    }
+
+    private fun requireHardwareProtection(privateKey: ECPrivateKey) {
+        val factory = java.security.KeyFactory.getInstance(privateKey.algorithm, "AndroidKeyStore")
+        val info = factory.getKeySpec(privateKey, android.security.keystore.KeyInfo::class.java)
+        check(info.isInsideSecureHardware) {
+            "Firma cancelada: el dispositivo no probó protección criptográfica por hardware"
+        }
+    }
+
+    private fun encryptIntoVault(source: File, destination: File, aad: ByteArray) {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        if (!keyStore.containsAlias(VAULT_KEY_ALIAS)) {
+            val generator = KeyGenerator.getInstance(
+                android.security.keystore.KeyProperties.KEY_ALGORITHM_AES,
+                "AndroidKeyStore",
+            )
+            generator.init(
+                android.security.keystore.KeyGenParameterSpec.Builder(
+                    VAULT_KEY_ALIAS,
+                    android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or
+                        android.security.keystore.KeyProperties.PURPOSE_DECRYPT,
+                )
+                    .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
+                    .build(),
+            )
+            generator.generateKey()
+        }
+        val key = (keyStore.getEntry(VAULT_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+            ?: error("Android Keystore no entregó la clave del vault")
+        reportVaultKeyProtection(key)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        cipher.updateAAD(aad)
+        FileOutputStream(destination).use { output ->
+            output.write("EVP2".toByteArray(Charsets.US_ASCII))
+            output.write(VAULT_KEY_VERSION)
+            output.write(aad.size shr 8)
+            output.write(aad.size and 0xff)
+            output.write(aad)
+            output.write(cipher.iv.size)
+            output.write(cipher.iv)
+            javax.crypto.CipherOutputStream(output, cipher).use { encrypted ->
+                FileInputStream(source).use { input -> input.copyTo(encrypted, 64 * 1024) }
+            }
+        }
+    }
+
+    private fun reportVaultKeyProtection(secretKey: SecretKey) {
+        val factory = javax.crypto.SecretKeyFactory.getInstance(secretKey.algorithm, "AndroidKeyStore")
+        val info = factory.getKeySpec(secretKey, android.security.keystore.KeyInfo::class.java)
+        if (!info.isInsideSecureHardware) {
+            Log.w(TAG, "Evidence vault key is device-bound but hardware protection is unavailable")
         }
     }
 }

@@ -49,6 +49,8 @@ data class ActiveTest(
     val capabilityPackId: String? = null,
     /** Physical/logical ECU target validated by the capability pack. */
     val targetAddress: String? = null,
+    /** Signed, operation-specific evidence requirements. Empty means unsafe. */
+    val safetyEvidenceRequirements: List<SafetyEvidenceRequirement> = emptyList(),
 )
 
 enum class SafetyCondition {
@@ -59,6 +61,24 @@ enum class SafetyCondition {
     TRANS_IN_PARK
 }
 
+enum class SafetySignalPredicate {
+    ENGINE_STOPPED,
+    ENGINE_RUNNING,
+    VEHICLE_STATIONARY,
+    BATTERY_MINIMUM,
+    TRANSMISSION_IN_PARK,
+}
+
+data class SafetyEvidenceRequirement(
+    val condition: SafetyCondition,
+    val signalAliases: Set<String>,
+    val maxAgeMs: Long,
+    val acceptedQualities: Set<TelemetryQuality>,
+    val acceptedSources: Set<ObdDataSource>,
+    val predicate: SafetySignalPredicate,
+    val threshold: Double? = null,
+)
+
 data class ActiveTestStatus(
     val isActive: Boolean = false,
     val progress: Float = 0f,
@@ -67,6 +87,15 @@ data class ActiveTestStatus(
     val testId: String? = null,
     val phase: ActiveDiagnosticTestPhase = ActiveDiagnosticTestPhase.IDLE,
     val stopVerified: Boolean = false,
+)
+
+data class ActiveTestEvidence(
+    val evidenceId: String,
+    val testId: String,
+    val phase: ActiveDiagnosticTestPhase,
+    val message: String,
+    val monotonicTimestampMs: Long,
+    val stopVerified: Boolean,
 )
 
 /** Mode 06 is monitor evidence, never an ECU-reported DTC. */

@@ -127,6 +127,37 @@ data class FindingDiagnosticSnapshotEntity(
     val rawExchangeIdsJson: String,
 )
 
+/**
+ * Authoritative many-to-many relation between a finding snapshot and the raw
+ * exchanges that prove it. `rawExchangeIdsJson` remains export compatibility
+ * metadata only; lifecycle and retention decisions use this table.
+ */
+@Entity(
+    tableName = "finding_snapshot_exchange_refs",
+    primaryKeys = ["snapshotId", "exchangeId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = FindingDiagnosticSnapshotEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["snapshotId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = DiagnosticExchangeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exchangeId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [Index("exchangeId")],
+)
+data class FindingSnapshotExchangeRefEntity(
+    val snapshotId: String,
+    val exchangeId: String,
+    val ordinal: Int,
+    val role: String,
+)
+
 @Entity(
     tableName = "diagnostic_session_integrity",
     indices = [Index(value = ["sessionId", "finalizedAtMs"])],
@@ -142,4 +173,11 @@ data class DiagnosticSessionIntegrityEntity(
     val finalizedAtMs: Long,
     val hashAlgorithm: String = "SHA-256",
     val canonicalizationVersion: String = "diagnostic-exchange-chain-v1",
+    @ColumnInfo(defaultValue = "''") val vehicleBindingId: String = "",
+    @ColumnInfo(defaultValue = "''") val appVersion: String = "",
+    val deviceKeyId: String? = null,
+    val signatureAlgorithm: String? = null,
+    val signatureBase64: String? = null,
+    val signedAtMs: Long? = null,
+    @ColumnInfo(defaultValue = "'UNSIGNED_LEGACY'") val trustState: String = "UNSIGNED_LEGACY",
 )

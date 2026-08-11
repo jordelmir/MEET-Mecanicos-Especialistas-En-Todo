@@ -86,7 +86,8 @@ class DiagnosticReasoningEngineTest {
         )
 
         assertTrue(result.case.hypotheses.first().title.contains("Fuga de vacio"))
-        assertTrue(result.case.hypotheses.first().probabilityPercent >= 45)
+        assertTrue(result.case.hypotheses.first().heuristicPriorityScore >= 45)
+        assertEquals(null, result.case.hypotheses.first().calibratedProbabilityPercent)
     }
 
     @Test
@@ -139,7 +140,7 @@ class DiagnosticReasoningEngineTest {
         )
 
         val pump = result.case.hypotheses.first { it.title.contains("Bomba combustible defectuosa") }
-        assertTrue(pump.probabilityPercent < 15)
+        assertTrue(pump.heuristicPriorityScore < 15)
         assertTrue(pump.contradictingEvidence.isNotEmpty())
     }
 

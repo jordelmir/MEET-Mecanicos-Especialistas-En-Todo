@@ -3,6 +3,7 @@ package com.elysium369.meet.data.local.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(tableName = "vehicles")
 data class VehicleEntity(
@@ -169,6 +170,7 @@ data class DtcDefinitionEntity(
     val tsbBulletins: String? = null,
     val diagnosticNamespace: String = "SAE_OBD",
     val dtcFormat: String = "SAE_J2012_2_BYTE",
+    @ColumnInfo(defaultValue = "''") val rawDtcIdentity: String = "",
     val failureType: Int? = null,
     val ecuFamily: String? = null,
     val calibration: String? = null,

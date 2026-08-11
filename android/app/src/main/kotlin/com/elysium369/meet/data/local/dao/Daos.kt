@@ -123,9 +123,11 @@ interface DtcDefinitionDao {
            WHERE code = :code
              AND diagnosticNamespace = :namespace
              AND (manufacturer = :manufacturer OR manufacturer = 'GENERIC')
+             AND (rawDtcIdentity = :rawDtcIdentity OR rawDtcIdentity = '')
              AND (failureType = :failureType OR failureType IS NULL)
            ORDER BY
              CASE WHEN manufacturer = :manufacturer THEN 0 ELSE 1 END,
+             CASE WHEN rawDtcIdentity = :rawDtcIdentity THEN 0 ELSE 1 END,
              CASE WHEN failureType = :failureType THEN 0 ELSE 1 END,
              CASE verificationStatus WHEN 'VERIFIED' THEN 0 WHEN 'REVIEWED' THEN 1 ELSE 2 END
            LIMIT 1"""
@@ -134,6 +136,7 @@ interface DtcDefinitionDao {
         code: String,
         manufacturer: String,
         namespace: String,
+        rawDtcIdentity: String,
         failureType: Int?,
     ): DtcDefinitionEntity?
 
