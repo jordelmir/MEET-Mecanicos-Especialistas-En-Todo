@@ -95,15 +95,32 @@ jobs:
             -dname "CN=MEET CI Ephemeral,OU=CI,O=Elysium Vanguard,C=CR"
       - name: Release R8 assembly
         working-directory: android
-        run: >-
-          ./gradlew :app:assembleRelease
-          -PKEYSTORE_PATH="${RUNNER_TEMP}/meet-ci-release.jks"
-          -PKEYSTORE_PASSWORD=ci-release-only
-          -PKEY_ALIAS=meet-ci
-          -PKEY_PASSWORD=ci-release-only
-          -PELYSIUM_SUPABASE_KEY_ROLE=ANON
-          -PELYSIUM_SUPABASE_URL=
-          -PELYSIUM_SUPABASE_KEY=
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle_args=(
+            -PKEYSTORE_PATH="${RUNNER_TEMP}/meet-ci-release.jks"
+            -PKEYSTORE_PASSWORD=ci-release-only
+            -PKEY_ALIAS=meet-ci
+            -PKEY_PASSWORD=ci-release-only
+            -PELYSIUM_SUPABASE_KEY_ROLE=ANON
+            -PELYSIUM_SUPABASE_URL=
+            -PELYSIUM_SUPABASE_KEY=
+          )
+          release_log="${RUNNER_TEMP}/meet-release-assembly.log"
+
+          if ./gradlew :app:assembleRelease "${gradle_args[@]}" 2>&1 | tee "$release_log"; then
+            exit 0
+          fi
+
+          if ! grep -q "Execution failed for task ':app:packageRelease'" "$release_log" ||
+             ! grep -q 'PackageAndroidArtifact\$IncrementalSplitterRunnable' "$release_log"; then
+            echo "::error::Release assembly failed outside the reviewed transient packaging boundary."
+            exit 1
+          fi
+
+          echo "::warning::Transient Android packaging failure detected; retrying packageRelease once."
+          ./gradlew :app:packageRelease "${gradle_args[@]}" --stacktrace
       - name: Built APK secret and string scan
         env:
           MEET_RELEASE_APK: android/app/build/outputs/apk/release/app-release.apk

@@ -39,6 +39,11 @@
     Los workflows dejaron de depender de acciones Node 20 obsoletas y el gate
     combinado instala sus dependencias TypeScript de forma determinista con
     `npm ci` antes de ejecutar la paridad.
+11. El empaquetador Android puede terminar R8 y fallar de forma transitoria en
+    `packageRelease` mediante `IncrementalSplitterRunnable`. CI conserva el log
+    completo y permite un único reintento de `packageRelease` solamente cuando
+    aparecen juntas esas dos firmas exactas. Errores de compilación, R8, firma
+    o cualquier otra etapa continúan fallando sin reintento.
 
 ## Matriz de verificación local
 
