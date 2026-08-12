@@ -32,12 +32,12 @@
     "migration-conformance": "NOT_REPORTED",
     "release-gates": "NOT_REPORTED"
   },
-  "generatedAt": "2026-08-12T12:49:51.321878+00:00",
+  "generatedAt": "2026-08-12T12:50:13.651551+00:00",
   "generator": "tools/vehicle-truth/generate-proof-status.py",
   "hardwareConformance": "PENDING_PHYSICAL_CORPUS",
   "schemaVersion": 1,
   "source": {
-    "commit": "4054ffc87605fd8eb744d65fc013266024c319f2",
+    "commit": "5a6f65d126ed0532cd09b6157bccc9d20ec0d596",
     "versionCode": 45,
     "versionName": "4.17.0"
   },
