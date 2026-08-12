@@ -1218,7 +1218,7 @@ fun ComponentLocatorScreen(
                                                 vehicleLabel = vehicleLabel,
                                                 engineType = visualEngineType,
                                                 component = checkNotNull(diagnosticComponent),
-                                                activeDtcs = allActiveDtcs.toSet(),
+                                                presentationOnlyDtcCodes = allActiveDtcs.toSet(),
                                                 livePidValues = livePidValues
                                             )
                                         }

@@ -8,9 +8,8 @@ object DiagnosticRawCommandPolicy {
         val reason: String,
     )
 
-    private val allowedAdapterPrefixes = setOf(
-        "ATZ", "ATI", "ATE", "ATL", "ATS", "ATH", "ATSP", "ATDP", "ATDPN",
-        "ATRV", "ATAL", "ATCAF", "ATCFC", "ATSH",
+    private val readOnlyAdapterCommands = setOf(
+        "ATI", "ATDP", "ATDPN", "ATRV",
     )
 
     private val readOnlyServices = setOf(
@@ -22,21 +21,33 @@ object DiagnosticRawCommandPolicy {
     )
 
     fun evaluate(command: String): Decision {
-        val normalized = command.uppercase().filter { it.isLetterOrDigit() }
-        if (normalized.isBlank()) {
-            return Decision(false, normalized, "Comando vacío.")
+        val raw = command.trim().uppercase()
+        if (raw.isBlank()) {
+            return Decision(false, "", "Comando vacío.")
         }
-        if (normalized.startsWith("AT")) {
-            val allowed = allowedAdapterPrefixes.any(normalized::startsWith)
+        if (raw.startsWith("AT")) {
+            if (!raw.matches(Regex("^AT ?[A-Z]{1,5}(?: ?[0-9A-F]{1,8})?$"))) {
+                return Decision(false, "", "Sintaxis AT inválida; no se normalizó ni ejecutó.")
+            }
+            val normalized = raw.replace(" ", "")
+            val allowed = normalized in readOnlyAdapterCommands
             return Decision(
                 allowed = allowed,
                 normalizedCommand = normalized,
                 reason = if (allowed) {
-                    "Configuración local de adaptador permitida."
+                    "Consulta de estado del adaptador permitida."
                 } else {
-                    "Comando AT fuera de la lista de producción revisada."
+                    "Comando AT bloqueado: el terminal normal no modifica estado del adaptador."
                 },
             )
+        }
+
+        if (!raw.matches(Regex("^[0-9A-F]{2}(?: ?[0-9A-F]{2})*$"))) {
+            return Decision(false, "", "Sintaxis hexadecimal inválida; no se normalizó ni ejecutó.")
+        }
+        val normalized = raw.replace(" ", "")
+        if (normalized.length > MAX_COMMAND_HEX_LENGTH) {
+            return Decision(false, "", "Comando excede el límite de lectura revisado.")
         }
 
         val service = normalized.take(2)
@@ -54,6 +65,12 @@ object DiagnosticRawCommandPolicy {
                 "Servicio bloqueado: puede cambiar estado, memoria, sesión, seguridad o actuadores del vehículo.",
             )
         }
+        val minimumLength = if (service == "22") 6 else 4
+        if (normalized.length < minimumLength) {
+            return Decision(false, "", "Comando incompleto para el servicio $service.")
+        }
         return Decision(true, normalized, "Servicio explícitamente de solo lectura.")
     }
+
+    private const val MAX_COMMAND_HEX_LENGTH = 64
 }

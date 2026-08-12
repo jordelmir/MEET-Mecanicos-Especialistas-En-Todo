@@ -137,17 +137,20 @@ data class Hypothesis(
     val caseId: String,
     val title: String,
     val componentOrSystem: String,
-    val probabilityPercent: Int,
+    /** Qualitative ordering signal. It is deliberately not exposed as probability. */
+    val heuristicPriorityScore: Int,
+    /** Available only after a reviewed calibration/holdout gate. */
+    val calibratedProbabilityPercent: Int? = null,
     val severity: DiagnosticSeverity,
     val reasoning: String,
     val supportingEvidence: List<String>,
     val contradictingEvidence: List<String>,
     val requiredTests: List<String>,
     val riskIfIgnored: String,
-    val estimatedCostMin: Int,
-    val estimatedCostMax: Int,
-    val laborTimeMin: Int,
-    val laborTimeMax: Int,
+    val estimatedCostMin: Int? = null,
+    val estimatedCostMax: Int? = null,
+    val laborTimeMin: Int? = null,
+    val laborTimeMax: Int? = null,
     val ruleId: String,
     val relatedComponents3d: List<String> = emptyList(),
 )
@@ -402,7 +405,7 @@ class DiagnosticReasoningEngine(
 
         val provisional = ruleEvaluations
             .map { it.toHypothesis(caseId, evidence, input) }
-            .sortedByDescending { it.probabilityPercent }
+            .sortedByDescending { it.heuristicPriorityScore }
 
         val contradictions = contradictionDetector.detect(input, provisional)
         val hypotheses = provisional
@@ -414,14 +417,14 @@ class DiagnosticReasoningEngine(
                     hypothesis
                 } else {
                     hypothesis.copy(
-                        probabilityPercent = (hypothesis.probabilityPercent - penalties).coerceAtLeast(3),
+                        heuristicPriorityScore = (hypothesis.heuristicPriorityScore - penalties).coerceAtLeast(3),
                         contradictingEvidence = hypothesis.contradictingEvidence +
                             contradictions.filter { it.hypothesisId == hypothesis.id }
                                 .map { it.contradictionReason },
                     )
                 }
             }
-            .sortedByDescending { it.probabilityPercent }
+            .sortedByDescending { it.heuristicPriorityScore }
 
         val recommendedTests = buildRecommendedTests(caseId, hypotheses, input.completedTests)
         val missingData = buildMissingData(input, normalizedDtcs, hypotheses)
@@ -523,17 +526,18 @@ class DiagnosticReasoningEngine(
             caseId = caseId,
             title = rule.hypothesis,
             componentOrSystem = rule.component,
-            probabilityPercent = probabilityPercent,
+            heuristicPriorityScore = heuristicPriorityScore,
+            calibratedProbabilityPercent = null,
             severity = rule.severity,
             reasoning = reasoning,
             supportingEvidence = supporting.distinct().take(8),
             contradictingEvidence = emptyList(),
             requiredTests = rule.recommendedTests.map { it.name },
             riskIfIgnored = rule.riskIfIgnored,
-            estimatedCostMin = rule.estimatedCostMin,
-            estimatedCostMax = rule.estimatedCostMax,
-            laborTimeMin = rule.laborTimeMin,
-            laborTimeMax = rule.laborTimeMax,
+            estimatedCostMin = null,
+            estimatedCostMax = null,
+            laborTimeMin = null,
+            laborTimeMax = null,
             ruleId = rule.id,
             relatedComponents3d = rule.components3d,
         )
@@ -691,7 +695,7 @@ class DiagnosticReasoningEngine(
             .distinctBy { (_, template) -> template.id }
             .take(12)
         return templates.map { (hypothesis, template) ->
-            val heuristicPriority = (hypothesis.probabilityPercent +
+            val heuristicPriority = (hypothesis.heuristicPriorityScore +
                 hypothesis.supportingEvidence.size * 4 -
                 hypothesis.contradictingEvidence.size * 3).coerceIn(5, 100)
             val costScore = when (template.difficulty) {
@@ -768,7 +772,7 @@ class DiagnosticReasoningEngine(
             ServiceRecommendation(
                 serviceId = service.id,
                 serviceName = service.name,
-                reason = top?.let { "Relacionado con ${it.title} (${it.probabilityPercent}%)." }
+                reason = top?.let { "Relacionado cualitativamente con ${it.title}; requiere pruebas antes de concluir." }
                     ?: "Diagnostico inicial recomendado por sintomas/DTC.",
                 requiredEvidence = service.requiredEvidence.map { it.name },
                 urgency = top?.severity ?: DiagnosticSeverity.MEDIUM,
@@ -808,7 +812,7 @@ class DiagnosticReasoningEngine(
                 p0230 && (lower.contains("rele") || lower.contains("relé") || lower.contains("arnes") || lower.contains("arnés")) ->
                     PartRecommendationState.MAY_BE_NEEDED
                 suggestion.riskPart -> PartRecommendationState.DO_NOT_BUY_YET
-                hypotheses.firstOrNull()?.probabilityPercent.orZero() >= 70 -> PartRecommendationState.MAY_BE_NEEDED
+                hypotheses.firstOrNull()?.heuristicPriorityScore.orZero() >= 70 -> PartRecommendationState.MAY_BE_NEEDED
                 else -> PartRecommendationState.INVESTIGATE_ONLY
             }
             val requiredEvidence = when (state) {
@@ -868,7 +872,7 @@ class DiagnosticReasoningEngine(
                         CausalTreeNode(
                             id = hypothesis.id,
                             title = hypothesis.title,
-                            probabilityPercent = hypothesis.probabilityPercent,
+                            probabilityPercent = hypothesis.calibratedProbabilityPercent,
                             evidence = hypothesis.supportingEvidence.take(3),
                             actionLabel = "Hacer prueba",
                             componentSlugs = hypothesis.relatedComponents3d,
@@ -991,7 +995,7 @@ class DiagnosticReasoningEngine(
             vehicleContext = input.vehicleLabel,
             evidenceTable = evidenceRows,
             hypothesesFromLocalEngine = diagnosticCase.hypotheses.map {
-                "${it.probabilityPercent}% ${it.title}; pruebas=${it.requiredTests.joinToString()}"
+                "PRIORIDAD_${it.heuristicPriorityScore.toPriorityBand()} ${it.title}; pruebas=${it.requiredTests.joinToString()}"
             },
             missingData = missingData,
             allowedOutputSchema = """
@@ -1021,11 +1025,11 @@ class DiagnosticReasoningEngine(
         appendLine("Caso: ${diagnosticCase.id}")
         appendLine("DTCs: ${diagnosticCase.dtcCodes.joinToString().ifBlank { "sin DTC confirmado" }}")
         appendLine("Estado: ${diagnosticCase.status}")
-        appendLine("Confianza: ${confidence.band.label} (${confidence.scorePercent}%)")
+        appendLine("Confianza cualitativa de evidencia: ${confidence.band.label}")
         appendLine()
         appendLine("Hipotesis priorizadas:")
         diagnosticCase.hypotheses.take(6).forEach { hypothesis ->
-            appendLine("- ${hypothesis.probabilityPercent}% ${hypothesis.title}")
+            appendLine("- PRIORIDAD ${hypothesis.heuristicPriorityScore.toPriorityBand()} · ${hypothesis.title}")
             appendLine("  Evidencia: ${hypothesis.supportingEvidence.take(3).joinToString().ifBlank { "pendiente" }}")
             appendLine("  Prueba siguiente: ${hypothesis.requiredTests.firstOrNull() ?: "pendiente"}")
         }
@@ -1095,7 +1099,7 @@ class DiagnosticReasoningEngine(
             RuleEvaluation(
                 rule = rule,
                 dtc = null,
-                probabilityPercent = rule.baseProbability,
+                heuristicPriorityScore = rule.baseProbability,
                 reasoning = "Diagnostico inicial por sintoma '${primary.symptom}'. Falta DTC/OBD real para conclusion fuerte.",
             )
         }
@@ -1109,7 +1113,7 @@ class DiagnosticReasoningEngine(
 data class RuleEvaluation(
     val rule: DiagnosticRule,
     val dtc: String?,
-    val probabilityPercent: Int,
+    val heuristicPriorityScore: Int,
     val reasoning: String,
 )
 
@@ -1124,12 +1128,12 @@ class RuleBasedDiagnosticEngine {
     fun evaluate(input: DiagnosticReasoningInput, dtcs: List<String>): List<RuleEvaluation> {
         return dtcs.flatMap { dtc ->
             rules.filter { rule -> rule.dtcPattern == dtc }.map { rule ->
-                val probability = adjustProbability(rule, dtc, input)
+                val priority = adjustPriority(rule, dtc, input)
                 RuleEvaluation(
                     rule = rule,
                     dtc = dtc,
-                    probabilityPercent = probability,
-                    reasoning = buildReasoning(rule, dtc, input, probability),
+                    heuristicPriorityScore = priority,
+                    reasoning = buildReasoning(rule, dtc, input, priority),
                 )
             }
         }.ifEmpty {
@@ -1138,14 +1142,14 @@ class RuleBasedDiagnosticEngine {
                 RuleEvaluation(
                     rule = rule,
                     dtc = dtc,
-                    probabilityPercent = 18,
+                    heuristicPriorityScore = 18,
                     reasoning = "DTC valido sin regla especifica local. Se requiere escaneo, freeze frame y manual del fabricante.",
                 )
             }
         }
     }
 
-    private fun adjustProbability(rule: DiagnosticRule, dtc: String, input: DiagnosticReasoningInput): Int {
+    private fun adjustPriority(rule: DiagnosticRule, dtc: String, input: DiagnosticReasoningInput): Int {
         var score = rule.baseProbability
         if (input.obdConnected) score += 4 else score -= 7
         if (input.freezeFrame.isNotEmpty()) score += 4
@@ -1196,11 +1200,11 @@ class RuleBasedDiagnosticEngine {
         rule: DiagnosticRule,
         dtc: String,
         input: DiagnosticReasoningInput,
-        probability: Int,
+        heuristicPriority: Int,
     ): String = buildString {
         append("$dtc apunta a ${rule.system}. ")
         append(rule.conditionExpression)
-        append(" Probabilidad local: $probability%. ")
+        append(" Prioridad heurística: ${heuristicPriority.toPriorityBand()}. ")
         if (!input.obdConnected) append("Sin OBD real, la conclusion queda limitada. ")
         if (rule.requiredEvidence.isNotEmpty()) append("Falta confirmar: ${rule.requiredEvidence.joinToString()}.")
     }
@@ -1864,6 +1868,12 @@ private fun trimDouble(value: Double): String =
     if (abs(value - value.roundToInt()) < 0.0001) value.roundToInt().toString() else "%.2f".format(Locale.US, value)
 
 private fun Int?.orZero(): Int = this ?: 0
+
+private fun Int.toPriorityBand(): String = when {
+    this >= 65 -> "ALTA"
+    this >= 35 -> "MEDIA"
+    else -> "BAJA"
+}
 
 private fun sha256(value: String): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())

@@ -478,6 +478,9 @@ interface MarketplaceDao {
             transactionKind = TransactionKind.REPAIR_SERVICE,
             grossCents = grossCents
         )
+        check(commission.authorized) {
+            "No se puede cerrar el ledger: falta un contrato de comisión aceptado y versionado"
+        }
         val transactionId = stableId("txn:service:${request.requestId}:completion")
         val metadata = jsonOf(
             "requestId" to request.requestId,

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "tiers": {
+    "low": {"coldStartP95Ms": 3500, "jankPercentMax": 8.0, "pssMbMax": 650},
+    "mid": {"coldStartP95Ms": 2200, "jankPercentMax": 5.0, "pssMbMax": 550},
+    "high": {"coldStartP95Ms": 1500, "jankPercentMax": 3.0, "pssMbMax": 450}
+  },
+  "scenarios": ["cold_start", "obd_connect", "dtc_scan", "repair_guide", "diagnostic_twin_3d", "rides_map"],
+  "measurementState": "PENDING_EXTERNAL_EXECUTION"
+}

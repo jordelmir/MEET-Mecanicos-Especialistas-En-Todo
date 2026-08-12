@@ -69,17 +69,30 @@ object DiagnosticEvidenceIntegrity {
         return level.single()
     }
 
-    fun verifyExchanges(exchanges: List<DiagnosticExchangeEntity>): DiagnosticIntegrityVerification {
+    fun verifySession(
+        expectedSessionId: String,
+        exchanges: List<DiagnosticExchangeEntity>,
+    ): DiagnosticIntegrityVerification {
+        require(expectedSessionId.isNotBlank())
+        val wrongScope = exchanges.filter { it.sessionId != expectedSessionId }
+        if (wrongScope.isNotEmpty()) {
+            return DiagnosticIntegrityVerification(
+                valid = false,
+                verifiedLeafCount = 0,
+                calculatedMerkleRoot = merkleRootSha256(emptyList()),
+                violations = wrongScope.map {
+                    DiagnosticIntegrityViolation(it.id, it.sessionSequence, "Intercambio fuera de la sesión esperada")
+                },
+            )
+        }
         val ordered = exchanges.sortedWith(
-            compareBy<DiagnosticExchangeEntity> { it.sessionId }
-                .thenBy { it.sessionSequence }
+            compareBy<DiagnosticExchangeEntity> { it.sessionSequence }
                 .thenBy { it.id },
         )
         val violations = mutableListOf<DiagnosticIntegrityViolation>()
-        ordered.groupBy { it.sessionId }.values.forEach { sessionExchanges ->
-            var priorHash = ""
-            var priorSequence = 0L
-            sessionExchanges.forEach { exchange ->
+        var priorHash = ""
+        var priorSequence = 0L
+        ordered.forEach { exchange ->
                 if (exchange.sessionSequence <= priorSequence) {
                     violations += exchange.violation("Secuencia no monotónica")
                 }
@@ -96,13 +109,31 @@ object DiagnosticEvidenceIntegrity {
                 }
                 priorSequence = exchange.sessionSequence
                 priorHash = exchange.exchangeHash
-            }
         }
         return DiagnosticIntegrityVerification(
             valid = violations.isEmpty(),
             verifiedLeafCount = ordered.size,
             calculatedMerkleRoot = merkleRootSha256(ordered.map { it.exchangeHash }),
             violations = violations,
+        )
+    }
+
+    fun verifySessions(exchanges: List<DiagnosticExchangeEntity>): Map<String, DiagnosticIntegrityVerification> =
+        exchanges.groupBy(DiagnosticExchangeEntity::sessionId)
+            .toSortedMap()
+            .mapValues { (sessionId, scoped) -> verifySession(sessionId, scoped) }
+
+    @Deprecated("Use verifySession or verifySessions so Merkle roots cannot cross session scope")
+    fun verifyExchanges(exchanges: List<DiagnosticExchangeEntity>): DiagnosticIntegrityVerification {
+        val sessions = exchanges.map { it.sessionId }.distinct()
+        if (sessions.size == 1) return verifySession(sessions.single(), exchanges)
+        return DiagnosticIntegrityVerification(
+            valid = false,
+            verifiedLeafCount = 0,
+            calculatedMerkleRoot = merkleRootSha256(emptyList()),
+            violations = listOf(
+                DiagnosticIntegrityViolation("MULTI_SESSION_INPUT", 0, "Se requiere verificación separada por sessionId"),
+            ),
         )
     }
 

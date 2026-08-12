@@ -40,6 +40,24 @@ interface VanguardTelemetryDao {
     @Query("SELECT * FROM vanguard_obd_sessions WHERE vehicleId = :vehicleId ORDER BY startedAt DESC LIMIT :limit")
     fun getSessionsForVehicle(vehicleId: String, limit: Int = 50): Flow<List<VanguardObdSessionEntity>>
 
+    @Query(
+        """UPDATE vanguard_obd_sessions
+           SET endedAt = :endedAt,
+               status = :status,
+               totalPidsRead = :totalPidsRead,
+               errorCount = :errorCount,
+               lastError = :lastError
+           WHERE sessionId = :sessionId"""
+    )
+    suspend fun finishSession(
+        sessionId: String,
+        endedAt: Long,
+        status: String,
+        totalPidsRead: Int,
+        errorCount: Int,
+        lastError: String?,
+    ): Int
+
     // ----- PID samples -----
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

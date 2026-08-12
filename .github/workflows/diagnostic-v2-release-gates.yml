@@ -51,6 +51,10 @@ jobs:
   release-gates:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -80,7 +84,7 @@ jobs:
       - name: Android lint
         working-directory: android
         run: ./gradlew :app:lintDebug
-      - name: Room migration verification and debug APK
+      - name: Room schema verification and debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug
       - name: Ephemeral release signing
@@ -93,7 +97,7 @@ jobs:
             -alias "meet-ci" \
             -keyalg RSA -keysize 3072 -validity 1 \
             -dname "CN=MEET CI Ephemeral,OU=CI,O=Elysium Vanguard,C=CR"
-      - name: Release R8 assembly
+      - name: Release R8 APK and AAB
         working-directory: android
         shell: bash
         run: |
@@ -109,7 +113,7 @@ jobs:
           )
           release_log="${RUNNER_TEMP}/meet-release-assembly.log"
 
-          if ./gradlew :app:assembleRelease "${gradle_args[@]}" 2>&1 | tee "$release_log"; then
+          if ./gradlew :app:assembleRelease :app:bundleRelease "${gradle_args[@]}" 2>&1 | tee "$release_log"; then
             exit 0
           fi
 
@@ -121,9 +125,57 @@ jobs:
 
           echo "::warning::Transient Android packaging failure detected; retrying packageRelease once."
           ./gradlew :app:packageRelease "${gradle_args[@]}" --stacktrace
+          ./gradlew :app:bundleRelease "${gradle_args[@]}" --stacktrace
       - name: Built APK secret and string scan
         env:
           MEET_RELEASE_APK: android/app/build/outputs/apk/release/app-release.apk
         run: bash tools/scan-release-secrets.sh
+      - name: Resolved release CycloneDX SBOM
+        working-directory: android
+        run: ./gradlew :app:generateReleaseSbom
+      - name: APK/AAB integrity, hashes, SBOM and size budgets
+        run: bash tools/vehicle-truth/verify-release-artifacts.sh
       - name: Cross-runtime parity
         run: bash tests/parity/ci-verify.sh
+      - name: Archive verifiable release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: meet-release-evidence-${{ github.sha }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/vehicle-truth-release-manifest.json
+            android/app/build/reports/sbom/meet-release.cdx.json
+      - name: Attest release APK/AAB provenance
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+
+  migration-conformance-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Create API 35 migration emulator
+        shell: bash
+        run: |
+          sdkmanager "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64"
+          echo no | avdmanager create avd --force --name meet-migration-api35 --package "system-images;android-35;google_apis;x86_64"
+          nohup emulator -avd meet-migration-api35 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 360 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'
+          adb shell input keyevent 82
+      - name: Execute adversarial Room migration conformance
+        working-directory: android
+        run: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.elysium369.meet.data.local.DiagnosticMigrationConformanceTest

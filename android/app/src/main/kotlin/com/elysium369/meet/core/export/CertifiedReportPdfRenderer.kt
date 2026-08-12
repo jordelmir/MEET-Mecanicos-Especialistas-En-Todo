@@ -10,6 +10,7 @@ import android.graphics.pdf.PdfDocument
 import com.elysium369.meet.core.reports.HashEngine
 import com.elysium369.meet.core.reports.ReportType
 import com.elysium369.meet.core.reports.QrPayload
+import com.elysium369.meet.core.reports.ReportPrivacyPolicy
 import com.elysium369.meet.data.local.entities.CertifiedReportEntity
 import com.elysium369.meet.data.local.entities.DiagnosticSnapshotEntity
 import com.elysium369.meet.data.local.entities.RepairActionEntity
@@ -56,6 +57,7 @@ class CertifiedReportPdfRenderer(private val context: Context) {
         val vehicleOdometerKm: Long?,
         val vehicleScore: Int? = null,
         val peritajeVerdict: String? = null,
+        val privacyPolicy: ReportPrivacyPolicy = ReportPrivacyPolicy.OWNER_COPY,
     )
 
     fun render(content: PageContent, outputFile: File): File {
@@ -168,8 +170,12 @@ class CertifiedReportPdfRenderer(private val context: Context) {
 
         var y = 175f
         canvas.drawText("Vehículo:", 32f, y, label); canvas.drawText(content.vehicleLabel, 130f, y, value); y += 22f
-        content.report.vin?.let { canvas.drawText("VIN:", 32f, y, label); canvas.drawText(it, 130f, y, value); y += 22f }
-        content.report.plate?.let { canvas.drawText("Placa:", 32f, y, label); canvas.drawText(it, 130f, y, value); y += 22f }
+        content.privacyPolicy.displayVin(content.report.vin)?.let {
+            canvas.drawText("VIN:", 32f, y, label); canvas.drawText(it, 130f, y, value); y += 22f
+        }
+        content.privacyPolicy.displayPlate(content.report.plate)?.let {
+            canvas.drawText("Placa:", 32f, y, label); canvas.drawText(it, 130f, y, value); y += 22f
+        }
         content.vehicleOdometerKm?.let {
             canvas.drawText("Odómetro:", 32f, y, label)
             canvas.drawText("%,d km".format(it), 130f, y, value); y += 22f

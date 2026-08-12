@@ -46,8 +46,45 @@ interface VanguardCommerceDao {
     @Query("SELECT * FROM vanguard_outbox WHERE status = :status AND nextAttemptAt <= :now ORDER BY nextAttemptAt ASC LIMIT :limit")
     suspend fun getOutboxByStatus(status: String, now: Long, limit: Int = 50): List<VanguardOutboxEntity>
 
-    @Query("UPDATE vanguard_outbox SET status = :status, attemptCount = attemptCount + 1, lastError = :error, updatedAt = :now WHERE outboxId = :outboxId")
-    suspend fun updateOutboxStatus(outboxId: String, status: String, error: String?, now: Long)
+    @Query("SELECT COUNT(*) FROM vanguard_outbox WHERE status IN ('PENDING', 'FAILED', 'IN_FLIGHT')")
+    suspend fun pendingOutboxCount(): Int
+
+    @Query(
+        """UPDATE vanguard_outbox
+           SET status = 'IN_FLIGHT', attemptCount = attemptCount + 1,
+               lastError = NULL, updatedAt = :now
+           WHERE outboxId = :outboxId AND status IN ('PENDING', 'FAILED')"""
+    )
+    suspend fun acquireOutbox(outboxId: String, now: Long): Int
+
+    @Query(
+        """UPDATE vanguard_outbox
+           SET status = 'DELIVERED', lastError = NULL, updatedAt = :now
+           WHERE outboxId = :outboxId AND status = 'IN_FLIGHT'"""
+    )
+    suspend fun markOutboxDelivered(outboxId: String, now: Long): Int
+
+    @Query(
+        """UPDATE vanguard_outbox
+           SET status = :status, lastError = :error,
+               nextAttemptAt = :nextAttemptAt, updatedAt = :now
+           WHERE outboxId = :outboxId AND status = 'IN_FLIGHT'"""
+    )
+    suspend fun markOutboxFailure(
+        outboxId: String,
+        status: String,
+        error: String,
+        nextAttemptAt: Long,
+        now: Long,
+    ): Int
+
+    @Query(
+        """UPDATE vanguard_outbox
+           SET status = 'FAILED', lastError = 'STALE_IN_FLIGHT_RECOVERED',
+               nextAttemptAt = :now, updatedAt = :now
+           WHERE status = 'IN_FLIGHT' AND updatedAt < :staleBefore"""
+    )
+    suspend fun recoverStaleOutbox(staleBefore: Long, now: Long): Int
 
     @Query("DELETE FROM vanguard_outbox WHERE status = 'DELIVERED' AND updatedAt < :olderThan")
     suspend fun pruneDelivered(olderThan: Long): Int

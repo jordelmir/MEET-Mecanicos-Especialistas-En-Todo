@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "latestVerifiedRelease": {
+    "versionName": "4.16.0",
+    "versionCode": 44,
+    "commit": "6909569c9adf47e1e5f9aaae2553f48f4a8cc561",
+    "githubActionsRun": "https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/actions/runs/31519063185",
+    "androidUnitTests": 783,
+    "typescriptTests": 184,
+    "lint": "PASSED",
+    "roomMigrationVerification": "PASSED_BY_BUILD",
+    "crossRuntimeParity": "PASSED",
+    "secretScans": "PASSED",
+    "debugApkSha256": "96b76913988c80311af538bfe381e2d2c191b7f1a20d5b1c650bc9f6c4356b18",
+    "releaseApkSha256": "54710702cf7b1fc3f0726c2f3d15d3310251f33693ba28d0cbbc73d0f97ab54f",
+    "deviceLaunch": "PASSED",
+    "coldStartSeconds": 1.78,
+    "fatalExceptionAfterLaunch": false
+  },
+  "vehicleTruthCandidate": {
+    "branch": "codex/vehicle-truth-os-4-17",
+    "sourceState": "IMPLEMENTED_NOT_VERIFIED",
+    "build": "NOT_EXECUTED_BY_OWNER_POLICY",
+    "tests": "NOT_EXECUTED_BY_OWNER_POLICY",
+    "hardwareConformance": "PENDING_EXTERNAL_FIXTURE",
+    "calibration": "PENDING_REVIEWED_DATASET",
+    "performanceLab": "PENDING_EXTERNAL_EXECUTION"
+  }
+}

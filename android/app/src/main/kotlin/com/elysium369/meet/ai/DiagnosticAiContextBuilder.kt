@@ -9,19 +9,22 @@ class DiagnosticAiContextBuilder @Inject constructor() {
         vehicleLabel: String?,
         engineType: EngineType,
         component: DiagnosticComponent,
-        activeDtcs: Set<String>,
+        presentationOnlyDtcCodes: Set<String>,
         livePidValues: Map<String, String>
     ): String {
-        val relatedActiveDtcs = component.relatedDtcs.map { it.code }.filter { activeDtcs.contains(it) }
+        val relatedDisplayCodes = component.relatedDtcs.map { it.code }
+            .filter { presentationOnlyDtcCodes.contains(it) }
         return buildString {
             appendLine("{")
             appendLine("  \"module\": \"visual_3d_diagnostics\",")
+            appendLine("  \"authorityPolicy\": \"EXPLAIN_ONLY_NO_DIAGNOSTIC_AUTHORITY\",")
+            appendLine("  \"evidenceWarning\": \"DTC strings are presentation-only; no finding or ECU failure may be inferred from them\",")
             appendLine("  \"vehicle\": \"${vehicleLabel.orEmpty().escapeJson()}\",")
             appendLine("  \"engineType\": \"${engineType.name}\",")
             appendLine("  \"component\": \"${component.name.escapeJson()}\",")
             appendLine("  \"componentId\": \"${component.id}\",")
             appendLine("  \"relatedDtcs\": [${component.relatedDtcs.joinToString { "\"${it.code}\"" }}],")
-            appendLine("  \"activeRelatedDtcs\": [${relatedActiveDtcs.joinToString { "\"$it\"" }}],")
+            appendLine("  \"presentationRelatedDtcCodes\": [${relatedDisplayCodes.joinToString { "\"$it\"" }}],")
             appendLine("  \"livePids\": {${livePidValues.entries.joinToString { "\"${it.key}\": \"${it.value.escapeJson()}\"" }}},")
             appendLine("  \"safety\": [${component.safetyWarnings.joinToString { "\"${it.message.escapeJson()}\"" }}],")
             appendLine("  \"recommendedTests\": [${component.workshopTests.joinToString { "\"${it.title.escapeJson()}: ${it.procedure.escapeJson()}\"" }}],")

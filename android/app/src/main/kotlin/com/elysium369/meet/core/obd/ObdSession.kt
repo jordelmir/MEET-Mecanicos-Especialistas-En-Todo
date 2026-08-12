@@ -45,6 +45,7 @@ enum class PhysicalBusOwner {
     OSCILLOSCOPE,
     ACTIVE_TEST,
     DTC_CLEAR,
+    TERMINAL_READ,
 }
 
 class ObdBusBusyException(owner: PhysicalBusOwner) :
@@ -243,6 +244,28 @@ class ObdSession(
     private val _ecuName = MutableStateFlow<String?>(null)
     val ecuName: StateFlow<String?> = _ecuName.asStateFlow()
 
+    @Volatile
+    private var vehicleCapabilityContext: DiagnosticCapabilityContext = DiagnosticCapabilityContext.UNKNOWN
+
+    fun setVehicleCapabilityContext(
+        manufacturer: String?,
+        modelFamily: String?,
+        year: Int?,
+        market: String? = null,
+    ) {
+        vehicleCapabilityContext = DiagnosticCapabilityContext(
+            manufacturer = manufacturer?.takeIf(String::isNotBlank),
+            modelFamily = modelFamily?.takeIf(String::isNotBlank),
+            year = year,
+            market = market?.takeIf(String::isNotBlank),
+            ecuFamily = null,
+            ecuAddress = null,
+            hardwareVersion = null,
+            softwareVersion = null,
+            calibrationId = null,
+        )
+    }
+
     private var baseDelayMs: Long = 50L
     private var maxLineLength: Int = 128
 
@@ -253,6 +276,30 @@ class ObdSession(
 
     private val _activeTestStatus = MutableStateFlow(ActiveTestStatus())
     val activeTestStatus: StateFlow<ActiveTestStatus> = _activeTestStatus.asStateFlow()
+    private val _activeTestEvidence = MutableStateFlow<List<ActiveTestEvidence>>(emptyList())
+    val activeTestEvidence: StateFlow<List<ActiveTestEvidence>> = _activeTestEvidence.asStateFlow()
+    @Suppress("unused")
+    private val activeTestEvidenceCollector = scope.launch {
+        activeTestStatus.drop(1).collect { status ->
+            val testId = status.testId ?: return@collect
+            val event = ActiveTestEvidence(
+                evidenceId = java.util.UUID.randomUUID().toString(),
+                testId = testId,
+                phase = status.phase,
+                message = status.message,
+                monotonicTimestampMs = System.nanoTime() / 1_000_000L,
+                stopVerified = status.stopVerified,
+            )
+            _activeTestEvidence.update { existing -> (existing + event).takeLast(2_000) }
+            sessionRecorder.recordActiveTestEvidence(
+                evidenceId = event.evidenceId,
+                testId = event.testId,
+                phase = event.phase.name,
+                message = event.message,
+                stopVerified = event.stopVerified,
+            )
+        }
+    }
     private var activeTestJob: Job? = null
 
     private var consecutiveErrors = 0
@@ -440,12 +487,12 @@ class ObdSession(
                         sessionRecorder.startSession(
                             ObdSessionStartContext(
                                 appVersion = BuildConfig.VERSION_NAME,
-                                vinHash = privacyGuard.vinHashOnly(_vin.value),
+                                vinHash = privacyGuard.vinPseudonym(_vin.value),
                                 adapterName = targetAddress?.let { if (bluetoothMacRegex.matches(it)) "Bluetooth OBD" else it },
-                                adapterMacHash = targetAddress?.takeIf { bluetoothMacRegex.matches(it) }?.let { privacyGuard.vinHashOnly(it) },
+                                adapterMacHash = targetAddress?.takeIf { bluetoothMacRegex.matches(it) }?.let { privacyGuard.vinPseudonym(it) },
                                 adapterFirmware = adapterVersion.ifBlank { null },
                                 protocolDetected = detectedProtocol.ifBlank { null },
-                                consentGranted = false,
+                                consentGranted = privacyGuard.allowsRemoteDiagnostics(context),
                                 startedAtMs = connectedAt
                             )
                         )
@@ -455,13 +502,20 @@ class ObdSession(
                     }
                 }
 
-                if (privacyGuard.allowsRemoteDiagnostics(context)) {
+                privacyGuard.remotePayload(
+                    context,
+                    listOf(
+                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("adapterType", adapterVersion, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DEVICE_ID),
+                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("notes", "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)", com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
+                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("protocol", detectedProtocol, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
+                    ),
+                )?.let { payload ->
                     scope.launch {
                         com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
                             userId = "anonymous_diagnostics",
-                            adapterType = privacyGuard.redactForTelemetry(adapterVersion),
-                            notes = "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)",
-                            protocol = privacyGuard.redactForTelemetry(detectedProtocol),
+                            adapterType = payload.fields["adapterType"].orEmpty(),
+                            notes = payload.fields["notes"].orEmpty(),
+                            protocol = payload.fields["protocol"].orEmpty(),
                             isSuccess = true
                         )
                     }
@@ -479,7 +533,7 @@ class ObdSession(
                         fetchCalibrationId()
                         fetchEcuName()
                         _statusMessage.value = if (_vin.value != null && _vin.value != "N/A") {
-                            "Vehículo identificado ✓ VIN: ${_vin.value}"
+                            "Vehículo identificado ✓ VIN capturado"
                         } else {
                             "Enlace activo. VIN no disponible."
                         }
@@ -523,13 +577,20 @@ class ObdSession(
             else -> "Error tras $MAX_CONNECT_ATTEMPTS intentos: $msg"
         }
 
-        if (privacyGuard.allowsRemoteDiagnostics(context)) {
+        privacyGuard.remotePayload(
+            context,
+            listOf(
+                com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("adapterType", adapterVersion.ifBlank { "Unknown" }, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DEVICE_ID),
+                com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("notes", "FAILED_CONNECTION ($MAX_CONNECT_ATTEMPTS attempts): $msg", com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DIAGNOSTIC_RAW),
+                com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("protocol", detectedProtocol, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
+            ),
+        )?.let { payload ->
             scope.launch {
                 com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
                     userId = "anonymous_diagnostics",
-                    adapterType = privacyGuard.redactForTelemetry(adapterVersion.ifBlank { "Unknown" }),
-                    notes = privacyGuard.redactForTelemetry("FAILED_CONNECTION ($MAX_CONNECT_ATTEMPTS attempts): $msg"),
-                    protocol = privacyGuard.redactForTelemetry(detectedProtocol),
+                    adapterType = payload.fields["adapterType"].orEmpty(),
+                    notes = payload.fields["notes"].orEmpty(),
+                    protocol = payload.fields["protocol"].orEmpty(),
                     isSuccess = false
                 )
             }
@@ -2219,7 +2280,10 @@ class ObdSession(
 
         fun normalizeRecord(record: DtcRecord, fallbackName: String?): DtcRecord {
             val responseName = moduleNameForResponse(record.responseAddress)
-            return record.copy(moduleName = responseName ?: record.moduleName ?: fallbackName)
+            return DiagnosticFindingFactory.withResolvedModuleName(
+                record = record,
+                moduleName = responseName ?: record.moduleName ?: fallbackName,
+            )
         }
 
         fun diagnosticRequestScope(target: String?, moduleName: String?): DiagnosticRequestScope = when {
@@ -4105,20 +4169,24 @@ class ObdSession(
     suspend fun verifySafetyForProAction(test: ActiveTest): ActiveDiagnosticSafetyDecision {
         // Refresh only the observations required by the policy. A failed read is
         // preserved as UNKNOWN and can never silently become zero/safe.
-        test.safetyConditions.forEach { condition ->
-            val pid = when (condition) {
-                SafetyCondition.ENGINE_OFF,
-                SafetyCondition.ENGINE_RUNNING -> "010C"
-                SafetyCondition.VEHICLE_STATIONARY -> "010D"
-                SafetyCondition.BATTERY_ABOVE_12V -> "0142"
-                SafetyCondition.TRANS_IN_PARK -> null
+        test.safetyEvidenceRequirements.forEach { requirement ->
+            val command = requirement.signalAliases.firstOrNull { alias ->
+                alias.matches(Regex("^[0-9A-Fa-f]{4,}$")) || alias.equals("ATRV", true)
             }
-            if (pid != null) refreshSafetyTelemetry(pid)
+            if (command != null) refreshSafetyTelemetry(command)
         }
         val decision = ActiveDiagnosticSafetyKernel.evaluate(
             test = test,
             telemetry = telemetrySamples.value,
             nowMonotonicMs = System.nanoTime() / 1_000_000L,
+            capabilityAuthorization = ActiveDiagnosticCapabilityRegistry.authorize(
+                test = test,
+                context = vehicleCapabilityContext.copy(
+                    ecuFamily = _ecuName.value,
+                    ecuAddress = test.targetAddress,
+                    calibrationId = _calibrationId.value,
+                ),
+            ),
         )
         if (!decision.allowed) {
             _statusMessage.value = decision.blockingReasons.joinToString(separator = " ")
@@ -4511,6 +4579,17 @@ class ObdSession(
             deferred.await()
         }
     }
+
+    internal suspend fun executeTerminalRead(command: String): String =
+        withExclusivePhysicalBus(PhysicalBusOwner.TERMINAL_READ) {
+            val protocolBefore = detectedProtocol
+            val targetBefore = targetAddress
+            val response = sendRawCommand(command)
+            check(detectedProtocol == protocolBefore && targetAddress == targetBefore) {
+                "Terminal read altered adapter/session state; result rejected"
+            }
+            response
+        }
 
     /**
      * Sends a command directly to the transport bypassing the queue.

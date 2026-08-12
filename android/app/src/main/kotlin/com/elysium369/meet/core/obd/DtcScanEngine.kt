@@ -178,7 +178,7 @@ data class FreezeFrameReadResult(
     val rawExchanges: Map<String, String> = emptyMap(),
 )
 
-data class DtcRecord(
+data class DtcRecord internal constructor(
     val code: String,
     val bucket: DtcBucket,
     val statusFlags: Set<DtcStatusFlag>,
@@ -209,6 +209,21 @@ data class DtcRecord(
         )
 }
 
+/** Parser output without authority to become persistent ECU evidence. */
+data class DecodedDtcCandidate internal constructor(
+    val code: String,
+    val bucket: DtcBucket,
+    val statusFlags: Set<DtcStatusFlag>,
+    val sourceService: String,
+    val namespace: DiagnosticNamespace,
+    val endpoint: DiagnosticFindingEndpoint,
+    val rawPayload: String,
+    val udsStatusByte: Int?,
+    val udsFailureType: String?,
+    val rawDtc24: Int?,
+    val dtcFormat: DtcFormat,
+)
+
 data class DiagnosticFindingEndpoint(
     val targetAddress: String?,
     val responseAddress: String?,
@@ -237,30 +252,56 @@ object DiagnosticFindingFactory {
             DiagnosticNamespace.KWP2000 -> DtcFormat.KWP2000
             DiagnosticNamespace.OEM -> DtcFormat.OEM
         },
-    ): DtcRecord {
-        require(rawPayload.isNotBlank()) { "ECU finding requires raw evidence" }
-        require(code.isNotBlank()) { "ECU finding requires a decoded code" }
-        val requestedService = sourceService.take(2).toIntOrNull(16)
-            ?: error("Invalid source service: $sourceService")
-        val expectedPositiveService = (requestedService + 0x40) and 0xFF
-        require(validatedResponse.serviceId == expectedPositiveService) {
-            "Response service ${validatedResponse.serviceId} does not prove request $sourceService"
-        }
-        require(endpoint.identity.isNotBlank()) { "ECU endpoint identity is required" }
-        return DtcRecord(
+    ): DtcRecord = authorize(
+        candidate = DecodedDtcCandidate(
             code = code,
             bucket = bucket,
             statusFlags = statusFlags,
             sourceService = sourceService,
             namespace = namespace,
-            targetAddress = endpoint.targetAddress,
-            responseAddress = endpoint.responseAddress,
-            moduleName = endpoint.moduleName,
+            endpoint = endpoint,
             rawPayload = rawPayload,
             udsStatusByte = udsStatusByte,
             udsFailureType = udsFailureType,
             rawDtc24 = rawDtc24,
             dtcFormat = dtcFormat,
+        ),
+        validatedResponse = validatedResponse,
+    )
+
+    /** Adds presentation metadata without granting authority to alter ECU evidence. */
+    fun withResolvedModuleName(record: DtcRecord, moduleName: String?): DtcRecord {
+        val resolved = moduleName?.trim()?.takeIf { it.isNotEmpty() } ?: return record
+        return record.copy(moduleName = resolved)
+    }
+
+    private fun authorize(
+        candidate: DecodedDtcCandidate,
+        validatedResponse: ProtocolResponse.Positive,
+    ): DtcRecord {
+        require(candidate.rawPayload.isNotBlank()) { "ECU finding requires raw evidence" }
+        require(candidate.code.isNotBlank()) { "ECU finding requires a decoded code" }
+        val requestedService = candidate.sourceService.take(2).toIntOrNull(16)
+            ?: error("Invalid source service: ${candidate.sourceService}")
+        val expectedPositiveService = (requestedService + 0x40) and 0xFF
+        require(validatedResponse.serviceId == expectedPositiveService) {
+            "Response service ${validatedResponse.serviceId} does not prove request ${candidate.sourceService}"
+        }
+        require(candidate.endpoint.identity.isNotBlank()) { "ECU endpoint identity is required" }
+        return DtcRecord(
+            code = candidate.code,
+            bucket = candidate.bucket,
+            statusFlags = candidate.statusFlags,
+            sourceService = candidate.sourceService,
+            namespace = candidate.namespace,
+            targetAddress = candidate.endpoint.targetAddress,
+            responseAddress = candidate.endpoint.responseAddress,
+            moduleName = candidate.endpoint.moduleName,
+            rawPayload = candidate.rawPayload,
+            udsStatusByte = candidate.udsStatusByte,
+            udsFailureType = candidate.udsFailureType,
+            rawDtc24 = candidate.rawDtc24,
+            dtcFormat = candidate.dtcFormat,
         )
     }
 }

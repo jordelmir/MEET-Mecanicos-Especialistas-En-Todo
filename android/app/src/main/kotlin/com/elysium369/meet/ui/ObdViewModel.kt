@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.obd.*
 import com.elysium369.meet.domain.diagnostics.ClearDiagnosticMemory
 import com.elysium369.meet.domain.diagnostics.FindingResolutionState
+import com.elysium369.meet.domain.diagnostics.LatestDiagnosticScanProjection
 import com.elysium369.meet.domain.diagnostics.RunDiagnosticScan
+import com.elysium369.meet.domain.diagnostics.VehicleSessionBinding
+import com.elysium369.meet.domain.diagnostics.VehicleSessionBindingState
 import com.elysium369.meet.domain.diagnostics.toSummary
 import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.core.monetization.FeatureKey
@@ -1643,6 +1646,15 @@ class ObdViewModel @Inject constructor(
 
     fun selectVehicle(vehicle: Vehicle?) {
         _selectedVehicle.value = vehicle
+        obdSession.setVehicleCapabilityContext(
+            manufacturer = vehicle?.make,
+            modelFamily = vehicle?.model,
+            year = vehicle?.year,
+        )
+        if (_latestDiagnosticScan.value?.belongsTo(vehicle?.id) != true) {
+            _latestDiagnosticScan.value = null
+        }
+        reconcileSelectedVehicleBinding(vehicle)
         // Reset sensor smoothers when switching vehicles to prevent cross-vehicle data contamination
         sensorSmoother.resetAll()
         predictiveEstimator.reset()
@@ -1651,14 +1663,67 @@ class ObdViewModel @Inject constructor(
         evaluateDnaInference()
     }
 
+    private fun reconcileSelectedVehicleBinding(vehicle: Vehicle?) {
+        val binding = _vehicleSessionBinding.value
+        val observedVin = binding.observedVin ?: return
+        if (vehicle == null) {
+            _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
+                diagnosticSessionId = binding.diagnosticSessionId,
+                physicalConnectionId = binding.physicalConnectionId,
+            )
+            return
+        }
+        val expectedVin = normalizeVin(vehicle.vin)
+        _vehicleSessionBinding.value = if (expectedVin == observedVin) {
+            binding.bindVerifiedVin(
+                vehicleId = vehicle.id,
+                observedVin = observedVin,
+                expectedVin = expectedVin,
+                evidenceId = "ecu-vin:${sha256Hex(observedVin.toByteArray()).take(16)}",
+            )
+        } else {
+            binding.conflict(
+                observedVin = observedVin,
+                expectedVin = expectedVin,
+                reason = "El VIN leído de la ECU no coincide con el vehículo seleccionado.",
+            )
+        }
+    }
+
+    fun confirmConnectedVehicle(vehicle: Vehicle) {
+        val binding = _vehicleSessionBinding.value
+        check(obdSession.state.value == ObdState.CONNECTED) {
+            "No hay una conexión física que pueda vincularse"
+        }
+        check(binding.bindingState == VehicleSessionBindingState.UNBOUND && binding.observedVin == null) {
+            "La confirmación manual solo está permitida cuando la ECU no entregó VIN y no existe conflicto"
+        }
+        _selectedVehicle.value = vehicle
+        obdSession.setVehicleCapabilityContext(vehicle.make, vehicle.model, vehicle.year)
+        _vehicleSessionBinding.value = binding.bindUserConfirmed(
+            vehicleId = vehicle.id,
+            expectedVin = vehicle.vin,
+            evidenceId = "user-confirmation:${UUID.randomUUID()}",
+        )
+        _latestDiagnosticScan.value = null
+    }
+
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
+    /** Authoritative sensor stream; consumers making physical conclusions use this, not the float projection. */
+    val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
 
     // Smooth sensor interpolation — eliminates erratic jumps from raw ELM327 readings
     private val sensorSmoother = SensorSmootherManager()
     private val predictiveEstimator = PredictiveTelemetryEstimator()
 
     private var currentSessionId: String = UUID.randomUUID().toString()
+    private val _vehicleSessionBinding = MutableStateFlow(
+        VehicleSessionBinding.unbound(currentSessionId, "NOT_CONNECTED")
+    )
+    val vehicleSessionBinding: StateFlow<VehicleSessionBinding> = _vehicleSessionBinding.asStateFlow()
+    private val _latestDiagnosticScan = MutableStateFlow<LatestDiagnosticScanProjection?>(null)
+    val latestDiagnosticScan: StateFlow<LatestDiagnosticScanProjection?> = _latestDiagnosticScan.asStateFlow()
     private val initialDtcScanMutex = Mutex()
     private val vinVehicleRecognitionMutex = Mutex()
     private val diagnosticEvidencePersistenceMutex = Mutex()
@@ -1691,14 +1756,14 @@ class ObdViewModel @Inject constructor(
         .map { findings -> findings.filter { it.status == "HISTORY" } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private val _latestScanActiveDtcs = MutableStateFlow<List<String>>(emptyList())
-    private val _latestScanPendingDtcs = MutableStateFlow<List<String>>(emptyList())
-    private val _latestScanPermanentDtcs = MutableStateFlow<List<String>>(emptyList())
-    private val _latestScanHistoricalDtcs = MutableStateFlow<List<String>>(emptyList())
+    private fun latestCodesForSelectedVehicle(bucket: DtcBucket): Flow<List<String>> =
+        combine(_selectedVehicle, _latestDiagnosticScan) { vehicle, projection ->
+            if (projection?.belongsTo(vehicle?.id) == true) projection.codesFor(bucket) else emptyList()
+        }
 
     // Canonical finding timeline is authoritative. Latest scan data bridges the
     // short interval before Room commits or when no vehicle has been selected.
-    val activeDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanActiveDtcs) { findings, latest ->
+    val activeDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, latestCodesForSelectedVehicle(DtcBucket.ACTIVE)) { findings, latest ->
         val canonical = findings.filter { finding ->
             val semantics = finding.projection.latestObservation?.semantics.orEmpty()
             finding.projection.latestObservation?.observationState == "OBSERVED" &&
@@ -1707,7 +1772,7 @@ class ObdViewModel @Inject constructor(
         (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val pendingDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanPendingDtcs) { findings, latest ->
+    val pendingDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, latestCodesForSelectedVehicle(DtcBucket.PENDING)) { findings, latest ->
         val canonical = findings.filter { finding ->
             val semantics = finding.projection.latestObservation?.semantics.orEmpty()
             finding.projection.latestObservation?.observationState == "OBSERVED" &&
@@ -1716,7 +1781,7 @@ class ObdViewModel @Inject constructor(
         (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val permanentDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanPermanentDtcs) { findings, latest ->
+    val permanentDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, latestCodesForSelectedVehicle(DtcBucket.PERMANENT)) { findings, latest ->
         val canonical = findings.filter { finding ->
             val semantics = finding.projection.latestObservation?.semantics.orEmpty()
             finding.projection.latestObservation?.observationState == "OBSERVED" &&
@@ -1726,7 +1791,7 @@ class ObdViewModel @Inject constructor(
         (canonical + latest).distinct()
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val historicalDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, _latestScanHistoricalDtcs) { findings, latest ->
+    val historicalDtcs: StateFlow<List<String>> = combine(canonicalOpenFindings, latestCodesForSelectedVehicle(DtcBucket.HISTORY)) { findings, latest ->
         val canonical = findings.filter { finding ->
             finding.timeline.any { "HISTORY" in it.semantics || "INTERMITTENT" in it.semantics }
         }.map { it.identity.displayCode }
@@ -2264,38 +2329,17 @@ class ObdViewModel @Inject constructor(
                     "Vehículo reconocido por VIN. ${existing.make} ${existing.model} seleccionado.",
                     "Vehicle recognized by VIN. ${existing.make} ${existing.model} selected."
                 )
-                addTerminalLog("[VIN] Vehículo existente seleccionado automáticamente: ${existing.make} ${existing.model} ($cleanVin)", TerminalLineType.SYSTEM)
+                addTerminalLog("[VIN] Vehículo existente seleccionado automáticamente: ${existing.make} ${existing.model}.", TerminalLineType.SYSTEM)
                 return@withLock existing
             }
 
-            val decoded = VinDecoder.decode(cleanVin) ?: return@withLock null
-            val year = decoded.modelYear.toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
-            val vehicle = Vehicle(
-                id = "vin_$cleanVin",
-                user_id = currentCloudUserId() ?: "guest",
-                year = year,
-                make = decoded.manufacturer,
-                model = "Detectado por VIN",
-                engine = "Identificado por escáner OBD-II | ${decoded.country} | Planta ${decoded.assemblyPlant}",
-                displacement_cc = 0,
-                engine_tech = "Por completar",
-                transmission_type = "Por completar",
-                transmission_subtype = "Por completar",
-                fuel_type = "Por completar",
-                vin = cleanVin,
-                plate = "VIN-${cleanVin.takeLast(6)}"
+            _vinDecoded.value = VinDecoder.decode(cleanVin)
+            addTerminalLog(
+                "[VIN] VIN capturado, pero no existe un vehículo Garage con esa identidad. " +
+                    "No se creó un perfil sintético; selecciona o registra el vehículo real para vincular la sesión.",
+                TerminalLineType.WARNING,
             )
-
-            vehicleRepository.insertVehicle(vehicle)
-            selectVehicle(vehicle)
-            lastAutoRecognizedVin = cleanVin
-            _vinDecoded.value = decoded
-            voiceFeedbackManager.speak(
-                "VIN leído correctamente. Creé el vehículo automáticamente en Garage.",
-                "VIN read successfully. I created the vehicle automatically in Garage."
-            )
-            addTerminalLog("[VIN] Perfil creado automáticamente desde escáner: ${vehicle.make} ${vehicle.year} ($cleanVin)", TerminalLineType.DECODED)
-            vehicle
+            null
         }
     }
 
@@ -3053,7 +3097,7 @@ class ObdViewModel @Inject constructor(
                             _vin.value = v
                             v?.let {
                                 detectManufacturer(it)
-                                autoSelectVehicleFromVin(it)
+                                bindVehicleFromObservedVin(it)
                             }
                             updateHealthScore()
                         }
@@ -3068,8 +3112,13 @@ class ObdViewModel @Inject constructor(
                 try {
                     obdSession.state
                         .collect { state ->
-                            if (state != ObdState.CONNECTED) {
+                            if (state == ObdState.DISCONNECTED || state == ObdState.ERROR) {
                                 hasCompletedInitialDtcScan = false
+                                _latestDiagnosticScan.value = null
+                                _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
+                                    diagnosticSessionId = currentSessionId,
+                                    physicalConnectionId = "NOT_CONNECTED",
+                                )
                             }
                         }
                 } catch (e: Exception) {
@@ -3142,7 +3191,7 @@ class ObdViewModel @Inject constructor(
                 if (savedVehicleId != null) {
                     val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
                     if (vehicle != null) {
-                        _selectedVehicle.value = vehicle
+                        selectVehicle(vehicle)
                         android.util.Log.d("ObdVM", "✅ Restored selected vehicle: ${vehicle.make} ${vehicle.model}")
                     } else {
                         android.util.Log.w("ObdVM", "⚠️ Saved vehicle ID not found in DB — clearing preference")
@@ -3319,6 +3368,7 @@ class ObdViewModel @Inject constructor(
             .putString("last_adapter_address", address)
             .apply()
         obdSession.setTargetAddress(address)
+        beginUnboundPhysicalSession(address)
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
             obdSession.connect()
@@ -3330,8 +3380,8 @@ class ObdViewModel @Inject constructor(
     }
 
     fun startDiagnosticSession(vehicle: Vehicle) {
-        _selectedVehicle.value = vehicle
-        currentSessionId = UUID.randomUUID().toString()
+        selectVehicle(vehicle)
+        beginUnboundPhysicalSession(lastAdapterAddress.ifBlank { "UNKNOWN_ADAPTER" })
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
             obdSession.connect()
@@ -3344,17 +3394,74 @@ class ObdViewModel @Inject constructor(
 
     private suspend fun runPostConnectDtcFirstStartup() {
         if (obdSession.state.value != ObdState.CONNECTED) return
-        ensureDtcScanBeforeAction(force = true)
         runCatching {
             val detectedVin = obdSession.fetchVin()
             _vin.value = detectedVin
             detectManufacturer(detectedVin)
-            autoSelectVehicleFromVin(detectedVin)
+            bindVehicleFromObservedVin(detectedVin)
             _currentOdometer.value = obdSession.readOdometer()
         }.onFailure { e ->
-            android.util.Log.e("ObdVM", "Post-DTC startup identification error", e)
+            android.util.Log.e("ObdVM", "Vehicle identity binding failed", e)
+            addTerminalLog(
+                "[IDENTIDAD] No se pudo vincular la sesión física. El scan será efímero y no persistirá evidencia.",
+                TerminalLineType.WARNING,
+            )
         }
+        ensureDtcScanBeforeAction(force = true)
         obdSession.startLivePolling()
+    }
+
+    private fun beginUnboundPhysicalSession(address: String) {
+        currentSessionId = UUID.randomUUID().toString()
+        val physicalConnectionId = sha256Hex(address.toByteArray(Charsets.UTF_8)).take(24)
+        _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
+            diagnosticSessionId = currentSessionId,
+            physicalConnectionId = physicalConnectionId,
+        )
+        _latestDiagnosticScan.value = null
+    }
+
+    private suspend fun bindVehicleFromObservedVin(rawVin: String?): Vehicle? {
+        val cleanVin = rawVin?.let(::normalizeVin)
+        if (cleanVin == null) {
+            addTerminalLog(
+                "[IDENTIDAD] VIN no disponible: sesión UNBOUND. Requiere confirmación explícita antes de persistir o activar hardware.",
+                TerminalLineType.WARNING,
+            )
+            return null
+        }
+        if (_vehicleSessionBinding.value.bindingState == VehicleSessionBindingState.UNBOUND) {
+            _vehicleSessionBinding.value = _vehicleSessionBinding.value.observeVin(
+                observedVin = cleanVin,
+                evidenceId = "ecu-vin:${sha256Hex(cleanVin.toByteArray()).take(16)}",
+            )
+        }
+        val selected = _selectedVehicle.value
+        val selectedVin = selected?.vin?.let(::normalizeVin)
+        if (selected != null && selectedVin != null && selectedVin != cleanVin) {
+            _vehicleSessionBinding.value = _vehicleSessionBinding.value.conflict(
+                observedVin = cleanVin,
+                expectedVin = selectedVin,
+                reason = "El VIN de ECU no coincide con el vehículo Garage seleccionado.",
+            )
+            addTerminalLog(
+                "[IDENTIDAD] CONFLICTO VIN: se bloquearon persistencia y operaciones activas hasta seleccionar el vehículo correcto.",
+                TerminalLineType.ERROR,
+            )
+            return null
+        }
+        val vehicle = autoSelectVehicleFromVin(cleanVin) ?: return null
+        _vehicleSessionBinding.value = _vehicleSessionBinding.value.bindVerifiedVin(
+            vehicleId = vehicle.id,
+            observedVin = cleanVin,
+            expectedVin = vehicle.vin,
+            evidenceId = "ecu-vin:${sha256Hex(cleanVin.toByteArray()).take(16)}",
+        )
+        addTerminalLog(
+            "[IDENTIDAD] Sesión vinculada por VIN verificado a ${vehicle.make} ${vehicle.model}.",
+            TerminalLineType.SYSTEM,
+        )
+        return vehicle
     }
 
     fun stopSession() {
@@ -3723,23 +3830,20 @@ class ObdViewModel @Inject constructor(
             val freshPermanent = professionalReport.codesForBucket(DtcBucket.PERMANENT)
             val freshHistory = professionalReport.codesForBucket(DtcBucket.HISTORY)
 
-            _latestScanActiveDtcs.value = freshActive
-            _latestScanPendingDtcs.value = freshPending
-            _latestScanPermanentDtcs.value = freshPermanent
-            _latestScanHistoricalDtcs.value = freshHistory
+            updateLatestScanProjection(professionalReport)
 
             addTerminalLog(
                 "[SCAN] Activos: ${freshActive.size} | Pendientes: ${freshPending.size} | Permanentes: ${freshPermanent.size} | Históricos: ${freshHistory.size}",
                 TerminalLineType.SYSTEM
             )
 
-            val vehicle = _selectedVehicle.value
+            val vehicle = boundSelectedVehicleOrNull()
             if (vehicle != null) {
                 val evidenceReferences = saveDiagnosticEvidence(professionalReport)
                 saveDetectedDtcFindings(professionalReport, evidenceReferences)
             } else if ((freshActive + freshPending + freshPermanent + freshHistory).isNotEmpty()) {
                 addTerminalLog(
-                    "[SCAN] Códigos visibles en pantalla desde el último escaneo; selecciona un vehículo para guardar historial persistente.",
+                    "[SCAN] Resultado efímero UNBOUND/CONFLICTED: no se persistió ni se mezcló con ningún vehículo Garage.",
                     TerminalLineType.WARNING
                 )
             }
@@ -3830,6 +3934,39 @@ class ObdViewModel @Inject constructor(
         if (detailedLines.isNotEmpty()) addTerminalLogs(detailedLines)
     }
 
+    private fun updateLatestScanProjection(report: DtcScanReport) {
+        val binding = _vehicleSessionBinding.value
+        _latestDiagnosticScan.value = LatestDiagnosticScanProjection(
+            scanId = UUID.randomUUID().toString(),
+            sessionId = currentSessionId,
+            vehicleBindingId = binding.bindingId,
+            vehicleId = binding.vehicleId.takeIf { binding.allowsPersistence },
+            findings = report.records,
+            completeness = report.completeness,
+            capturedAt = System.currentTimeMillis(),
+        )
+    }
+
+    private fun boundSelectedVehicleOrNull(): Vehicle? {
+        val binding = _vehicleSessionBinding.value
+        val selected = _selectedVehicle.value
+        return selected?.takeIf {
+            binding.allowsPersistence && binding.vehicleId == it.id
+        }
+    }
+
+    private fun requireBoundVehicleForCriticalOperation(): Vehicle {
+        return boundSelectedVehicleOrNull() ?: throw IllegalStateException(
+            when (_vehicleSessionBinding.value.bindingState) {
+                VehicleSessionBindingState.CONFLICTED ->
+                    "VIN en conflicto: selecciona el vehículo físico correcto antes de continuar."
+                VehicleSessionBindingState.UNBOUND ->
+                    "Sesión sin vínculo de identidad: verifica VIN o confirma el vehículo explícitamente."
+                else -> "El vehículo seleccionado no pertenece a esta conexión física."
+            }
+        )
+    }
+
     private data class PersistedExchangeReference(
         val exchangeId: String,
         val targetAddress: String?,
@@ -3891,6 +4028,7 @@ class ObdViewModel @Inject constructor(
 
     private suspend fun saveDiagnosticEvidence(report: DtcScanReport): List<PersistedExchangeReference> =
         diagnosticEvidencePersistenceMutex.withLock {
+        requireBoundVehicleForCriticalOperation()
         if (report.rawExchanges.isEmpty()) return@withLock emptyList()
         val transport = when {
             report.protocol.contains("DOIP", ignoreCase = true) -> DiagnosticTransport.DOIP
@@ -3979,16 +4117,39 @@ class ObdViewModel @Inject constructor(
         }
         diagnosticEvidenceDao.appendExchanges(exchangesWithReferences.map { it.first })
         val entities = exchangesWithReferences.map { it.first }
+        val scanId = UUID.randomUUID().toString()
+        val parserVersion = entities.map { it.parserVersion }.distinct().joinToString("+")
+        val merkleRoot = merkleRootSha256(entities.map { it.exchangeHash })
+        val finalizedAt = System.currentTimeMillis()
+        val bindingId = _vehicleSessionBinding.value.bindingId
+        val canonicalManifest = listOf(
+            scanId,
+            currentSessionId,
+            bindingId,
+            merkleRoot,
+            "SHA-256",
+            parserVersion,
+            com.elysium369.meet.BuildConfig.VERSION_NAME,
+            finalizedAt,
+        ).joinToString("|")
+        val signedManifest = DiagnosticManifestSigner.sign(canonicalManifest, finalizedAt).getOrNull()
         diagnosticEvidenceDao.appendSessionIntegrity(
             DiagnosticSessionIntegrityEntity(
-                scanId = UUID.randomUUID().toString(),
+                scanId = scanId,
                 sessionId = currentSessionId,
-                parserVersion = entities.map { it.parserVersion }.distinct().joinToString("+"),
+                parserVersion = parserVersion,
                 firstSequence = entities.first().sessionSequence,
                 lastSequence = entities.last().sessionSequence,
                 leafCount = entities.size,
-                merkleRoot = merkleRootSha256(entities.map { it.exchangeHash }),
-                finalizedAtMs = System.currentTimeMillis(),
+                merkleRoot = merkleRoot,
+                finalizedAtMs = finalizedAt,
+                vehicleBindingId = bindingId,
+                appVersion = com.elysium369.meet.BuildConfig.VERSION_NAME,
+                deviceKeyId = signedManifest?.keyId,
+                signatureAlgorithm = signedManifest?.signatureAlgorithm,
+                signatureBase64 = signedManifest?.signatureBase64,
+                signedAtMs = signedManifest?.signedAtMs,
+                trustState = if (signedManifest != null) "HARDWARE_SIGNED" else "UNSIGNED_HARDWARE_UNAVAILABLE",
             )
         )
         exchangesWithReferences.map { it.second }
@@ -4093,7 +4254,7 @@ class ObdViewModel @Inject constructor(
         report: DtcScanReport,
         evidenceReferences: List<PersistedExchangeReference> = emptyList(),
     ) {
-        val vehicle = _selectedVehicle.value ?: return
+        val vehicle = requireBoundVehicleForCriticalOperation()
         val now = System.currentTimeMillis()
         val records = report.records
         val distinctFindings = records.distinctBy { it.findingKey(vehicle.id) }
@@ -4179,6 +4340,7 @@ class ObdViewModel @Inject constructor(
                     code = record.code,
                     manufacturer = vehicleMake,
                     namespace = record.namespace.name,
+                    rawDtcIdentity = record.codeIdentity.rawCode,
                     failureType = record.codeIdentity.failureType,
                 )
                 val description = com.elysium369.meet.ui.components.DtcUtils.getSpanishDescription(def, record.code)
@@ -4549,6 +4711,7 @@ class ObdViewModel @Inject constructor(
             code = finding.code.uppercase(),
             manufacturer = normalizedMake,
             namespace = finding.namespace.name,
+            rawDtcIdentity = finding.codeIdentity.rawCode,
             failureType = finding.codeIdentity.failureType,
         )?.let(::localizeDtcDefinition)
             ?: generateFallbackDefinition(finding.code.uppercase()).copy(
@@ -4614,6 +4777,12 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun clearDtcs(): ClearDtcResult {
+        val bindingFailure = runCatching { requireBoundVehicleForCriticalOperation() }.exceptionOrNull()
+        if (bindingFailure != null) {
+            val message = bindingFailure.message.orEmpty()
+            _clearDtcResult.value = message
+            return ClearDtcResult.Rejected(emptyList(), message = message)
+        }
         ensureDtcScanBeforeAction()
         _isClearing.value = true
         voiceFeedbackManager.speak("Iniciando borrado de códigos de error de la memoria.", "Starting fault code memory erase.")
@@ -4636,10 +4805,7 @@ class ObdViewModel @Inject constructor(
         result.postClearReport?.let { report ->
             postClearEvidenceReferences = saveDiagnosticEvidence(report)
             saveDetectedDtcFindings(report, postClearEvidenceReferences)
-            _latestScanActiveDtcs.value = report.codesForBucket(DtcBucket.ACTIVE)
-            _latestScanPendingDtcs.value = report.codesForBucket(DtcBucket.PENDING)
-            _latestScanPermanentDtcs.value = report.codesForBucket(DtcBucket.PERMANENT)
-            _latestScanHistoricalDtcs.value = report.codesForBucket(DtcBucket.HISTORY)
+            updateLatestScanProjection(report)
         }
         if (result.verifiedFindingIds.isNotEmpty()) {
             result.postClearReport?.let { report ->
@@ -4891,7 +5057,7 @@ class ObdViewModel @Inject constructor(
     }
 
     private suspend fun persistFindingSnapshot(record: DtcRecord, frame: FreezeFrameReadResult) {
-        val vehicle = _selectedVehicle.value ?: return
+        val vehicle = requireBoundVehicleForCriticalOperation()
         val key = record.findingKey(vehicle.id)
         val finding = diagnosticFindingRepository.getIdentityByStableKey(
             vehicleId = vehicle.id,
@@ -4946,16 +5112,18 @@ class ObdViewModel @Inject constructor(
                 },
             ),
         )
-        diagnosticEvidenceDao.appendFindingSnapshot(
-            FindingDiagnosticSnapshotEntity(
-                id = UUID.randomUUID().toString(),
+        val snapshotId = UUID.randomUUID().toString()
+        diagnosticEvidenceDao.appendFindingSnapshotWithExchangeRefs(
+            snapshot = FindingDiagnosticSnapshotEntity(
+                id = snapshotId,
                 findingId = finding.id,
                 moduleIdentity = key.moduleIdentity,
                 capturedAtMs = capturedAtMs,
                 source = DiagnosticSnapshotSource.SAE_MODE_02.name,
                 parametersJson = parameterEvidence,
                 rawExchangeIdsJson = Json.encodeToString(exchangeIds),
-            )
+            ),
+            exchangeIds = exchangeIds,
         )
     }
 
@@ -4963,7 +5131,7 @@ class ObdViewModel @Inject constructor(
         val detectedVin = obdSession.fetchVin()
         _vin.value = detectedVin
         detectManufacturer(detectedVin)
-        autoSelectVehicleFromVin(detectedVin)
+        bindVehicleFromObservedVin(detectedVin)
         return detectedVin
     }
 
@@ -5017,7 +5185,7 @@ class ObdViewModel @Inject constructor(
             return "BLOCKED: ${decision.reason}"
         }
         ensureDtcScanBeforeAction()
-        return obdSession.sendRawCommand(decision.normalizedCommand)
+        return DiagnosticTerminalTransaction(obdSession).execute(decision.normalizedCommand).rawResponse
     }
 
     /**
@@ -5398,6 +5566,13 @@ class ObdViewModel @Inject constructor(
     // --- Active Testing (Bidirectional) ---
     fun runActiveTest(test: ActiveTest) {
         viewModelScope.launch {
+            val bindingFailure = runCatching { requireBoundVehicleForCriticalOperation() }.exceptionOrNull()
+            if (bindingFailure != null) {
+                val message = bindingFailure.message.orEmpty()
+                addTerminalLog("[SEGURIDAD] $message", TerminalLineType.ERROR)
+                voiceFeedbackManager.speak(message, message)
+                return@launch
+            }
             ensureDtcScanBeforeAction()
             obdSession.runActiveTest(test)
         }
@@ -5413,6 +5588,7 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun resetOilService(): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         voiceFeedbackManager.speak("Ejecutando reset de servicio de aceite.", "Executing oil service reset.")
         val mfr = _manufacturer.value
@@ -5426,24 +5602,28 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun registerBattery(capacityAh: Int): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         val mfr = _manufacturer.value
         return diagnosticManager.registerBattery(mfr, capacityAh)
     }
 
     suspend fun resetEPB(open: Boolean): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         val mfr = _manufacturer.value
         return diagnosticManager.resetEPB(mfr, open)
     }
 
     suspend fun calibrateSAS(): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         val mfr = _manufacturer.value
         return diagnosticManager.calibrateSAS(mfr)
     }
 
     suspend fun relearnThrottle(): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         voiceFeedbackManager.speak("Ejecutando reaprendizaje del cuerpo de aceleración.", "Executing throttle body relearn.")
         val mfr = _manufacturer.value
@@ -5457,6 +5637,7 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun regenerateDPF(): Boolean {
+        requireBoundVehicleForCriticalOperation()
         ensureDtcScanBeforeAction()
         voiceFeedbackManager.speak("Iniciando regeneración del filtro de partículas.", "Starting particulate filter regeneration.")
         val mfr = _manufacturer.value

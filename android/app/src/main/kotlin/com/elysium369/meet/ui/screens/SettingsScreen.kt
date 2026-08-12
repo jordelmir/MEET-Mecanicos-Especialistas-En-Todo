@@ -283,8 +283,8 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             DiagnosticTelemetryConsent.entries.forEach { option ->
                                 val label = when (option) {
                                     DiagnosticTelemetryConsent.DISABLED -> "Solo local · no enviar"
-                                    DiagnosticTelemetryConsent.ANONYMOUS_DIAGNOSTICS -> "Telemetría anónima y redactada"
-                                    DiagnosticTelemetryConsent.FULL_DIAGNOSTICS -> "Compartir diagnóstico redactado"
+                                    DiagnosticTelemetryConsent.ANONYMOUS_REDACTED -> "Telemetría anónima y redactada"
+                                    DiagnosticTelemetryConsent.CONSENTED_REDACTED -> "Compartir diagnóstico redactado"
                                 }
                                 Row(
                                     Modifier

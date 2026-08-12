@@ -27,12 +27,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.obd.TelemetrySample
 import com.elysium369.meet.data.local.entities.DtcCauseEntity
 import com.elysium369.meet.data.local.entities.DtcDefinitionEntity
 import com.elysium369.meet.data.local.entities.DtcRelatedPidEntity
 import com.elysium369.meet.data.local.entities.DtcRepairCostEntity
 import com.elysium369.meet.data.local.entities.DtcVerifiedFixEntity
 import com.elysium369.meet.data.supabase.RepairCase
+import com.elysium369.meet.domain.evidence.EvidenceMetric
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
@@ -42,8 +44,9 @@ data class RepairStep(
     val title: String,
     val description: String,
     val icon: String,
-    val minutes: Int,
-    val difficulty: String
+    val minutes: Int?,
+    val difficulty: String?,
+    val estimateProvenance: String? = null,
 )
 
 private data class DisplayRepairCause(
@@ -55,7 +58,7 @@ private data class DtcSolutionCard(
     val source: String,
     val title: String,
     val description: String,
-    val successRate: Float,
+    val successMetric: EvidenceMetric<Float>? = null,
     val voteCount: Int = 0,
     val partRequired: String? = null,
     val estimatedCostUsd: Float? = null,
@@ -112,8 +115,8 @@ object DtcRepairHelper {
             title = title,
             description = description,
             icon = icon,
-            minutes = 15 + (stepNum * 5) % 20,
-            difficulty = if (stepNum > 3) "Difícil" else if (stepNum > 1) "Medio" else "Fácil"
+            minutes = null,
+            difficulty = null,
         )
     }
 }
@@ -187,7 +190,7 @@ private fun normalizeRepairCause(text: String): String {
 private fun buildLivePidReadings(
     relatedPids: List<DtcRelatedPidEntity>,
     definition: DtcDefinitionEntity?,
-    liveData: Map<String, Float>,
+    telemetrySamples: Map<String, TelemetrySample>,
     isConnected: Boolean,
     dtcCode: String
 ): List<LivePidReading> {
@@ -211,7 +214,7 @@ private fun buildLivePidReadings(
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
             val values = parts.mapNotNull { command ->
-                liveData.resolveLivePidValue(command)?.let { command to it }
+                telemetrySamples.resolveVerifiedPidValue(command)?.let { command to it }
             }
             val firstCore = normalizePidCommand(parts.firstOrNull() ?: spec.command)
             val unit = spec.unit.ifBlank { inferPidUnit(firstCore, spec.title) }
@@ -222,7 +225,7 @@ private fun buildLivePidReadings(
                 "--"
             }
             val judgement = if (hasValue) {
-                evaluatePidJudgement(firstCore, values.first().second, values.map { it.second }, spec.normalRange, liveData)
+                evaluatePidJudgement(firstCore, values.first().second, values.map { it.second }, spec.normalRange, telemetrySamples)
             } else if (isConnected) {
                 PidJudgement(
                     status = "ESPERANDO PID",
@@ -311,7 +314,7 @@ private fun buildFallbackLivePidSpecs(
     }
 }
 
-private fun Map<String, Float>.resolveLivePidValue(command: String): Float? {
+private fun Map<String, TelemetrySample>.resolveVerifiedPidValue(command: String): Float? {
     val compact = normalizePidCommand(command)
     val core = compact.removePrefix("01")
     val aliases = buildList {
@@ -349,7 +352,14 @@ private fun Map<String, Float>.resolveLivePidValue(command: String): Float? {
             "5E" -> add("TRANS_TEMP")
         }
     }
-    return aliases.firstNotNullOfOrNull { this[it] }
+    val sample = aliases.firstNotNullOfOrNull { this[it] }
+        ?: values.firstOrNull { candidate ->
+            aliases.any { alias ->
+                candidate.pid.equals(alias, ignoreCase = true) ||
+                    candidate.name.equals(alias, ignoreCase = true)
+            }
+        }
+    return sample?.takeIf(TelemetrySample::hasRealValue)?.value?.toFloat()
 }
 
 private fun normalizePidCommand(command: String): String {
@@ -450,7 +460,7 @@ private fun evaluatePidJudgement(
     value: Float,
     values: List<Float>,
     normalRange: String?,
-    liveData: Map<String, Float>
+    telemetrySamples: Map<String, TelemetrySample>
 ): PidJudgement {
     parseRange(normalRange)?.let { (min, max) ->
         return if (value in min..max) {
@@ -460,14 +470,14 @@ private fun evaluatePidJudgement(
         }
     }
     val core = normalized.removePrefix("01")
-    val rpm = liveData.resolveLivePidValue("$01 0C") ?: 0f
-    val load = liveData.resolveLivePidValue("$01 04") ?: 0f
-    val ect = liveData.resolveLivePidValue("$01 05")
-    val speed = liveData.resolveLivePidValue("$01 0D") ?: 0f
-    val runTime = liveData.resolveLivePidValue("$01 1F")
-    val baro = liveData.resolveLivePidValue("$01 33")
-    val isEngineOff = rpm <= 100f
-    val isIdle = rpm in 600f..1100f && speed < 8f
+    val rpm = telemetrySamples.resolveVerifiedPidValue("$01 0C")
+    val load = telemetrySamples.resolveVerifiedPidValue("$01 04")
+    val ect = telemetrySamples.resolveVerifiedPidValue("$01 05")
+    val speed = telemetrySamples.resolveVerifiedPidValue("$01 0D")
+    val runTime = telemetrySamples.resolveVerifiedPidValue("$01 1F")
+    val baro = telemetrySamples.resolveVerifiedPidValue("$01 33")
+    val isEngineOff = rpm?.let { it <= 100f } == true
+    val isIdle = rpm?.let { it in 600f..1100f } == true && speed?.let { it < 8f } == true
 
     fun trimJudgement(v: Float, label: String): PidJudgement {
         val absTrim = kotlin.math.abs(v)
@@ -489,8 +499,8 @@ private fun evaluatePidJudgement(
             value !in 0f..100f -> badJudgement("MALO", "Carga calculada fuera de escala OBD (${String.format("%.1f", value)}%).", "Valida PID/decoder y revisa comunicacion antes de diagnosticar componentes.")
             isIdle && value in 15f..45f -> goodJudgement("BUENO", "Carga calculada coherente para ralenti caliente.", "Usa MAP/MAF y trims para confirmar que la carga responde al acelerar.")
             isIdle && value > 65f -> badJudgement("MALO", "Carga muy alta casi detenido; puede indicar esfuerzo, aire/combustible incorrecto o dato sesgado.", "Revisa MAP/MAF, admision obstruida, cuerpo de aceleracion y frenos/compresor si aplica.")
-            value < 5f && rpm > 600f -> watchJudgement("VIGILAR", "Carga muy baja con motor encendido; puede ser ralenti estable o lectura sesgada.", "Acelera suave: la carga debe subir. Si no cambia, revisa MAF/MAP/TPS.")
-            value > 85f && speed < 5f -> watchJudgement("VIGILAR", "Carga alta detenido; puede ser A/C, direccion, alternador cargando o dato sesgado.", "Cruza con RPM, MAP/MAF y voltaje antes de condenar.")
+            value < 5f && rpm?.let { it > 600f } == true -> watchJudgement("VIGILAR", "Carga muy baja con motor encendido; puede ser ralenti estable o lectura sesgada.", "Acelera suave: la carga debe subir. Si no cambia, revisa MAF/MAP/TPS.")
+            value > 85f && speed?.let { it < 5f } == true -> watchJudgement("VIGILAR", "Carga alta detenido; puede ser A/C, direccion, alternador cargando o dato sesgado.", "Cruza con RPM, MAP/MAF y voltaje antes de condenar.")
             else -> goodJudgement("BUENO", "Carga calculada coherente para una lectura general.", "Valida bajo la condicion exacta en que aparece el DTC.")
         }
         "05" -> when {
@@ -498,8 +508,8 @@ private fun evaluatePidJudgement(
             value >= 125f -> criticalJudgement("CRITICO", "Temperatura de refrigerante peligrosa (${value.toInt()}°C).", "Apaga o baja carga si es real; revisa nivel, abanicos, termostato, tapa, bomba y purga.")
             value >= 116f -> badJudgement("MALO", "Temperatura alta (${value.toInt()}°C).", "Verifica abanicos, radiador, termostato, aire en sistema y fugas antes de seguir probando.")
             value > 108f -> watchJudgement("VIGILAR", "Temperatura por encima de zona caliente típica.", "Observa si abanicos bajan la temperatura; confirma con termometro si sospechas sensor.")
-            rpm > 700f && (runTime ?: 0f) > 600f && value < 75f -> badJudgement("MALO", "Motor sigue frio tras varios minutos; posible termostato abierto o ECT sesgado.", "Revisa termostato, nivel/purga y compara ECT contra temperatura real.")
-            value < 85f && rpm > 700f -> watchJudgement("VIGILAR", "Motor aun frio para diagnostico fino de mezcla.", "Espera temperatura de operacion antes de juzgar trims, O2 y catalizador.")
+            rpm?.let { it > 700f } == true && runTime?.let { it > 600f } == true && value < 75f -> badJudgement("MALO", "Motor sigue frio tras varios minutos; posible termostato abierto o ECT sesgado.", "Revisa termostato, nivel/purga y compara ECT contra temperatura real.")
+            value < 85f && rpm?.let { it > 700f } == true -> watchJudgement("VIGILAR", "Motor aun frio para diagnostico fino de mezcla.", "Espera temperatura de operacion antes de juzgar trims, O2 y catalizador.")
             else -> goodJudgement("BUENO", "Temperatura en zona de trabajo normal.", "El motor esta listo para validar closed loop y trims.")
         }
         "06" -> trimJudgement(value, "STFT Banco 1")
@@ -508,7 +518,7 @@ private fun evaluatePidJudgement(
         "09" -> trimJudgement(value, "LTFT Banco 2")
         "0A" -> when {
             value <= 0f -> watchJudgement("VIGILAR", "Presion de combustible no reportada o cero.", "Muchos carros no exponen este PID; usa manometro si el DTC apunta a combustible.")
-            value < 250f && load > 40f -> badJudgement("MALO", "Presion de combustible baja para carga moderada/alta.", "Revisa bomba, filtro, regulador, voltaje de bomba y lineas.")
+            value < 250f && load?.let { it > 40f } == true -> badJudgement("MALO", "Presion de combustible baja para carga moderada/alta.", "Revisa bomba, filtro, regulador, voltaje de bomba y lineas.")
             else -> goodJudgement("BUENO", "Presion reportada sin alerta generica.", "Confirma contra especificacion OEM porque este rango varia por sistema.")
         }
         "0B" -> when {
@@ -537,13 +547,13 @@ private fun evaluatePidJudgement(
         }
         "10" -> when {
             isEngineOff && value > 0.5f -> badJudgement("MALO", "MAF reporta flujo con motor apagado.", "Revisa MAF sesgado, tierra, alimentacion, retorno de senal o decoder.")
-            value <= 0f && rpm > 700f -> badJudgement("MALO", "MAF en cero con motor encendido.", "Revisa MAF desconectado, alimentacion, masa, senal o admision bloqueada.")
+            value <= 0f && rpm?.let { it > 700f } == true -> badJudgement("MALO", "MAF en cero con motor encendido.", "Revisa MAF desconectado, alimentacion, masa, senal o admision bloqueada.")
             isIdle && value in 2f..7f -> goodJudgement("BUENO", "MAF en ralenti dentro de guia generica.", "Grafica contra RPM/TPS: debe subir de forma progresiva y sin saltos.")
             isIdle && value in 1f..12f -> watchJudgement("VIGILAR", "MAF en ralenti fuera de zona ideal pero posible por cilindrada/carga.", "Compara con trims; positivo sugiere MAF bajo o aire no medido, negativo sugiere MAF alto.")
             isIdle -> badJudgement("MALO", "MAF en ralenti muy fuera de guia generica.", "Revisa filtro/admisión, fugas despues del MAF, suciedad del sensor y cableado.")
-            rpm in 2200f..2800f && speed < 10f && value in 15f..25f -> goodJudgement("BUENO", "MAF cerca de 2500 RPM dentro de guia generica.", "Confirma que el ascenso sea lineal entre 1000 y 2500 RPM.")
-            rpm in 2200f..2800f && speed < 10f && (value < 8f || value > 40f) -> watchJudgement("VIGILAR", "MAF cerca de 2500 RPM no cuadra con guia comun.", "Valida cilindrada y especificacion OEM; si trims acompanan, prueba MAF y admision.")
-            value > 80f && load < 35f -> watchJudgement("VIGILAR", "MAF alto para baja carga.", "Revisa sensor sesgado, admision alterada o escala no compatible.")
+            rpm?.let { it in 2200f..2800f } == true && speed?.let { it < 10f } == true && value in 15f..25f -> goodJudgement("BUENO", "MAF cerca de 2500 RPM dentro de guia generica.", "Confirma que el ascenso sea lineal entre 1000 y 2500 RPM.")
+            rpm?.let { it in 2200f..2800f } == true && speed?.let { it < 10f } == true && (value < 8f || value > 40f) -> watchJudgement("VIGILAR", "MAF cerca de 2500 RPM no cuadra con guia comun.", "Valida cilindrada y especificacion OEM; si trims acompanan, prueba MAF y admision.")
+            value > 80f && load?.let { it < 35f } == true -> watchJudgement("VIGILAR", "MAF alto para baja carga.", "Revisa sensor sesgado, admision alterada o escala no compatible.")
             else -> goodJudgement("BUENO", "MAF responde con valor real plausible.", "Debe subir al acelerar; si queda plano, revisa sensor/cableado.")
         }
         "11" -> when {
@@ -561,7 +571,7 @@ private fun evaluatePidJudgement(
         "1F" -> goodJudgement("BUENO", "Tiempo desde arranque: ${value.toInt()} s.", "Ayuda a saber si la prueba se hizo en frio o caliente.")
         "2C" -> when {
             value < 0f || value > 100f -> badJudgement("MALO", "EGR comandado fuera de escala.", "Revisa PID/calibracion o valvula.")
-            value > 5f && rpm < 700f -> watchJudgement("VIGILAR", "EGR comandado en condicion cercana a ralenti.", "Si hay ralenti inestable, revisa EGR trabada abierta.")
+            value > 5f && rpm?.let { it < 700f } == true -> watchJudgement("VIGILAR", "EGR comandado en condicion cercana a ralenti.", "Si hay ralenti inestable, revisa EGR trabada abierta.")
             else -> goodJudgement("BUENO", "Comando EGR plausible.", "Compara comando vs respuesta MAP/MAF si el DTC es EGR.")
         }
         "2F" -> when {
@@ -578,10 +588,10 @@ private fun evaluatePidJudgement(
             else -> goodJudgement("BUENO", "Temperatura de catalizador sin alerta generica.", "Cruza con O2 pre/post catalizador.")
         }
         "42" -> when {
-            value in 13.2f..15.0f && rpm > 400f -> goodJudgement("BUENO", "Voltaje de carga sano con motor encendido.", "Sistema electrico estable para diagnostico.")
-            value in 12.3f..12.8f && rpm <= 400f -> goodJudgement("BUENO", "Voltaje de bateria razonable con motor apagado.", "Enciende motor para confirmar alternador.")
+            value in 13.2f..15.0f && rpm?.let { it > 400f } == true -> goodJudgement("BUENO", "Voltaje de carga sano con motor encendido.", "Sistema electrico estable para diagnostico.")
+            value in 12.3f..12.8f && rpm?.let { it <= 400f } == true -> goodJudgement("BUENO", "Voltaje de bateria razonable con motor apagado.", "Enciende motor para confirmar alternador.")
             value < 11.8f -> criticalJudgement("CRITICO", "Voltaje bajo (${String.format("%.1f", value)} V).", "Carga/probar bateria; voltaje bajo genera DTCs falsos y fallas de comunicacion.")
-            rpm > 400f && value < 12.6f -> badJudgement("MALO", "Motor encendido pero voltaje no sube como carga normal.", "Confirma en bornes con multimetro; revisa alternador, fusible, correa y masas.")
+            rpm?.let { it > 400f } == true && value < 12.6f -> badJudgement("MALO", "Motor encendido pero voltaje no sube como carga normal.", "Confirma en bornes con multimetro; revisa alternador, fusible, correa y masas.")
             value > 16.5f -> criticalJudgement("CRITICO", "Voltaje alto (${String.format("%.1f", value)} V).", "Revisa regulador/alternador antes de danar modulos.")
             value > 15.0f -> watchJudgement("VIGILAR", "Voltaje alto para carga tipica, aunque algunos alternadores inteligentes varian.", "Confirma con multimetro y especificacion OEM antes de condenar.")
             else -> watchJudgement("VIGILAR", "Voltaje fuera de zona ideal para esta condicion.", "Confirma con multimetro en bateria y revisa masas/carga.")
@@ -650,7 +660,7 @@ private fun buildPidHelperText(coreCommand: String, status: String, hasValue: Bo
 private fun buildLiveSectionVerdict(
     readings: List<LivePidReading>,
     isConnected: Boolean,
-    liveData: Map<String, Float>
+    telemetrySamples: Map<String, TelemetrySample>
 ): LiveSectionVerdict {
     if (!isConnected) {
         return LiveSectionVerdict(
@@ -660,7 +670,7 @@ private fun buildLiveSectionVerdict(
             severity = 0
         )
     }
-    if (liveData.isEmpty()) {
+    if (telemetrySamples.values.none(TelemetrySample::hasRealValue)) {
         return LiveSectionVerdict(
             title = "ESPERANDO DATOS",
             detail = "El enlace existe, pero aun no hay PIDs suficientes para dictamen.",
@@ -725,7 +735,15 @@ private fun buildDtcSolutionCards(
                 source = fix.source?.uppercase() ?: "BD VERIFICADA",
                 title = "Solución confirmada",
                 description = fix.fixDescriptionEs,
-                successRate = fix.successRate.coerceIn(0f, 1f),
+                successMetric = fix.voteCount.takeIf { it > 0 }?.let { count ->
+                    EvidenceMetric(
+                        value = fix.successRate.coerceIn(0f, 1f),
+                        source = fix.source ?: "BASE_CONOCIMIENTO_VERIFICADA",
+                        sampleCount = count,
+                        confidenceMethod = "RESULTADOS_REGISTRADOS_NO_CALIBRADOS",
+                        generatedAt = System.currentTimeMillis(),
+                    )
+                },
                 voteCount = fix.voteCount,
                 partRequired = fix.partRequired,
                 estimatedCostUsd = fix.estimatedCostUsd,
@@ -751,7 +769,15 @@ private fun buildDtcSolutionCards(
                         if (repairCase.parts_used.isNotBlank()) appendLine("Partes/materiales usados: ${repairCase.parts_used.trim()}")
                         if (repairCase.time_spent > 0) appendLine("Tiempo real informado: ${repairCase.time_spent} min")
                     }.trim(),
-                    successRate = (repairCase.success_rate / 100.0).toFloat().coerceIn(0f, 1f),
+                    successMetric = repairCase.votes.takeIf { it > 0 }?.let { count ->
+                        EvidenceMetric(
+                            value = (repairCase.success_rate / 100.0).toFloat().coerceIn(0f, 1f),
+                            source = "COMUNIDAD_AUTOREPORTADA",
+                            sampleCount = count,
+                            confidenceMethod = "NO_CALIBRADO",
+                            generatedAt = System.currentTimeMillis(),
+                        )
+                    },
                     voteCount = repairCase.votes,
                     partRequired = repairCase.parts_used.takeIf { it.isNotBlank() },
                     estimatedCostUsd = repairCase.cost.toFloat().takeIf { it > 0f },
@@ -767,7 +793,7 @@ private fun buildDtcSolutionCards(
         .distinctBy { normalizeRepairCause("${it.source}:${it.title}:${it.description.take(180)}") }
         .sortedWith(
             compareByDescending<DtcSolutionCard> { solutionRank(it.source) }
-                .thenByDescending { it.successRate }
+                .thenByDescending { it.successMetric?.value ?: -1f }
                 .thenByDescending { it.voteCount }
         )
         .take(12)
@@ -816,7 +842,6 @@ private fun buildGeneratedDtcSolutions(
                 ${procedureLine.ifBlank { "1. Inspeccion visual. 2. Prueba electrica o mecanica del componente. 3. Reparacion. 4. Borrar DTC y repetir ciclo de manejo." }}
                 $costLine
             """.trimIndent(),
-            successRate = 0.82f,
             difficultyLevel = "medio"
         ),
         buildElectricalSolutionCard(code, family),
@@ -829,7 +854,6 @@ private fun buildGeneratedDtcSolutions(
                 No declares el carro reparado solo porque se borro la luz. Borra el DTC, realiza prueba de manejo con las mismas condiciones del freeze frame, revisa datos en vivo y confirma que el monitor OBD complete sin que el codigo vuelva.
                 Si regresa de inmediato, trata como falla electrica activa. Si regresa despues de calentar o vibrar, sospecha arnes, conector flojo, fuga termica, soldadura fria o componente que falla bajo carga.
             """.trimIndent(),
-            successRate = 0.9f,
             difficultyLevel = "facil"
         )
     )
@@ -871,7 +895,7 @@ private fun classifyDtcSolutionFamily(
 }
 
 private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
-    val (title, description, part, difficulty, rate) = when (family) {
+    val (title, description, part, difficulty, _) = when (family) {
         "misfire" -> arrayOf(
             "Misfire: chispa, combustible y compresion en ese orden",
             """
@@ -882,7 +906,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Bujia, bobina, inyector o reparacion mecanica segun prueba",
             "medio",
-            "0.88"
+            "HEURISTIC_ONLY"
         )
         "lean" -> arrayOf(
             "Mezcla pobre: aire no medido antes de culpar sensores",
@@ -894,7 +918,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Manguera de vacio, empaque, MAF, filtro o bomba segun prueba",
             "medio",
-            "0.87"
+            "HEURISTIC_ONLY"
         )
         "rich" -> arrayOf(
             "Mezcla rica: exceso de combustible o lectura de aire falsa",
@@ -906,7 +930,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "MAF, inyector, regulador, ECT o filtro",
             "medio",
-            "0.84"
+            "HEURISTIC_ONLY"
         )
         "air_metering" -> arrayOf(
             "MAF/MAP/aire: limpiar, medir y comparar carga calculada",
@@ -918,7 +942,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Limpiador MAF, sensor MAF/MAP, ducto admision",
             "facil",
-            "0.85"
+            "HEURISTIC_ONLY"
         )
         "oxygen" -> arrayOf(
             "O2/AFR: no cambiar sensor sin revisar causa externa",
@@ -930,7 +954,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Sensor O2/AFR, fusible, arnes o reparacion de escape",
             "medio",
-            "0.83"
+            "HEURISTIC_ONLY"
         )
         "catalyst" -> arrayOf(
             "Catalizador: confirmar eficiencia antes de gastar fuerte",
@@ -942,7 +966,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Catalizador, reparacion de mezcla, sensor O2 o fuga de escape",
             "dificil",
-            "0.8"
+            "HEURISTIC_ONLY"
         )
         "evap" -> arrayOf(
             "EVAP: humo, tapa y valvulas antes de bajar tanque",
@@ -954,7 +978,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Tapa gasolina, purge, vent, manguera EVAP, canister",
             "medio",
-            "0.86"
+            "HEURISTIC_ONLY"
         )
         "egr" -> arrayOf(
             "EGR: carbon, comando y pasajes",
@@ -966,7 +990,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Valvula EGR, empaque, limpiador EGR, manguera de vacio",
             "medio",
-            "0.84"
+            "HEURISTIC_ONLY"
         )
         "cooling" -> arrayOf(
             "Temperatura/refrigeracion: sensor, termostato y aire en sistema",
@@ -978,7 +1002,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Termostato, sensor ECT, refrigerante, tapa/radiador",
             "medio",
-            "0.85"
+            "HEURISTIC_ONLY"
         )
         "throttle" -> arrayOf(
             "Acelerador electronico: limpieza y reaprendizaje",
@@ -990,7 +1014,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Cuerpo de aceleracion, pedal APP, limpiador throttle",
             "medio",
-            "0.83"
+            "HEURISTIC_ONLY"
         )
         "transmission" -> arrayOf(
             "Transmision: fluido correcto antes de sensores caros",
@@ -1002,7 +1026,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Fluido correcto, filtro, solenoide, arnes o cuerpo de valvulas",
             "dificil",
-            "0.78"
+            "HEURISTIC_ONLY"
         )
         "network" -> arrayOf(
             "Red CAN/UDS: energia, masa y terminacion",
@@ -1014,7 +1038,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Fusible, masa, arnes CAN, modulo afectado",
             "dificil",
-            "0.81"
+            "HEURISTIC_ONLY"
         )
         "chassis" -> arrayOf(
             "Chasis/ABS: sensor, aro reluctor y cable flexible",
@@ -1026,7 +1050,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Sensor ABS, aro reluctor, cableado, rodamiento",
             "medio",
-            "0.82"
+            "HEURISTIC_ONLY"
         )
         "body" -> arrayOf(
             "Body/airbag/confort: baja tension y conectores primero",
@@ -1038,7 +1062,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Conector, fusible, modulo body/SRS segun prueba",
             "dificil",
-            "0.79"
+            "HEURISTIC_ONLY"
         )
         else -> arrayOf(
             "Circuito/sensor: diagnostico electrico profesional",
@@ -1050,7 +1074,7 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
             """.trimIndent(),
             "Sensor/actuador, conector, terminal o arnes",
             "medio",
-            "0.82"
+            "HEURISTIC_ONLY"
         )
     }
 
@@ -1058,7 +1082,6 @@ private fun buildFamilySpecificSolutionCard(family: String): DtcSolutionCard {
         source = "TALLER ELYSIUM",
         title = title,
         description = description,
-        successRate = rate.toFloat(),
         partRequired = part,
         difficultyLevel = difficulty
     )
@@ -1079,7 +1102,6 @@ private fun buildElectricalSolutionCard(code: String, family: String): DtcSoluti
             Repara cables con crimp automotriz sellado o soldadura bien hecha mas termocontraible adhesivo; no retuerzas cables con cinta como reparacion final.
             $extra
         """.trimIndent(),
-        successRate = 0.86f,
         partRequired = "Limpiador de contactos, terminales, termocontraible adhesivo",
         difficultyLevel = "medio"
     )
@@ -1102,7 +1124,6 @@ private fun buildChemicalsSolutionCard(code: String, family: String): DtcSolutio
             No rocíes solventes sobre escape caliente, alternador girando, bobinas energizadas ni cerca de gasolina. Deja evaporar antes de conectar bateria o arrancar.
             $familyAdvice
         """.trimIndent(),
-        successRate = 0.74f,
         partRequired = "Limpiador especifico, penetrante, aditivo solo si aplica",
         difficultyLevel = "facil"
     )
@@ -1123,7 +1144,6 @@ private fun buildHardwareExtractionSolutionCard(code: String, family: String): D
             Soldar una tuerca a un perno roto es ultimo recurso: bateria desconectada, modulos sensibles protegidos segun procedimiento, masa de soldadora cerca del punto, zona limpia de aceite/gasolina y operador competente.
             Si se dana rosca, repara con helicoil/timesert o inserto equivalente; silicon y pegamento no sustituyen torque ni rosca estructural.
         """.trimIndent(),
-        successRate = 0.68f,
         partRequired = "Penetrante, dado 6 puntas, extractor, helicoil/timesert si aplica",
         difficultyLevel = "dificil"
     )
@@ -1134,22 +1154,22 @@ object DtcRepairDatabase {
         val u = code.uppercase()
         return when {
             u.startsWith("P030") || u == "P0300" -> listOf(
-                RepairStep("Prueba de Bobinas de Encendido", "Intercambia la bobina del cilindro afectado con uno sano (ej: cambia bobina 1 a la posición 2). Escanea de nuevo el motor; si la falla (misfire) se desplaza al cilindro 2, la bobina está defectuosa y debe ser reemplazada.", "⚡", 15, "Fácil"),
-                RepairStep("Inspección de la Bujía", "Desmonta la bujía del cilindro que falla usando una copa para bujías de 5/8\". Inspecciona el desgaste del electrodo, presencia de aceite, depósitos de carbón o grietas en la cerámica. Calibra la holgura del electrodo según especificaciones del manual del fabricante o reemplázala.", "🔧", 20, "Fácil"),
-                RepairStep("Verificación de Inyectores de Combustible", "Usa un destornillador largo como estetoscopio apoyándolo en el cuerpo del inyector. Debes escuchar un tic-tac constante con el motor en marcha. Adicionalmente, mide la resistencia del inyector (debe marcar entre 11 y 16 ohmios). Si marca infinito o resistencia fuera de rango, reemplázalo.", "⛽", 25, "Medio"),
-                RepairStep("Prueba de Compresión", "Si hay chispa y combustible correctos, realiza una prueba de compresión utilizando un manómetro en el cilindro afectado. La presión debe ser superior a 120 PSI y no variar más del 10% con respecto a los otros cilindros. Valores bajos indican fuga en válvulas, junta de culata rota o anillos desgastados.", "📊", 30, "Difícil")
+                RepairStep("Prueba de Bobinas de Encendido", "Intercambia la bobina del cilindro afectado con otra posición compatible. Vuelve a escanear; si la falla se desplaza al cilindro receptor, la bobina queda identificada como sospechosa. Confirma el procedimiento y compatibilidad en la documentación del vehículo antes de sustituir.", "⚡", null, null),
+                RepairStep("Inspección de la Bujía", "Retira la bujía con la herramienta correcta e inspecciona electrodo, aislador, depósitos y contaminación. Compara separación, tipo y torque con la especificación OEM del vehículo antes de ajustar o sustituir.", "🔧", null, null),
+                RepairStep("Verificación de Inyectores de Combustible", "Comprueba mando eléctrico, alimentación, señal y contribución del inyector con herramientas apropiadas. La resistencia y la presión aceptables dependen del inyector y del sistema; consulta la especificación OEM y no condenes la pieza con un rango genérico.", "⛽", null, null),
+                RepairStep("Prueba mecánica del cilindro", "Si chispa y combustible fueron verificados, mide compresión y, cuando corresponda, fuga de cilindro. Compara entre cilindros y contra la especificación OEM; un valor aislado sin procedimiento, temperatura y condiciones de prueba no confirma una reparación.", "📊", null, null)
             )
             u == "P0171" || u == "P0174" -> listOf(
-                RepairStep("Búsqueda de Fugas de Vacío", "Revisa todas las mangueras de vacío del colector de admisión, válvula PCV y conductos de hule del filtro de aire. El aire no medido que entra al motor causa mezcla pobre. Rocía un poco de agua jabonosa o limpiador de carburador en las juntas con el motor encendido; si las RPM cambian, localizaste la fuga.", "💨", 20, "Fácil"),
-                RepairStep("Limpieza del Sensor MAF", "Desmonta el sensor de flujo de masa de aire (MAF) de la tubería de admisión. Aplica abundante aerosol limpiador de sensores MAF directamente sobre el filamento caliente (NUNCA lo toques físicamente ni uses solventes agresivos). Deja secar por 10 minutos y vuelve a instalar.", "🧼", 15, "Fácil"),
-                RepairStep("Prueba de Presión de Combustible", "Conecta un manómetro en la válvula de servicio del riel de inyectores. Abre el switch y mide la presión de la bomba. Debe mantenerse constante (ej: 40-50 PSI). Si es baja, reemplaza el filtro de gasolina obstruido o la bomba de combustible.", "⛽", 30, "Medio"),
-                RepairStep("Inspección del Sensor de Oxígeno", "Conéctate al scanner OBD2 y grafica el voltaje del Sensor de Oxígeno del Banco 1. El voltaje debe oscilar rápidamente entre 0.1V y 0.9V. Si el sensor se queda estancado en un solo valor cercano a cero voltios de manera constante, reemplázalo.", "📡", 25, "Medio")
+                RepairStep("Búsqueda de aire no medido", "Inspecciona admisión, PCV, juntas y mangueras mediante un método seguro y apropiado, preferentemente humo controlado. No rocíes productos inflamables sobre un motor caliente. Correlaciona el hallazgo con fuel trims y condiciones de carga.", "💨", null, null),
+                RepairStep("Inspección del sensor MAF", "Revisa contaminación, alimentación, masa, señal, conector y tubería. Limpia únicamente si el fabricante del sensor lo permite, con producto específico y sin tocar el elemento; valida el resultado con datos antes y después.", "🧼", null, null),
+                RepairStep("Prueba de presión de combustible", "Mide presión y retención con el adaptador y las precauciones correctas. Compara exclusivamente contra la especificación OEM para ese motor y condición; una presión baja no identifica por sí sola bomba, filtro, regulador o alimentación.", "⛽", null, null),
+                RepairStep("Evaluación de sensores de mezcla", "Grafica sensores de oxígeno o relación aire-combustible junto con trims, carga y temperatura. El comportamiento esperado depende de la tecnología y estrategia del vehículo; verifica tipo y especificación antes de condenar un sensor.", "📡", null, null)
             )
             else -> listOf(
-                RepairStep("Inspección del Conector y Cableado", "Localiza el sensor o actuador asociado al código $code. Desconecta el terminal eléctrico, busca rastros de corrosión o humedad. Limpia los pines con limpiador de contactos electrónicos. Revisa que los cables del arnés no estén pelados, derretidos por calor o quebrados.", "🔌", 15, "Fácil"),
-                RepairStep("Medición de Voltaje de Referencia", "Pon el switch en posición ON con el motor apagado. Con un multímetro digital en corriente directa (VDC), mide el voltaje en el pin de señal de alimentación del arnés desconectado del sensor. Debe marcar exactamente 5.0V o 12.0V de alimentación de la ECU.", "⚡", 15, "Fácil"),
-                RepairStep("Prueba de Resistencia de Componente", "Configura el multímetro en ohmios (Ω). Mide la resistencia entre las terminales internas del sensor o solenoide retirado del vehículo. Compara la lectura con los valores especificados en el manual de taller. Si la lectura es cero (cortocircuito) o infinito (circuito abierto), el sensor está dañado.", "📟", 20, "Medio"),
-                RepairStep("Ciclo de Manejo y Confirmación", "Utiliza la función de Borrar Códigos de Elysium Vanguard para apagar la luz Check Engine. Conduce el vehículo por 10-15 minutos en ciudad y carretera para completar un ciclo de conducción de la ECU. Vuelve a escanear; si el monitor está completo y no hay DTCs activos, la reparación fue exitosa.", "🚗", 20, "Fácil")
+                RepairStep("Inspección del conector y cableado", "Identifica primero el componente y terminales asociados a $code con información aplicable al vehículo. Inspecciona daños, humedad, corrosión, tensión de terminales y continuidad sin forzar ni puentear circuitos.", "🔌", null, null),
+                RepairStep("Medición del circuito", "Con el diagrama correcto, mide alimentación, masa, referencia y señal en los puntos y condiciones indicados por el fabricante. No asumas que todo circuito usa 5 V o 12 V.", "⚡", null, null),
+                RepairStep("Prueba del componente", "Aplica la prueba indicada para el tipo exacto de sensor o actuador y compara con la especificación OEM. Una lectura cero o infinita puede ser válida o inválida según el componente, circuito y condición de medición.", "📟", null, null),
+                RepairStep("Verificación posterior", "Después de la intervención, conserva el escaneo previo, borra únicamente cuando sea seguro y vuelve a observar el DTC bajo las condiciones requeridas. Declara resuelto solo con ausencia verificada, monitores pertinentes y evidencia posterior suficiente.", "🚗", null, null)
             )
         }
     }
@@ -1187,7 +1207,7 @@ fun DtcRepairGuideScreen(
     
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val liveData by viewModel.liveData.collectAsState()
+    val telemetrySamples by viewModel.telemetrySamples.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val isScannerConnected = connectionState == ObdState.CONNECTED
 
@@ -1222,7 +1242,8 @@ fun DtcRepairGuideScreen(
                         "facil" -> "Fácil"
                         "medio" -> "Medio"
                         else -> "Difícil"
-                    }
+                    },
+                    estimateProvenance = "Procedimiento registrado en la base de conocimiento",
                 )
             }
         } else {
@@ -1241,7 +1262,7 @@ fun DtcRepairGuideScreen(
                         lines.mapIndexed { idx, line -> DtcRepairHelper.parseStepString(line, idx + 1) }
                     }
                 } catch (e: Exception) {
-                    listOf(RepairStep("Procedimiento de Diagnóstico", rawSteps, "🔧", 20, "Medio"))
+                    listOf(RepairStep("Procedimiento de Diagnóstico", rawSteps, "🔧", null, null))
                 }
             } else {
                 DtcRepairDatabase.getSteps(dtcCode)
@@ -1293,20 +1314,20 @@ fun DtcRepairGuideScreen(
         )
     }
 
-    val livePidReadings = remember(relatedPids, definition, liveData, isScannerConnected, dtcCode) {
+    val livePidReadings = remember(relatedPids, definition, telemetrySamples, isScannerConnected, dtcCode) {
         buildLivePidReadings(
             relatedPids = relatedPids,
             definition = definition,
-            liveData = liveData,
+            telemetrySamples = telemetrySamples,
             isConnected = isScannerConnected,
             dtcCode = dtcCode
         )
     }
-    val liveSectionVerdict = remember(livePidReadings, isScannerConnected, liveData) {
+    val liveSectionVerdict = remember(livePidReadings, isScannerConnected, telemetrySamples) {
         buildLiveSectionVerdict(
             readings = livePidReadings,
             isConnected = isScannerConnected,
-            liveData = liveData
+            telemetrySamples = telemetrySamples
         )
     }
 
@@ -1844,7 +1865,8 @@ fun DtcRepairGuideScreen(
                                             glowColor = when (targetStep.difficulty) {
                                                 "Fácil" -> MeetColors.neonGreen
                                                 "Medio" -> MeetColors.warning
-                                                else -> MeetColors.error
+                                                "Difícil" -> MeetColors.error
+                                                else -> MeetColors.cyberCyan
                                             },
                                             enableHolo3D = true
                                         ) {
@@ -1883,7 +1905,8 @@ fun DtcRepairGuideScreen(
                                                                 when (targetStep.difficulty) {
                                                                     "Fácil" -> MeetColors.neonGreen.copy(alpha = 0.12f)
                                                                     "Medio" -> MeetColors.warning.copy(alpha = 0.12f)
-                                                                    else -> MeetColors.error.copy(alpha = 0.12f)
+                                                                    "Difícil" -> MeetColors.error.copy(alpha = 0.12f)
+                                                                    else -> MeetColors.cyberCyan.copy(alpha = 0.12f)
                                                                 }
                                                             )
                                                             .border(
@@ -1891,18 +1914,20 @@ fun DtcRepairGuideScreen(
                                                                 when (targetStep.difficulty) {
                                                                     "Fácil" -> MeetColors.neonGreen
                                                                     "Medio" -> MeetColors.warning
-                                                                    else -> MeetColors.error
+                                                                    "Difícil" -> MeetColors.error
+                                                                    else -> MeetColors.cyberCyan
                                                                 },
                                                                 RoundedCornerShape(6.dp)
                                                             )
                                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                                     ) {
                                                         Text(
-                                                            text = targetStep.difficulty.uppercase(),
+                                                            text = targetStep.difficulty?.uppercase() ?: "NIVEL NO VERIFICADO",
                                                             color = when (targetStep.difficulty) {
                                                                 "Fácil" -> MeetColors.neonGreen
                                                                 "Medio" -> MeetColors.warning
-                                                                else -> MeetColors.error
+                                                                "Difícil" -> MeetColors.error
+                                                                else -> MeetColors.cyberCyan
                                                             },
                                                             fontWeight = FontWeight.Black,
                                                             fontSize = 8.sp,
@@ -1927,10 +1952,13 @@ fun DtcRepairGuideScreen(
                                                 )
                                                 Spacer(modifier = Modifier.height(16.dp))
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text("⏱️ Tiempo Estimado: ", color = MeetColors.textSecondary, fontSize = 11.sp)
+                                                    Text("⏱️ Tiempo: ", color = MeetColors.textSecondary, fontSize = 11.sp)
                                                     Text(
-                                                        "${targetStep.minutes} min",
-                                                        color = Color.White,
+                                                        targetStep.minutes
+                                                            ?.takeIf { targetStep.estimateProvenance != null }
+                                                            ?.let { "$it min · ${targetStep.estimateProvenance}" }
+                                                            ?: "No estimado; depende del vehículo y la prueba física",
+                                                        color = if (targetStep.minutes == null) MeetColors.warning else Color.White,
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         fontFamily = FontFamily.Monospace
@@ -1955,10 +1983,10 @@ fun DtcRepairGuideScreen(
                                     }
                                     val isLast = activeStepIdx == steps.size - 1
                                     EliteButton(
-                                        text = if (isLast) "REPARACIÓN LISTA" else "SIGUIENTE PASO",
+                                        text = if (isLast) "TERMINÉ · VERIFICAR" else "SIGUIENTE PASO",
                                         onClick = {
                                             if (isLast) {
-                                                navController.popBackStack()
+                                                navController.navigate("scanner") { launchSingleTop = true }
                                             } else {
                                                 activeStepIdx++
                                             }
@@ -1995,7 +2023,9 @@ fun DtcRepairGuideScreen(
                                                 fontWeight = FontWeight.Black
                                             )
                                             Text(
-                                                if (liveData.isNotEmpty()) "PIDs activos recibidos: ${liveData.size}" else "Sin datos OBD en vivo todavía",
+                                                if (telemetrySamples.values.any(TelemetrySample::hasRealValue)) {
+                                                    "PIDs OBD reales válidos: ${telemetrySamples.values.count(TelemetrySample::hasRealValue)}"
+                                                } else "Sin datos OBD reales válidos todavía",
                                                 color = MeetColors.textSecondary,
                                                 fontSize = 10.sp,
                                                 fontFamily = FontFamily.Monospace
@@ -2015,15 +2045,24 @@ fun DtcRepairGuideScreen(
                                         }
                                     }
 
-                                    val rpm = liveData.resolveLivePidValue("$01 0C")
-                                    val speed = liveData.resolveLivePidValue("$01 0D")
-                                    val temp = liveData.resolveLivePidValue("$01 05")
-                                    val voltage = liveData.resolveLivePidValue("$01 42")
+                                    val rpm = telemetrySamples.resolveVerifiedPidValue("$01 0C")
+                                    val speed = telemetrySamples.resolveVerifiedPidValue("$01 0D")
+                                    val temp = telemetrySamples.resolveVerifiedPidValue("$01 05")
+                                    val voltage = telemetrySamples.resolveVerifiedPidValue("$01 42")
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        LiveMiniMetric("RPM", rpm?.toInt()?.toString() ?: "--", if ((rpm ?: 0f) > 400f) "MOTOR ON" else "MOTOR OFF", Modifier.weight(1f))
+                                        LiveMiniMetric(
+                                            "RPM",
+                                            rpm?.toInt()?.toString() ?: "--",
+                                            when {
+                                                rpm == null -> "NO VERIFICADO"
+                                                rpm > 400f -> "MOTOR ON"
+                                                else -> "MOTOR OFF"
+                                            },
+                                            Modifier.weight(1f),
+                                        )
                                         LiveMiniMetric("KM/H", speed?.toInt()?.toString() ?: "--", "VEL.", Modifier.weight(1f))
                                         LiveMiniMetric("TEMP", temp?.toInt()?.let { "$it°" } ?: "--", "ECT", Modifier.weight(1f))
                                         LiveMiniMetric("VOLT", voltage?.let { String.format("%.1f", it) } ?: "--", "ECU", Modifier.weight(1f))
@@ -2205,11 +2244,18 @@ fun DtcRepairGuideScreen(
                                                     )
                                                 }
 
+                                                val provenRate = solution.successMetric
                                                 Text(
-                                                    text = "Confianza: ${(solution.successRate * 100).toInt()}%",
-                                                    color = accentColor,
+                                                    text = provenRate?.let { metric ->
+                                                        if (metric.confidenceMethod == "CALIBRATED_HOLDOUT") {
+                                                            "Resultado calibrado: ${(metric.value * 100).toInt()}% · ${metric.sampleCount} muestra(s) · ${metric.source}"
+                                                        } else {
+                                                            "Evidencia registrada · ${metric.sampleCount} muestra(s) · ${metric.source} · sin probabilidad calibrada"
+                                                        }
+                                                    } ?: "Sin estadística verificable",
+                                                    color = if (provenRate == null) MeetColors.warning else accentColor,
                                                     fontWeight = FontWeight.Black,
-                                                    fontSize = 12.sp,
+                                                    fontSize = 10.sp,
                                                     fontFamily = FontFamily.Monospace
                                                 )
                                             }

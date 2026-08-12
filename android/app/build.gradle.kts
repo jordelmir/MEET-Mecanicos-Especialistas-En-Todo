@@ -421,3 +421,43 @@ tasks.register("verifyNoSecretsInSource") {
 tasks.named("preBuild") {
     dependsOn("verifyNoSecretsInSource")
 }
+
+tasks.register("generateReleaseSbom") {
+    group = "verification"
+    description = "Generates a CycloneDX 1.5 SBOM from the resolved release runtime graph."
+    val outputFile = layout.buildDirectory.file("reports/sbom/meet-release.cdx.json")
+    outputs.file(outputFile)
+    doLast {
+        val artifacts = configurations.getByName("releaseRuntimeClasspath")
+            .resolvedConfiguration.resolvedArtifacts
+            .sortedWith(compareBy({ it.moduleVersion.id.group }, { it.name }, { it.moduleVersion.id.version }))
+        val components = artifacts.map { artifact ->
+            val sha256 = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(artifact.file.readBytes())
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            mapOf(
+                "type" to "library",
+                "group" to artifact.moduleVersion.id.group,
+                "name" to artifact.name,
+                "version" to artifact.moduleVersion.id.version,
+                "purl" to "pkg:maven/${artifact.moduleVersion.id.group}/${artifact.name}@${artifact.moduleVersion.id.version}",
+                "hashes" to listOf(mapOf("alg" to "SHA-256", "content" to sha256)),
+            )
+        }
+        val componentIdentity = components.joinToString("\n") { component ->
+            "${component["purl"]}|${component["hashes"]}"
+        }
+        val serial = java.util.UUID.nameUUIDFromBytes(componentIdentity.toByteArray(Charsets.UTF_8))
+        val bom = mapOf(
+            "bomFormat" to "CycloneDX",
+            "specVersion" to "1.5",
+            "serialNumber" to "urn:uuid:$serial",
+            "version" to 1,
+            "metadata" to mapOf("component" to mapOf("type" to "application", "name" to "MEET Android")),
+            "components" to components,
+        )
+        val target = outputFile.get().asFile
+        target.parentFile.mkdirs()
+        target.writeText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(bom)))
+    }
+}
