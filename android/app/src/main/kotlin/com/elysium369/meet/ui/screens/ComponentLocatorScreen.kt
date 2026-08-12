@@ -127,6 +127,7 @@ fun ComponentLocatorScreen(
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val canonicalFindingProjection by locatorViewModel.spatialProjection.collectAsState()
     val canonicalFindingCode by locatorViewModel.spatialFindingCode.collectAsState()
+    val diagnosticPathTargets by locatorViewModel.diagnosticPathTargets.collectAsState()
     LaunchedEffect(initialFindingId) {
         initialFindingId?.takeIf(String::isNotBlank)?.let(locatorViewModel::loadFindingProjection)
     }
@@ -496,6 +497,49 @@ fun ComponentLocatorScreen(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Black
                         )
+                    }
+                }
+            }
+        }
+
+        if (diagnosticPathTargets.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    "RUTA CAUSAL · MEDICIÓN GUIADA",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    diagnosticPathTargets.forEach { target ->
+                        Column(
+                            modifier = Modifier
+                                .widthIn(min = 170.dp, max = 260.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MeetColors.cardBackground.copy(alpha = 0.86f))
+                                .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                                .padding(10.dp),
+                        ) {
+                            Text(target.layer, color = MeetColors.neonPurple, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            Text(target.label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(target.path, color = MeetColors.textSecondary, fontSize = 9.sp, maxLines = 2)
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                "MEDIR AQUÍ",
+                                color = MeetColors.neonGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.clickable {
+                                    navController.navigate("scanner") { launchSingleTop = true }
+                                },
+                            )
+                        }
                     }
                 }
             }

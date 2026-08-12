@@ -42,12 +42,15 @@ data class DiagnosticFindingSummary(
     val severity: String,
     val occurrenceCount: Int,
     val lastSeenAt: Long,
+    val namespace: String,
+    val failureType: Int,
 )
 
 fun CanonicalDiagnosticFinding.toSummary(): DiagnosticFindingSummary {
     val observedTimeline = timeline.filter { it.observationState == "OBSERVED" }
     val latestObservedSemantics = observedTimeline.maxWithOrNull(
-        compareBy<DiagnosticObservationEntity> { it.observedAt }
+        compareBy<DiagnosticObservationEntity> { it.findingSequence }
+            .thenBy { it.observedAt }
             .thenBy { it.sessionSequence }
             .thenBy { it.id },
     )?.semantics.orEmpty()
@@ -68,6 +71,8 @@ fun CanonicalDiagnosticFinding.toSummary(): DiagnosticFindingSummary {
         severity = "NO_CALIBRADA",
         occurrenceCount = observedTimeline.size,
         lastSeenAt = timeline.maxOfOrNull { it.observedAt } ?: identity.createdAtMs,
+        namespace = identity.diagnosticNamespace,
+        failureType = identity.failureType,
     )
 }
 
@@ -75,7 +80,8 @@ fun CanonicalDiagnosticFinding.toSummary(): DiagnosticFindingSummary {
 object FindingStateProjector {
     fun project(timeline: List<DiagnosticObservationEntity>): ProjectedFindingState {
         val latest = timeline.maxWithOrNull(
-            compareBy<DiagnosticObservationEntity> { it.observedAt }
+            compareBy<DiagnosticObservationEntity> { it.findingSequence }
+                .thenBy { it.observedAt }
                 .thenBy { it.sessionSequence }
                 .thenBy { it.id },
         )
@@ -107,6 +113,7 @@ interface DiagnosticFindingRepository {
         ecuEndpointId: String,
         namespace: String,
         rawDtcIdentity: String,
+        failureType: Int,
     ): DiagnosticFindingEntity?
     suspend fun insertIdentity(finding: DiagnosticFindingEntity): Long
     suspend fun rebuildProjection(findingId: String): ProjectedFindingState?
@@ -164,11 +171,13 @@ class RoomDiagnosticFindingRepository @Inject constructor(
         ecuEndpointId: String,
         namespace: String,
         rawDtcIdentity: String,
+        failureType: Int,
     ): DiagnosticFindingEntity? = findingDao.getByStableIdentity(
         vehicleId = vehicleId,
         ecuEndpointId = ecuEndpointId,
         namespace = namespace,
         rawDtcIdentity = rawDtcIdentity,
+        failureType = failureType,
     )
 
     override suspend fun insertIdentity(finding: DiagnosticFindingEntity): Long =

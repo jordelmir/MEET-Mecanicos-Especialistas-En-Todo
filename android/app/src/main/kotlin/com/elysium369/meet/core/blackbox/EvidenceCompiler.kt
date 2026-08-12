@@ -45,7 +45,7 @@ object EvidenceCompiler {
         videoFile: File,
         audioFile: File?,
         telemetryJson: String,
-        dtcsList: List<String>
+        findings: List<BlackBoxFindingReference>
     ): EvidencePackageEntity = withContext(Dispatchers.IO) {
         val timestamp = System.currentTimeMillis()
         val formattedDate = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).apply {
@@ -55,7 +55,7 @@ object EvidenceCompiler {
         
         // 1. Generate PDF Report on Android canvas
         val pdfFile = File(outputDir, "incident_report_$formattedDate.pdf")
-        generatePdfReport(pdfFile, eventType, gpsLocation, timestamp, telemetryJson, dtcsList)
+        generatePdfReport(pdfFile, eventType, gpsLocation, timestamp, telemetryJson, findings)
 
         // 2. Generate telemetry JSON file
         val jsonFile = File(outputDir, "telemetry_$formattedDate.json").apply {
@@ -116,7 +116,7 @@ object EvidenceCompiler {
             videoPath = encryptedPackage.absolutePath,
             audioPath = "",
             pidSnapshot = "ENCRYPTED_IN_VAULT",
-            dtcs = "ENCRYPTED_COUNT:${dtcsList.size}",
+            dtcs = "ENCRYPTED_CANONICAL_FINDING_COUNT:${findings.size}",
             hashSha256 = hash,
             signatureVersion = signature,
             createdAt = timestamp
@@ -129,7 +129,7 @@ object EvidenceCompiler {
         gps: String,
         timestamp: Long,
         telemetryJson: String,
-        dtcs: List<String>
+        findings: List<BlackBoxFindingReference>
     ) {
         val doc = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size
@@ -184,7 +184,14 @@ object EvidenceCompiler {
         paint.color = Color.parseColor("#475569")
         
         // Simple mock parse since it's displaying baseline parameters
-        canvas.drawText("Códigos DTC Activos: ${if (dtcs.isEmpty()) "Ninguno" else dtcs.joinToString(", ")}", 40f, 290f, paint)
+        val findingText = if (findings.isEmpty()) {
+            "Ningún finding canónico capturado"
+        } else {
+            findings.joinToString(" | ") { finding ->
+                "${finding.displayCode}@${finding.ecuEndpointId}/${finding.namespace} [${finding.status}] id=${finding.findingId}"
+            }
+        }
+        canvas.drawText("Findings canónicos: ${findingText.take(105)}", 40f, 290f, paint)
 
         // Safety Warnings / Legal Notice
         paint.color = Color.parseColor("#F8FAFC")
@@ -327,3 +334,11 @@ object EvidenceCompiler {
         }
     }
 }
+    data class BlackBoxFindingReference(
+        val findingId: String,
+        val displayCode: String,
+        val ecuEndpointId: String,
+        val namespace: String,
+        val status: String,
+        val failureType: Int,
+    )

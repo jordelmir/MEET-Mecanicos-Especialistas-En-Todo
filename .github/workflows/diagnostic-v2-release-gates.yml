@@ -78,6 +78,13 @@ jobs:
         run: bash tools/scan-git-history-secrets.sh
       - name: Production invariants
         run: bash tools/verify-production-guards.sh
+      - name: Production invariant negative self-tests
+        run: bash tools/test-production-guards.sh
+      - name: Gradle configuration preflight
+        working-directory: android
+        run: |
+          ./gradlew help
+          ./gradlew :app:tasks
       - name: Diagnostic unit and property tests
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest
@@ -87,6 +94,27 @@ jobs:
       - name: Room schema verification and debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug
+      - name: Require Room schema authority through current database
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema_dir="android/app/schemas/com.elysium369.meet.data.local.MeetDatabase"
+          current_version="$(sed -nE 's/^[[:space:]]*version = ([0-9]+),/\1/p' android/app/src/main/kotlin/com/elysium369/meet/data/local/MeetDatabase.kt)"
+          [[ "$current_version" =~ ^[0-9]+$ ]] || { echo "::error::Unable to resolve Room version"; exit 1; }
+          for version in $(seq 53 "$current_version"); do
+            test -s "$schema_dir/$version.json" || {
+              echo "::error::Room schema $version.json was not emitted by the compiled model"
+              exit 1
+            }
+            git ls-files --error-unmatch "$schema_dir/$version.json" >/dev/null 2>&1 || {
+              echo "::error::Room schema $version.json exists only as an uncommitted build output"
+              exit 1
+            }
+          done
+          git diff --exit-code -- "$schema_dir" || {
+            echo "::error::Compiled Room model differs from committed schema authority"
+            exit 1
+          }
       - name: Ephemeral release signing
         shell: bash
         run: |
@@ -170,6 +198,17 @@ jobs:
       - name: Create API 35 migration emulator
         shell: bash
         run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root" || { echo "::error::Android SDK root is unavailable"; exit 1; }
+          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/cmdline-tools/bin:$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
+          for tool in sdkmanager avdmanager adb emulator; do
+            command -v "$tool" >/dev/null 2>&1 || {
+              echo "::error::Required Android migration tool missing: $tool"
+              exit 1
+            }
+          done
+          sdkmanager --licenses < /dev/null >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64"
           echo no | avdmanager create avd --force --name meet-migration-api35 --package "system-images;android-35;google_apis;x86_64"
           nohup emulator -avd meet-migration-api35 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
@@ -179,3 +218,40 @@ jobs:
       - name: Execute adversarial Room migration conformance
         working-directory: android
         run: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.elysium369.meet.data.local.DiagnosticMigrationConformanceTest
+
+  proof-status:
+    if: always()
+    needs: [release-gates, migration-conformance-emulator]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download release evidence when available
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: meet-release-evidence-*
+          path: proof-artifacts
+          merge-multiple: true
+      - name: Generate proof status only from job outcomes and artifact bytes
+        run: |
+          python3 tools/vehicle-truth/generate-proof-status.py \
+            --output docs/generated/4.17-proof-status.json \
+            --commit "${GITHUB_SHA}" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --version-name "4.17.0" \
+            --version-code 45 \
+            --gate "release-gates=${{ needs.release-gates.result }}" \
+            --gate "migration-conformance=${{ needs.migration-conformance-emulator.result }}" \
+            --artifact "debug-apk=proof-artifacts/app-debug.apk" \
+            --artifact "release-apk=proof-artifacts/app-release.apk" \
+            --artifact "release-aab=proof-artifacts/app-release.aab" \
+            --artifact "sbom=proof-artifacts/meet-release.cdx.json"
+      - name: Archive proof status
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: meet-proof-status-${{ github.sha }}
+          retention-days: 90
+          if-no-files-found: error
+          path: docs/generated/4.17-proof-status.json

@@ -150,6 +150,10 @@ data class DerivedMetricEntity(
     val confidence: Double = 0.0,
     val inputPidsJson: String = "[]",
     val formulaVersion: String = "UNVERSIONED",
+    val inputQuality: Double = 0.0,
+    val formulaAuthority: String = "UNREVIEWED_FORMULA",
+    val derivationCompleteness: Double = 0.0,
+    val measurementUncertainty: Double? = null,
 )
 
 @Entity(tableName = "health_scores", indices = [Index("vehicleId"), Index("computedAt")])

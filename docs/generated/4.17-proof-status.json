@@ -1,0 +1,45 @@
+{
+  "artifacts": {
+    "debug-apk": {
+      "path": "proof-artifacts/app-debug.apk",
+      "present": false,
+      "sha256": null,
+      "sizeBytes": null
+    },
+    "release-aab": {
+      "path": "proof-artifacts/app-release.aab",
+      "present": false,
+      "sha256": null,
+      "sizeBytes": null
+    },
+    "release-apk": {
+      "path": "proof-artifacts/app-release.apk",
+      "present": false,
+      "sha256": null,
+      "sizeBytes": null
+    },
+    "sbom": {
+      "path": "proof-artifacts/meet-release.cdx.json",
+      "present": false,
+      "sha256": null,
+      "sizeBytes": null
+    }
+  },
+  "calibrationAuthority": "PENDING_SIGNED_REVIEWED_DATASET",
+  "ciRun": "NOT_EXECUTED_BY_OWNER_POLICY",
+  "gates": {
+    "hardware-conformance": "NOT_REPORTED",
+    "migration-conformance": "NOT_REPORTED",
+    "release-gates": "NOT_REPORTED"
+  },
+  "generatedAt": "2026-08-12T12:49:51.321878+00:00",
+  "generator": "tools/vehicle-truth/generate-proof-status.py",
+  "hardwareConformance": "PENDING_PHYSICAL_CORPUS",
+  "schemaVersion": 1,
+  "source": {
+    "commit": "4054ffc87605fd8eb744d65fc013266024c319f2",
+    "versionCode": 45,
+    "versionName": "4.17.0"
+  },
+  "verificationState": "NOT_VERIFIED"
+}

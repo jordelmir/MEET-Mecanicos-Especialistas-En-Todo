@@ -282,6 +282,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("repair_verification/{findingId}") { backStack ->
+                RepairVerificationWorkflowScreen(
+                    navController = navController,
+                    findingId = backStack.arguments?.getString("findingId").orEmpty(),
+                )
+            }
             composable("terminal") {
                 TerminalScreen(viewModel = obdViewModel)
             }

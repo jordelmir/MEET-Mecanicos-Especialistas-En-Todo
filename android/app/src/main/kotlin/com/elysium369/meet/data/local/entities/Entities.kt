@@ -51,6 +51,7 @@ data class DiagnosticSessionEntity(
                 "diagnosticNamespace",
                 "moduleIdentity",
                 "rawDtcIdentity",
+                "failureType",
             ],
             name = "index_dtc_events_finding_identity",
         ),

@@ -12,7 +12,20 @@ if [[ ${#manifests[@]} -eq 0 ]]; then
 fi
 
 for manifest in "${manifests[@]}"; do
-  jq -e '.schemaVersion == 1 and (.runId|length) >= 16 and (.files|length) > 0 and .review.state == "REVIEWED"' "$manifest" >/dev/null
+  jq -e '
+    .schemaVersion == 1 and
+    (.runId|length) >= 16 and
+    (.files|length) > 0 and
+    (.artifacts|length) > 0 and
+    .review.state == "REVIEWED" and
+    .state == "CERTIFIED" and
+    .fixtureType != "REPLAY_ONLY" and
+    (.referenceAuthority.signature|length) > 0 and
+    (.expected.ecu|length) > 0
+  ' "$manifest" >/dev/null || {
+    echo "Manifest is not a certified physical authority: $manifest" >&2
+    exit 23
+  }
   base="$(dirname "$manifest")"
   while IFS=$'\t' read -r relative expected; do
     target="$base/$relative"

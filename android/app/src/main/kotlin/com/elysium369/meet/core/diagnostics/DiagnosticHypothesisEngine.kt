@@ -13,6 +13,7 @@ enum class GuidedDiagnosisMode { HEURISTIC, CALIBRATED }
 data class GuidedDiagnosisCalibration(
     val priors: List<CalibratedHypothesisPrior>,
     val testCandidates: List<DiagnosticTestDecisionCandidate>,
+    val artifact: SignedCalibrationArtifact? = null,
 )
 
 /**
@@ -21,6 +22,7 @@ data class GuidedDiagnosisCalibration(
  */
 class DiagnosticHypothesisEngine(
     private val reasoningEngine: DiagnosticReasoningEngine = DiagnosticReasoningEngine(),
+    private val calibrationTrustRegistry: CalibrationTrustRegistry = CalibrationTrustRegistry.DenyAll,
 ) {
     fun analyze(
         input: DiagnosticReasoningInput,
@@ -34,13 +36,23 @@ class DiagnosticHypothesisEngine(
                 availableTools.isEmpty() || test.toolRequired.isBlank() ||
                     availableTools.any { it.equals(test.toolRequired, ignoreCase = true) }
             }
-        val calibratedScores = calibration?.testCandidates.orEmpty()
+        val trustedCalibration = calibration?.let { candidate ->
+            val artifact = candidate.artifact
+            candidate.takeIf {
+                artifact != null && calibrationTrustRegistry.authorize(artifact) &&
+                    candidate.testCandidates.all { test ->
+                        test.calibrationDatasetId == artifact.datasetId &&
+                            test.calibrationDatasetVersion == artifact.version
+                    }
+            }
+        }
+        val calibratedScores = trustedCalibration?.testCandidates.orEmpty()
             .filter { candidate ->
                 candidate.requiredTools.all { required ->
                     availableTools.any { it.equals(required, ignoreCase = true) }
                 }
             }
-            .map { candidate -> DiagnosticTestDecisionModel.score(calibration!!.priors, candidate) }
+            .map { candidate -> DiagnosticTestDecisionModel.score(trustedCalibration!!.priors, candidate) }
             .filter(DiagnosticTestDecisionScore::calibrated)
         val bestCalibrated = calibratedScores.maxByOrNull(DiagnosticTestDecisionScore::utility)
         val calibratedTest = bestCalibrated?.let { score -> pending.firstOrNull { it.id == score.testId } }
@@ -50,7 +62,7 @@ class DiagnosticHypothesisEngine(
                 nextTest = calibratedTest.copy(
                     quantitativeDecisionAvailable = true,
                     expectedInformationGainBits = bestCalibrated.expectedInformationGainBits,
-                    calibrationDatasetId = calibration?.testCandidates
+                    calibrationDatasetId = trustedCalibration?.testCandidates
                         ?.firstOrNull { it.testId == calibratedTest.id }?.calibrationDatasetId,
                 ),
                 decisionReason = bestCalibrated.reason,

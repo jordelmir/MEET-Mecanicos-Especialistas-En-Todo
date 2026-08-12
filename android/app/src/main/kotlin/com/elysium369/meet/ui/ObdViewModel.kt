@@ -4051,6 +4051,7 @@ class ObdViewModel @Inject constructor(
             }
             val exchangeId = UUID.randomUUID().toString()
             val sequence = startingSequence + offset + 1L
+            val elapsedRealtimeNanos = System.nanoTime()
             val rawRequestHash = sha256Hex(exchange.command.toByteArray(Charsets.UTF_8))
             val rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8))
             val persistedRequestScope = when (exchange.requestScope) {
@@ -4059,21 +4060,18 @@ class ObdViewModel @Inject constructor(
                 is DiagnosticRequestScope.Logical -> "LOGICAL"
                 DiagnosticRequestScope.LegacyUnaddressed -> "LEGACY_UNADDRESSED"
             }
-            val exchangeHash = canonicalHash(
-                currentSessionId,
-                sequence.toString(),
-                exchange.timestampMs.toString(),
-                persistedRequestScope,
-                exchange.targetAddress.orEmpty(),
-                exchange.responseAddress.orEmpty(),
-                exchange.command,
-                exchange.outcome.name,
-                rawRequestHash,
-                rawResponseHash,
-                previousHash,
-                exchange.parserVersion,
+            val retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name
+            val encryptedBlob = DiagnosticEvidenceVault.encrypt(
+                sessionId = currentSessionId,
+                exchangeId = exchangeId,
+                rawRequest = exchange.command,
+                rawResponse = exchange.rawResponse,
+                requestHash = rawRequestHash,
+                responseHash = rawResponseHash,
+                createdAtMs = exchange.timestampMs,
+                retentionClass = retentionClass,
             )
-            val entity = DiagnosticExchangeEntity(
+            val draft = DiagnosticExchangeEntity(
                 id = exchangeId,
                 sessionId = currentSessionId,
                 timestampMs = exchange.timestampMs,
@@ -4084,8 +4082,8 @@ class ObdViewModel @Inject constructor(
                 requestAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
                 service = exchange.command,
-                rawRequest = exchange.command,
-                rawResponse = exchange.rawResponse,
+                rawRequest = "",
+                rawResponse = "",
                 decodedOutcome = exchange.outcome.name,
                 latencyMs = exchange.latencyMs,
                 retryCount = exchange.retryCount,
@@ -4093,19 +4091,23 @@ class ObdViewModel @Inject constructor(
                 adapterConfiguration = report.protocol,
                 parserVersion = exchange.parserVersion,
                 sessionSequence = sequence,
-                elapsedRealtimeNanos = System.nanoTime(),
+                elapsedRealtimeNanos = elapsedRealtimeNanos,
                 rawRequestHash = rawRequestHash,
                 rawResponseHash = rawResponseHash,
                 previousExchangeHash = previousHash,
-                exchangeHash = exchangeHash,
-                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                exchangeHash = "",
+                retentionClass = retentionClass,
                 expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
                     com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
                     exchange.timestampMs,
                 ),
+                canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.EXCHANGE_CHAIN_V2,
+                rawPayloadBlobId = encryptedBlob.blobId,
             )
+            val exchangeHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.exchangeHash(draft)
+            val entity = draft.copy(exchangeHash = exchangeHash)
             previousHash = exchangeHash
-            entity to PersistedExchangeReference(
+            Triple(entity, encryptedBlob, PersistedExchangeReference(
                 exchangeId = exchangeId,
                 targetAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
@@ -4113,9 +4115,8 @@ class ObdViewModel @Inject constructor(
                 rawResponseHash = rawResponseHash,
                 outcome = exchange.outcome,
                 requestScope = persistedRequestScope,
-            )
+            ))
         }
-        diagnosticEvidenceDao.appendExchanges(exchangesWithReferences.map { it.first })
         val entities = exchangesWithReferences.map { it.first }
         val scanId = UUID.randomUUID().toString()
         val parserVersion = entities.map { it.parserVersion }.distinct().joinToString("+")
@@ -4133,8 +4134,10 @@ class ObdViewModel @Inject constructor(
             finalizedAt,
         ).joinToString("|")
         val signedManifest = DiagnosticManifestSigner.sign(canonicalManifest, finalizedAt).getOrNull()
-        diagnosticEvidenceDao.appendSessionIntegrity(
-            DiagnosticSessionIntegrityEntity(
+        diagnosticEvidenceDao.appendEncryptedSession(
+            blobs = exchangesWithReferences.map { it.second },
+            exchanges = entities,
+            integrity = DiagnosticSessionIntegrityEntity(
                 scanId = scanId,
                 sessionId = currentSessionId,
                 parserVersion = parserVersion,
@@ -4150,35 +4153,33 @@ class ObdViewModel @Inject constructor(
                 signatureBase64 = signedManifest?.signatureBase64,
                 signedAtMs = signedManifest?.signedAtMs,
                 trustState = if (signedManifest != null) "HARDWARE_SIGNED" else "UNSIGNED_HARDWARE_UNAVAILABLE",
-            )
+                signerPublicKeyBase64 = signedManifest?.publicKeyBase64,
+                certificateChainJson = signedManifest?.certificateChainBase64
+                    ?.joinToString(prefix = "[\"", separator = "\",\"", postfix = "\"]"),
+                keySecurityLevel = signedManifest?.keySecurityLevel,
+            ),
         )
-        exchangesWithReferences.map { it.second }
+        exchangesWithReferences.map { it.third }
     }
 
     private suspend fun appendDiagnosticObservation(observation: DiagnosticObservationEntity) =
         diagnosticEvidencePersistenceMutex.withLock {
         val sequence = diagnosticEvidenceDao.maxObservationSequence(observation.sessionId) + 1L
+        val findingSequence = diagnosticEvidenceDao.maxFindingSequence(observation.findingId) + 1L
         val previousHash = diagnosticEvidenceDao.latestObservationHash(observation.findingId).orEmpty()
-        val observationHash = canonicalHash(
-            observation.findingId,
-            observation.sessionId,
-            sequence.toString(),
-            observation.observedAt.toString(),
-            observation.observationState,
-            observation.semantics,
-            observation.statusByte?.toString().orEmpty(),
-            observation.sourceService,
-            observation.exchangeId.orEmpty(),
-            observation.rawPayloadHash,
-            previousHash,
+        val draft = observation.copy(
+            sessionSequence = sequence,
+            findingSequence = findingSequence,
+            elapsedRealtimeNanos = System.nanoTime(),
+            previousObservationHash = previousHash,
+            canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.OBSERVATION_CHAIN_V2,
         )
-        diagnosticEvidenceDao.appendObservation(
-            observation.copy(
-                sessionSequence = sequence,
-                elapsedRealtimeNanos = System.nanoTime(),
-                previousObservationHash = previousHash,
-                observationHash = observationHash,
-            )
+        val observationHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.observationHash(draft)
+        diagnosticEvidenceDao.appendObservationWithExpectedPredecessor(
+            observation = draft.copy(observationHash = observationHash),
+            expectedSessionSequence = sequence,
+            expectedFindingSequence = findingSequence,
+            expectedPreviousHash = previousHash,
         )
     }
 
@@ -4200,23 +4201,19 @@ class ObdViewModel @Inject constructor(
         val previousHash = diagnosticEvidenceDao.latestExchangeHash(currentSessionId).orEmpty()
         val requestHash = sha256Hex(rawRequest.toByteArray(Charsets.UTF_8))
         val responseHash = sha256Hex(rawResponse.toByteArray(Charsets.UTF_8))
-        val exchangeHash = canonicalHash(
-            currentSessionId,
-            sequence.toString(),
-            timestampMs.toString(),
-            requestScope,
-            requestAddress.orEmpty(),
-            responseAddress.orEmpty(),
-            service,
-            decodedOutcome,
-            requestHash,
-            responseHash,
-            previousHash,
-            parserVersion,
-        )
         val exchangeId = UUID.randomUUID().toString()
-        diagnosticEvidenceDao.appendExchange(
-            DiagnosticExchangeEntity(
+        val retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name
+        val blob = DiagnosticEvidenceVault.encrypt(
+            sessionId = currentSessionId,
+            exchangeId = exchangeId,
+            rawRequest = rawRequest,
+            rawResponse = rawResponse,
+            requestHash = requestHash,
+            responseHash = responseHash,
+            createdAtMs = timestampMs,
+            retentionClass = retentionClass,
+        )
+        val draft = DiagnosticExchangeEntity(
                 id = exchangeId,
                 sessionId = currentSessionId,
                 timestampMs = timestampMs,
@@ -4226,8 +4223,8 @@ class ObdViewModel @Inject constructor(
                 requestAddress = requestAddress,
                 responseAddress = responseAddress,
                 service = service,
-                rawRequest = rawRequest,
-                rawResponse = rawResponse,
+                rawRequest = "",
+                rawResponse = "",
                 decodedOutcome = decodedOutcome,
                 latencyMs = null,
                 retryCount = 0,
@@ -4239,14 +4236,19 @@ class ObdViewModel @Inject constructor(
                 rawRequestHash = requestHash,
                 rawResponseHash = responseHash,
                 previousExchangeHash = previousHash,
-                exchangeHash = exchangeHash,
-                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                exchangeHash = "",
+                retentionClass = retentionClass,
                 expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
                     com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
                     timestampMs,
                 ),
-            ),
+                canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.EXCHANGE_CHAIN_V2,
+                rawPayloadBlobId = blob.blobId,
+            )
+        val entity = draft.copy(
+            exchangeHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.exchangeHash(draft),
         )
+        diagnosticEvidenceDao.appendEncryptedExchange(blob, entity)
         exchangeId
     }
 
@@ -4270,12 +4272,14 @@ class ObdViewModel @Inject constructor(
                 ecuEndpointId = findingKey.moduleIdentity,
                 namespace = findingKey.namespace.name,
                 rawDtcIdentity = findingKey.rawDtcIdentity,
+                failureType = findingKey.failureType,
             )
             val exactExisting = dtcDao.getUnresolvedFinding(
                 vehicleId = vehicle.id,
                 namespace = findingKey.namespace.name,
                 moduleIdentity = findingKey.moduleIdentity,
                 rawDtcIdentity = findingKey.rawDtcIdentity,
+                failureType = findingKey.failureType,
             )
             val sameLegacyIdentityCount = distinctFindings.count {
                 it.code.equals(record.code, ignoreCase = true) &&
@@ -4307,6 +4311,11 @@ class ObdViewModel @Inject constructor(
                     rawDtcIdentity = findingKey.rawDtcIdentity,
                     displayCode = record.code.uppercase(),
                     createdAtMs = existing?.firstSeenAt ?: now,
+                    failureType = findingKey.failureType,
+                    moduleRole = record.moduleName.orEmpty(),
+                    requestAddress = record.targetAddress,
+                    responseAddress = record.responseAddress,
+                    vehicleBindingId = _vehicleSessionBinding.value.bindingId,
                 )
             )
             if (existing != null) {
@@ -4910,6 +4919,7 @@ class ObdViewModel @Inject constructor(
                     moduleIdentity = finding.ecuEndpointId,
                     rawDtcIdentity = finding.rawDtcIdentity,
                     displayCode = finding.displayCode,
+                    failureType = finding.failureType,
                 ),
                 requiredSemantics = requiredSemantics,
                 sourceService = timeline.latestObservedSourceService(),
@@ -5064,6 +5074,7 @@ class ObdViewModel @Inject constructor(
             ecuEndpointId = key.moduleIdentity,
             namespace = key.namespace.name,
             rawDtcIdentity = key.rawDtcIdentity,
+            failureType = key.failureType,
         ) ?: return
         val reportProtocol = lastDtcScanReport.value?.protocol.orEmpty()
         val snapshotTransport = when {
@@ -6513,6 +6524,7 @@ class ObdViewModel @Inject constructor(
                     val seventyTwoHoursAgo = System.currentTimeMillis() - (72 * 60 * 60 * 1000L)
                     towTruckDao.purgeOldRequests(seventyTwoHoursAgo)
                     diagnosticEvidenceDao.purgeExpiredUnreferencedExchanges(System.currentTimeMillis())
+                    diagnosticEvidenceDao.purgeOrphanedEncryptedBlobs()
                     diagnosticEvidenceDao.purgeOrphanedSessionIntegrity()
                 } catch (e: Exception) {
                     android.util.Log.e("ObdViewModel", "Auto-cleanup failed", e)
@@ -8604,9 +8616,6 @@ class ObdViewModel @Inject constructor(
 
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
-
-    private fun canonicalHash(vararg fields: String): String =
-        com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.canonicalHash(*fields)
 
     private fun merkleRootSha256(hashes: List<String>): String =
         com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.merkleRootSha256(hashes)

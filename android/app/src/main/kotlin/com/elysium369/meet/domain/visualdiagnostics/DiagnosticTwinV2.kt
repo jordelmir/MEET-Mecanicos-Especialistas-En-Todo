@@ -20,6 +20,8 @@ data class DiagnosticTwinElement(
     val evidenceIds: Set<String>,
     val reason: String,
     val visualAuthority: VisualAuthority,
+    val sourceReferenceIds: Set<String> = emptySet(),
+    val sourceContentHashes: Set<String> = emptySet(),
 )
 
 data class DiagnosticTwinV2(
@@ -36,6 +38,8 @@ data class DiagnosticTwinObservation(
     val evidenceIds: Set<String>,
     val anomalous: Boolean? = null,
     val verifiedOk: Boolean = false,
+    val sourceReferenceIds: Set<String> = emptySet(),
+    val sourceContentHashes: Set<String> = emptySet(),
 )
 
 /** Evidence projection. Red/anomalous requires an observation; causal proximity stays RELATED. */
@@ -60,7 +64,16 @@ object DiagnosticTwinV2Engine {
             val evidence = buildSet {
                 addAll(observation?.evidenceIds.orEmpty())
                 addAll(graphEvidence[entityId].orEmpty())
+            }
+            val sourceReferenceIds = buildSet {
+                addAll(observation?.sourceReferenceIds.orEmpty())
+                addAll(paths.flatMap { it.sourceRefs }.map { "${it.sourceDocumentId}:${it.blockId}" })
+                addAll(graphNodes[entityId]?.sourceReferenceIds.orEmpty())
+            }
+            val sourceContentHashes = buildSet {
+                addAll(observation?.sourceContentHashes.orEmpty())
                 addAll(paths.flatMap { it.sourceRefs }.map { it.textHash })
+                addAll(graphNodes[entityId]?.sourceContentHashes.orEmpty())
             }
             val state = when {
                 observation?.anomalous == true -> DiagnosticTwinState.ANOMALOUS
@@ -103,6 +116,8 @@ object DiagnosticTwinV2Engine {
                     DiagnosticTwinState.RELATED, DiagnosticTwinState.UNTESTED -> VisualAuthority.CAUSALLY_RELATED
                     DiagnosticTwinState.NOT_APPLICABLE, DiagnosticTwinState.UNKNOWN -> VisualAuthority.EDUCATIONAL_ONLY
                 },
+                sourceReferenceIds = sourceReferenceIds,
+                sourceContentHashes = sourceContentHashes,
             )
         }
         return DiagnosticTwinV2(graph.vehicleId, graph.vehicleBindingId, topology, elements, generatedAt)

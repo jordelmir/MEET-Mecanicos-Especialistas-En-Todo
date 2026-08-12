@@ -3203,7 +3203,7 @@ object AppModule {
         }
     }
 
-    private val MIGRATION_49_50 = object : Migration(49, 50) {
+    internal val MIGRATION_49_50 = object : Migration(49, 50) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE dtc_events ADD COLUMN diagnosticNamespace TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE dtc_events ADD COLUMN moduleIdentity TEXT NOT NULL DEFAULT ''")
@@ -3467,7 +3467,7 @@ object AppModule {
         }
     }
 
-    private val MIGRATION_52_53 = object : Migration(52, 53) {
+    internal val MIGRATION_52_53 = object : Migration(52, 53) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """CREATE TABLE IF NOT EXISTS finding_snapshot_exchange_refs (
@@ -3497,13 +3497,13 @@ object AppModule {
         }
     }
 
-    private val MIGRATION_53_54 = object : Migration(53, 54) {
+    internal val MIGRATION_53_54 = object : Migration(53, 54) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE dtc_definitions ADD COLUMN rawDtcIdentity TEXT NOT NULL DEFAULT ''")
         }
     }
 
-    private val MIGRATION_54_55 = object : Migration(54, 55) {
+    internal val MIGRATION_54_55 = object : Migration(54, 55) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN vehicleBindingId TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN appVersion TEXT NOT NULL DEFAULT ''")
@@ -3512,6 +3512,114 @@ object AppModule {
             db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signatureBase64 TEXT")
             db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signedAtMs INTEGER")
             db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN trustState TEXT NOT NULL DEFAULT 'UNSIGNED_LEGACY'")
+        }
+    }
+
+    internal val MIGRATION_55_56 = object : Migration(55, 56) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // v1 records remain byte-for-byte verifiable. Only new writes use v2.
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN canonicalizationVersion TEXT NOT NULL DEFAULT 'diagnostic-exchange-chain-v1'")
+            db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN rawPayloadBlobId TEXT")
+            db.execSQL("ALTER TABLE diagnostic_observations ADD COLUMN findingSequence INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE diagnostic_observations ADD COLUMN canonicalizationVersion TEXT NOT NULL DEFAULT 'diagnostic-observation-chain-v1'")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_diagnostic_observations_findingId_findingSequence " +
+                    "ON diagnostic_observations(findingId, findingSequence)",
+            )
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS encrypted_evidence_blobs (
+                    blobId TEXT NOT NULL PRIMARY KEY,
+                    cipherSuite TEXT NOT NULL,
+                    keyVersion INTEGER NOT NULL,
+                    nonce BLOB NOT NULL,
+                    aad BLOB NOT NULL,
+                    ciphertext BLOB NOT NULL,
+                    ciphertextHash TEXT NOT NULL,
+                    createdAtMs INTEGER NOT NULL,
+                    retentionClass TEXT NOT NULL
+                )""",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_encrypted_evidence_blobs_createdAtMs ON encrypted_evidence_blobs(createdAtMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_encrypted_evidence_blobs_retentionClass ON encrypted_evidence_blobs(retentionClass)")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN signerPublicKeyBase64 TEXT")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN certificateChainJson TEXT")
+            db.execSQL("ALTER TABLE diagnostic_session_integrity ADD COLUMN keySecurityLevel TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN failureType INTEGER NOT NULL DEFAULT -1")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN moduleRole TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN requestAddress TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN responseAddress TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN ecuFamily TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN hardwareVersion TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN softwareVersion TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN calibrationId TEXT")
+            db.execSQL("ALTER TABLE diagnostic_findings ADD COLUMN vehicleBindingId TEXT NOT NULL DEFAULT ''")
+            db.execSQL("DROP INDEX IF EXISTS index_diagnostic_findings_stable_identity")
+            // Recover failure-type identity from legacy events before enforcing
+            // the expanded stable key. This prevents two UDS sub-failures with
+            // the same raw 24-bit value from remaining collapsed.
+            db.execSQL(
+                """UPDATE diagnostic_findings
+                   SET failureType = COALESCE((
+                       SELECT MIN(COALESCE(event.failureType, -1))
+                       FROM dtc_events event
+                       WHERE event.vehicleId = diagnostic_findings.vehicleId
+                         AND (CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END) = diagnostic_findings.ecuEndpointId
+                         AND (CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END) = diagnostic_findings.diagnosticNamespace
+                         AND event.rawDtcIdentity = diagnostic_findings.rawDtcIdentity
+                   ), -1)""",
+            )
+            db.execSQL(
+                """INSERT OR IGNORE INTO diagnostic_findings(
+                       id, vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity,
+                       displayCode, createdAtMs, resolutionState, resolvedAtMs, failureType,
+                       moduleRole, requestAddress, responseAddress, ecuFamily, hardwareVersion,
+                       softwareVersion, calibrationId, vehicleBindingId
+                   )
+                   SELECT finding.id || ':ft:' || COALESCE(event.failureType, -1),
+                          finding.vehicleId, finding.ecuEndpointId, finding.diagnosticNamespace,
+                          finding.rawDtcIdentity, finding.displayCode,
+                          MIN(event.firstSeenAt), finding.resolutionState, finding.resolvedAtMs,
+                          COALESCE(event.failureType, -1),
+                          MAX(event.moduleName), MAX(NULLIF(event.targetAddress, '')),
+                          MAX(NULLIF(event.responseAddress, '')), NULL, NULL, NULL, NULL, ''
+                   FROM dtc_events event
+                   INNER JOIN diagnostic_findings finding
+                     ON finding.vehicleId = event.vehicleId
+                    AND finding.ecuEndpointId = CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END
+                    AND finding.diagnosticNamespace = CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END
+                    AND finding.rawDtcIdentity = event.rawDtcIdentity
+                   WHERE COALESCE(event.failureType, -1) != finding.failureType
+                   GROUP BY finding.id, COALESCE(event.failureType, -1)""",
+            )
+            db.execSQL(
+                """UPDATE diagnostic_observations
+                   SET findingId = COALESCE((
+                       SELECT target.id
+                       FROM dtc_events event
+                       INNER JOIN diagnostic_findings target
+                         ON target.vehicleId = event.vehicleId
+                        AND target.ecuEndpointId = CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END
+                        AND target.diagnosticNamespace = CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END
+                        AND target.rawDtcIdentity = event.rawDtcIdentity
+                        AND target.failureType = COALESCE(event.failureType, -1)
+                       WHERE diagnostic_observations.id = 'legacy-import-' || event.id
+                       LIMIT 1
+                   ), findingId)
+                   WHERE id LIKE 'legacy-import-%'""",
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX index_diagnostic_findings_stable_identity " +
+                    "ON diagnostic_findings(vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity, failureType)",
+            )
+            db.execSQL("DROP INDEX IF EXISTS index_dtc_events_finding_identity")
+            db.execSQL(
+                "CREATE INDEX index_dtc_events_finding_identity " +
+                    "ON dtc_events(vehicleId, diagnosticNamespace, moduleIdentity, rawDtcIdentity, failureType)",
+            )
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN inputQuality REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN formulaAuthority TEXT NOT NULL DEFAULT 'UNREVIEWED_FORMULA'")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN derivationCompleteness REAL NOT NULL DEFAULT 0.0")
+            db.execSQL("ALTER TABLE derived_metrics ADD COLUMN measurementUncertainty REAL")
         }
     }
 
@@ -3557,7 +3665,8 @@ object AppModule {
             MIGRATION_51_52,
             MIGRATION_52_53,
             MIGRATION_53_54,
-            MIGRATION_54_55
+            MIGRATION_54_55,
+            MIGRATION_55_56
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

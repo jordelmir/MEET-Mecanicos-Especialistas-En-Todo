@@ -7,6 +7,7 @@ manifest="${1:-$repo_root/android/app/build/outputs/vehicle-truth-release-manife
 sbom="$repo_root/android/app/build/reports/sbom/meet-release.cdx.json"
 mkdir -p "$(dirname "$manifest")"
 [[ -f "$sbom" ]] || { echo "Missing resolved release SBOM: $sbom" >&2; exit 30; }
+python3 "$repo_root/tools/vehicle-truth/validate-sbom.py" "$sbom"
 
 artifacts=(
   "debugApk|$repo_root/android/app/build/outputs/apk/debug/app-debug.apk"
@@ -27,8 +28,18 @@ for item in "${artifacts[@]}"; do
 done
 
 sbom_sha="$(shasum -a 256 "$sbom" | awk '{print $1}')"
-printf '%s\n' "${rows[@]}" | jq -s --arg commit "$(git -C "$repo_root" rev-parse HEAD)" --arg sbomSha "$sbom_sha" \
-  '{schemaVersion:1,commit:$commit,reproducibility:"SOURCE_AND_TOOLCHAIN_PIN_REQUIRED",sbom:{path:"android/app/build/reports/sbom/meet-release.cdx.json",sha256:$sbomSha},artifacts:.}' > "$manifest"
+gradle_distribution="$(sed -n 's/^distributionUrl=//p' "$repo_root/android/gradle/wrapper/gradle-wrapper.properties")"
+gradle_distribution_sha="$(sed -n 's/^distributionSha256Sum=//p' "$repo_root/android/gradle/wrapper/gradle-wrapper.properties")"
+agp_version="$(sed -nE 's/.*com\.android\.application"\) version "([^"]+)".*/\1/p' "$repo_root/android/build.gradle.kts" | head -1)"
+java_version="$(java -version 2>&1 | head -1)"
+printf '%s\n' "${rows[@]}" | jq -s \
+  --arg commit "$(git -C "$repo_root" rev-parse HEAD)" \
+  --arg sbomSha "$sbom_sha" \
+  --arg gradleDistribution "$gradle_distribution" \
+  --arg gradleDistributionSha256 "$gradle_distribution_sha" \
+  --arg agpVersion "$agp_version" \
+  --arg javaVersion "$java_version" \
+  '{schemaVersion:2,commit:$commit,reproducibility:"SOURCE_AND_TOOLCHAIN_PIN_REQUIRED",toolchain:{gradleDistribution:$gradleDistribution,gradleDistributionSha256:$gradleDistributionSha256,androidGradlePlugin:$agpVersion,java:$javaVersion},sbom:{path:"android/app/build/reports/sbom/meet-release.cdx.json",sha256:$sbomSha},artifacts:.}' > "$manifest"
 
 unzip -tq "$repo_root/android/app/build/outputs/bundle/release/app-release.aab" >/dev/null
 jarsigner -verify "$repo_root/android/app/build/outputs/bundle/release/app-release.aab" >/dev/null

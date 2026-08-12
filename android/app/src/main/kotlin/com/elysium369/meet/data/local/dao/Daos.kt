@@ -57,6 +57,7 @@ interface DtcDao {
              AND diagnosticNamespace = :namespace
              AND moduleIdentity = :moduleIdentity
              AND rawDtcIdentity = :rawDtcIdentity
+             AND COALESCE(failureType, -1) = :failureType
              AND resolvedAt IS NULL
            LIMIT 1"""
     )
@@ -65,6 +66,7 @@ interface DtcDao {
         namespace: String,
         moduleIdentity: String,
         rawDtcIdentity: String,
+        failureType: Int,
     ): DtcEventEntity?
 
     @Query("SELECT * FROM dtc_events WHERE id = :findingId LIMIT 1")

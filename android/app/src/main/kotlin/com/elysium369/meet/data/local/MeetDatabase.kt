@@ -122,12 +122,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         DiagnosticSnapshotEntity::class,
         DiagnosticFindingEntity::class,
         DiagnosticExchangeEntity::class,
+        EncryptedEvidenceBlobEntity::class,
         DiagnosticObservationEntity::class,
         FindingDiagnosticSnapshotEntity::class,
         FindingSnapshotExchangeRefEntity::class,
         DiagnosticSessionIntegrityEntity::class,
     ],
-    version = 55,
+    version = 56,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

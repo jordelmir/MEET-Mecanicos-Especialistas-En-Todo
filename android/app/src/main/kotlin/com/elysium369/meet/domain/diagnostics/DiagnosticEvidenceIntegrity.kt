@@ -19,7 +19,11 @@ data class DiagnosticIntegrityVerification(
 
 /** Byte-stable authority used by persistence, replay, export and conformance checks. */
 object DiagnosticEvidenceIntegrity {
-    const val CANONICALIZATION_VERSION = "diagnostic-exchange-chain-v1"
+    const val EXCHANGE_CHAIN_V1 = "diagnostic-exchange-chain-v1"
+    const val EXCHANGE_CHAIN_V2 = "diagnostic-exchange-chain-v2"
+    const val OBSERVATION_CHAIN_V1 = "diagnostic-observation-chain-v1"
+    const val OBSERVATION_CHAIN_V2 = "diagnostic-observation-chain-v2"
+    const val CANONICALIZATION_VERSION = EXCHANGE_CHAIN_V2
 
     fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
@@ -29,34 +33,87 @@ object DiagnosticEvidenceIntegrity {
             .toByteArray(Charsets.UTF_8),
     )
 
-    fun exchangeHash(exchange: DiagnosticExchangeEntity): String = canonicalHash(
-        exchange.sessionId,
-        exchange.sessionSequence.toString(),
-        exchange.timestampMs.toString(),
-        exchange.requestScope,
-        exchange.requestAddress.orEmpty(),
-        exchange.responseAddress.orEmpty(),
-        exchange.service,
-        exchange.decodedOutcome,
-        exchange.rawRequestHash,
-        exchange.rawResponseHash,
-        exchange.previousExchangeHash,
-        exchange.parserVersion,
+    /** v2 length-prefixes UTF-8 bytes, not UTF-16 code units. */
+    fun canonicalHashV2(vararg fields: String): String = sha256Hex(
+        fields.fold(ByteArray(0)) { accumulator, value ->
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            accumulator + "${bytes.size}:".toByteArray(Charsets.US_ASCII) + bytes
+        },
     )
 
-    fun observationHash(observation: DiagnosticObservationEntity): String = canonicalHash(
-        observation.findingId,
-        observation.sessionId,
-        observation.sessionSequence.toString(),
-        observation.observedAt.toString(),
-        observation.observationState,
-        observation.semantics,
-        observation.statusByte?.toString().orEmpty(),
-        observation.sourceService,
-        observation.exchangeId.orEmpty(),
-        observation.rawPayloadHash,
-        observation.previousObservationHash,
-    )
+    fun exchangeHash(exchange: DiagnosticExchangeEntity): String = when (exchange.canonicalizationVersion) {
+        EXCHANGE_CHAIN_V1 -> canonicalHash(
+            exchange.sessionId,
+            exchange.sessionSequence.toString(),
+            exchange.timestampMs.toString(),
+            exchange.requestScope,
+            exchange.requestAddress.orEmpty(),
+            exchange.responseAddress.orEmpty(),
+            exchange.service,
+            exchange.decodedOutcome,
+            exchange.rawRequestHash,
+            exchange.rawResponseHash,
+            exchange.previousExchangeHash,
+            exchange.parserVersion,
+        )
+        EXCHANGE_CHAIN_V2 -> canonicalHashV2(
+            EXCHANGE_CHAIN_V2,
+            exchange.sessionId,
+            exchange.sessionSequence.toString(),
+            exchange.elapsedRealtimeNanos.toString(),
+            exchange.timestampMs.toString(),
+            exchange.transport,
+            exchange.applicationProtocol,
+            exchange.requestScope,
+            exchange.requestAddress.orEmpty(),
+            exchange.responseAddress.orEmpty(),
+            exchange.service,
+            exchange.rawRequestHash,
+            exchange.rawResponseHash,
+            exchange.decodedOutcome,
+            exchange.latencyMs?.toString().orEmpty(),
+            exchange.retryCount.toString(),
+            exchange.negativeResponseCode?.toString().orEmpty(),
+            exchange.adapterConfiguration,
+            exchange.parserVersion,
+            exchange.previousExchangeHash,
+            exchange.rawPayloadBlobId.orEmpty(),
+        )
+        else -> ""
+    }
+
+    fun observationHash(observation: DiagnosticObservationEntity): String = when (observation.canonicalizationVersion) {
+        OBSERVATION_CHAIN_V1 -> canonicalHash(
+            observation.findingId,
+            observation.sessionId,
+            observation.sessionSequence.toString(),
+            observation.observedAt.toString(),
+            observation.observationState,
+            observation.semantics,
+            observation.statusByte?.toString().orEmpty(),
+            observation.sourceService,
+            observation.exchangeId.orEmpty(),
+            observation.rawPayloadHash,
+            observation.previousObservationHash,
+        )
+        OBSERVATION_CHAIN_V2 -> canonicalHashV2(
+            OBSERVATION_CHAIN_V2,
+            observation.findingId,
+            observation.findingSequence.toString(),
+            observation.sessionId,
+            observation.sessionSequence.toString(),
+            observation.elapsedRealtimeNanos.toString(),
+            observation.observedAt.toString(),
+            observation.observationState,
+            observation.semantics,
+            observation.statusByte?.toString().orEmpty(),
+            observation.sourceService,
+            observation.exchangeId.orEmpty(),
+            observation.rawPayloadHash,
+            observation.previousObservationHash,
+        )
+        else -> ""
+    }
 
     fun merkleRootSha256(hashes: List<String>): String {
         if (hashes.isEmpty()) return sha256Hex(ByteArray(0))
@@ -99,10 +156,14 @@ object DiagnosticEvidenceIntegrity {
                 if (exchange.previousExchangeHash != priorHash) {
                     violations += exchange.violation("Enlace hash previo inválido")
                 }
-                if (sha256Hex(exchange.rawRequest.toByteArray(Charsets.UTF_8)) != exchange.rawRequestHash ||
-                    sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8)) != exchange.rawResponseHash
+                if (exchange.rawPayloadBlobId == null &&
+                    (sha256Hex(exchange.rawRequest.toByteArray(Charsets.UTF_8)) != exchange.rawRequestHash ||
+                        sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8)) != exchange.rawResponseHash)
                 ) {
                     violations += exchange.violation("Hash de evidencia raw inválido")
+                }
+                if (exchange.canonicalizationVersion !in setOf(EXCHANGE_CHAIN_V1, EXCHANGE_CHAIN_V2)) {
+                    violations += exchange.violation("Versión canónica de intercambio no soportada")
                 }
                 if (exchangeHash(exchange) != exchange.exchangeHash) {
                     violations += exchange.violation("Hash canónico del intercambio inválido")
@@ -161,10 +222,18 @@ object DiagnosticEvidenceIntegrity {
         ordered.groupBy { it.findingId }.values.forEach { findingObservations ->
             var priorHash = ""
             findingObservations.sortedWith(
-                compareBy<DiagnosticObservationEntity> { it.observedAt }
+                compareBy<DiagnosticObservationEntity> { it.findingSequence }
+                    .thenBy { it.observedAt }
                     .thenBy { it.sessionSequence }
                     .thenBy { it.id },
             ).forEach { observation ->
+                if (observation.canonicalizationVersion == OBSERVATION_CHAIN_V2 && observation.findingSequence <= 0L) {
+                    violations += DiagnosticIntegrityViolation(
+                        observation.id,
+                        observation.findingSequence,
+                        "Secuencia causal por finding ausente",
+                    )
+                }
                 if (observation.previousObservationHash != priorHash) {
                     violations += DiagnosticIntegrityViolation(
                         observation.id,

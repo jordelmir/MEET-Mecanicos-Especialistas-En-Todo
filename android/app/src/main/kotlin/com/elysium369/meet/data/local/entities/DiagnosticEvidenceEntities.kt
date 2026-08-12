@@ -11,7 +11,7 @@ import androidx.room.PrimaryKey
     tableName = "diagnostic_findings",
     indices = [
         Index(
-            value = ["vehicleId", "ecuEndpointId", "diagnosticNamespace", "rawDtcIdentity"],
+            value = ["vehicleId", "ecuEndpointId", "diagnosticNamespace", "rawDtcIdentity", "failureType"],
             unique = true,
             name = "index_diagnostic_findings_stable_identity",
         ),
@@ -27,6 +27,15 @@ data class DiagnosticFindingEntity(
     val createdAtMs: Long,
     val resolutionState: String = "OPEN",
     val resolvedAtMs: Long? = null,
+    @ColumnInfo(defaultValue = "-1") val failureType: Int = -1,
+    @ColumnInfo(defaultValue = "''") val moduleRole: String = "",
+    val requestAddress: String? = null,
+    val responseAddress: String? = null,
+    val ecuFamily: String? = null,
+    val hardwareVersion: String? = null,
+    val softwareVersion: String? = null,
+    val calibrationId: String? = null,
+    @ColumnInfo(defaultValue = "''") val vehicleBindingId: String = "",
 )
 
 /** Append-only physical/protocol evidence. Raw request and response are never updated. */
@@ -63,6 +72,26 @@ data class DiagnosticExchangeEntity(
     @ColumnInfo(defaultValue = "''") val exchangeHash: String = "",
     @ColumnInfo(defaultValue = "'RAW_FORENSIC'") val retentionClass: String = "RAW_FORENSIC",
     val expiresAtMs: Long? = null,
+    @ColumnInfo(defaultValue = "'diagnostic-exchange-chain-v1'")
+    val canonicalizationVersion: String = "diagnostic-exchange-chain-v1",
+    val rawPayloadBlobId: String? = null,
+)
+
+/** Ciphertext authority for sensitive raw protocol payloads. Metadata remains searchable. */
+@Entity(
+    tableName = "encrypted_evidence_blobs",
+    indices = [Index(value = ["createdAtMs"]), Index(value = ["retentionClass"])],
+)
+data class EncryptedEvidenceBlobEntity(
+    @PrimaryKey val blobId: String,
+    val cipherSuite: String,
+    val keyVersion: Int,
+    val nonce: ByteArray,
+    val aad: ByteArray,
+    val ciphertext: ByteArray,
+    val ciphertextHash: String,
+    val createdAtMs: Long,
+    val retentionClass: String,
 )
 
 /** Temporal state of one stable finding. Insert only; never rewrite past observations. */
@@ -84,6 +113,7 @@ data class DiagnosticExchangeEntity(
     ],
     indices = [
         Index(value = ["findingId", "observedAt"]),
+        Index(value = ["findingId", "findingSequence"]),
         Index(value = ["sessionId", "observedAt"]),
         Index(value = ["exchangeId"]),
     ],
@@ -103,6 +133,9 @@ data class DiagnosticObservationEntity(
     @ColumnInfo(defaultValue = "0") val elapsedRealtimeNanos: Long = 0,
     @ColumnInfo(defaultValue = "''") val previousObservationHash: String = "",
     @ColumnInfo(defaultValue = "''") val observationHash: String = "",
+    @ColumnInfo(defaultValue = "0") val findingSequence: Long = 0,
+    @ColumnInfo(defaultValue = "'diagnostic-observation-chain-v1'")
+    val canonicalizationVersion: String = "diagnostic-observation-chain-v1",
 )
 
 @Entity(
@@ -180,4 +213,7 @@ data class DiagnosticSessionIntegrityEntity(
     val signatureBase64: String? = null,
     val signedAtMs: Long? = null,
     @ColumnInfo(defaultValue = "'UNSIGNED_LEGACY'") val trustState: String = "UNSIGNED_LEGACY",
+    val signerPublicKeyBase64: String? = null,
+    val certificateChainJson: String? = null,
+    val keySecurityLevel: String? = null,
 )
