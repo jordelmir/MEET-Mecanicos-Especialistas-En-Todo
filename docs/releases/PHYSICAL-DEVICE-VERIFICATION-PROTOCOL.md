@@ -37,6 +37,10 @@ Internet, `targetSdk` menor que 36, ausencia del host Supabase de producción,
 una referencia a `localhost`, instalación o lanzamiento fallidos, proceso
 muerto, actividad fuera de primer plano, red Android no validada, crash o ANR.
 
+CI ejecuta el mismo contrato sobre el APK sin usar ADB mediante `--apk-only`.
+Así se verifican anticipadamente API 36, Internet y backend productivo; no se
+presenta ese preflight como sustituto de la prueba en el Honor.
+
 La evidencia queda en `artifacts/physical-device/`, directorio ignorado por
 Git. Incluye SHA-256 del APK, identidad y parche del dispositivo, versión
 instalada, salida de lanzamiento, estado de actividad, conectividad y logcat de

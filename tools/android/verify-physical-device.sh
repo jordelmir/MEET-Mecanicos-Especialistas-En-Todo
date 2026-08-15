@@ -8,6 +8,7 @@ APK="android/app/build/outputs/apk/debug/app-debug.apk"
 OUTPUT_ROOT="artifacts/physical-device"
 SERIAL=""
 SETTLE_SECONDS=15
+APK_ONLY=false
 
 usage() {
   cat <<'EOF'
@@ -20,6 +21,7 @@ Options:
   --apk PATH            APK to install (default: debug APK).
   --output-root PATH    Ignored evidence directory.
   --settle-seconds N    Seconds to observe the launched process (default: 15).
+  --apk-only            Verify the APK online contract without using ADB.
   --help                Show this help.
 EOF
 }
@@ -30,6 +32,7 @@ while (($#)); do
     --apk) APK="${2:?missing value for --apk}"; shift 2 ;;
     --output-root) OUTPUT_ROOT="${2:?missing value for --output-root}"; shift 2 ;;
     --settle-seconds) SETTLE_SECONDS="${2:?missing value for --settle-seconds}"; shift 2 ;;
+    --apk-only) APK_ONLY=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -40,12 +43,18 @@ done
   exit 2
 }
 
-for command_name in adb awk date find grep sed shasum sleep sort tail tee tr unzip; do
+for command_name in awk date find grep sed shasum sleep sort tail tee tr unzip; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "Required command not found: $command_name" >&2
     exit 2
   }
 done
+if [[ "$APK_ONLY" == false ]]; then
+  command -v adb >/dev/null 2>&1 || {
+    echo "Required command not found: adb" >&2
+    exit 2
+  }
+fi
 
 [[ -f "$APK" ]] || {
   echo "APK not found: $APK" >&2
@@ -53,29 +62,31 @@ done
   exit 2
 }
 
-if [[ -z "$SERIAL" ]]; then
-  ONLINE_DEVICE_LIST="$(adb devices | awk 'NR > 1 && $2 == "device" {print $1}')"
-  ONLINE_DEVICE_COUNT="$(awk 'NF {count++} END {print count + 0}' <<<"$ONLINE_DEVICE_LIST")"
-  if [[ "$ONLINE_DEVICE_COUNT" -ne 1 ]]; then
-    echo "Expected exactly one online ADB device; found $ONLINE_DEVICE_COUNT." >&2
-    echo "Pass --serial when more than one physical device is connected." >&2
-    exit 2
+if [[ "$APK_ONLY" == false ]]; then
+  if [[ -z "$SERIAL" ]]; then
+    ONLINE_DEVICE_LIST="$(adb devices | awk 'NR > 1 && $2 == "device" {print $1}')"
+    ONLINE_DEVICE_COUNT="$(awk 'NF {count++} END {print count + 0}' <<<"$ONLINE_DEVICE_LIST")"
+    if [[ "$ONLINE_DEVICE_COUNT" -ne 1 ]]; then
+      echo "Expected exactly one online ADB device; found $ONLINE_DEVICE_COUNT." >&2
+      echo "Pass --serial when more than one physical device is connected." >&2
+      exit 2
+    fi
+    SERIAL="$ONLINE_DEVICE_LIST"
   fi
-  SERIAL="$ONLINE_DEVICE_LIST"
-fi
 
-ADB=(adb -s "$SERIAL")
-[[ "$("${ADB[@]}" get-state 2>/dev/null)" == "device" ]] || {
-  echo "ADB device is not online: $SERIAL" >&2
-  exit 2
-}
+  ADB=(adb -s "$SERIAL")
+  [[ "$("${ADB[@]}" get-state 2>/dev/null)" == "device" ]] || {
+    echo "ADB device is not online: $SERIAL" >&2
+    exit 2
+  }
 
-KERNEL_QEMU="$("${ADB[@]}" shell getprop ro.kernel.qemu | tr -d '\r')"
-HARDWARE="$("${ADB[@]}" shell getprop ro.hardware | tr -d '\r')"
-PRODUCT="$("${ADB[@]}" shell getprop ro.product.name | tr -d '\r')"
-if [[ "$KERNEL_QEMU" == "1" || "$SERIAL" == emulator-* || "$HARDWARE" == *ranchu* || "$PRODUCT" == sdk_* ]]; then
-  echo "Rejected emulator/non-physical target: $SERIAL" >&2
-  exit 3
+  KERNEL_QEMU="$("${ADB[@]}" shell getprop ro.kernel.qemu | tr -d '\r')"
+  HARDWARE="$("${ADB[@]}" shell getprop ro.hardware | tr -d '\r')"
+  PRODUCT="$("${ADB[@]}" shell getprop ro.product.name | tr -d '\r')"
+  if [[ "$KERNEL_QEMU" == "1" || "$SERIAL" == emulator-* || "$HARDWARE" == *ranchu* || "$PRODUCT" == sdk_* ]]; then
+    echo "Rejected emulator/non-physical target: $SERIAL" >&2
+    exit 3
+  fi
 fi
 
 SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
@@ -110,6 +121,17 @@ unzip -p "$APK" 'classes*.dex' | LC_ALL=C grep -aF "$EXPECTED_ONLINE_HOST" >/dev
 if unzip -p "$APK" 'classes*.dex' | LC_ALL=C grep -aE 'localhost:3000|127\.0\.0\.1:3000' >/dev/null; then
   echo "APK contains a forbidden localhost backend reference" >&2
   exit 3
+fi
+if [[ "$APK_ONLY" == true ]]; then
+  echo "package=$APK_PACKAGE"
+  echo "version_name=$VERSION_NAME"
+  echo "version_code=$VERSION_CODE"
+  echo "target_sdk=$TARGET_SDK"
+  echo "internet_permission=present"
+  echo "production_backend_host=present"
+  echo "localhost_backend_reference=absent"
+  echo "apk_preflight=PASS"
+  exit 0
 fi
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"

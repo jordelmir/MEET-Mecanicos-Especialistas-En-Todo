@@ -50,6 +50,7 @@ chmod +x "$TEST_DIR/adb"
 
 bash -n "$VERIFIER"
 bash "$VERIFIER" --help >/dev/null
+bash "$VERIFIER" --apk "$APK" --apk-only | grep -Fq "apk_preflight=PASS"
 
 set +e
 no_device_output="$(PATH="$TEST_DIR:$PATH" MEET_FAKE_ADB_MODE=none \
