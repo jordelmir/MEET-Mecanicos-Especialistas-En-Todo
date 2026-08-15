@@ -101,6 +101,8 @@ jobs:
       - name: Room schema verification and debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug
+      - name: Physical-device verifier preflight (no emulator)
+        run: bash tools/android/test-physical-device-verifier.sh
       - name: Compile physical-device migration test APK
         working-directory: android
         run: ./gradlew :app:assembleDebugAndroidTest
