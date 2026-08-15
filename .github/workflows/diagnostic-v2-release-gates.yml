@@ -201,8 +201,8 @@ jobs:
           set -euo pipefail
           sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           test -n "$sdk_root" || { echo "::error::Android SDK root is unavailable"; exit 1; }
-          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/cmdline-tools/bin:$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
-          for tool in sdkmanager avdmanager adb emulator; do
+          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/cmdline-tools/bin:$PATH"
+          for tool in sdkmanager avdmanager; do
             command -v "$tool" >/dev/null 2>&1 || {
               echo "::error::Required Android migration tool missing: $tool"
               exit 1
@@ -210,6 +210,13 @@ jobs:
           done
           sdkmanager --licenses < /dev/null >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64"
+          export PATH="$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
+          for tool in adb emulator; do
+            command -v "$tool" >/dev/null 2>&1 || {
+              echo "::error::Required Android migration tool missing after installation: $tool"
+              exit 1
+            }
+          done
           echo no | avdmanager create avd --force --name meet-migration-api35 --package "system-images;android-35;google_apis;x86_64"
           nohup emulator -avd meet-migration-api35 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
           adb wait-for-device
