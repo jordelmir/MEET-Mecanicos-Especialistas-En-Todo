@@ -42,6 +42,10 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     defaultConfig {
         applicationId = "com.elysium369.meet"
         minSdk = 26
@@ -324,7 +328,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     
     // Kotlin Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     
     // Google Fonts
     implementation("androidx.compose.ui:ui-text-google-fonts:1.6.1")

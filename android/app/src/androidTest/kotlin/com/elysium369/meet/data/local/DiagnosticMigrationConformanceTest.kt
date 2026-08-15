@@ -62,11 +62,11 @@ class DiagnosticMigrationConformanceTest {
             execSQL("DELETE FROM diagnostic_findings")
             execSQL(
                 "INSERT INTO diagnostic_findings(id,vehicleId,ecuEndpointId,diagnosticNamespace,rawDtcIdentity,displayCode,createdAtMs,resolutionState,resolvedAtMs) VALUES(?,?,?,?,?,?,?,?,NULL)",
-                arrayOf("uds-a", "vehicle-1", "ECM", "UDS", "123456:11", "P1234", 100L, "OPEN"),
+                arrayOf<Any?>("uds-a", "vehicle-1", "ECM", "UDS", "123456:11", "P1234", 100L, "OPEN"),
             )
             execSQL(
                 "INSERT INTO diagnostic_findings(id,vehicleId,ecuEndpointId,diagnosticNamespace,rawDtcIdentity,displayCode,createdAtMs,resolutionState,resolvedAtMs) VALUES(?,?,?,?,?,?,?,?,NULL)",
-                arrayOf("uds-b", "vehicle-1", "TCM", "UDS", "123456:22", "P1234", 200L, "OPEN"),
+                arrayOf<Any?>("uds-b", "vehicle-1", "TCM", "UDS", "123456:22", "P1234", 200L, "OPEN"),
             )
             close()
         }
@@ -183,7 +183,7 @@ class DiagnosticMigrationConformanceTest {
                 moduleIdentity,moduleName,targetAddress,responseAddress,sourceService,statusByte,
                 observationSemantic,synced
             ) VALUES(?,?,?,?,?,?,?,?,?,NULL,1,NULL,'OBSERVED','SAE_OBD','ECM','ECM','7E0','7E8','03',NULL,'ACTIVE',0)""",
-            arrayOf(id, sessionId, "vehicle-1", "P0230", "", "UNKNOWN", "ACTIVE", firstSeenAt, lastSeenAt),
+            arrayOf<Any?>(id, sessionId, "vehicle-1", "P0230", "", "UNKNOWN", "ACTIVE", firstSeenAt, lastSeenAt),
         )
     }
 
@@ -199,7 +199,7 @@ class DiagnosticMigrationConformanceTest {
                 moduleIdentity,moduleName,targetAddress,responseAddress,sourceService,statusByte,
                 observationSemantic,rawDtcIdentity,rawDtc24,failureType,dtcFormat,synced
             ) VALUES(?,?,?,?,?,?,?,?,?,NULL,1,NULL,'OBSERVED','UDS','ECM','Engine ECU','7E0','7E8','19',NULL,'ACTIVE','123456',1193046,?,'UDS_3_BYTE',0)""",
-            arrayOf(id, "session-$id", "vehicle-1", "P1234", "", "UNKNOWN", "ACTIVE", observedAt, observedAt, failureType),
+            arrayOf<Any?>(id, "session-$id", "vehicle-1", "P1234", "", "UNKNOWN", "ACTIVE", observedAt, observedAt, failureType),
         )
     }
 

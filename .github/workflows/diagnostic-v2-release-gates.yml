@@ -108,7 +108,7 @@ jobs:
           schema_dir="android/app/schemas/com.elysium369.meet.data.local.MeetDatabase"
           current_version="$(sed -nE 's/^[[:space:]]*version = ([0-9]+),/\1/p' android/app/src/main/kotlin/com/elysium369/meet/data/local/MeetDatabase.kt)"
           [[ "$current_version" =~ ^[0-9]+$ ]] || { echo "::error::Unable to resolve Room version"; exit 1; }
-          for version in $(seq 53 "$current_version"); do
+          for version in $(seq 49 "$current_version"); do
             test -s "$schema_dir/$version.json" || {
               echo "::error::Room schema $version.json was not emitted by the compiled model"
               exit 1
@@ -226,8 +226,11 @@ jobs:
           done
           echo no | avdmanager create avd --force --name meet-migration-api36 --package "system-images;android-36;google_apis;x86_64"
           nohup emulator -avd meet-migration-api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
-          adb wait-for-device
-          timeout 360 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'
+          if ! timeout 360 bash -c 'adb wait-for-device && until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'; then
+            echo "::error::API 36 emulator did not become ready within 360 seconds"
+            tail -200 /tmp/meet-emulator.log || true
+            exit 1
+          fi
           adb shell input keyevent 82
       - name: Execute adversarial Room migration conformance
         working-directory: android

@@ -80,7 +80,7 @@ object DiagnosticManifestSigner {
                     Base64.getEncoder().encodeToString(certificate.encoded)
                 },
                 keySecurityLevel = when {
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                         info.securityLevel == KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
                     info.isInsideSecureHardware -> "TRUSTED_EXECUTION_ENVIRONMENT"
                     else -> "SOFTWARE"

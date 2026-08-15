@@ -3342,6 +3342,38 @@ object AppModule {
 
     internal val MIGRATION_51_52 = object : Migration(51, 52) {
         override fun migrate(db: SupportSQLiteDatabase) {
+            // Repair any v51 event that was persisted before its finding. This can
+            // happen after an interrupted multi-table write and must not erase the
+            // only durable diagnostic identity during migration.
+            db.execSQL(
+                """INSERT OR IGNORE INTO diagnostic_findings(
+                       id, vehicleId, ecuEndpointId, diagnosticNamespace, rawDtcIdentity,
+                       displayCode, createdAtMs, resolutionState, resolvedAtMs
+                   )
+                   SELECT event.id, event.vehicleId,
+                          CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END,
+                          CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END,
+                          event.rawDtcIdentity, event.code, event.firstSeenAt, 'OPEN', NULL
+                   FROM dtc_events event
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM diagnostic_findings finding
+                       WHERE finding.vehicleId = event.vehicleId
+                         AND finding.ecuEndpointId = CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END
+                         AND finding.diagnosticNamespace = CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END
+                         AND finding.rawDtcIdentity = event.rawDtcIdentity
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dtc_events earlier
+                       WHERE earlier.vehicleId = event.vehicleId
+                         AND (CASE WHEN earlier.moduleIdentity = '' THEN 'LEGACY' ELSE earlier.moduleIdentity END) =
+                             (CASE WHEN event.moduleIdentity = '' THEN 'LEGACY' ELSE event.moduleIdentity END)
+                         AND (CASE WHEN earlier.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE earlier.diagnosticNamespace END) =
+                             (CASE WHEN event.diagnosticNamespace = '' THEN 'SAE_OBD' ELSE event.diagnosticNamespace END)
+                         AND earlier.rawDtcIdentity = event.rawDtcIdentity
+                         AND (earlier.firstSeenAt < event.firstSeenAt OR
+                              (earlier.firstSeenAt = event.firstSeenAt AND earlier.id < event.id))
+                   )""",
+            )
             db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN sessionSequence INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN elapsedRealtimeNanos INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE diagnostic_exchanges ADD COLUMN rawRequestHash TEXT NOT NULL DEFAULT ''")
