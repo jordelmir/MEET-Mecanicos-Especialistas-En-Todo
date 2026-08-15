@@ -51,6 +51,10 @@ jobs:
   release-gates:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_URL: ${{ secrets.ELYSIUM_SUPABASE_URL }}
+      ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_KEY: ${{ secrets.ELYSIUM_SUPABASE_KEY }}
+      ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_KEY_ROLE: ANON
     permissions:
       contents: read
       id-token: write
@@ -80,6 +84,18 @@ jobs:
         run: bash tools/verify-production-guards.sh
       - name: Production invariant negative self-tests
         run: bash tools/test-production-guards.sh
+      - name: Require protected online Android configuration
+        shell: bash
+        run: |
+          if [[ ! "$ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_URL" =~ ^https://[a-z0-9]+\.supabase\.co/?$ ]]; then
+            echo "::error::ELYSIUM_SUPABASE_URL must be a protected HTTPS Supabase project URL."
+            exit 1
+          fi
+          if [[ -z "$ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_KEY" ||
+                "$ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_KEY" == sb_secret_* ]]; then
+            echo "::error::ELYSIUM_SUPABASE_KEY must be a protected anon/publishable client key."
+            exit 1
+          fi
       - name: Gradle configuration preflight
         working-directory: android
         run: |
@@ -148,8 +164,6 @@ jobs:
             -PKEY_ALIAS=meet-ci
             -PKEY_PASSWORD=ci-release-only
             -PELYSIUM_SUPABASE_KEY_ROLE=ANON
-            -PELYSIUM_SUPABASE_URL=
-            -PELYSIUM_SUPABASE_KEY=
           )
           release_log="${RUNNER_TEMP}/meet-release-assembly.log"
 
