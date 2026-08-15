@@ -165,20 +165,21 @@ jobs:
             -PKEY_PASSWORD=ci-release-only
             -PELYSIUM_SUPABASE_KEY_ROLE=ANON
           )
-          release_log="${RUNNER_TEMP}/meet-release-assembly.log"
+          apk_log="${RUNNER_TEMP}/meet-release-apk.log"
 
-          if ./gradlew :app:assembleRelease :app:bundleRelease "${gradle_args[@]}" 2>&1 | tee "$release_log"; then
-            exit 0
+          if ! ./gradlew :app:assembleRelease "${gradle_args[@]}" 2>&1 | tee "$apk_log"; then
+            if ! grep -q "Execution failed for task ':app:packageRelease'" "$apk_log" ||
+               ! grep -q 'PackageAndroidArtifact\$IncrementalSplitterRunnable' "$apk_log"; then
+              echo "::error::Release APK assembly failed outside the reviewed transient packaging boundary."
+              exit 1
+            fi
+
+            echo "::warning::Transient Android APK packaging failure detected; retrying packageRelease once."
+            ./gradlew :app:packageRelease "${gradle_args[@]}" --stacktrace
           fi
 
-          if ! grep -q "Execution failed for task ':app:packageRelease'" "$release_log" ||
-             ! grep -q 'PackageAndroidArtifact\$IncrementalSplitterRunnable' "$release_log"; then
-            echo "::error::Release assembly failed outside the reviewed transient packaging boundary."
-            exit 1
-          fi
-
-          echo "::warning::Transient Android packaging failure detected; retrying packageRelease once."
-          ./gradlew :app:packageRelease "${gradle_args[@]}" --stacktrace
+          # Bundle packaging runs in a fresh single-use Gradle process. This releases
+          # the R8 heap before bundletool handles the large offline knowledge assets.
           ./gradlew :app:bundleRelease "${gradle_args[@]}" --stacktrace
       - name: Built APK secret and string scan
         env:
