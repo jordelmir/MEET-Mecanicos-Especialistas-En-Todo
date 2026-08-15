@@ -698,10 +698,6 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     @Volatile
     private var mostRecentSessionId: String? = null
 
-    private companion object {
-        const val MAX_PENDING_WRITES = 2_048
-    }
-
     fun onStart(ctx: ObdSessionStartContext) {
         startSession(ctx)
     }
@@ -1082,6 +1078,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     }
 
     private companion object {
+        const val MAX_PENDING_WRITES = 2_048
         const val UNKNOWN_LATENCY_MS = -1L
     }
 }

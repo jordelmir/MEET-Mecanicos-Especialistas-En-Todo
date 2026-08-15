@@ -329,11 +329,12 @@ object EvidenceCompiler {
     private fun reportVaultKeyProtection(secretKey: SecretKey) {
         val factory = javax.crypto.SecretKeyFactory.getInstance(secretKey.algorithm, "AndroidKeyStore")
         val info = factory.getKeySpec(secretKey, android.security.keystore.KeyInfo::class.java)
+            as android.security.keystore.KeyInfo
         if (!info.isInsideSecureHardware) {
             Log.w(TAG, "Evidence vault key is device-bound but hardware protection is unavailable")
         }
     }
-}
+
     data class BlackBoxFindingReference(
         val findingId: String,
         val displayCode: String,
@@ -342,3 +343,4 @@ object EvidenceCompiler {
         val status: String,
         val failureType: Int,
     )
+}

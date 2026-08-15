@@ -526,7 +526,7 @@ fun ComponentLocatorScreen(
                                 .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
                                 .padding(10.dp),
                         ) {
-                            Text(target.layer, color = MeetColors.neonPurple, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            Text(target.layer, color = MeetColors.electricBlue, fontSize = 9.sp, fontWeight = FontWeight.Black)
                             Text(target.label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Text(target.path, color = MeetColors.textSecondary, fontSize = 9.sp, maxLines = 2)
                             Spacer(Modifier.height(5.dp))

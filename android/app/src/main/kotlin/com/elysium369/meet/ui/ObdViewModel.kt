@@ -1710,8 +1710,6 @@ class ObdViewModel @Inject constructor(
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
-    /** Authoritative sensor stream; consumers making physical conclusions use this, not the float projection. */
-    val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
 
     // Smooth sensor interpolation — eliminates erratic jumps from raw ELM327 readings
     private val sensorSmoother = SensorSmootherManager()
@@ -3381,7 +3379,7 @@ class ObdViewModel @Inject constructor(
 
     fun startDiagnosticSession(vehicle: Vehicle) {
         selectVehicle(vehicle)
-        beginUnboundPhysicalSession(lastAdapterAddress.ifBlank { "UNKNOWN_ADAPTER" })
+        beginUnboundPhysicalSession(lastAdapterAddress.orEmpty().ifBlank { "UNKNOWN_ADAPTER" })
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
             obdSession.connect()
