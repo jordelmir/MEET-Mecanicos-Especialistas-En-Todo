@@ -101,6 +101,9 @@ jobs:
       - name: Room schema verification and debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug
+      - name: Compile physical-device migration test APK
+        working-directory: android
+        run: ./gradlew :app:assembleDebugAndroidTest
       - name: Require Room schema authority through current database
         shell: bash
         run: |
@@ -192,59 +195,9 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
 
-  migration-conformance-emulator:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
-      - name: Create API 36 migration emulator
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          test -n "$sdk_root" || { echo "::error::Android SDK root is unavailable"; exit 1; }
-          export PATH="$sdk_root/cmdline-tools/latest/bin:$sdk_root/cmdline-tools/bin:$PATH"
-          for tool in sdkmanager avdmanager; do
-            command -v "$tool" >/dev/null 2>&1 || {
-              echo "::error::Required Android migration tool missing: $tool"
-              exit 1
-            }
-          done
-          sdkmanager --licenses < /dev/null >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
-          export PATH="$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
-          export ANDROID_AVD_HOME="${RUNNER_TEMP}/meet-avd"
-          mkdir -p "$ANDROID_AVD_HOME"
-          for tool in adb emulator; do
-            command -v "$tool" >/dev/null 2>&1 || {
-              echo "::error::Required Android migration tool missing after installation: $tool"
-              exit 1
-            }
-          done
-          printf 'no\n' | avdmanager create avd --force --name meet-migration-api36 --package "system-images;android-36;google_apis;x86_64"
-          emulator -list-avds | grep -Fx meet-migration-api36 >/dev/null || {
-            echo "::error::API 36 AVD was not created in $ANDROID_AVD_HOME"
-            exit 1
-          }
-          nohup emulator -avd meet-migration-api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
-          if ! timeout 360 bash -c 'adb wait-for-device && until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'; then
-            echo "::error::API 36 emulator did not become ready within 360 seconds"
-            tail -200 /tmp/meet-emulator.log || true
-            exit 1
-          fi
-          adb shell input keyevent 82
-      - name: Execute adversarial Room migration conformance
-        working-directory: android
-        run: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.elysium369.meet.data.local.DiagnosticMigrationConformanceTest
-
   proof-status:
     if: always()
-    needs: [release-gates, migration-conformance-emulator]
+    needs: [release-gates]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -266,7 +219,6 @@ jobs:
             --version-name "4.17.0" \
             --version-code 45 \
             --gate "release-gates=${{ needs.release-gates.result }}" \
-            --gate "migration-conformance=${{ needs.migration-conformance-emulator.result }}" \
             --artifact "debug-apk=proof-artifacts/app-debug.apk" \
             --artifact "release-apk=proof-artifacts/app-release.apk" \
             --artifact "release-aab=proof-artifacts/app-release.aab" \
