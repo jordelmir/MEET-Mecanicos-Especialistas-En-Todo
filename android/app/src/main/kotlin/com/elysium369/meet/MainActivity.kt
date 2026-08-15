@@ -664,6 +664,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+            composable("platform_trust_center") {
+                PlatformTrustCenterScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable("repair_case_detail/{caseId}") { backStack ->
                 val caseId = backStack.arguments?.getString("caseId") ?: ""
                 val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()

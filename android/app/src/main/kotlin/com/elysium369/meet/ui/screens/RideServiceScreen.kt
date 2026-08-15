@@ -138,6 +138,7 @@ fun RideServiceScreen(
     LaunchedEffect(Unit) {
         permissionsLauncher.launch(permissionsToRequest)
         viewModel.detectCurrentLocation(context)
+        viewModel.refreshOwnTrustDecisions()
         viewModel.startRideProjectionSync()
     }
     DisposableEffect(viewModel) {

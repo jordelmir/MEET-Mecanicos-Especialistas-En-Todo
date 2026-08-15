@@ -88,6 +88,7 @@ import com.elysium369.meet.ride.domain.RideSupportPolicy
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.VerificationFileEvidence
+import com.elysium369.meet.ride.domain.PlatformOwnerAccess
 import com.elysium369.meet.ride.domain.RideCommandEnvelope
 import com.elysium369.meet.ride.domain.RideCommandType
 import com.elysium369.meet.ride.domain.RideId
@@ -103,6 +104,8 @@ import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
 import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
+import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
@@ -1162,10 +1165,67 @@ class ObdViewModel @Inject constructor(
 
     private fun currentCloudUserId(): String? {
         return SupabaseManager.client.auth.currentUserOrNull()?.id
+            ?: com.elysium369.meet.data.remote.SupabaseModule.client.auth
+                .currentUserOrNull()?.id
     }
 
     val currentUserId: String? get() = currentCloudUserId()
     val currentRideActorId: String get() = localDeviceId
+
+    private val _platformOwnerAccess = MutableStateFlow(PlatformOwnerAccess.UNKNOWN)
+    val platformOwnerAccess: StateFlow<PlatformOwnerAccess> =
+        _platformOwnerAccess.asStateFlow()
+
+    fun refreshPlatformOwnerAccess() {
+        if (currentCloudUserId() == null) {
+            _platformOwnerAccess.value = PlatformOwnerAccess.SIGNED_OUT
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _platformOwnerAccess.value = try {
+                if (PlatformTrustCenterGateway.hasOwnerAccess()) {
+                    PlatformOwnerAccess.GRANTED
+                } else {
+                    PlatformOwnerAccess.DENIED
+                }
+            } catch (error: Exception) {
+                Log.w("MeetTrustCenter", "Owner authority check unavailable", error)
+                PlatformOwnerAccess.UNAVAILABLE
+            }
+        }
+    }
+
+    fun refreshOwnTrustDecisions() {
+        if (currentCloudUserId() == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                .onSuccess { applications ->
+                    val latestByType = applications
+                        .groupBy { it.serviceType }
+                        .mapValues { (_, values) -> values.maxBy { it.submittedAt } }
+                    latestByType["RIDE_DRIVER"]?.let { application ->
+                        val now = System.currentTimeMillis()
+                        rideDao.updateDriverVerificationStatus(
+                            driverId = localDeviceId,
+                            status = application.status,
+                            approvedAt = now.takeIf { application.status == "APPROVED" },
+                            updatedAt = now,
+                        )
+                    }
+                    latestByType["PASSENGER"]?.let { application ->
+                        val now = System.currentTimeMillis()
+                        rideDao.updatePassengerVerificationStatus(
+                            passengerId = localDeviceId,
+                            status = application.status,
+                            approvedAt = now.takeIf { application.status == "APPROVED" },
+                        )
+                    }
+                }
+                .onFailure {
+                    Log.w("MeetTrustCenter", "Own verification decision sync unavailable", it)
+                }
+        }
+    }
 
     private fun currentProviderUserId(): String {
         return currentCloudUserId() ?: "local_device_$localDeviceId"
@@ -1196,8 +1256,25 @@ class ObdViewModel @Inject constructor(
         val userId = currentProviderUserId()
         providerRolesJob?.cancel()
         providerRolesJob = viewModelScope.launch(Dispatchers.IO) {
+            if (currentCloudUserId() != null) {
+                runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                    .onSuccess { applications ->
+                        val decisions = applications.associateBy { it.profileReference }
+                        providerProfileDao.getProfilesForUser(userId).first().forEach { profile ->
+                            val decision = decisions[profile.profileId] ?: return@forEach
+                            providerProfileDao.setProfileVerified(
+                                profileId = profile.profileId,
+                                verified = decision.status == "APPROVED",
+                                updatedAt = System.currentTimeMillis(),
+                            )
+                        }
+                    }
+                    .onFailure {
+                        Log.w("MeetTrustCenter", "Provider review sync unavailable", it)
+                    }
+            }
             providerProfileDao.getProfilesForUser(userId).collect { profiles ->
-                val activeProfiles = profiles.filter { it.isActive }
+                val activeProfiles = profiles.filter { it.isActive && it.verified }
                 _userProviderProfiles.value = profiles
                 _isMechanic.value = activeProfiles.any { it.providerType == "MECHANIC" }
                 _isTowTruckDriver.value = activeProfiles.any { it.providerType == "TOW_TRUCK" }
@@ -1270,17 +1347,34 @@ class ObdViewModel @Inject constructor(
 
             providerProfileDao.insertProfile(profile)
 
-            // Sync to cloud
-            if (cloudUserId != null) {
+            val cloudSubmission = if (cloudUserId != null) {
                 runCatching {
-                    SupabaseManager.client.postgrest["provider_profiles"].upsert(profile)
-                }.onFailure { Log.w("ObdViewModel", "Provider profile saved locally; cloud sync unavailable", it) }
-            }
+                    PlatformTrustCenterGateway.submit(
+                        ServiceVerificationSubmission(
+                            serviceType = providerType,
+                            profileReference = profile.profileId,
+                            displayName = ownerName,
+                            businessName = businessName,
+                            phone = phone,
+                            locationLabel = location,
+                            licenseReference = licenseNumber.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            } else null
 
             withContext(Dispatchers.Main) {
                 context?.let {
                     val typeLabel = providerTypeLabel(providerType)
-                    android.widget.Toast.makeText(it, "🎉 ¡Registrado como $typeLabel exitosamente!", android.widget.Toast.LENGTH_LONG).show()
+                    val message = when {
+                        cloudUserId == null ->
+                            "Perfil de $typeLabel guardado localmente. Inicia sesión para enviarlo a verificación."
+                        cloudSubmission?.isSuccess == true ->
+                            "Solicitud de $typeLabel enviada al Centro de Confianza. Estado: pendiente."
+                        else ->
+                            "Perfil guardado localmente; la verificación remota está pendiente de sincronización."
+                    }
+                    android.widget.Toast.makeText(it, message, android.widget.Toast.LENGTH_LONG).show()
                 }
             }
 
@@ -8670,11 +8764,76 @@ class ObdViewModel @Inject constructor(
                 approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertPassengerVerification(entity)
+            val cloudUserId = currentCloudUserId()
+            if (cloudUserId != null) {
+                val evidenceFiles = listOf(
+                    verificationFileEvidence("profile", pathProfilePhoto),
+                    verificationFileEvidence("id_front", pathCedulaFront),
+                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
+                )
+                val manifest = buildPassengerEvidenceManifestSha256(
+                    fullName = fullName,
+                    phone = phone,
+                    evidenceFiles = evidenceFiles,
+                )
+                runCatching {
+                    PlatformTrustCenterGateway.submit(
+                        ServiceVerificationSubmission(
+                            serviceType = "PASSENGER",
+                            profileReference = "primary",
+                            displayName = fullName,
+                            phone = phone,
+                            evidenceManifestSha256 = manifest,
+                        ),
+                    )
+                }.onFailure {
+                    Log.w("MeetTrustCenter", "Passenger review submission unavailable", it)
+                    _rideVerificationNotice.emit(
+                        "Registro local guardado; la revisión remota está pendiente de sincronización.",
+                    )
+                }
+            }
             android.util.Log.i(
                 "MeetRides",
                 "Passenger verification submitted; status=${verificationDecision.status}",
             )
         }
+    }
+
+    private suspend fun buildPassengerEvidenceManifestSha256(
+        fullName: String,
+        phone: String,
+        evidenceFiles: List<VerificationFileEvidence>,
+    ): String = withContext(Dispatchers.IO) {
+        val digest = MessageDigest.getInstance("SHA-256")
+        fun append(value: String) {
+            digest.update(value.toByteArray(Charsets.UTF_8))
+            digest.update(0)
+        }
+        append("meet-rides-passenger-evidence-v1")
+        append(fullName.trim())
+        append(phone.trim())
+        evidenceFiles.sortedBy(VerificationFileEvidence::label).forEach { evidence ->
+            append(evidence.label)
+            append(evidence.byteCount.toString())
+            val file = java.io.File(evidence.path)
+            val contentHash = if (file.isFile) {
+                file.inputStream().buffered().use { input ->
+                    val fileDigest = MessageDigest.getInstance("SHA-256")
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        fileDigest.update(buffer, 0, read)
+                    }
+                    fileDigest.digest().toHex()
+                }
+            } else {
+                "missing"
+            }
+            append(contentHash)
+        }
+        digest.digest().toHex()
     }
 
     /**

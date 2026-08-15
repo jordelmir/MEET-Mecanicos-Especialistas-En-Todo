@@ -58,6 +58,11 @@ fun HomeScreen(
     val protocol by viewModel.detectedProtocol.collectAsState()
     val adapterVer by viewModel.adapterVersion.collectAsState()
     val isClone by viewModel.isCloneAdapter.collectAsState()
+    val platformOwnerAccess by viewModel.platformOwnerAccess.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshPlatformOwnerAccess()
+    }
 
     val totalDtcs = activeDtcs.size + pendingDtcs.size + permanentDtcs.size
     val readyCount = readiness?.monitors?.count { it.complete } ?: 0
@@ -373,31 +378,35 @@ fun HomeScreen(
             // ── Quick Actions Grid ──
             PhantomSectionHeader("Acciones Rápidas")
 
-            val actions = listOf(
-                Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner",
-                Triple("⚠️", "DTCs", MeetColors.error) to "dtc",
-                Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito",
-                Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna",
-                Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator",
-                Triple("🔩", "Piezas", MeetColors.neonGreen) to "parts_repairs",
-                Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings",
-                Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings",
-                Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage",
-                Triple("🤖", "IA", MeetColors.electricBlue) to "ai",
-                Triple("🔧", "Terminal", MeetColors.cyberCyan) to "terminal",
-                Triple("💬", "Soporte", MeetColors.warning) to "support_chat",
-                Triple("💬", "Chat Flota", MeetColors.electricBlue) to "fleet_chat_list/b1",
-                Triple("📄", "Reportes", MeetColors.electricBlue) to "reports",
-                Triple("🔮", "HUD Reflejo", MeetColors.neonGreen) to "hud",
-                Triple("📹", "Cámara HUD", MeetColors.electricBlue) to "dashcam",
-                Triple("📋", "DVIR Diario", MeetColors.cyberCyan) to "dvir",
-                Triple("🩺", "Salud AI", MeetColors.electricBlue) to "health_score",
-                Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance",
-                Triple("🍃", "Eco Viajes", MeetColors.neonGreen) to "trips",
-                Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link",
-                Triple("🪪", "Proveedores", MeetColors.warning) to "provider_registration",
-                Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub"
-            )
+            val actions = buildList {
+                add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
+                add(Triple("⚠️", "DTCs", MeetColors.error) to "dtc")
+                add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
+                add(Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna")
+                add(Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator")
+                add(Triple("🔩", "Piezas", MeetColors.neonGreen) to "parts_repairs")
+                add(Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings")
+                add(Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings")
+                add(Triple("🚗", "Garage", MeetColors.cyberCyan) to "garage")
+                add(Triple("🤖", "IA", MeetColors.electricBlue) to "ai")
+                add(Triple("🔧", "Terminal", MeetColors.cyberCyan) to "terminal")
+                add(Triple("💬", "Soporte", MeetColors.warning) to "support_chat")
+                add(Triple("💬", "Chat Flota", MeetColors.electricBlue) to "fleet_chat_list/b1")
+                add(Triple("📄", "Reportes", MeetColors.electricBlue) to "reports")
+                add(Triple("🔮", "HUD Reflejo", MeetColors.neonGreen) to "hud")
+                add(Triple("📹", "Cámara HUD", MeetColors.electricBlue) to "dashcam")
+                add(Triple("📋", "DVIR Diario", MeetColors.cyberCyan) to "dvir")
+                add(Triple("🩺", "Salud AI", MeetColors.electricBlue) to "health_score")
+                add(Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance")
+                add(Triple("🍃", "Eco Viajes", MeetColors.neonGreen) to "trips")
+                add(Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link")
+                add(Triple("🪪", "Proveedores", MeetColors.warning) to "provider_registration")
+                if (com.elysium369.meet.ride.domain.PlatformOwnerAccessPolicy
+                        .canExposeTrustCenter(platformOwnerAccess)) {
+                    add(Triple("🛡️", "Centro de Confianza", MeetColors.neonGreen) to "platform_trust_center")
+                }
+                add(Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub")
+            }
 
             actions.chunked(2).forEachIndexed { rowIdx, row ->
                 AnimatedEntrance(6 + rowIdx) {
