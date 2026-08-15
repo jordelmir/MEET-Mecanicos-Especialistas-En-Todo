@@ -23,7 +23,7 @@ That's why it ships first, alone, before any UI work.
 ## What lands
 
 ### 1. Supabase migration
-File: `supabase/migrations/20260704000000_reports_foundations.sql`
+File: `supabase/migrations/20260704001000_reports_foundations.sql`
 
 * 4 enums: `report_type`, `report_status`, `evidence_type`,
   `diagnostic_provenance`.

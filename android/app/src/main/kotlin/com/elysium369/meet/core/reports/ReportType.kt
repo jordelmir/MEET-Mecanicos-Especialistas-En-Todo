@@ -2,7 +2,7 @@ package com.elysium369.meet.core.reports
 
 /**
  * Mirror of the Postgres enum `public.report_type` defined in
- *   supabase/migrations/20260704000000_reports_foundations.sql
+ *   supabase/migrations/20260704001000_reports_foundations.sql
  *
  * Adding a new value here REQUIRES a Postgres `alter type ... add value`
  * migration and the same label in `lib/reports/types.ts` to keep

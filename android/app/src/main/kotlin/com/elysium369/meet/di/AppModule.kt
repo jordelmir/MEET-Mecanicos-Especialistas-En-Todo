@@ -2909,7 +2909,7 @@ object AppModule {
      * Reports PDF Certificados + Vehicle Technical History round.
      *
      * Mirrors the Postgres schema in
-     *   supabase/migrations/20260704000000_reports_foundations.sql
+     *   supabase/migrations/20260704001000_reports_foundations.sql
      *   supabase/migrations/20260705000000_reports_sync_and_evidence_extend.sql
      *
      * Indexes + FKs are created with `IF NOT EXISTS` so re-running the
