@@ -58,7 +58,7 @@ grep -q 'readOnlyServices' "$RAW_COMMAND_POLICY" || \
   fail "read-only terminal allowlist missing"
 [[ ! -e "$PRODUCTION_KOTLIN/com/elysium369/meet/core/vanguard/VanguardCoreStubs.kt" ]] || \
   fail "Vanguard production stub file restored"
-if grep -REn --include='*.kt' 'DtcRecord[[:space:]]*\(' "$PRODUCTION_KOTLIN" \
+if grep -REn --include='*.kt' '(^|[^[:alnum:]_])DtcRecord[[:space:]]*\(' "$PRODUCTION_KOTLIN" \
   | grep -Ev '/core/obd/DtcScanEngine\.kt:' >/dev/null; then
   fail "production code bypasses DiagnosticFindingFactory"
 fi
