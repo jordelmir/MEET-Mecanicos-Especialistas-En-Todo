@@ -218,13 +218,19 @@ jobs:
           sdkmanager --licenses < /dev/null >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
           export PATH="$sdk_root/platform-tools:$sdk_root/emulator:$PATH"
+          export ANDROID_AVD_HOME="${RUNNER_TEMP}/meet-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           for tool in adb emulator; do
             command -v "$tool" >/dev/null 2>&1 || {
               echo "::error::Required Android migration tool missing after installation: $tool"
               exit 1
             }
           done
-          echo no | avdmanager create avd --force --name meet-migration-api36 --package "system-images;android-36;google_apis;x86_64"
+          printf 'no\n' | avdmanager create avd --force --name meet-migration-api36 --package "system-images;android-36;google_apis;x86_64"
+          emulator -list-avds | grep -Fx meet-migration-api36 >/dev/null || {
+            echo "::error::API 36 AVD was not created in $ANDROID_AVD_HOME"
+            exit 1
+          }
           nohup emulator -avd meet-migration-api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/meet-emulator.log 2>&1 &
           if ! timeout 360 bash -c 'adb wait-for-device && until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'; then
             echo "::error::API 36 emulator did not become ready within 360 seconds"
