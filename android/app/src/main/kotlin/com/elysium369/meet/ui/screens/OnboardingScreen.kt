@@ -8,8 +8,10 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +33,7 @@ import com.elysium369.meet.ui.components.EliteTextButton
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import com.elysium369.meet.ui.components.neonGlow
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.identity.OnboardingUsageProfile
 import java.util.Locale
 
 // ═══════════════════════════════════════════════════════════════
@@ -41,7 +44,7 @@ import java.util.Locale
 fun OnboardingScreen(onFinish: () -> Unit) {
     val context = LocalContext.current
     var step by remember { mutableIntStateOf(1) }
-    var selectedProfile by remember { mutableStateOf("owner") }
+    var selectedProfile by remember { mutableStateOf(OnboardingUsageProfile.OWNER) }
     var selectedAdapter by remember { mutableStateOf("bt_classic") }
     val detectedLanguage = remember { Locale.getDefault().language.takeIf { it == "es" || it == "en" } ?: "es" }
 
@@ -148,7 +151,8 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     } else {
                         context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
                             .edit()
-                            .putString("user_profile", selectedProfile)
+                            .putString("user_profile", selectedProfile.storageId)
+                            .putString("usage_profile_sync_state", "PENDING")
                             .putString("preferred_adapter", selectedAdapter)
                             .putString("app_language", detectedLanguage)
                             .putBoolean("real_adapter_hint_seen", false)
@@ -166,7 +170,8 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     onClick = {
                         context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
                             .edit()
-                            .putString("user_profile", selectedProfile)
+                            .putString("user_profile", selectedProfile.storageId)
+                            .putString("usage_profile_sync_state", "PENDING")
                             .putString("preferred_adapter", selectedAdapter)
                             .putString("app_language", detectedLanguage)
                             .apply()
@@ -236,8 +241,16 @@ private fun OnboardingStep1() {
 }
 
 @Composable
-private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun OnboardingStep2(
+    selectedProfile: OnboardingUsageProfile,
+    onSelect: (OnboardingUsageProfile) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .heightIn(max = 500.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(
             "¿CÓMO USARÁS ELYSIUM VANGUARD?",
             style = MaterialTheme.typography.headlineMedium,
@@ -252,18 +265,13 @@ private fun OnboardingStep2(selectedProfile: String, onSelect: (String) -> Unit)
         )
         Spacer(Modifier.height(28.dp))
 
-        listOf(
-            Triple("owner", "Dueño de carro", "simple y guiado"),
-            Triple("mechanic", "Mecánico", "diagnóstico técnico"),
-            Triple("workshop", "Taller", "clientes y órdenes"),
-            Triple("fleet", "Flota", "riesgo y mantenimiento")
-        ).forEachIndexed { idx, (id, title, desc) ->
-            Spacer(Modifier.height(if (idx == 0) 0.dp else 10.dp))
+        OnboardingUsageProfile.entries.forEachIndexed { idx, profile ->
+            Spacer(Modifier.height(if (idx == 0) 0.dp else 8.dp))
             EliteOutlinedButton(
-                onClick = { onSelect(id) },
-                modifier = Modifier.fillMaxWidth().height(58.dp),
-                text = "${if (selectedProfile == id) "✓" else "•"}  $title — $desc",
-                color = if (selectedProfile == id) MeetColors.neonGreen else MeetColors.cyberCyan
+                onClick = { onSelect(profile) },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                text = "${if (selectedProfile == profile) "✓" else "•"}  ${profile.displayLabel} — ${profile.description}",
+                color = if (selectedProfile == profile) MeetColors.neonGreen else MeetColors.cyberCyan
             )
         }
 
@@ -320,13 +328,12 @@ private fun OnboardingStep3(selectedAdapter: String, onSelect: (String) -> Unit)
 }
 
 @Composable
-private fun OnboardingStep4(profile: String, adapter: String, language: String) {
-    val profileLabel = when (profile) {
-        "mechanic" -> "Mecánico independiente"
-        "workshop" -> "Taller"
-        "fleet" -> "Flota"
-        else -> "Dueño de carro"
-    }
+private fun OnboardingStep4(
+    profile: OnboardingUsageProfile,
+    adapter: String,
+    language: String,
+) {
+    val profileLabel = profile.displayLabel
     val adapterLabel = when (adapter) {
         "ble" -> "BLE"
         "wifi" -> "WiFi ELM"
@@ -370,7 +377,14 @@ private fun OnboardingStep4(profile: String, adapter: String, language: String) 
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            "Siguiente paso: agrega tu vehículo y conecta un adaptador OBD-II físico. Si quieres ofrecer servicios, activa proveedor después desde Proveedores.",
+            when (profile) {
+                OnboardingUsageProfile.RIDE_PASSENGER ->
+                    "Siguiente paso: inicia sesión y completa tu perfil para solicitar viajes en línea."
+                OnboardingUsageProfile.RIDE_DRIVER ->
+                    "Siguiente paso: inicia sesión y completa la verificación de conductor y vehículo. Elegir este perfil no te aprueba automáticamente."
+                else ->
+                    "Siguiente paso: agrega tu vehículo y conecta un adaptador OBD-II físico. Si quieres ofrecer servicios, activa proveedor después desde Proveedores."
+            },
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
