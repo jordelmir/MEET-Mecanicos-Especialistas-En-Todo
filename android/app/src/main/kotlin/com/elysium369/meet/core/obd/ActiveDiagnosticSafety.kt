@@ -1,9 +1,11 @@
 package com.elysium369.meet.core.obd
 
+import android.content.Context
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
+import java.math.BigDecimal
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 
@@ -111,15 +113,6 @@ data class SignedDiagnosticCapabilityPack(
         require(schemaVersion > 0 && issuedAt > 0 && revocationVersion >= 0)
         require(contentHash.matches(Regex("^[0-9a-fA-F]{64}$")))
         require(signature.isNotBlank() && operations.isNotEmpty())
-        val canonicalFields = listOf(
-            packId, issuer, keyId, applicability.manufacturer, applicability.ecuFamily,
-            applicability.ecuAddress, applicability.calibrationId,
-        ) + operations.flatMap {
-            listOf(it.operationId, it.service, it.requestTemplate, it.stopRequest, it.sourceAuthority)
-        }
-        require(canonicalFields.none { '|' in it || ';' in it }) {
-            "Capability pack contiene delimitadores ambiguos en contenido firmado."
-        }
         require(operations.map { it.operationId }.distinct().size == operations.size)
         require(operations.all {
             it.operationId.isNotBlank() && it.maximumDurationMs in 1..300_000 &&
@@ -128,25 +121,131 @@ data class SignedDiagnosticCapabilityPack(
         })
     }
 
-    fun canonicalContent(): String = listOf(
-        packId, schemaVersion, issuer, keyId, issuedAt, expiresAt ?: "", revocationVersion,
-        applicability.manufacturer, applicability.modelFamily ?: "", applicability.yearFrom ?: "",
-        applicability.yearTo ?: "", applicability.market ?: "", applicability.ecuFamily,
-        applicability.ecuAddress, applicability.hardwareVersion ?: "", applicability.softwareVersion ?: "",
-        applicability.calibrationId,
-        operations.sortedBy { it.operationId }.joinToString(";") { operation ->
-            listOf(
-                operation.operationId, operation.service, operation.requestTemplate,
-                operation.positiveResponseService, operation.negativeResponsePolicy,
-                operation.sessionRequirements.sorted().joinToString(","),
-                operation.securityRequirements.sorted().joinToString(","),
-                operation.safetyRequirements.map { it.name }.sorted().joinToString(","),
-                operation.maximumDurationMs, operation.stopRequest,
-                operation.stopPositiveResponseService, operation.postconditions.sorted().joinToString(","),
-                operation.sourceAuthority,
-            ).joinToString("|")
-        },
-    ).joinToString("|")
+    fun canonicalBytes(): ByteArray = CanonicalJson.encode(
+        mapOf(
+            "applicability" to mapOf(
+                "calibrationId" to applicability.calibrationId,
+                "ecuAddress" to applicability.ecuAddress,
+                "ecuFamily" to applicability.ecuFamily,
+                "hardwareVersion" to applicability.hardwareVersion,
+                "manufacturer" to applicability.manufacturer,
+                "market" to applicability.market,
+                "modelFamily" to applicability.modelFamily,
+                "softwareVersion" to applicability.softwareVersion,
+                "yearFrom" to applicability.yearFrom,
+                "yearTo" to applicability.yearTo,
+            ),
+            "expiresAt" to expiresAt,
+            "issuedAt" to issuedAt,
+            "issuer" to issuer,
+            "keyId" to keyId,
+            "operations" to operations.sortedBy { it.operationId }.map { operation ->
+                mapOf(
+                    "maximumDurationMs" to operation.maximumDurationMs,
+                    "negativeResponsePolicy" to operation.negativeResponsePolicy,
+                    "operationId" to operation.operationId,
+                    "positiveResponseService" to operation.positiveResponseService,
+                    "postconditions" to operation.postconditions.sorted(),
+                    "requestTemplate" to operation.requestTemplate,
+                    "safetyRequirements" to operation.safetyRequirements.map { it.name }.sorted(),
+                    "securityRequirements" to operation.securityRequirements.sorted(),
+                    "service" to operation.service,
+                    "sessionRequirements" to operation.sessionRequirements.sorted(),
+                    "sourceAuthority" to operation.sourceAuthority,
+                    "stopPositiveResponseService" to operation.stopPositiveResponseService,
+                    "stopRequest" to operation.stopRequest,
+                )
+            },
+            "packId" to packId,
+            "revocationVersion" to revocationVersion,
+            "schemaVersion" to schemaVersion,
+        ),
+    )
+}
+
+data class CapabilityTrustManifest(
+    val trustVersion: Long,
+    val issuedAt: Long,
+    val expiresAt: Long,
+    val trustedIssuerKeysBase64: Map<String, String>,
+    val revokedIssuerKeys: Set<String>,
+    val revokedPackIds: Set<String>,
+    val minimumPackSchema: Int,
+    val minimumAppVersion: String,
+    val rootKeyId: String,
+    val signatureBase64: String,
+) {
+    fun canonicalBytes(): ByteArray = CanonicalJson.encode(
+        mapOf(
+            "expiresAt" to expiresAt,
+            "issuedAt" to issuedAt,
+            "minimumAppVersion" to minimumAppVersion,
+            "minimumPackSchema" to minimumPackSchema,
+            "revokedIssuerKeys" to revokedIssuerKeys.sorted(),
+            "revokedPackIds" to revokedPackIds.sorted(),
+            "rootKeyId" to rootKeyId,
+            "trustVersion" to trustVersion,
+            "trustedIssuerKeysBase64" to trustedIssuerKeysBase64.toSortedMap(),
+        ),
+    )
+}
+
+interface CapabilityTrustStateStore {
+    fun highestAcceptedTrustVersion(): Long
+    fun persistHighestAcceptedTrustVersion(version: Long)
+}
+
+internal class AndroidCapabilityTrustStateStore(context: Context) : CapabilityTrustStateStore {
+    private val preferences = context.getSharedPreferences("meet_capability_trust", Context.MODE_PRIVATE)
+    override fun highestAcceptedTrustVersion(): Long = preferences.getLong("highestAcceptedTrustVersion", 0L)
+    override fun persistHighestAcceptedTrustVersion(version: Long) {
+        check(preferences.edit().putLong("highestAcceptedTrustVersion", version).commit())
+    }
+}
+
+/** Versioned JCS-compatible restricted profile: sorted keys, finite numbers, strings, arrays and null. */
+internal object CanonicalJson {
+    fun encode(value: Any?): ByteArray = render(value).toByteArray(Charsets.UTF_8)
+
+    private fun render(value: Any?): String = when (value) {
+        null -> "null"
+        is String -> value.asJsonString()
+        is Double -> value.canonicalFiniteNumber()
+        is Float -> value.toDouble().canonicalFiniteNumber()
+        is Byte, is Short, is Int, is Long -> value.toString()
+        is Boolean -> value.toString()
+        is Map<*, *> -> value.entries
+            .map { (key, item) -> require(key is String); key to item }
+            .sortedBy { it.first }
+            .joinToString(prefix = "{", postfix = "}") { (key, item) ->
+                "${key.asJsonString()}:${render(item)}"
+            }
+        is Iterable<*> -> value.joinToString(prefix = "[", postfix = "]") { render(it) }
+        else -> error("Unsupported canonical JSON type: ${value::class.java.name}")
+    }
+
+    private fun String.asJsonString(): String = buildString(length + 2) {
+        append('"')
+        this@asJsonString.forEach { character ->
+            when (character) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\b' -> append("\\b")
+                '\u000C' -> append("\\f")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (character.code < 0x20) append("\\u%04x".format(character.code)) else append(character)
+            }
+        }
+        append('"')
+    }
+
+    private fun Double.canonicalFiniteNumber(): String {
+        require(isFinite()) { "Canonical JSON rejects non-finite numbers" }
+        if (this == 0.0) return "0"
+        return BigDecimal.valueOf(this).stripTrailingZeros().toPlainString()
+    }
 }
 
 /**
@@ -158,18 +257,42 @@ object ActiveDiagnosticCapabilityRegistry {
     private val packs = ConcurrentHashMap<String, SignedDiagnosticCapabilityPack>()
     private val trustedKeys = ConcurrentHashMap<String, ByteArray>()
     private val revokedPacks = ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var minimumPackSchema = Int.MAX_VALUE
 
-    fun loadTrustSnapshot(
-        publicKeysById: Map<String, ByteArray>,
+    internal fun installTrustedManifest(
+        manifest: CapabilityTrustManifest,
+        offlineRootPublicKey: ByteArray,
+        stateStore: CapabilityTrustStateStore,
         candidatePacks: Collection<SignedDiagnosticCapabilityPack>,
-        revokedPackIds: Set<String>,
-    ) {
+        appVersion: String,
+        nowMs: Long = System.currentTimeMillis(),
+    ): ActiveCapabilityAuthorization {
+        if (manifest.trustVersion <= stateStore.highestAcceptedTrustVersion()) {
+            return denied("Rollback/replay de trust manifest rechazado.")
+        }
+        if (nowMs !in manifest.issuedAt until manifest.expiresAt) return denied("Trust manifest fuera de vigencia.")
+        if (compareVersions(appVersion, manifest.minimumAppVersion) < 0) return denied("Versión de MEET inferior al mínimo del trust manifest.")
+        if (MessageDigest.getInstance("SHA-256").digest(offlineRootPublicKey).toHex() != manifest.rootKeyId.lowercase()) {
+            return denied("La root pública no coincide con rootKeyId.")
+        }
+        val trustDigest = domainSeparatedHash("MEET-CAPABILITY-TRUST-V1", manifest.canonicalBytes())
+        if (!verifyEcdsa(offlineRootPublicKey, trustDigest, manifest.signatureBase64)) {
+            return denied("Firma de Capability Trust Root inválida.")
+        }
+        val decodedKeys = runCatching {
+            manifest.trustedIssuerKeysBase64
+                .filterKeys { it !in manifest.revokedIssuerKeys }
+                .mapValues { Base64.getDecoder().decode(it.value) }
+        }.getOrElse { return denied("Trust manifest contiene una clave inválida.") }
         trustedKeys.clear()
-        trustedKeys.putAll(publicKeysById.mapValues { it.value.copyOf() })
+        trustedKeys.putAll(decodedKeys.mapValues { it.value.copyOf() })
         revokedPacks.clear()
-        revokedPacks.addAll(revokedPackIds)
+        revokedPacks.addAll(manifest.revokedPackIds)
+        minimumPackSchema = manifest.minimumPackSchema
         packs.clear()
         candidatePacks.forEach { pack -> if (verifyPack(pack).verified) packs[pack.packId] = pack }
+        stateStore.persistHighestAcceptedTrustVersion(manifest.trustVersion)
+        return ActiveCapabilityAuthorization(true, "Capability Trust Root verificado e instalado.")
     }
 
     fun authorize(
@@ -201,18 +324,12 @@ object ActiveDiagnosticCapabilityRegistry {
     }
 
     private fun verifyPack(pack: SignedDiagnosticCapabilityPack): ActiveCapabilityAuthorization {
+        if (pack.schemaVersion < minimumPackSchema) return denied("Schema de capability pack obsoleto.")
         val publicKeyBytes = trustedKeys[pack.keyId] ?: return denied("Key ID ${pack.keyId} no confiable.")
-        val canonical = pack.canonicalContent().toByteArray(Charsets.UTF_8)
-        val actualHash = MessageDigest.getInstance("SHA-256").digest(canonical).toHex()
+        val digest = domainSeparatedHash("MEET-CAPABILITY-PACK-V2", pack.canonicalBytes())
+        val actualHash = digest.toHex()
         if (!actualHash.equals(pack.contentHash, true)) return denied("Content hash del paquete no coincide.")
-        val verified = runCatching {
-            val publicKey = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicKeyBytes))
-            Signature.getInstance("SHA256withECDSA").run {
-                initVerify(publicKey)
-                update(pack.contentHash.lowercase().toByteArray(Charsets.US_ASCII))
-                verify(Base64.getDecoder().decode(pack.signature))
-            }
-        }.getOrDefault(false)
+        val verified = verifyEcdsa(publicKeyBytes, digest, pack.signature)
         return if (verified) ActiveCapabilityAuthorization(true, "Firma ECDSA verificada.")
         else denied("Firma del paquete inválida.")
     }
@@ -235,6 +352,30 @@ object ActiveDiagnosticCapabilityRegistry {
             } == true
 
     private fun denied(reason: String) = ActiveCapabilityAuthorization(false, reason)
+
+    private fun compareVersions(left: String, right: String): Int {
+        val lhs = left.split('.').map { it.toIntOrNull() ?: 0 }
+        val rhs = right.split('.').map { it.toIntOrNull() ?: 0 }
+        return (0 until maxOf(lhs.size, rhs.size))
+            .firstNotNullOfOrNull { index ->
+                (lhs.getOrElse(index) { 0 } - rhs.getOrElse(index) { 0 }).takeIf { it != 0 }
+            } ?: 0
+    }
+
+    private fun domainSeparatedHash(domain: String, canonical: ByteArray): ByteArray =
+        MessageDigest.getInstance("SHA-256").digest(
+            domain.toByteArray(Charsets.US_ASCII) + byteArrayOf(0) + canonical,
+        )
+
+    private fun verifyEcdsa(publicKeyBytes: ByteArray, digest: ByteArray, signatureBase64: String): Boolean =
+        runCatching {
+            val publicKey = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicKeyBytes))
+            Signature.getInstance("NONEwithECDSA").run {
+                initVerify(publicKey)
+                update(digest)
+                verify(Base64.getDecoder().decode(signatureBase64))
+            }
+        }.getOrDefault(false)
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }

@@ -18,12 +18,17 @@
     "fatalExceptionAfterLaunch": false
   },
   "vehicleTruthCandidate": {
-    "branch": "codex/vehicle-truth-os-4-17",
+    "branch": "codex/proof-carrying-vehicle-os-4-18",
+    "baselineCommit": "4054ffc87605fd8eb744d65fc013266024c319f2",
+    "versionName": "4.17.0",
+    "versionCode": 45,
+    "databaseVersion": 56,
     "sourceState": "IMPLEMENTED_NOT_VERIFIED",
     "build": "NOT_EXECUTED_BY_OWNER_POLICY",
     "tests": "NOT_EXECUTED_BY_OWNER_POLICY",
-    "hardwareConformance": "PENDING_EXTERNAL_FIXTURE",
-    "calibration": "PENDING_REVIEWED_DATASET",
+    "roomSchemas53Through56": "PENDING_ROOM_GENERATION_AFTER_AUTHORIZED_BUILD",
+    "hardwareConformance": "PENDING_PHYSICAL_CORPUS",
+    "calibration": "PENDING_SIGNED_REVIEWED_DATASET",
     "performanceLab": "PENDING_EXTERNAL_EXECUTION"
   }
 }

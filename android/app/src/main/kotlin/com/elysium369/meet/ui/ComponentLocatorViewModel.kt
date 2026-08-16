@@ -28,6 +28,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+data class DiagnosticPathTarget(
+    val canonicalId: String,
+    val label: String,
+    val layer: String,
+    val path: String,
+    val sourceReferenceIds: Set<String>,
+    val sourceContentHashes: Set<String>,
+    val requiredEvidence: Set<String>,
+)
+
 /** DI boundary for the 3D diagnostic feature; Compose no longer constructs repositories. */
 @HiltViewModel
 class ComponentLocatorViewModel @Inject constructor(
@@ -44,45 +54,70 @@ class ComponentLocatorViewModel @Inject constructor(
     private val _spatialFindingCode = MutableStateFlow<String?>(null)
     val spatialFindingCode: StateFlow<String?> = _spatialFindingCode.asStateFlow()
 
+    private val _diagnosticPathTargets = MutableStateFlow<List<DiagnosticPathTarget>>(emptyList())
+    val diagnosticPathTargets: StateFlow<List<DiagnosticPathTarget>> = _diagnosticPathTargets.asStateFlow()
+
     /** Resolves a persisted finding; UI query strings never reconstruct diagnostic authority. */
     fun loadFindingProjection(findingId: String) {
+        _diagnosticPathTargets.value = emptyList()
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 val finding = findingRepository.observeFinding(findingId).first() ?: return@withContext null
                 val identity = finding.identity
                 val vehicle = vehicleDao.getVehicleById(identity.vehicleId)
                     ?: return@withContext null
-                val applicabilityContext = KnowledgeApplicabilityContext(
-                    vehicle = ActiveVehicleIdentity(
+                val activeVehicle = ActiveVehicleIdentity(
                         make = vehicle.make,
                         model = vehicle.model,
                         year = vehicle.year,
                         engine = vehicle.engine,
                         transmission = vehicle.transmissionType,
                         vin = vehicle.vin.takeIf(String::isNotBlank),
-                    ),
-                    ecuName = identity.ecuEndpointId,
-                    ecuAddress = identity.ecuEndpointId,
+                    )
+                val applicabilityContext = KnowledgeApplicabilityContext(
+                    vehicle = activeVehicle,
+                    ecuName = identity.moduleRole.takeIf(String::isNotBlank),
+                    ecuAddress = identity.responseAddress ?: identity.requestAddress,
+                    hardwareNumber = identity.hardwareVersion,
+                    softwareNumber = identity.softwareVersion,
+                    calibrationId = identity.calibrationId,
                     findingNamespace = identity.diagnosticNamespace,
                     findingRawIdentity = identity.rawDtcIdentity,
+                    findingFailureType = identity.failureType.takeIf { it >= 0 },
                 )
                 val knowledgeMatch = DiagnosticKnowledgeQueryEngine(knowledgeGraph).resolve(
                     DiagnosticKnowledgeQuery(
                         namespace = identity.diagnosticNamespace,
                         displayCode = identity.displayCode,
                         rawDtcIdentity = identity.rawDtcIdentity,
-                        failureType = null,
+                        failureType = identity.failureType.takeIf { it >= 0 },
                         ecuEndpoint = identity.ecuEndpointId,
-                        vehicleProfile = null,
+                        vehicleProfile = activeVehicle,
                     ),
                 )
                 val root = knowledgeMatch.node
                 val relations = root?.let { dtcNode ->
-                    TypedCausalPathEngine(knowledgeGraph).pathsFrom(
+                    val allPaths = TypedCausalPathEngine(knowledgeGraph).pathsFrom(
                         root = dtcNode,
                         applicabilityContext = applicabilityContext,
                     )
-                        .filter { it.terminal.type.name == "COMPONENT" }
+                    _diagnosticPathTargets.value = allPaths
+                        .filter { path -> path.terminal.type.name in PATH_FIRST_LAYERS }
+                        .map { path ->
+                            DiagnosticPathTarget(
+                                canonicalId = path.terminal.canonicalKey ?: path.terminal.id,
+                                label = path.terminal.label,
+                                layer = path.terminal.type.name,
+                                path = (listOf(dtcNode.label) + path.steps.map { it.to.label }).joinToString(" → "),
+                                sourceReferenceIds = path.sourceRefs.mapTo(linkedSetOf()) {
+                                    "${it.sourceDocumentId}:${it.blockId}"
+                                },
+                                sourceContentHashes = path.sourceRefs.mapTo(linkedSetOf()) { it.textHash },
+                                requiredEvidence = path.evidenceRequirements.toSet(),
+                            )
+                        }
+                        .distinctBy { it.layer to it.canonicalId }
+                    allPaths.filter { it.terminal.type.name == "COMPONENT" }
                         .map { path ->
                                 val component = path.terminal
                                 val edge = path.steps.last().edge
@@ -119,7 +154,7 @@ class ComponentLocatorViewModel @Inject constructor(
                         rawDtcIdentity = identity.rawDtcIdentity,
                         namespace = identity.diagnosticNamespace,
                         moduleIdentity = identity.ecuEndpointId,
-                        moduleName = identity.ecuEndpointId,
+                        moduleName = identity.moduleRole.ifBlank { identity.ecuEndpointId },
                         knowledgeRelations = relations,
                     ),
                 )
@@ -134,6 +169,10 @@ class ComponentLocatorViewModel @Inject constructor(
         KnowledgeEdgeType.ROUTES_THROUGH_CIRCUIT -> "ELECTRICAL"
         KnowledgeEdgeType.INVOLVES_ECU -> "COMMUNICATION"
         else -> "MECHANICAL"
+    }
+
+    private companion object {
+        val PATH_FIRST_LAYERS = setOf("CIRCUIT", "SIGNAL", "PID", "DIAGNOSTIC_TEST", "MEASUREMENT", "COMPONENT")
     }
 
 }

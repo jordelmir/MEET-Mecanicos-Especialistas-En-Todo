@@ -20,7 +20,7 @@ class DiagnosticAiContextBuilderTest {
             vehicleLabel = "2020 Toyota Corolla 2.0",
             engineType = EngineType.L4,
             component = alternator!!,
-            activeDtcs = setOf("P0562"),
+            presentationOnlyDtcCodes = setOf("P0562"),
             livePidValues = mapOf("0142" to "12.10 V")
         )
 

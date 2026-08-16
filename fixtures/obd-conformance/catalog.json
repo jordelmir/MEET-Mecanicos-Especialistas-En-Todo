@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "certifiedCaseCount": 0,
+  "state": "PENDING_PHYSICAL_CORPUS",
+  "requiredCoverage": {
+    "protocols": ["CAN_11", "CAN_29", "ISO_TP_SINGLE", "ISO_TP_MULTI", "ISO_9141", "KWP", "UDS", "DOIP"],
+    "vehicleClasses": ["GASOLINE", "DIESEL", "HEV", "PHEV", "BEV"],
+    "adapterClasses": ["ELM_ECONOMY", "ELM_QUALITY", "STN_OBDLINK", "BLE", "WIFI", "DOIP"]
+  },
+  "cases": []
+}

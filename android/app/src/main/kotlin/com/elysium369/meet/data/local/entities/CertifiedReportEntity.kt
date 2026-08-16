@@ -9,7 +9,7 @@ import com.elysium369.meet.core.reports.ReportType
 
 /**
  * Room mirror of `public.certified_reports` defined in
- *   supabase/migrations/20260704000000_reports_foundations.sql
+ *   supabase/migrations/20260704001000_reports_foundations.sql
  *
  * The column names match the SQL labels exactly (camelCase quoted in
  * Postgres) so a future sync layer can map row → entity without a

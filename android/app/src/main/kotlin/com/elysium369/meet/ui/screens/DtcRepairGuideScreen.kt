@@ -428,8 +428,17 @@ private fun formatPidValue(value: Float, unit: String): String {
     }
 }
 
+private data class GenericDiagnosticGuideline(
+    val guidance: String,
+    val sourceId: String = "MEET_GENERIC_WORKSHOP_GUIDELINE_V1",
+    val authority: String = "REVIEW_REQUIRED",
+) {
+    val displayText: String
+        get() = "Referencia genérica; no especificación OEM. $guidance · Fuente: $sourceId · $authority"
+}
+
 private fun researchBasedRangeText(normalized: String): String? {
-    return when (normalized.removePrefix("01")) {
+    val guidance = when (normalized.removePrefix("01")) {
         "03" -> "Guía: closed loop esperado con motor caliente; open loop puede ser normal en frío"
         "04" -> "Guía: 15-45% en ralentí suele ser sano; alto detenido exige revisar carga/aire"
         "05" -> "Guía: 88-107°C caliente; 108-115°C vigilar; 116°C+ alto"
@@ -453,6 +462,7 @@ private fun researchBasedRangeText(normalized: String): String? {
         "5E" -> "Guía: transmisión 115°C+ requiere revisar fluido/enfriador/carga"
         else -> null
     }
+    return guidance?.let(::GenericDiagnosticGuideline)?.displayText
 }
 
 private fun evaluatePidJudgement(
@@ -1986,7 +1996,14 @@ fun DtcRepairGuideScreen(
                                         text = if (isLast) "TERMINÉ · VERIFICAR" else "SIGUIENTE PASO",
                                         onClick = {
                                             if (isLast) {
-                                                navController.navigate("scanner") { launchSingleTop = true }
+                                                val canonicalFindingId = findingId.orEmpty()
+                                                if (canonicalFindingId.isNotBlank()) {
+                                                    navController.navigate("repair_verification/$canonicalFindingId") {
+                                                        launchSingleTop = true
+                                                    }
+                                                } else {
+                                                    navController.navigate("scanner") { launchSingleTop = true }
+                                                }
                                             } else {
                                                 activeStepIdx++
                                             }

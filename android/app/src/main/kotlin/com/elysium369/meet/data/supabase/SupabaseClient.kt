@@ -38,6 +38,21 @@ data class Vehicle(
     val plate: String
 )
 
+/** Wire model for the production `cloud_vehicles` table. */
+@Serializable
+private data class CloudVehicle(
+    val id: String,
+    val user_id: String,
+    val vin: String? = null,
+    val make: String,
+    val model: String,
+    val year: Int? = null,
+    val engine: String? = null,
+    val plate: String? = null,
+    val odometer: Int = 0,
+    val nickname: String? = null,
+)
+
 @Serializable
 data class DiagnosticSession(
     val id: String? = null,
@@ -134,37 +149,37 @@ object SupabaseManager {
 class VehicleRepository @Inject constructor(
     private val vehicleDao: VehicleDao
 ) {
-    fun getVehiclesForUser(): Flow<List<Vehicle>> {
-        return vehicleDao.getAllVehicles().map { entities ->
+    fun getVehiclesForUser(userId: String): Flow<List<Vehicle>> {
+        return vehicleDao.getAllVehiclesForUser(userId).map { entities ->
             entities.map { it.toDomain() }
         }
     }
 
     suspend fun syncVehiclesFromCloud(userId: String) {
         try {
-            val cloudVehicles = SupabaseManager.client.postgrest["vehicles"]
+            val cloudVehicles = SupabaseManager.client.postgrest["cloud_vehicles"]
                 .select {
                     filter {
                         eq("user_id", userId)
                     }
-                }.decodeList<Vehicle>()
+                }.decodeList<CloudVehicle>()
             
             cloudVehicles.forEach { vehicle ->
-                vehicleDao.insertVehicle(vehicle.toEntity())
+                vehicleDao.insertVehicle(vehicle.toLocalVehicle().toEntity())
             }
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to sync vehicles from cloud", e)
         }
     }
 
-    suspend fun getVehicleById(id: String): Vehicle? {
-        return vehicleDao.getVehicleById(id)?.toDomain()
+    suspend fun getVehicleById(userId: String, id: String): Vehicle? {
+        return vehicleDao.getVehicleByIdForUser(userId, id)?.toDomain()
     }
 
-    suspend fun getVehicleByVin(vin: String): Vehicle? {
+    suspend fun getVehicleByVin(userId: String, vin: String): Vehicle? {
         val cleanVin = vin.trim().uppercase()
         if (cleanVin.isBlank() || cleanVin == "N/A" || cleanVin == "NOT_READ") return null
-        return vehicleDao.getVehicleByVin(cleanVin)?.toDomain()
+        return vehicleDao.getVehicleByVinForUser(userId, cleanVin)?.toDomain()
     }
     
     suspend fun insertVehicle(vehicle: Vehicle) {
@@ -173,7 +188,9 @@ class VehicleRepository @Inject constructor(
         
         // Sync to cloud
         try {
-            SupabaseManager.client.postgrest["vehicles"].upsert(vehicle)
+            val authenticatedUserId = SupabaseManager.client.auth.currentUserOrNull()?.id
+            if (authenticatedUserId != vehicle.user_id) return
+            SupabaseManager.client.postgrest["cloud_vehicles"].upsert(vehicle.toCloudVehicle())
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to push vehicle to cloud", e)
         }
@@ -185,9 +202,10 @@ class VehicleRepository @Inject constructor(
         
         // Delete from cloud
         try {
-            SupabaseManager.client.postgrest["vehicles"].delete {
+            SupabaseManager.client.postgrest["cloud_vehicles"].delete {
                 filter {
                     eq("id", vehicle.id)
+                    eq("user_id", vehicle.user_id)
                 }
             }
         } catch (e: Exception) {
@@ -195,6 +213,28 @@ class VehicleRepository @Inject constructor(
         }
     }
 }
+
+private fun CloudVehicle.toLocalVehicle() = Vehicle(
+    id = id,
+    user_id = user_id,
+    year = year ?: 0,
+    make = make,
+    model = model,
+    engine = engine ?: "Dato no capturado",
+    vin = vin ?: "NOT_READ",
+    plate = plate ?: "NOT_SET",
+)
+
+private fun Vehicle.toCloudVehicle() = CloudVehicle(
+    id = id,
+    user_id = user_id,
+    vin = vin.takeUnless { it == "NOT_READ" },
+    make = make,
+    model = model,
+    year = year.takeIf { it > 0 },
+    engine = engine.takeUnless { it == "Dato no capturado" },
+    plate = plate.takeUnless { it == "NOT_SET" },
+)
 
 fun VehicleEntity.toDomain() = Vehicle(
     id = id,

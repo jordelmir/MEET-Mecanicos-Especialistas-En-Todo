@@ -1,11 +1,29 @@
-# MEET OBD hardware conformance corpus
+# Corpus OBD de conformidad física
 
-This directory is deliberately evidence-only. It contains no synthetic run labelled as physical truth.
+Este directorio es la autoridad de entrada para comparaciones MEET contra un
+scanner de referencia. No contiene trazas sintéticas presentadas como pruebas
+reales. Un caso solo puede cambiar de `PENDING_PHYSICAL_CAPTURE` a `CERTIFIED`
+cuando conserva la traza cruda, el resultado del instrumento de referencia y
+la identidad verificable del vehículo/adaptador sin exponer VIN o placa.
 
-- `hardware-runs/`: signed manifests and captures produced with a real adapter/ECU/vehicle or approved bench.
-- `golden-traces/`: reviewed, immutable traces promoted from hardware runs.
-- `manifest.schema.json`: mandatory provenance and chain-of-custody contract.
+Protocolos mínimos: CAN 11/29 bit, ISO-TP single/multi-frame, ISO 9141, KWP,
+UDS y DoIP. Clases mínimas: gasolina, diésel, HEV, PHEV y BEV. Adaptadores:
+ELM económico, ELM de calidad, clase STN/OBDLink, BLE, Wi-Fi y DoIP.
 
-A physical claim is publishable only after the manifest, raw bytes, expected decode, observed decode,
-adapter identity, transport, ECU address, software versions and reviewer signature are present. An empty
-corpus means `PENDING_EXTERNAL_FIXTURE`; it never means conformance passed.
+- `hardware-runs/`: manifiestos firmados y capturas de vehículo/ECU/banco real.
+- `golden-traces/`: trazas inmutables promovidas después de revisión.
+- `manifest.schema.json`: provenance, software, hashes y cadena de custodia.
+
+Invariantes bloqueantes por caso certificado:
+
+- `inventedDtcCount == 0`
+- `falseCleanCount == 0`
+- `wrongEcuCount == 0`
+- `wrongStatusCount == 0`
+- `wrongSnapshotOwnerCount == 0`
+- `crossVehicleContamination == 0`
+
+Los archivos binarios de captura se guardan fuera de Git cuando contienen
+datos sensibles; el manifiesto versionado conserva SHA-256, tamaño, autoridad
+y referencia de custodia. Ausencia de captura significa pendiente, nunca PASS.
+Un replay puede probar determinismo, pero nunca se etiqueta como evidencia física.

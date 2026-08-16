@@ -1,5 +1,8 @@
+import java.security.MessageDigest
 import java.util.Properties
 import java.util.Base64
+import java.util.UUID
+import java.util.zip.ZipFile
 import org.gradle.api.GradleException
 
 plugins {
@@ -39,12 +42,18 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     defaultConfig {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 44
-        versionName = "4.16.0"
+        // Source identity is independent from verification state. 4.16.0/code 44
+        // remains the latest verified artifact until the 4.17 proof gates pass.
+        versionCode = 45
+        versionName = "4.17.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
@@ -319,7 +328,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     
     // Kotlin Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     
     // Google Fonts
     implementation("androidx.compose.ui:ui-text-google-fonts:1.6.1")
@@ -431,30 +440,100 @@ tasks.register("generateReleaseSbom") {
         val artifacts = configurations.getByName("releaseRuntimeClasspath")
             .resolvedConfiguration.resolvedArtifacts
             .sortedWith(compareBy({ it.moduleVersion.id.group }, { it.name }, { it.moduleVersion.id.version }))
-        val components = artifacts.map { artifact ->
-            val sha256 = java.security.MessageDigest.getInstance("SHA-256")
-                .digest(artifact.file.readBytes())
+        val dependencyComponents = artifacts.map { artifact ->
+            val artifactDigest = MessageDigest.getInstance("SHA-256")
+            artifact.file.inputStream().buffered().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    artifactDigest.update(buffer, 0, count)
+                }
+            }
+            val sha256 = artifactDigest.digest()
                 .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val purl = "pkg:maven/${artifact.moduleVersion.id.group}/${artifact.name}@${artifact.moduleVersion.id.version}"
             mapOf(
                 "type" to "library",
+                "bom-ref" to purl,
                 "group" to artifact.moduleVersion.id.group,
                 "name" to artifact.name,
                 "version" to artifact.moduleVersion.id.version,
-                "purl" to "pkg:maven/${artifact.moduleVersion.id.group}/${artifact.name}@${artifact.moduleVersion.id.version}",
+                "scope" to "required",
+                "purl" to purl,
                 "hashes" to listOf(mapOf("alg" to "SHA-256", "content" to sha256)),
+                "licenses" to listOf(mapOf("license" to mapOf("name" to "NOASSERTION"))),
+                "properties" to listOf(
+                    mapOf("name" to "meet.resolved.artifactType", "value" to artifact.type),
+                    mapOf("name" to "meet.resolved.fileName", "value" to artifact.file.name),
+                ),
             )
         }
+        val releaseApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
+        val nativeComponents = if (releaseApk.isFile) {
+            ZipFile(releaseApk).use { archive ->
+                archive.entries().asSequence()
+                    .filter { !it.isDirectory && it.name.startsWith("lib/") && it.name.endsWith(".so") }
+                    .sortedBy { it.name }
+                    .map { entry ->
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        archive.getInputStream(entry).use { input ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                digest.update(buffer, 0, count)
+                            }
+                        }
+                        val sha256 = digest.digest()
+                            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                        val ref = "urn:meet:native:${entry.name}:$sha256"
+                        mapOf(
+                            "type" to "library",
+                            "bom-ref" to ref,
+                            "name" to entry.name.substringAfterLast('/'),
+                            "version" to android.defaultConfig.versionName,
+                            "scope" to "required",
+                            "hashes" to listOf(mapOf("alg" to "SHA-256", "content" to sha256)),
+                            "licenses" to listOf(mapOf("license" to mapOf("name" to "NOASSERTION"))),
+                            "properties" to listOf(
+                                mapOf("name" to "meet.native.apkPath", "value" to entry.name),
+                                mapOf("name" to "meet.native.abi", "value" to entry.name.split('/').getOrElse(1) { "unknown" }),
+                            ),
+                        )
+                    }
+                    .toList()
+            }
+        } else {
+            emptyList()
+        }
+        val components = dependencyComponents + nativeComponents
         val componentIdentity = components.joinToString("\n") { component ->
             "${component["purl"]}|${component["hashes"]}"
         }
-        val serial = java.util.UUID.nameUUIDFromBytes(componentIdentity.toByteArray(Charsets.UTF_8))
+        val serial = UUID.nameUUIDFromBytes(componentIdentity.toByteArray(Charsets.UTF_8))
+        val applicationRef = "pkg:apk/com.elysium369.meet@${android.defaultConfig.versionName}"
         val bom = mapOf(
             "bomFormat" to "CycloneDX",
             "specVersion" to "1.5",
             "serialNumber" to "urn:uuid:$serial",
             "version" to 1,
-            "metadata" to mapOf("component" to mapOf("type" to "application", "name" to "MEET Android")),
+            "metadata" to mapOf(
+                "component" to mapOf(
+                    "type" to "application",
+                    "bom-ref" to applicationRef,
+                    "name" to "MEET Android",
+                    "version" to android.defaultConfig.versionName,
+                ),
+                "properties" to listOf(
+                    mapOf("name" to "meet.source.versionCode", "value" to android.defaultConfig.versionCode.toString()),
+                    mapOf("name" to "meet.sbom.generator", "value" to "meet-gradle-cyclonedx-v2"),
+                ),
+            ),
             "components" to components,
+            "dependencies" to listOf(
+                mapOf("ref" to applicationRef, "dependsOn" to components.map { it["bom-ref"] }),
+            ) + components.map { mapOf("ref" to it["bom-ref"], "dependsOn" to emptyList<String>()) },
         )
         val target = outputFile.get().asFile
         target.parentFile.mkdirs()

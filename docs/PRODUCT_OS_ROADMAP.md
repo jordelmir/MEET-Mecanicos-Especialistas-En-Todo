@@ -4,6 +4,8 @@
 
 > Ejecución Vehicle Truth OS 4.17: [matriz de implementación y gates de evidencia](vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md).
 
+> Evolución Proof-Carrying 4.18: [matriz completa de la auditoría y estado verificable](vehicle-truth/MEET-4.18-PROOF-CARRYING-IMPLEMENTATION.md).
+
 MEET apunta a ser un sistema operativo automotriz: diagnostico, telemetria, reparacion, taller, marketplace, reportes y aprendizaje.
 
 ## Implementado En Esta Fase

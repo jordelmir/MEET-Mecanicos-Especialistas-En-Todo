@@ -39,6 +39,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 
@@ -347,6 +348,10 @@ data class DerivedMetric(
     val confidence: Double = 0.0,
     val inputPids: List<String> = emptyList(),
     val formulaVersion: String = "UNVERSIONED",
+    val inputQuality: Double = 0.0,
+    val formulaAuthority: String = "GENERIC_REVIEW_REQUIRED",
+    val derivationCompleteness: Double = 0.0,
+    val measurementUncertainty: Double? = null,
 ) {
     /** Accesor Double para callers que esperan precisión decimal. */
     val valueAsDouble: Double?
@@ -390,9 +395,13 @@ class DerivedMetricsEngine {
                 unit = definition.unit,
                 isDisplayable = value != null,
                 origin = "DERIVED_FROM_REAL_PID",
-                confidence = if (value == null) 0.0 else 1.0,
+                confidence = 0.0,
                 inputPids = definition.inputPids,
                 formulaVersion = definition.formulaVersion,
+                inputQuality = if (value == null) 0.0 else 0.75,
+                formulaAuthority = "MEET_REVIEWED_GENERIC_FORMULA",
+                derivationCompleteness = if (value == null) 0.0 else 1.0,
+                measurementUncertainty = null,
             )
         }
     }
@@ -429,7 +438,9 @@ class DerivedMetricsEngine {
 // EcuFailureIntelligence
 // ═══════════════════════════════════════════════════════════════
 
-enum class EcuFailureType { NONE, INTERMITTENT, PERSISTENT, PENDING, HISTORICAL, ECU_TIMEOUT }
+enum class EcuFailureType {
+    NONE, ECU_TIMEOUT, COMMUNICATION_RETRY, NEGATIVE_RESPONSE, MALFORMED_RESPONSE, LINK_DEGRADED,
+}
 
 /**
  * Contexto universal de falla ECU. Absorbe tanto fallas DTC como fallas de lectura PID.
@@ -477,10 +488,10 @@ class EcuFailureIntelligence {
         val type = when {
             context.eventType.contains("TIMEOUT", ignoreCase = true) ||
                 context.rawResponse?.contains("TIMEOUT", ignoreCase = true) == true -> EcuFailureType.ECU_TIMEOUT
-            context.negativeResponseCode != null -> EcuFailureType.PERSISTENT
-            context.retryCount > 0 -> EcuFailureType.INTERMITTENT
-            context.dtcCode.isNotBlank() -> EcuFailureType.PERSISTENT
-            context.eventType.contains("FAIL", ignoreCase = true) -> EcuFailureType.PENDING
+            context.negativeResponseCode != null -> EcuFailureType.NEGATIVE_RESPONSE
+            context.retryCount > 0 -> EcuFailureType.COMMUNICATION_RETRY
+            context.rawResponse?.contains("MALFORMED", ignoreCase = true) == true -> EcuFailureType.MALFORMED_RESPONSE
+            context.eventType.contains("LINK_DEGRADED", ignoreCase = true) -> EcuFailureType.LINK_DEGRADED
             else -> EcuFailureType.NONE
         }
         val evidenceScore = when {
@@ -492,9 +503,10 @@ class EcuFailureIntelligence {
         }
         val recommendation = when (type) {
             EcuFailureType.ECU_TIMEOUT -> "Verificar enlace, alimentación del adaptador y disponibilidad de la ECU."
-            EcuFailureType.INTERMITTENT -> "Repetir lectura conservando el intercambio crudo y la latencia."
-            EcuFailureType.PERSISTENT -> "Revisar NRC/respuesta cruda antes de cualquier conclusión física."
-            EcuFailureType.PENDING -> "Evidencia insuficiente; requiere una lectura de confirmación."
+            EcuFailureType.COMMUNICATION_RETRY -> "Repetir lectura conservando el intercambio crudo y la latencia."
+            EcuFailureType.NEGATIVE_RESPONSE -> "Revisar NRC/respuesta cruda antes de cualquier conclusión física."
+            EcuFailureType.MALFORMED_RESPONSE -> "Conservar la trama y revisar parser/protocolo sin crear un DTC."
+            EcuFailureType.LINK_DEGRADED -> "Estabilizar el enlace antes de emitir conclusiones diagnósticas."
             else -> null
         }
         return ClassifiedEcuFailure(context, type, evidenceScore, recommendation)
@@ -613,20 +625,73 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     private val dao: VanguardTelemetryDao,
     private val scope: CoroutineScope,
 ) {
-    private val persistenceQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    enum class WriteClass { BEST_EFFORT_TELEMETRY, DURABLE_DIAGNOSTIC_EVIDENCE, FORENSIC_CRITICAL }
+    enum class PersistenceResult { PERSISTED, DURABLY_QUEUED, QUEUED_VOLATILE, DROPPED_BEST_EFFORT, FAILED }
+
+    data class RecorderHealth(
+        val queueDepth: Long,
+        val oldestPendingAgeMs: Long,
+        val lastWriteLatencyMs: Long,
+        val writeFailures: Long,
+        val droppedBestEffortEvents: Long,
+    )
+
+    private data class QueuedWrite(
+        val writeClass: WriteClass,
+        val enqueuedAtMs: Long,
+        val operation: suspend () -> Unit,
+    )
+
+    private val persistenceQueue = Channel<QueuedWrite>(capacity = MAX_PENDING_WRITES)
+    private val queueDepth = AtomicLong(0)
+    private val writeFailures = AtomicLong(0)
+    private val droppedBestEffort = AtomicLong(0)
+    private val oldestPendingAtMs = AtomicLong(0)
+    private val lastWriteLatencyMs = AtomicLong(0)
 
     init {
         CoroutineScope(scope.coroutineContext).launch {
-            for (operation in persistenceQueue) {
-                runCatching { operation() }
-                    .onFailure { Log.e("ObdSessionRecorder", "Durable evidence write failed", it) }
+            for (queued in persistenceQueue) {
+                val startedAt = System.currentTimeMillis()
+                runCatching { queued.operation() }
+                    .onFailure {
+                        writeFailures.incrementAndGet()
+                        Log.e("ObdSessionRecorder", "${queued.writeClass} write failed", it)
+                    }
+                lastWriteLatencyMs.set((System.currentTimeMillis() - startedAt).coerceAtLeast(0))
+                if (queueDepth.decrementAndGet() == 0L) oldestPendingAtMs.set(0)
             }
         }
     }
 
-    private fun persist(operation: suspend () -> Unit) {
-        check(persistenceQueue.trySend(operation).isSuccess) {
-            "ObdSessionRecorder persistence queue is unavailable"
+    fun health(nowMs: Long = System.currentTimeMillis()): RecorderHealth = RecorderHealth(
+        queueDepth = queueDepth.get(),
+        oldestPendingAgeMs = oldestPendingAtMs.get().takeIf { it > 0 }
+            ?.let { (nowMs - it).coerceAtLeast(0) } ?: 0,
+        lastWriteLatencyMs = lastWriteLatencyMs.get(),
+        writeFailures = writeFailures.get(),
+        droppedBestEffortEvents = droppedBestEffort.get(),
+    )
+
+    private fun persist(
+        writeClass: WriteClass = WriteClass.DURABLE_DIAGNOSTIC_EVIDENCE,
+        operation: suspend () -> Unit,
+    ): PersistenceResult {
+        val now = System.currentTimeMillis()
+        val result = persistenceQueue.trySend(QueuedWrite(writeClass, now, operation))
+        if (result.isSuccess) {
+            if (queueDepth.incrementAndGet() == 1L) oldestPendingAtMs.set(now)
+            // This bounded channel protects RAM but is not a disk-backed outbox.
+            // Callers must not present QUEUED_VOLATILE as evidence already saved.
+            return PersistenceResult.QUEUED_VOLATILE
+        }
+        return if (writeClass == WriteClass.BEST_EFFORT_TELEMETRY) {
+            droppedBestEffort.incrementAndGet()
+            PersistenceResult.DROPPED_BEST_EFFORT
+        } else {
+            writeFailures.incrementAndGet()
+            Log.e("ObdSessionRecorder", "Fail-closed: $writeClass queue is full or closed")
+            PersistenceResult.FAILED
         }
     }
 
@@ -641,11 +706,11 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
         finishSession(ctx)
     }
 
-    /** Starts a durable, explicitly unbound physical session. */
+    /** Starts an explicitly unbound physical session; failure to queue is fatal. */
     fun startSession(ctx: ObdSessionStartContext): String {
         val sessionId = ctx.sessionId.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
         mostRecentSessionId = sessionId
-        persist {
+        val persistence = persist(WriteClass.FORENSIC_CRITICAL) {
             dao.insertSession(
                 VanguardObdSessionEntity(
                     sessionId = sessionId,
@@ -668,6 +733,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
                 )
             )
         }
+        check(persistence != PersistenceResult.FAILED) { "Unable to queue forensic session start" }
         return sessionId
     }
 
@@ -675,7 +741,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
         val context = failure.failure
         val sessionId = context.sessionId.ifBlank { mostRecentSessionId.orEmpty() }
         val vehicleId = context.vehicle?.vehicleId.orEmpty()
-        persist {
+        val persistence = persist(WriteClass.FORENSIC_CRITICAL) {
             dao.insertAuditLog(
                 AuditLogEntity(
                     actorId = null,
@@ -701,6 +767,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
                 )
             }
         }
+        check(persistence != PersistenceResult.FAILED) { "Unable to queue diagnostic failure evidence" }
     }
 
     fun recordFailure(failure: ObdFailureRecord) {
@@ -722,7 +789,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
             latencyMs = record.latencyMs,
             timeoutMs = record.timeoutMs,
             retryCount = record.retryCount,
-            errorType = record.negativeResponseCode?.let { EcuFailureType.PERSISTENT },
+            errorType = record.negativeResponseCode?.let { EcuFailureType.NEGATIVE_RESPONSE },
         )
     }
 
@@ -738,7 +805,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     ) {
         if (sessionId.isBlank() || command.isBlank()) return
         val now = System.currentTimeMillis()
-        persist {
+        persist(WriteClass.DURABLE_DIAGNOSTIC_EVIDENCE) {
             dao.insertCommandLog(
                 ObdCommandLogEntity(
                     sessionId = sessionId,
@@ -790,7 +857,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     ) {
         if (sessionId.isBlank() || pid.isBlank()) return
         val occurredAt = timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis()
-        persist {
+        persist(WriteClass.BEST_EFFORT_TELEMETRY) {
             val numeric = state.numericValueOrNull
             if (numeric != null && numeric.isFinite()) {
                 dao.insertPidSample(
@@ -830,7 +897,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
         timestampMs: Long = 0L
     ) {
         val occurredAt = timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis()
-        persist {
+        persist(WriteClass.BEST_EFFORT_TELEMETRY) {
             metrics.forEach { raw ->
                 val metric = when (raw) {
                     is DerivedMetric -> raw.valueAsDouble?.let { value ->
@@ -851,8 +918,15 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
                             unit = metric.unit,
                             computedAt = metric.timestampMs.takeIf { it > 0L } ?: occurredAt,
                             origin = "DERIVED_FROM_REAL_PID",
-                            confidence = 1.0,
+                            confidence = when (raw) {
+                                is DerivedMetric -> (raw.inputQuality * raw.derivationCompleteness).coerceIn(0.0, 0.99)
+                                else -> 0.5
+                            },
                             formulaVersion = metric.formula.ifBlank { "UNVERSIONED" },
+                            inputQuality = (raw as? DerivedMetric)?.inputQuality ?: 0.5,
+                            formulaAuthority = (raw as? DerivedMetric)?.formulaAuthority ?: "UNREVIEWED_FORMULA",
+                            derivationCompleteness = (raw as? DerivedMetric)?.derivationCompleteness ?: 0.5,
+                            measurementUncertainty = (raw as? DerivedMetric)?.measurementUncertainty,
                         )
                     )
                 }
@@ -924,7 +998,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
 
     fun finishSession(ctx: ObdSessionFinishContext) {
         if (ctx.sessionId.isBlank()) return
-        persist {
+        val persistence = persist(WriteClass.FORENSIC_CRITICAL) {
             val updated = dao.finishSession(
                 sessionId = ctx.sessionId,
                 endedAt = ctx.endedAt,
@@ -935,6 +1009,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
             )
             check(updated == 1) { "Vanguard session ${ctx.sessionId} was not persisted before finish" }
         }
+        check(persistence != PersistenceResult.FAILED) { "Unable to queue forensic session finish" }
         if (mostRecentSessionId == ctx.sessionId) mostRecentSessionId = null
     }
 
@@ -945,9 +1020,9 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
         message: String,
         stopVerified: Boolean,
         occurredAt: Long = System.currentTimeMillis(),
-    ) {
-        val sessionId = mostRecentSessionId ?: return
-        persist {
+    ): PersistenceResult {
+        val sessionId = mostRecentSessionId ?: return PersistenceResult.FAILED
+        return persist(WriteClass.FORENSIC_CRITICAL) {
             dao.insertAuditLog(
                 AuditLogEntity(
                     actorId = null,
@@ -1003,6 +1078,7 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
     }
 
     private companion object {
+        const val MAX_PENDING_WRITES = 2_048
         const val UNKNOWN_LATENCY_MS = -1L
     }
 }

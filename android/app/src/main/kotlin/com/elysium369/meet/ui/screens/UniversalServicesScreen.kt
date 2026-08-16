@@ -53,7 +53,9 @@ fun UniversalServicesScreen(
     val allRequests by viewModel.serviceRequests.collectAsState()
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val gps by viewModel.currentGpsLocation.collectAsState()
-    val myProfile = profiles.firstOrNull { it.providerType == "SERVICE_PROVIDER" && it.isActive }
+    val myProfile = profiles.firstOrNull {
+        it.providerType == "SERVICE_PROVIDER" && it.isActive && it.verified
+    }
     var providerMode by rememberSaveableCompat { mutableStateOf(false) }
     var query by rememberSaveableCompat { mutableStateOf("") }
     var selected by remember { mutableStateOf<UniversalServiceDefinition?>(null) }

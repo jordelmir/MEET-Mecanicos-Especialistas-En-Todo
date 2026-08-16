@@ -9,6 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.room.migration.Migration
 
 @RunWith(AndroidJUnit4::class)
 class DiagnosticMigrationConformanceTest {
@@ -61,11 +62,11 @@ class DiagnosticMigrationConformanceTest {
             execSQL("DELETE FROM diagnostic_findings")
             execSQL(
                 "INSERT INTO diagnostic_findings(id,vehicleId,ecuEndpointId,diagnosticNamespace,rawDtcIdentity,displayCode,createdAtMs,resolutionState,resolvedAtMs) VALUES(?,?,?,?,?,?,?,?,NULL)",
-                arrayOf("uds-a", "vehicle-1", "ECM", "UDS", "123456:11", "P1234", 100L, "OPEN"),
+                arrayOf<Any?>("uds-a", "vehicle-1", "ECM", "UDS", "123456:11", "P1234", 100L, "OPEN"),
             )
             execSQL(
                 "INSERT INTO diagnostic_findings(id,vehicleId,ecuEndpointId,diagnosticNamespace,rawDtcIdentity,displayCode,createdAtMs,resolutionState,resolvedAtMs) VALUES(?,?,?,?,?,?,?,?,NULL)",
-                arrayOf("uds-b", "vehicle-1", "TCM", "UDS", "123456:22", "P1234", 200L, "OPEN"),
+                arrayOf<Any?>("uds-b", "vehicle-1", "TCM", "UDS", "123456:22", "P1234", 200L, "OPEN"),
             )
             close()
         }
@@ -87,6 +88,88 @@ class DiagnosticMigrationConformanceTest {
         }
     }
 
+    @Test
+    fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
+        listOf(49, 50, 52, 53, 54, 55).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-56"
+            helper.createDatabase(databaseName, startVersion).close()
+            helper.runMigrationsAndValidate(
+                databaseName,
+                56,
+                true,
+                *migrationsFrom(startVersion),
+            ).use { db ->
+                db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+            }
+        }
+    }
+
+    @Test
+    fun staged50To56PreservesDistinctRawIdentityAndFindingCausalityColumns() {
+        val databaseName = "diagnostic-migration-staged-50-to-56"
+        helper.createDatabase(databaseName, 50).apply {
+            insertLegacyEvent("event-a", "session-a", 100L, 200L)
+            insertLegacyEvent("event-b", "session-b", 300L, 400L)
+            close()
+        }
+        helper.runMigrationsAndValidate(
+            databaseName,
+            56,
+            true,
+            *migrationsFrom(50),
+        ).use { db ->
+            db.query("SELECT COUNT(*) FROM diagnostic_findings").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(1, cursor.getInt(0))
+            }
+            db.query("SELECT COUNT(*) FROM diagnostic_observations WHERE findingSequence = 0").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(2, cursor.getInt(0))
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        }
+    }
+
+    @Test
+    fun sameUdsRawIdentityWithDifferentFailureTypeRemainsTwoFindings() {
+        val databaseName = "diagnostic-migration-uds-failure-types-to-56"
+        helper.createDatabase(databaseName, 51).apply {
+            insertRawUdsEvent("uds-ft-11", 0x11, 100L)
+            insertRawUdsEvent("uds-ft-22", 0x22, 200L)
+            close()
+        }
+        helper.runMigrationsAndValidate(
+            databaseName,
+            56,
+            true,
+            *migrationsFrom(51),
+        ).use { db ->
+            db.query(
+                "SELECT COUNT(*) FROM diagnostic_findings WHERE vehicleId='vehicle-1' AND rawDtcIdentity='123456'",
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(2, cursor.getInt(0))
+            }
+            db.query(
+                "SELECT COUNT(DISTINCT failureType) FROM diagnostic_findings WHERE vehicleId='vehicle-1' AND rawDtcIdentity='123456'",
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(2, cursor.getInt(0))
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        }
+    }
+
+    private fun migrationsFrom(startVersion: Int): Array<Migration> = buildList {
+        if (startVersion <= 49) add(AppModule.MIGRATION_49_50)
+        if (startVersion <= 50) add(AppModule.MIGRATION_50_51)
+        if (startVersion <= 51) add(AppModule.MIGRATION_51_52)
+        if (startVersion <= 52) add(AppModule.MIGRATION_52_53)
+        if (startVersion <= 53) add(AppModule.MIGRATION_53_54)
+        if (startVersion <= 54) add(AppModule.MIGRATION_54_55)
+        if (startVersion <= 55) add(AppModule.MIGRATION_55_56)
+    }.toTypedArray()
+
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(
         id: String,
         sessionId: String,
@@ -100,7 +183,23 @@ class DiagnosticMigrationConformanceTest {
                 moduleIdentity,moduleName,targetAddress,responseAddress,sourceService,statusByte,
                 observationSemantic,synced
             ) VALUES(?,?,?,?,?,?,?,?,?,NULL,1,NULL,'OBSERVED','SAE_OBD','ECM','ECM','7E0','7E8','03',NULL,'ACTIVE',0)""",
-            arrayOf(id, sessionId, "vehicle-1", "P0230", "", "UNKNOWN", "ACTIVE", firstSeenAt, lastSeenAt),
+            arrayOf<Any?>(id, sessionId, "vehicle-1", "P0230", "", "UNKNOWN", "ACTIVE", firstSeenAt, lastSeenAt),
+        )
+    }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertRawUdsEvent(
+        id: String,
+        failureType: Int,
+        observedAt: Long,
+    ) {
+        execSQL(
+            """INSERT INTO dtc_events(
+                id,sessionId,vehicleId,code,description,severity,status,firstSeenAt,lastSeenAt,
+                resolvedAt,occurrenceCount,freezeFrameJson,observationState,diagnosticNamespace,
+                moduleIdentity,moduleName,targetAddress,responseAddress,sourceService,statusByte,
+                observationSemantic,rawDtcIdentity,rawDtc24,failureType,dtcFormat,synced
+            ) VALUES(?,?,?,?,?,?,?,?,?,NULL,1,NULL,'OBSERVED','UDS','ECM','Engine ECU','7E0','7E8','19',NULL,'ACTIVE','123456',1193046,?,'UDS_3_BYTE',0)""",
+            arrayOf<Any?>(id, "session-$id", "vehicle-1", "P1234", "", "UNKNOWN", "ACTIVE", observedAt, observedAt, failureType),
         )
     }
 

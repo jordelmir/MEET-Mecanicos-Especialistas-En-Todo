@@ -20,6 +20,7 @@ data class DiagnosticTestDecisionCandidate(
     val normalizedSafetyRisk: Double,
     val requiredTools: List<String>,
     val calibrationDatasetId: String?,
+    val calibrationDatasetVersion: String? = null,
 )
 
 data class DiagnosticTestDecisionScore(
@@ -44,6 +45,7 @@ object DiagnosticTestDecisionModel {
     ): DiagnosticTestDecisionScore {
         val hypothesisIds = priors.map { it.hypothesisId }.toSet()
         val complete = candidate.calibrationDatasetId?.isNotBlank() == true &&
+            candidate.calibrationDatasetVersion?.isNotBlank() == true &&
             priors.isNotEmpty() &&
             priors.all { it.probability in 0.0..1.0 } &&
             priors.sumOf { it.probability } > 0.0 &&

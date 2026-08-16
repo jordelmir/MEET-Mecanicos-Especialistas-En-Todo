@@ -27,6 +27,7 @@ interface DiagnosticFindingDao {
              AND ecuEndpointId = :ecuEndpointId
              AND diagnosticNamespace = :namespace
              AND rawDtcIdentity = :rawDtcIdentity
+             AND failureType = :failureType
            LIMIT 1""",
     )
     suspend fun getByStableIdentity(
@@ -34,6 +35,7 @@ interface DiagnosticFindingDao {
         ecuEndpointId: String,
         namespace: String,
         rawDtcIdentity: String,
+        failureType: Int,
     ): DiagnosticFindingEntity?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

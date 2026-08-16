@@ -2,7 +2,7 @@ package com.elysium369.meet.core.reports
 
 /**
  * Mirror of the Postgres enum `public.report_status` defined in
- *   supabase/migrations/20260704000000_reports_foundations.sql
+ *   supabase/migrations/20260704001000_reports_foundations.sql
  *
  * Lifecycle:
  *   DRAFT → READY → SIGNED → EXPORTED → SHARED

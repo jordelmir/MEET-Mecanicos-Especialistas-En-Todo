@@ -2,7 +2,7 @@ package com.elysium369.meet.core.reports
 
 /**
  * Mirror of the Postgres enum `public.evidence_type` defined in
- *   supabase/migrations/20260704000000_reports_foundations.sql
+ *   supabase/migrations/20260704001000_reports_foundations.sql
  *   supabase/migrations/20260705000000_reports_sync_and_evidence_extend.sql
  *
  * Total: 19 values. Original 9 (PR-4) + 10 added in the evidence_extend

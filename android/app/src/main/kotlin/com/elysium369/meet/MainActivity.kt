@@ -282,6 +282,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("repair_verification/{findingId}") { backStack ->
+                RepairVerificationWorkflowScreen(
+                    navController = navController,
+                    findingId = backStack.arguments?.getString("findingId").orEmpty(),
+                )
+            }
             composable("terminal") {
                 TerminalScreen(viewModel = obdViewModel)
             }
@@ -656,6 +662,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 ProviderRegistrationScreen(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("platform_trust_center") {
+                PlatformTrustCenterScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable("repair_case_detail/{caseId}") { backStack ->

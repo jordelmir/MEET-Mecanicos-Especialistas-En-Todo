@@ -33,10 +33,9 @@ object RideVerificationPolicy {
     }
 
     /**
-     * Grants access without misrepresenting a local pilot approval as a remote
-     * identity review. Production and pilot approvals are intentionally
-     * distinguishable in storage and UI.
+     * Local evidence attestation is never enough to operate. Only an explicit
+     * remote review may grant access.
      */
     fun grantsAccess(status: String?): Boolean =
-        status == "APPROVED" || status == PILOT_APPROVED
+        status == "APPROVED"
 }

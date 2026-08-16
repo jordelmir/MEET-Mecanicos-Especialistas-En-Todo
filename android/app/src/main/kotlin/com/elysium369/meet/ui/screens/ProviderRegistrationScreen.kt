@@ -102,6 +102,7 @@ fun ProviderRegistrationScreen(
     val context = LocalContext.current
 
     LaunchedEffect(viewModel) {
+        viewModel.refreshOwnTrustDecisions()
         viewModel.rideVerificationNotice.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
@@ -224,7 +225,7 @@ fun ProviderRegistrationScreen(
                     driverVerification?.status == "PENDING" -> "Verificación en revisión"
                     driverVerification?.status == "APPROVED" -> "Chofer verificado"
                     driverVerification?.status == RideVerificationPolicy.PILOT_APPROVED ->
-                        "Acceso piloto habilitado"
+                        "Expediente local listo; revisión pendiente"
                     driverVerification?.status == "REJECTED" -> "Reintentar verificación"
                     else -> null
                 }

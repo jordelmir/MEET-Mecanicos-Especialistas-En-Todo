@@ -354,6 +354,7 @@ class DiagnosticFindingKey(
     val moduleIdentity: String,
     val rawDtcIdentity: String,
     val displayCode: String,
+    val failureType: Int = -1,
 ) {
     /** Backwards-compatible presentation alias; never use as binary identity. */
     val code: String get() = displayCode
@@ -363,18 +364,20 @@ class DiagnosticFindingKey(
             vehicleId == other.vehicleId &&
             namespace == other.namespace &&
             moduleIdentity == other.moduleIdentity &&
-            rawDtcIdentity == other.rawDtcIdentity
+            rawDtcIdentity == other.rawDtcIdentity &&
+            failureType == other.failureType
 
     override fun hashCode(): Int {
         var result = vehicleId.hashCode()
         result = 31 * result + namespace.hashCode()
         result = 31 * result + moduleIdentity.hashCode()
         result = 31 * result + rawDtcIdentity.hashCode()
+        result = 31 * result + failureType
         return result
     }
 
     override fun toString(): String =
-        "$vehicleId|${namespace.name}|$moduleIdentity|$rawDtcIdentity"
+        "$vehicleId|${namespace.name}|$moduleIdentity|$rawDtcIdentity|$failureType"
 }
 
 fun DtcRecord.primaryObservationSemantic(): DiagnosticSemantic = when (namespace) {
@@ -407,4 +410,5 @@ fun DtcRecord.findingKey(vehicleId: String): DiagnosticFindingKey = DiagnosticFi
     moduleIdentity = DiagnosticModuleIdentity.canonical(targetAddress, responseAddress, moduleName),
     rawDtcIdentity = codeIdentity.stableRawIdentity,
     displayCode = code.uppercase(),
+    failureType = codeIdentity.failureType ?: -1,
 )

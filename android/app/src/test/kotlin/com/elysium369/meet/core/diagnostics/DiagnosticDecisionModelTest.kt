@@ -38,6 +38,7 @@ class DiagnosticDecisionModelTest {
                 normalizedSafetyRisk = 0.05,
                 requiredTools = listOf("DVOM"),
                 calibrationDatasetId = "verified-repairs-v1",
+                calibrationDatasetVersion = "1.0.0",
             ),
         )
         assertTrue(score.calibrated)

@@ -2,7 +2,7 @@
  * lib/reports — shared types for the certified-report pipeline.
  *
  * The types here mirror the SQL schema in
- * `supabase/migrations/20260704000000_reports_foundations.sql` and the
+ * `supabase/migrations/20260704001000_reports_foundations.sql` and the
  * Kotlin types in `android/.../diagnostic/DiagnosticSnapshot.kt`. The
  * goal is byte-level contract parity: a web report and an Android
  * report with the same content produce the same `integrityHash` so

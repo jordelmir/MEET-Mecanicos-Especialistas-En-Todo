@@ -1,21 +1,100 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://meet-elysium.invalid/schemas/obd-conformance-manifest-v1.json",
-  "title": "MEET OBD Conformance Manifest v1",
+  "title": "MEET OBD physical conformance case",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "capturedAt", "fixtureType", "adapter", "transport", "ecuEndpoints", "software", "files", "review"],
+  "required": ["schemaVersion", "caseId", "runId", "capturedAt", "state", "fixtureType", "protocol", "vehicleClass", "adapterClass", "adapter", "transport", "ecuEndpoints", "software", "files", "review", "artifacts", "expected", "referenceAuthority"],
   "properties": {
     "schemaVersion": {"const": 1},
+    "caseId": {"type": "string", "minLength": 1},
     "runId": {"type": "string", "minLength": 16},
     "capturedAt": {"type": "string", "format": "date-time"},
+    "state": {"enum": ["PENDING_PHYSICAL_CAPTURE", "CAPTURED_UNREVIEWED", "CERTIFIED", "REVOKED"]},
     "fixtureType": {"enum": ["REAL_VEHICLE", "APPROVED_ECU_BENCH", "REPLAY_ONLY"]},
     "vehicleBindingHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
-    "adapter": {"type": "object", "required": ["manufacturer", "model", "firmware"], "properties": {"manufacturer":{"type":"string"},"model":{"type":"string"},"firmware":{"type":"string"}}, "additionalProperties": false},
+    "protocol": {"enum": ["CAN_11", "CAN_29", "ISO_TP_SINGLE", "ISO_TP_MULTI", "ISO_9141", "KWP", "UDS", "DOIP"]},
+    "vehicleClass": {"enum": ["GASOLINE", "DIESEL", "HEV", "PHEV", "BEV"]},
+    "adapterClass": {"enum": ["ELM_ECONOMY", "ELM_QUALITY", "STN_OBDLINK", "BLE", "WIFI", "DOIP"]},
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manufacturer", "model", "firmware"],
+      "properties": {
+        "manufacturer": {"type": "string"},
+        "model": {"type": "string"},
+        "firmware": {"type": "string"}
+      }
+    },
     "transport": {"enum": ["BLUETOOTH_CLASSIC", "BLE", "WIFI_TCP", "DOIP"]},
-    "ecuEndpoints": {"type":"array", "minItems":1, "items":{"type":"string","minLength":1}},
-    "software": {"type":"object", "required":["appCommit","parserVersion"], "properties":{"appCommit":{"type":"string","pattern":"^[0-9a-f]{40}$"},"parserVersion":{"type":"string","minLength":1}}, "additionalProperties": false},
-    "files": {"type":"array", "minItems":1, "items":{"type":"object","required":["path","sha256","mediaType"],"properties":{"path":{"type":"string"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"mediaType":{"type":"string"}},"additionalProperties":false}},
-    "review": {"type":"object", "required":["state"], "properties":{"state":{"enum":["CAPTURED","REVIEWED","REJECTED"]},"reviewer":{"type":["string","null"]},"signature":{"type":["string","null"]}}, "additionalProperties":false}
+    "ecuEndpoints": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["appCommit", "parserVersion"],
+      "properties": {
+        "appCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "parserVersion": {"type": "string", "minLength": 1}
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "mediaType"],
+        "properties": {
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "mediaType": {"type": "string"}
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["CAPTURED", "REVIEWED", "REJECTED"]},
+        "reviewer": {"type": ["string", "null"]},
+        "signature": {"type": ["string", "null"]}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "sha256", "sizeBytes", "custodyReference"],
+        "properties": {
+          "role": {"enum": ["MEET_RAW_TRACE", "REFERENCE_RESULT", "SNAPSHOT", "COVERAGE", "CLEAR_BEHAVIOR"]},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "sizeBytes": {"type": "integer", "minimum": 1},
+          "custodyReference": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["ecu", "findings", "statuses", "coverage", "clearBehavior"],
+      "properties": {
+        "ecu": {"type": "array", "items": {"type": "string"}},
+        "findings": {"type": "array", "items": {"type": "object"}},
+        "statuses": {"type": "array", "items": {"type": "string"}},
+        "coverage": {"type": "object"},
+        "clearBehavior": {"type": "object"}
+      }
+    },
+    "referenceAuthority": {
+      "type": "object",
+      "required": ["instrument", "reviewer", "reviewedAt", "signature"],
+      "properties": {
+        "instrument": {"type": "string"},
+        "reviewer": {"type": "string"},
+        "reviewedAt": {"type": "string", "format": "date-time"},
+        "signature": {"type": "string"}
+      }
+    }
   }
 }

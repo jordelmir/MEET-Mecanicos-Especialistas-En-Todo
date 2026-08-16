@@ -113,7 +113,7 @@ create table if not exists public.universal_service_requests (
     title text not null check (char_length(title) between 3 and 160),
     description text not null check (char_length(description) between 10 and 5000),
     intake jsonb not null default '{}'::jsonb,
-    location geography(point, 4326),
+    location extensions.geography(point, 4326),
     location_label text,
     offered_price_minor bigint not null check (offered_price_minor > 0),
     final_price_minor bigint check (final_price_minor is null or final_price_minor > 0),

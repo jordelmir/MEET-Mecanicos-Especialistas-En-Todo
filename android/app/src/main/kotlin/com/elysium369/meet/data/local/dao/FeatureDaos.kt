@@ -696,20 +696,23 @@ interface ProviderProfileDao {
     @Query("SELECT * FROM provider_profiles WHERE userId = :userId ORDER BY isActive DESC, updatedAt DESC")
     fun getProfilesForUser(userId: String): Flow<List<ProviderProfileEntity>>
 
-    @Query("SELECT * FROM provider_profiles WHERE userId = :userId AND isActive = 1")
+    @Query("SELECT * FROM provider_profiles WHERE userId = :userId AND isActive = 1 AND verified = 1")
     fun getActiveProfilesForUser(userId: String): Flow<List<ProviderProfileEntity>>
 
     @Query("SELECT * FROM provider_profiles WHERE userId = :userId AND providerType = :type LIMIT 1")
     suspend fun getProfileByUserAndType(userId: String, type: String): ProviderProfileEntity?
 
-    @Query("SELECT EXISTS(SELECT 1 FROM provider_profiles WHERE userId = :userId AND providerType = :type AND isActive = 1)")
+    @Query("SELECT EXISTS(SELECT 1 FROM provider_profiles WHERE userId = :userId AND providerType = :type AND isActive = 1 AND verified = 1)")
     suspend fun isUserRegisteredAs(userId: String, type: String): Boolean
 
-    @Query("SELECT * FROM provider_profiles WHERE providerType = :type AND isActive = 1 ORDER BY rating DESC")
+    @Query("SELECT * FROM provider_profiles WHERE providerType = :type AND isActive = 1 AND verified = 1 ORDER BY rating DESC")
     fun getActiveProvidersByType(type: String): Flow<List<ProviderProfileEntity>>
 
     @Query("UPDATE provider_profiles SET isActive = :isActive, updatedAt = :updatedAt WHERE profileId = :profileId")
     suspend fun setProfileActive(profileId: String, isActive: Boolean, updatedAt: Long)
+
+    @Query("UPDATE provider_profiles SET verified = :verified, updatedAt = :updatedAt WHERE profileId = :profileId")
+    suspend fun setProfileVerified(profileId: String, verified: Boolean, updatedAt: Long)
 
     @Query("UPDATE provider_profiles SET rating = :rating, totalJobs = totalJobs + 1, updatedAt = :updatedAt WHERE profileId = :profileId")
     suspend fun updateRatingAndJobs(profileId: String, rating: Double, updatedAt: Long)

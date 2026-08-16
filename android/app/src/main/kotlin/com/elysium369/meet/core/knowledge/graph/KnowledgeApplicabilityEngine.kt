@@ -27,12 +27,8 @@ data class KnowledgeConstraintDecision(
     val conflictingConstraints: List<String>,
     val reason: String,
 ) {
-    val diagnosticUseAllowed: Boolean
-        get() = state in setOf(
-            KnowledgeConstraintState.CONFIRMED,
-            KnowledgeConstraintState.PROBABLE,
-            KnowledgeConstraintState.CONDITIONAL,
-        )
+    @Deprecated("Use KnowledgeUsePolicy.authorize with an explicit purpose")
+    val diagnosticUseAllowed: Boolean get() = false
 }
 
 /**

@@ -18,6 +18,19 @@ enum class VehicleSessionBindingMethod {
     USER_CONFIRMATION,
 }
 
+enum class ClearDtcBlockReason {
+    NO_SELECTED_VEHICLE,
+    VIN_CONFLICT,
+    OBSERVED_VIN_NOT_LINKED,
+    BINDING_MISMATCH,
+}
+
+sealed interface ClearDtcAuthorization {
+    data object Authorized : ClearDtcAuthorization
+    data object RequiresUserConfirmation : ClearDtcAuthorization
+    data class Blocked(val reason: ClearDtcBlockReason) : ClearDtcAuthorization
+}
+
 /** Immutable authority boundary between a physical link and a Garage vehicle. */
 data class VehicleSessionBinding(
     val bindingId: String,
@@ -130,6 +143,26 @@ data class VehicleSessionBinding(
             conflictReason = null,
         )
     }
+}
+
+/**
+ * Pure authorization decision for the destructive DTC-clear flow.
+ * An ECU that cannot provide VIN may be bound only through an explicit user
+ * confirmation in the UI; VIN conflicts never fall back to that path.
+ */
+fun VehicleSessionBinding.authorizeDtcClear(selectedVehicleId: String?): ClearDtcAuthorization = when {
+    selectedVehicleId == null ->
+        ClearDtcAuthorization.Blocked(ClearDtcBlockReason.NO_SELECTED_VEHICLE)
+    bindingState == VehicleSessionBindingState.CONFLICTED ->
+        ClearDtcAuthorization.Blocked(ClearDtcBlockReason.VIN_CONFLICT)
+    allowsActiveOperations && vehicleId == selectedVehicleId ->
+        ClearDtcAuthorization.Authorized
+    allowsActiveOperations ->
+        ClearDtcAuthorization.Blocked(ClearDtcBlockReason.BINDING_MISMATCH)
+    bindingState == VehicleSessionBindingState.UNBOUND && observedVin == null ->
+        ClearDtcAuthorization.RequiresUserConfirmation
+    else ->
+        ClearDtcAuthorization.Blocked(ClearDtcBlockReason.OBSERVED_VIN_NOT_LINKED)
 }
 
 data class LatestDiagnosticScanProjection(

@@ -10,6 +10,7 @@ import com.elysium369.meet.data.local.entities.DiagnosticObservationEntity
 import com.elysium369.meet.data.local.entities.FindingDiagnosticSnapshotEntity
 import com.elysium369.meet.data.local.entities.FindingSnapshotExchangeRefEntity
 import com.elysium369.meet.data.local.entities.DiagnosticSessionIntegrityEntity
+import com.elysium369.meet.data.local.entities.EncryptedEvidenceBlobEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -18,10 +19,52 @@ interface DiagnosticEvidenceDao {
     suspend fun appendExchange(exchange: DiagnosticExchangeEntity)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun appendEncryptedBlob(blob: EncryptedEvidenceBlobEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun appendEncryptedBlobs(blobs: List<EncryptedEvidenceBlobEntity>)
+
+    @Transaction
+    suspend fun appendEncryptedExchange(
+        blob: EncryptedEvidenceBlobEntity,
+        exchange: DiagnosticExchangeEntity,
+    ) {
+        require(exchange.rawPayloadBlobId == blob.blobId)
+        appendEncryptedBlob(blob)
+        appendExchange(exchange)
+    }
+
+    @Transaction
+    suspend fun appendEncryptedSession(
+        blobs: List<EncryptedEvidenceBlobEntity>,
+        exchanges: List<DiagnosticExchangeEntity>,
+        integrity: DiagnosticSessionIntegrityEntity,
+    ) {
+        require(blobs.size == exchanges.size)
+        require(exchanges.all { exchange -> blobs.any { it.blobId == exchange.rawPayloadBlobId } })
+        appendEncryptedBlobs(blobs)
+        appendExchanges(exchanges)
+        appendSessionIntegrity(integrity)
+    }
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun appendExchanges(exchanges: List<DiagnosticExchangeEntity>)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun appendObservation(observation: DiagnosticObservationEntity)
+
+    @Transaction
+    suspend fun appendObservationWithExpectedPredecessor(
+        observation: DiagnosticObservationEntity,
+        expectedSessionSequence: Long,
+        expectedFindingSequence: Long,
+        expectedPreviousHash: String,
+    ) {
+        check(maxObservationSequence(observation.sessionId) + 1L == expectedSessionSequence)
+        check(maxFindingSequence(observation.findingId) + 1L == expectedFindingSequence)
+        check(latestObservationHash(observation.findingId).orEmpty() == expectedPreviousHash)
+        appendObservation(observation)
+    }
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun appendObservations(observations: List<DiagnosticObservationEntity>)
@@ -65,16 +108,19 @@ interface DiagnosticEvidenceDao {
     @Query("SELECT COALESCE(MAX(sessionSequence), 0) FROM diagnostic_observations WHERE sessionId = :sessionId")
     suspend fun maxObservationSequence(sessionId: String): Long
 
-    @Query("SELECT observationHash FROM diagnostic_observations WHERE findingId = :findingId ORDER BY observedAt DESC, sessionSequence DESC LIMIT 1")
+    @Query("SELECT COALESCE(MAX(findingSequence), 0) FROM diagnostic_observations WHERE findingId = :findingId")
+    suspend fun maxFindingSequence(findingId: String): Long
+
+    @Query("SELECT observationHash FROM diagnostic_observations WHERE findingId = :findingId ORDER BY findingSequence DESC, observedAt DESC, sessionSequence DESC LIMIT 1")
     suspend fun latestObservationHash(findingId: String): String?
 
     @Query("SELECT * FROM diagnostic_exchanges WHERE sessionId = :sessionId ORDER BY sessionSequence ASC, id ASC")
     fun observeSessionExchanges(sessionId: String): Flow<List<DiagnosticExchangeEntity>>
 
-    @Query("SELECT * FROM diagnostic_observations WHERE findingId = :findingId ORDER BY observedAt ASC, sessionSequence ASC, id ASC")
+    @Query("SELECT * FROM diagnostic_observations WHERE findingId = :findingId ORDER BY findingSequence ASC, observedAt ASC, sessionSequence ASC, id ASC")
     fun observeFindingTimeline(findingId: String): Flow<List<DiagnosticObservationEntity>>
 
-    @Query("SELECT * FROM diagnostic_observations WHERE findingId = :findingId ORDER BY observedAt ASC, sessionSequence ASC, id ASC")
+    @Query("SELECT * FROM diagnostic_observations WHERE findingId = :findingId ORDER BY findingSequence ASC, observedAt ASC, sessionSequence ASC, id ASC")
     suspend fun getFindingTimeline(findingId: String): List<DiagnosticObservationEntity>
 
     @Query("SELECT * FROM finding_diagnostic_snapshots WHERE findingId = :findingId ORDER BY capturedAtMs DESC")
@@ -90,6 +136,15 @@ interface DiagnosticEvidenceDao {
              )""",
     )
     suspend fun purgeExpiredUnreferencedExchanges(nowMs: Long): Int
+
+    @Query(
+        """DELETE FROM encrypted_evidence_blobs
+           WHERE blobId NOT IN (
+               SELECT rawPayloadBlobId FROM diagnostic_exchanges
+               WHERE rawPayloadBlobId IS NOT NULL
+           )""",
+    )
+    suspend fun purgeOrphanedEncryptedBlobs(): Int
 
     @Query(
         """DELETE FROM diagnostic_session_integrity

@@ -62,6 +62,7 @@ logs/
 android/app/build/
 android/.gradle/
 android/build/
+artifacts/physical-device/
 android/local.properties
 android/**/local.properties
 android/gradle-8.5/
@@ -89,6 +90,15 @@ supabase/functions/.env.*
 supabase/secrets.env
 supabase/.secrets
 supabase/.secrets.*
+supabase/.mcp.json
+supabase/.cli-token
+**/.supabase-access-token
+
+# --- Additional secret-bearing local configuration ---
+*.properties.local
+**/secrets.properties
+**/credentials.json
+**/service-account*.json
 
 # --- Python Temp ---
 __pycache__/

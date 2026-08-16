@@ -144,6 +144,7 @@ private fun CameraPreviewAndOverlay(
     val longitudinalG by viewModel.longitudinalG.collectAsState()
     val totalG = kotlin.math.sqrt(lateralG * lateralG + longitudinalG * longitudinalG)
     val activeDtcs by viewModel.activeDtcs.collectAsState()
+    val activeFindingSummaries by viewModel.canonicalActiveFindingSummaries.collectAsState()
 
     // Crash detection: G-Force impact
     LaunchedEffect(isRecordingDashcam, totalG) {
@@ -234,7 +235,16 @@ private fun CameraPreviewAndOverlay(
                                         videoFile = java.io.File(videoPath),
                                         audioFile = null,
                                         telemetryJson = Json.encodeToString(liveData),
-                                        dtcsList = activeDtcs
+                                        findings = activeFindingSummaries.map { finding ->
+                                            com.elysium369.meet.core.blackbox.EvidenceCompiler.BlackBoxFindingReference(
+                                                findingId = finding.id,
+                                                displayCode = finding.code,
+                                                ecuEndpointId = finding.moduleIdentity,
+                                                namespace = finding.namespace,
+                                                status = finding.status,
+                                                failureType = finding.failureType,
+                                            )
+                                        }
                                     )
                                     viewModel.saveEvidencePackage(evidence)
                                 } catch (e: Exception) {

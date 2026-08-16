@@ -1,5 +1,8 @@
 package com.elysium369.meet.domain.diagnostics
 
+import com.elysium369.meet.data.local.entities.DiagnosticFindingEntity
+import com.elysium369.meet.data.local.entities.DiagnosticObservationEntity
+
 enum class VehicleEvidenceNodeType {
     VEHICLE, ECU, COMPONENT, CIRCUIT, SIGNAL, FINDING, OBSERVATION, MEASUREMENT,
     SNAPSHOT, HYPOTHESIS, DIAGNOSTIC_TEST, REPAIR, PART, VERIFICATION,
@@ -18,6 +21,8 @@ data class VehicleEvidenceGraphNode(
     val label: String,
     val evidenceIds: Set<String>,
     val createdAt: Long,
+    val sourceReferenceIds: Set<String> = emptySet(),
+    val sourceContentHashes: Set<String> = emptySet(),
 ) {
     init {
         require(id.isNotBlank() && vehicleId.isNotBlank() && vehicleBindingId.isNotBlank())
@@ -34,11 +39,107 @@ data class VehicleEvidenceGraphEdge(
     val type: VehicleEvidenceEdgeType,
     val evidenceIds: Set<String>,
     val createdAt: Long,
+    val sourceReferenceIds: Set<String> = emptySet(),
+    val sourceContentHashes: Set<String> = emptySet(),
 ) {
     init {
         require(id.isNotBlank() && vehicleId.isNotBlank() && vehicleBindingId.isNotBlank())
         require(fromNodeId.isNotBlank() && toNodeId.isNotBlank() && fromNodeId != toNodeId)
         require(evidenceIds.none(String::isBlank) && createdAt > 0)
+    }
+}
+
+data class VehicleEvidenceGraphProjectionInput(
+    val vehicleId: String,
+    val vehicleBindingId: String,
+    val findings: List<DiagnosticFindingEntity>,
+    val observations: List<DiagnosticObservationEntity>,
+)
+
+interface VehicleEvidenceGraphRepository {
+    fun rebuild(input: VehicleEvidenceGraphProjectionInput): VehicleEvidenceGraph
+}
+
+/** Deterministic projection over canonical authorities; no competing graph database. */
+object DeterministicVehicleEvidenceGraphRepository : VehicleEvidenceGraphRepository {
+    override fun rebuild(input: VehicleEvidenceGraphProjectionInput): VehicleEvidenceGraph {
+        require(input.vehicleBindingId.isNotBlank())
+        val scopedFindings = input.findings
+            .filter { it.vehicleId == input.vehicleId && it.vehicleBindingId == input.vehicleBindingId }
+            .sortedBy { it.id }
+        val findingIds = scopedFindings.mapTo(hashSetOf()) { it.id }
+        val scopedObservations = input.observations
+            .filter { it.findingId in findingIds }
+            .sortedWith(compareBy<DiagnosticObservationEntity> { it.findingId }.thenBy { it.findingSequence }.thenBy { it.id })
+        val vehicleNode = VehicleEvidenceGraphNode(
+            id = "vehicle:${input.vehicleId}",
+            vehicleId = input.vehicleId,
+            vehicleBindingId = input.vehicleBindingId,
+            type = VehicleEvidenceNodeType.VEHICLE,
+            label = "Vehículo verificado",
+            evidenceIds = setOf(input.vehicleBindingId),
+            createdAt = scopedFindings.minOfOrNull { it.createdAtMs } ?: 1L,
+        )
+        val nodes = buildList {
+            add(vehicleNode)
+            scopedFindings.forEach { finding ->
+                add(
+                    VehicleEvidenceGraphNode(
+                        id = "finding:${finding.id}",
+                        vehicleId = input.vehicleId,
+                        vehicleBindingId = input.vehicleBindingId,
+                        type = VehicleEvidenceNodeType.FINDING,
+                        label = "${finding.displayCode} · ${finding.moduleRole.ifBlank { finding.ecuEndpointId }}",
+                        evidenceIds = setOf(finding.id),
+                        createdAt = finding.createdAtMs,
+                    ),
+                )
+            }
+            scopedObservations.forEach { observation ->
+                add(
+                    VehicleEvidenceGraphNode(
+                        id = "observation:${observation.id}",
+                        vehicleId = input.vehicleId,
+                        vehicleBindingId = input.vehicleBindingId,
+                        type = VehicleEvidenceNodeType.OBSERVATION,
+                        label = observation.observationState,
+                        evidenceIds = listOfNotNull(observation.exchangeId, observation.id).toSet(),
+                        createdAt = observation.observedAt,
+                    ),
+                )
+            }
+        }
+        val edges = buildList {
+            scopedFindings.forEach { finding ->
+                add(
+                    VehicleEvidenceGraphEdge(
+                        id = "vehicle-finding:${finding.id}",
+                        vehicleId = input.vehicleId,
+                        vehicleBindingId = input.vehicleBindingId,
+                        fromNodeId = vehicleNode.id,
+                        toNodeId = "finding:${finding.id}",
+                        type = VehicleEvidenceEdgeType.APPLIES_TO,
+                        evidenceIds = setOf(finding.id),
+                        createdAt = finding.createdAtMs,
+                    ),
+                )
+            }
+            scopedObservations.forEach { observation ->
+                add(
+                    VehicleEvidenceGraphEdge(
+                        id = "finding-observation:${observation.id}",
+                        vehicleId = input.vehicleId,
+                        vehicleBindingId = input.vehicleBindingId,
+                        fromNodeId = "finding:${observation.findingId}",
+                        toNodeId = "observation:${observation.id}",
+                        type = VehicleEvidenceEdgeType.OBSERVED_AT,
+                        evidenceIds = listOfNotNull(observation.exchangeId, observation.id).toSet(),
+                        createdAt = observation.observedAt,
+                    ),
+                )
+            }
+        }
+        return VehicleEvidenceGraph(input.vehicleId, input.vehicleBindingId, nodes, edges)
     }
 }
 

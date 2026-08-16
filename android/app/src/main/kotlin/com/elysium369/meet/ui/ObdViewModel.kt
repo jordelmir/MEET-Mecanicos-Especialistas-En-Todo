@@ -10,6 +10,7 @@ import com.elysium369.meet.domain.diagnostics.LatestDiagnosticScanProjection
 import com.elysium369.meet.domain.diagnostics.RunDiagnosticScan
 import com.elysium369.meet.domain.diagnostics.VehicleSessionBinding
 import com.elysium369.meet.domain.diagnostics.VehicleSessionBindingState
+import com.elysium369.meet.domain.diagnostics.VinVehicleIdentity
 import com.elysium369.meet.domain.diagnostics.toSummary
 import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.core.monetization.FeatureKey
@@ -88,6 +89,7 @@ import com.elysium369.meet.ride.domain.RideSupportPolicy
 import com.elysium369.meet.ride.domain.RideVerificationEvidencePolicy
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.VerificationFileEvidence
+import com.elysium369.meet.ride.domain.PlatformOwnerAccess
 import com.elysium369.meet.ride.domain.RideCommandEnvelope
 import com.elysium369.meet.ride.domain.RideCommandType
 import com.elysium369.meet.ride.domain.RideId
@@ -103,6 +105,8 @@ import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
 import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
+import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
@@ -1162,10 +1166,67 @@ class ObdViewModel @Inject constructor(
 
     private fun currentCloudUserId(): String? {
         return SupabaseManager.client.auth.currentUserOrNull()?.id
+            ?: com.elysium369.meet.data.remote.SupabaseModule.client.auth
+                .currentUserOrNull()?.id
     }
 
     val currentUserId: String? get() = currentCloudUserId()
     val currentRideActorId: String get() = localDeviceId
+
+    private val _platformOwnerAccess = MutableStateFlow(PlatformOwnerAccess.UNKNOWN)
+    val platformOwnerAccess: StateFlow<PlatformOwnerAccess> =
+        _platformOwnerAccess.asStateFlow()
+
+    fun refreshPlatformOwnerAccess() {
+        if (currentCloudUserId() == null) {
+            _platformOwnerAccess.value = PlatformOwnerAccess.SIGNED_OUT
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _platformOwnerAccess.value = try {
+                if (PlatformTrustCenterGateway.hasOwnerAccess()) {
+                    PlatformOwnerAccess.GRANTED
+                } else {
+                    PlatformOwnerAccess.DENIED
+                }
+            } catch (error: Exception) {
+                Log.w("MeetTrustCenter", "Owner authority check unavailable", error)
+                PlatformOwnerAccess.UNAVAILABLE
+            }
+        }
+    }
+
+    fun refreshOwnTrustDecisions() {
+        if (currentCloudUserId() == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                .onSuccess { applications ->
+                    val latestByType = applications
+                        .groupBy { it.serviceType }
+                        .mapValues { (_, values) -> values.maxBy { it.submittedAt } }
+                    latestByType["RIDE_DRIVER"]?.let { application ->
+                        val now = System.currentTimeMillis()
+                        rideDao.updateDriverVerificationStatus(
+                            driverId = localDeviceId,
+                            status = application.status,
+                            approvedAt = now.takeIf { application.status == "APPROVED" },
+                            updatedAt = now,
+                        )
+                    }
+                    latestByType["PASSENGER"]?.let { application ->
+                        val now = System.currentTimeMillis()
+                        rideDao.updatePassengerVerificationStatus(
+                            passengerId = localDeviceId,
+                            status = application.status,
+                            approvedAt = now.takeIf { application.status == "APPROVED" },
+                        )
+                    }
+                }
+                .onFailure {
+                    Log.w("MeetTrustCenter", "Own verification decision sync unavailable", it)
+                }
+        }
+    }
 
     private fun currentProviderUserId(): String {
         return currentCloudUserId() ?: "local_device_$localDeviceId"
@@ -1196,8 +1257,25 @@ class ObdViewModel @Inject constructor(
         val userId = currentProviderUserId()
         providerRolesJob?.cancel()
         providerRolesJob = viewModelScope.launch(Dispatchers.IO) {
+            if (currentCloudUserId() != null) {
+                runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                    .onSuccess { applications ->
+                        val decisions = applications.associateBy { it.profileReference }
+                        providerProfileDao.getProfilesForUser(userId).first().forEach { profile ->
+                            val decision = decisions[profile.profileId] ?: return@forEach
+                            providerProfileDao.setProfileVerified(
+                                profileId = profile.profileId,
+                                verified = decision.status == "APPROVED",
+                                updatedAt = System.currentTimeMillis(),
+                            )
+                        }
+                    }
+                    .onFailure {
+                        Log.w("MeetTrustCenter", "Provider review sync unavailable", it)
+                    }
+            }
             providerProfileDao.getProfilesForUser(userId).collect { profiles ->
-                val activeProfiles = profiles.filter { it.isActive }
+                val activeProfiles = profiles.filter { it.isActive && it.verified }
                 _userProviderProfiles.value = profiles
                 _isMechanic.value = activeProfiles.any { it.providerType == "MECHANIC" }
                 _isTowTruckDriver.value = activeProfiles.any { it.providerType == "TOW_TRUCK" }
@@ -1270,17 +1348,34 @@ class ObdViewModel @Inject constructor(
 
             providerProfileDao.insertProfile(profile)
 
-            // Sync to cloud
-            if (cloudUserId != null) {
+            val cloudSubmission = if (cloudUserId != null) {
                 runCatching {
-                    SupabaseManager.client.postgrest["provider_profiles"].upsert(profile)
-                }.onFailure { Log.w("ObdViewModel", "Provider profile saved locally; cloud sync unavailable", it) }
-            }
+                    PlatformTrustCenterGateway.submit(
+                        ServiceVerificationSubmission(
+                            serviceType = providerType,
+                            profileReference = profile.profileId,
+                            displayName = ownerName,
+                            businessName = businessName,
+                            phone = phone,
+                            locationLabel = location,
+                            licenseReference = licenseNumber.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            } else null
 
             withContext(Dispatchers.Main) {
                 context?.let {
                     val typeLabel = providerTypeLabel(providerType)
-                    android.widget.Toast.makeText(it, "🎉 ¡Registrado como $typeLabel exitosamente!", android.widget.Toast.LENGTH_LONG).show()
+                    val message = when {
+                        cloudUserId == null ->
+                            "Perfil de $typeLabel guardado localmente. Inicia sesión para enviarlo a verificación."
+                        cloudSubmission?.isSuccess == true ->
+                            "Solicitud de $typeLabel enviada al Centro de Confianza. Estado: pendiente."
+                        else ->
+                            "Perfil guardado localmente; la verificación remota está pendiente de sincronización."
+                    }
+                    android.widget.Toast.makeText(it, message, android.widget.Toast.LENGTH_LONG).show()
                 }
             }
 
@@ -1705,13 +1800,19 @@ class ObdViewModel @Inject constructor(
             expectedVin = vehicle.vin,
             evidenceId = "user-confirmation:${UUID.randomUUID()}",
         )
+        // The startup pre-scan was intentionally ephemeral while UNBOUND.
+        // Force the destructive flow to acquire and persist a new scan under
+        // this explicit binding before it can build a clear plan.
+        hasCompletedInitialDtcScan = false
         _latestDiagnosticScan.value = null
+        addTerminalLog(
+            "[IDENTIDAD] Vehículo confirmado manualmente para esta sesión física. Se exigirá un nuevo pre-scan antes de borrar memoria DTC.",
+            TerminalLineType.SYSTEM,
+        )
     }
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
     val liveData: StateFlow<Map<String, Float>> = _liveData.asStateFlow()
-    /** Authoritative sensor stream; consumers making physical conclusions use this, not the float projection. */
-    val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
 
     // Smooth sensor interpolation — eliminates erratic jumps from raw ELM327 readings
     private val sensorSmoother = SensorSmootherManager()
@@ -2314,15 +2415,14 @@ class ObdViewModel @Inject constructor(
             lastAutoRecognizedVin = cleanVin
             return _selectedVehicle.value
         }
-        if (lastAutoRecognizedVin == cleanVin) return _selectedVehicle.value
-
         return vinVehicleRecognitionMutex.withLock {
             if (_selectedVehicle.value?.vin?.equals(cleanVin, ignoreCase = true) == true) {
                 lastAutoRecognizedVin = cleanVin
                 return@withLock _selectedVehicle.value
             }
 
-            vehicleRepository.getVehicleByVin(cleanVin)?.let { existing ->
+            val ownerId = currentProviderUserId()
+            vehicleRepository.getVehicleByVin(ownerId, cleanVin)?.let { existing ->
                 selectVehicle(existing)
                 lastAutoRecognizedVin = cleanVin
                 voiceFeedbackManager.speak(
@@ -2333,21 +2433,35 @@ class ObdViewModel @Inject constructor(
                 return@withLock existing
             }
 
-            _vinDecoded.value = VinDecoder.decode(cleanVin)
-            addTerminalLog(
-                "[VIN] VIN capturado, pero no existe un vehículo Garage con esa identidad. " +
-                    "No se creó un perfil sintético; selecciona o registra el vehículo real para vincular la sesión.",
-                TerminalLineType.WARNING,
+            val decoded = VinDecoder.decode(cleanVin)
+            _vinDecoded.value = decoded
+            val remembered = Vehicle(
+                id = VinVehicleIdentity.stableVehicleId(ownerId, cleanVin),
+                user_id = ownerId,
+                year = 0,
+                make = "Fabricante pendiente de confirmar",
+                model = "Modelo pendiente de confirmar",
+                engine = "Dato no capturado",
+                vin = cleanVin,
+                plate = "NOT_SET",
             )
-            null
+            vehicleRepository.insertVehicle(remembered)
+            selectVehicle(remembered)
+            lastAutoRecognizedVin = cleanVin
+            voiceFeedbackManager.speak(
+                "VIN detectado y vehículo recordado en tu garaje.",
+                "VIN detected and vehicle remembered in your garage.",
+            )
+            addTerminalLog(
+                "[VIN] Nueva identidad ECU guardada para este usuario. Marca, modelo y motor permanecen pendientes hasta contar con evidencia.",
+                TerminalLineType.SYSTEM,
+            )
+            remembered
         }
     }
 
     private fun normalizeVin(rawVin: String): String? {
-        val clean = rawVin.trim().uppercase()
-            .replace(Regex("[^A-HJ-NPR-Z0-9]"), "")
-        if (clean.length != 17) return null
-        return clean
+        return VinVehicleIdentity.normalize(rawVin)
     }
 
     // ═══════════════════════════════════════
@@ -2629,7 +2743,7 @@ class ObdViewModel @Inject constructor(
     val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser()
+    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser(currentProviderUserId())
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // --- DVIR Inspection Flow & CRUD Helpers ---
@@ -3189,7 +3303,7 @@ class ObdViewModel @Inject constructor(
                 val savedVehicleId = prefs.getString("selected_vehicle_id", null)
 
                 if (savedVehicleId != null) {
-                    val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
+                    val vehicle = vehicleRepository.getVehicleById(currentProviderUserId(), savedVehicleId)
                     if (vehicle != null) {
                         selectVehicle(vehicle)
                         android.util.Log.d("ObdVM", "✅ Restored selected vehicle: ${vehicle.make} ${vehicle.model}")
@@ -3381,13 +3495,13 @@ class ObdViewModel @Inject constructor(
 
     fun startDiagnosticSession(vehicle: Vehicle) {
         selectVehicle(vehicle)
-        beginUnboundPhysicalSession(lastAdapterAddress.ifBlank { "UNKNOWN_ADAPTER" })
+        beginUnboundPhysicalSession(lastAdapterAddress.orEmpty().ifBlank { "UNKNOWN_ADAPTER" })
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
             obdSession.connect()
             if (obdSession.state.value == ObdState.CONNECTED) {
                 runPostConnectDtcFirstStartup()
-                startForegroundService(vehicle.id, lastAdapterAddress)
+                startForegroundService(_selectedVehicle.value?.id ?: vehicle.id, lastAdapterAddress)
             }
         }
     }
@@ -3436,20 +3550,9 @@ class ObdViewModel @Inject constructor(
                 evidenceId = "ecu-vin:${sha256Hex(cleanVin.toByteArray()).take(16)}",
             )
         }
-        val selected = _selectedVehicle.value
-        val selectedVin = selected?.vin?.let(::normalizeVin)
-        if (selected != null && selectedVin != null && selectedVin != cleanVin) {
-            _vehicleSessionBinding.value = _vehicleSessionBinding.value.conflict(
-                observedVin = cleanVin,
-                expectedVin = selectedVin,
-                reason = "El VIN de ECU no coincide con el vehículo Garage seleccionado.",
-            )
-            addTerminalLog(
-                "[IDENTIDAD] CONFLICTO VIN: se bloquearon persistencia y operaciones activas hasta seleccionar el vehículo correcto.",
-                TerminalLineType.ERROR,
-            )
-            return null
-        }
+        // The physical ECU is authoritative for the connected car. A stale
+        // Garage selection is replaced by the owner-scoped VIN identity below;
+        // it must never receive this car's scans or DTC history.
         val vehicle = autoSelectVehicleFromVin(cleanVin) ?: return null
         _vehicleSessionBinding.value = _vehicleSessionBinding.value.bindVerifiedVin(
             vehicleId = vehicle.id,
@@ -4051,6 +4154,7 @@ class ObdViewModel @Inject constructor(
             }
             val exchangeId = UUID.randomUUID().toString()
             val sequence = startingSequence + offset + 1L
+            val elapsedRealtimeNanos = System.nanoTime()
             val rawRequestHash = sha256Hex(exchange.command.toByteArray(Charsets.UTF_8))
             val rawResponseHash = sha256Hex(exchange.rawResponse.toByteArray(Charsets.UTF_8))
             val persistedRequestScope = when (exchange.requestScope) {
@@ -4059,21 +4163,18 @@ class ObdViewModel @Inject constructor(
                 is DiagnosticRequestScope.Logical -> "LOGICAL"
                 DiagnosticRequestScope.LegacyUnaddressed -> "LEGACY_UNADDRESSED"
             }
-            val exchangeHash = canonicalHash(
-                currentSessionId,
-                sequence.toString(),
-                exchange.timestampMs.toString(),
-                persistedRequestScope,
-                exchange.targetAddress.orEmpty(),
-                exchange.responseAddress.orEmpty(),
-                exchange.command,
-                exchange.outcome.name,
-                rawRequestHash,
-                rawResponseHash,
-                previousHash,
-                exchange.parserVersion,
+            val retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name
+            val encryptedBlob = DiagnosticEvidenceVault.encrypt(
+                sessionId = currentSessionId,
+                exchangeId = exchangeId,
+                rawRequest = exchange.command,
+                rawResponse = exchange.rawResponse,
+                requestHash = rawRequestHash,
+                responseHash = rawResponseHash,
+                createdAtMs = exchange.timestampMs,
+                retentionClass = retentionClass,
             )
-            val entity = DiagnosticExchangeEntity(
+            val draft = DiagnosticExchangeEntity(
                 id = exchangeId,
                 sessionId = currentSessionId,
                 timestampMs = exchange.timestampMs,
@@ -4084,8 +4185,8 @@ class ObdViewModel @Inject constructor(
                 requestAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
                 service = exchange.command,
-                rawRequest = exchange.command,
-                rawResponse = exchange.rawResponse,
+                rawRequest = "",
+                rawResponse = "",
                 decodedOutcome = exchange.outcome.name,
                 latencyMs = exchange.latencyMs,
                 retryCount = exchange.retryCount,
@@ -4093,19 +4194,23 @@ class ObdViewModel @Inject constructor(
                 adapterConfiguration = report.protocol,
                 parserVersion = exchange.parserVersion,
                 sessionSequence = sequence,
-                elapsedRealtimeNanos = System.nanoTime(),
+                elapsedRealtimeNanos = elapsedRealtimeNanos,
                 rawRequestHash = rawRequestHash,
                 rawResponseHash = rawResponseHash,
                 previousExchangeHash = previousHash,
-                exchangeHash = exchangeHash,
-                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                exchangeHash = "",
+                retentionClass = retentionClass,
                 expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
                     com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
                     exchange.timestampMs,
                 ),
+                canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.EXCHANGE_CHAIN_V2,
+                rawPayloadBlobId = encryptedBlob.blobId,
             )
+            val exchangeHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.exchangeHash(draft)
+            val entity = draft.copy(exchangeHash = exchangeHash)
             previousHash = exchangeHash
-            entity to PersistedExchangeReference(
+            Triple(entity, encryptedBlob, PersistedExchangeReference(
                 exchangeId = exchangeId,
                 targetAddress = exchange.targetAddress,
                 responseAddress = exchange.responseAddress,
@@ -4113,9 +4218,8 @@ class ObdViewModel @Inject constructor(
                 rawResponseHash = rawResponseHash,
                 outcome = exchange.outcome,
                 requestScope = persistedRequestScope,
-            )
+            ))
         }
-        diagnosticEvidenceDao.appendExchanges(exchangesWithReferences.map { it.first })
         val entities = exchangesWithReferences.map { it.first }
         val scanId = UUID.randomUUID().toString()
         val parserVersion = entities.map { it.parserVersion }.distinct().joinToString("+")
@@ -4133,8 +4237,10 @@ class ObdViewModel @Inject constructor(
             finalizedAt,
         ).joinToString("|")
         val signedManifest = DiagnosticManifestSigner.sign(canonicalManifest, finalizedAt).getOrNull()
-        diagnosticEvidenceDao.appendSessionIntegrity(
-            DiagnosticSessionIntegrityEntity(
+        diagnosticEvidenceDao.appendEncryptedSession(
+            blobs = exchangesWithReferences.map { it.second },
+            exchanges = entities,
+            integrity = DiagnosticSessionIntegrityEntity(
                 scanId = scanId,
                 sessionId = currentSessionId,
                 parserVersion = parserVersion,
@@ -4150,35 +4256,33 @@ class ObdViewModel @Inject constructor(
                 signatureBase64 = signedManifest?.signatureBase64,
                 signedAtMs = signedManifest?.signedAtMs,
                 trustState = if (signedManifest != null) "HARDWARE_SIGNED" else "UNSIGNED_HARDWARE_UNAVAILABLE",
-            )
+                signerPublicKeyBase64 = signedManifest?.publicKeyBase64,
+                certificateChainJson = signedManifest?.certificateChainBase64
+                    ?.joinToString(prefix = "[\"", separator = "\",\"", postfix = "\"]"),
+                keySecurityLevel = signedManifest?.keySecurityLevel,
+            ),
         )
-        exchangesWithReferences.map { it.second }
+        exchangesWithReferences.map { it.third }
     }
 
     private suspend fun appendDiagnosticObservation(observation: DiagnosticObservationEntity) =
         diagnosticEvidencePersistenceMutex.withLock {
         val sequence = diagnosticEvidenceDao.maxObservationSequence(observation.sessionId) + 1L
+        val findingSequence = diagnosticEvidenceDao.maxFindingSequence(observation.findingId) + 1L
         val previousHash = diagnosticEvidenceDao.latestObservationHash(observation.findingId).orEmpty()
-        val observationHash = canonicalHash(
-            observation.findingId,
-            observation.sessionId,
-            sequence.toString(),
-            observation.observedAt.toString(),
-            observation.observationState,
-            observation.semantics,
-            observation.statusByte?.toString().orEmpty(),
-            observation.sourceService,
-            observation.exchangeId.orEmpty(),
-            observation.rawPayloadHash,
-            previousHash,
+        val draft = observation.copy(
+            sessionSequence = sequence,
+            findingSequence = findingSequence,
+            elapsedRealtimeNanos = System.nanoTime(),
+            previousObservationHash = previousHash,
+            canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.OBSERVATION_CHAIN_V2,
         )
-        diagnosticEvidenceDao.appendObservation(
-            observation.copy(
-                sessionSequence = sequence,
-                elapsedRealtimeNanos = System.nanoTime(),
-                previousObservationHash = previousHash,
-                observationHash = observationHash,
-            )
+        val observationHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.observationHash(draft)
+        diagnosticEvidenceDao.appendObservationWithExpectedPredecessor(
+            observation = draft.copy(observationHash = observationHash),
+            expectedSessionSequence = sequence,
+            expectedFindingSequence = findingSequence,
+            expectedPreviousHash = previousHash,
         )
     }
 
@@ -4200,23 +4304,19 @@ class ObdViewModel @Inject constructor(
         val previousHash = diagnosticEvidenceDao.latestExchangeHash(currentSessionId).orEmpty()
         val requestHash = sha256Hex(rawRequest.toByteArray(Charsets.UTF_8))
         val responseHash = sha256Hex(rawResponse.toByteArray(Charsets.UTF_8))
-        val exchangeHash = canonicalHash(
-            currentSessionId,
-            sequence.toString(),
-            timestampMs.toString(),
-            requestScope,
-            requestAddress.orEmpty(),
-            responseAddress.orEmpty(),
-            service,
-            decodedOutcome,
-            requestHash,
-            responseHash,
-            previousHash,
-            parserVersion,
-        )
         val exchangeId = UUID.randomUUID().toString()
-        diagnosticEvidenceDao.appendExchange(
-            DiagnosticExchangeEntity(
+        val retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name
+        val blob = DiagnosticEvidenceVault.encrypt(
+            sessionId = currentSessionId,
+            exchangeId = exchangeId,
+            rawRequest = rawRequest,
+            rawResponse = rawResponse,
+            requestHash = requestHash,
+            responseHash = responseHash,
+            createdAtMs = timestampMs,
+            retentionClass = retentionClass,
+        )
+        val draft = DiagnosticExchangeEntity(
                 id = exchangeId,
                 sessionId = currentSessionId,
                 timestampMs = timestampMs,
@@ -4226,8 +4326,8 @@ class ObdViewModel @Inject constructor(
                 requestAddress = requestAddress,
                 responseAddress = responseAddress,
                 service = service,
-                rawRequest = rawRequest,
-                rawResponse = rawResponse,
+                rawRequest = "",
+                rawResponse = "",
                 decodedOutcome = decodedOutcome,
                 latencyMs = null,
                 retryCount = 0,
@@ -4239,14 +4339,19 @@ class ObdViewModel @Inject constructor(
                 rawRequestHash = requestHash,
                 rawResponseHash = responseHash,
                 previousExchangeHash = previousHash,
-                exchangeHash = exchangeHash,
-                retentionClass = com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC.name,
+                exchangeHash = "",
+                retentionClass = retentionClass,
                 expiresAtMs = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceRetentionPolicy.expiresAtMs(
                     com.elysium369.meet.core.vanguard.DiagnosticRetentionClass.RAW_FORENSIC,
                     timestampMs,
                 ),
-            ),
+                canonicalizationVersion = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.EXCHANGE_CHAIN_V2,
+                rawPayloadBlobId = blob.blobId,
+            )
+        val entity = draft.copy(
+            exchangeHash = com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.exchangeHash(draft),
         )
+        diagnosticEvidenceDao.appendEncryptedExchange(blob, entity)
         exchangeId
     }
 
@@ -4270,12 +4375,14 @@ class ObdViewModel @Inject constructor(
                 ecuEndpointId = findingKey.moduleIdentity,
                 namespace = findingKey.namespace.name,
                 rawDtcIdentity = findingKey.rawDtcIdentity,
+                failureType = findingKey.failureType,
             )
             val exactExisting = dtcDao.getUnresolvedFinding(
                 vehicleId = vehicle.id,
                 namespace = findingKey.namespace.name,
                 moduleIdentity = findingKey.moduleIdentity,
                 rawDtcIdentity = findingKey.rawDtcIdentity,
+                failureType = findingKey.failureType,
             )
             val sameLegacyIdentityCount = distinctFindings.count {
                 it.code.equals(record.code, ignoreCase = true) &&
@@ -4307,6 +4414,11 @@ class ObdViewModel @Inject constructor(
                     rawDtcIdentity = findingKey.rawDtcIdentity,
                     displayCode = record.code.uppercase(),
                     createdAtMs = existing?.firstSeenAt ?: now,
+                    failureType = findingKey.failureType,
+                    moduleRole = record.moduleName.orEmpty(),
+                    requestAddress = record.targetAddress,
+                    responseAddress = record.responseAddress,
+                    vehicleBindingId = _vehicleSessionBinding.value.bindingId,
                 )
             )
             if (existing != null) {
@@ -4910,6 +5022,7 @@ class ObdViewModel @Inject constructor(
                     moduleIdentity = finding.ecuEndpointId,
                     rawDtcIdentity = finding.rawDtcIdentity,
                     displayCode = finding.displayCode,
+                    failureType = finding.failureType,
                 ),
                 requiredSemantics = requiredSemantics,
                 sourceService = timeline.latestObservedSourceService(),
@@ -5064,6 +5177,7 @@ class ObdViewModel @Inject constructor(
             ecuEndpointId = key.moduleIdentity,
             namespace = key.namespace.name,
             rawDtcIdentity = key.rawDtcIdentity,
+            failureType = key.failureType,
         ) ?: return
         val reportProtocol = lastDtcScanReport.value?.protocol.orEmpty()
         val snapshotTransport = when {
@@ -5750,7 +5864,7 @@ class ObdViewModel @Inject constructor(
 
             val vehicle = Vehicle(
                 id = UUID.randomUUID().toString(),
-                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                user_id = currentProviderUserId(),
                 year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,
@@ -6513,6 +6627,7 @@ class ObdViewModel @Inject constructor(
                     val seventyTwoHoursAgo = System.currentTimeMillis() - (72 * 60 * 60 * 1000L)
                     towTruckDao.purgeOldRequests(seventyTwoHoursAgo)
                     diagnosticEvidenceDao.purgeExpiredUnreferencedExchanges(System.currentTimeMillis())
+                    diagnosticEvidenceDao.purgeOrphanedEncryptedBlobs()
                     diagnosticEvidenceDao.purgeOrphanedSessionIntegrity()
                 } catch (e: Exception) {
                     android.util.Log.e("ObdViewModel", "Auto-cleanup failed", e)
@@ -8605,9 +8720,6 @@ class ObdViewModel @Inject constructor(
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
 
-    private fun canonicalHash(vararg fields: String): String =
-        com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.canonicalHash(*fields)
-
     private fun merkleRootSha256(hashes: List<String>): String =
         com.elysium369.meet.domain.diagnostics.DiagnosticEvidenceIntegrity.merkleRootSha256(hashes)
 
@@ -8663,11 +8775,76 @@ class ObdViewModel @Inject constructor(
                 approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertPassengerVerification(entity)
+            val cloudUserId = currentCloudUserId()
+            if (cloudUserId != null) {
+                val evidenceFiles = listOf(
+                    verificationFileEvidence("profile", pathProfilePhoto),
+                    verificationFileEvidence("id_front", pathCedulaFront),
+                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
+                )
+                val manifest = buildPassengerEvidenceManifestSha256(
+                    fullName = fullName,
+                    phone = phone,
+                    evidenceFiles = evidenceFiles,
+                )
+                runCatching {
+                    PlatformTrustCenterGateway.submit(
+                        ServiceVerificationSubmission(
+                            serviceType = "PASSENGER",
+                            profileReference = "primary",
+                            displayName = fullName,
+                            phone = phone,
+                            evidenceManifestSha256 = manifest,
+                        ),
+                    )
+                }.onFailure {
+                    Log.w("MeetTrustCenter", "Passenger review submission unavailable", it)
+                    _rideVerificationNotice.emit(
+                        "Registro local guardado; la revisión remota está pendiente de sincronización.",
+                    )
+                }
+            }
             android.util.Log.i(
                 "MeetRides",
                 "Passenger verification submitted; status=${verificationDecision.status}",
             )
         }
+    }
+
+    private suspend fun buildPassengerEvidenceManifestSha256(
+        fullName: String,
+        phone: String,
+        evidenceFiles: List<VerificationFileEvidence>,
+    ): String = withContext(Dispatchers.IO) {
+        val digest = MessageDigest.getInstance("SHA-256")
+        fun append(value: String) {
+            digest.update(value.toByteArray(Charsets.UTF_8))
+            digest.update(0)
+        }
+        append("meet-rides-passenger-evidence-v1")
+        append(fullName.trim())
+        append(phone.trim())
+        evidenceFiles.sortedBy(VerificationFileEvidence::label).forEach { evidence ->
+            append(evidence.label)
+            append(evidence.byteCount.toString())
+            val file = java.io.File(evidence.path)
+            val contentHash = if (file.isFile) {
+                file.inputStream().buffered().use { input ->
+                    val fileDigest = MessageDigest.getInstance("SHA-256")
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        fileDigest.update(buffer, 0, read)
+                    }
+                    fileDigest.digest().toHex()
+                }
+            } else {
+                "missing"
+            }
+            append(contentHash)
+        }
+        digest.digest().toHex()
     }
 
     /**

@@ -27,6 +27,8 @@ import com.elysium369.meet.core.obd.ObdState
 import androidx.compose.ui.draw.alpha
 import com.elysium369.meet.ui.components.EliteScrollContainer
 import com.elysium369.meet.ui.components.eliteScrollbar
+import com.elysium369.meet.ui.components.DtcClearConfirmationDialog
+import com.elysium369.meet.domain.diagnostics.authorizeDtcClear
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 
@@ -50,12 +52,15 @@ fun ScannerDiagnosticTab(
     val alerts by viewModel.maintenanceAlerts.collectAsState()
     val odometer by viewModel.currentOdometer.collectAsState()
     val freezeFrameData by viewModel.freezeFrameData.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val vehicleSessionBinding by viewModel.vehicleSessionBinding.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
     var isScanningModules by remember { mutableStateOf(false) }
     var detectedModules by remember { mutableStateOf<List<com.elysium369.meet.core.obd.NetworkModule>>(emptyList()) }
     var aiAnalysisResult by remember { mutableStateOf<String?>(null) }
     var isAnalyzingAi by remember { mutableStateOf(false) }
+    var showClearDialog by remember { mutableStateOf(false) }
 
     // Local states for granular DTC operations
     var refreshingFreezeFrames by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
@@ -67,6 +72,21 @@ fun ScannerDiagnosticTab(
     val syncStatus by viewModel.cloudSyncState.collectAsState()
 
     val listState = rememberLazyListState()
+
+    if (showClearDialog) {
+        DtcClearConfirmationDialog(
+            authorization = vehicleSessionBinding.authorizeDtcClear(selectedVehicle?.id),
+            selectedVehicle = selectedVehicle,
+            onDismiss = { showClearDialog = false },
+            onConfirmVehicle = viewModel::confirmConnectedVehicle,
+            onExecuteClear = {
+                coroutineScope.launch {
+                    val result = viewModel.clearDtcs()
+                    snackbarHostState.showSnackbar(result.message)
+                }
+            },
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         EliteScrollContainer(modifier = Modifier.fillMaxSize()) {
@@ -448,12 +468,7 @@ fun ScannerDiagnosticTab(
                 item {
                     com.elysium369.meet.ui.components.EliteButton(
                         text = "BORRAR CÓDIGOS DE FALLA (RESET)",
-                        onClick = {
-                            coroutineScope.launch {
-                                val result = viewModel.clearDtcs()
-                                snackbarHostState.showSnackbar(result.message)
-                            }
-                        },
+                        onClick = { showClearDialog = true },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         color = MeetColors.error
                     )
