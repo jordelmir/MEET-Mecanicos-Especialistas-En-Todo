@@ -10,13 +10,13 @@ import com.elysium369.meet.data.supabase.DiagnosticSession
 import com.elysium369.meet.data.supabase.SupabaseManager
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.Json
 import android.util.Log
 import com.elysium369.meet.data.supabase.toDomain
-import com.elysium369.meet.data.supabase.DtcEvent
 import com.elysium369.meet.data.supabase.Trip
+import com.elysium369.meet.identity.ActivePrincipal
+import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.identity.OfflineOwnership
 
 /**
  * SyncWorker — Professional background synchronization engine.
@@ -28,18 +28,20 @@ class SyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val sessionDao: DiagnosticSessionDao,
     private val tripDao: TripDao,
-    private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao
+    private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao,
+    private val activePrincipalKernel: ActivePrincipalKernel,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         Log.d("SyncWorker", "Starting background sync...")
         
-        val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return Result.failure()
+        val activePrincipal = activePrincipalKernel.current()
+        if (!activePrincipal.canSyncToCloud) return Result.success()
 
         return try {
-            syncSessions(userId)
-            syncTrips(userId)
-            syncDtcs(userId)
+            syncSessions(activePrincipal)
+            syncTrips(activePrincipal)
+            syncDtcs(activePrincipal)
             Result.success()
         } catch (e: Exception) {
             Log.e("SyncWorker", "Sync failed", e)
@@ -47,8 +49,8 @@ class SyncWorker @AssistedInject constructor(
         }
     }
 
-    private suspend fun syncSessions(userId: String) {
-        val pendingSessions = sessionDao.getPendingSync()
+    private suspend fun syncSessions(activePrincipal: ActivePrincipal) {
+        val pendingSessions = sessionDao.getPendingSync(activePrincipal.id)
         if (pendingSessions.isEmpty()) return
 
         Log.i("SyncWorker", "Found ${pendingSessions.size} pending sessions to sync")
@@ -56,10 +58,11 @@ class SyncWorker @AssistedInject constructor(
         val syncedIds = mutableListOf<String>()
 
         pendingSessions.forEach { entity ->
+            if (!OfflineOwnership.canSync(entity.ownerPrincipalId, activePrincipal)) return@forEach
             val domainSession = DiagnosticSession(
                 id = entity.id,
-                user_id = userId,
-                vehicle_vin = entity.vehicleId,
+                user_id = entity.ownerPrincipalId,
+                vehicle_vin = entity.observedVin.takeUnless { it == "LEGACY_NOT_CAPTURED" },
                 adapter_type = entity.adapterFingerprint,
                 dtcs_found = entity.dtcSnapshot,
                 live_data_snapshot = entity.liveDataSummary
@@ -75,12 +78,12 @@ class SyncWorker @AssistedInject constructor(
         }
 
         if (syncedIds.isNotEmpty()) {
-            sessionDao.markAsSynced(syncedIds)
+            sessionDao.markAsSynced(syncedIds, activePrincipal.id)
         }
     }
 
-    private suspend fun syncTrips(userId: String) {
-        val pendingTrips = tripDao.getPendingSync()
+    private suspend fun syncTrips(activePrincipal: ActivePrincipal) {
+        val pendingTrips = tripDao.getPendingSync(activePrincipal.id)
         if (pendingTrips.isEmpty()) return
 
         Log.i("SyncWorker", "Found ${pendingTrips.size} pending trips to sync")
@@ -88,9 +91,10 @@ class SyncWorker @AssistedInject constructor(
         val syncedIds = mutableListOf<String>()
 
         pendingTrips.forEach { entity ->
+            if (!OfflineOwnership.canSync(entity.ownerPrincipalId, activePrincipal)) return@forEach
             val domainTrip = Trip(
                 id = entity.id,
-                user_id = userId,
+                user_id = entity.ownerPrincipalId,
                 vehicle_id = entity.vehicleId,
                 session_id = entity.sessionId,
                 started_at = entity.startedAt,
@@ -117,12 +121,12 @@ class SyncWorker @AssistedInject constructor(
         }
 
         if (syncedIds.isNotEmpty()) {
-            tripDao.markAsSynced(syncedIds)
+            tripDao.markAsSynced(syncedIds, activePrincipal.id)
         }
     }
 
-    private suspend fun syncDtcs(userId: String) {
-        val pendingDtcs = dtcDao.getPendingSyncDtcs()
+    private suspend fun syncDtcs(activePrincipal: ActivePrincipal) {
+        val pendingDtcs = dtcDao.getPendingSyncDtcs(activePrincipal.id)
         if (pendingDtcs.isEmpty()) return
 
         Log.i("SyncWorker", "Found ${pendingDtcs.size} pending DTCs to sync")
@@ -131,6 +135,7 @@ class SyncWorker @AssistedInject constructor(
         val supabase = SupabaseManager.client
 
         pendingDtcs.forEach { entity ->
+            if (!OfflineOwnership.canSync(entity.ownerPrincipalId, activePrincipal)) return@forEach
             val domainDtc = entity.toDomain()
             try {
                 supabase.postgrest["dtc_events"].upsert(domainDtc)
@@ -142,7 +147,7 @@ class SyncWorker @AssistedInject constructor(
         }
 
         if (syncedIds.isNotEmpty()) {
-            dtcDao.markDtcsAsSynced(syncedIds)
+            dtcDao.markDtcsAsSynced(syncedIds, activePrincipal.id)
         }
     }
 }

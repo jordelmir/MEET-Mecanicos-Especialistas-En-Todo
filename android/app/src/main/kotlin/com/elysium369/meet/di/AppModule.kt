@@ -3655,6 +3655,44 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_56_57 = object : Migration(56, 57) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Existing rows predate immutable ownership. Quarantine them rather
+            // than guessing that the next signed-in account owns their evidence.
+            listOf("diagnostic_sessions", "dtc_events", "trips").forEach { table ->
+                db.execSQL(
+                    "ALTER TABLE $table ADD COLUMN ownerPrincipalId TEXT NOT NULL DEFAULT 'OWNER_UNKNOWN_LEGACY'",
+                )
+                db.execSQL(
+                    "ALTER TABLE $table ADD COLUMN tenantId TEXT NOT NULL DEFAULT 'PERSONAL'",
+                )
+                db.execSQL(
+                    "ALTER TABLE $table ADD COLUMN originDeviceId TEXT NOT NULL DEFAULT 'LEGACY_UNKNOWN'",
+                )
+                db.execSQL(
+                    "ALTER TABLE $table ADD COLUMN createdOffline INTEGER NOT NULL DEFAULT 1",
+                )
+            }
+            // Before v57 this column sometimes held a VIN. Preserve that value
+            // only as observed evidence, and reset the canonical identifier.
+            db.execSQL(
+                "ALTER TABLE diagnostic_sessions ADD COLUMN observedVin TEXT NOT NULL DEFAULT 'LEGACY_NOT_CAPTURED'",
+            )
+            db.execSQL("UPDATE diagnostic_sessions SET observedVin = vehicleId")
+            db.execSQL("UPDATE diagnostic_sessions SET vehicleId = 'LEGACY_UNKNOWN'")
+            db.execSQL(
+                "CREATE INDEX index_diagnostic_sessions_owner_sync " +
+                    "ON diagnostic_sessions(ownerPrincipalId, synced)",
+            )
+            db.execSQL(
+                "CREATE INDEX index_dtc_events_owner_sync ON dtc_events(ownerPrincipalId, synced)",
+            )
+            db.execSQL(
+                "CREATE INDEX index_trips_owner_sync ON trips(ownerPrincipalId, synced)",
+            )
+        }
+    }
+
 
     @Provides
     @Singleton
@@ -3698,7 +3736,8 @@ object AppModule {
             MIGRATION_52_53,
             MIGRATION_53_54,
             MIGRATION_54_55,
-            MIGRATION_55_56
+            MIGRATION_55_56,
+            MIGRATION_56_57
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
