@@ -10,6 +10,7 @@ import com.elysium369.meet.domain.diagnostics.LatestDiagnosticScanProjection
 import com.elysium369.meet.domain.diagnostics.RunDiagnosticScan
 import com.elysium369.meet.domain.diagnostics.VehicleSessionBinding
 import com.elysium369.meet.domain.diagnostics.VehicleSessionBindingState
+import com.elysium369.meet.domain.diagnostics.VinVehicleIdentity
 import com.elysium369.meet.domain.diagnostics.toSummary
 import com.elysium369.meet.core.monetization.MonetizationPolicy
 import com.elysium369.meet.core.monetization.FeatureKey
@@ -1799,7 +1800,15 @@ class ObdViewModel @Inject constructor(
             expectedVin = vehicle.vin,
             evidenceId = "user-confirmation:${UUID.randomUUID()}",
         )
+        // The startup pre-scan was intentionally ephemeral while UNBOUND.
+        // Force the destructive flow to acquire and persist a new scan under
+        // this explicit binding before it can build a clear plan.
+        hasCompletedInitialDtcScan = false
         _latestDiagnosticScan.value = null
+        addTerminalLog(
+            "[IDENTIDAD] Vehículo confirmado manualmente para esta sesión física. Se exigirá un nuevo pre-scan antes de borrar memoria DTC.",
+            TerminalLineType.SYSTEM,
+        )
     }
 
     private val _liveData = MutableStateFlow<Map<String, Float>>(emptyMap())
@@ -2406,15 +2415,14 @@ class ObdViewModel @Inject constructor(
             lastAutoRecognizedVin = cleanVin
             return _selectedVehicle.value
         }
-        if (lastAutoRecognizedVin == cleanVin) return _selectedVehicle.value
-
         return vinVehicleRecognitionMutex.withLock {
             if (_selectedVehicle.value?.vin?.equals(cleanVin, ignoreCase = true) == true) {
                 lastAutoRecognizedVin = cleanVin
                 return@withLock _selectedVehicle.value
             }
 
-            vehicleRepository.getVehicleByVin(cleanVin)?.let { existing ->
+            val ownerId = currentProviderUserId()
+            vehicleRepository.getVehicleByVin(ownerId, cleanVin)?.let { existing ->
                 selectVehicle(existing)
                 lastAutoRecognizedVin = cleanVin
                 voiceFeedbackManager.speak(
@@ -2425,21 +2433,35 @@ class ObdViewModel @Inject constructor(
                 return@withLock existing
             }
 
-            _vinDecoded.value = VinDecoder.decode(cleanVin)
-            addTerminalLog(
-                "[VIN] VIN capturado, pero no existe un vehículo Garage con esa identidad. " +
-                    "No se creó un perfil sintético; selecciona o registra el vehículo real para vincular la sesión.",
-                TerminalLineType.WARNING,
+            val decoded = VinDecoder.decode(cleanVin)
+            _vinDecoded.value = decoded
+            val remembered = Vehicle(
+                id = VinVehicleIdentity.stableVehicleId(ownerId, cleanVin),
+                user_id = ownerId,
+                year = 0,
+                make = "Fabricante pendiente de confirmar",
+                model = "Modelo pendiente de confirmar",
+                engine = "Dato no capturado",
+                vin = cleanVin,
+                plate = "NOT_SET",
             )
-            null
+            vehicleRepository.insertVehicle(remembered)
+            selectVehicle(remembered)
+            lastAutoRecognizedVin = cleanVin
+            voiceFeedbackManager.speak(
+                "VIN detectado y vehículo recordado en tu garaje.",
+                "VIN detected and vehicle remembered in your garage.",
+            )
+            addTerminalLog(
+                "[VIN] Nueva identidad ECU guardada para este usuario. Marca, modelo y motor permanecen pendientes hasta contar con evidencia.",
+                TerminalLineType.SYSTEM,
+            )
+            remembered
         }
     }
 
     private fun normalizeVin(rawVin: String): String? {
-        val clean = rawVin.trim().uppercase()
-            .replace(Regex("[^A-HJ-NPR-Z0-9]"), "")
-        if (clean.length != 17) return null
-        return clean
+        return VinVehicleIdentity.normalize(rawVin)
     }
 
     // ═══════════════════════════════════════
@@ -2721,7 +2743,7 @@ class ObdViewModel @Inject constructor(
     val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser()
+    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser(currentProviderUserId())
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // --- DVIR Inspection Flow & CRUD Helpers ---
@@ -3281,7 +3303,7 @@ class ObdViewModel @Inject constructor(
                 val savedVehicleId = prefs.getString("selected_vehicle_id", null)
 
                 if (savedVehicleId != null) {
-                    val vehicle = vehicleRepository.getVehicleById(savedVehicleId)
+                    val vehicle = vehicleRepository.getVehicleById(currentProviderUserId(), savedVehicleId)
                     if (vehicle != null) {
                         selectVehicle(vehicle)
                         android.util.Log.d("ObdVM", "✅ Restored selected vehicle: ${vehicle.make} ${vehicle.model}")
@@ -3479,7 +3501,7 @@ class ObdViewModel @Inject constructor(
             obdSession.connect()
             if (obdSession.state.value == ObdState.CONNECTED) {
                 runPostConnectDtcFirstStartup()
-                startForegroundService(vehicle.id, lastAdapterAddress)
+                startForegroundService(_selectedVehicle.value?.id ?: vehicle.id, lastAdapterAddress)
             }
         }
     }
@@ -3528,20 +3550,9 @@ class ObdViewModel @Inject constructor(
                 evidenceId = "ecu-vin:${sha256Hex(cleanVin.toByteArray()).take(16)}",
             )
         }
-        val selected = _selectedVehicle.value
-        val selectedVin = selected?.vin?.let(::normalizeVin)
-        if (selected != null && selectedVin != null && selectedVin != cleanVin) {
-            _vehicleSessionBinding.value = _vehicleSessionBinding.value.conflict(
-                observedVin = cleanVin,
-                expectedVin = selectedVin,
-                reason = "El VIN de ECU no coincide con el vehículo Garage seleccionado.",
-            )
-            addTerminalLog(
-                "[IDENTIDAD] CONFLICTO VIN: se bloquearon persistencia y operaciones activas hasta seleccionar el vehículo correcto.",
-                TerminalLineType.ERROR,
-            )
-            return null
-        }
+        // The physical ECU is authoritative for the connected car. A stale
+        // Garage selection is replaced by the owner-scoped VIN identity below;
+        // it must never receive this car's scans or DTC history.
         val vehicle = autoSelectVehicleFromVin(cleanVin) ?: return null
         _vehicleSessionBinding.value = _vehicleSessionBinding.value.bindVerifiedVin(
             vehicleId = vehicle.id,
@@ -5853,7 +5864,7 @@ class ObdViewModel @Inject constructor(
 
             val vehicle = Vehicle(
                 id = UUID.randomUUID().toString(),
-                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                user_id = currentProviderUserId(),
                 year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,

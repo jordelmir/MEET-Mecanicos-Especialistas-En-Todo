@@ -70,6 +70,7 @@ import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.knowledge.RepairKnowledgeEvidencePanel
 import com.elysium369.meet.ui.knowledge.rememberRepairKnowledgeUiState
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.domain.diagnostics.authorizeDtcClear
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
@@ -340,6 +341,7 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     val canonicalOpenFindings by viewModel.canonicalOpenFindings.collectAsState()
     val canonicalResolvedFindings by viewModel.canonicalResolvedFindings.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val vehicleSessionBinding by viewModel.vehicleSessionBinding.collectAsState()
     val googleSearchVehicle = remember(selectedVehicle) {
         selectedVehicle.toDtcGoogleSearchVehicleContext()
     }
@@ -419,17 +421,14 @@ fun DtcScreen(navController: NavController, viewModel: ObdViewModel) {
     }
 
     if (showClearDialog) {
-        EliteDialog(
-            title = "⚠️ Acción avanzada: borrar memoria DTC",
-            message = "La app construirá un plan inmutable desde el último escaneo: Mode 04 únicamente para hallazgos SAE OBD y UDS Service 14 únicamente para ECU físicas demostradas por evidencia. Puede apagar la MIL, borrar datos de congelación y reiniciar monitores de preparación; no demuestra que la falla fue reparada. Después se repetirá el escaneo y solo se marcarán ausencias con cobertura ECU/servicio suficiente. Todo resultado parcial o inconcluso conservará los hallazgos sin resolver. La orden se bloquea sin sesión OBD válida o sin un plan previo verificable.\n\n¿Confirmas esta acción irreversible en el vehículo conectado?",
+        DtcClearConfirmationDialog(
+            authorization = vehicleSessionBinding.authorizeDtcClear(selectedVehicle?.id),
+            selectedVehicle = selectedVehicle,
             onDismiss = { showClearDialog = false },
-            onConfirm = {
-                showClearDialog = false
+            onConfirmVehicle = viewModel::confirmConnectedVehicle,
+            onExecuteClear = {
                 coroutineScope.launch { viewModel.clearDtcs() }
             },
-            confirmText = "CONFIRMAR PLAN",
-            dismissText = "CANCELAR",
-            isDestructive = true
         )
     }
 

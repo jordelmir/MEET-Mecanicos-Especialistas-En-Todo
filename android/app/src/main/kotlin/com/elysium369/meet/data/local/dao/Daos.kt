@@ -6,14 +6,19 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface VehicleDao {
-    @Query("SELECT * FROM vehicles")
-    fun getAllVehicles(): Flow<List<VehicleEntity>>
+    @Query("SELECT * FROM vehicles WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getAllVehiclesForUser(userId: String): Flow<List<VehicleEntity>>
 
-    @Query("SELECT * FROM vehicles WHERE id = :id")
+    @Query("SELECT * FROM vehicles WHERE id = :id AND userId = :userId LIMIT 1")
+    suspend fun getVehicleByIdForUser(userId: String, id: String): VehicleEntity?
+
+    // Detail screens already receive an opaque vehicle ID from the owner-scoped
+    // Garage list. Identity discovery itself must use the scoped queries above.
+    @Query("SELECT * FROM vehicles WHERE id = :id LIMIT 1")
     suspend fun getVehicleById(id: String): VehicleEntity?
 
-    @Query("SELECT * FROM vehicles WHERE UPPER(vin) = UPPER(:vin) LIMIT 1")
-    suspend fun getVehicleByVin(vin: String): VehicleEntity?
+    @Query("SELECT * FROM vehicles WHERE userId = :userId AND UPPER(vin) = UPPER(:vin) LIMIT 1")
+    suspend fun getVehicleByVinForUser(userId: String, vin: String): VehicleEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: VehicleEntity)
