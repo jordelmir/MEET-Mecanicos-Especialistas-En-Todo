@@ -47,6 +47,39 @@ create extension pgcrypto with schema extensions;
 create table auth.users(
     id uuid primary key default extensions.gen_random_uuid()
 );
+create table public.user_profiles (
+    id uuid primary key default extensions.gen_random_uuid(),
+    auth_user_id uuid unique references auth.users(id) on delete cascade,
+    display_name text not null default '',
+    primary_role text not null default 'driver' check (primary_role in (
+        'driver', 'enthusiast', 'pro_user', 'mechanic', 'workshop_owner',
+        'parts_store', 'tow_provider', 'ride_driver', 'fleet_manager',
+        'verified_company', 'creator', 'admin', 'super_admin',
+        'support_agent', 'trust_safety_reviewer'
+    )),
+    updated_at timestamptz not null default now()
+);
+create table public.user_roles (
+    id uuid primary key default extensions.gen_random_uuid(),
+    user_profile_id uuid not null references public.user_profiles(id) on delete cascade,
+    role_name text not null check (role_name in (
+        'driver', 'enthusiast', 'pro_user', 'mechanic', 'workshop_owner',
+        'parts_store', 'tow_provider', 'ride_driver', 'fleet_manager',
+        'verified_company', 'creator', 'admin', 'super_admin',
+        'support_agent', 'trust_safety_reviewer'
+    )),
+    granted_by uuid,
+    is_active boolean not null default true,
+    metadata jsonb not null default '{}'::jsonb,
+    updated_at timestamptz not null default now(),
+    unique (user_profile_id, role_name)
+);
+create table public.provider_profiles (
+    id uuid primary key default extensions.gen_random_uuid(),
+    user_profile_id uuid not null references public.user_profiles(id) on delete cascade,
+    provider_type text not null,
+    unique (user_profile_id, provider_type)
+);
 create or replace function auth.uid()
 returns uuid
 language sql
@@ -71,6 +104,7 @@ migrations=(
   "$repo_root/supabase/migrations/20260730050000_ride_guardian_safety.sql"
   "$repo_root/supabase/migrations/20260730060000_ride_support_cases.sql"
   "$repo_root/supabase/migrations/20260730070000_ride_tenant_boundary.sql"
+  "$repo_root/supabase/migrations/20260816010000_authenticated_usage_roles.sql"
 )
 
 for migration in "${migrations[@]}"; do
@@ -100,6 +134,10 @@ psql \
 psql \
   "${psql_args[@]}" \
   -f "$repo_root/tests/ride/ride-tenant-boundary-integration.sql"
+
+psql \
+  "${psql_args[@]}" \
+  -f "$repo_root/tests/ride/ride-usage-profile-integration.sql"
 
 psql \
   "${psql_args[@]}" \

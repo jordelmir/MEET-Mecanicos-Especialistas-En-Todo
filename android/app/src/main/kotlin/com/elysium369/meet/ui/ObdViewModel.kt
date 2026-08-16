@@ -114,6 +114,9 @@ import com.elysium369.meet.ride.traffic.RideRoadSide
 import com.elysium369.meet.ride.traffic.RideRoadReportAvailabilityPolicy
 import com.elysium369.meet.ride.traffic.RideGeoCell
 import com.elysium369.meet.ride.traffic.RideSegmentSpeedSample
+import com.elysium369.meet.identity.OnboardingUsageProfile
+import com.elysium369.meet.identity.UsageProfileGateway
+import com.elysium369.meet.identity.UsageProfileSyncResult
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.security.MessageDigest
@@ -1172,6 +1175,64 @@ class ObdViewModel @Inject constructor(
 
     val currentUserId: String? get() = currentCloudUserId()
     val currentRideActorId: String get() = localDeviceId
+
+    private val _usageProfileSyncState = MutableStateFlow(
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .getString("usage_profile_sync_state", "PENDING") ?: "PENDING",
+    )
+    val usageProfileSyncState: StateFlow<String> = _usageProfileSyncState.asStateFlow()
+
+    /**
+     * Reconciles the local onboarding intent with the authenticated authority.
+     * Safe to call repeatedly: server activation and the local user/profile key
+     * make it idempotent, including after process death or account switching.
+     */
+    fun syncSelectedUsageProfile() {
+        val userId = currentCloudUserId() ?: run {
+            _usageProfileSyncState.value = "AUTHENTICATION_REQUIRED"
+            return
+        }
+        val preferences = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+        val profile = OnboardingUsageProfile.fromStorageId(
+            preferences.getString("user_profile", OnboardingUsageProfile.OWNER.storageId),
+        ) ?: run {
+            _usageProfileSyncState.value = "INVALID_LOCAL_PROFILE"
+            return
+        }
+        if (
+            preferences.getString("usage_profile_synced_user_id", null) == userId &&
+            preferences.getString("usage_profile_synced_value", null) == profile.storageId &&
+            preferences.getString("usage_profile_sync_state", null) == "SYNCED"
+        ) return
+
+        _usageProfileSyncState.value = "SYNCING"
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = UsageProfileGateway.activate(profile)) {
+                is UsageProfileSyncResult.Activated -> {
+                    preferences.edit()
+                        .putString("usage_profile_synced_user_id", userId)
+                        .putString("usage_profile_synced_value", profile.storageId)
+                        .putString("usage_profile_sync_state", "SYNCED")
+                        .apply()
+                    _usageProfileSyncState.value = if (result.verificationRequired) {
+                        "SYNCED_VERIFICATION_REQUIRED"
+                    } else {
+                        "SYNCED"
+                    }
+                }
+                UsageProfileSyncResult.AuthenticationRequired ->
+                    _usageProfileSyncState.value = "AUTHENTICATION_REQUIRED"
+                is UsageProfileSyncResult.Rejected -> {
+                    Log.w("MeetIdentity", "Usage profile rejected: ${result.code}")
+                    _usageProfileSyncState.value = "REJECTED"
+                }
+                is UsageProfileSyncResult.Unavailable -> {
+                    Log.w("MeetIdentity", "Usage profile sync unavailable: ${result.message}")
+                    _usageProfileSyncState.value = "RETRY_PENDING"
+                }
+            }
+        }
+    }
 
     private val _platformOwnerAccess = MutableStateFlow(PlatformOwnerAccess.UNKNOWN)
     val platformOwnerAccess: StateFlow<PlatformOwnerAccess> =

@@ -240,9 +240,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
             }
             composable("auth") {
                 AuthScreen(
-                    onAuthSuccess = { navController.navigate("home") {
-                        popUpTo("auth") { inclusive = true }
-                    }},
+                    onAuthSuccess = {
+                        obdViewModel.syncSelectedUsageProfile()
+                        navController.navigate("home") {
+                            popUpTo("auth") { inclusive = true }
+                        }
+                    },
                     onOfflineMode = { navController.navigate("home") {
                         popUpTo("auth") { inclusive = true }
                     }}

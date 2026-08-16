@@ -10,14 +10,34 @@ enrollment_migration="$repo_root/supabase/migrations/20260730040000_ride_driver_
 guardian_migration="$repo_root/supabase/migrations/20260730050000_ride_guardian_safety.sql"
 support_migration="$repo_root/supabase/migrations/20260730060000_ride_support_cases.sql"
 tenant_migration="$repo_root/supabase/migrations/20260730070000_ride_tenant_boundary.sql"
+usage_roles_migration="$repo_root/supabase/migrations/20260816010000_authenticated_usage_roles.sql"
 
 if [[ ! -f "$migration" || ! -f "$ledger_migration" ||
       ! -f "$command_migration" || ! -f "$flow_migration" ||
       ! -f "$enrollment_migration" || ! -f "$guardian_migration" ||
-      ! -f "$support_migration" || ! -f "$tenant_migration" ]]; then
+      ! -f "$support_migration" || ! -f "$tenant_migration" ||
+      ! -f "$usage_roles_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
   exit 1
 fi
+
+rg -q "function public\.meet_activate_usage_profile_v1" "$usage_roles_migration" || {
+  echo "ride migration contract: FAIL (authenticated usage role RPC missing)" >&2
+  exit 1
+}
+rg -q "'ride_passenger'" "$usage_roles_migration" &&
+rg -q "'ride_driver'" "$usage_roles_migration" || {
+  echo "ride migration contract: FAIL (ride usage roles missing)" >&2
+  exit 1
+}
+rg -q "verification_required" "$usage_roles_migration" || {
+  echo "ride migration contract: FAIL (driver verification honesty missing)" >&2
+  exit 1
+}
+rg -q "revoke all on function public\.meet_activate_usage_profile_v1" "$usage_roles_migration" || {
+  echo "ride migration contract: FAIL (usage role RPC privilege hardening missing)" >&2
+  exit 1
+}
 
 rg -q "create table if not exists public\\.ride_safety_events" \
   "$guardian_migration" || {

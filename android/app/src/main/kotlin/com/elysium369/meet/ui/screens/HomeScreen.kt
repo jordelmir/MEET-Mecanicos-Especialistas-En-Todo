@@ -34,6 +34,7 @@ import com.elysium369.meet.core.obd.ObdState
 import java.util.Calendar
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.identity.OnboardingUsageProfile
 
 // ═══════════════════════════════════════════════════════════════
 // HOME SCREEN V2 — Phantom Carbon Edition
@@ -62,6 +63,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.refreshPlatformOwnerAccess()
+        viewModel.syncSelectedUsageProfile()
     }
 
     val totalDtcs = activeDtcs.size + pendingDtcs.size + permanentDtcs.size
@@ -69,6 +71,7 @@ fun HomeScreen(
     val monitorCount = readiness?.monitors?.size ?: 0
     val batteryVoltage = liveData["0142"] ?: liveData["42"] ?: liveData["Voltaje ECU"] ?: liveData["VOLTAGE"]
     val commandState = remember(
+        userProfile,
         activeVehicle,
         obdState,
         totalDtcs,
@@ -77,7 +80,7 @@ fun HomeScreen(
         readyCount,
         monitorCount
     ) {
-        buildHomeCommandState(
+        buildRoleFirstHomeState(userProfile) ?: buildHomeCommandState(
             hasVehicle = activeVehicle != null,
             obdState = obdState,
             totalDtcs = totalDtcs,
@@ -619,10 +622,29 @@ private fun buildHomeCommandState(
 }
 
 private fun profileLabel(profile: String): String {
-    return when (profile) {
-        "mechanic" -> "MECÁNICO"
-        "workshop" -> "TALLER"
-        "fleet" -> "FLOTA"
-        else -> "USUARIO"
-    }
+    return OnboardingUsageProfile.fromStorageId(profile)
+        ?.displayLabel
+        ?.uppercase()
+        ?: "USUARIO"
 }
+
+private fun buildRoleFirstHomeState(profile: String): HomeCommandState? =
+    when (OnboardingUsageProfile.fromStorageId(profile)) {
+        OnboardingUsageProfile.RIDE_PASSENGER -> HomeCommandState(
+            title = "Tu movilidad en Elysium Viajes",
+            recommendation = "Completa tu registro de usuario de viajes para solicitar rutas, revisar costos y acceder a soporte.",
+            primaryAction = "ABRIR VIAJES",
+            primaryRoute = "ride_service",
+            severityColor = MeetColors.cyberCyan,
+            statusLine = "Perfil de usuario de viajes",
+        )
+        OnboardingUsageProfile.RIDE_DRIVER -> HomeCommandState(
+            title = "Activa tu operación como conductor",
+            recommendation = "Completa identidad, documentación y vehículo. El despacho permanece bloqueado hasta que la verificación corresponda.",
+            primaryAction = "ABRIR VIAJES",
+            primaryRoute = "ride_service",
+            severityColor = MeetColors.neonGreen,
+            statusLine = "Verificación independiente requerida",
+        )
+        else -> null
+    }
