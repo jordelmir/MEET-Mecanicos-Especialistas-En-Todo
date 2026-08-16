@@ -16,7 +16,8 @@ import kotlinx.coroutines.isActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.UUID
-import io.github.jan.supabase.gotrue.auth
+import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.identity.OfflineOwnership
 
 /**
  * TripManager — Professional trip tracking and telemetry analysis engine.
@@ -35,7 +36,8 @@ class TripManager @Inject constructor(
     private val obdSession: ObdSession,
     private val tripRepository: com.elysium369.meet.data.supabase.TripRepository,
     private val phoneSpeedTracker: com.elysium369.meet.core.obd.PhoneSpeedTracker,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val activePrincipalKernel: ActivePrincipalKernel,
 ) {
     private var _currentTrip: TripEntity? = null
     private val _currentTripState = MutableStateFlow<TripEntity?>(null)
@@ -79,6 +81,7 @@ class TripManager @Inject constructor(
     fun startMonitoring(vehicleId: String, sessionId: String) {
         monitoringJob?.cancel()
         resetAccumulators()
+        val principal = activePrincipalKernel.current()
         
         _currentTrip = TripEntity(
             id = UUID.randomUUID().toString(),
@@ -96,7 +99,11 @@ class TripManager @Inject constructor(
             fuelEfficiency = null,
             ecoScore = 100,
             gpsTrackJson = null,
-            synced = false
+            synced = false,
+            ownerPrincipalId = principal.id,
+            tenantId = OfflineOwnership.PERSONAL_TENANT,
+            originDeviceId = activePrincipalKernel.localDeviceId,
+            createdOffline = true,
         )
         _currentTripState.value = _currentTrip
 
@@ -287,7 +294,7 @@ class TripManager @Inject constructor(
             // Convert to Domain Trip for Sync
             val domainTrip = com.elysium369.meet.data.supabase.Trip(
                 id = tripEntity.id,
-                user_id = com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id ?: "guest",
+                user_id = tripEntity.ownerPrincipalId,
                 vehicle_id = tripEntity.vehicleId,
                 session_id = tripEntity.sessionId,
                 started_at = tripEntity.startedAt,
@@ -305,7 +312,7 @@ class TripManager @Inject constructor(
             )
 
             // Save via Repository (Local + Remote attempt)
-            tripRepository.saveTrip(domainTrip)
+            tripRepository.saveTrip(domainTrip, tripEntity.ownerPrincipalId)
         } finally {
             // Guarantee cleanup even if sync fails — prevents orphaned monitoring
             monitoringJob?.cancel()

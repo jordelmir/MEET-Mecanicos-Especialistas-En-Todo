@@ -32,11 +32,11 @@ interface DiagnosticSessionDao {
     @Query("SELECT * FROM diagnostic_sessions WHERE vehicleId = :vehicleId ORDER BY startedAt DESC")
     fun getSessionsForVehicle(vehicleId: String): Flow<List<DiagnosticSessionEntity>>
 
-    @Query("SELECT * FROM diagnostic_sessions WHERE synced = 0")
-    suspend fun getPendingSync(): List<DiagnosticSessionEntity>
+    @Query("SELECT * FROM diagnostic_sessions WHERE synced = 0 AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun getPendingSync(ownerPrincipalId: String): List<DiagnosticSessionEntity>
 
-    @Query("UPDATE diagnostic_sessions SET synced = 1 WHERE id IN (:ids)")
-    suspend fun markAsSynced(ids: List<String>)
+    @Query("UPDATE diagnostic_sessions SET synced = 1 WHERE id IN (:ids) AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun markAsSynced(ids: List<String>, ownerPrincipalId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: DiagnosticSessionEntity)
@@ -53,12 +53,13 @@ interface DtcDao {
     @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NOT NULL ORDER BY resolvedAt DESC")
     fun getVerifiedResolvedDtcsForVehicle(vehicleId: String): Flow<List<DtcEventEntity>>
 
-    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND resolvedAt IS NULL")
-    suspend fun getUnresolvedDtcsList(vehicleId: String): List<DtcEventEntity>
+    @Query("SELECT * FROM dtc_events WHERE vehicleId = :vehicleId AND ownerPrincipalId = :ownerPrincipalId AND resolvedAt IS NULL")
+    suspend fun getUnresolvedDtcsList(vehicleId: String, ownerPrincipalId: String): List<DtcEventEntity>
     
     @Query(
         """SELECT * FROM dtc_events
            WHERE vehicleId = :vehicleId
+             AND ownerPrincipalId = :ownerPrincipalId
              AND diagnosticNamespace = :namespace
              AND moduleIdentity = :moduleIdentity
              AND rawDtcIdentity = :rawDtcIdentity
@@ -68,23 +69,28 @@ interface DtcDao {
     )
     suspend fun getUnresolvedFinding(
         vehicleId: String,
+        ownerPrincipalId: String,
         namespace: String,
         moduleIdentity: String,
         rawDtcIdentity: String,
         failureType: Int,
     ): DtcEventEntity?
 
-    @Query("SELECT * FROM dtc_events WHERE id = :findingId LIMIT 1")
-    suspend fun getFindingById(findingId: String): DtcEventEntity?
+    @Query("SELECT * FROM dtc_events WHERE id = :findingId AND ownerPrincipalId = :ownerPrincipalId LIMIT 1")
+    suspend fun getFindingById(findingId: String, ownerPrincipalId: String): DtcEventEntity?
 
-    @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, observationState = 'VERIFIED_ABSENT', synced = 0 WHERE id IN (:findingIds) AND resolvedAt IS NULL")
-    suspend fun resolveVerifiedFindings(findingIds: List<String>, resolvedAt: Long)
+    @Query("UPDATE dtc_events SET resolvedAt = :resolvedAt, observationState = 'VERIFIED_ABSENT', synced = 0 WHERE id IN (:findingIds) AND ownerPrincipalId = :ownerPrincipalId AND resolvedAt IS NULL")
+    suspend fun resolveVerifiedFindings(
+        findingIds: List<String>,
+        ownerPrincipalId: String,
+        resolvedAt: Long,
+    )
 
-    @Query("SELECT * FROM dtc_events WHERE synced = 0")
-    suspend fun getPendingSyncDtcs(): List<DtcEventEntity>
+    @Query("SELECT * FROM dtc_events WHERE synced = 0 AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun getPendingSyncDtcs(ownerPrincipalId: String): List<DtcEventEntity>
 
-    @Query("UPDATE dtc_events SET synced = 1 WHERE id IN (:ids)")
-    suspend fun markDtcsAsSynced(ids: List<String>)
+    @Query("UPDATE dtc_events SET synced = 1 WHERE id IN (:ids) AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun markDtcsAsSynced(ids: List<String>, ownerPrincipalId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDtc(dtc: DtcEventEntity)
@@ -95,14 +101,14 @@ interface DtcDao {
 
 @Dao
 interface TripDao {
-    @Query("SELECT * FROM trips WHERE vehicleId = :vehicleId ORDER BY startedAt DESC")
-    fun getTripsForVehicle(vehicleId: String): Flow<List<TripEntity>>
+    @Query("SELECT * FROM trips WHERE vehicleId = :vehicleId AND ownerPrincipalId = :ownerPrincipalId ORDER BY startedAt DESC")
+    fun getTripsForVehicle(vehicleId: String, ownerPrincipalId: String): Flow<List<TripEntity>>
 
-    @Query("SELECT * FROM trips WHERE synced = 0")
-    suspend fun getPendingSync(): List<TripEntity>
+    @Query("SELECT * FROM trips WHERE synced = 0 AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun getPendingSync(ownerPrincipalId: String): List<TripEntity>
 
-    @Query("UPDATE trips SET synced = 1 WHERE id IN (:ids)")
-    suspend fun markAsSynced(ids: List<String>)
+    @Query("UPDATE trips SET synced = 1 WHERE id IN (:ids) AND ownerPrincipalId = :ownerPrincipalId")
+    suspend fun markAsSynced(ids: List<String>, ownerPrincipalId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrip(trip: TripEntity)

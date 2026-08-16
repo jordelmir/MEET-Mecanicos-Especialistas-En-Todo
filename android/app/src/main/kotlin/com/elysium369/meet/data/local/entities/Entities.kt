@@ -29,17 +29,27 @@ data class VehicleEntity(
     val assignedDriverId: String? = null
 )
 
-@Entity(tableName = "diagnostic_sessions")
+@Entity(
+    tableName = "diagnostic_sessions",
+    indices = [Index(value = ["ownerPrincipalId", "synced"], name = "index_diagnostic_sessions_owner_sync")],
+)
 data class DiagnosticSessionEntity(
     @PrimaryKey val id: String,
+    /** Canonical local/cloud vehicle UUID. Never a VIN. */
     val vehicleId: String,
+    /** VIN observed during this physical scan, if available. */
+    @ColumnInfo(defaultValue = "LEGACY_NOT_CAPTURED") val observedVin: String,
     val adapterFingerprint: String,
     val protocolUsed: String,
     val startedAt: Long,
     val endedAt: Long?,
     val dtcSnapshot: String, // JSON
     val liveDataSummary: String, // JSON
-    val synced: Boolean
+    val synced: Boolean,
+    @ColumnInfo(defaultValue = "OWNER_UNKNOWN_LEGACY") val ownerPrincipalId: String,
+    @ColumnInfo(defaultValue = "PERSONAL") val tenantId: String,
+    @ColumnInfo(defaultValue = "LEGACY_UNKNOWN") val originDeviceId: String,
+    @ColumnInfo(defaultValue = "1") val createdOffline: Boolean,
 )
 
 @Entity(
@@ -55,6 +65,7 @@ data class DiagnosticSessionEntity(
             ],
             name = "index_dtc_events_finding_identity",
         ),
+        Index(value = ["ownerPrincipalId", "synced"], name = "index_dtc_events_owner_sync"),
     ],
 )
 data class DtcEventEntity(
@@ -86,10 +97,17 @@ data class DtcEventEntity(
     val rawDtc24: Int? = null,
     val failureType: Int? = null,
     val dtcFormat: String = "UNKNOWN",
-    val synced: Boolean = false
+    val synced: Boolean = false,
+    @ColumnInfo(defaultValue = "OWNER_UNKNOWN_LEGACY") val ownerPrincipalId: String,
+    @ColumnInfo(defaultValue = "PERSONAL") val tenantId: String,
+    @ColumnInfo(defaultValue = "LEGACY_UNKNOWN") val originDeviceId: String,
+    @ColumnInfo(defaultValue = "1") val createdOffline: Boolean,
 )
 
-@Entity(tableName = "trips")
+@Entity(
+    tableName = "trips",
+    indices = [Index(value = ["ownerPrincipalId", "synced"], name = "index_trips_owner_sync")],
+)
 data class TripEntity(
     @PrimaryKey val id: String,
     val vehicleId: String,
@@ -106,7 +124,11 @@ data class TripEntity(
     val fuelEfficiency: Float?,
     val ecoScore: Int,
     val gpsTrackJson: String?,
-    val synced: Boolean
+    val synced: Boolean,
+    @ColumnInfo(defaultValue = "OWNER_UNKNOWN_LEGACY") val ownerPrincipalId: String,
+    @ColumnInfo(defaultValue = "PERSONAL") val tenantId: String,
+    @ColumnInfo(defaultValue = "LEGACY_UNKNOWN") val originDeviceId: String,
+    @ColumnInfo(defaultValue = "1") val createdOffline: Boolean,
 )
 
 @Entity(tableName = "adapter_profiles")

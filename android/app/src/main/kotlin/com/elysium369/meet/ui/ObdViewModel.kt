@@ -108,6 +108,8 @@ import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
+import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.identity.OfflineOwnership
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
@@ -462,6 +464,7 @@ class ObdViewModel @Inject constructor(
     private val rideDao: com.elysium369.meet.data.local.dao.RideDao,
     private val rideCommandRepository: RideCommandRepository,
     private val rideRemoteProjectionRepository: RideRemoteProjectionRepository,
+    private val activePrincipalKernel: ActivePrincipalKernel,
     val entitlementManager: com.elysium369.meet.core.monetization.EntitlementManager,
     val adGateManager: com.elysium369.meet.core.monetization.AdGateManager,
     val usageMeter: com.elysium369.meet.core.monetization.UsageMeter,
@@ -469,10 +472,8 @@ class ObdViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
-    private val localDeviceId: String = android.provider.Settings.Secure.getString(
-        context.contentResolver,
-        android.provider.Settings.Secure.ANDROID_ID
-    ) ?: java.util.UUID.randomUUID().toString()
+    private val localDeviceId: String = activePrincipalKernel.localDeviceId
+    val activePrincipal = activePrincipalKernel.activePrincipal
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
@@ -1290,7 +1291,7 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun currentProviderUserId(): String {
-        return currentCloudUserId() ?: "local_device_$localDeviceId"
+        return activePrincipalKernel.current().id
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2729,7 +2730,7 @@ class ObdViewModel @Inject constructor(
                         "recommendation" to recommendationText
                     ))
                 )
-                sessionLogRepository.saveSession(session)
+                sessionLogRepository.saveSession(session, vehicle.id)
                 Log.d("ObdVM", "✅ Oscilloscope capture saved: $pidName ($diagnosisSeverity)")
             } catch (e: Exception) {
                 Log.e("ObdVM", "Failed to save oscilloscope capture", e)
@@ -2793,7 +2794,9 @@ class ObdViewModel @Inject constructor(
     // --- Reactive Data from Room ---
     val trips: StateFlow<List<TripEntity>> = _selectedVehicle
         .flatMapLatest { vehicle ->
-            vehicle?.let { tripDao.getTripsForVehicle(it.id) } ?: flowOf(emptyList())
+            vehicle?.let {
+                tripDao.getTripsForVehicle(it.id, activePrincipalKernel.current().id)
+            } ?: flowOf(emptyList())
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val maintenanceAlerts: StateFlow<List<MaintenanceAlertEntity>> = _selectedVehicle
@@ -2804,7 +2807,9 @@ class ObdViewModel @Inject constructor(
     val customPids: StateFlow<List<CustomPidEntity>> = customPidDao.getAllCustomPids()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val vehicles: StateFlow<List<Vehicle>> = vehicleRepository.getVehiclesForUser(currentProviderUserId())
+    val vehicles: StateFlow<List<Vehicle>> = activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+        vehicleRepository.getVehiclesForUser(principal.id)
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // --- DVIR Inspection Flow & CRUD Helpers ---
@@ -3024,6 +3029,35 @@ class ObdViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            activePrincipalKernel.activePrincipal.drop(1).collectLatest { principal ->
+                // A principal transition is a tenant boundary. Never retain a
+                // vehicle, physical binding, provider role or remote projection
+                // selected under the previous account.
+                notesPollingJob?.cancel()
+                providerRolesJob?.cancel()
+                stopRideProjectionSync()
+                _selectedVehicle.value = null
+                _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
+                    diagnosticSessionId = currentSessionId,
+                    physicalConnectionId = "PRINCIPAL_CHANGED",
+                )
+                _userProviderProfiles.value = emptyList()
+                _isMechanic.value = false
+                _isTowTruckDriver.value = false
+                _isPartsStore.value = false
+                context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .remove("selected_vehicle_id")
+                    .apply()
+                refreshProviderRoles()
+                if (principal.isAuthenticated) {
+                    withContext(Dispatchers.IO) {
+                        vehicleRepository.syncVehiclesFromCloud(principal.id)
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             entitlementManager.hasAccess(FeatureKey.SCAN_ADVANCED).collect { hasAccess ->
                 _isPremium.value = hasAccess
@@ -3907,7 +3941,7 @@ class ObdViewModel @Inject constructor(
             live_data_snapshot = Json.encodeToString(snapshot.mapValues { it.value.toString() })
         )
 
-        sessionLogRepository.saveSession(session)
+        sessionLogRepository.saveSession(session, vehicle.id)
     }
 
     private fun clearState() {
@@ -4424,7 +4458,8 @@ class ObdViewModel @Inject constructor(
         val now = System.currentTimeMillis()
         val records = report.records
         val distinctFindings = records.distinctBy { it.findingKey(vehicle.id) }
-        val legacyCandidates = dtcDao.getUnresolvedDtcsList(vehicle.id)
+        val ownerPrincipalId = activePrincipalKernel.current().id
+        val legacyCandidates = dtcDao.getUnresolvedDtcsList(vehicle.id, ownerPrincipalId)
             .filter { it.diagnosticNamespace.isBlank() || it.moduleIdentity.isBlank() }
             .toMutableList()
 
@@ -4440,6 +4475,7 @@ class ObdViewModel @Inject constructor(
             )
             val exactExisting = dtcDao.getUnresolvedFinding(
                 vehicleId = vehicle.id,
+                ownerPrincipalId = ownerPrincipalId,
                 namespace = findingKey.namespace.name,
                 moduleIdentity = findingKey.moduleIdentity,
                 rawDtcIdentity = findingKey.rawDtcIdentity,
@@ -4462,7 +4498,7 @@ class ObdViewModel @Inject constructor(
             } else {
                 null
             }
-            val canonicalEvent = canonicalFinding?.let { dtcDao.getFindingById(it.id) }
+            val canonicalEvent = canonicalFinding?.let { dtcDao.getFindingById(it.id, ownerPrincipalId) }
             val existing = exactExisting ?: legacyExisting ?: canonicalEvent
             val metadata = dtcRecordMetadata(record)
             val findingId = canonicalFinding?.id ?: existing?.id ?: UUID.randomUUID().toString()
@@ -4504,7 +4540,7 @@ class ObdViewModel @Inject constructor(
                         rawDtc24 = record.rawDtc24,
                         failureType = record.codeIdentity.failureType,
                         dtcFormat = record.dtcFormat.name,
-                        synced = false
+                        synced = false,
                     )
                 )
             } else {
@@ -4549,7 +4585,11 @@ class ObdViewModel @Inject constructor(
                         rawDtc24 = record.rawDtc24,
                         failureType = record.codeIdentity.failureType,
                         dtcFormat = record.dtcFormat.name,
-                        synced = false
+                        synced = false,
+                        ownerPrincipalId = ownerPrincipalId,
+                        tenantId = OfflineOwnership.PERSONAL_TENANT,
+                        originDeviceId = activePrincipalKernel.localDeviceId,
+                        createdOffline = true,
                     )
                 )
 
@@ -4623,7 +4663,7 @@ class ObdViewModel @Inject constructor(
             ) {
                 // Canonical append-only evidence is authoritative. The old table
                 // is updated only as a compatibility read model when it exists.
-                dtcDao.getFindingById(finding.id)?.let { compatibilityEvent ->
+                dtcDao.getFindingById(finding.id, activePrincipalKernel.current().id)?.let { compatibilityEvent ->
                     dtcDao.insertDtc(compatibilityEvent.copy(
                         observationState = "NOT_OBSERVED_LAST_SCAN",
                         synced = false
@@ -4988,7 +5028,11 @@ class ObdViewModel @Inject constructor(
                     evidenceReferences = postClearEvidenceReferences,
                 )
             }
-            dtcDao.resolveVerifiedFindings(result.verifiedFindingIds.toList(), System.currentTimeMillis())
+            dtcDao.resolveVerifiedFindings(
+                result.verifiedFindingIds.toList(),
+                activePrincipalKernel.current().id,
+                System.currentTimeMillis(),
+            )
             updateHealthScore()
             scheduleSync()
         }

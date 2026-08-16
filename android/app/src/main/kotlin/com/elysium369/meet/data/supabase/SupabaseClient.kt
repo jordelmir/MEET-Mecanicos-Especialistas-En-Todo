@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.identity.OfflineOwnership
 import com.elysium369.meet.data.local.dao.VehicleDao
 import com.elysium369.meet.data.local.dao.DiagnosticSessionDao
 import com.elysium369.meet.data.local.entities.VehicleEntity
@@ -276,27 +278,38 @@ fun Vehicle.toEntity() = VehicleEntity(
 class SessionLogRepository @Inject constructor(
     private val sessionDao: DiagnosticSessionDao,
     private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao,
+    private val activePrincipalKernel: ActivePrincipalKernel,
     @ApplicationContext private val context: Context
 ) {
-    suspend fun saveSession(session: DiagnosticSession) {
+    suspend fun saveSession(session: DiagnosticSession, canonicalVehicleId: String) {
+        require(canonicalVehicleId.isNotBlank()) { "Canonical vehicle id is required" }
+        val principal = activePrincipalKernel.current()
         // 1. Save locally first (Always succeeds)
         val entity = DiagnosticSessionEntity(
             id = session.id ?: java.util.UUID.randomUUID().toString(),
-            vehicleId = session.vehicle_vin ?: "unknown",
+            vehicleId = canonicalVehicleId,
+            observedVin = session.vehicle_vin ?: "LEGACY_NOT_CAPTURED",
             adapterFingerprint = session.adapter_type,
             protocolUsed = "Auto",
             startedAt = System.currentTimeMillis(),
             endedAt = System.currentTimeMillis(),
             dtcSnapshot = session.dtcs_found,
             liveDataSummary = session.live_data_snapshot,
-            synced = false
+            synced = false,
+            ownerPrincipalId = principal.id,
+            tenantId = OfflineOwnership.PERSONAL_TENANT,
+            originDeviceId = activePrincipalKernel.localDeviceId,
+            createdOffline = true,
         )
         sessionDao.insertSession(entity)
 
         // 2. Try immediate sync if network is available
+        if (!principal.canSyncToCloud) return
         try {
-            SupabaseManager.client.postgrest["scan_sessions"].insert(session)
-            sessionDao.markAsSynced(listOf(entity.id))
+            SupabaseManager.client.postgrest["scan_sessions"].insert(
+                session.copy(user_id = principal.id),
+            )
+            sessionDao.markAsSynced(listOf(entity.id), principal.id)
         } catch (e: Exception) {
             // 3. Fallback: Schedule background sync if immediate fails
             scheduleBackgroundSync()
@@ -335,9 +348,12 @@ class SessionLogRepository @Inject constructor(
 @Singleton
 class TripRepository @Inject constructor(
     private val tripDao: com.elysium369.meet.data.local.dao.TripDao,
+    private val activePrincipalKernel: ActivePrincipalKernel,
     @ApplicationContext private val context: Context
 ) {
-    suspend fun saveTrip(trip: Trip) {
+    suspend fun saveTrip(trip: Trip, ownerPrincipalId: String) {
+        val principal = activePrincipalKernel.current()
+        require(ownerPrincipalId == trip.user_id) { "Trip actor and immutable owner must match" }
         // 1. Save locally
         val entity = com.elysium369.meet.data.local.entities.TripEntity(
             id = trip.id,
@@ -355,14 +371,19 @@ class TripRepository @Inject constructor(
             fuelEfficiency = trip.fuel_efficiency,
             ecoScore = trip.eco_score,
             gpsTrackJson = trip.gps_track_json,
-            synced = false
+            synced = false,
+            ownerPrincipalId = ownerPrincipalId,
+            tenantId = OfflineOwnership.PERSONAL_TENANT,
+            originDeviceId = activePrincipalKernel.localDeviceId,
+            createdOffline = true,
         )
         tripDao.insertTrip(entity)
 
         // 2. Try immediate sync
+        if (!com.elysium369.meet.identity.OfflineOwnership.canSync(ownerPrincipalId, principal)) return
         try {
             SupabaseManager.client.postgrest["trips"].insert(trip)
-            tripDao.markAsSynced(listOf(entity.id))
+            tripDao.markAsSynced(listOf(entity.id), ownerPrincipalId)
         } catch (e: Exception) {
             // 3. Fallback to background sync
             scheduleBackgroundSync()

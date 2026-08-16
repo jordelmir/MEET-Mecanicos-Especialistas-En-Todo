@@ -128,7 +128,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         FindingSnapshotExchangeRefEntity::class,
         DiagnosticSessionIntegrityEntity::class,
     ],
-    version = 56,
+    version = 57,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

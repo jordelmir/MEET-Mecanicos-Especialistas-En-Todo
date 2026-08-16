@@ -90,12 +90,12 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
-        listOf(49, 50, 52, 53, 54, 55).forEach { startVersion ->
-            val databaseName = "diagnostic-migration-$startVersion-to-56"
+        listOf(49, 50, 52, 53, 54, 55, 56).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-57"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                56,
+                57,
                 true,
                 *migrationsFrom(startVersion),
             ).use { db ->
@@ -105,8 +105,50 @@ class DiagnosticMigrationConformanceTest {
     }
 
     @Test
-    fun staged50To56PreservesDistinctRawIdentityAndFindingCausalityColumns() {
-        val databaseName = "diagnostic-migration-staged-50-to-56"
+    fun migration56To57QuarantinesLegacyOwnershipAndSeparatesObservedVin() {
+        val databaseName = "offline-ownership-56-to-57"
+        helper.createDatabase(databaseName, 56).apply {
+            execSQL(
+                """INSERT INTO diagnostic_sessions(
+                    id,vehicleId,adapterFingerprint,protocolUsed,startedAt,endedAt,
+                    dtcSnapshot,liveDataSummary,synced
+                ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                arrayOf<Any?>(
+                    "session-legacy",
+                    "KMHCG41DP5U123456",
+                    "adapter",
+                    "ISO15765",
+                    100L,
+                    200L,
+                    "[]",
+                    "{}",
+                    0,
+                ),
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            57,
+            true,
+            AppModule.MIGRATION_56_57,
+        ).use { db ->
+            db.query(
+                "SELECT vehicleId, observedVin, ownerPrincipalId FROM diagnostic_sessions WHERE id='session-legacy'",
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("LEGACY_UNKNOWN", cursor.getString(0))
+                assertEquals("KMHCG41DP5U123456", cursor.getString(1))
+                assertEquals("OWNER_UNKNOWN_LEGACY", cursor.getString(2))
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        }
+    }
+
+    @Test
+    fun staged50To57PreservesDistinctRawIdentityAndFindingCausalityColumns() {
+        val databaseName = "diagnostic-migration-staged-50-to-57"
         helper.createDatabase(databaseName, 50).apply {
             insertLegacyEvent("event-a", "session-a", 100L, 200L)
             insertLegacyEvent("event-b", "session-b", 300L, 400L)
@@ -114,7 +156,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            56,
+            57,
             true,
             *migrationsFrom(50),
         ).use { db ->
@@ -132,7 +174,7 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun sameUdsRawIdentityWithDifferentFailureTypeRemainsTwoFindings() {
-        val databaseName = "diagnostic-migration-uds-failure-types-to-56"
+        val databaseName = "diagnostic-migration-uds-failure-types-to-57"
         helper.createDatabase(databaseName, 51).apply {
             insertRawUdsEvent("uds-ft-11", 0x11, 100L)
             insertRawUdsEvent("uds-ft-22", 0x22, 200L)
@@ -140,7 +182,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            56,
+            57,
             true,
             *migrationsFrom(51),
         ).use { db ->
@@ -168,6 +210,7 @@ class DiagnosticMigrationConformanceTest {
         if (startVersion <= 53) add(AppModule.MIGRATION_53_54)
         if (startVersion <= 54) add(AppModule.MIGRATION_54_55)
         if (startVersion <= 55) add(AppModule.MIGRATION_55_56)
+        if (startVersion <= 56) add(AppModule.MIGRATION_56_57)
     }.toTypedArray()
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(
