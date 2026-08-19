@@ -1,0 +1,10 @@
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/hce_service_desc"
+    android:requireDeviceUnlock="true">
+    <aid-group
+        android:category="other"
+        android:description="@string/hce_service_desc">
+        <!-- MEET Vanguard Digital Vehicle Access AID: F03941434345535301 (F0 + "9ACCESS" + 01) -->
+        <aid-filter android:name="F03941434345535301" />
+    </aid-group>
+</host-apdu-service>

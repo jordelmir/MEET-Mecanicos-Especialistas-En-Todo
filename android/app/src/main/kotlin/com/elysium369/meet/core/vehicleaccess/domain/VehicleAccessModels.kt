@@ -130,7 +130,7 @@ data class AccessGrant(
     val permissions: Set<AccessPermission>,
     val validFromEpochMs: Long,
     val validUntilEpochMs: Long,
-    val isVehicleEnforced: Boolean, // true if OEM cloud/hardware enforces it, false if MEET policy only
+    val isVehicleEnforced: Boolean = false, // true if OEM cloud/hardware enforces it, false if MEET policy only
     val status: CredentialStatus = CredentialStatus.ACTIVE,
     val revocationReason: String? = null
 )

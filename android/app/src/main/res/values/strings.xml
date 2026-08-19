@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OBD2 Elysium Vanguard</string>
+    <string name="hce_service_desc">MEET Vehicle Access Digital Key</string>
+</resources>

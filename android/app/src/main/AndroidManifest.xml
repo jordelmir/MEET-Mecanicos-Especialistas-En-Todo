@@ -29,7 +29,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Vehicle Access, Digital Key & Radio Radios (Optional) -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
+    <uses-feature android:name="android.hardware.uwb" android:required="false" />
 
     <queries>
         <package android:name="com.waze" />
@@ -99,6 +103,20 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- MEET Vehicle Access Host Card Emulation (HCE) ISO-DEP APDU Service -->
+        <service
+            android:name=".core.vehicleaccess.infrastructure.MeetVehicleAccessHceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/apduservice" />
+        </service>
 
     </application>
 
