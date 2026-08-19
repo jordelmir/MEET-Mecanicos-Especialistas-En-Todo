@@ -398,10 +398,8 @@ class ObdSession(
         val oldTransport = transport
         transport = null
         if (oldTransport != null) {
-            kotlinx.coroutines.runBlocking {
-                kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    runCatching { oldTransport.disconnect() }
-                }
+            scope.launch(Dispatchers.IO) {
+                runCatching { oldTransport.disconnect() }
             }
         }
 
@@ -677,13 +675,13 @@ class ObdSession(
                         .distinct()
                         .filter { pid ->
                             val pidInt = pid.toIntOrNull(16) ?: return@filter true
-                            supportedPids.isEmpty() || supportedPids.contains(pidInt)
+                            !supportDiscoveryComplete || supportedPids.contains(pidInt)
                         }
 
                     val normalPriorityPids = dashboardPids.map { it.removePrefix("01") }
                         .filter { pid ->
                             val pidInt = pid.toIntOrNull(16) ?: return@filter true
-                            supportedPids.isEmpty() || supportedPids.contains(pidInt)
+                            !supportDiscoveryComplete || supportedPids.contains(pidInt)
                         }
                         .filter { pid ->
                             !highPriorityPids.contains(pid)

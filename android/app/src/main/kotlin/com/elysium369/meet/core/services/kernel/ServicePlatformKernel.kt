@@ -85,13 +85,25 @@ enum class ServiceVertical(val code: String, val displayName: String) {
     PARTS("parts", "Marketplace Técnico de Repuestos"),
     RIDE("ride", "Movilidad y Viajes"),
     INSPECTION("inspection", "Inspección Pre-Compra Forense"),
-    UNIVERSAL("universal", "Elysium Vanguard Universal");
+    UNIVERSAL("universal", "Elysium Vanguard Universal"),
+    UNKNOWN("unknown", "Vertical Desconocido");
 
     companion object {
         fun fromCode(code: String): ServiceVertical =
-            values().firstOrNull { it.code.equals(code, ignoreCase = true) } ?: UNIVERSAL
+            values().firstOrNull { it.code.equals(code.trim(), ignoreCase = true) } ?: UNKNOWN
+
+        fun fromCodeStrict(code: String): ServiceVertical {
+            val res = fromCode(code)
+            if (res == UNKNOWN) {
+                throw UnsupportedServiceVerticalException("Vertical '$code' no es reconocido por la plataforma")
+            }
+            return res
+        }
     }
 }
+
+class UnsupportedServiceVerticalException(message: String) : IllegalArgumentException(message)
+class UnsupportedProviderTypeException(message: String) : IllegalArgumentException(message)
 
 /**
  * Canonical provider types aligned across UI, ViewModel, Repository and PostgreSQL provider_profiles.
@@ -101,7 +113,8 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
     WORKSHOP("workshop", "Taller Mecánico Establecido"),
     PARTS_STORE("parts_store", "Venta de Repuestos"),
     TOW_PROVIDER("tow_provider", "Operador de Grúas"),
-    RIDE_DRIVER("ride_driver", "Conductor de Movilidad");
+    RIDE_DRIVER("ride_driver", "Conductor de Movilidad"),
+    UNKNOWN("unknown", "Tipo de Proveedor Desconocido");
 
     companion object {
         fun fromDbValue(value: String): ProviderType = when (value.trim().lowercase()) {
@@ -110,7 +123,15 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
             "parts_store", "part_store", "store" -> PARTS_STORE
             "tow_provider", "tow_truck", "tow", "tow_driver" -> TOW_PROVIDER
             "ride_driver", "driver", "ride" -> RIDE_DRIVER
-            else -> values().firstOrNull { it.name.equals(value, ignoreCase = true) } ?: MECHANIC
+            else -> values().firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: UNKNOWN
+        }
+
+        fun fromDbValueStrict(value: String): ProviderType {
+            val res = fromDbValue(value)
+            if (res == UNKNOWN) {
+                throw UnsupportedProviderTypeException("Tipo de proveedor '$value' no es reconocido por la plataforma")
+            }
+            return res
         }
     }
 }

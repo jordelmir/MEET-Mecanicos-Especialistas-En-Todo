@@ -18,14 +18,24 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
+/**
+ * BleTransport — Elysium Vanguard Hardened Edition.
+ * Fully asynchronous BLE GATT transport for OBD-II with serialized CCCD/GATT operation queues,
+ * generation tokens against stale callbacks, bounded buffer memory, and semantic ELM readiness verification.
+ */
 @SuppressLint("MissingPermission")
 class BleTransport(
     private val context: Context,
     private val device: BluetoothDevice
 ) : TransportInterface {
 
-    private val TAG = "EV_BLE"
+    companion object {
+        private const val TAG = "BleTransport"
+        private const val MAX_CONNECT_ATTEMPTS = 3
+        private const val MAX_ACCUMULATOR_BYTES = 4096
+    }
 
     // Standard UUIDs used across common OBD2 BLE adapters
     private val SERVICE_UUIDS = listOf(
@@ -50,21 +60,32 @@ class BleTransport(
     private var writeChar: BluetoothGattCharacteristic? = null
     private val gattMutex = Mutex()
 
+    private val connectionGeneration = AtomicLong(0L)
+
     @Volatile
     private var connectionDeferred: CompletableDeferred<Boolean>? = null
 
     @Volatile
     private var writeDeferred: CompletableDeferred<Boolean>? = null
 
-    // Fragment accumulator — Thread-safe
+    // Fragment accumulator — Thread-safe and bounded
     private val responseAccumulator = StringBuffer()
-    private val responseReady = Channel<String>(Channel.UNLIMITED)
+    private val responseReady = Channel<String>(64)
 
     @Volatile
     private var connected = false
 
+    override val isConnected: Boolean
+        get() = connected && gatt != null
+
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) {
+                Log.d(TAG, "Dropping stale onConnectionStateChange from old GATT instance")
+                return
+            }
+
             Log.d(TAG, "onConnectionStateChange status=$status newState=$newState")
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.w(TAG, "GATT connection status error: $status")
@@ -84,11 +105,16 @@ class BleTransport(
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
             Log.d(TAG, "onMtuChanged mtu=$mtu status=$status")
             gatt.discoverServices()
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
+
             Log.d(TAG, "onServicesDiscovered status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 var foundWrite = false
@@ -131,6 +157,9 @@ class BleTransport(
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
+
             Log.d(TAG, "onDescriptorWrite status=$status desc=${descriptor.uuid}")
             if (descriptor.uuid == CCCD_UUID && status == BluetoothGatt.GATT_SUCCESS) {
                 connected = (writeChar != null)
@@ -145,6 +174,8 @@ class BleTransport(
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
             writeDeferred?.complete(status == BluetoothGatt.GATT_SUCCESS)
         }
 
@@ -153,6 +184,8 @@ class BleTransport(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic
         ) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
             handleIncomingBytes(characteristic.value)
         }
 
@@ -161,31 +194,39 @@ class BleTransport(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) {
+            val activeGatt = this@BleTransport.gatt
+            if (activeGatt == null || activeGatt !== gatt) return
             handleIncomingBytes(value)
         }
 
         private fun handleIncomingBytes(value: ByteArray) {
             val chunk = String(value, Charsets.ISO_8859_1)
+            if (responseAccumulator.length + chunk.length > MAX_ACCUMULATOR_BYTES) {
+                Log.w(TAG, "BLE accumulator overflow protection triggered; resetting buffer")
+                responseAccumulator.setLength(0)
+            }
             responseAccumulator.append(chunk)
 
             if (responseAccumulator.contains('>') ||
                 responseAccumulator.contains("NO DATA") ||
                 responseAccumulator.contains("ERROR") ||
-                responseAccumulator.contains("STOPPED")) {
-
-                val completeResponse = responseAccumulator.toString()
+                responseAccumulator.contains("STOPPED")
+            ) {
+                val fullResponse = responseAccumulator.toString()
                 responseAccumulator.setLength(0)
-                responseReady.trySend(completeResponse)
+                responseReady.trySend(fullResponse)
             }
         }
     }
 
     override suspend fun connect() {
         var lastException: Exception? = null
-        for (attempt in 1..3) {
+
+        for (attempt in 1..MAX_CONNECT_ATTEMPTS) {
             try {
-                gatt?.disconnect()
-                gatt?.close()
+                Log.d(TAG, "BLE connection attempt $attempt/$MAX_CONNECT_ATTEMPTS to ${device.address}")
+                val gen = connectionGeneration.incrementAndGet()
+                disconnect()
 
                 val deferred = CompletableDeferred<Boolean>()
                 connectionDeferred = deferred
@@ -196,18 +237,29 @@ class BleTransport(
                     deferred.await()
                 }
 
-                if (success && connected) {
-                    // Send ELM readiness probe before declaring link operational
+                if (success && connected && gen == connectionGeneration.get()) {
+                    // Send ELM readiness probe and validate response semantically
                     drain()
                     val probeResult = runCatching {
                         write("\r".toByteArray(Charsets.ISO_8859_1))
                         read(128, 1500L)
                     }
-                    if (probeResult.isSuccess && probeResult.getOrNull() != null) {
-                        Log.i(TAG, "✓ BLE GATT Link and ELM readiness established on attempt $attempt")
+                    val probeBytes = probeResult.getOrNull()
+                    val probeStr = probeBytes?.let { String(it, Charsets.ISO_8859_1).trim() }
+
+                    val isElmReady = probeResult.isSuccess && probeStr != null && (
+                        probeStr.contains('>') ||
+                        probeStr.contains("ELM", ignoreCase = true) ||
+                        probeStr.contains("OK", ignoreCase = true) ||
+                        probeStr.contains("41") ||
+                        probeStr.contains("?")
+                    )
+
+                    if (isElmReady) {
+                        Log.i(TAG, "✓ BLE GATT Link and verified ELM readiness established on attempt $attempt")
                         return
                     } else {
-                        Log.w(TAG, "✗ BLE ELM prompt probe failed on attempt $attempt: ${probeResult.exceptionOrNull()?.message}")
+                        Log.w(TAG, "✗ BLE ELM prompt probe failed semantically on attempt $attempt (response='$probeStr')")
                         disconnect()
                     }
                 }
@@ -220,16 +272,20 @@ class BleTransport(
         }
 
         disconnect()
-        throw lastException ?: TransportRemoteClosed("Error de enlace BLE: El adaptador no completó la negociación GATT/CCCD")
+        throw lastException ?: TransportRemoteClosed("Error de enlace BLE: El adaptador no completó la negociación GATT/CCCD o la sonda ELM no respondió")
     }
 
     override suspend fun disconnect() {
         runCatching { gatt?.disconnect() }
         runCatching { gatt?.close() }
         gatt = null
+        writeChar = null
         connected = false
         connectionDeferred?.complete(false)
         connectionDeferred = null
+        writeDeferred?.complete(false)
+        writeDeferred = null
+        responseAccumulator.setLength(0)
     }
 
     override suspend fun reconnect() {
@@ -282,7 +338,4 @@ class BleTransport(
             responseReady.tryReceive()
         }
     }
-
-    override val isConnected: Boolean
-        get() = connected
 }

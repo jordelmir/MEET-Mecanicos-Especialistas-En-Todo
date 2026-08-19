@@ -63,19 +63,27 @@ enum class VerificationRequirement {
 data class RepairVerificationBundle(
     val workOrderId: UUID,
     val vehicleId: String,
+    val vehicleBindingId: String,
     val preScanReportHash: String,
     val postScanReportHash: String,
-    val remainingDtcCount: Int,
+    val requiredFindingIds: Set<String>,
+    val clearedFindingIds: Set<String>,
+    val remainingFindingIds: Set<String>,
     val allMonitorsPassed: Boolean = true,
     val evidenceHashes: List<String> = emptyList(),
 ) {
     init {
         require(vehicleId.isNotBlank()) { "Vehicle ID cannot be blank in verification bundle" }
+        require(vehicleBindingId.isNotBlank()) { "Vehicle binding ID is required" }
+        require(preScanReportHash.isNotBlank()) { "Pre-scan report hash is required" }
         require(postScanReportHash.isNotBlank()) { "Post-scan report hash is required" }
     }
 
     val isCleanPass: Boolean
-        get() = remainingDtcCount == 0 && postScanReportHash.isNotBlank()
+        get() = remainingFindingIds.isEmpty() &&
+                requiredFindingIds.isNotEmpty() &&
+                postScanReportHash.isNotBlank() &&
+                preScanReportHash.isNotBlank()
 }
 
 sealed interface RepairAction {
@@ -88,18 +96,7 @@ sealed interface RepairAction {
     data class RequestParts(val partsCount: Int) : RepairAction
     object ResumeRepair : RepairAction
     data class CompleteTechnicianWork(val beforePhotoHash: String?, val afterPhotoHash: String) : RepairAction
-    data class SubmitPostScanValidation(val bundle: RepairVerificationBundle) : RepairAction {
-        // Backwards compatible constructor
-        constructor(scanReportHash: String, verifiedDtcCount: Int, isClean: Boolean = true) : this(
-            RepairVerificationBundle(
-                workOrderId = UUID.randomUUID(),
-                vehicleId = "verified_vehicle",
-                preScanReportHash = "pre_scan",
-                postScanReportHash = scanReportHash,
-                remainingDtcCount = if (isClean) 0 else verifiedDtcCount
-            )
-        )
-    }
+    data class SubmitPostScanValidation(val bundle: RepairVerificationBundle) : RepairAction
     data class CustomerConfirm(val verificationPolicy: VerificationRequirement = VerificationRequirement.OBD_REQUIRED) : RepairAction
     data class CloseWorkOrder(val settlementTxId: String, val finalInvoiceHash: String) : RepairAction
     data class RaiseDispute(val reason: String) : RepairAction
@@ -174,8 +171,9 @@ object RepairStateEngine {
             } else null
         }
         is RepairAction.SubmitPostScanValidation -> {
-            if (fromState == RepairState.VALIDATION_PENDING &&
+            if (fromState in setOf(RepairState.VALIDATION_PENDING, RepairState.REPAIR_COMPLETED) &&
                 action.bundle.postScanReportHash.isNotBlank() &&
+                action.bundle.preScanReportHash.isNotBlank() &&
                 actorRole in setOf(ServiceRole.TECHNICIAN, ServiceRole.WORKSHOP_ADMIN)) {
                 if (action.bundle.isCleanPass) RepairState.VALIDATION_PASSED else RepairState.VALIDATION_FAILED
             } else null

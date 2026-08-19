@@ -63,9 +63,12 @@ class RepairAndTowStateEnginesTest {
         val cleanBundle = RepairVerificationBundle(
             workOrderId = UUID.randomUUID(),
             vehicleId = "VIN_12345",
+            vehicleBindingId = "BIND_67890",
             preScanReportHash = "sha256_pre",
             postScanReportHash = "sha256_post",
-            remainingDtcCount = 0,
+            requiredFindingIds = setOf("F_P0300"),
+            clearedFindingIds = setOf("F_P0300"),
+            remainingFindingIds = emptySet(),
             allMonitorsPassed = true,
         )
         val validationPassed = RepairStateEngine.getNextState(
@@ -107,9 +110,12 @@ class RepairAndTowStateEnginesTest {
         val dirtyBundle = RepairVerificationBundle(
             workOrderId = UUID.randomUUID(),
             vehicleId = "VIN_12345",
+            vehicleBindingId = "BIND_67890",
             preScanReportHash = "sha256_pre",
             postScanReportHash = "sha256_post",
-            remainingDtcCount = 2, // 2 DTCs still present!
+            requiredFindingIds = setOf("F_P0300", "F_P0171"),
+            clearedFindingIds = setOf("F_P0300"),
+            remainingFindingIds = setOf("F_P0171"), // P0171 still present!
             allMonitorsPassed = false,
         )
         val failed = RepairStateEngine.getNextState(

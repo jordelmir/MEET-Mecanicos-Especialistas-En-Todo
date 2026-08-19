@@ -1488,6 +1488,7 @@ class ObdViewModel @Inject constructor(
             com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER -> "Gruista"
             com.elysium369.meet.core.services.kernel.ProviderType.PARTS_STORE -> "Repuestera"
             com.elysium369.meet.core.services.kernel.ProviderType.RIDE_DRIVER -> "Chofer de Viajes"
+            com.elysium369.meet.core.services.kernel.ProviderType.UNKNOWN -> "Desconocido"
         }
     }
 

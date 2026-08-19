@@ -880,18 +880,18 @@ fun RepairNetworkScreen(
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "Tienda: ${acceptedOffer?.storeName ?: "Repuestera Asociada"}",
+                                        text = "Tienda: ${acceptedOffer?.storeName ?: "NO DISPONIBLE"}",
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
                                     Text(
-                                        text = "Repuesto: ${acceptedOffer?.brand ?: "OEM"} (${acceptedOffer?.partNumber ?: ""})",
+                                        text = "Repuesto: ${acceptedOffer?.brand ?: "NO INFORMADA"} (${acceptedOffer?.partNumber ?: "NO DISPONIBLE"})",
                                         color = MeetColors.textSecondary,
                                         fontSize = 11.sp
                                     )
                                     Text(
-                                        text = "Garantía: ${acceptedOffer?.warrantyDays ?: 30} días | ETA: ${acceptedOffer?.etaMinutes ?: 40} minutos",
+                                        text = "Garantía: ${acceptedOffer?.warrantyDays?.let { "$it días" } ?: "NO INFORMADA"} | ETA: ${acceptedOffer?.etaMinutes?.let { "$it minutos" } ?: "NO DISPONIBLE"}",
                                         color = MeetColors.cyberCyan,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold
@@ -931,15 +931,18 @@ fun RepairNetworkScreen(
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    EliteButton(
-                                        text = "📦 MARCAR COMO RECIBIDO",
-                                        onClick = {
-                                            obdViewModel.confirmPartReceipt(partReq.requestId, acceptedOffer?.offerId ?: "", context)
-                                        },
-                                        color = MeetColors.electricBlue,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                    val currentOffer = acceptedOffer
+                                    if (currentOffer != null && currentOffer.offerId.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        EliteButton(
+                                            text = "📦 MARCAR COMO RECIBIDO",
+                                            onClick = {
+                                                obdViewModel.confirmPartReceipt(partReq.requestId, currentOffer.offerId, context)
+                                            },
+                                            color = MeetColors.electricBlue,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                             } else {
                                 Text("OFERTAS DE REPUESTERAS (${offers.size})", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
