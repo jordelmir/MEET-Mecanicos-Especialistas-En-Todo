@@ -140,6 +140,14 @@ object PidRegistry {
             PidDefinition("22", "2203", "Odómetro VAG", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat() * 16777216f) + (b.toFloat() * 65536f) + (c.toFloat() * 256f) + d.toFloat()) / 1000f }, PidCategory.ENGINE, true)
         ),
         "HYUNDAI" to listOf(
+            // Hyundai Gasolina 2000-2010 (Accent / Verna 1.6L G4ED, Getz, Matrix, Elantra)
+            PidDefinition("21", "01", "Ancho Pulso Inyector", "ms", 0f, 30f, 15f, 25f, { a, b, _, _ -> (a * 256f + b) / 1000f }, PidCategory.FUEL, true),
+            PidDefinition("21", "01", "Temp Fluido ATF (Caja Auto)", "°C", -40f, 180f, 110f, 130f, { _, _, c, _ -> c - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "01", "Marcha Actual A4AF3", "", 0f, 5f, 0f, 0f, { _, _, _, d -> (d and 0x07).toFloat() }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "02", "Retardo Encendido Knock", "°", 0f, 25f, 5f, 10f, { a, _, _, _ -> a / 2f }, PidCategory.ENGINE, true),
+            PidDefinition("21", "02", "Válvula Ralentí ISCA", "%", 0f, 100f, 80f, 95f, { _, b, _, _ -> b * 100f / 255f }, PidCategory.ENGINE, true),
+            PidDefinition("21", "02", "Presión Gas A/C", "bar", 0f, 35f, 25f, 30f, { _, _, c, _ -> c * 0.14f }, PidCategory.ENGINE, true),
+            // Hyundai EV / Híbridos Modernos
             PidDefinition("22", "0101", "Temp Bat EV", "°C", -40f, 80f, 45f, 55f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
             PidDefinition("22", "0105", "SOH Batería", "%", 0f, 100f, 80f, 70f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
             PidDefinition("22", "0106", "SOC Batería", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
