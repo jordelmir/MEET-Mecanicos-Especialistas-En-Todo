@@ -117,7 +117,9 @@ class BtClassicTransport(
                 // Prioritize Insecure SPP for ELM327 clones which often fail auth handshake
                 connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
                 connectionMethods.add("Standard SPP" to { device.createRfcommSocketToServiceRecord(SPP_UUID) })
+                connectionMethods.add("Insecure Reflection CH1" to { invokeReflectiveInsecureSocketCreation(device, 1) })
                 connectionMethods.add("Reflection CH1" to { invokeReflectiveSocketCreation(device, 1) })
+                connectionMethods.add("Insecure Reflection CH2" to { invokeReflectiveInsecureSocketCreation(device, 2) })
                 connectionMethods.add("Reflection CH2" to { invokeReflectiveSocketCreation(device, 2) })
 
                 var lastException: Exception? = null

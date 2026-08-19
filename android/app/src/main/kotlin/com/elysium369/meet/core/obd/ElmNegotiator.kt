@@ -183,15 +183,15 @@ class ElmNegotiator(private val transport: TransportInterface) {
             delay(400)
         }
 
-        // Step 5c: Manual Sweep if Auto fails
-        val manualList = listOf("6", "7", "8", "9", "D", "E", "3", "5", "4", "1", "2", "A") // CAN 11/29, CAN FD, ISO, KWP, J1850, J1939
+        // Step 5c: Manual Sweep if Auto fails (Prioritize KWP2000 & ISO 9141 for Asian pre-2008 vehicles)
+        val manualList = listOf("5", "4", "3", "6", "7", "8", "9", "D", "E", "1", "2", "A") // KWP2000 Fast/Slow, ISO 9141, CAN 11/29, CAN FD, J1850, J1939
         for (pCode in manualList) {
             if (pCode == hint.atspCode) continue // Already tried
             
             onProgress("Escaneando protocolo $pCode...")
             sendWithTimeout("ATSP$pCode\r", 1000)
             delay(baseDelay)
-            val resp = sendWithTimeout("0100\r", 3000)
+            val resp = sendWithTimeout("0100\r", 3500)
             if (isPositivePidSupportResponse(resp)) {
                 return detectActiveProtocol()
             }
@@ -221,6 +221,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         add("ATS0") // Spaces off
         add("ATH0") // Headers off
         add("ATCAF1") // CAN Auto Formatting on
+        add("ATAL")   // Allow Long messages (critical for KWP2000 multiline dumps)
         add("ATAT1") // Conservative adaptive timing while the vehicle protocol is unknown.
         add("ATSTFF") // Give slow ISO/KWP/J1850 ECUs enough time during detection.
 
@@ -236,7 +237,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         if (clean.contains("NODATA") || clean.contains("UNABLE") || clean.contains("ERROR") || clean == "?") {
             return false
         }
-        return clean.contains("4100")
+        return clean.contains("4100") || clean.contains("410")
     }
 
     private fun runtimeBaseDelay(protocol: ObdProtocol, isClone: Boolean): Long {
