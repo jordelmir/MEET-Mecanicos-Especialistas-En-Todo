@@ -398,8 +398,10 @@ class ObdSession(
         val oldTransport = transport
         transport = null
         if (oldTransport != null) {
-            scope.launch(Dispatchers.IO) {
-                runCatching { oldTransport.disconnect() }
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    runCatching { oldTransport.disconnect() }
+                }
             }
         }
 

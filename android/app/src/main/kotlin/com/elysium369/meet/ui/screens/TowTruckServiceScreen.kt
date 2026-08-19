@@ -63,7 +63,7 @@ fun TowTruckServiceScreen(
 
     var showRatingDialog by remember { mutableStateOf(false) }
     var ratingTargetId by remember { mutableStateOf("") }
-    var ratingTargetType by remember { mutableStateOf("TOW_TRUCK") }
+    var ratingTargetType by remember { mutableStateOf(com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER.dbValue) }
 
     if (showRegistrationScreen) {
         ProviderRegistrationScreen(
@@ -190,7 +190,7 @@ fun TowTruckServiceScreen(
                     onCompleteService = { requestId, driverId ->
                         viewModel.completeTowTruckRequest(requestId)
                         ratingTargetId = driverId ?: "driver"
-                        ratingTargetType = "TOW_TRUCK"
+                        ratingTargetType = com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER.dbValue
                         showRatingDialog = true
                     }
                 )

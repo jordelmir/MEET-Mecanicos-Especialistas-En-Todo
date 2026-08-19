@@ -257,7 +257,7 @@ fun ProviderRegistrationScreen(
             },
             onRegister = { businessName, ownerName, phone, location, specialties, radiusKm, licenseNumber ->
                 viewModel.registerAsProvider(
-                    providerType = selectedTypeInfo!!.type,
+                    providerType = com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(selectedTypeInfo!!.type).dbValue,
                     businessName = businessName,
                     ownerName = ownerName,
                     phone = phone,

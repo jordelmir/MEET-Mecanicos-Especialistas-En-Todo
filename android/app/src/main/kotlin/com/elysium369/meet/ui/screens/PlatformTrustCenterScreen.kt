@@ -294,13 +294,13 @@ private fun TrustDecisionDialog(
     )
 }
 
-private fun serviceLabel(type: String): String = when (type) {
-    "PASSENGER" -> "Pasajero"
-    "RIDE_DRIVER" -> "Chofer de viajes"
-    "TOW_TRUCK" -> "Grúa / asistencia vial"
-    "MECHANIC" -> "Mecánico / taller"
-    "PARTS_STORE" -> "Repuestera"
-    "SERVICE_PROVIDER" -> "Proveedor de servicios"
+private fun serviceLabel(type: String): String = when (type.lowercase()) {
+    "passenger" -> "Pasajero"
+    "ride_driver" -> "Chofer de viajes"
+    "tow_truck", "tow_provider" -> "Grúa / asistencia vial"
+    "mechanic", "workshop" -> "Mecánico / taller"
+    "parts_store" -> "Repuestera"
+    "service_provider" -> "Proveedor de servicios"
     else -> type
 }
 

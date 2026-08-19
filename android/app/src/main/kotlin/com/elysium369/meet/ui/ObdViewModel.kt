@@ -1345,9 +1345,16 @@ class ObdViewModel @Inject constructor(
             providerProfileDao.getProfilesForUser(userId).collect { profiles ->
                 val activeProfiles = profiles.filter { it.isActive && it.verified }
                 _userProviderProfiles.value = profiles
-                _isMechanic.value = activeProfiles.any { it.providerType == "MECHANIC" }
-                _isTowTruckDriver.value = activeProfiles.any { it.providerType == "TOW_TRUCK" }
-                _isPartsStore.value = activeProfiles.any { it.providerType == "PARTS_STORE" }
+                _isMechanic.value = activeProfiles.any { 
+                    val t = com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType)
+                    t == com.elysium369.meet.core.services.kernel.ProviderType.MECHANIC || t == com.elysium369.meet.core.services.kernel.ProviderType.WORKSHOP
+                }
+                _isTowTruckDriver.value = activeProfiles.any { 
+                    com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) == com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER 
+                }
+                _isPartsStore.value = activeProfiles.any { 
+                    com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) == com.elysium369.meet.core.services.kernel.ProviderType.PARTS_STORE 
+                }
             }
         }
     }
@@ -1469,15 +1476,18 @@ class ObdViewModel @Inject constructor(
 
     /** Check if the current user can see provider-facing content for a given type */
     suspend fun canViewProviderContent(providerType: String): Boolean {
-        return providerProfileDao.isUserRegisteredAs(currentProviderUserId(), providerType)
+        val canonical = com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(providerType).dbValue
+        val legacy = if (canonical == "tow_provider") "TOW_TRUCK" else providerType.uppercase()
+        return providerProfileDao.isUserRegisteredAs(currentProviderUserId(), canonical) ||
+               providerProfileDao.isUserRegisteredAs(currentProviderUserId(), legacy)
     }
 
     private fun providerTypeLabel(providerType: String): String {
-        return when (providerType) {
-            "MECHANIC" -> "Mecánico"
-            "TOW_TRUCK" -> "Gruista"
-            "PARTS_STORE" -> "Repuestera"
-            else -> "Proveedor"
+        return when (com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(providerType)) {
+            com.elysium369.meet.core.services.kernel.ProviderType.MECHANIC, com.elysium369.meet.core.services.kernel.ProviderType.WORKSHOP -> "Mecánico"
+            com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER -> "Gruista"
+            com.elysium369.meet.core.services.kernel.ProviderType.PARTS_STORE -> "Repuestera"
+            com.elysium369.meet.core.services.kernel.ProviderType.RIDE_DRIVER -> "Chofer de Viajes"
         }
     }
 

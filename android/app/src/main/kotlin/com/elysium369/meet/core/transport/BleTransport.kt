@@ -53,6 +53,9 @@ class BleTransport(
     @Volatile
     private var connectionDeferred: CompletableDeferred<Boolean>? = null
 
+    @Volatile
+    private var writeDeferred: CompletableDeferred<Boolean>? = null
+
     // Fragment accumulator — Thread-safe
     private val responseAccumulator = StringBuffer()
     private val responseReady = Channel<String>(Channel.UNLIMITED)
@@ -135,6 +138,14 @@ class BleTransport(
             } else if (status != BluetoothGatt.GATT_SUCCESS) {
                 connectionDeferred?.complete(false)
             }
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            writeDeferred?.complete(status == BluetoothGatt.GATT_SUCCESS)
         }
 
         @Deprecated("Deprecated in Java")
@@ -230,7 +241,10 @@ class BleTransport(
     override suspend fun write(data: ByteArray) {
         gattMutex.withLock {
             val char = writeChar ?: throw TransportWriteFailure("Error: Adaptador BLE no inicializado")
-            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val writeCompletion = CompletableDeferred<Boolean>()
+            writeDeferred = writeCompletion
+
+            val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
                 res == 0
             } else {
@@ -239,8 +253,18 @@ class BleTransport(
                 @Suppress("DEPRECATION")
                 gatt?.writeCharacteristic(char) ?: false
             }
-            if (!success) {
-                throw TransportWriteFailure("Fallo al escribir en el radio BLE")
+            if (!initiated) {
+                writeDeferred = null
+                throw TransportWriteFailure("Fallo al iniciar escritura en radio BLE")
+            }
+
+            val ack = withTimeoutOrNull(2000L) {
+                writeCompletion.await()
+            } ?: false
+
+            writeDeferred = null
+            if (!ack) {
+                throw TransportWriteFailure("Timeout o error esperando ACK de escritura BLE")
             }
         }
     }
