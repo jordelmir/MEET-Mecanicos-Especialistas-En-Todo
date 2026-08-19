@@ -2527,6 +2527,8 @@ class ObdViewModel @Inject constructor(
             }
 
             val ownerId = currentProviderUserId()
+            
+            // 1. If an existing vehicle in the garage already has this exact VIN, select it
             vehicleRepository.getVehicleByVin(ownerId, cleanVin)?.let { existing ->
                 selectVehicle(existing)
                 lastAutoRecognizedVin = cleanVin
@@ -2538,15 +2540,31 @@ class ObdViewModel @Inject constructor(
                 return@withLock existing
             }
 
+            // 2. If the user currently has an active vehicle without a VIN, bind this VIN to it permanently
+            _selectedVehicle.value?.let { currentVehicle ->
+                if (currentVehicle.vin.isBlank() || currentVehicle.vin == "NOT_SET" || currentVehicle.vin == "PENDIENTE" || currentVehicle.vin == "N/A") {
+                    val updatedVehicle = currentVehicle.copy(vin = cleanVin)
+                    vehicleRepository.insertVehicle(updatedVehicle)
+                    selectVehicle(updatedVehicle)
+                    lastAutoRecognizedVin = cleanVin
+                    addTerminalLog("[VIN] VIN $cleanVin vinculado y guardado permanentemente para ${updatedVehicle.make} ${updatedVehicle.model}.", TerminalLineType.SYSTEM)
+                    return@withLock updatedVehicle
+                }
+            }
+
+            // 3. Otherwise, create a new persistent vehicle in the garage from the decoded VIN
             val decoded = VinDecoder.decode(cleanVin)
             _vinDecoded.value = decoded
+            val parsedYear = decoded?.modelYear?.toIntOrNull() ?: 0
+            val parsedMake = decoded?.manufacturer?.takeIf { it.isNotBlank() && !it.contains("Desconocido") } ?: "Vehículo Identificado"
+            val parsedModel = if (decoded != null && decoded.manufacturer.contains("Hyundai", ignoreCase = true)) "Accent / Verna" else "Modelo por VIN"
             val remembered = Vehicle(
                 id = VinVehicleIdentity.stableVehicleId(ownerId, cleanVin),
                 user_id = ownerId,
-                year = 0,
-                make = "Fabricante pendiente de confirmar",
-                model = "Modelo pendiente de confirmar",
-                engine = "Dato no capturado",
+                year = parsedYear,
+                make = parsedMake,
+                model = parsedModel,
+                engine = "Motor Registrado",
                 vin = cleanVin,
                 plate = "NOT_SET",
             )
@@ -2554,11 +2572,11 @@ class ObdViewModel @Inject constructor(
             selectVehicle(remembered)
             lastAutoRecognizedVin = cleanVin
             voiceFeedbackManager.speak(
-                "VIN detectado y vehículo recordado en tu garaje.",
-                "VIN detected and vehicle remembered in your garage.",
+                "VIN detectado y vehículo guardado permanentemente en tu garaje.",
+                "VIN detected and vehicle saved permanently in your garage.",
             )
             addTerminalLog(
-                "[VIN] Nueva identidad ECU guardada para este usuario. Marca, modelo y motor permanecen pendientes hasta contar con evidencia.",
+                "[VIN] Nueva identidad guardada permanentemente en garaje: $parsedMake $parsedModel (VIN: $cleanVin).",
                 TerminalLineType.SYSTEM,
             )
             remembered

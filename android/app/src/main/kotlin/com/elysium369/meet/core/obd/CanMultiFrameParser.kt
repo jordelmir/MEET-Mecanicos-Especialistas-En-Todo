@@ -92,40 +92,60 @@ object CanMultiFrameParser {
     }
 
     fun decodeVin(rawResponse: String): String {
-        val fullHex = parse(rawResponse)
-        
-        // Search for 49 02 response
-        val idx = fullHex.uppercase().indexOf("4902")
-        if (idx < 0) return "N/A"
-        
-        // Mode 09 PID 02 data format: 
-        // 49 02 [Number of data items (1 byte)] [VIN Data...]
-        // Skip 49 02 + 01 (often 01 data item)
-        var dataStart = idx + 6
-        
+        if (rawResponse.isBlank()) return "N/A"
+
+        // 1. Direct ASCII extraction if 17-char VIN is present in raw response
+        val asciiMatch = Regex("\\b[A-HJ-NPR-Z0-9]{17}\\b", RegexOption.IGNORE_CASE).find(rawResponse)
+        if (asciiMatch != null && VinDecoder.validateCheckDigit(asciiMatch.value.uppercase())) {
+            return asciiMatch.value.uppercase()
+        }
+
+        val fullHex = parse(rawResponse).uppercase()
+
+        // Search for known VIN response service prefixes
+        // 4902 (Mode 09 PID 02), 62F190 (UDS Read DID F190), 5A90 (KWP2000 1A 90), 6100 (Mode 21 00)
+        val prefixes = listOf("4902", "62F190", "5A90", "6100")
+        var dataStart = -1
+
+        for (prefix in prefixes) {
+            val idx = fullHex.indexOf(prefix)
+            if (idx >= 0) {
+                dataStart = if (prefix == "4902") idx + 6 else idx + prefix.length
+                break
+            }
+        }
+
+        if (dataStart < 0) {
+            // Check if full string itself is hex-encoded ASCII
+            if (fullHex.length >= 34) {
+                dataStart = 0
+            } else {
+                return "N/A"
+            }
+        }
+
         val data = fullHex.substring(minOf(dataStart, fullHex.length))
         val vin = StringBuilder()
-        
+
         for (i in 0 until data.length - 1 step 2) {
             try {
                 val hexChar = data.substring(i, i + 2)
-                // Ignorar explícitamente bytes de relleno comunes en tramas CAN (como AA, 55, 00, FF)
-                if (hexChar.equals("AA", ignoreCase = true) || 
-                    hexChar.equals("55", ignoreCase = true) || 
-                    hexChar.equals("FF", ignoreCase = true) || 
-                    hexChar.equals("00", ignoreCase = true)) {
+                if (hexChar.equals("AA", ignoreCase = true) ||
+                    hexChar.equals("55", ignoreCase = true) ||
+                    hexChar.equals("FF", ignoreCase = true) ||
+                    hexChar.equals("00", ignoreCase = true)
+                ) {
                     continue
                 }
                 val b = hexChar.toInt(16)
                 val c = b.toChar()
-                // Un VIN real solo contiene caracteres alfanuméricos
-                if (c.isLetterOrDigit()) {
+                if (c.isLetterOrDigit() && c.uppercaseChar() !in listOf('I', 'O', 'Q')) {
                     vin.append(c.uppercaseChar())
                 }
             } catch (_: Exception) {}
         }
-        
+
         val result = vin.toString().trim()
-        return if (result.length >= 17) result.take(17) else if (result.isNotEmpty()) result else "N/A"
+        return if (result.length >= 17) result.take(17) else if (result.length in 11..16) result else "N/A"
     }
 }

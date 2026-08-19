@@ -3204,14 +3204,23 @@ class ObdSession(
 
     suspend fun fetchVin(): String {
         if (_state.value != ObdState.CONNECTED) return "N/A"
-        return try {
-            val response = sendRawCommand("0902")
-            val vin = CanMultiFrameParser.decodeVin(response)
-            if (vin.isNotBlank() && vin != "N/A") {
-                _vin.value = vin
-                vin
-            } else "N/A"
-        } catch (_: Exception) { "Error al leer VIN" }
+        
+        // Multi-protocol VIN candidate commands
+        val vinCommands = listOf("0902", "22F190", "1A90", "2100")
+        for (cmd in vinCommands) {
+            try {
+                val response = sendRawCommand(cmd)
+                val vin = CanMultiFrameParser.decodeVin(response)
+                if (vin.isNotBlank() && vin != "N/A") {
+                    _vin.value = vin
+                    Log.i(TAG, "✓ VIN captured via $cmd: $vin")
+                    return vin
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "VIN probe $cmd failed: ${e.message}")
+            }
+        }
+        return "N/A"
     }
 
     /**
