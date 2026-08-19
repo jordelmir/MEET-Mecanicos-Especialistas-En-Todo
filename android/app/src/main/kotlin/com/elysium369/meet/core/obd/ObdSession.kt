@@ -3926,6 +3926,15 @@ class ObdSession(
 
         // Save for next time
         fingerprint.saveProfile(address, profile)
+        runCatching {
+            KnownGoodAdapterStore.recordSuccess(
+                fingerprint = address,
+                transportType = if (targetAddress?.startsWith("BLE_") == true) TransportType.BLUETOOTH_LE else TransportType.BLUETOOTH_CLASSIC,
+                connectMethod = ConnectMethod.REFLECTION_CH1,
+                protocol = profile.detectedProtocol.name,
+                connectDurationMs = profile.baseDelayMs
+            )
+        }
 
         // Apply profile to session
         adapterVersion = profile.chipVersion
