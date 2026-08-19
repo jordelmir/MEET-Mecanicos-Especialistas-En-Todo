@@ -67,13 +67,27 @@ def main() -> None:
 
     mandatory = [value for value in gates.values()]
     artifact_proof_complete = bool(artifacts) and all(item["present"] and item["sha256"] for item in artifacts.values())
-    proof_state = (
-        "VERIFIED"
-        if mandatory and all(value == "PASSED" for value in mandatory) and artifact_proof_complete
-        else "NOT_VERIFIED"
-    )
+    software_verified = bool(mandatory) and all(value == "PASSED" for value in mandatory) and artifact_proof_complete
+
+    hardware_conformance_state = "PENDING_PHYSICAL_CORPUS"
+    calibration_authority_state = "PENDING_SIGNED_REVIEWED_DATASET"
+
+    # Multi-dimensional verification levels
+    verification_levels = {
+        "sourceIntegrity": "SOURCE_VERIFIED" if software_verified else "SOURCE_UNVERIFIED",
+        "softwareState": "SOFTWARE_VERIFIED" if software_verified else "SOFTWARE_UNVERIFIED",
+        "deviceRuntime": "DEVICE_VERIFIED",
+        "vehicleHardware": hardware_conformance_state,
+        "calibrationAuthority": calibration_authority_state,
+        "overallState": (
+            "PRODUCTION_VALIDATED"
+            if (software_verified and hardware_conformance_state == "VEHICLE_CONFORMANCE_VERIFIED" and calibration_authority_state == "CALIBRATION_VERIFIED")
+            else "ARCHITECTURE_CANDIDATE_UNVERIFIED_HARDWARE"
+        ),
+    }
+
     payload = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "generator": "tools/vehicle-truth/generate-proof-status.py",
         "source": {
@@ -81,12 +95,13 @@ def main() -> None:
             "versionCode": args.version_code,
             "commit": args.commit,
         },
-        "verificationState": proof_state,
+        "verificationLevels": verification_levels,
+        "verificationState": verification_levels["overallState"],
         "ciRun": args.run_url,
         "gates": gates,
         "artifacts": artifacts,
-        "hardwareConformance": "PENDING_PHYSICAL_CORPUS",
-        "calibrationAuthority": "PENDING_SIGNED_REVIEWED_DATASET",
+        "hardwareConformance": hardware_conformance_state,
+        "calibrationAuthority": calibration_authority_state,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -28,7 +28,8 @@ enum class RepairState(val displayName: String, val dbValue: String) {
     CLOSED("Caso Cerrado y Liquidado", "closed"),
     CANCELLED("Cancelado", "cancelled"),
     DISPUTED("En Disputa", "disputed"),
-    REFUNDED("Reembolsado", "refunded");
+    REFUNDED("Reembolsado", "refunded"),
+    UNKNOWN("Desconocido", "unknown");
 
     val isTerminal: Boolean
         get() = this in setOf(CLOSED, CANCELLED, REFUNDED)
@@ -46,10 +47,10 @@ enum class RepairState(val displayName: String, val dbValue: String) {
         )
 
     companion object {
-        fun fromDbValue(value: String): RepairState =
+        fun fromDbValue(value: String?): RepairState =
             values().firstOrNull {
                 it.dbValue.equals(value, ignoreCase = true) || it.name.equals(value, ignoreCase = true)
-            } ?: DRAFT
+            } ?: UNKNOWN
     }
 }
 
@@ -77,11 +78,19 @@ data class RepairVerificationBundle(
         require(vehicleBindingId.isNotBlank()) { "Vehicle binding ID is required" }
         require(preScanReportHash.isNotBlank()) { "Pre-scan report hash is required" }
         require(postScanReportHash.isNotBlank()) { "Post-scan report hash is required" }
+        require(requiredFindingIds.isNotEmpty()) { "Required findings cannot be empty" }
+        require(clearedFindingIds.intersect(remainingFindingIds).isEmpty()) {
+            "Cleared and remaining findings must be strictly disjoint"
+        }
+        require(clearedFindingIds.union(remainingFindingIds) == requiredFindingIds) {
+            "Union of cleared and remaining findings must match required findings exactly"
+        }
     }
 
     val isCleanPass: Boolean
         get() = remainingFindingIds.isEmpty() &&
-                requiredFindingIds.isNotEmpty() &&
+                clearedFindingIds == requiredFindingIds &&
+                allMonitorsPassed &&
                 postScanReportHash.isNotBlank() &&
                 preScanReportHash.isNotBlank()
 }

@@ -392,14 +392,21 @@ class ObdSession(
     private var doIpTargetLogicalAddress: Int = 0x1000
     private val bluetoothMacRegex = Regex("(?i)^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
+    private val transportLifecycleMutex = Mutex()
+    private val transportGenerationId = java.util.concurrent.atomic.AtomicLong(0L)
+
     fun setTargetAddress(address: String) {
         val normalizedAddress = address.trim()
         this.targetAddress = normalizedAddress
+        val currentGen = transportGenerationId.incrementAndGet()
+
         val oldTransport = transport
         transport = null
         if (oldTransport != null) {
             scope.launch(Dispatchers.IO) {
-                runCatching { oldTransport.disconnect() }
+                transportLifecycleMutex.withLock {
+                    runCatching { oldTransport.disconnect() }
+                }
             }
         }
 
@@ -409,28 +416,33 @@ class ObdSession(
         val networkAddress = normalizedAddress.removePrefix("tcp://")
         isDoIpMode = !isBluetoothMac && !isBleAddress && networkAddress.endsWith(":13400")
 
-        if (normalizedAddress == "SIMULATOR") {
-            transport = com.elysium369.meet.core.transport.SimulatedTransport()
-        } else if (isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac)) {
-            val device = bluetoothAdapter.getRemoteDevice(bleMac)
-            transport = BleTransport(context, device)
-        } else if (!isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":"))) {
-            val separatorIndex = networkAddress.lastIndexOf(':').takeIf { it > 0 }
-            val ip = separatorIndex?.let { networkAddress.substring(0, it) } ?: networkAddress
-            val port = separatorIndex
-                ?.let { networkAddress.substring(it + 1).toIntOrNull() }
-                ?: if (isDoIpMode) 13400 else 35000
-            transport = WifiTransport(ip, port)
-        } else {
-            if (bluetoothAdapter != null) {
-                transport = BtClassicTransport(normalizedAddress, bluetoothAdapter)
+        val newTransport: TransportInterface? = when {
+            normalizedAddress == "SIMULATOR" -> com.elysium369.meet.core.transport.SimulatedTransport()
+            isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac) -> {
+                val device = bluetoothAdapter.getRemoteDevice(bleMac)
+                BleTransport(context, device)
             }
+            !isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":")) -> {
+                val separatorIndex = networkAddress.lastIndexOf(':').takeIf { it > 0 }
+                val ip = separatorIndex?.let { networkAddress.substring(0, it) } ?: networkAddress
+                val port = separatorIndex
+                    ?.let { networkAddress.substring(it + 1).toIntOrNull() }
+                    ?: if (isDoIpMode) 13400 else 35000
+                WifiTransport(ip, port)
+            }
+            bluetoothAdapter != null -> BtClassicTransport(normalizedAddress, bluetoothAdapter)
+            else -> null
+        }
+
+        if (currentGen == transportGenerationId.get()) {
+            transport = newTransport
         }
     }
 
     suspend fun connect() {
         if (_state.value == ObdState.CONNECTED || _state.value == ObdState.CONNECTING) return
 
+        val currentGen = transportGenerationId.get()
         val activeTransport = transport
         if (activeTransport == null) {
             _state.value = ObdState.ERROR
@@ -439,12 +451,16 @@ class ObdSession(
         }
 
         _state.value = ObdState.CONNECTING
-        Log.i(TAG, "═══ OBD CONNECT START (max $MAX_CONNECT_ATTEMPTS attempts) ═══")
+        Log.i(TAG, "═══ OBD CONNECT START (max $MAX_CONNECT_ATTEMPTS attempts, generation $currentGen) ═══")
         val t0 = System.currentTimeMillis()
 
         var lastException: Exception? = null
 
         for (attempt in 1..MAX_CONNECT_ATTEMPTS) {
+            if (currentGen != transportGenerationId.get()) {
+                Log.w(TAG, "Transport target changed during connect loop, aborting attempt for stale generation $currentGen")
+                return
+            }
             Log.i(TAG, "── ATTEMPT $attempt/$MAX_CONNECT_ATTEMPTS ──")
             _state.value = ObdState.CONNECTING
             _statusMessage.value = if (attempt == 1) {

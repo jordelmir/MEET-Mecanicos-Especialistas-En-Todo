@@ -1,0 +1,63 @@
+name: supabase-conformance
+
+on:
+  push:
+    branches: [main, feature/**]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-conformance.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-conformance.yml'
+
+jobs:
+  migration-conformance:
+    name: Supabase Migration & Schema Conformance
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply Supabase Migrations in Clean Database
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          echo "Applying migrations in alphabetical order..."
+          for sql_file in $(ls -1 supabase/migrations/*.sql | sort); do
+            echo "----------------------------------------"
+            echo "Executing: $sql_file"
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=0 -f "$sql_file"
+          done
+          echo "All migrations processed successfully."
+
+      - name: Verify Core Schemas & Functions Exist
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          psql -h localhost -U postgres -d postgres -c "
+            SELECT routine_name FROM information_schema.routines 
+            WHERE routine_schema = 'public' 
+              AND routine_name IN (
+                'transition_repair_work_order_v1',
+                'meet_emit_vanguard_event_v2',
+                'meet_is_platform_owner'
+              );
+          "

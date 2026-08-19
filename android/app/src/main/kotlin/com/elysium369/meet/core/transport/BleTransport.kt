@@ -59,6 +59,7 @@ class BleTransport(
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     private val gattMutex = Mutex()
+    private val gattOperationMutex = Mutex()
 
     private val connectionGeneration = AtomicLong(0L)
 
@@ -68,9 +69,22 @@ class BleTransport(
     @Volatile
     private var writeDeferred: CompletableDeferred<Boolean>? = null
 
+    @Volatile
+    private var descriptorDeferred: CompletableDeferred<Boolean>? = null
+
+    @Volatile
+    private var mtuDeferred: CompletableDeferred<Int>? = null
+
+    @Volatile
+    private var servicesDeferred: CompletableDeferred<Int>? = null
+
     // Fragment accumulator — Thread-safe and bounded
     private val responseAccumulator = StringBuffer()
     private val responseReady = Channel<String>(64)
+
+    // Telemetry
+    val droppedResponseCount = AtomicLong(0L)
+    val accumulatorOverflowCount = AtomicLong(0L)
 
     @Volatile
     private var connected = false
@@ -96,8 +110,8 @@ class BleTransport(
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                runCatching { gatt.requestMtu(512) }
-                gatt.discoverServices()
+                connected = true
+                connectionDeferred?.complete(true)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 connected = false
                 connectionDeferred?.complete(false)
@@ -108,7 +122,7 @@ class BleTransport(
             val activeGatt = this@BleTransport.gatt
             if (activeGatt == null || activeGatt !== gatt) return
             Log.d(TAG, "onMtuChanged mtu=$mtu status=$status")
-            gatt.discoverServices()
+            mtuDeferred?.complete(if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23)
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -116,44 +130,7 @@ class BleTransport(
             if (activeGatt == null || activeGatt !== gatt) return
 
             Log.d(TAG, "onServicesDiscovered status=$status")
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                var foundWrite = false
-                var cccdPending = false
-
-                for (service in gatt.services) {
-                    if (SERVICE_UUIDS.contains(service.uuid)) {
-                        for (char in service.characteristics) {
-                            if (CHAR_WRITE_UUIDS.contains(char.uuid)) {
-                                writeChar = char
-                                foundWrite = true
-                            }
-                            if (CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
-                                gatt.setCharacteristicNotification(char, true)
-                                val desc = char.getDescriptor(CCCD_UUID)
-                                if (desc != null) {
-                                    cccdPending = true
-                                    val value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        gatt.writeDescriptor(desc, value)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        desc.value = value
-                                        @Suppress("DEPRECATION")
-                                        gatt.writeDescriptor(desc)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (!cccdPending && foundWrite) {
-                    connected = true
-                    connectionDeferred?.complete(true)
-                }
-            } else {
-                connectionDeferred?.complete(false)
-            }
+            servicesDeferred?.complete(status)
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
@@ -161,12 +138,7 @@ class BleTransport(
             if (activeGatt == null || activeGatt !== gatt) return
 
             Log.d(TAG, "onDescriptorWrite status=$status desc=${descriptor.uuid}")
-            if (descriptor.uuid == CCCD_UUID && status == BluetoothGatt.GATT_SUCCESS) {
-                connected = (writeChar != null)
-                connectionDeferred?.complete(connected)
-            } else if (status != BluetoothGatt.GATT_SUCCESS) {
-                connectionDeferred?.complete(false)
-            }
+            descriptorDeferred?.complete(status == BluetoothGatt.GATT_SUCCESS)
         }
 
         override fun onCharacteristicWrite(
@@ -203,6 +175,7 @@ class BleTransport(
             val chunk = String(value, Charsets.ISO_8859_1)
             if (responseAccumulator.length + chunk.length > MAX_ACCUMULATOR_BYTES) {
                 Log.w(TAG, "BLE accumulator overflow protection triggered; resetting buffer")
+                accumulatorOverflowCount.incrementAndGet()
                 responseAccumulator.setLength(0)
             }
             responseAccumulator.append(chunk)
@@ -214,7 +187,11 @@ class BleTransport(
             ) {
                 val fullResponse = responseAccumulator.toString()
                 responseAccumulator.setLength(0)
-                responseReady.trySend(fullResponse)
+                val sendResult = responseReady.trySend(fullResponse)
+                if (sendResult.isFailure) {
+                    Log.w(TAG, "BLE response queue full, dropped response")
+                    droppedResponseCount.incrementAndGet()
+                }
             }
         }
     }
@@ -233,12 +210,78 @@ class BleTransport(
 
                 gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
 
-                val success = withTimeout(7000L) {
+                val linkEstablished = withTimeout(7000L) {
                     deferred.await()
                 }
 
-                if (success && connected && gen == connectionGeneration.get()) {
-                    // Send ELM readiness probe and validate response semantically
+                if (!linkEstablished || gen != connectionGeneration.get()) {
+                    disconnect()
+                    continue
+                }
+
+                val currentGatt = gatt ?: throw TransportRemoteClosed("GATT instance is null")
+
+                // Serialized GATT Operation Queue
+                gattOperationMutex.withLock {
+                    // 1. Request MTU
+                    val mDeferred = CompletableDeferred<Int>()
+                    mtuDeferred = mDeferred
+                    runCatching { currentGatt.requestMtu(512) }
+                    withTimeoutOrNull(2000L) { mDeferred.await() }
+
+                    // 2. Discover Services
+                    val sDeferred = CompletableDeferred<Int>()
+                    servicesDeferred = sDeferred
+                    currentGatt.discoverServices()
+                    val sStatus = withTimeout(4000L) { sDeferred.await() }
+                    if (sStatus != BluetoothGatt.GATT_SUCCESS) {
+                        throw TransportRemoteClosed("Service discovery failed with status $sStatus")
+                    }
+
+                    // 3. Resolve OBD Characteristic Profile
+                    var selectedWrite: BluetoothGattCharacteristic? = null
+                    var selectedNotify: BluetoothGattCharacteristic? = null
+
+                    for (service in currentGatt.services) {
+                        if (SERVICE_UUIDS.contains(service.uuid)) {
+                            for (char in service.characteristics) {
+                                if (selectedWrite == null && CHAR_WRITE_UUIDS.contains(char.uuid)) {
+                                    selectedWrite = char
+                                }
+                                if (selectedNotify == null && CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
+                                    selectedNotify = char
+                                }
+                            }
+                        }
+                    }
+
+                    writeChar = selectedWrite ?: throw TransportRemoteClosed("No compatible OBD write characteristic found")
+                    val notifyChar = selectedNotify ?: throw TransportRemoteClosed("No compatible OBD notify characteristic found")
+
+                    // 4. Enable Notifications & Write CCCD Descriptor
+                    currentGatt.setCharacteristicNotification(notifyChar, true)
+                    val desc = notifyChar.getDescriptor(CCCD_UUID)
+                    if (desc != null) {
+                        val dDeferred = CompletableDeferred<Boolean>()
+                        descriptorDeferred = dDeferred
+                        val value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            currentGatt.writeDescriptor(desc, value)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            desc.value = value
+                            @Suppress("DEPRECATION")
+                            currentGatt.writeDescriptor(desc)
+                        }
+                        val dSuccess = withTimeout(3000L) { dDeferred.await() }
+                        if (!dSuccess) {
+                            throw TransportRemoteClosed("Descriptor write rejected by adapter")
+                        }
+                    }
+                }
+
+                if (gen == connectionGeneration.get() && writeChar != null) {
+                    // Send ELM readiness probe and validate response semantically (reject '?')
                     drain()
                     val probeResult = runCatching {
                         write("\r".toByteArray(Charsets.ISO_8859_1))
@@ -251,9 +294,8 @@ class BleTransport(
                         probeStr.contains('>') ||
                         probeStr.contains("ELM", ignoreCase = true) ||
                         probeStr.contains("OK", ignoreCase = true) ||
-                        probeStr.contains("41") ||
-                        probeStr.contains("?")
-                    )
+                        probeStr.contains("41")
+                    ) && !probeStr.contains("?")
 
                     if (isElmReady) {
                         Log.i(TAG, "✓ BLE GATT Link and verified ELM readiness established on attempt $attempt")

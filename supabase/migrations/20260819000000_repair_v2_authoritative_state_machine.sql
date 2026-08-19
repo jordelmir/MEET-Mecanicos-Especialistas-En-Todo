@@ -1,15 +1,83 @@
 -- 20260819000000_repair_v2_authoritative_state_machine.sql
 -- Enforce strict server-authoritative state transitions, role gating, NULL-safe participant checks,
--- version increments, timestamp updates, evidence materialization and status parity with Android RepairStateEngine.
+-- optimistic locking via expected_version, idempotency equivocation protection,
+-- canonical vanguard_events emission, and strictly typed evidence materialization.
 
+-- 1. Canonical Vanguard Domain Event Helper Function
+CREATE OR REPLACE FUNCTION public.meet_emit_vanguard_event_v2(
+  p_aggregate_type TEXT,
+  p_aggregate_id TEXT,
+  p_event_type TEXT,
+  p_actor_id TEXT,
+  p_actor_role TEXT,
+  p_source TEXT,
+  p_idempotency_key TEXT,
+  p_payload_json TEXT,
+  p_correlation_id TEXT DEFAULT NULL,
+  p_causation_id TEXT DEFAULT NULL,
+  p_schema_version INT DEFAULT 1
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_event_id TEXT := 'evt_' || gen_random_uuid()::text;
+  v_occurred_at_ms BIGINT := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
+BEGIN
+  INSERT INTO public.vanguard_events (
+    event_id,
+    aggregate_type,
+    aggregate_id,
+    event_type,
+    actor_id,
+    actor_role,
+    source,
+    correlation_id,
+    causation_id,
+    idempotency_key,
+    payload_json,
+    schema_version,
+    occurred_at_ms,
+    created_at
+  ) VALUES (
+    v_event_id,
+    p_aggregate_type,
+    p_aggregate_id,
+    p_event_type,
+    p_actor_id,
+    p_actor_role,
+    COALESCE(p_source, 'server_rpc'),
+    p_correlation_id,
+    p_causation_id,
+    p_idempotency_key,
+    p_payload_json,
+    p_schema_version,
+    v_occurred_at_ms,
+    NOW()
+  )
+  ON CONFLICT (idempotency_key) DO NOTHING;
+
+  RETURN v_event_id;
+EXCEPTION WHEN undefined_table THEN
+  RETURN NULL;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.meet_emit_vanguard_event_v2 FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.meet_emit_vanguard_event_v2 TO authenticated, service_role;
+
+-- 2. Authoritative State Machine RPC for Repair Work Orders
 CREATE OR REPLACE FUNCTION public.transition_repair_work_order_v1(
   p_work_order_id UUID,
   p_actor_id UUID,
   p_actor_role TEXT,
   p_to_status TEXT,
   p_reason TEXT,
-  p_evidence JSONB,
-  p_idempotency_key TEXT
+  p_evidence JSONB DEFAULT NULL,
+  p_idempotency_key TEXT DEFAULT NULL,
+  p_expected_version INT DEFAULT NULL
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -23,14 +91,15 @@ DECLARE
   v_mechanic_user_profile_id UUID;
   v_request_id UUID;
   v_current_version INT;
-  v_event_id TEXT;
   v_item JSONB;
   v_evidence_type TEXT;
   v_file_hash TEXT;
   v_file_url TEXT;
   v_caption TEXT;
-  v_primary_evidence_hash TEXT := NULL;
+  v_post_scan_hash TEXT := NULL;
+  v_invoice_hash TEXT := NULL;
   v_is_valid_transition BOOLEAN := FALSE;
+  v_idem_key TEXT;
 BEGIN
   -- 1. Validate Target Status Parity (Including validation_passed and validation_failed)
   IF p_to_status NOT IN (
@@ -55,7 +124,12 @@ BEGIN
     RAISE EXCEPTION 'Work order not found';
   END IF;
 
-  -- 3. Validate Participant Identity with NULL-safe checks
+  -- 3. Optimistic Concurrency Check (Fail-closed against stale writes)
+  IF p_expected_version IS NOT NULL AND v_current_version != p_expected_version THEN
+    RAISE EXCEPTION 'STALE_COMMAND: Expected version %, but current work order version is %', p_expected_version, v_current_version;
+  END IF;
+
+  -- 4. Validate Participant Identity with NULL-safe checks
   IF p_actor_role = 'customer' THEN
     IF p_actor_id IS DISTINCT FROM v_customer_id THEN
       RAISE EXCEPTION 'Customer % is not the owner of work order %', p_actor_id, p_work_order_id;
@@ -71,17 +145,26 @@ BEGIN
     RAISE EXCEPTION 'Invalid actor role: %', p_actor_role;
   END IF;
 
-  -- 4. Idempotency Check
-  IF EXISTS (
+  -- 5. Idempotency Check with Equivocation Protection
+  v_idem_key := COALESCE(p_idempotency_key, 'idem_' || gen_random_uuid()::text);
+  IF p_idempotency_key IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.repair_status_events
     WHERE idempotency_key = p_idempotency_key
   ) THEN
-    RETURN TRUE;
+    IF EXISTS (
+      SELECT 1 FROM public.repair_status_events
+      WHERE idempotency_key = p_idempotency_key
+        AND work_order_id = p_work_order_id
+        AND to_status = p_to_status
+    ) THEN
+      RETURN TRUE;
+    ELSE
+      RAISE EXCEPTION 'IDEMPOTENCY_EQUIVOCATION: Idempotency key % was already used for a different transition', p_idempotency_key;
+    END IF;
   END IF;
 
-  -- 5. Strict Server-Side State Machine Matrix Check
+  -- 6. Strict Server-Side State Machine Matrix Check
   IF p_actor_role IN ('admin', 'system') THEN
-    -- Admin override must still follow non-terminal transition sanity
     IF v_from_status IN ('cancelled', 'refunded', 'closed') AND p_to_status NOT IN ('disputed', 'refunded', 'closed') THEN
       RAISE EXCEPTION 'Cannot revive terminal work order from % to %', v_from_status, p_to_status;
     END IF;
@@ -106,7 +189,7 @@ BEGIN
         IF p_to_status IN ('validation_pending', 'repair_completed') AND p_actor_role = 'mechanic' THEN v_is_valid_transition := TRUE; END IF;
       WHEN 'validation_pending' THEN
         IF p_to_status = 'validation_passed' AND p_actor_role = 'mechanic' THEN
-          -- Validation passed strictly requires non-empty evidence
+          -- Validation passed strictly requires non-empty post-scan evidence
           IF p_evidence IS NULL OR (jsonb_typeof(p_evidence) = 'array' AND jsonb_array_length(p_evidence) = 0) THEN
             RAISE EXCEPTION 'Transition to validation_passed requires post-scan verification evidence';
           END IF;
@@ -131,20 +214,25 @@ BEGIN
     RAISE EXCEPTION 'Illegal state transition from % to % by actor role %', v_from_status, p_to_status, p_actor_role;
   END IF;
 
-  -- 6. Insert Evidence Blobs & Extract Primary Evidence Hash
+  -- 7. Insert Evidence Blobs & Extract Strictly Typed Evidence Hashes
   IF COALESCE(jsonb_typeof(p_evidence), 'array') = 'array' THEN
     FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_evidence, '[]'::jsonb))
     LOOP
-      v_evidence_type := COALESCE(v_item->>'evidence_type', v_item->>'type');
+      v_evidence_type := UPPER(COALESCE(v_item->>'evidence_type', v_item->>'type', ''));
       v_file_hash := COALESCE(v_item->>'file_hash', v_item->>'hash');
       v_file_url := COALESCE(v_item->>'file_url', v_item->>'url');
       v_caption := v_item->>'caption';
 
-      IF v_file_hash IS NOT NULL AND v_primary_evidence_hash IS NULL THEN
-        v_primary_evidence_hash := v_file_hash;
+      -- Avoid evidence type confusion
+      IF v_file_hash IS NOT NULL THEN
+        IF v_evidence_type IN ('POST_SCAN_REPORT', 'POST_SCAN', 'DTC_SCAN') AND v_post_scan_hash IS NULL THEN
+          v_post_scan_hash := v_file_hash;
+        ELSIF v_evidence_type IN ('FINAL_INVOICE', 'INVOICE', 'RECEIPT') AND v_invoice_hash IS NULL THEN
+          v_invoice_hash := v_file_hash;
+        END IF;
       END IF;
 
-      IF v_evidence_type IS NOT NULL AND v_file_hash IS NOT NULL THEN
+      IF v_evidence_type <> '' AND v_file_hash IS NOT NULL THEN
         INSERT INTO public.repair_evidence (
           work_order_id,
           evidence_type,
@@ -169,7 +257,7 @@ BEGIN
     END LOOP;
   END IF;
 
-  -- 7. Update Work Order with Version Increment, Timestamps and Evidence Materialization
+  -- 8. Update Work Order with Version Increment, Timestamps and Evidence Materialization
   UPDATE public.repair_work_orders
   SET
     status = p_to_status,
@@ -183,11 +271,11 @@ BEGIN
       ELSE completed_at
     END,
     final_dtc_scan_hash = CASE
-      WHEN p_to_status = 'validation_passed' AND v_primary_evidence_hash IS NOT NULL THEN v_primary_evidence_hash
+      WHEN p_to_status = 'validation_passed' AND v_post_scan_hash IS NOT NULL THEN v_post_scan_hash
       ELSE final_dtc_scan_hash
     END,
     invoice_hash = CASE
-      WHEN p_to_status = 'closed' AND v_primary_evidence_hash IS NOT NULL THEN v_primary_evidence_hash
+      WHEN p_to_status = 'closed' AND v_invoice_hash IS NOT NULL THEN v_invoice_hash
       ELSE invoice_hash
     END,
     updated_at = NOW()
@@ -202,7 +290,7 @@ BEGIN
     WHERE id = v_request_id;
   END IF;
 
-  -- 8. Record Status Transition Event
+  -- 9. Record Status Transition Event
   INSERT INTO public.repair_status_events (
     work_order_id,
     from_status,
@@ -221,40 +309,33 @@ BEGIN
     p_actor_role,
     p_reason,
     p_evidence,
-    p_idempotency_key
+    v_idem_key
   );
 
-  -- 9. Emit Vanguard Domain Event (if vanguard_events table exists)
-  BEGIN
-    INSERT INTO public.vanguard_events (
-      aggregate_id,
-      aggregate_type,
-      event_type,
-      version,
-      payload,
-      occurred_at
-    )
-    VALUES (
-      p_work_order_id,
-      'REPAIR_WORK_ORDER',
-      'WORK_ORDER_STATE_TRANSITIONED',
-      v_current_version + 1,
-      jsonb_build_object(
-        'work_order_id', p_work_order_id,
-        'from_status', v_from_status,
-        'to_status', p_to_status,
-        'actor_id', p_actor_id,
-        'actor_role', p_actor_role,
-        'idempotency_key', p_idempotency_key,
-        'reason', p_reason
-      ),
-      NOW()
-    );
-  EXCEPTION WHEN undefined_table THEN
-    -- vanguard_events table is optional depending on projection architecture
-    NULL;
-  END;
+  -- 10. Emit Vanguard Domain Event via canonical helper
+  PERFORM public.meet_emit_vanguard_event_v2(
+    p_aggregate_type := 'repair_work_order',
+    p_aggregate_id := p_work_order_id::text,
+    p_event_type := 'WORK_ORDER_STATE_TRANSITIONED',
+    p_actor_id := p_actor_id::text,
+    p_actor_role := p_actor_role,
+    p_source := 'repair_state_engine_v1',
+    p_idempotency_key := v_idem_key,
+    p_payload_json := jsonb_build_object(
+      'work_order_id', p_work_order_id,
+      'from_status', v_from_status,
+      'to_status', p_to_status,
+      'actor_id', p_actor_id,
+      'actor_role', p_actor_role,
+      'reason', p_reason,
+      'evidence', p_evidence,
+      'version', v_current_version + 1
+    )::text
+  );
 
   RETURN TRUE;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.transition_repair_work_order_v1 FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.transition_repair_work_order_v1 TO authenticated, service_role;
