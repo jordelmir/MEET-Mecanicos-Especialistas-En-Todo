@@ -418,25 +418,13 @@ private fun ClientWorkspaceView(
                         
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        val displayPriceStr = if (isDolarCurrency) {
-                            val usdVal = priceOfferCrc / 500.0f
-                            String.format(Locale.US, "$%.0f USD", usdVal)
-                        } else {
-                            val crcVal = (priceOfferCrc / 1000.0f).toInt() * 1000
-                            "₡${String.format(Locale.US, "%,d", crcVal)} CRC"
-                        }
+                        val displayPriceStr = com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOfferCrc.toLong()).formatted()
 
                         Text(
                             text = displayPriceStr,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Black,
                             color = TowTruckColors.greenAccent
-                        )
-                        
-                        Text(
-                            text = if (isDolarCurrency) "Equivalent a ₡${(priceOfferCrc).toInt()} CRC approx" else "Equivalente a $${(priceOfferCrc / 500).toInt()} USD approx",
-                            fontSize = 11.sp,
-                            color = TowTruckColors.textSecondary
                         )
 
                         Slider(
@@ -455,7 +443,6 @@ private fun ClientWorkspaceView(
                             val lat = latText.toDoubleOrNull() ?: 9.9281
                             val lng = lngText.toDoubleOrNull() ?: -84.0907
                             val loc = if (locationName.isBlank()) "Ubicación GPS detectada" else locationName
-                            val priceInUsd = (priceOfferCrc / 500.0f).toDouble()
                             viewModel.createTowTruckRequest(
                                 latitude = lat,
                                 longitude = lng,
@@ -464,7 +451,7 @@ private fun ClientWorkspaceView(
                                 destLng = null,
                                 destName = destinationName.takeIf { it.isNotBlank() },
                                 phone = phone,
-                                priceOffer = priceInUsd,
+                                priceOffer = priceOfferCrc.toDouble(),
                                 vehicleInfoOverride = vehicleInfoToUse
                             )
                             locationName = ""
@@ -663,9 +650,7 @@ private fun RequestCardItem(
                 ) {
                     Text(request.status, color = statusColor, fontWeight = FontWeight.Black, fontSize = 12.sp)
                 }
-                var showInUsd by remember { mutableStateOf(false) }
-                val priceCrc = (request.priceOffer * 500).toInt()
-                val priceFormatted = if (showInUsd) "$${request.priceOffer.toInt()} USD" else "₡${String.format(Locale.US, "%,d", priceCrc)} CRC"
+                val priceFormatted = com.elysium369.meet.core.services.kernel.Money.ofCrc(request.priceOffer.toLong()).formatted()
                 
                 Text(
                     text = priceFormatted,
@@ -674,7 +659,6 @@ private fun RequestCardItem(
                     color = TowTruckColors.greenAccent,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { showInUsd = !showInUsd }
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }

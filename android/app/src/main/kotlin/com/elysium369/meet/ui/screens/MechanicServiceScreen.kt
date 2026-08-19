@@ -501,13 +501,7 @@ private fun ClientWorkspaceView(
                         }
                     }
 
-                    val priceInColones = priceOfferCrc
-                    val priceInDollars = priceOfferCrc / 500.0f
-                    val displayPrice = if (isDolarCurrency) {
-                        String.format("$%.2f USD", priceInDollars)
-                    } else {
-                        String.format("₡%,.0f Colones", priceInColones)
-                    }
+                    val displayPrice = com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOfferCrc.toLong()).formatted()
 
                     Text(
                         text = displayPrice,
@@ -1153,7 +1147,7 @@ private fun RequestCardItem(
                 }
 
                 Text(
-                    text = String.format("₡%,.0f / $%.0f USD", priceInCrc, request.priceOffer),
+                    text = com.elysium369.meet.core.services.kernel.Money.ofCrc(request.priceOffer.toLong()).formatted(),
                     fontWeight = FontWeight.Black,
                     color = MechanicColors.greenAccent,
                     fontSize = 16.sp
