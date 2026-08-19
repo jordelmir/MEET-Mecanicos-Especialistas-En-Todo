@@ -36,7 +36,7 @@ object DiagnosticScanPlanCompiler {
                 }
             }
 
-        if (mode == DiagnosticScanMode.QUICK) return confirmed.values.toList()
+        if (mode == DiagnosticScanMode.QUICK || mode == DiagnosticScanMode.CLEAR_VERIFY) return confirmed.values.toList()
 
         val plan = LinkedHashMap(confirmed)
         discoveryCandidates.forEach { (address, name) ->

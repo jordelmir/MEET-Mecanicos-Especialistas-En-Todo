@@ -49,6 +49,7 @@ enum class ScanCompleteness {
 enum class DiagnosticScanMode {
     QUICK,
     FULL_VEHICLE,
+    CLEAR_VERIFY,
 }
 
 data class ScanProgressState(

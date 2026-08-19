@@ -101,19 +101,15 @@ class BtClassicTransport(
                 
                 Log.d(TAG, "Device resolved: name=$deviceName, type=$deviceType, bondState=$bondState")
                 
-                // 1. HARD RESET — Ensure radio is clean and not searching
+                // 1. HARD RESET — Ensure radio is clean and not searching. Always cancel discovery prior to connecting.
                 try {
-                    val isScanning = runCatching { bluetoothAdapter.isDiscovering }.getOrDefault(false)
-                    if (isScanning) {
-                        Log.d(TAG, "Cancelling active BT discovery...")
-                        runCatching { bluetoothAdapter.cancelDiscovery() }
-                        delay(200)
-                    }
+                    bluetoothAdapter.cancelDiscovery()
+                    delay(150)
                 } catch (e: Exception) { 
-                    Log.w(TAG, "Error handling discovery state", e)
+                    Log.w(TAG, "Error cancelling BT discovery", e)
                 }
                 
-                delay(500)
+                delay(200)
 
                 val connectionMethods = mutableListOf<Pair<String, () -> BluetoothSocket?>>()
                 // Prioritize Insecure SPP for ELM327 clones which often fail auth handshake
@@ -129,7 +125,7 @@ class BtClassicTransport(
                     Log.i(TAG, "→ Trying method: $methodName")
                     try {
                         cleanup()
-                        delay(200) // Brief pause before creating socket
+                        delay(100)
                         
                         socket = try {
                             createSocket()
@@ -147,6 +143,8 @@ class BtClassicTransport(
                         }
                         
                         Log.d(TAG, "  Socket created, attempting connect natively...")
+                        // Always ensure discovery is cancelled immediately before the blocking connect call
+                        runCatching { bluetoothAdapter.cancelDiscovery() }
                         socket?.connect()
                         
                         inputStream = BufferedInputStream(socket?.inputStream, 32768)
@@ -170,7 +168,7 @@ class BtClassicTransport(
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
                         cleanup()
-                        delay(500) // Delay before trying next method
+                        delay(250)
                     }
                 }
                 
@@ -178,7 +176,7 @@ class BtClassicTransport(
                 // Format error nicely for UI if it's the classic socket read failed error
                 val errMsg = lastException?.message ?: ""
                 if (errMsg.contains("read failed, socket might closed") || errMsg.contains("timeout")) {
-                    throw java.io.IOException("No se pudo enlazar al ELM327. Desvincula el dispositivo en los ajustes de Bluetooth de Android y vuelve a emparejarlo.")
+                    throw java.io.IOException("No se pudo enlazar al ELM327. Verifica que el adaptador tenga alimentación y que el Bluetooth esté encendido.")
                 }
                 throw lastException ?: java.io.IOException("ELITE LINK FAILURE: El adaptador no respondió a ninguna estrategia de enlace.")
             }
@@ -187,7 +185,7 @@ class BtClassicTransport(
 
     override suspend fun reconnect() {
         disconnect()
-        delay(1000)
+        delay(500)
         connect()
     }
 
@@ -216,11 +214,11 @@ class BtClassicTransport(
                     out.write(data)
                     out.flush()
                 } catch (e: Exception) {
-                    // Check if socket is still alive
                     if (socket?.isConnected != true) {
-                        throw java.io.IOException("Broken Pipe: El adaptador cerró la conexión.")
+                        cleanup()
+                        throw TransportRemoteClosed("Broken Pipe: El adaptador cerró la conexión.")
                     }
-                    throw java.io.IOException("Send Failure: ${e.message}")
+                    throw TransportWriteFailure("Send Failure: ${e.message}", e)
                 }
             }
         }
@@ -233,7 +231,7 @@ class BtClassicTransport(
             try {
                 val tempBuffer = ByteArray(2048)
                 var totalWaited = 0L
-                val pollInterval = 5L  // 5ms polling for latency balance
+                val pollInterval = 5L
 
                 var lastByte: Byte = 0
                 while (totalWaited < timeoutMs) {
@@ -255,6 +253,10 @@ class BtClassicTransport(
                 }
                 if (output.size() > 0) output.toByteArray() else null
             } catch (e: Exception) {
+                if (socket?.isConnected != true || e is java.io.IOException) {
+                    cleanup()
+                    throw TransportReadFailure("Fallo de I/O en socket Bluetooth: ${e.message}", e)
+                }
                 if (output.size() > 0) output.toByteArray() else null
             }
         }

@@ -1,14 +1,21 @@
 package com.elysium369.meet.core.transport
 
 import android.annotation.SuppressLint
-import android.bluetooth.*
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
+import android.util.Log
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 @SuppressLint("MissingPermission")
 class BleTransport(
@@ -16,7 +23,9 @@ class BleTransport(
     private val device: BluetoothDevice
 ) : TransportInterface {
 
-    // UUIDs que usan los clones BLE más comunes — probar todos en orden
+    private val TAG = "EV_BLE"
+
+    // UUIDs que usan los adaptadores BLE OBD2 más comunes
     private val SERVICE_UUIDS = listOf(
         UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb"), // Vgate, genéricos
         UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"), // ELM327 BLE común
@@ -33,52 +42,59 @@ class BleTransport(
         UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb"),
         UUID.fromString("18cda784-4bd3-4370-85bb-bfed91ec86af")
     )
+    private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     
-    private var connectionLatch = CountDownLatch(1)
+    @Volatile
+    private var connectionDeferred: CompletableDeferred<Boolean>? = null
     
-    // ACUMULADOR DE FRAGMENTOS — la clave para clones BLE
-    // Must be thread-safe: accessed from GATT Binder threads
+    // ACUMULADOR DE FRAGMENTOS — Thread-safe
     private val responseAccumulator = StringBuffer()
     private val responseReady = Channel<String>(Channel.UNLIMITED)
     
+    @Volatile
     private var connected = false
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            Log.d(TAG, "onConnectionStateChange status=$status newState=$newState")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // ELYSIUM VANGUARD: Request high priority for lower latency
                 gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                // requestMtu(512) debe ser el PRIMER comando después de onConnectionStateChange
-                gatt.requestMtu(512)
+                // Attempt MTU expansion asynchronously, but proceed with service discovery immediately
+                runCatching { gatt.requestMtu(512) }
+                gatt.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 connected = false
-                connectionLatch.countDown()
+                connectionDeferred?.complete(false)
             }
         }
         
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            // MTU negociado exitosamente — ahora sí iniciar servicio discovery
+            Log.d(TAG, "onMtuChanged mtu=$mtu status=$status")
+            // Ensure service discovery is active
             gatt.discoverServices()
         }
         
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            Log.d(TAG, "onServicesDiscovered status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                var found = false
+                var foundWrite = false
+                var cccdPending = false
+
                 for (service in gatt.services) {
                     if (SERVICE_UUIDS.contains(service.uuid)) {
                         for (char in service.characteristics) {
                             if (CHAR_WRITE_UUIDS.contains(char.uuid)) {
                                 writeChar = char
-                                found = true
+                                foundWrite = true
                             }
                             if (CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
                                 gatt.setCharacteristicNotification(char, true)
-                                // Standard Client Characteristic Config descriptor setup
-                                val desc = char.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+                                val desc = char.getDescriptor(CCCD_UUID)
                                 if (desc != null) {
+                                    cccdPending = true
                                     val value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         gatt.writeDescriptor(desc, value)
@@ -93,13 +109,22 @@ class BleTransport(
                         }
                     }
                 }
-                connected = found
-                connectionLatch.countDown()
+                
+                if (!cccdPending && foundWrite) {
+                    connected = true
+                    connectionDeferred?.complete(true)
+                }
+            } else {
+                connectionDeferred?.complete(false)
             }
         }
 
-        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            // Handle write success/fail if needed for flow control
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            Log.d(TAG, "onDescriptorWrite status=$status desc=${descriptor.uuid}")
+            if (descriptor.uuid == CCCD_UUID && status == BluetoothGatt.GATT_SUCCESS) {
+                connected = (writeChar != null)
+                connectionDeferred?.complete(connected)
+            }
         }
 
         @Deprecated("Deprecated in Java")
@@ -122,8 +147,7 @@ class BleTransport(
             val chunk = String(value, Charsets.ISO_8859_1)
             responseAccumulator.append(chunk)
             
-            // Solo emitir cuando la respuesta esté COMPLETA
-            // Completa = contiene el prompt ">" de ELM327
+            // Solo emitir cuando la respuesta esté COMPLETA (contiene prompt '>' o status codes)
             if (responseAccumulator.contains('>') ||
                 responseAccumulator.contains("NO DATA") ||
                 responseAccumulator.contains("ERROR") ||
@@ -137,51 +161,54 @@ class BleTransport(
     }
 
     override suspend fun connect() {
-        // ELYSIUM VANGUARD: Multi-retry connection for flaky BLE stacks
         var lastException: Exception? = null
-        for (attempt in 0 until 3) {
+        for (attempt in 1..3) {
             try {
                 gatt?.disconnect()
                 gatt?.close()
                 
-                // Reset latch for each connection attempt
-                connectionLatch = CountDownLatch(1)
+                val deferred = CompletableDeferred<Boolean>()
+                connectionDeferred = deferred
                 
                 gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-                val success = connectionLatch.await(8, TimeUnit.SECONDS)
                 
-                if (success && connected) return  // Actually exit the function on success
+                val success = withTimeout(7000L) {
+                    deferred.await()
+                }
                 
-                kotlinx.coroutines.delay(1000)
+                if (success && connected) {
+                    Log.i(TAG, "✓ BLE GATT Link established on attempt $attempt")
+                    return
+                }
+                
+                delay(500)
             } catch (e: Exception) {
                 lastException = e
-                if (attempt == 2) throw e
+                Log.w(TAG, "BLE connect attempt $attempt failed: ${e.message}")
             }
         }
 
-        if (!connected) {
-            gatt?.disconnect()
-            gatt?.close()
-            gatt = null
-            throw Exception("Error de enlace BLE: El adaptador no respondió a la negociación GATT")
-        }
+        disconnect()
+        throw lastException ?: TransportRemoteClosed("Error de enlace BLE: El adaptador no completó la negociación GATT/CCCD")
     }
 
     override suspend fun disconnect() {
-        gatt?.disconnect()
-        gatt?.close()
+        runCatching { gatt?.disconnect() }
+        runCatching { gatt?.close() }
         gatt = null
         connected = false
+        connectionDeferred?.complete(false)
+        connectionDeferred = null
     }
 
     override suspend fun reconnect() {
         disconnect()
-        kotlinx.coroutines.delay(1000)
+        delay(500)
         connect()
     }
 
     override suspend fun write(data: ByteArray) {
-        val char = writeChar ?: throw Exception("Error: Adaptador BLE no inicializado")
+        val char = writeChar ?: throw TransportWriteFailure("Error: Adaptador BLE no inicializado")
         val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
             res == 0
@@ -192,7 +219,7 @@ class BleTransport(
             gatt?.writeCharacteristic(char) ?: false
         }
         if (!success) {
-            throw java.io.IOException("Fallo al escribir en el radio BLE")
+            throw TransportWriteFailure("Fallo al escribir en el radio BLE")
         }
     }
 
@@ -204,7 +231,6 @@ class BleTransport(
     }
 
     override suspend fun drain() {
-        // ELYSIUM VANGUARD: Clear all pending responses in the channel and the string accumulator
         responseAccumulator.setLength(0)
         while (!responseReady.isEmpty) {
             responseReady.tryReceive()

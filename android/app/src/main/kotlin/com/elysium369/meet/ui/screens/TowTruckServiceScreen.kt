@@ -527,8 +527,13 @@ private fun DriverWorkspaceView(
     context: Context,
     onCompleteService: (String, String, String) -> Unit
 ) {
-    var driverName by remember { mutableStateOf("Grúas Express Pro") }
-    var driverPhone by remember { mutableStateOf("+52 55 9999 8888") }
+    val profiles by viewModel.userProviderProfiles.collectAsState()
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val myProfile = profiles.firstOrNull { it.providerType == "TOW_PROVIDER" || it.providerType == "DRIVER" }
+
+    var driverName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Grúas Express Pro") }
+    var driverPhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }
+    val driverId = myProfile?.profileId ?: activePrincipal.id
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -582,7 +587,7 @@ private fun DriverWorkspaceView(
                     onOpenWaze = { viewModel.openWaze(context, req.latitude, req.longitude) },
                     onShareWhatsApp = { viewModel.shareLocationViaWhatsApp(context, req.latitude, req.longitude, req.locationName) },
                     onTakeService = {
-                        viewModel.takeTowTruckRequest(req.requestId, "driver_101", driverName, driverPhone)
+                        viewModel.takeTowTruckRequest(req.requestId, driverId, driverName, driverPhone)
                     }
                 )
             }

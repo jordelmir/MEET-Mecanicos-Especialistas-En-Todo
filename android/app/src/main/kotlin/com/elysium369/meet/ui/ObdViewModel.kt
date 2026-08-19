@@ -1663,6 +1663,32 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    /** Confirms receipt and delivery of the ordered part */
+    fun confirmPartReceipt(partRequestId: String, offerId: String, context: android.content.Context? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                marketplaceDao.updatePartRequestStatus(partRequestId, "COMPLETED", offerId)
+                scheduleVanguardCommerceSync()
+
+                runCatching {
+                    SupabaseManager.client.postgrest["part_requests"].update(
+                        mapOf(
+                            "status" to "COMPLETED",
+                            "statusV2" to "DELIVERED"
+                        )
+                    ) { filter { eq("requestId", partRequestId) } }
+                }
+                withContext(Dispatchers.Main) {
+                    context?.let {
+                        android.widget.Toast.makeText(it, "🎉 ¡Repuesto recibido y confirmado!", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ObdViewModel", "Failed to confirm part receipt", e)
+            }
+        }
+    }
+
     // Background periodic task to poll/sync local Room data with Supabase for Marketplace
     fun startMarketplaceSync() {
         viewModelScope.launch(Dispatchers.IO) {
