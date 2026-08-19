@@ -464,12 +464,24 @@ fun ScannerDiagnosticTab(
                     }
                 } ?: item { Text("Esperando datos de monitores...", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall) }
 
+                // Generate Certified Forensic Report Action
+                if (navController != null) {
+                    item {
+                        com.elysium369.meet.ui.components.EliteButton(
+                            text = "📄 GENERAR REPORTE FORENSE CERTIFICADO (PDF + QR)",
+                            onClick = { navController.navigate("reports") },
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                            color = MeetColors.neonGreen
+                        )
+                    }
+                }
+
                 // Clear DTCs Action
                 item {
-                    com.elysium369.meet.ui.components.EliteButton(
+                    com.elysium369.meet.ui.components.EliteOutlinedButton(
                         text = "BORRAR CÓDIGOS DE FALLA (RESET)",
                         onClick = { showClearDialog = true },
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         color = MeetColors.error
                     )
                 }
