@@ -90,13 +90,21 @@ class ElmNegotiator(private val transport: TransportInterface) {
         var idResponse = ""
         for (attempt in 1..3) {
             idResponse = sendWithTimeout("ATZ\r", 2500)
-            if (isValidIdResponse(idResponse)) break
+            if (isValidIdResponse(idResponse)) {
+                delay(1000) // Essential post-reset stabilization for clone UARTs
+                transport.drain()
+                break
+            }
             
             if (attempt == 2) {
                 idResponse = sendWithTimeout("AT WS\r", 2000)
-                if (isValidIdResponse(idResponse)) break
+                if (isValidIdResponse(idResponse)) {
+                    delay(800)
+                    transport.drain()
+                    break
+                }
             }
-            delay(300)
+            delay(500)
             transport.drain()
         }
 

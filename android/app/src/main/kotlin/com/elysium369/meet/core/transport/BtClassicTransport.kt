@@ -32,9 +32,14 @@ class BtClassicTransport(
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     
     private var socket: BluetoothSocket? = null
-    private var inputStream: BufferedInputStream? = null
-    private var outputStream: BufferedOutputStream? = null
+    private var rawInputStream: InputStream? = null
+    private var rawOutputStream: OutputStream? = null
     private val mutex = Mutex()
+
+    // Continuous In-Memory Receive Buffer
+    private val rxBuffer = java.io.ByteArrayOutputStream(8192)
+    private val rxMutex = Any()
+    private var readerJob: kotlinx.coroutines.Job? = null
 
     // Cached Reflection Methods for Performance
     private val createRfcommMethod by lazy {
@@ -170,13 +175,16 @@ class BtClassicTransport(
                             watchdogJob.cancel()
                         }
                         
-                        inputStream = BufferedInputStream(socket?.inputStream, 32768)
-                        outputStream = BufferedOutputStream(socket?.outputStream, 1024)
+                        rawInputStream = socket?.inputStream
+                        rawOutputStream = socket?.outputStream
                         
                         if (isConnected) {
                             val elapsed = System.currentTimeMillis() - methodStart
                             Log.i(TAG, "  ✓ $methodName CONNECTED in ${elapsed}ms")
                             Log.i(TAG, "═══ BT CONNECT SUCCESS ═══ Total: ${System.currentTimeMillis() - connectStartTime}ms")
+                            
+                            // Start Continuous Reader Worker Thread
+                            startReaderWorker()
                             return@withContext
                         } else {
                             Log.w(TAG, "  ✗ $methodName socket.connect() returned but isConnected=false")
@@ -206,6 +214,31 @@ class BtClassicTransport(
         }
     }
 
+    private fun startReaderWorker() {
+        readerJob?.cancel()
+        synchronized(rxMutex) {
+            rxBuffer.reset()
+        }
+        val stream = rawInputStream ?: return
+        readerJob = CoroutineScope(Dispatchers.IO).launch {
+            val buf = ByteArray(2048)
+            try {
+                while (socket?.isConnected == true) {
+                    val bytesRead = stream.read(buf)
+                    if (bytesRead > 0) {
+                        synchronized(rxMutex) {
+                            rxBuffer.write(buf, 0, bytesRead)
+                        }
+                    } else if (bytesRead < 0) {
+                        break
+                    }
+                }
+            } catch (_: Exception) {
+                // Expected when socket is closed on disconnect
+            }
+        }
+    }
+
     override suspend fun reconnect() {
         disconnect()
         delay(500)
@@ -213,12 +246,17 @@ class BtClassicTransport(
     }
 
     private fun cleanup() {
-        runCatching { inputStream?.close() }
-        runCatching { outputStream?.close() }
+        readerJob?.cancel()
+        readerJob = null
+        runCatching { rawInputStream?.close() }
+        runCatching { rawOutputStream?.close() }
         runCatching { socket?.close() }
         socket = null
-        inputStream = null
-        outputStream = null
+        rawInputStream = null
+        rawOutputStream = null
+        synchronized(rxMutex) {
+            rxBuffer.reset()
+        }
     }
 
     override suspend fun disconnect() {
@@ -232,7 +270,7 @@ class BtClassicTransport(
     override suspend fun write(data: ByteArray) {
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val out = outputStream ?: throw java.io.IOException("Socket Error: Enlace no disponible")
+                val out = rawOutputStream ?: throw java.io.IOException("Socket Error: Enlace no disponible")
                 try {
                     out.write(data)
                     out.flush()
@@ -248,41 +286,28 @@ class BtClassicTransport(
     }
 
     override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
-        return withContext(Dispatchers.IO) {
-            val stream = inputStream ?: return@withContext null
-            val output = java.io.ByteArrayOutputStream()
-            try {
-                val tempBuffer = ByteArray(2048)
-                var totalWaited = 0L
-                val pollInterval = 5L
-
-                var lastByte: Byte = 0
-                while (totalWaited < timeoutMs) {
-                    val available = stream.available()
-                    if (available > 0) {
-                        val toRead = minOf(available, tempBuffer.size)
-                        val bytesRead = stream.read(tempBuffer, 0, toRead)
-                        if (bytesRead > 0) {
-                            output.write(tempBuffer, 0, bytesRead)
-                            lastByte = tempBuffer[bytesRead - 1]
-                            val hasPrompt = (lastByte == '>'.code.toByte())
-                            if (output.size() >= maxBytes || hasPrompt) {
-                                return@withContext output.toByteArray()
-                            }
-                        }
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            synchronized(rxMutex) {
+                val current = rxBuffer.toByteArray()
+                if (current.isNotEmpty()) {
+                    val hasPrompt = current.contains('>'.code.toByte())
+                    if (current.size >= maxBytes || hasPrompt) {
+                        rxBuffer.reset()
+                        return current
                     }
-                    delay(pollInterval)
-                    totalWaited += pollInterval
                 }
-                if (output.size() > 0) output.toByteArray() else null
-            } catch (e: Exception) {
-                if (socket?.isConnected != true || e is java.io.IOException) {
-                    cleanup()
-                    throw TransportReadFailure("Fallo de I/O en socket Bluetooth: ${e.message}", e)
-                }
-                if (output.size() > 0) output.toByteArray() else null
+            }
+            delay(3)
+        }
+        synchronized(rxMutex) {
+            if (rxBuffer.size() > 0) {
+                val res = rxBuffer.toByteArray()
+                rxBuffer.reset()
+                return res
             }
         }
+        return null
     }
 
     /**
@@ -290,21 +315,13 @@ class BtClassicTransport(
      * Essential for high-frequency PID polling.
      */
     override suspend fun drain() {
-        withContext(Dispatchers.IO) {
-            val stream = inputStream ?: return@withContext
-            try {
-                var available = stream.available()
-                while (available > 0) {
-                    stream.skip(available.toLong())
-                    delay(1)
-                    available = stream.available()
-                }
-            } catch (_: Exception) {}
+        synchronized(rxMutex) {
+            rxBuffer.reset()
         }
     }
 
     override val isConnected: Boolean
-        get() = socket?.isConnected == true && inputStream != null && outputStream != null
+        get() = socket?.isConnected == true && rawInputStream != null && rawOutputStream != null
     
     companion object {
         private const val TAG = "EV_BT"
