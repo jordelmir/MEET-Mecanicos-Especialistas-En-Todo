@@ -559,31 +559,6 @@ fun Modifier.crtScanlines(color: Color = Color.Black.copy(alpha = 0.12f)): Modif
     }
 }
 
-private fun Map<String, Float>.resolveGaugeValue(pid: String): Float? {
-    val compact = pid.uppercase().replace(" ", "")
-    val core = compact.removePrefix("01")
-    val aliases = buildList {
-        add(pid)
-        add(compact)
-        add(core)
-        if (core.length == 2) add("01$core")
-        when (core) {
-            "0C" -> addAll(listOf("RPM", "rpm"))
-            "0D" -> addAll(listOf("SPEED", "speed", "VELOCIDAD"))
-            "05" -> addAll(listOf("COOLANT", "coolant", "ECT"))
-            "04" -> add("ENGINE_LOAD")
-            "0B" -> addAll(listOf("MAP", "map"))
-            "10" -> addAll(listOf("MAF", "maf"))
-            "11" -> addAll(listOf("THROTTLE", "throttle"))
-            "0F" -> add("IAT")
-            "0E" -> add("TIMING_ADVANCE")
-            "2F" -> add("FUEL_LEVEL")
-            "42" -> addAll(listOf("VOLTAGE", "voltage", "CTRL_VOLTAGE", "AT RV", "ATRV", "ELM_VOLTAGE"))
-        }
-    }
-    return aliases.firstNotNullOfOrNull { this[it] }
-}
-
 // ═══════════════════════════════════════
 // HEALTH INDEX CARD (Elysium V2 Militarized)
 // ═══════════════════════════════════════

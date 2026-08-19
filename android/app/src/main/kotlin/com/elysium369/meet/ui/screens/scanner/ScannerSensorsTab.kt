@@ -177,7 +177,7 @@ fun ScannerSensorsTab(
                 if (isExpanded) GridItemSpan(maxLineSpan) else GridItemSpan(1)
             }) { index ->
                 val gauge = filteredGauges[index]
-                val currentValue = liveData[gauge.pid] ?: 0f
+                val currentValue = liveData.resolveGaugeValue(gauge.pid) ?: (liveData[gauge.pid] ?: 0f)
                 val isPinned = pinnedPids.contains(gauge.pid)
                 val isExpanded = expandedPid == gauge.pid
                 val isAnomalous = anomalousPids.any { it.pid == gauge.pid }
