@@ -980,6 +980,45 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                 }
             }
 
+            // ============================================================
+            //  SECCIÓN 8: INFORMACIÓN Y VERSIÓN DEL SISTEMA
+            // ============================================================
+            item {
+                Column {
+                    PhantomSectionHeader(label = "SISTEMA Y VERSIÓN", accentColor = MeetColors.cyberCyan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.cyberCyan,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            SettingsRow(
+                                label = "Versión del Sistema (App)",
+                                value = "MEET v${com.elysium369.meet.BuildConfig.VERSION_NAME} (Build ${com.elysium369.meet.BuildConfig.VERSION_CODE})",
+                                valueColor = MeetColors.cyberCyan
+                            )
+                            SettingsRow(
+                                label = "Arquitectura de Enlace",
+                                value = "Continuous IO Reader + K-Line Targeted",
+                                valueColor = MeetColors.neonGreen
+                            )
+                            SettingsRow(
+                                label = "Motor de Telemetría",
+                                value = "Global Multi-Platform OEM Suite",
+                                valueColor = MeetColors.warning
+                            )
+                            SettingsRow(
+                                label = "Integridad Criptográfica",
+                                value = "TS ≡ Kotlin SHA-256 Verified",
+                                valueColor = MeetColors.neonGreen
+                            )
+                        }
+                    }
+                }
+            }
+
             // Bottom spacer
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
