@@ -2978,9 +2978,9 @@ class ObdSession(
                 return ClearDtcResult.Rejected(commandEvidence, message = message)
             }
 
-            _statusMessage.value = "Borrado aceptado por ECU; ejecutando verificación post-borrado completa..."
-            delay(500)
-            val postClearReport = readProfessionalDtcScanOwned(DiagnosticScanMode.FULL_VEHICLE)
+            _statusMessage.value = "✓ ECU aceptó comando de borrado. Verificando ausencia de fallas dirigida..."
+            delay(150)
+            val postClearReport = readProfessionalDtcScanOwned(DiagnosticScanMode.CLEAR_VERIFY)
             if (postClearReport.wasCancelled) {
                 val message = "Borrado aceptado; verificación cancelada. Ningún hallazgo fue resuelto."
                 _statusMessage.value = message

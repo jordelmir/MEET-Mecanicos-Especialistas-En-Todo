@@ -1518,10 +1518,14 @@ private fun StoreWorkspaceView(
     context: Context,
     onCompleteService: (String, String) -> Unit
 ) {
-    var storeName by remember { mutableStateOf("Repuestos El Atlántico") }
-    var storePhone by remember { mutableStateOf("+506 7777 7777") }
+    val profiles by viewModel.userProviderProfiles.collectAsState()
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val myProfile = profiles.firstOrNull { it.providerType == "PARTS_STORE" || it.providerType == "STORE" }
 
-    val storeId = "store_101"
+    var storeName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Distribuidora de Repuestos") }
+    var storePhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }
+
+    val storeId = myProfile?.profileId ?: activePrincipal.id
 
     var offeringRequestId by remember { mutableStateOf<String?>(null) }
     var brand by remember { mutableStateOf("") }

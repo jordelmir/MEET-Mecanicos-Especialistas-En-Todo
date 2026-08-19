@@ -20,6 +20,52 @@ class ElmNegotiator(private val transport: TransportInterface) {
     )
 
     /**
+     * Fast-path reconnection for known good adapter + vehicle pairing.
+     * Skips full ATZ reset and manual sweeps.
+     */
+    suspend fun negotiateFastPath(
+        knownProtocol: ObdProtocol,
+        onProgress: (String) -> Unit
+    ): AdapterProfile? {
+        if (knownProtocol == ObdProtocol.AUTO) return null
+        return runCatching {
+            onProgress("Reconexión rápida (${knownProtocol.displayName})...")
+            transport.drain()
+            transport.write("\r".toByteArray())
+            delay(30)
+            transport.drain()
+
+            // Quick sync
+            val ati = sendWithTimeout("ATI\r", 600)
+            if (!isValidIdResponse(ati)) return@runCatching null
+
+            val isClone = detectClone(ati)
+            val chipVersion = parseChipVersion(ati)
+            val isSTN = ati.contains("STN", true) || ati.contains("vLinker", true)
+
+            // Essential init
+            sendWithTimeout("ATE0\r", 400)
+            sendWithTimeout("ATH0\r", 400)
+            sendWithTimeout("ATCAF1\r", 400)
+            sendWithTimeout("ATSP${knownProtocol.atspCode}\r", 600)
+
+            // Fast Probe ECU
+            val resp = sendWithTimeout("0100\r", 1500)
+            if (!isPositivePidSupportResponse(resp)) return@runCatching null
+
+            applyRuntimeSettings(knownProtocol, isClone)
+            AdapterProfile(
+                chipVersion = chipVersion,
+                isClone = isClone,
+                isSTN = isSTN,
+                detectedProtocol = knownProtocol,
+                baseDelayMs = runtimeBaseDelay(knownProtocol, isClone),
+                maxLineLength = if (isClone) 64 else 512
+            )
+        }.getOrNull()
+    }
+
+    /**
      * Executes the full ELM327/STN negotiation sequence.
      * @param hintProtocol Optional protocol to try first to speed up connection
      * @param onProgress Callback for UI status updates

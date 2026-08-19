@@ -884,8 +884,12 @@ private fun MechanicWorkspaceView(
     context: Context,
     onCompleteService: (String, String) -> Unit
 ) {
-    var mechanicName by remember { mutableStateOf("Mecánica Pro") }
-    var mechanicPhone by remember { mutableStateOf("+506 8888 8888") }
+    val profiles by viewModel.userProviderProfiles.collectAsState()
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val myProfile = profiles.firstOrNull { it.providerType == "MECHANIC" || it.providerType == "WORKSHOP" }
+
+    var mechanicName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Mecánica Pro") }
+    var mechanicPhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }
     var providerServiceId by remember {
         mutableStateOf(WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first().id)
     }
@@ -893,11 +897,11 @@ private fun MechanicWorkspaceView(
     val selectedProviderService = WorkshopServiceCatalog.serviceById(providerServiceId)
         ?: WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first()
 
-    val mechanicId = "mechanic_101"
+    val mechanicId = myProfile?.profileId ?: activePrincipal.id
 
     // Limit visibility: only OPEN requests OR requests accepted by THIS mechanic.
     // Requests accepted by other mechanics will not be shown.
-    val visibleRequests = remember(allRequests) {
+    val visibleRequests = remember(allRequests, mechanicId) {
         allRequests.filter { req ->
             req.status == "OPEN" || (req.status == "ACCEPTED" && req.assignedMechanicId == mechanicId)
         }

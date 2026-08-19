@@ -31,7 +31,11 @@ object SaeObdDiagnosticStrategy : DiagnosticStrategy {
     override val applicationProtocol = DiagnosticApplicationProtocol.SAE_OBD
     override fun compileDtcPlan(mode: DiagnosticScanMode): DiagnosticStrategyPlan =
         DiagnosticStrategyPlan(
-            primaryRequests = if (mode == DiagnosticScanMode.QUICK) listOf("03") else listOf("03", "07", "0A"),
+            primaryRequests = when (mode) {
+                DiagnosticScanMode.QUICK -> listOf("03")
+                DiagnosticScanMode.CLEAR_VERIFY -> listOf("03", "07")
+                DiagnosticScanMode.FULL_VEHICLE -> listOf("03", "07", "0A")
+            },
         )
 }
 

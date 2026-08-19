@@ -476,8 +476,8 @@ fun RepairNetworkScreen(
                     val bidsFlow = remember(req.requestId) { obdViewModel.getBidsForRequest(req.requestId) }
                     val bids by bidsFlow.collectAsState(initial = emptyList<ServiceBidEntity>())
 
-                    // Dynamically determine type (Tow Truck vs Mechanic) based on problem text
-                    val isTowTruckType = req.problem.lowercase().contains("grúa") || req.problem.lowercase().contains("grua") || req.description.lowercase().contains("grúa") || req.description.lowercase().contains("grua")
+                    // Dynamically determine type (Tow Truck vs Mechanic) based on typed service or problem text
+                    val isTowTruckType = req.problem.lowercase().contains("grúa") || req.problem.lowercase().contains("grua") || req.problem.lowercase().contains("remolque") || req.description.lowercase().contains("grúa")
                     val typeLabel = if (isTowTruckType) "🚛 SERVICIO DE GRÚA VIP" else "🛠️ MECÁNICO / TALLER VIP"
                     val typeColor = if (isTowTruckType) MeetColors.warning else MeetColors.neonGreen
 
@@ -502,81 +502,81 @@ fun RepairNetworkScreen(
                                         fontWeight = FontWeight.Black,
                                         fontSize = 16.sp
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = typeLabel,
+                                        typeLabel,
                                         color = typeColor,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 9.sp
+                                        fontSize = 11.sp
                                     )
+                                }
+                                val badgeColor = when (req.priority) {
+                                    "EMERGENCY" -> MeetColors.error
+                                    "HIGH" -> MeetColors.warning
+                                    else -> MeetColors.cyberCyan
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .background(
-                                            if (req.priority == "HIGH") Color(0xFFFF4D4D).copy(alpha = 0.15f) else MeetColors.cyberCyan.copy(alpha = 0.15f),
-                                            RoundedCornerShape(6.dp)
-                                        )
+                                        .background(badgeColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        req.priority,
-                                        color = if (req.priority == "HIGH") Color(0xFFFF4D4D) else MeetColors.cyberCyan,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
+                                        text = req.priority,
+                                        color = badgeColor,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 10.sp
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(8.dp))
-                            Text(req.description, color = MeetColors.textSecondary, fontSize = 12.sp, lineHeight = 16.sp)
-                            Spacer(Modifier.height(10.dp))
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                AnimatedNeonIcon(Icons.Default.LocationOn, "Ubicación", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(req.location, color = MeetColors.textMuted, fontSize = 11.sp)
-                            }
-                            Spacer(Modifier.height(14.dp))
-                            
-                            HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.4f))
-                            Spacer(Modifier.height(12.dp))
 
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                req.description,
+                                color = MeetColors.textSecondary,
+                                fontSize = 13.sp
+                            )
+
+                            if (!req.autoDtcCode.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("DTC VINCULADO: ", color = MeetColors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(req.autoDtcCode, color = MeetColors.error, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Status and Actions
                             if (req.status == "ACCEPTED") {
-                                // ── Active Contract UI Dashboard ──
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MeetColors.cyberCyan.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
-                                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                                        .padding(14.dp)
+                                        .background(MeetColors.cyberCyan.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        .padding(12.dp)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .background(MeetColors.cyberCyan, CircleShape)
-                                                .neonGlow(MeetColors.cyberCyan, CircleShape, minElevation = 2f, maxElevation = 6f)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "CONTRATO DE SERVICIO ACTIVO",
-                                            color = MeetColors.cyberCyan,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Asignado a: ${req.assignedMechanicName ?: "Proveedor Seleccionado"}",
+                                        "⚡ SERVICIO ACEPTADO POR PROVEEDOR",
+                                        color = MeetColors.cyberCyan,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 12.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Mecánico/Grúa: ${req.assignedMechanicName ?: "Especialista Asignado"}",
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
-                                    Text(
-                                        text = "Teléfono: ${req.assignedMechanicPhone ?: "+506 8888-8888"}",
-                                        color = MeetColors.textSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    if (!req.assignedMechanicPhone.isNullOrBlank()) {
+                                        Text(
+                                            "Teléfono: ${req.assignedMechanicPhone}",
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     
                                     // Call & Navigate Buttons
                                     Row(
@@ -586,12 +586,16 @@ fun RepairNetworkScreen(
                                         EliteButton(
                                             text = "📞 LLAMAR PROVEEDOR",
                                             onClick = {
-                                                val phoneNum = req.assignedMechanicPhone ?: "+50688888888"
-                                                val dialIntent = android.content.Intent(
-                                                    android.content.Intent.ACTION_DIAL,
-                                                    android.net.Uri.parse("tel:${phoneNum.replace("-", "").replace(" ", "")}")
-                                                )
-                                                context.startActivity(dialIntent)
+                                                val phoneNum = req.assignedMechanicPhone
+                                                if (!phoneNum.isNullOrBlank()) {
+                                                    val dialIntent = android.content.Intent(
+                                                        android.content.Intent.ACTION_DIAL,
+                                                        android.net.Uri.parse("tel:${phoneNum.replace("-", "").replace(" ", "")}")
+                                                    )
+                                                    context.startActivity(dialIntent)
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "Teléfono no disponible", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             },
                                             color = MeetColors.neonGreen,
                                             modifier = Modifier.weight(1f)
@@ -936,8 +940,7 @@ fun RepairNetworkScreen(
                                     EliteButton(
                                         text = "📦 MARCAR COMO RECIBIDO",
                                         onClick = {
-                                            obdViewModel.acceptPartOffer(partReq.requestId, acceptedOffer?.offerId ?: "")
-                                            android.widget.Toast.makeText(context, "🎉 ¡Repuesto recibido y confirmado!", android.widget.Toast.LENGTH_LONG).show()
+                                            obdViewModel.confirmPartReceipt(partReq.requestId, acceptedOffer?.offerId ?: "", context)
                                         },
                                         color = MeetColors.electricBlue,
                                         modifier = Modifier.fillMaxWidth()
