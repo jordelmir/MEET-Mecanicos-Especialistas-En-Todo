@@ -172,74 +172,44 @@ class ElmNegotiator(private val transport: TransportInterface) {
             }
             delay(baseDelay)
             val resp = sendWithTimeout("0100\r", 4000)
-            if (isPositivePidSupportResponse(resp)) {
+            if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
                 Log.i(TAG, "✓ Fast-probe SUCCESS on hinted protocol: ${hint.displayName}")
                 return hint
             }
-            Log.w(TAG, "Hint protocol ${hint.name} failed, starting targeted protocol sweep")
+            Log.w(TAG, "Hint protocol ${hint.name} failed, proceeding to structured recipe execution")
         }
 
-        // Step 5b: Targeted Deterministic Protocol & Header Probe
-        // Prioritize Hyundai K-Line with Physical ECU (0x10) addressing, then Functional and CAN
-        data class TargetedProbe(
-            val protocol: ObdProtocol,
-            val header: String?,
-            val initCommands: List<String>,
-            val timeoutMs: Long
-        )
+        // Step 5b: Structured Vehicle Link Recipes (Standard CAN first, then legacy K-Line & J1850)
+        val candidateRecipes = com.elysium369.meet.core.obd.recipes.VehicleLinkRecipe.ALL_RECIPES
 
-        val probes = listOf(
-            // 1. Hyundai KWP2000 Fast Init Physical ECU (0x10) - Primary for Accent 2005 (Bosch/Kefico)
-            TargetedProbe(ObdProtocol.KWP2000_FAST, "8110F1", listOf("ATIB10", "ATAL", "ATWM8110F13E"), 4500L),
-            // 2. Hyundai KWP2000 Fast Init Broadcast Functional
-            TargetedProbe(ObdProtocol.KWP2000_FAST, "C233F1", listOf("ATIB10", "ATAL"), 4500L),
-            // 3. Hyundai KWP2000 5-baud Physical ECU (0x10)
-            TargetedProbe(ObdProtocol.KWP2000, "8110F1", listOf("ATIB10", "ATAL"), 5000L),
-            // 4. ISO 9141-2 Physical ECU (0x10)
-            TargetedProbe(ObdProtocol.ISO9141, "686A10", listOf("ATIB10", "ATAL"), 5000L),
-            // 5. ISO 9141-2 Functional
-            TargetedProbe(ObdProtocol.ISO9141, "686AF1", listOf("ATIB10", "ATAL"), 5000L),
-            // 6. Standard CAN 11-bit 500K
-            TargetedProbe(ObdProtocol.CAN_11BIT_500K, "7DF", listOf("ATCAF1"), 3000L),
-            // 7. Extended CAN 29-bit 500K
-            TargetedProbe(ObdProtocol.CAN_29BIT_500K, "18DB33F1", listOf("ATCAF1"), 3000L),
-            // 8. CAN 11-bit 250K
-            TargetedProbe(ObdProtocol.CAN_11BIT_250K, "7DF", listOf("ATCAF1"), 3000L),
-            // 9. CAN 29-bit 250K
-            TargetedProbe(ObdProtocol.CAN_29BIT_250K, "18DB33F1", listOf("ATCAF1"), 3000L),
-            // 10. J1850 PWM & VPW
-            TargetedProbe(ObdProtocol.J1850_PWM, null, emptyList(), 3000L),
-            TargetedProbe(ObdProtocol.J1850_VPW, null, emptyList(), 3000L)
-        )
-
-        for (probe in probes) {
-            onProgress("Sincronizando ${probe.protocol.displayName}...")
-            sendWithTimeout("ATSP${probe.protocol.atspCode}\r", 800)
-            for (cmd in probe.initCommands) {
+        for (recipe in candidateRecipes) {
+            onProgress("Probando ${recipe.displayName}...")
+            sendWithTimeout("ATSP${recipe.protocol.atspCode}\r", 800)
+            for (cmd in recipe.initCommands) {
                 sendWithTimeout("$cmd\r", 500)
             }
-            if (probe.header != null) {
-                sendWithTimeout("ATSH${probe.header}\r", 500)
+            if (recipe.requestHeader != null) {
+                sendWithTimeout("ATSH${recipe.requestHeader}\r", 500)
             }
             delay(baseDelay.coerceAtLeast(80L))
 
-            val resp = sendWithTimeout("0100\r", probe.timeoutMs)
-            Log.i(TAG, "Probe [ATSP${probe.protocol.atspCode} Header=${probe.header}] -> '$resp'")
+            val resp = sendWithTimeout("0100\r", recipe.probeTimeoutMs)
+            Log.i(TAG, "Recipe [${recipe.id} ATSP${recipe.protocol.atspCode} Header=${recipe.requestHeader}] -> '$resp'")
 
-            if (isPositivePidSupportResponse(resp)) {
-                Log.i(TAG, "✓ ECU SYNCHRONIZED on ${probe.protocol.displayName} (Header=${probe.header})")
-                return probe.protocol
+            if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
+                Log.i(TAG, "✓ ECU SYNCHRONIZED via recipe: ${recipe.displayName}")
+                return recipe.protocol
             }
         }
 
         // Step 5c: Fallback to ATSP0 (Auto)
-        onProgress("Buscando en modo automático (ATSP0)...")
+        onProgress("Buscando en modo automático universal (ATSP0)...")
         sendWithTimeout("ATSP0\r", 1000)
         delay(baseDelay)
 
         for (attempt in 1..2) {
             val resp = sendWithTimeout("0100\r", 5000)
-            if (isPositivePidSupportResponse(resp)) {
+            if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
                 return detectActiveProtocol()
             }
             if (resp.contains("UNABLE") || resp.contains("ERROR")) break

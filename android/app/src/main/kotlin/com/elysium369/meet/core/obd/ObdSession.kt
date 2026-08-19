@@ -570,8 +570,14 @@ class ObdSession(
                 val msg = e.message ?: "Error desconocido"
                 Log.w(TAG, "── ATTEMPT $attempt FAILED: ${e.javaClass.simpleName}: $msg", e)
 
-                // Disconnect cleanly before retrying
-                try { activeTransport.disconnect() } catch (_: Exception) {}
+                // Only disconnect physical transport if the physical transport itself dropped or failed.
+                // If Bluetooth is healthy and only ECU/Protocol handshake failed, preserve physical link.
+                val isPhysicalFailure = !activeTransport.isConnected || e is com.elysium369.meet.core.transport.TransportRemoteClosed || (e is java.io.IOException && !msg.contains("ECU"))
+                if (isPhysicalFailure) {
+                    try { activeTransport.disconnect() } catch (_: Exception) {}
+                } else {
+                    try { activeTransport.drain() } catch (_: Exception) {}
+                }
 
                 if (attempt < MAX_CONNECT_ATTEMPTS) {
                     // Show retry UI with countdown
@@ -4531,8 +4537,9 @@ class ObdSession(
                     var success = false
                     var attempts = 0
                     val startTime = System.currentTimeMillis()
+                    val maxAttempts = if (command.retryPolicy == RetryPolicy.NEVER_AFTER_WRITE) 1 else 2
 
-                    while (!success && attempts < 2 && isRunning) {
+                    while (!success && attempts < maxAttempts && isRunning) {
                         try {
                             communicationMutex.withLock {
                                 trafficListener?.onCommandSent(command.query)
@@ -4554,13 +4561,22 @@ class ObdSession(
                                     t.write("${command.query}\r".toByteArray())
                                     readResponse(timeoutMs = 2000L)
                                 }
-                                if (response.isNotBlank() && !response.contains("?")) {
+
+                                val clean = response.trim().uppercase()
+                                val isHardwareOrBusError = clean.contains("CAN ERROR") || clean.contains("BUS ERROR") ||
+                                        clean.contains("STOPPED") || clean.contains("BUS BUSY") || clean.contains("FB ERROR") ||
+                                        clean.contains("BUFFER FULL") || clean.contains("UNABLE TO CONNECT") ||
+                                        clean.contains("ERR1") || clean.contains("ERR2") || clean == "?"
+
+                                val isNoData = clean == "NO DATA" || clean == "NODATA"
+
+                                if (!isHardwareOrBusError && response.isNotBlank()) {
                                     success = true
                                     consecutiveErrors = 0
                                     lastHeartbeatTime = System.currentTimeMillis()
                                     val latency = System.currentTimeMillis() - startTime
                                     updateQos(latency, true)
-                                    recordCommandLog(command.query, response, success = true, latencyMs = latency, retryCount = attempts)
+                                    recordCommandLog(command.query, response, success = !isNoData, latencyMs = latency, retryCount = attempts)
                                     trafficListener?.onResponseReceived(command.query, response)
                                     command.onSuccess(response)
                                 } else {
@@ -4882,7 +4898,19 @@ class ObdSession(
     }
 }
 
-data class ObdCommand(val query: String, val priority: Int, val onSuccess: (String) -> Unit, val onError: (Exception) -> Unit)
+enum class RetryPolicy {
+    SAFE_IDEMPOTENT,
+    RETRY_ON_TRANSPORT_BEFORE_WRITE_ONLY,
+    NEVER_AFTER_WRITE
+}
+
+data class ObdCommand(
+    val query: String,
+    val priority: Int = 1,
+    val onSuccess: (String) -> Unit = {},
+    val onError: (Exception) -> Unit = {},
+    val retryPolicy: RetryPolicy = RetryPolicy.SAFE_IDEMPOTENT
+)
 class ObdCommandQueue {
     private val queue = mutableListOf<ObdCommand>()
     @Synchronized fun enqueue(c: ObdCommand) { queue.add(c); queue.sortByDescending { it.priority } }

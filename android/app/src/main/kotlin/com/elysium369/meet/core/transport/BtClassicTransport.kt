@@ -227,6 +227,10 @@ class BtClassicTransport(
                     val bytesRead = stream.read(buf)
                     if (bytesRead > 0) {
                         synchronized(rxMutex) {
+                            if (rxBuffer.size() + bytesRead > MAX_RX_BUFFER_SIZE) {
+                                Log.w(TAG, "Bluetooth Classic rxBuffer bounded overflow protection triggered; resetting buffer")
+                                rxBuffer.reset()
+                            }
                             rxBuffer.write(buf, 0, bytesRead)
                         }
                     } else if (bytesRead < 0) {
@@ -325,5 +329,6 @@ class BtClassicTransport(
     
     companion object {
         private const val TAG = "EV_BT"
+        private const val MAX_RX_BUFFER_SIZE = 65536
     }
 }

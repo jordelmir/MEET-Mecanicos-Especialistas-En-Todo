@@ -238,25 +238,44 @@ class BleTransport(
                         throw TransportRemoteClosed("Service discovery failed with status $sStatus")
                     }
 
-                    // 3. Resolve OBD Characteristic Profile
+                    // 3. Resolve OBD Characteristic Profile (same service)
                     var selectedWrite: BluetoothGattCharacteristic? = null
                     var selectedNotify: BluetoothGattCharacteristic? = null
 
                     for (service in currentGatt.services) {
                         if (SERVICE_UUIDS.contains(service.uuid)) {
+                            var sWrite: BluetoothGattCharacteristic? = null
+                            var sNotify: BluetoothGattCharacteristic? = null
                             for (char in service.characteristics) {
-                                if (selectedWrite == null && CHAR_WRITE_UUIDS.contains(char.uuid)) {
-                                    selectedWrite = char
+                                if (sWrite == null && CHAR_WRITE_UUIDS.contains(char.uuid)) {
+                                    sWrite = char
                                 }
-                                if (selectedNotify == null && CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
-                                    selectedNotify = char
+                                if (sNotify == null && CHAR_NOTIFY_UUIDS.contains(char.uuid)) {
+                                    sNotify = char
                                 }
+                            }
+                            if (sWrite != null && sNotify != null) {
+                                selectedWrite = sWrite
+                                selectedNotify = sNotify
+                                break
+                            } else if (selectedWrite == null && sWrite != null) {
+                                selectedWrite = sWrite
+                            } else if (selectedNotify == null && sNotify != null) {
+                                selectedNotify = sNotify
                             }
                         }
                     }
 
                     writeChar = selectedWrite ?: throw TransportRemoteClosed("No compatible OBD write characteristic found")
                     val notifyChar = selectedNotify ?: throw TransportRemoteClosed("No compatible OBD notify characteristic found")
+
+                    // Inspect characteristic properties to determine ACK vs NO_RESPONSE
+                    val properties = writeChar?.properties ?: 0
+                    val supportsWriteWithAck = (properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
+                    val supportsWriteNoResponse = (properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
+                    isNoResponseWrite = !supportsWriteWithAck && supportsWriteNoResponse
+
+                    Log.i(TAG, "Resolved BLE UART: Write=${writeChar?.uuid} (NoResponse=$isNoResponseWrite), Notify=${notifyChar.uuid}")
 
                     // 4. Enable Notifications & Write CCCD Descriptor
                     currentGatt.setCharacteristicNotification(notifyChar, true)
@@ -294,7 +313,8 @@ class BleTransport(
                         probeStr.contains('>') ||
                         probeStr.contains("ELM", ignoreCase = true) ||
                         probeStr.contains("OK", ignoreCase = true) ||
-                        probeStr.contains("41")
+                        probeStr.contains("STN", ignoreCase = true) ||
+                        probeStr.contains("OBD", ignoreCase = true)
                     ) && !probeStr.contains("?")
 
                     if (isElmReady) {
@@ -322,6 +342,7 @@ class BleTransport(
         runCatching { gatt?.close() }
         gatt = null
         writeChar = null
+        isNoResponseWrite = false
         connected = false
         connectionDeferred?.complete(false)
         connectionDeferred = null
@@ -336,16 +357,26 @@ class BleTransport(
         connect()
     }
 
+    private var isNoResponseWrite = false
+
     override suspend fun write(data: ByteArray) {
         gattMutex.withLock {
             val char = writeChar ?: throw TransportWriteFailure("Error: Adaptador BLE no inicializado")
-            val writeCompletion = CompletableDeferred<Boolean>()
+            val writeType = if (isNoResponseWrite) {
+                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            } else {
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            }
+
+            val writeCompletion = if (!isNoResponseWrite) CompletableDeferred<Boolean>() else null
             writeDeferred = writeCompletion
 
             val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+                val res = gatt?.writeCharacteristic(char, data, writeType)
                 res == 0
             } else {
+                @Suppress("DEPRECATION")
+                char.writeType = writeType
                 @Suppress("DEPRECATION")
                 char.value = data
                 @Suppress("DEPRECATION")
@@ -356,13 +387,15 @@ class BleTransport(
                 throw TransportWriteFailure("Fallo al iniciar escritura en radio BLE")
             }
 
-            val ack = withTimeoutOrNull(2000L) {
-                writeCompletion.await()
-            } ?: false
+            if (writeCompletion != null) {
+                val ack = withTimeoutOrNull(2000L) {
+                    writeCompletion.await()
+                } ?: false
 
-            writeDeferred = null
-            if (!ack) {
-                throw TransportWriteFailure("Timeout o error esperando ACK de escritura BLE")
+                writeDeferred = null
+                if (!ack) {
+                    throw TransportWriteFailure("Timeout o error esperando ACK de escritura BLE")
+                }
             }
         }
     }

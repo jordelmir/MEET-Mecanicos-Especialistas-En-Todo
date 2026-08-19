@@ -161,12 +161,12 @@ object PidRegistry {
         ),
         "HYUNDAI" to listOf(
             // Hyundai Gasolina (Accent / Verna 1.6L G4ED, Getz, Matrix, Elantra, Tucson, Sonata)
-            PidDefinition("21", "01", "Ancho Pulso Inyector", "ms", 0f, 30f, 15f, 25f, { a, b, _, _ -> (a * 256f + b) / 1000f }, PidCategory.FUEL, true),
-            PidDefinition("21", "01", "Temp Fluido ATF (Caja Auto)", "°C", -40f, 180f, 110f, 130f, { _, _, c, _ -> c - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("21", "01", "Marcha Actual A4AF3/A6F", "", 0f, 8f, 0f, 0f, { _, _, _, d -> (d and 0x0F).toFloat() }, PidCategory.TRANSMISSION, true),
-            PidDefinition("21", "02", "Retardo Encendido Knock", "°", 0f, 25f, 5f, 10f, { a, _, _, _ -> a / 2f }, PidCategory.ENGINE, true),
-            PidDefinition("21", "02", "Válvula Ralentí ISCA", "%", 0f, 100f, 80f, 95f, { _, b, _, _ -> b * 100f / 255f }, PidCategory.ENGINE, true),
-            PidDefinition("21", "02", "Presión Gas A/C", "bar", 0f, 35f, 25f, 30f, { _, _, c, _ -> c * 0.14f }, PidCategory.ENGINE, true),
+            PidDefinition("21", "01A", "Ancho Pulso Inyector", "ms", 0f, 30f, 15f, 25f, { a, b, _, _ -> (a * 256f + b) / 1000f }, PidCategory.FUEL, true),
+            PidDefinition("21", "01B", "Temp Fluido ATF (Caja Auto)", "°C", -40f, 180f, 110f, 130f, { _, _, c, _ -> c - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "01C", "Marcha Actual A4AF3/A6F", "", 0f, 8f, 0f, 0f, { _, _, _, d -> (d and 0x0F).toFloat() }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "02A", "Retardo Encendido Knock", "°", 0f, 25f, 5f, 10f, { a, _, _, _ -> a / 2f }, PidCategory.ENGINE, true),
+            PidDefinition("21", "02B", "Válvula Ralentí ISCA", "%", 0f, 100f, 80f, 95f, { _, b, _, _ -> b * 100f / 255f }, PidCategory.ENGINE, true),
+            PidDefinition("21", "02C", "Presión Gas A/C", "bar", 0f, 35f, 25f, 30f, { _, _, c, _ -> c * 0.14f }, PidCategory.ENGINE, true),
             // Hyundai Modern Smartstream & Turbo T-GDI
             PidDefinition("22", "1105", "Presión Turbo Smartstream", "kPa", 0f, 350f, 220f, 260f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
             PidDefinition("22", "1108", "Temp Aceite Motor CVVD", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
