@@ -52,8 +52,8 @@ android {
         targetSdk = 36
         // Source identity is independent from verification state. 4.16.0/code 44
         // remains the latest verified artifact until the 4.17 proof gates pass.
-        versionCode = 45
-        versionName = "4.17.0"
+        versionCode = 46
+        versionName = "4.20.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
