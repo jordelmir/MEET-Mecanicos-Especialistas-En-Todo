@@ -12,7 +12,9 @@ class ProductionHardcodedActorGuardTest {
         "store_101",
         "+50688888888",
         "+50677777777",
+        "+50622448888",
         "local_shop_id",
+        "demo_vehicle",
         "Grúas Express Pro",
         "Mecánica Elite Pro",
     )

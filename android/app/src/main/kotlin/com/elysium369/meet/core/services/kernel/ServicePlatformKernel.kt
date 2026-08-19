@@ -3,180 +3,157 @@ package com.elysium369.meet.core.services.kernel
 import java.util.UUID
 
 /**
- * Feature proof states for strict release truth verification.
+ * Universal Proof-Carrying State contract for auditability and release truth.
  */
 enum class FeatureProofState {
-    MODEL_ONLY,
-    RUNTIME_INTEGRATED,
-    UNIT_VERIFIED,
-    INTEGRATION_VERIFIED,
-    CI_VERIFIED,
-    PHYSICAL_VERIFIED,
-    CANARY_VERIFIED,
-    PRODUCTION,
+    MODEL_EXISTS,
+    CLIENT_IMPLEMENTED,
+    SERVER_AUTHORITATIVE,
+    PHYSICALLY_VERIFIED,
 }
 
 /**
- * Exception thrown when encountering unsupported or unmapped currency.
- * Fails closed instead of defaulting to USD.
+ * Exception thrown when a monetary operation encounters an unsupported or unmapped currency.
+ * Fails closed to prevent financial contamination.
  */
-class UnsupportedCurrencyException(message: String) : IllegalArgumentException(message)
+class UnsupportedCurrencyException(currencyRaw: String) :
+    IllegalArgumentException("Unsupported currency code: '$currencyRaw'. Financial operations must fail closed.")
 
 /**
- * Currency codes supported by MEET Service Platform (ISO-4217).
+ * Strict ISO 4217 Currency Code representation.
  */
-enum class CurrencyCode(val standardDecimals: Int, val symbol: String) {
-    CRC(0, "₡"),
-    USD(2, "$"),
-    EUR(2, "€");
+enum class CurrencyCode(val standardSymbol: String, val decimalPlaces: Int) {
+    CRC("₡", 0),
+    USD("$", 2);
 
     companion object {
-        fun fromString(code: String): CurrencyCode = when (code.trim().uppercase()) {
-            "CRC" -> CRC
-            "USD" -> USD
-            "EUR" -> EUR
-            else -> throw UnsupportedCurrencyException("Unknown or unsupported currency code: '$code'")
+        fun fromString(value: String): CurrencyCode = when (value.trim().uppercase()) {
+            "CRC", "COLONES", "COLÓN", "₡" -> CRC
+            "USD", "DOLLARS", "DÓLARES", "$" -> USD
+            else -> throw UnsupportedCurrencyException(value)
         }
 
-        fun fromStringOrNull(code: String?): CurrencyCode? {
-            if (code.isNullOrBlank()) return null
-            return when (code.trim().uppercase()) {
-                "CRC" -> CRC
-                "USD" -> USD
-                "EUR" -> EUR
-                else -> null
-            }
+        fun fromStringOrNull(value: String?): CurrencyCode? = when (value?.trim()?.uppercase()) {
+            "CRC", "COLONES", "COLÓN", "₡" -> CRC
+            "USD", "DOLLARS", "DÓLARES", "$" -> USD
+            else -> null
         }
     }
 }
 
 /**
- * Universal monetary representation in minor units (e.g., cents, colones).
- * Eliminates floating point rounding issues and currency mismatches.
+ * Precise, overflow-safe integer money representation using minor units (e.g. cents/colones).
  */
 data class Money(
     val amountMinor: Long,
     val currency: CurrencyCode,
 ) {
     init {
-        require(amountMinor >= 0) { "Monetary amount cannot be negative" }
+        require(amountMinor >= 0) { "Monetary amounts cannot be negative: $amountMinor" }
     }
 
-    val formattedString: String
-        get() = when (currency) {
-            CurrencyCode.CRC -> "${currency.symbol}${String.format(java.util.Locale.US, "%,d", amountMinor)}"
-            CurrencyCode.USD, CurrencyCode.EUR -> {
-                val major = amountMinor / 100
-                val minor = amountMinor % 100
-                "${currency.symbol}${String.format(java.util.Locale.US, "%,d.%02d", major, minor)}"
-            }
-        }
-
     operator fun plus(other: Money): Money {
-        require(currency == other.currency) { "Cannot add different currencies: $currency vs ${other.currency}" }
-        return Money(amountMinor + other.amountMinor, currency)
+        require(currency == other.currency) { "Cannot add distinct currencies: $currency vs ${other.currency}" }
+        return Money(Math.addExact(amountMinor, other.amountMinor), currency)
     }
 
     operator fun minus(other: Money): Money {
-        require(currency == other.currency) { "Cannot subtract different currencies: $currency vs ${other.currency}" }
-        require(amountMinor >= other.amountMinor) { "Monetary subtraction underflow" }
-        return Money(amountMinor - other.amountMinor, currency)
+        require(currency == other.currency) { "Cannot subtract distinct currencies: $currency vs ${other.currency}" }
+        val result = amountMinor - other.amountMinor
+        require(result >= 0) { "Monetary subtraction underflow: $amountMinor - ${other.amountMinor}" }
+        return Money(result, currency)
+    }
+
+    fun formatted(): String = when (currency) {
+        CurrencyCode.CRC -> String.format(java.util.Locale.US, "${currency.standardSymbol}%,d", amountMinor)
+        CurrencyCode.USD -> String.format(java.util.Locale.US, "${currency.standardSymbol}%,.2f", amountMinor / 100.0)
     }
 
     companion object {
         fun zero(currency: CurrencyCode): Money = Money(0L, currency)
-        fun fromCents(cents: Long, currency: CurrencyCode = CurrencyCode.USD): Money = Money(cents, currency)
-        fun fromColones(colones: Long): Money = Money(colones, CurrencyCode.CRC)
+        fun ofCrc(colones: Long): Money = Money(colones, CurrencyCode.CRC)
+        fun ofUsdCents(cents: Long): Money = Money(cents, CurrencyCode.USD)
     }
 }
 
 /**
- * Canonical provider types aligned with PostgreSQL database enum.
+ * Service vertical classification for MEET/Elysium Vanguard.
  */
-enum class ProviderType(val dbValue: String) {
-    MECHANIC("mechanic"),
-    WORKSHOP("workshop"),
-    PARTS_STORE("parts_store"),
-    TOW_PROVIDER("tow_provider"),
-    RIDE_DRIVER("ride_driver");
+enum class ServiceVertical(val code: String, val displayName: String) {
+    REPAIR("repair", "Red de Reparación Mecánica"),
+    TOW("tow", "Servicio de Grúas y Rescate"),
+    PARTS("parts", "Marketplace Técnico de Repuestos"),
+    RIDE("ride", "Movilidad y Viajes"),
+    INSPECTION("inspection", "Inspección Pre-Compra Forense"),
+    UNIVERSAL("universal", "Elysium Vanguard Universal");
 
     companion object {
-        fun fromDbValue(value: String): ProviderType = values().firstOrNull {
-            it.dbValue.equals(value.trim(), ignoreCase = true) ||
-                    it.name.equals(value.trim(), ignoreCase = true)
-        } ?: throw IllegalArgumentException("Unknown ProviderType: '$value'")
+        fun fromCode(code: String): ServiceVertical =
+            values().firstOrNull { it.code.equals(code, ignoreCase = true) } ?: UNIVERSAL
+    }
+}
 
-        fun fromDbValueOrNull(value: String?): ProviderType? {
-            if (value.isNullOrBlank()) return null
-            return values().firstOrNull {
-                it.dbValue.equals(value.trim(), ignoreCase = true) ||
-                        it.name.equals(value.trim(), ignoreCase = true)
-            }
+/**
+ * Canonical provider types aligned across UI, ViewModel, Repository and PostgreSQL provider_profiles.
+ */
+enum class ProviderType(val dbValue: String, val displayName: String) {
+    MECHANIC("mechanic", "Mecánico Profesional"),
+    WORKSHOP("workshop", "Taller Mecánico Establecido"),
+    PARTS_STORE("parts_store", "Venta de Repuestos"),
+    TOW_PROVIDER("tow_provider", "Operador de Grúas"),
+    RIDE_DRIVER("ride_driver", "Conductor de Movilidad");
+
+    companion object {
+        fun fromDbValue(value: String): ProviderType = when (value.trim().lowercase()) {
+            "mechanic" -> MECHANIC
+            "workshop" -> WORKSHOP
+            "parts_store", "part_store", "store" -> PARTS_STORE
+            "tow_provider", "tow_truck", "tow", "tow_driver" -> TOW_PROVIDER
+            "ride_driver", "driver", "ride" -> RIDE_DRIVER
+            else -> values().firstOrNull { it.name.equals(value, ignoreCase = true) } ?: MECHANIC
         }
     }
 }
 
 /**
- * Service verticals supported across MEET and Elysium Services.
- */
-enum class ServiceVertical(val displayName: String, val category: String) {
-    MOBILE_MECHANIC("Mecánico Móvil", "AUTOMOTIVE"),
-    WORKSHOP("Taller Mecánico", "AUTOMOTIVE"),
-    TOWING("Servicio de Grúa", "ROADSIDE"),
-    PARTS_DELIVERY("Entrega de Repuestos", "PARTS"),
-    PARTS_PICKUP("Retiro de Repuestos", "PARTS"),
-    ROADSIDE_ASSISTANCE("Asistencia en Carretera", "ROADSIDE"),
-    DIAGNOSTIC_SPECIALIST("Especialista en Diagnóstico", "AUTOMOTIVE"),
-    ELECTRICIAN("Electricidad Automotriz", "AUTOMOTIVE"),
-    TIRE_SERVICE("Servicio de Llantas", "ROADSIDE"),
-    BATTERY_SERVICE("Servicio de Baterías", "ROADSIDE"),
-    LOCKSMITH("Cerrajería Vial", "ROADSIDE"),
-    UNIVERSAL_SERVICE("Servicio Elysium", "UNIVERSAL");
-
-    companion object {
-        fun fromString(value: String): ServiceVertical = values().firstOrNull {
-            it.name.equals(value, ignoreCase = true) || it.displayName.equals(value, ignoreCase = true)
-        } ?: UNIVERSAL_SERVICE
-    }
-}
-
-/**
- * Roles assignable to an actor within a service operation.
+ * Service role hierarchy for role-based access control.
  */
 enum class ServiceRole {
     CUSTOMER,
     TECHNICIAN,
     WORKSHOP_ADMIN,
-    TOW_OPERATOR,
     PARTS_STORE_AGENT,
+    TOW_OPERATOR,
     RIDE_DRIVER,
     PLATFORM_ADMIN,
-    COMMUNITY_CONTRIBUTOR,
+    SYSTEM_AUTOMATION,
 }
 
 /**
- * Verification state within Trust Center authority.
+ * Verification state within Trust Center.
  */
 enum class VerificationState {
-    PENDING,
+    UNVERIFIED,
+    PENDING_REVIEW,
     APPROVED,
-    REJECTED,
+    SUSPENDED,
     REVOKED,
-    EXPIRED,
 }
 
 /**
- * Server-authoritative snapshot of provider verification and trust.
+ * Cryptographically verifiable or server-signed Provider Trust Snapshot.
  */
 data class ProviderTrustSnapshot(
     val providerProfileId: UUID,
     val verificationState: VerificationState,
-    val isActive: Boolean,
-    val trustVersion: Long,
+    val trustVersion: Int,
     val verifiedAtEpochMs: Long?,
     val expiresAtEpochMs: Long?,
     val revokedAtEpochMs: Long?,
+    val verifiedByAdminId: UUID?,
     val eligibleServiceVerticals: Set<ServiceVertical>,
+    val maxConcurrentJobs: Int = 3,
+    val isActive: Boolean = true,
 ) {
     val isAuthorizedToWork: Boolean
         get() = verificationState == VerificationState.APPROVED &&
@@ -229,10 +206,38 @@ data class ServiceActor(
     }
 
     val isVerifiedProvider: Boolean
-        get() = trustSnapshot?.isAuthorizedToWork == true
+        get() = trustSnapshot != null &&
+                providerProfileId != null &&
+                trustSnapshot.providerProfileId == providerProfileId &&
+                trustSnapshot.isAuthorizedToWork
 
-    fun hasPermission(permission: ServicePermission): Boolean =
-        roles.contains(ServiceRole.PLATFORM_ADMIN) || permissions.contains(permission)
+    fun hasPermission(permission: ServicePermission, requestedVertical: ServiceVertical? = null): Boolean {
+        if (roles.contains(ServiceRole.PLATFORM_ADMIN)) return true
+        if (!permissions.contains(permission)) return false
+
+        val requiresProviderVerification = when (permission) {
+            ServicePermission.SUBMIT_OFFER,
+            ServicePermission.START_ROUTE,
+            ServicePermission.CONFIRM_ARRIVAL,
+            ServicePermission.START_INSPECTION,
+            ServicePermission.CONFIRM_DIAGNOSIS,
+            ServicePermission.REQUEST_PARTS,
+            ServicePermission.DISPATCH_PARTS,
+            ServicePermission.PERFORM_REPAIR,
+            ServicePermission.COMPLETE_WORK,
+            ServicePermission.SUBMIT_POST_SCAN,
+            ServicePermission.FINALIZE_INVOICE -> true
+            else -> false
+        }
+
+        if (requiresProviderVerification) {
+            if (!isVerifiedProvider) return false
+            if (requestedVertical != null && trustSnapshot?.eligibleServiceVerticals?.contains(requestedVertical) != true) {
+                return false
+            }
+        }
+        return true
+    }
 
     companion object {
         fun customer(
@@ -321,17 +326,25 @@ data class ProviderIdentity(
     val authUserId: UUID,
     val businessName: String,
     val providerType: ProviderType,
-    val isVerified: Boolean,
-    val isActive: Boolean,
-    val status: String,
-    val ratingScore: Double,
-    val totalJobsCompleted: Int,
+    val trustSnapshot: ProviderTrustSnapshot? = null,
+    val isVerifiedLegacy: Boolean = false,
+    val isActiveLegacy: Boolean = true,
+    val status: String = "active",
+    val ratingScore: Double = 0.0,
+    val totalJobsCompleted: Int = 0,
     val specialties: List<String> = emptyList(),
     val certifications: List<String> = emptyList(),
     val phone: String? = null,
 ) {
+    val isVerified: Boolean
+        get() = trustSnapshot?.isAuthorizedToWork ?: (isVerifiedLegacy && isActiveLegacy)
+
     val isEligibleToWork: Boolean
-        get() = isVerified && isActive && status.equals("active", ignoreCase = true)
+        get() = if (trustSnapshot != null) {
+            trustSnapshot.isAuthorizedToWork && trustSnapshot.providerProfileId == providerProfileId
+        } else {
+            isVerifiedLegacy && isActiveLegacy && status.equals("active", ignoreCase = true)
+        }
 }
 
 /**
@@ -358,6 +371,11 @@ data class ServiceCommandEnvelope(
     val payloadJson: String,
     val payloadVersion: Int = 1,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
+    val signedPayloadHash: String? = null,
+    val signature: String? = null,
+    val keyId: String? = null,
+    val algorithm: String? = null,
+    val nonce: String? = null,
 )
 
 /**

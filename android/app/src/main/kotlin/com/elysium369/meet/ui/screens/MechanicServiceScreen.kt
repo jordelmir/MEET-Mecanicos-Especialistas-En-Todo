@@ -534,11 +534,15 @@ private fun ClientWorkspaceView(
 
                     Button(
                         onClick = {
+                            val vehicle = selectedVehicle
+                            if (vehicle == null) {
+                                Toast.makeText(context, "⚠️ Debes seleccionar un vehículo registrado para enviar la solicitud", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
                             val parsedLat = latText.toDoubleOrNull() ?: 0.0
                             val parsedLng = lngText.toDoubleOrNull() ?: 0.0
-                            val vehicleId = selectedVehicle?.id ?: "demo_vehicle"
                             viewModel.createServiceRequest(
-                                vehicleId = vehicleId,
+                                vehicleId = vehicle.id,
                                 problem = problemText.ifBlank { selectedService.name },
                                 description = descriptionText,
                                 location = locationName,
@@ -546,19 +550,19 @@ private fun ClientWorkspaceView(
                                 latitude = parsedLat,
                                 longitude = parsedLng,
                                 phone = phone,
-                                priceOffer = priceInDollars.toDouble(),
+                                priceOffer = priceOfferCrc.toDouble(),
                                 serviceId = selectedService.id,
                                 serviceCategory = selectedService.category.name,
                                 dtcCodes = activeDtcs
                             )
-                            Toast.makeText(context, "✅ Solicitud enviada a la red de mecánicos", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "✅ Solicitud registrada para sincronización", Toast.LENGTH_SHORT).show()
                             problemText = ""
                             descriptionText = ""
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MechanicColors.cyanAccent),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = (problemText.isNotBlank() || selectedService.name.isNotBlank()) && phone.isNotBlank()
+                        enabled = selectedVehicle != null && (problemText.isNotBlank() || selectedService.name.isNotBlank()) && phone.isNotBlank()
                     ) {
                         Text(
                             text = "🛠️ ENVIAR SOLICITUD A RED DE MECÁNICOS",

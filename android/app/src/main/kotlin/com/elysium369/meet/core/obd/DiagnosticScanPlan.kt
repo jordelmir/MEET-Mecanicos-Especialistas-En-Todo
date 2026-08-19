@@ -46,11 +46,10 @@ object DiagnosticScanPlanCompiler {
 
             if (targetAddresses.isNotEmpty()) {
                 val targeted = confirmed.filterKeys { it in targetAddresses }
-                if (targeted.isNotEmpty()) {
-                    return targeted.values.toList()
-                }
+                // Fail closed: Never broaden to all ECUs if targeted resolution failed
+                return targeted.values.toList()
             }
-            return confirmed.values.toList()
+            return emptyList()
         }
 
         if (mode == DiagnosticScanMode.QUICK) return confirmed.values.toList()

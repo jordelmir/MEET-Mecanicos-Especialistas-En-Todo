@@ -137,12 +137,11 @@ private fun requestCompatibilityContext(
 private fun inferOfferConfidence(request: PartRequestEntity, offer: PartOfferEntity): CompatibilityConfidence {
     val requested = request.partNumber?.trim().orEmpty()
     val offered = offer.partNumber.trim()
-    val isOemMatch = requested.isNotBlank() && requested.equals(offered, ignoreCase = true)
+    val isStringMatch = requested.isNotBlank() && requested.equals(offered, ignoreCase = true)
     return when {
-        isOemMatch && request.oemPreference.equals("OEM", ignoreCase = true) -> CompatibilityConfidence.EXACT
-        isOemMatch -> CompatibilityConfidence.HIGH
-        offered.isNotBlank() && !offered.equals("Por confirmar", ignoreCase = true) -> CompatibilityConfidence.MEDIUM
-        offered.isNotBlank() -> CompatibilityConfidence.LOW
+        // String match alone is HIGH probability; EXACT is reserved exclusively for VIN + OEM catalog proof
+        isStringMatch -> CompatibilityConfidence.HIGH
+        offered.isNotBlank() && !offered.equals("Por confirmar", ignoreCase = true) -> CompatibilityConfidence.LOW
         else -> CompatibilityConfidence.UNKNOWN
     }
 }
@@ -1094,13 +1093,21 @@ private fun ClientWorkspaceView(
                                 ).show()
                                 return@Button
                             }
+                            val vehicle = selectedVehicle
+                            if (vehicle == null) {
+                                Toast.makeText(
+                                    context,
+                                    "⚠️ Debes seleccionar un vehículo registrado antes de solicitar repuestos.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@Button
+                            }
                             val parsedLat = latText.toDoubleOrNull() ?: 0.0
                             val parsedLng = lngText.toDoubleOrNull() ?: 0.0
-                            val vehicleId = selectedVehicle?.id ?: "demo_vehicle"
                             
                             viewModel.createPartRequest(
                                 serviceRequestId = null,
-                                vehicleId = vehicleId,
+                                vehicleId = vehicle.id,
                                 dtcCode = viewModel.activeDtcs.value.firstOrNull(),
                                 partName = partName,
                                 partNumber = partNumber.takeIf { it.isNotBlank() },

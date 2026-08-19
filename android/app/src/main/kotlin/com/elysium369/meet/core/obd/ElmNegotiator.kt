@@ -208,11 +208,11 @@ class ElmNegotiator(private val transport: TransportInterface) {
         
         val activeLine = cleanLines.firstOrNull { line ->
             val cleanLine = line.removePrefix("A").removePrefix("a").trim()
-            cleanLine.length == 1 && (cleanLine[0].isDigit() || cleanLine[0].uppercaseChar() in 'A'..'C')
+            cleanLine.length == 1 && (cleanLine[0].isDigit() || cleanLine[0].uppercaseChar() in 'A'..'F')
         } ?: "0"
         
         val protocolCode = activeLine.removePrefix("A").removePrefix("a").trim()
-        return ObdProtocol.values().find { it.atspCode == protocolCode } ?: ObdProtocol.AUTO
+        return ObdProtocol.values().find { it.atspCode.equals(protocolCode, ignoreCase = true) } ?: ObdProtocol.AUTO
     }
 
     private fun buildInitSequence(isSTN: Boolean): List<String> = buildList {

@@ -4480,13 +4480,23 @@ class ObdSession(
 
     private fun parseProtocolName(response: String): String {
         // ATDPN returns protocol number prefixed with optional "A" (for auto-detected)
-        // e.g. "A6" means auto-detected protocol 6, "6" means manually set protocol 6
-        val clean = response.uppercase().trim().removePrefix("A")
+        // e.g. "A6" means auto-detected protocol 6, "AD" means auto-detected CAN FD 11bit
+        val clean = response.uppercase().trim().removePrefix("A").trim()
+        val matchedProtocol = ObdProtocol.values().firstOrNull { it.atspCode.equals(clean, ignoreCase = true) }
+        if (matchedProtocol != null && matchedProtocol != ObdProtocol.AUTO) {
+            return matchedProtocol.displayName
+        }
         return when (clean) {
             "6" -> "ISO 15765-4 (CAN 11/500)"
             "7" -> "ISO 15765-4 (CAN 29/500)"
             "8" -> "ISO 15765-4 (CAN 11/250)"
             "9" -> "ISO 15765-4 (CAN 29/250)"
+            "A" -> "SAE J1939 CAN 29bit 250K"
+            "B" -> "User CAN 11bit"
+            "C" -> "User CAN 29bit"
+            "D" -> "CAN FD 11bit 500K/2M"
+            "E" -> "CAN FD 29bit 500K/2M"
+            "F" -> "DoIP ISO 13400 (Ethernet)"
             "3" -> "ISO 9141-2"
             "4" -> "KWP 2000 (5 baud)"
             "5" -> "KWP 2000 (Fast)"

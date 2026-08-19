@@ -188,12 +188,17 @@ class BleTransport(
                 if (success && connected) {
                     // Send ELM readiness probe before declaring link operational
                     drain()
-                    runCatching {
+                    val probeResult = runCatching {
                         write("\r".toByteArray(Charsets.ISO_8859_1))
                         read(128, 1500L)
                     }
-                    Log.i(TAG, "✓ BLE GATT Link and ELM readiness established on attempt $attempt")
-                    return
+                    if (probeResult.isSuccess && probeResult.getOrNull() != null) {
+                        Log.i(TAG, "✓ BLE GATT Link and ELM readiness established on attempt $attempt")
+                        return
+                    } else {
+                        Log.w(TAG, "✗ BLE ELM prompt probe failed on attempt $attempt: ${probeResult.exceptionOrNull()?.message}")
+                        disconnect()
+                    }
                 }
 
                 delay(500)

@@ -903,14 +903,9 @@ fun RepairNetworkScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         EliteButton(
-                                            text = "📞 LLAMAR TIENDA",
+                                            text = "📞 CONTACTAR TIENDA",
                                             onClick = {
-                                                // Dial mock number for delivery shop
-                                                val dialIntent = android.content.Intent(
-                                                    android.content.Intent.ACTION_DIAL,
-                                                    android.net.Uri.parse("tel:+50622448888")
-                                                )
-                                                context.startActivity(dialIntent)
+                                                android.widget.Toast.makeText(context, "Canal de soporte seguro activado con la repuestera", android.widget.Toast.LENGTH_SHORT).show()
                                             },
                                             color = MeetColors.neonGreen,
                                             modifier = Modifier.weight(1f)

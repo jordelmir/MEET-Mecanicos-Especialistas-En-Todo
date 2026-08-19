@@ -5,8 +5,10 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -142,17 +144,28 @@ class BtClassicTransport(
                             continue
                         }
                         
-                        Log.d(TAG, "  Socket created, attempting connect natively (timeout 3500ms)...")
+                        Log.d(TAG, "  Socket created, attempting connect natively (active watchdog 3500ms)...")
                         // Always ensure discovery is cancelled immediately before the blocking connect call
                         runCatching { bluetoothAdapter.cancelDiscovery() }
-                        try {
-                            withTimeout(3500L) {
-                                socket?.connect()
+
+                        val currentSocket = socket ?: continue
+                        val watchdogJob = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            delay(3500L)
+                            if (!currentSocket.isConnected) {
+                                Log.w(TAG, "  ✗ Active watchdog triggered at 3500ms; forcibly unblocking connect() via socket.close()")
+                                runCatching { currentSocket.close() }
                             }
-                        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                            Log.w(TAG, "  ✗ $methodName connect timed out after 3500ms, aborting socket")
-                            socket?.close()
-                            throw TransportConnectTimeout("Bluetooth connect timeout on method: $methodName")
+                        }
+
+                        try {
+                            currentSocket.connect()
+                        } catch (e: Exception) {
+                            if (System.currentTimeMillis() - methodStart >= 3400L) {
+                                throw TransportConnectTimeout("Bluetooth connect watchdog timeout on method: $methodName")
+                            }
+                            throw e
+                        } finally {
+                            watchdogJob.cancel()
                         }
                         
                         inputStream = BufferedInputStream(socket?.inputStream, 32768)

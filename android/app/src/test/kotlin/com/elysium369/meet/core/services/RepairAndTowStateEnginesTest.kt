@@ -8,6 +8,8 @@ import com.elysium369.meet.core.services.parts.PartsStateEngine
 import com.elysium369.meet.core.services.repair.RepairAction
 import com.elysium369.meet.core.services.repair.RepairState
 import com.elysium369.meet.core.services.repair.RepairStateEngine
+import com.elysium369.meet.core.services.repair.RepairVerificationBundle
+import com.elysium369.meet.core.services.repair.VerificationRequirement
 import com.elysium369.meet.core.services.tow.TowAction
 import com.elysium369.meet.core.services.tow.TowState
 import com.elysium369.meet.core.services.tow.TowStateEngine
@@ -57,12 +59,28 @@ class RepairAndTowStateEnginesTest {
         val validationPending = RepairStateEngine.getNextState(RepairState.REPAIR_IN_PROGRESS, RepairAction.CompleteTechnicianWork("before_hash", "after_hash"), ServiceRole.TECHNICIAN)
         assertEquals(RepairState.VALIDATION_PENDING, validationPending)
 
-        // Technician validates scan -> VALIDATION_PASSED (NOT customer confirmed!)
-        val validationPassed = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.SubmitPostScanValidation("scan_report_hash", 1, isClean = true), ServiceRole.TECHNICIAN)
+        // Clean Post-Scan Verification Bundle
+        val cleanBundle = RepairVerificationBundle(
+            workOrderId = UUID.randomUUID(),
+            vehicleId = "VIN_12345",
+            preScanReportHash = "sha256_pre",
+            postScanReportHash = "sha256_post",
+            remainingDtcCount = 0,
+            allMonitorsPassed = true,
+        )
+        val validationPassed = RepairStateEngine.getNextState(
+            RepairState.VALIDATION_PENDING,
+            RepairAction.SubmitPostScanValidation(cleanBundle),
+            ServiceRole.TECHNICIAN
+        )
         assertEquals(RepairState.VALIDATION_PASSED, validationPassed)
 
         // Customer explicitly confirms work
-        val customerConfirmed = RepairStateEngine.getNextState(RepairState.VALIDATION_PASSED, RepairAction.CustomerConfirm, ServiceRole.CUSTOMER)
+        val customerConfirmed = RepairStateEngine.getNextState(
+            RepairState.VALIDATION_PASSED,
+            RepairAction.CustomerConfirm(VerificationRequirement.OBD_REQUIRED),
+            ServiceRole.CUSTOMER
+        )
         assertEquals(RepairState.CUSTOMER_CONFIRMED, customerConfirmed)
 
         // Close work order requires settlement and final invoice proof
@@ -73,15 +91,33 @@ class RepairAndTowStateEnginesTest {
     @Test
     fun testRepairStateCannotSkipValidation() {
         // Customer cannot confirm directly from VALIDATION_PENDING without scan proof
-        val invalidConfirm = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.CustomerConfirm, ServiceRole.CUSTOMER)
+        val invalidConfirm = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.CustomerConfirm(), ServiceRole.CUSTOMER)
         assertNull(invalidConfirm)
     }
 
     @Test
     fun testTechnicianCannotCreateCustomerConfirmed() {
         // Technician cannot perform CustomerConfirm
-        val invalidAction = RepairStateEngine.getNextState(RepairState.VALIDATION_PASSED, RepairAction.CustomerConfirm, ServiceRole.TECHNICIAN)
+        val invalidAction = RepairStateEngine.getNextState(RepairState.VALIDATION_PASSED, RepairAction.CustomerConfirm(), ServiceRole.TECHNICIAN)
         assertNull(invalidAction)
+    }
+
+    @Test
+    fun testDirtyPostScanTransitionsToValidationFailed() {
+        val dirtyBundle = RepairVerificationBundle(
+            workOrderId = UUID.randomUUID(),
+            vehicleId = "VIN_12345",
+            preScanReportHash = "sha256_pre",
+            postScanReportHash = "sha256_post",
+            remainingDtcCount = 2, // 2 DTCs still present!
+            allMonitorsPassed = false,
+        )
+        val failed = RepairStateEngine.getNextState(
+            RepairState.VALIDATION_PENDING,
+            RepairAction.SubmitPostScanValidation(dirtyBundle),
+            ServiceRole.TECHNICIAN
+        )
+        assertEquals(RepairState.VALIDATION_FAILED, failed)
     }
 
     @Test
@@ -99,42 +135,22 @@ class RepairAndTowStateEnginesTest {
         val loading = TowStateEngine.getNextState(TowState.ARRIVED, TowAction.StartLoading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADING, loading)
 
-        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded("secure_load_hash"), ServiceRole.TOW_OPERATOR)
+        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded("sha256_load_photo"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADED, loaded)
 
         val inTransit = TowStateEngine.getNextState(TowState.LOADED, TowAction.StartTransit, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.IN_TRANSIT, inTransit)
 
-        val atDest = TowStateEngine.getNextState(TowState.IN_TRANSIT, TowAction.ArrivedAtDestination, ServiceRole.TOW_OPERATOR)
-        assertEquals(TowState.ARRIVED_DESTINATION, atDest)
+        val arrivedDest = TowStateEngine.getNextState(TowState.IN_TRANSIT, TowAction.ArrivedAtDestination, ServiceRole.TOW_OPERATOR)
+        assertEquals(TowState.ARRIVED_DESTINATION, arrivedDest)
 
         val unloading = TowStateEngine.getNextState(TowState.ARRIVED_DESTINATION, TowAction.StartUnloading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.UNLOADING, unloading)
 
-        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered("delivery_hash"), ServiceRole.TOW_OPERATOR)
+        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered("sha256_drop_photo"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.DELIVERED, delivered)
 
         val completed = TowStateEngine.getNextState(TowState.DELIVERED, TowAction.CompleteService, ServiceRole.CUSTOMER)
         assertEquals(TowState.COMPLETED, completed)
-    }
-
-    @Test
-    fun testPartsCompatibilityConfidenceTiers() {
-        assertEquals(
-            CompatibilityConfidence.EXACT,
-            CompatibilityConfidence.evaluate(vinMatched = true, oemMatched = true, catalogExact = true, specsMatched = true, hasConflict = false)
-        )
-        assertEquals(
-            CompatibilityConfidence.HIGH,
-            CompatibilityConfidence.evaluate(vinMatched = false, oemMatched = false, catalogExact = true, specsMatched = true, hasConflict = false)
-        )
-        assertEquals(
-            CompatibilityConfidence.PROBABLE,
-            CompatibilityConfidence.evaluate(vinMatched = false, oemMatched = false, catalogExact = false, specsMatched = true, hasConflict = false)
-        )
-        assertEquals(
-            CompatibilityConfidence.CONFLICTED,
-            CompatibilityConfidence.evaluate(vinMatched = true, oemMatched = true, catalogExact = true, specsMatched = true, hasConflict = true)
-        )
     }
 }

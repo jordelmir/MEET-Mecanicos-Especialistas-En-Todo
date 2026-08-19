@@ -30,7 +30,7 @@ class ServiceRatingV2Test {
             raterProfileId = raterId,
             ratedProviderId = providerId,
             raterRole = ServiceRole.CUSTOMER,
-            serviceVertical = ServiceVertical.MOBILE_MECHANIC,
+            serviceVertical = ServiceVertical.REPAIR,
             dimensionalScores = mapOf(
                 RatingDimension.TECHNICAL_QUALITY to 5,
                 RatingDimension.COMEBACK_AVOIDANCE to 5,
@@ -65,7 +65,7 @@ class ServiceRatingV2Test {
             raterProfileId = imposterId, // Mismatch!
             ratedProviderId = providerId,
             raterRole = ServiceRole.CUSTOMER,
-            serviceVertical = ServiceVertical.WORKSHOP,
+            serviceVertical = ServiceVertical.REPAIR,
             dimensionalScores = mapOf(RatingDimension.TECHNICAL_QUALITY to 5),
             comment = "Intento no autorizado",
         )

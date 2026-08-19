@@ -42,6 +42,9 @@ class MeetApplication : Application(), Configuration.Provider {
         // Initialize monetization analytics
         com.elysium369.meet.core.monetization.MonetizationAnalytics.initialize(this)
         
+        // Initialize persistent KnownGoodAdapterStore
+        com.elysium369.meet.core.obd.KnownGoodAdapterStore.initialize(this)
+        
         // Load DTC JSON if empty
         val dtcLoader = DtcDatabaseLoader(this, db)
         dtcLoader.loadIfEmpty()

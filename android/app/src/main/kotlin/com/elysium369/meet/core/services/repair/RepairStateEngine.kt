@@ -6,29 +6,29 @@ import java.util.UUID
 /**
  * Server-authoritative repair lifecycle states matching Supabase repair_requests & repair_work_orders.
  */
-enum class RepairState(val displayName: String) {
-    DRAFT("Borrador"),
-    PUBLISHED("Publicado"),
-    TRIAGED("Triaje Completado"),
-    WAITING_OFFERS("Esperando Ofertas"),
-    OFFER_RECEIVED("Oferta Recibida"),
-    OFFER_ACCEPTED("Oferta Aceptada"),
-    MECHANIC_ASSIGNED("Mecánico Asignado"),
-    IN_ROUTE("Mecánico en Camino"),
-    INSPECTION_STARTED("Inspección Iniciada"),
-    DIAGNOSIS_CONFIRMED("Diagnóstico Confirmado"),
-    PARTS_REQUIRED("Repuestos Requeridos"),
-    WAITING_PARTS("Esperando Repuestos"),
-    REPAIR_IN_PROGRESS("Reparación en Progreso"),
-    REPAIR_COMPLETED("Trabajo Técnico Completado"),
-    VALIDATION_PENDING("Verificación Post-Reparación Pendiente"),
-    VALIDATION_PASSED("Validación Post-Scan Aprobada"),
-    VALIDATION_FAILED("Validación Post-Scan Fallida"),
-    CUSTOMER_CONFIRMED("Confirmado por Cliente"),
-    CLOSED("Caso Cerrado y Liquidado"),
-    CANCELLED("Cancelado"),
-    DISPUTED("En Disputa"),
-    REFUNDED("Reembolsado");
+enum class RepairState(val displayName: String, val dbValue: String) {
+    DRAFT("Borrador", "draft"),
+    PUBLISHED("Publicado", "published"),
+    TRIAGED("Triaje Completado", "triaged"),
+    WAITING_OFFERS("Esperando Ofertas", "waiting_offers"),
+    OFFER_RECEIVED("Oferta Recibida", "offer_received"),
+    OFFER_ACCEPTED("Oferta Aceptada", "offer_accepted"),
+    MECHANIC_ASSIGNED("Mecánico Asignado", "mechanic_assigned"),
+    IN_ROUTE("Mecánico en Camino", "in_route"),
+    INSPECTION_STARTED("Inspección Iniciada", "inspection_started"),
+    DIAGNOSIS_CONFIRMED("Diagnóstico Confirmado", "diagnosis_confirmed"),
+    PARTS_REQUIRED("Repuestos Requeridos", "parts_required"),
+    WAITING_PARTS("Esperando Repuestos", "waiting_parts"),
+    REPAIR_IN_PROGRESS("Reparación en Progreso", "repair_in_progress"),
+    REPAIR_COMPLETED("Trabajo Técnico Completado", "repair_completed"),
+    VALIDATION_PENDING("Verificación Post-Reparación Pendiente", "validation_pending"),
+    VALIDATION_PASSED("Validación Post-Scan Aprobada", "validation_passed"),
+    VALIDATION_FAILED("Validación Post-Scan Fallida", "validation_failed"),
+    CUSTOMER_CONFIRMED("Confirmado por Cliente", "customer_confirmed"),
+    CLOSED("Caso Cerrado y Liquidado", "closed"),
+    CANCELLED("Cancelado", "cancelled"),
+    DISPUTED("En Disputa", "disputed"),
+    REFUNDED("Reembolsado", "refunded");
 
     val isTerminal: Boolean
         get() = this in setOf(CLOSED, CANCELLED, REFUNDED)
@@ -44,6 +44,38 @@ enum class RepairState(val displayName: String) {
             VALIDATION_PASSED,
             VALIDATION_FAILED,
         )
+
+    companion object {
+        fun fromDbValue(value: String): RepairState =
+            values().firstOrNull {
+                it.dbValue.equals(value, ignoreCase = true) || it.name.equals(value, ignoreCase = true)
+            } ?: DRAFT
+    }
+}
+
+enum class VerificationRequirement {
+    OBD_REQUIRED,
+    VISUAL_REQUIRED,
+    FUNCTIONAL_TEST_REQUIRED,
+    NONE_BY_POLICY,
+}
+
+data class RepairVerificationBundle(
+    val workOrderId: UUID,
+    val vehicleId: String,
+    val preScanReportHash: String,
+    val postScanReportHash: String,
+    val remainingDtcCount: Int,
+    val allMonitorsPassed: Boolean = true,
+    val evidenceHashes: List<String> = emptyList(),
+) {
+    init {
+        require(vehicleId.isNotBlank()) { "Vehicle ID cannot be blank in verification bundle" }
+        require(postScanReportHash.isNotBlank()) { "Post-scan report hash is required" }
+    }
+
+    val isCleanPass: Boolean
+        get() = remainingDtcCount == 0 && postScanReportHash.isNotBlank()
 }
 
 sealed interface RepairAction {
@@ -56,8 +88,19 @@ sealed interface RepairAction {
     data class RequestParts(val partsCount: Int) : RepairAction
     object ResumeRepair : RepairAction
     data class CompleteTechnicianWork(val beforePhotoHash: String?, val afterPhotoHash: String) : RepairAction
-    data class SubmitPostScanValidation(val scanReportHash: String, val verifiedDtcCount: Int, val isClean: Boolean = true) : RepairAction
-    object CustomerConfirm : RepairAction
+    data class SubmitPostScanValidation(val bundle: RepairVerificationBundle) : RepairAction {
+        // Backwards compatible constructor
+        constructor(scanReportHash: String, verifiedDtcCount: Int, isClean: Boolean = true) : this(
+            RepairVerificationBundle(
+                workOrderId = UUID.randomUUID(),
+                vehicleId = "verified_vehicle",
+                preScanReportHash = "pre_scan",
+                postScanReportHash = scanReportHash,
+                remainingDtcCount = if (isClean) 0 else verifiedDtcCount
+            )
+        )
+    }
+    data class CustomerConfirm(val verificationPolicy: VerificationRequirement = VerificationRequirement.OBD_REQUIRED) : RepairAction
     data class CloseWorkOrder(val settlementTxId: String, val finalInvoiceHash: String) : RepairAction
     data class RaiseDispute(val reason: String) : RepairAction
     data class Cancel(val reason: String) : RepairAction
@@ -132,16 +175,20 @@ object RepairStateEngine {
         }
         is RepairAction.SubmitPostScanValidation -> {
             if (fromState == RepairState.VALIDATION_PENDING &&
-                action.scanReportHash.isNotBlank() &&
+                action.bundle.postScanReportHash.isNotBlank() &&
                 actorRole in setOf(ServiceRole.TECHNICIAN, ServiceRole.WORKSHOP_ADMIN)) {
-                if (action.isClean) RepairState.VALIDATION_PASSED else RepairState.VALIDATION_FAILED
+                if (action.bundle.isCleanPass) RepairState.VALIDATION_PASSED else RepairState.VALIDATION_FAILED
             } else null
         }
         is RepairAction.CustomerConfirm -> {
-            // Customer can only confirm AFTER validation has passed (cannot skip validation from VALIDATION_PENDING)
-            if (fromState in setOf(RepairState.VALIDATION_PASSED, RepairState.REPAIR_COMPLETED) &&
-                actorRole == ServiceRole.CUSTOMER) {
-                RepairState.CUSTOMER_CONFIRMED
+            if (actorRole == ServiceRole.CUSTOMER) {
+                if (fromState == RepairState.VALIDATION_PASSED) {
+                    RepairState.CUSTOMER_CONFIRMED
+                } else if (fromState == RepairState.REPAIR_COMPLETED && action.verificationPolicy == VerificationRequirement.NONE_BY_POLICY) {
+                    RepairState.CUSTOMER_CONFIRMED
+                } else {
+                    null
+                }
             } else null
         }
         is RepairAction.CloseWorkOrder -> {
