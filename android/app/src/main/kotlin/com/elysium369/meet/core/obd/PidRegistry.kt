@@ -110,109 +110,172 @@ object PidRegistry {
     )
 
     /**
-     * Manufacturer-specific PIDs (usually Mode 22).
-     * These require specific ECU headers and often security access.
+     * Manufacturer-specific OEM PIDs (Modes 21, 22, UDS 22).
+     * Complete world-class multi-brand diagnostic catalogue covering all major global platforms.
      */
     val MANUFACTURER_PIDS = mapOf(
+        "TOYOTA" to listOf(
+            PidDefinition("21", "01", "Temp Bat HV Híbrida", "°C", -40f, 100f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "02", "SOC Batería HV", "%", 0f, 100f, 40f, 20f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "67", "Temp Transmisión CVT / E-CVT", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "C4", "Odómetro Toyota", "km", 0f, 1000000f, 0f, 0f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.ENGINE, true),
+            PidDefinition("21", "82", "Voltaje Bloque 1 Bat HV", "V", 0f, 25f, 12f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "83", "Voltaje Bloque 2 Bat HV", "V", 0f, 25f, 12f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "84", "Voltaje Bloque 3 Bat HV", "V", 0f, 25f, 12f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "85", "Voltaje Bloque 4 Bat HV", "V", 0f, 25f, 12f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("21", "90", "Temp Inversor MG1/MG2", "°C", -40f, 150f, 90f, 110f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("21", "91", "Revoluciones Motor MG2", "rpm", -15000f, 15000f, 12000f, 14000f, { a, b, _, _ -> (a * 256f + b) - 32768f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "1356", "Presión Aceite Freno Hidráulico", "bar", 0f, 200f, 150f, 180f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true)
+        ),
         "FORD" to listOf(
-            PidDefinition("22", "03E0", "Carga Alt.", "%", 0f, 100f, 90f, 98f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "0200", "Presión Aceite", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "1E23", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "03E0", "Carga Alternador SmartCharge", "%", 0f, 100f, 90f, 98f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0200", "Presión Aceite Motor", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1E23", "Temp Aceite Motor EOT", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "1E1C", "Temp Culata CHT", "°C", -40f, 250f, 115f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "1E1F", "Temp Transmisión TFT 6R/10R", "°C", -40f, 180f, 110f, 130f, { a, b, _, _ -> ((a * 256f + b) / 16f) - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "0234", "Presión Riel Combustible FRP", "kPa", 0f, 250000f, 180000f, 220000f, { a, b, _, _ -> (a * 256f + b) * 10f }, PidCategory.FUEL, true),
+            PidDefinition("22", "042F", "Carga Hollín DPF", "%", 0f, 100f, 80f, 95f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "0430", "Presión Boost Turbo EcoBoost", "psi", -14.7f, 35f, 22f, 28f, { a, b, _, _ -> ((a * 256f + b) / 100f) - 14.7f }, PidCategory.ENGINE, true),
             PidDefinition("22", "DD01", "Odómetro Ford", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f }, PidCategory.ENGINE, true)
         ),
-        "TOYOTA" to listOf(
-            PidDefinition("21", "01", "Temp Bat HV", "°C", -40f, 100f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("21", "02", "SOC Bat HV", "%", 0f, 100f, 40f, 20f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "1356", "Temp Trans CVT", "°C", -40f, 200f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("21", "C4", "Odómetro Toyota", "km", 0f, 1000000f, 0f, 0f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.ENGINE, true)
-        ),
         "GM" to listOf(
-            PidDefinition("22", "1940", "Temp Trans Fluid", "°C", -40f, 150f, 110f, 125f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("22", "1153", "Vida Aceite", "%", 0f, 100f, 10f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1940", "Temp Transmisión 6L/8L/10L", "°C", -40f, 160f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1153", "Vida Útil Aceite Motor", "%", 0f, 100f, 15f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true),
             PidDefinition("22", "0513", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "184B", "Estado MDS", "", 0f, 1f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1154", "Presión Aceite Motor GM", "kPa", 0f, 1000f, 180f, 120f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "184B", "Desactivación Cilindros AFM/DFM", "", 0f, 8f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1941", "Resbalamiento Convertidor Torque", "rpm", -500f, 2500f, 150f, 400f, { a, b, _, _ -> (a * 256f + b) - 32768f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1198", "Retardo Total Detonación Knock", "°", 0f, 25f, 4f, 8f, { a, _, _, _ -> a / 2f }, PidCategory.ENGINE, true),
             PidDefinition("22", "1A6C", "Odómetro GM", "km", 0f, 1000000f, 0f, 0f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.ENGINE, true)
         ),
         "VOLKSWAGEN" to listOf(
-            PidDefinition("22", "11BD", "Presión Turbo Deseada", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "11BE", "Presión Turbo Real", "hPa", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "2032", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "11BD", "Presión Turbo Solicitada", "hPa", 0f, 3500f, 2400f, 2800f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "11BE", "Presión Turbo Real", "hPa", 0f, 3500f, 2400f, 2800f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "2032", "Temp Aceite Motor G8", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "1942", "Temp Embrague DSG DQ200/DQ250/DQ381", "°C", -40f, 250f, 140f, 170f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "2045", "Masa Hollín DPF Medida", "g", 0f, 80f, 24f, 40f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "2046", "Masa Cenizas DPF Acumulada", "g", 0f, 150f, 70f, 90f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "115A", "Presión Riel Common Rail HPFP", "bar", 0f, 2500f, 1800f, 2200f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.FUEL, true),
+            PidDefinition("22", "118F", "Torsión / Desfase Árbol Levas", "°", -15f, 15f, 3f, 6f, { a, b, _, _ -> ((a * 256f + b) / 10f) - 100f }, PidCategory.ENGINE, true),
             PidDefinition("22", "2203", "Odómetro VAG", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat() * 16777216f) + (b.toFloat() * 65536f) + (c.toFloat() * 256f) + d.toFloat()) / 1000f }, PidCategory.ENGINE, true)
         ),
         "HYUNDAI" to listOf(
-            // Hyundai Gasolina 2000-2010 (Accent / Verna 1.6L G4ED, Getz, Matrix, Elantra)
+            // Hyundai Gasolina (Accent / Verna 1.6L G4ED, Getz, Matrix, Elantra, Tucson, Sonata)
             PidDefinition("21", "01", "Ancho Pulso Inyector", "ms", 0f, 30f, 15f, 25f, { a, b, _, _ -> (a * 256f + b) / 1000f }, PidCategory.FUEL, true),
             PidDefinition("21", "01", "Temp Fluido ATF (Caja Auto)", "°C", -40f, 180f, 110f, 130f, { _, _, c, _ -> c - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("21", "01", "Marcha Actual A4AF3", "", 0f, 5f, 0f, 0f, { _, _, _, d -> (d and 0x07).toFloat() }, PidCategory.TRANSMISSION, true),
+            PidDefinition("21", "01", "Marcha Actual A4AF3/A6F", "", 0f, 8f, 0f, 0f, { _, _, _, d -> (d and 0x0F).toFloat() }, PidCategory.TRANSMISSION, true),
             PidDefinition("21", "02", "Retardo Encendido Knock", "°", 0f, 25f, 5f, 10f, { a, _, _, _ -> a / 2f }, PidCategory.ENGINE, true),
             PidDefinition("21", "02", "Válvula Ralentí ISCA", "%", 0f, 100f, 80f, 95f, { _, b, _, _ -> b * 100f / 255f }, PidCategory.ENGINE, true),
             PidDefinition("21", "02", "Presión Gas A/C", "bar", 0f, 35f, 25f, 30f, { _, _, c, _ -> c * 0.14f }, PidCategory.ENGINE, true),
-            // Hyundai EV / Híbridos Modernos
+            // Hyundai Modern Smartstream & Turbo T-GDI
+            PidDefinition("22", "1105", "Presión Turbo Smartstream", "kPa", 0f, 350f, 220f, 260f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1108", "Temp Aceite Motor CVVD", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            // Hyundai EV / Híbridos Modernos (Ioniq, Kona EV)
             PidDefinition("22", "0101", "Temp Bat EV", "°C", -40f, 80f, 45f, 55f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "0105", "SOH Batería", "%", 0f, 100f, 80f, 70f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "0106", "SOC Batería", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0105", "SOH Batería EV", "%", 0f, 100f, 80f, 70f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0106", "SOC Batería EV", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
             PidDefinition("22", "0102", "Temp Motor Eléctrico", "°C", -40f, 200f, 120f, 150f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true)
         ),
         "NISSAN" to listOf(
-            PidDefinition("22", "1166", "Temp Trans CVT", "°C", -40f, 200f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("22", "1183", "Presión Turbo", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1166", "Temp Transmisión CVT Jatco", "°C", -40f, 200f, 105f, 125f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1167", "Contador Deterioro Fluido CVT", "pts", 0f, 250000f, 180000f, 210000f, { a, b, c, _ -> (a.toFloat() * 65536f + b.toFloat() * 256f + c.toFloat()) }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1183", "Presión Turbo DIG-T", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
             PidDefinition("22", "115E", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "1207", "SOC Bat Leaf", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "1208", "SOH Bat Leaf", "%", 0f, 100f, 70f, 60f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true)
+            PidDefinition("22", "1154", "Ángulo VTC Árbol Levas", "°", -30f, 60f, 45f, 55f, { a, _, _, _ -> a / 2f - 30f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1207", "SOC Bat Leaf EV", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "1208", "SOH Bat Leaf EV", "%", 0f, 100f, 75f, 65f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.ELECTRICAL, true)
         ),
         "HONDA" to listOf(
-            PidDefinition("22", "0130", "Estado VTEC", "", 0f, 1f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
-            PidDefinition("22", "0156", "Presión CVT", "kPa", 0f, 3000f, 2000f, 2500f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "0130", "Estado VTEC / VTC", "", 0f, 1f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "0156", "Presión Transmisión CVT", "kPa", 0f, 3500f, 2200f, 2800f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "0157", "Temp Transmisión AT / CVT", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
             PidDefinition("22", "0145", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "0160", "SOC Bat Híbrida", "%", 0f, 100f, 20f, 10f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true)
+            PidDefinition("22", "0160", "SOC Batería Híbrida IMA/e:HEV", "%", 0f, 100f, 20f, 10f, { a, _, _, _ -> a / 2.55f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0165", "Corriente Motor Híbrido", "A", -200f, 200f, 150f, 180f, { a, b, _, _ -> (a * 256f + b) - 500f }, PidCategory.ELECTRICAL, true)
         ),
         "BMW" to listOf(
-            PidDefinition("22", "1304", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "133F", "Presión Boost Turbo", "mbar", 0f, 3000f, 2200f, 2500f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
-            PidDefinition("22", "1349", "Cantidad Inyección", "mg", 0f, 100f, 60f, 80f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.FUEL, true),
-            PidDefinition("22", "1505", "Temp DME/ECU", "°C", -40f, 120f, 80f, 95f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "1304", "Temp Aceite Motor DME", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "1306", "Temp Salida Radiador", "°C", -40f, 150f, 95f, 110f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "133F", "Presión Turbo TwinPower Actual", "mbar", 0f, 3500f, 2400f, 2900f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1340", "Presión Turbo TwinPower Setpoint", "mbar", 0f, 3500f, 2400f, 2900f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1349", "Presión Riel Diésel / Gasolina HDP", "bar", 0f, 2500f, 1800f, 2200f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.FUEL, true),
+            PidDefinition("22", "1505", "Temp Módulo DME/DDE", "°C", -40f, 120f, 80f, 95f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "1802", "Temp Transmisión ZF 8HP", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1310", "Ángulo Excéntrico Valvetronic", "°", 0f, 200f, 160f, 180f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
             PidDefinition("22", "2BC0", "Odómetro BMW", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat())/10f }, PidCategory.ENGINE, true)
         ),
         "MERCEDES" to listOf(
-            PidDefinition("22", "104A", "Nivel AdBlue", "%", 0f, 100f, 15f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
-            PidDefinition("22", "1053", "Carga Hollín DPF", "%", 0f, 100f, 80f, 95f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
-            PidDefinition("22", "1040", "Pos. Actuador Turbo", "%", 0f, 100f, 80f, 95f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "1038", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "1038", "Temp Aceite Motor CDI/CGI", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "104A", "Nivel AdBlue / DEF BlueTEC", "%", 0f, 100f, 15f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "1053", "Carga Hollín Filtro DPF", "%", 0f, 100f, 80f, 95f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "1040", "Posición Actuador Turbo VNT", "%", 0f, 100f, 85f, 95f, { a, _, _, _ -> a / 2.55f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1905", "Temp Transmisión 7G/9G-Tronic", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1058", "Presión Riel CDI", "bar", 0f, 2500f, 1800f, 2200f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.FUEL, true),
             PidDefinition("22", "1002", "Odómetro Mercedes", "km", 0f, 1000000f, 0f, 0f, { a, b, c, d -> ((a.toFloat()*16777216f)+(b.toFloat()*65536f)+(c.toFloat()*256f)+d.toFloat()) }, PidCategory.ENGINE, true)
         ),
         "SUBARU" to listOf(
-            PidDefinition("22", "F002", "Corrección Knock", "°", -25f, 25f, -5f, -10f, { a, _, _, _ -> (a - 128f) / 2f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "F00B", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "F006", "Boost Turbo", "psi", -14.7f, 30f, 18f, 22f, { a, _, _, _ -> (a - 128f) * 37f / 255f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "F032", "Temp Diferencial", "°C", -40f, 200f, 100f, 120f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true)
+            PidDefinition("22", "F002", "Corrección Knock Retard", "°", -25f, 25f, -5f, -10f, { a, _, _, _ -> (a - 128f) / 2f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "F00B", "Temp Aceite Motor Boxer", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "F006", "Presión Boost Turbo WRX/STI", "psi", -14.7f, 35f, 20f, 26f, { a, _, _, _ -> (a - 128f) * 37f / 255f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "F032", "Temp Transmisión Lineartronic CVT", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "F035", "Temp Diferencial Trasero AWD", "°C", -40f, 200f, 100f, 120f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "F014", "Multiplicador Avance Ignición (IAM)", "", 0f, 1f, 0.8f, 0.5f, { a, _, _, _ -> a / 16f }, PidCategory.ENGINE, true)
         ),
         "MAZDA" to listOf(
-            PidDefinition("22", "2186", "Boost Skyactiv", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "2124", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "F432", "Presión i-ACTIV AWD", "kPa", 0f, 2000f, 1500f, 1800f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.TRANSMISSION, true)
+            PidDefinition("22", "2186", "Presión Boost Skyactiv-G/D", "kPa", 0f, 350f, 220f, 270f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "2124", "Temp Aceite Motor Skyactiv", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "2150", "Temp Transmisión Skyactiv-Drive 6AT", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "F432", "Torque Transferencia i-ACTIV AWD", "Nm", 0f, 1500f, 1000f, 1300f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "2195", "Temp Gases Escape EGT", "°C", 0f, 1000f, 800f, 920f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.TEMPERATURE, true)
         ),
         "KIA" to listOf(
             PidDefinition("22", "E003", "SOC Batería EV", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
             PidDefinition("22", "E004", "Temp Motor Eléctrico", "°C", -40f, 200f, 120f, 150f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "E005", "Temp Inversor", "°C", -40f, 120f, 80f, 95f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "E010", "Potencia Regenerativa", "kW", 0f, 100f, 60f, 80f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true)
+            PidDefinition("22", "E005", "Temp Inversor Potencia", "°C", -40f, 120f, 80f, 95f, { a, _, _, _ -> a - 40f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "E010", "Potencia Regenerativa EV", "kW", 0f, 150f, 80f, 120f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true)
         ),
         "CHRYSLER" to listOf(
-            PidDefinition("22", "1128", "Estado MDS (Cilindros)", "", 0f, 8f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
-            PidDefinition("22", "110A", "Presión Aceite HEMI", "kPa", 0f, 1000f, 150f, 100f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "1190", "Temp Trans", "°C", -40f, 200f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
-            PidDefinition("22", "1160", "Estado TIPM", "", 0f, 255f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ELECTRICAL, true)
+            PidDefinition("22", "1128", "Estado Desactivación HEMI MDS", "", 0f, 8f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "110A", "Presión Aceite HEMI / Pentastar", "kPa", 0f, 1000f, 180f, 120f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "1190", "Temp Transmisión Torqueflite 8HP", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1160", "Estado Módulo TIPM / BCM", "", 0f, 255f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ELECTRICAL, true)
         ),
         "MITSUBISHI" to listOf(
-            PidDefinition("22", "0201", "SOC Bat PHEV", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
-            PidDefinition("22", "0210", "Estado S-AWC", "", 0f, 4f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.TRANSMISSION, true),
-            PidDefinition("22", "0215", "Temp Motor Trasero", "°C", -40f, 200f, 120f, 150f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true)
+            PidDefinition("22", "0201", "SOC Batería Outlander PHEV", "%", 0f, 100f, 20f, 10f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0210", "Modo Vectorización S-AWC", "", 0f, 4f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "0215", "Temp Motor Eléctrico Trasero", "°C", -40f, 200f, 120f, 150f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "0218", "Temp Transmisión INVECS-III CVT", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true)
         ),
         "VOLVO" to listOf(
-            PidDefinition("22", "4028", "Presión Turbo", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "4032", "Presión Supercargador", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
-            PidDefinition("22", "4040", "Temp Aceite Motor", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
-            PidDefinition("22", "4060", "Estado DSTC", "", 0f, 3f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true)
+            PidDefinition("22", "4028", "Presión Turbo Drive-E", "kPa", 0f, 350f, 220f, 270f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "4032", "Presión Supercargador Roots", "kPa", 0f, 300f, 200f, 250f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "4040", "Temp Aceite Motor VEA", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "4060", "Estado Control Estabilidad DSTC", "", 0f, 3f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.ENGINE, true)
+        ),
+        "RENAULT" to listOf(
+            PidDefinition("22", "0105", "Masa Cenizas DPF dCi", "g", 0f, 80f, 25f, 40f, { a, b, _, _ -> (a * 256f + b) / 100f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "0112", "Presión Turbo dCi / TCe", "mbar", 0f, 3500f, 2300f, 2800f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.ENGINE, true),
+            PidDefinition("22", "0120", "Presión Riel Diésel Common Rail", "bar", 0f, 2200f, 1600f, 2000f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.FUEL, true),
+            PidDefinition("22", "0145", "Temp Embrague Transmisión EDC", "°C", -40f, 250f, 140f, 170f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true)
+        ),
+        "PEUGEOT" to listOf(
+            PidDefinition("22", "1104", "Nivel Depósito Urea AdBlue BlueHDi", "%", 0f, 100f, 15f, 5f, { a, _, _, _ -> a / 2.55f }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "110A", "Presión Diferencial Filtro FAP", "mbar", 0f, 600f, 200f, 350f, { a, b, _, _ -> (a * 256f + b).toFloat() }, PidCategory.EMISSIONS, true),
+            PidDefinition("22", "1125", "Temp Transmisión EAT6 / EAT8", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "1132", "Temp Aceite Motor PureTech / HDi", "°C", -40f, 200f, 120f, 140f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true)
+        ),
+        "SUZUKI" to listOf(
+            PidDefinition("22", "010A", "Presión Boost Boosterjet", "kPa", 0f, 280f, 190f, 230f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ENGINE, true),
+            PidDefinition("22", "0120", "Temp Fluido CVT Suzuki", "°C", -40f, 180f, 110f, 130f, { a, _, _, _ -> a - 40f }, PidCategory.TRANSMISSION, true),
+            PidDefinition("22", "0135", "Estado Tracción AllGrip AWD", "", 0f, 4f, 0f, 0f, { a, _, _, _ -> a.toFloat() }, PidCategory.TRANSMISSION, true)
+        ),
+        "TESLA_EV" to listOf(
+            PidDefinition("22", "0101", "Voltaje Pack HV Total", "V", 0f, 500f, 320f, 300f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0102", "Corriente Batería HV", "A", -1200f, 1200f, 800f, 1000f, { a, b, _, _ -> (a * 256f + b) - 2000f }, PidCategory.ELECTRICAL, true),
+            PidDefinition("22", "0105", "Temp Promedio Pack HV", "°C", -40f, 85f, 50f, 65f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "0108", "Temp Inversor Drive Unit", "°C", -40f, 150f, 90f, 115f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "0109", "Temp Estátor Motor", "°C", -40f, 180f, 120f, 150f, { a, _, _, _ -> a - 40f }, PidCategory.TEMPERATURE, true),
+            PidDefinition("22", "0110", "Energía Remanente Útil", "kWh", 0f, 150f, 15f, 5f, { a, b, _, _ -> (a * 256f + b) / 10f }, PidCategory.ELECTRICAL, true)
         )
     )
 
