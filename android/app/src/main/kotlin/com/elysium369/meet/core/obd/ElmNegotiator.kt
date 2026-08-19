@@ -159,22 +159,57 @@ class ElmNegotiator(private val transport: TransportInterface) {
         if (hint != ObdProtocol.AUTO) {
             onProgress("Probando protocolo guardado: ${hint.displayName}...")
             sendWithTimeout("ATSP${hint.atspCode}\r", 1000)
+            if (hint in setOf(ObdProtocol.KWP2000_FAST, ObdProtocol.KWP2000, ObdProtocol.ISO9141)) {
+                sendWithTimeout("ATIB10\r", 600) // Set ISO baud rate to 10400
+            }
             delay(baseDelay)
             val resp = sendWithTimeout("0100\r", 4000)
             if (isPositivePidSupportResponse(resp)) {
+                Log.i(TAG, "✓ Fast-probe SUCCESS on hinted protocol: ${hint.displayName}")
                 return hint
             }
-            Log.w(TAG, "Hint protocol ${hint.name} failed, falling back to auto-search")
-            sendWithTimeout("ATSP0\r", 800) // Reset to auto
-            delay(baseDelay)
+            Log.w(TAG, "Hint protocol ${hint.name} failed, starting targeted protocol sweep")
         }
 
-        // Step 5b: Try ATSP0 (Auto)
+        // Step 5b: Targeted Deterministic Protocol Sweep
+        // Prioritize K-Line protocols for Hyundai/Kia/Asian 2000-2007, then standard CAN
+        val protocolCandidates: List<Pair<ObdProtocol, Long>> = listOf(
+            ObdProtocol.KWP2000_FAST to 4500L,   // ATSP5 (Hyundai Accent / Verna primary)
+            ObdProtocol.KWP2000 to 4500L,        // ATSP4 (Hyundai 5-baud)
+            ObdProtocol.ISO9141 to 4500L,        // ATSP3 (ISO 9141-2)
+            ObdProtocol.CAN_11BIT_500K to 3000L, // ATSP6 (Standard CAN)
+            ObdProtocol.CAN_29BIT_500K to 3000L, // ATSP7 (Extended CAN)
+            ObdProtocol.CAN_11BIT_250K to 3000L, // ATSP8
+            ObdProtocol.CAN_29BIT_250K to 3000L, // ATSP9
+            ObdProtocol.J1850_PWM to 3000L,      // ATSP1
+            ObdProtocol.J1850_VPW to 3000L       // ATSP2
+        )
+
+        for ((candidate, probeTimeout) in protocolCandidates) {
+            if (candidate == hint) continue // Already tried in hint phase
+
+            onProgress("Probando ${candidate.displayName}...")
+            sendWithTimeout("ATSP${candidate.atspCode}\r", 800)
+            if (candidate in setOf(ObdProtocol.KWP2000_FAST, ObdProtocol.KWP2000, ObdProtocol.ISO9141)) {
+                sendWithTimeout("ATIB10\r", 500)
+            }
+            delay(baseDelay.coerceAtLeast(60L))
+
+            val resp = sendWithTimeout("0100\r", probeTimeout)
+            Log.d(TAG, "Probe [ATSP${candidate.atspCode}] -> '$resp'")
+
+            if (isPositivePidSupportResponse(resp)) {
+                Log.i(TAG, "✓ ECU SYNCHRONIZED on ${candidate.displayName}")
+                return candidate
+            }
+        }
+
+        // Step 5c: Fallback to ATSP0 (Auto)
+        onProgress("Buscando en modo automático (ATSP0)...")
         sendWithTimeout("ATSP0\r", 1000)
         delay(baseDelay)
-        
+
         for (attempt in 1..2) {
-            onProgress("Auto-detectando protocolo ($attempt/2)...")
             val resp = sendWithTimeout("0100\r", 5000)
             if (isPositivePidSupportResponse(resp)) {
                 return detectActiveProtocol()
@@ -183,21 +218,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
             delay(400)
         }
 
-        // Step 5c: Manual Sweep if Auto fails (Prioritize KWP2000 & ISO 9141 for Asian pre-2008 vehicles)
-        val manualList = listOf("5", "4", "3", "6", "7", "8", "9", "D", "E", "1", "2", "A") // KWP2000 Fast/Slow, ISO 9141, CAN 11/29, CAN FD, J1850, J1939
-        for (pCode in manualList) {
-            if (pCode == hint.atspCode) continue // Already tried
-            
-            onProgress("Escaneando protocolo $pCode...")
-            sendWithTimeout("ATSP$pCode\r", 1000)
-            delay(baseDelay)
-            val resp = sendWithTimeout("0100\r", 3500)
-            if (isPositivePidSupportResponse(resp)) {
-                return detectActiveProtocol()
-            }
-        }
-
-        throw ObdConnectionException("No se pudo enlazar con la ECU del vehículo. Verifica el contacto (IGN ON).")
+        throw ObdConnectionException("No se pudo enlazar con la ECU del vehículo. Verifica que el contacto esté en ON (motor encendido o ignición puesta).")
     }
 
     private suspend fun detectActiveProtocol(): ObdProtocol {
