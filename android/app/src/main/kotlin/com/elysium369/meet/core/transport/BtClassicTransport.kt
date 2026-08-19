@@ -114,11 +114,11 @@ class BtClassicTransport(
                 delay(200)
 
                 val connectionMethods = mutableListOf<Pair<String, () -> BluetoothSocket?>>()
-                // Prioritize Insecure SPP for ELM327 clones which often fail auth handshake
-                connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
-                connectionMethods.add("Standard SPP" to { device.createRfcommSocketToServiceRecord(SPP_UUID) })
+                // Direct RFCOMM Channel 1 bypasses slow remote SDP queries on cheap ELM clones
                 connectionMethods.add("Insecure Reflection CH1" to { invokeReflectiveInsecureSocketCreation(device, 1) })
                 connectionMethods.add("Reflection CH1" to { invokeReflectiveSocketCreation(device, 1) })
+                connectionMethods.add("Insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID) })
+                connectionMethods.add("Standard SPP" to { device.createRfcommSocketToServiceRecord(SPP_UUID) })
                 connectionMethods.add("Insecure Reflection CH2" to { invokeReflectiveInsecureSocketCreation(device, 2) })
                 connectionMethods.add("Reflection CH2" to { invokeReflectiveSocketCreation(device, 2) })
 
@@ -146,15 +146,15 @@ class BtClassicTransport(
                             continue
                         }
                         
-                        Log.d(TAG, "  Socket created, attempting connect natively (active watchdog 3500ms)...")
+                        Log.d(TAG, "  Socket created, attempting connect natively (active watchdog 7000ms)...")
                         // Always ensure discovery is cancelled immediately before the blocking connect call
                         runCatching { bluetoothAdapter.cancelDiscovery() }
 
                         val currentSocket = socket ?: continue
                         val watchdogJob = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                            delay(3500L)
+                            delay(7000L)
                             if (!currentSocket.isConnected) {
-                                Log.w(TAG, "  ✗ Active watchdog triggered at 3500ms; forcibly unblocking connect() via socket.close()")
+                                Log.w(TAG, "  ✗ Active watchdog triggered at 7000ms; forcibly unblocking connect() via socket.close()")
                                 runCatching { currentSocket.close() }
                             }
                         }
@@ -162,7 +162,7 @@ class BtClassicTransport(
                         try {
                             currentSocket.connect()
                         } catch (e: Exception) {
-                            if (System.currentTimeMillis() - methodStart >= 3400L) {
+                            if (System.currentTimeMillis() - methodStart >= 6800L) {
                                 throw TransportConnectTimeout("Bluetooth connect watchdog timeout on method: $methodName")
                             }
                             throw e
