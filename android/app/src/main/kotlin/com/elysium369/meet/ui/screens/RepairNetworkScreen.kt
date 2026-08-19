@@ -872,7 +872,7 @@ fun RepairNetworkScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            "ENVÍO DE PIEZA CONFIRMADO - EN CAMINO 📦",
+                                            "COTIZACIÓN ACEPTADA - PREPARANDO PEDIDO 📦",
                                             color = MeetColors.neonGreen,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 11.sp

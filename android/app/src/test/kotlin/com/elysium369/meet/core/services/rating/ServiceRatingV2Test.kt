@@ -11,11 +11,24 @@ class ServiceRatingV2Test {
 
     @Test
     fun testWeightedScoreCalculation() {
+        val raterId = UUID.randomUUID()
+        val providerId = UUID.randomUUID()
+        val txId = UUID.randomUUID()
+        val workOrderId = UUID.randomUUID()
+
+        val proof = VerifiedTransactionProof(
+            transactionId = txId,
+            workOrderId = workOrderId,
+            raterProfileId = raterId,
+            ratedProviderId = providerId,
+            completedAtEpochMs = System.currentTimeMillis() - 10000L,
+            serverSignature = "sig_hmac_sha256_verified_12345",
+        )
+
         val submission = ServiceRatingSubmission(
-            transactionId = UUID.randomUUID(),
-            workOrderId = UUID.randomUUID(),
-            raterProfileId = UUID.randomUUID(),
-            ratedProviderId = UUID.randomUUID(),
+            transactionProof = proof,
+            raterProfileId = raterId,
+            ratedProviderId = providerId,
             raterRole = ServiceRole.CUSTOMER,
             serviceVertical = ServiceVertical.MOBILE_MECHANIC,
             dimensionalScores = mapOf(
@@ -27,24 +40,34 @@ class ServiceRatingV2Test {
                 RatingDimension.DOCUMENTATION_QUALITY to 5,
             ),
             comment = "Excelente servicio técnico y diagnóstico impecable",
-            isVerifiedTransaction = true,
         )
 
         assertTrue(submission.weightedScore >= 4.7)
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun testRejectRatingForUnverifiedTransaction() {
-        ServiceRatingSubmission(
+    fun testRejectRatingWhenRaterMismatchesProof() {
+        val raterId = UUID.randomUUID()
+        val imposterId = UUID.randomUUID()
+        val providerId = UUID.randomUUID()
+
+        val proof = VerifiedTransactionProof(
             transactionId = UUID.randomUUID(),
-            workOrderId = null,
-            raterProfileId = UUID.randomUUID(),
-            ratedProviderId = UUID.randomUUID(),
+            workOrderId = UUID.randomUUID(),
+            raterProfileId = raterId,
+            ratedProviderId = providerId,
+            completedAtEpochMs = System.currentTimeMillis(),
+            serverSignature = "sig_valid",
+        )
+
+        ServiceRatingSubmission(
+            transactionProof = proof,
+            raterProfileId = imposterId, // Mismatch!
+            ratedProviderId = providerId,
             raterRole = ServiceRole.CUSTOMER,
             serviceVertical = ServiceVertical.WORKSHOP,
             dimensionalScores = mapOf(RatingDimension.TECHNICAL_QUALITY to 5),
-            comment = "Falla",
-            isVerifiedTransaction = false,
+            comment = "Intento no autorizado",
         )
     }
 }

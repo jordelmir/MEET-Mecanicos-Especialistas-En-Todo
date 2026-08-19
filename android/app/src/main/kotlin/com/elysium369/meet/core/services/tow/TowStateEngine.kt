@@ -48,7 +48,11 @@ object TowStateEngine {
         actorRole: ServiceRole,
     ): TowState? = when (action) {
         is TowAction.AssignOperator -> {
-            if (fromState in setOf(TowState.REQUESTED, TowState.MATCHING)) TowState.ASSIGNED else null
+            if (fromState in setOf(TowState.REQUESTED, TowState.MATCHING) &&
+                action.towUnitId.isNotBlank() &&
+                actorRole in setOf(ServiceRole.TOW_OPERATOR, ServiceRole.WORKSHOP_ADMIN, ServiceRole.PLATFORM_ADMIN)) {
+                TowState.ASSIGNED
+            } else null
         }
         is TowAction.StartEnRoute -> {
             if (fromState == TowState.ASSIGNED && actorRole == ServiceRole.TOW_OPERATOR) TowState.EN_ROUTE else null
@@ -60,7 +64,11 @@ object TowStateEngine {
             if (fromState == TowState.ARRIVED && actorRole == ServiceRole.TOW_OPERATOR) TowState.LOADING else null
         }
         is TowAction.ConfirmLoaded -> {
-            if (fromState == TowState.LOADING && actorRole == ServiceRole.TOW_OPERATOR) TowState.LOADED else null
+            if (fromState == TowState.LOADING &&
+                action.secureEvidenceHash.isNotBlank() &&
+                actorRole == ServiceRole.TOW_OPERATOR) {
+                TowState.LOADED
+            } else null
         }
         is TowAction.StartTransit -> {
             if (fromState == TowState.LOADED && actorRole == ServiceRole.TOW_OPERATOR) TowState.IN_TRANSIT else null
@@ -72,13 +80,20 @@ object TowStateEngine {
             if (fromState == TowState.ARRIVED_DESTINATION && actorRole == ServiceRole.TOW_OPERATOR) TowState.UNLOADING else null
         }
         is TowAction.ConfirmDelivered -> {
-            if (fromState == TowState.UNLOADING && actorRole == ServiceRole.TOW_OPERATOR) TowState.DELIVERED else null
+            if (fromState == TowState.UNLOADING &&
+                action.deliveryEvidenceHash.isNotBlank() &&
+                actorRole == ServiceRole.TOW_OPERATOR) {
+                TowState.DELIVERED
+            } else null
         }
         is TowAction.CompleteService -> {
             if (fromState == TowState.DELIVERED && actorRole in setOf(ServiceRole.CUSTOMER, ServiceRole.PLATFORM_ADMIN)) TowState.COMPLETED else null
         }
         is TowAction.Cancel -> {
-            if (fromState in setOf(TowState.REQUESTED, TowState.MATCHING, TowState.ASSIGNED)) TowState.CANCELLED else null
+            if (fromState in setOf(TowState.REQUESTED, TowState.MATCHING, TowState.ASSIGNED) &&
+                actorRole in setOf(ServiceRole.CUSTOMER, ServiceRole.PLATFORM_ADMIN)) {
+                TowState.CANCELLED
+            } else null
         }
         is TowAction.RaiseDispute -> {
             if (fromState.isActive || fromState == TowState.DELIVERED) TowState.DISPUTED else null

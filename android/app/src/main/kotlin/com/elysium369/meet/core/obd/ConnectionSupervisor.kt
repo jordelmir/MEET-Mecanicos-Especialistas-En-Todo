@@ -44,7 +44,7 @@ class ConnectionSupervisor(
                     recoveryState = RecoveryState.IDLE
                 )
 
-                // 1. Await full closure of previous transport
+                // 1. Await full synchronous closure of previous transport
                 activeTransport?.let { old ->
                     Log.d(TAG, "Closing active transport before switch...")
                     runCatching { old.disconnect() }
@@ -62,6 +62,8 @@ class ConnectionSupervisor(
 
     suspend fun connectWithFastPath(
         fingerprint: String,
+        transportType: TransportType = TransportType.BLUETOOTH_CLASSIC,
+        connectMethod: ConnectMethod? = null,
         connectBlock: suspend (TransportInterface) -> Unit
     ) {
         lifecycleMutex.withLock {
@@ -82,8 +84,6 @@ class ConnectionSupervisor(
                     _health.value = _health.value.copy(
                         transport = TransportHealth.CONNECTED,
                         adapter = AdapterHealth.SYNCHRONIZED,
-                        protocol = ProtocolHealth.LOCKED,
-                        ecu = EcuHealth.RESPONSIVE,
                         lastSuccessfulExchangeMs = System.currentTimeMillis(),
                         consecutiveTimeouts = 0,
                         rollingErrorRate = 0.0,
@@ -92,10 +92,13 @@ class ConnectionSupervisor(
 
                     KnownGoodAdapterStore.recordSuccess(
                         fingerprint = fingerprint,
-                        transportType = TransportType.BLUETOOTH_CLASSIC,
-                        connectMethod = ConnectMethod.INSECURE_SPP,
+                        transportType = transportType,
+                        connectMethod = connectMethod ?: knownProfile?.preferredConnectMethod,
                         protocol = knownProfile?.preferredProtocol,
-                        connectDurationMs = duration
+                        connectDurationMs = duration,
+                        preferredUuid = knownProfile?.preferredUuid,
+                        rfcommChannel = knownProfile?.rfcommChannel,
+                        preferredInitRecipe = knownProfile?.preferredInitRecipe,
                     )
                 } catch (e: Exception) {
                     KnownGoodAdapterStore.recordFailure(fingerprint)
@@ -109,15 +112,22 @@ class ConnectionSupervisor(
         }
     }
 
+    fun updateProtocolHealth(protocol: ProtocolHealth, ecu: EcuHealth) {
+        _health.value = _health.value.copy(
+            protocol = protocol,
+            ecu = ecu
+        )
+    }
+
     fun recordExchangeOutcome(isSuccess: Boolean, latencyMs: Long, isNoData: Boolean = false) {
         val current = _health.value
         if (isSuccess) {
-            val updatedP95 = if (current.latencyP95Ms > 0) (current.latencyP95Ms * 9 + latencyMs) / 10 else latencyMs
+            val updatedEwma = if (current.ewmaLatencyMs > 0) (current.ewmaLatencyMs * 9 + latencyMs) / 10 else latencyMs
             _health.value = current.copy(
                 lastSuccessfulExchangeMs = System.currentTimeMillis(),
                 consecutiveTimeouts = 0,
                 rollingErrorRate = (current.rollingErrorRate * 0.9).coerceAtLeast(0.0),
-                latencyP95Ms = updatedP95,
+                ewmaLatencyMs = updatedEwma,
                 ecu = if (isNoData) EcuHealth.NO_DATA else EcuHealth.RESPONSIVE
             )
         } else {

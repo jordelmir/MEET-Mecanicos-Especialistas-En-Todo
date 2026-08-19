@@ -142,10 +142,18 @@ class BtClassicTransport(
                             continue
                         }
                         
-                        Log.d(TAG, "  Socket created, attempting connect natively...")
+                        Log.d(TAG, "  Socket created, attempting connect natively (timeout 3500ms)...")
                         // Always ensure discovery is cancelled immediately before the blocking connect call
                         runCatching { bluetoothAdapter.cancelDiscovery() }
-                        socket?.connect()
+                        try {
+                            withTimeout(3500L) {
+                                socket?.connect()
+                            }
+                        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                            Log.w(TAG, "  ✗ $methodName connect timed out after 3500ms, aborting socket")
+                            socket?.close()
+                            throw TransportConnectTimeout("Bluetooth connect timeout on method: $methodName")
+                        }
                         
                         inputStream = BufferedInputStream(socket?.inputStream, 32768)
                         outputStream = BufferedOutputStream(socket?.outputStream, 1024)

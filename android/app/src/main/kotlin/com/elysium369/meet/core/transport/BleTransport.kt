@@ -13,6 +13,8 @@ import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -25,12 +27,12 @@ class BleTransport(
 
     private val TAG = "EV_BLE"
 
-    // UUIDs que usan los adaptadores BLE OBD2 más comunes
+    // Standard UUIDs used across common OBD2 BLE adapters
     private val SERVICE_UUIDS = listOf(
-        UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb"), // Vgate, genéricos
-        UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"), // ELM327 BLE común
+        UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb"), // Vgate, generic
+        UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"), // ELM327 BLE common
         UUID.fromString("e7810a71-73ae-499d-8c15-faa9aef0c3f2"), // vLinker
-        UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")  // SPP sobre BLE
+        UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")  // SPP over BLE
     )
     private val CHAR_WRITE_UUIDS = listOf(
         UUID.fromString("0000fff2-0000-1000-8000-00805f9b34fb"),
@@ -46,23 +48,30 @@ class BleTransport(
 
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
-    
+    private val gattMutex = Mutex()
+
     @Volatile
     private var connectionDeferred: CompletableDeferred<Boolean>? = null
-    
-    // ACUMULADOR DE FRAGMENTOS — Thread-safe
+
+    // Fragment accumulator — Thread-safe
     private val responseAccumulator = StringBuffer()
     private val responseReady = Channel<String>(Channel.UNLIMITED)
-    
+
     @Volatile
     private var connected = false
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             Log.d(TAG, "onConnectionStateChange status=$status newState=$newState")
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                Log.w(TAG, "GATT connection status error: $status")
+                connected = false
+                connectionDeferred?.complete(false)
+                return
+            }
+
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                // Attempt MTU expansion asynchronously, but proceed with service discovery immediately
                 runCatching { gatt.requestMtu(512) }
                 gatt.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -70,13 +79,12 @@ class BleTransport(
                 connectionDeferred?.complete(false)
             }
         }
-        
+
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             Log.d(TAG, "onMtuChanged mtu=$mtu status=$status")
-            // Ensure service discovery is active
             gatt.discoverServices()
         }
-        
+
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             Log.d(TAG, "onServicesDiscovered status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -109,7 +117,7 @@ class BleTransport(
                         }
                     }
                 }
-                
+
                 if (!cccdPending && foundWrite) {
                     connected = true
                     connectionDeferred?.complete(true)
@@ -124,6 +132,8 @@ class BleTransport(
             if (descriptor.uuid == CCCD_UUID && status == BluetoothGatt.GATT_SUCCESS) {
                 connected = (writeChar != null)
                 connectionDeferred?.complete(connected)
+            } else if (status != BluetoothGatt.GATT_SUCCESS) {
+                connectionDeferred?.complete(false)
             }
         }
 
@@ -142,17 +152,16 @@ class BleTransport(
         ) {
             handleIncomingBytes(value)
         }
-        
+
         private fun handleIncomingBytes(value: ByteArray) {
             val chunk = String(value, Charsets.ISO_8859_1)
             responseAccumulator.append(chunk)
-            
-            // Solo emitir cuando la respuesta esté COMPLETA (contiene prompt '>' o status codes)
+
             if (responseAccumulator.contains('>') ||
                 responseAccumulator.contains("NO DATA") ||
                 responseAccumulator.contains("ERROR") ||
                 responseAccumulator.contains("STOPPED")) {
-                
+
                 val completeResponse = responseAccumulator.toString()
                 responseAccumulator.setLength(0)
                 responseReady.trySend(completeResponse)
@@ -166,21 +175,27 @@ class BleTransport(
             try {
                 gatt?.disconnect()
                 gatt?.close()
-                
+
                 val deferred = CompletableDeferred<Boolean>()
                 connectionDeferred = deferred
-                
+
                 gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-                
+
                 val success = withTimeout(7000L) {
                     deferred.await()
                 }
-                
+
                 if (success && connected) {
-                    Log.i(TAG, "✓ BLE GATT Link established on attempt $attempt")
+                    // Send ELM readiness probe before declaring link operational
+                    drain()
+                    runCatching {
+                        write("\r".toByteArray(Charsets.ISO_8859_1))
+                        read(128, 1500L)
+                    }
+                    Log.i(TAG, "✓ BLE GATT Link and ELM readiness established on attempt $attempt")
                     return
                 }
-                
+
                 delay(500)
             } catch (e: Exception) {
                 lastException = e
@@ -208,18 +223,20 @@ class BleTransport(
     }
 
     override suspend fun write(data: ByteArray) {
-        val char = writeChar ?: throw TransportWriteFailure("Error: Adaptador BLE no inicializado")
-        val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-            res == 0
-        } else {
-            @Suppress("DEPRECATION")
-            char.value = data
-            @Suppress("DEPRECATION")
-            gatt?.writeCharacteristic(char) ?: false
-        }
-        if (!success) {
-            throw TransportWriteFailure("Fallo al escribir en el radio BLE")
+        gattMutex.withLock {
+            val char = writeChar ?: throw TransportWriteFailure("Error: Adaptador BLE no inicializado")
+            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val res = gatt?.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+                res == 0
+            } else {
+                @Suppress("DEPRECATION")
+                char.value = data
+                @Suppress("DEPRECATION")
+                gatt?.writeCharacteristic(char) ?: false
+            }
+            if (!success) {
+                throw TransportWriteFailure("Fallo al escribir en el radio BLE")
+            }
         }
     }
 

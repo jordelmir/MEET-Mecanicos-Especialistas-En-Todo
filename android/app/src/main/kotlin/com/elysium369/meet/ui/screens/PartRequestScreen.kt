@@ -137,9 +137,12 @@ private fun requestCompatibilityContext(
 private fun inferOfferConfidence(request: PartRequestEntity, offer: PartOfferEntity): CompatibilityConfidence {
     val requested = request.partNumber?.trim().orEmpty()
     val offered = offer.partNumber.trim()
+    val isOemMatch = requested.isNotBlank() && requested.equals(offered, ignoreCase = true)
     return when {
-        requested.isNotBlank() && requested.equals(offered, ignoreCase = true) -> CompatibilityConfidence.HIGH
+        isOemMatch && request.oemPreference.equals("OEM", ignoreCase = true) -> CompatibilityConfidence.EXACT
+        isOemMatch -> CompatibilityConfidence.HIGH
         offered.isNotBlank() && !offered.equals("Por confirmar", ignoreCase = true) -> CompatibilityConfidence.MEDIUM
+        offered.isNotBlank() -> CompatibilityConfidence.LOW
         else -> CompatibilityConfidence.UNKNOWN
     }
 }

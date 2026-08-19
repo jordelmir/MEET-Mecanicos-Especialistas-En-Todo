@@ -13,26 +13,48 @@ enum class RatingDimension(val displayName: String, val weight: Double) {
     DOCUMENTATION_QUALITY("Calidad de Evidencia y Reporte", 0.10),
 }
 
+/**
+ * Cryptographic server-authoritative proof of a completed, verified transaction.
+ */
+data class VerifiedTransactionProof(
+    val transactionId: UUID,
+    val workOrderId: UUID,
+    val raterProfileId: UUID,
+    val ratedProviderId: UUID,
+    val completedAtEpochMs: Long,
+    val serverSignature: String,
+) {
+    init {
+        require(serverSignature.isNotBlank()) { "Server signature of completed transaction required" }
+        require(completedAtEpochMs > 0) { "Valid completed transaction timestamp required" }
+    }
+}
+
 data class ServiceRatingSubmission(
     val ratingId: UUID = UUID.randomUUID(),
-    val transactionId: UUID,
-    val workOrderId: UUID?,
+    val transactionProof: VerifiedTransactionProof,
     val raterProfileId: UUID,
     val ratedProviderId: UUID,
     val raterRole: ServiceRole,
     val serviceVertical: ServiceVertical,
     val dimensionalScores: Map<RatingDimension, Int>, // 1..5 stars per dimension
     val comment: String?,
-    val isVerifiedTransaction: Boolean,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
 ) {
     init {
-        require(isVerifiedTransaction) { "Ratings can only be submitted for verified, completed transactions" }
+        require(raterProfileId == transactionProof.raterProfileId) { "Rater identity must match transaction proof" }
+        require(ratedProviderId == transactionProof.ratedProviderId) { "Rated provider identity must match transaction proof" }
         require(dimensionalScores.isNotEmpty()) { "At least one rating dimension must be scored" }
         dimensionalScores.forEach { (dim, score) ->
             require(score in 1..5) { "Score for $dim must be between 1 and 5 (was $score)" }
         }
     }
+
+    val transactionId: UUID
+        get() = transactionProof.transactionId
+
+    val workOrderId: UUID
+        get() = transactionProof.workOrderId
 
     val weightedScore: Double
         get() {

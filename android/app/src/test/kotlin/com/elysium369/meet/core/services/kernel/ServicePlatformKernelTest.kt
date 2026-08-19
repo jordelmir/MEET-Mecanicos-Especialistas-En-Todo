@@ -26,6 +26,11 @@ class ServicePlatformKernelTest {
         assertEquals(2550L, diff.amountMinor)
     }
 
+    @Test(expected = UnsupportedCurrencyException::class)
+    fun testUnknownCurrencyFailsClosed() {
+        CurrencyCode.fromString("UNKNOWN_OR_INVALID")
+    }
+
     @Test
     fun testCustomerServiceActorPermissions() {
         val authId = UUID.randomUUID()
@@ -40,24 +45,57 @@ class ServicePlatformKernelTest {
     }
 
     @Test
-    fun testProviderServiceActorPermissions() {
+    fun testProviderRoleCannotImplyVerificationWithoutTrustSnapshot() {
         val authId = UUID.randomUUID()
         val profileId = UUID.randomUUID()
         val providerId = UUID.randomUUID()
-        val technician = ServiceActor.provider(
+
+        // Unverified provider without Trust Center snapshot
+        val unverifiedTechnician = ServiceActor.provider(
             authUserId = authId,
             userProfileId = profileId,
             providerProfileId = providerId,
             role = ServiceRole.TECHNICIAN,
             displayName = "Taller Los Santos",
             phone = "+506 2222 3333",
+            trustSnapshot = null,
         )
+        assertFalse(unverifiedTechnician.isVerifiedProvider)
 
-        assertTrue(technician.isVerifiedProvider)
-        assertTrue(technician.hasPermission(ServicePermission.SUBMIT_OFFER))
-        assertTrue(technician.hasPermission(ServicePermission.START_ROUTE))
-        assertTrue(technician.hasPermission(ServicePermission.PERFORM_REPAIR))
-        assertTrue(technician.hasPermission(ServicePermission.SUBMIT_POST_SCAN))
+        // Verified provider with valid snapshot
+        val snapshot = ProviderTrustSnapshot(
+            providerProfileId = providerId,
+            verificationState = VerificationState.APPROVED,
+            isActive = true,
+            trustVersion = 1L,
+            verifiedAtEpochMs = System.currentTimeMillis(),
+            expiresAtEpochMs = System.currentTimeMillis() + 86400000L,
+            revokedAtEpochMs = null,
+            eligibleServiceVerticals = setOf(ServiceVertical.MOBILE_MECHANIC, ServiceVertical.WORKSHOP),
+        )
+        val verifiedTechnician = ServiceActor.provider(
+            authUserId = authId,
+            userProfileId = profileId,
+            providerProfileId = providerId,
+            role = ServiceRole.TECHNICIAN,
+            displayName = "Taller Los Santos",
+            phone = "+506 2222 3333",
+            trustSnapshot = snapshot,
+        )
+        assertTrue(verifiedTechnician.isVerifiedProvider)
+        assertTrue(verifiedTechnician.hasPermission(ServicePermission.SUBMIT_OFFER))
+        assertTrue(verifiedTechnician.hasPermission(ServicePermission.START_ROUTE))
+        assertTrue(verifiedTechnician.hasPermission(ServicePermission.PERFORM_REPAIR))
+        assertTrue(verifiedTechnician.hasPermission(ServicePermission.SUBMIT_POST_SCAN))
+    }
+
+    @Test
+    fun testTowProviderCanonicalTypeRoundTrip() {
+        assertEquals(ProviderType.TOW_PROVIDER, ProviderType.fromDbValue("tow_provider"))
+        assertEquals(ProviderType.MECHANIC, ProviderType.fromDbValue("mechanic"))
+        assertEquals(ProviderType.WORKSHOP, ProviderType.fromDbValue("workshop"))
+        assertEquals(ProviderType.PARTS_STORE, ProviderType.fromDbValue("parts_store"))
+        assertEquals(ProviderType.RIDE_DRIVER, ProviderType.fromDbValue("ride_driver"))
     }
 
     @Test

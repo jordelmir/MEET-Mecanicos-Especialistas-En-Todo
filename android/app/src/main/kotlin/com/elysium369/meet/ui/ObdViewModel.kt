@@ -963,7 +963,7 @@ class ObdViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Shop/Workshop bids derived dynamically
-    private val _shopId = MutableStateFlow<String?>("local_shop_id") // Simulated shop ID
+    private val _shopId = MutableStateFlow<String?>(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     val shopBids: StateFlow<List<ServiceBidEntity>> = _shopId
         .flatMapLatest { shopId ->
@@ -1041,16 +1041,22 @@ class ObdViewModel @Inject constructor(
         warrantyDays: Int,
         message: String,
         providerPhone: String = "",
-        providerName: String = "Mecánica Elite Pro",
+        providerName: String = "",
         providerId: String? = null,
+        providerRating: Double = 0.0,
     ) {
+        val principal = activePrincipal.value
+        val resolvedShopId = providerId ?: _shopId.value ?: principal.id
+        val resolvedProviderName = providerName.ifBlank { "Proveedor de Servicio" }
+        val resolvedPhone = providerPhone
+
         val bid = ServiceBidEntity(
             bidId = UUID.randomUUID().toString(),
             requestId = requestId,
-            shopId = providerId ?: _shopId.value ?: "unknown_shop",
-            shopName = providerName,
-            shopRating = 4.9,
-            providerPhone = providerPhone,
+            shopId = resolvedShopId,
+            shopName = resolvedProviderName,
+            shopRating = providerRating,
+            providerPhone = resolvedPhone,
             price = price,
             estimatedHours = estimatedHours,
             warrantyDays = warrantyDays,

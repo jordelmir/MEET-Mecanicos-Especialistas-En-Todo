@@ -11,11 +11,14 @@ object DiagnosticScanPlanCompiler {
     /**
      * Confirmed topology responders are always first. Static addresses remain
      * discovery candidates only and can never reduce mathematical completeness.
+     * When mode is CLEAR_VERIFY, strictly limits targets to the ECUs referenced
+     * in the ClearVerificationPlan.
      */
     fun compile(
         mode: DiagnosticScanMode,
         confirmedModules: List<NetworkModule>,
         discoveryCandidates: Map<String, String>,
+        clearVerificationPlan: ClearVerificationPlan? = null,
     ): List<DiagnosticScanTarget> {
         val confirmed = linkedMapOf<String, DiagnosticScanTarget>()
         confirmedModules.asSequence()
@@ -36,7 +39,21 @@ object DiagnosticScanPlanCompiler {
                 }
             }
 
-        if (mode == DiagnosticScanMode.QUICK || mode == DiagnosticScanMode.CLEAR_VERIFY) return confirmed.values.toList()
+        if (mode == DiagnosticScanMode.CLEAR_VERIFY) {
+            val targetAddresses = clearVerificationPlan?.targets?.map {
+                it.findingKey.moduleIdentity.trim().uppercase()
+            }?.toSet().orEmpty()
+
+            if (targetAddresses.isNotEmpty()) {
+                val targeted = confirmed.filterKeys { it in targetAddresses }
+                if (targeted.isNotEmpty()) {
+                    return targeted.values.toList()
+                }
+            }
+            return confirmed.values.toList()
+        }
+
+        if (mode == DiagnosticScanMode.QUICK) return confirmed.values.toList()
 
         val plan = LinkedHashMap(confirmed)
         discoveryCandidates.forEach { (address, name) ->

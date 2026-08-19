@@ -44,24 +44,44 @@ class RepairAndTowStateEnginesTest {
         val invalidStart = RepairStateEngine.getNextState(RepairState.OFFER_ACCEPTED, RepairAction.StartRoute, ServiceRole.CUSTOMER)
         assertNull(invalidStart)
 
-        // 6. Inspection -> Diagnosis -> Repair in progress -> Completed -> Validation Pending -> Customer confirmed -> Closed
+        // 6. Inspection -> Diagnosis -> Repair in progress -> Completed -> Validation Pending -> Validation Passed -> Customer confirmed -> Closed
         val inspection = RepairStateEngine.getNextState(RepairState.IN_ROUTE, RepairAction.StartInspection, ServiceRole.TECHNICIAN)
         assertEquals(RepairState.INSPECTION_STARTED, inspection)
 
-        val diag = RepairStateEngine.getNextState(RepairState.INSPECTION_STARTED, RepairAction.ConfirmDiagnosis("hash123"), ServiceRole.TECHNICIAN)
+        val diag = RepairStateEngine.getNextState(RepairState.INSPECTION_STARTED, RepairAction.ConfirmDiagnosis("sha256_diagnosis_hash"), ServiceRole.TECHNICIAN)
         assertEquals(RepairState.DIAGNOSIS_CONFIRMED, diag)
 
         val inProgress = RepairStateEngine.getNextState(RepairState.DIAGNOSIS_CONFIRMED, RepairAction.ResumeRepair, ServiceRole.TECHNICIAN)
         assertEquals(RepairState.REPAIR_IN_PROGRESS, inProgress)
 
-        val validationPending = RepairStateEngine.getNextState(RepairState.REPAIR_IN_PROGRESS, RepairAction.CompleteTechnicianWork("before", "after"), ServiceRole.TECHNICIAN)
+        val validationPending = RepairStateEngine.getNextState(RepairState.REPAIR_IN_PROGRESS, RepairAction.CompleteTechnicianWork("before_hash", "after_hash"), ServiceRole.TECHNICIAN)
         assertEquals(RepairState.VALIDATION_PENDING, validationPending)
 
-        val validated = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.SubmitPostScanValidation("scanHash", 1), ServiceRole.TECHNICIAN)
-        assertEquals(RepairState.CUSTOMER_CONFIRMED, validated)
+        // Technician validates scan -> VALIDATION_PASSED (NOT customer confirmed!)
+        val validationPassed = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.SubmitPostScanValidation("scan_report_hash", 1, isClean = true), ServiceRole.TECHNICIAN)
+        assertEquals(RepairState.VALIDATION_PASSED, validationPassed)
 
-        val closed = RepairStateEngine.getNextState(RepairState.CUSTOMER_CONFIRMED, RepairAction.CloseWorkOrder, ServiceRole.CUSTOMER)
+        // Customer explicitly confirms work
+        val customerConfirmed = RepairStateEngine.getNextState(RepairState.VALIDATION_PASSED, RepairAction.CustomerConfirm, ServiceRole.CUSTOMER)
+        assertEquals(RepairState.CUSTOMER_CONFIRMED, customerConfirmed)
+
+        // Close work order requires settlement and final invoice proof
+        val closed = RepairStateEngine.getNextState(RepairState.CUSTOMER_CONFIRMED, RepairAction.CloseWorkOrder("settle_tx_123", "final_invoice_hash_456"), ServiceRole.CUSTOMER)
         assertEquals(RepairState.CLOSED, closed)
+    }
+
+    @Test
+    fun testRepairStateCannotSkipValidation() {
+        // Customer cannot confirm directly from VALIDATION_PENDING without scan proof
+        val invalidConfirm = RepairStateEngine.getNextState(RepairState.VALIDATION_PENDING, RepairAction.CustomerConfirm, ServiceRole.CUSTOMER)
+        assertNull(invalidConfirm)
+    }
+
+    @Test
+    fun testTechnicianCannotCreateCustomerConfirmed() {
+        // Technician cannot perform CustomerConfirm
+        val invalidAction = RepairStateEngine.getNextState(RepairState.VALIDATION_PASSED, RepairAction.CustomerConfirm, ServiceRole.TECHNICIAN)
+        assertNull(invalidAction)
     }
 
     @Test
@@ -79,7 +99,7 @@ class RepairAndTowStateEnginesTest {
         val loading = TowStateEngine.getNextState(TowState.ARRIVED, TowAction.StartLoading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADING, loading)
 
-        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded("hash"), ServiceRole.TOW_OPERATOR)
+        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded("secure_load_hash"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADED, loaded)
 
         val inTransit = TowStateEngine.getNextState(TowState.LOADED, TowAction.StartTransit, ServiceRole.TOW_OPERATOR)
@@ -91,7 +111,7 @@ class RepairAndTowStateEnginesTest {
         val unloading = TowStateEngine.getNextState(TowState.ARRIVED_DESTINATION, TowAction.StartUnloading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.UNLOADING, unloading)
 
-        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered("hash"), ServiceRole.TOW_OPERATOR)
+        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered("delivery_hash"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.DELIVERED, delivered)
 
         val completed = TowStateEngine.getNextState(TowState.DELIVERED, TowAction.CompleteService, ServiceRole.CUSTOMER)

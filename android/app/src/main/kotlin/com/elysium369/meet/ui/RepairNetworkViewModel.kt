@@ -235,7 +235,7 @@ class RepairNetworkViewModel(
                 parts_used = partsUsed,
                 verified = false,
                 votes = 0,
-                success_rate = 100.0,
+                success_rate = 0.0, // Unverified initial state
                 created_at = System.currentTimeMillis().toString()
             )
             val success = repository.insertRepairCase(newCase)
@@ -247,13 +247,13 @@ class RepairNetworkViewModel(
         }
     }
 
-    // Helper: calculate reputational status dynamically based on votes or cases
+    // Helper: calculate reputational status dynamically based on votes or cases (honest community badges)
     fun getReputationTitle(authorId: String, totalCasesByAuthor: Int = 1): String {
         return when {
-            totalCasesByAuthor >= 11 -> "Master 🏆"
-            totalCasesByAuthor >= 6 -> "Mecánico certificado 🔧"
-            totalCasesByAuthor >= 3 -> "Experto 🛠️"
-            totalCasesByAuthor >= 1 -> "Contribuidor 🤝"
+            totalCasesByAuthor >= 11 -> "Contribuidor Master 🏆"
+            totalCasesByAuthor >= 6 -> "Contribuidor Destacado 🛠️"
+            totalCasesByAuthor >= 3 -> "Contribuidor Frecuente 🤝"
+            totalCasesByAuthor >= 1 -> "Contribuidor Comunitario"
             else -> "Usuario"
         }
     }

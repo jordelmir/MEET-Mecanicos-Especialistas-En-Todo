@@ -4,6 +4,7 @@ import com.elysium369.meet.data.local.dao.RepairCaseDao
 import com.elysium369.meet.data.local.dao.RepairNetworkAddonsDao
 import com.elysium369.meet.data.local.entities.RepairCaseEntity
 import com.elysium369.meet.data.local.entities.RepairVoteEntity
+import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,7 @@ open class RepairCaseRepository @Inject constructor(
     private val repairNetworkAddonsDao: RepairNetworkAddonsDao
 ) {
     private val defaultUserId: String
-        get() = "local_user_" + android.os.Build.SERIAL.hashCode().toString(16)
+        get() = SupabaseManager.client.auth.currentUserOrNull()?.id ?: "authenticated_community_user"
     // Local bookmarks/saved cases
     open fun getSavedCases(): Flow<List<RepairCase>> {
         return repairCaseDao.getSavedCases().map { entities ->

@@ -3,6 +3,26 @@ package com.elysium369.meet.core.services.kernel
 import java.util.UUID
 
 /**
+ * Feature proof states for strict release truth verification.
+ */
+enum class FeatureProofState {
+    MODEL_ONLY,
+    RUNTIME_INTEGRATED,
+    UNIT_VERIFIED,
+    INTEGRATION_VERIFIED,
+    CI_VERIFIED,
+    PHYSICAL_VERIFIED,
+    CANARY_VERIFIED,
+    PRODUCTION,
+}
+
+/**
+ * Exception thrown when encountering unsupported or unmapped currency.
+ * Fails closed instead of defaulting to USD.
+ */
+class UnsupportedCurrencyException(message: String) : IllegalArgumentException(message)
+
+/**
  * Currency codes supported by MEET Service Platform (ISO-4217).
  */
 enum class CurrencyCode(val standardDecimals: Int, val symbol: String) {
@@ -11,11 +31,21 @@ enum class CurrencyCode(val standardDecimals: Int, val symbol: String) {
     EUR(2, "€");
 
     companion object {
-        fun fromString(code: String): CurrencyCode = when (code.uppercase()) {
+        fun fromString(code: String): CurrencyCode = when (code.trim().uppercase()) {
             "CRC" -> CRC
             "USD" -> USD
             "EUR" -> EUR
-            else -> USD
+            else -> throw UnsupportedCurrencyException("Unknown or unsupported currency code: '$code'")
+        }
+
+        fun fromStringOrNull(code: String?): CurrencyCode? {
+            if (code.isNullOrBlank()) return null
+            return when (code.trim().uppercase()) {
+                "CRC" -> CRC
+                "USD" -> USD
+                "EUR" -> EUR
+                else -> null
+            }
         }
     }
 }
@@ -61,6 +91,32 @@ data class Money(
 }
 
 /**
+ * Canonical provider types aligned with PostgreSQL database enum.
+ */
+enum class ProviderType(val dbValue: String) {
+    MECHANIC("mechanic"),
+    WORKSHOP("workshop"),
+    PARTS_STORE("parts_store"),
+    TOW_PROVIDER("tow_provider"),
+    RIDE_DRIVER("ride_driver");
+
+    companion object {
+        fun fromDbValue(value: String): ProviderType = values().firstOrNull {
+            it.dbValue.equals(value.trim(), ignoreCase = true) ||
+                    it.name.equals(value.trim(), ignoreCase = true)
+        } ?: throw IllegalArgumentException("Unknown ProviderType: '$value'")
+
+        fun fromDbValueOrNull(value: String?): ProviderType? {
+            if (value.isNullOrBlank()) return null
+            return values().firstOrNull {
+                it.dbValue.equals(value.trim(), ignoreCase = true) ||
+                        it.name.equals(value.trim(), ignoreCase = true)
+            }
+        }
+    }
+}
+
+/**
  * Service verticals supported across MEET and Elysium Services.
  */
 enum class ServiceVertical(val displayName: String, val category: String) {
@@ -99,6 +155,37 @@ enum class ServiceRole {
 }
 
 /**
+ * Verification state within Trust Center authority.
+ */
+enum class VerificationState {
+    PENDING,
+    APPROVED,
+    REJECTED,
+    REVOKED,
+    EXPIRED,
+}
+
+/**
+ * Server-authoritative snapshot of provider verification and trust.
+ */
+data class ProviderTrustSnapshot(
+    val providerProfileId: UUID,
+    val verificationState: VerificationState,
+    val isActive: Boolean,
+    val trustVersion: Long,
+    val verifiedAtEpochMs: Long?,
+    val expiresAtEpochMs: Long?,
+    val revokedAtEpochMs: Long?,
+    val eligibleServiceVerticals: Set<ServiceVertical>,
+) {
+    val isAuthorizedToWork: Boolean
+        get() = verificationState == VerificationState.APPROVED &&
+                isActive &&
+                revokedAtEpochMs == null &&
+                (expiresAtEpochMs == null || expiresAtEpochMs > System.currentTimeMillis())
+}
+
+/**
  * Granular permissions required for mutating service state.
  */
 enum class ServicePermission {
@@ -123,7 +210,7 @@ enum class ServicePermission {
 
 /**
  * Comprehensive service actor model ensuring end-to-end identity chain:
- * AuthPrincipal -> UserProfile -> ProviderProfile -> WorkshopMembership -> TechnicianIdentity
+ * AuthPrincipal -> UserProfile -> ProviderProfile -> ProviderTrustSnapshot -> TechnicianIdentity
  */
 data class ServiceActor(
     val authUserId: UUID,
@@ -135,16 +222,14 @@ data class ServiceActor(
     val permissions: Set<ServicePermission>,
     val displayName: String,
     val phone: String?,
+    val trustSnapshot: ProviderTrustSnapshot? = null,
 ) {
     init {
         require(displayName.isNotBlank()) { "Actor display name cannot be blank" }
     }
 
     val isVerifiedProvider: Boolean
-        get() = providerProfileId != null && (roles.contains(ServiceRole.TECHNICIAN) ||
-                roles.contains(ServiceRole.WORKSHOP_ADMIN) ||
-                roles.contains(ServiceRole.TOW_OPERATOR) ||
-                roles.contains(ServiceRole.PARTS_STORE_AGENT))
+        get() = trustSnapshot?.isAuthorizedToWork == true
 
     fun hasPermission(permission: ServicePermission): Boolean =
         roles.contains(ServiceRole.PLATFORM_ADMIN) || permissions.contains(permission)
@@ -172,6 +257,7 @@ data class ServiceActor(
             ),
             displayName = displayName,
             phone = phone,
+            trustSnapshot = null,
         )
 
         fun provider(
@@ -183,6 +269,7 @@ data class ServiceActor(
             phone: String? = null,
             organizationId: UUID? = null,
             technicianId: UUID? = null,
+            trustSnapshot: ProviderTrustSnapshot? = null,
             additionalPermissions: Set<ServicePermission> = emptySet(),
         ): ServiceActor {
             val basePermissions = when (role) {
@@ -220,6 +307,7 @@ data class ServiceActor(
                 permissions = basePermissions + additionalPermissions,
                 displayName = displayName,
                 phone = phone,
+                trustSnapshot = trustSnapshot,
             )
         }
     }
@@ -232,7 +320,7 @@ data class ProviderIdentity(
     val providerProfileId: UUID,
     val authUserId: UUID,
     val businessName: String,
-    val providerType: String,
+    val providerType: ProviderType,
     val isVerified: Boolean,
     val isActive: Boolean,
     val status: String,

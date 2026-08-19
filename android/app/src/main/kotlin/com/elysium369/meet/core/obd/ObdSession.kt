@@ -395,8 +395,12 @@ class ObdSession(
     fun setTargetAddress(address: String) {
         val normalizedAddress = address.trim()
         this.targetAddress = normalizedAddress
-        transport?.let { old ->
-            scope.launch { runCatching { old.disconnect() } }
+        val oldTransport = transport
+        transport = null
+        if (oldTransport != null) {
+            scope.launch(Dispatchers.IO) {
+                runCatching { oldTransport.disconnect() }
+            }
         }
 
         val isBleAddress = normalizedAddress.startsWith("ble://", ignoreCase = true)
@@ -2238,7 +2242,10 @@ class ObdSession(
         readProfessionalDtcScanOwned(mode)
     }
 
-    private suspend fun readProfessionalDtcScanOwned(mode: DiagnosticScanMode): DtcScanReport {
+    private suspend fun readProfessionalDtcScanOwned(
+        mode: DiagnosticScanMode,
+        verificationPlan: ClearVerificationPlan? = null,
+    ): DtcScanReport {
         val startedAt = System.currentTimeMillis()
         diagnosticScanCancellationRequested = false
         _diagnosticScanEvents.tryEmit(DiagnosticScanEvent.ScanStarted(mode))
@@ -2643,6 +2650,7 @@ class ObdSession(
                     mode = mode,
                     confirmedModules = _networkTopology.value,
                     discoveryCandidates = professionalDtcTargets(),
+                    clearVerificationPlan = verificationPlan,
                 )
                 modulesPlanned = physicalTargets.size.coerceAtLeast(1)
                 // Functional SAE reads plus at most three evidence services
@@ -2980,7 +2988,10 @@ class ObdSession(
 
             _statusMessage.value = "✓ ECU aceptó comando de borrado. Verificando ausencia de fallas dirigida..."
             delay(150)
-            val postClearReport = readProfessionalDtcScanOwned(DiagnosticScanMode.CLEAR_VERIFY)
+            val postClearReport = readProfessionalDtcScanOwned(
+                mode = DiagnosticScanMode.CLEAR_VERIFY,
+                verificationPlan = verificationPlan,
+            )
             if (postClearReport.wasCancelled) {
                 val message = "Borrado aceptado; verificación cancelada. Ningún hallazgo fue resuelto."
                 _statusMessage.value = message

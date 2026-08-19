@@ -179,7 +179,12 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                                 AnimatedNeonIcon(Icons.Default.CheckCircle, contentDescription = "Tasa", tint = MeetColors.neonGreen, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("TASA ÉXITO", color = MeetColors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                Text("${case.success_rate.toInt()}%", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (case.verified && case.success_rate > 0) "${case.success_rate.toInt()}%" else "Sin verificar",
+                                    color = if (case.verified && case.success_rate > 0) Color.White else MeetColors.textSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }

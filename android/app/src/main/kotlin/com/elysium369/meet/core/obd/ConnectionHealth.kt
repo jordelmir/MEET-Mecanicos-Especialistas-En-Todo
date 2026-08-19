@@ -45,7 +45,7 @@ data class ConnectionHealth(
     val lastSuccessfulExchangeMs: Long = 0L,
     val consecutiveTimeouts: Int = 0,
     val rollingErrorRate: Double = 0.0,
-    val latencyP95Ms: Long = 0L,
+    val ewmaLatencyMs: Long = 0L,
     val recoveryState: RecoveryState = RecoveryState.IDLE,
 ) {
     val isFullyFunctional: Boolean
@@ -60,7 +60,7 @@ data class ConnectionHealth(
             transport != TransportHealth.CONNECTED -> "● Adaptador desconectado"
             ecu == EcuHealth.UNRESPONSIVE -> "● Adaptador conectado / ECU no responde"
             rollingErrorRate > 0.3 -> "● Conexión degradada"
-            latencyP95Ms > 300L -> "● Conexión lenta"
+            ewmaLatencyMs > 300L -> "● Conexión lenta"
             isFullyFunctional -> "● Enlace estable (100%)"
             else -> "● Enlace activo"
         }

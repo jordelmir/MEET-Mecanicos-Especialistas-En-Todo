@@ -529,10 +529,17 @@ private fun DriverWorkspaceView(
 ) {
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val activePrincipal by viewModel.activePrincipal.collectAsState()
-    val myProfile = profiles.firstOrNull { it.providerType == "TOW_PROVIDER" || it.providerType == "DRIVER" }
+    val myProfile = profiles.firstOrNull {
+        it.providerType.equals("tow_provider", ignoreCase = true) ||
+                it.providerType.equals("TOW_PROVIDER", ignoreCase = true)
+    }
 
-    var driverName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Grúas Express Pro") }
-    var driverPhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }
+    var driverName by remember(myProfile) {
+        mutableStateOf(myProfile?.businessName ?: "Operador de Grúa")
+    }
+    var driverPhone by remember(myProfile) {
+        mutableStateOf(myProfile?.phone ?: "")
+    }
     val driverId = myProfile?.profileId ?: activePrincipal.id
 
     LazyColumn(
