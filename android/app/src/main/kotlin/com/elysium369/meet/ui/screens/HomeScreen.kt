@@ -386,6 +386,7 @@ fun HomeScreen(
                 add(Triple("⚠️", "DTCs", MeetColors.error) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
                 add(Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna")
+                add(Triple("🗝️", "Acceso & IMMO", MeetColors.neonGreen) to "vehicle_access")
                 add(Triple("📦", "Motor 3D", MeetColors.cyberCyan) to "component_locator")
                 add(Triple("🔩", "Piezas", MeetColors.neonGreen) to "parts_repairs")
                 add(Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings")

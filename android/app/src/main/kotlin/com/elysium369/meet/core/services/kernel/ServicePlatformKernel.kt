@@ -85,6 +85,7 @@ enum class ServiceVertical(val code: String, val displayName: String) {
     PARTS("parts", "Marketplace Técnico de Repuestos"),
     RIDE("ride", "Movilidad y Viajes"),
     INSPECTION("inspection", "Inspección Pre-Compra Forense"),
+    VEHICLE_ACCESS("vehicle_access", "Acceso Vehicular, Llaves & IMMO"),
     UNIVERSAL("universal", "Elysium Vanguard Universal"),
     UNKNOWN("unknown", "Vertical Desconocido");
 
@@ -114,6 +115,7 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
     PARTS_STORE("parts_store", "Venta de Repuestos"),
     TOW_PROVIDER("tow_provider", "Operador de Grúas"),
     RIDE_DRIVER("ride_driver", "Conductor de Movilidad"),
+    AUTO_LOCKSMITH("auto_locksmith", "Cerrajería Automotriz & Seguridad"),
     UNKNOWN("unknown", "Tipo de Proveedor Desconocido");
 
     companion object {
@@ -123,6 +125,7 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
             "parts_store", "part_store", "store" -> PARTS_STORE
             "tow_provider", "tow_truck", "tow", "tow_driver" -> TOW_PROVIDER
             "ride_driver", "driver", "ride" -> RIDE_DRIVER
+            "auto_locksmith", "locksmith", "keys" -> AUTO_LOCKSMITH
             else -> values().firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: UNKNOWN
         }
 
@@ -146,6 +149,7 @@ enum class ServiceRole {
     PARTS_STORE_AGENT,
     TOW_OPERATOR,
     RIDE_DRIVER,
+    VEHICLE_SECURITY_TECHNICIAN,
     PLATFORM_ADMIN,
     SYSTEM_AUTOMATION,
 }

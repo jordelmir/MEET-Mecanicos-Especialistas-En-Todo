@@ -647,6 +647,12 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("vehicle_access") {
+                com.elysium369.meet.ui.screens.vehicleaccess.VehicleAccessDashboardScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
             composable("repair_network") {
                 val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 RepairNetworkScreen(
