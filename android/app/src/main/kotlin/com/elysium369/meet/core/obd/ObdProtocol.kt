@@ -19,5 +19,16 @@ enum class ObdProtocol(val atspCode: String, val displayName: String) {
     // Modern Protocols
     CAN_FD_11BIT("D", "CAN FD 11bit 500K/2M"),
     CAN_FD_29BIT("E", "CAN FD 29bit 500K/2M"),
-    DOIP_ISO13400("F", "DoIP ISO 13400 (Ethernet)")
+    DOIP_ISO13400("F", "DoIP ISO 13400 (Ethernet)");
+
+    companion object {
+        fun fromString(value: String?): ObdProtocol {
+            if (value.isNullOrBlank()) return AUTO
+            return values().firstOrNull {
+                it.name.equals(value, ignoreCase = true) ||
+                it.displayName.equals(value, ignoreCase = true) ||
+                it.atspCode.equals(value, ignoreCase = true)
+            } ?: AUTO
+        }
+    }
 }

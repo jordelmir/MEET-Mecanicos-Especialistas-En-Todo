@@ -235,7 +235,7 @@ class ObdSession(
 
     private val _detectedProtocol = MutableStateFlow("")
     val detectedProtocolFlow: StateFlow<String> = _detectedProtocol.asStateFlow()
-    private var detectedProtocol: String = ""
+    internal var detectedProtocol: String = ""
         set(value) { field = value; _detectedProtocol.value = value }
 
     private val _calibrationId = MutableStateFlow<String?>(null)
@@ -3876,10 +3876,21 @@ class ObdSession(
         Log.i(TAG, "── INIT ADAPTER START ── (cached=${cachedProfile != null})")
 
         val negotiator = ElmNegotiator(t)
-        val profile = negotiator.negotiate(
-            hintProtocol = cachedProfile?.detectedProtocol ?: ObdProtocol.AUTO
-        ) { status ->
-            _statusMessage.value = status
+        var profile: ElmNegotiator.AdapterProfile? = null
+
+        val hint = cachedProfile?.detectedProtocol
+        if (hint != null && hint != ObdProtocol.AUTO) {
+            profile = negotiator.negotiateFastPath(hint) { status ->
+                _statusMessage.value = status
+            }
+        }
+
+        if (profile == null) {
+            profile = negotiator.negotiate(
+                hintProtocol = hint ?: ObdProtocol.AUTO
+            ) { status ->
+                _statusMessage.value = status
+            }
         }
 
         // Save for next time
