@@ -171,36 +171,56 @@ class ElmNegotiator(private val transport: TransportInterface) {
             Log.w(TAG, "Hint protocol ${hint.name} failed, starting targeted protocol sweep")
         }
 
-        // Step 5b: Targeted Deterministic Protocol Sweep
-        // Prioritize K-Line protocols for Hyundai/Kia/Asian 2000-2007, then standard CAN
-        val protocolCandidates: List<Pair<ObdProtocol, Long>> = listOf(
-            ObdProtocol.KWP2000_FAST to 4500L,   // ATSP5 (Hyundai Accent / Verna primary)
-            ObdProtocol.KWP2000 to 4500L,        // ATSP4 (Hyundai 5-baud)
-            ObdProtocol.ISO9141 to 4500L,        // ATSP3 (ISO 9141-2)
-            ObdProtocol.CAN_11BIT_500K to 3000L, // ATSP6 (Standard CAN)
-            ObdProtocol.CAN_29BIT_500K to 3000L, // ATSP7 (Extended CAN)
-            ObdProtocol.CAN_11BIT_250K to 3000L, // ATSP8
-            ObdProtocol.CAN_29BIT_250K to 3000L, // ATSP9
-            ObdProtocol.J1850_PWM to 3000L,      // ATSP1
-            ObdProtocol.J1850_VPW to 3000L       // ATSP2
+        // Step 5b: Targeted Deterministic Protocol & Header Probe
+        // Prioritize Hyundai K-Line with Physical ECU (0x10) addressing, then Functional and CAN
+        data class TargetedProbe(
+            val protocol: ObdProtocol,
+            val header: String?,
+            val initCommands: List<String>,
+            val timeoutMs: Long
         )
 
-        for ((candidate, probeTimeout) in protocolCandidates) {
-            if (candidate == hint) continue // Already tried in hint phase
+        val probes = listOf(
+            // 1. Hyundai KWP2000 Fast Init Physical ECU (0x10) - Primary for Accent 2005 (Bosch/Kefico)
+            TargetedProbe(ObdProtocol.KWP2000_FAST, "8110F1", listOf("ATIB10", "ATAL", "ATWM8110F13E"), 4500L),
+            // 2. Hyundai KWP2000 Fast Init Broadcast Functional
+            TargetedProbe(ObdProtocol.KWP2000_FAST, "C233F1", listOf("ATIB10", "ATAL"), 4500L),
+            // 3. Hyundai KWP2000 5-baud Physical ECU (0x10)
+            TargetedProbe(ObdProtocol.KWP2000, "8110F1", listOf("ATIB10", "ATAL"), 5000L),
+            // 4. ISO 9141-2 Physical ECU (0x10)
+            TargetedProbe(ObdProtocol.ISO9141, "686A10", listOf("ATIB10", "ATAL"), 5000L),
+            // 5. ISO 9141-2 Functional
+            TargetedProbe(ObdProtocol.ISO9141, "686AF1", listOf("ATIB10", "ATAL"), 5000L),
+            // 6. Standard CAN 11-bit 500K
+            TargetedProbe(ObdProtocol.CAN_11BIT_500K, "7DF", listOf("ATCAF1"), 3000L),
+            // 7. Extended CAN 29-bit 500K
+            TargetedProbe(ObdProtocol.CAN_29BIT_500K, "18DB33F1", listOf("ATCAF1"), 3000L),
+            // 8. CAN 11-bit 250K
+            TargetedProbe(ObdProtocol.CAN_11BIT_250K, "7DF", listOf("ATCAF1"), 3000L),
+            // 9. CAN 29-bit 250K
+            TargetedProbe(ObdProtocol.CAN_29BIT_250K, "18DB33F1", listOf("ATCAF1"), 3000L),
+            // 10. J1850 PWM & VPW
+            TargetedProbe(ObdProtocol.J1850_PWM, null, emptyList(), 3000L),
+            TargetedProbe(ObdProtocol.J1850_VPW, null, emptyList(), 3000L)
+        )
 
-            onProgress("Probando ${candidate.displayName}...")
-            sendWithTimeout("ATSP${candidate.atspCode}\r", 800)
-            if (candidate in setOf(ObdProtocol.KWP2000_FAST, ObdProtocol.KWP2000, ObdProtocol.ISO9141)) {
-                sendWithTimeout("ATIB10\r", 500)
+        for (probe in probes) {
+            onProgress("Sincronizando ${probe.protocol.displayName}...")
+            sendWithTimeout("ATSP${probe.protocol.atspCode}\r", 800)
+            for (cmd in probe.initCommands) {
+                sendWithTimeout("$cmd\r", 500)
             }
-            delay(baseDelay.coerceAtLeast(60L))
+            if (probe.header != null) {
+                sendWithTimeout("ATSH${probe.header}\r", 500)
+            }
+            delay(baseDelay.coerceAtLeast(80L))
 
-            val resp = sendWithTimeout("0100\r", probeTimeout)
-            Log.d(TAG, "Probe [ATSP${candidate.atspCode}] -> '$resp'")
+            val resp = sendWithTimeout("0100\r", probe.timeoutMs)
+            Log.i(TAG, "Probe [ATSP${probe.protocol.atspCode} Header=${probe.header}] -> '$resp'")
 
             if (isPositivePidSupportResponse(resp)) {
-                Log.i(TAG, "✓ ECU SYNCHRONIZED on ${candidate.displayName}")
-                return candidate
+                Log.i(TAG, "✓ ECU SYNCHRONIZED on ${probe.protocol.displayName} (Header=${probe.header})")
+                return probe.protocol
             }
         }
 
@@ -255,10 +275,10 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
     private fun isPositivePidSupportResponse(resp: String): Boolean {
         val clean = resp.replace(Regex("[\\s\\r\\n>]+"), "").uppercase()
-        if (clean.contains("NODATA") || clean.contains("UNABLE") || clean.contains("ERROR") || clean == "?") {
+        if (clean.isEmpty() || clean == "?" || clean.contains("NODATA") || clean.contains("UNABLE") || clean.contains("ERROR") || clean.contains("BUSINIT:ERR") || clean.contains("STOPPED") || clean.contains("BUSERROR")) {
             return false
         }
-        return clean.contains("4100") || clean.contains("410")
+        return clean.contains("4100") || clean.contains("410") || (clean.contains("41") && clean.length >= 6)
     }
 
     private fun runtimeBaseDelay(protocol: ObdProtocol, isClone: Boolean): Long {
