@@ -130,6 +130,7 @@ fun GarageScreen(
                             onDetails = { navController.navigate("vehicle_detail/${vehicle.id}") },
                             onReports = { navController.navigate("inspection_session/${vehicle.id}") },
                             onHistory = { navController.navigate("vehicle_history/${vehicle.id}") },
+                            onAccess = { navController.navigate("vehicle_access") },
                             onDelete = { vehicleToDelete = vehicle }
                         )
                     }
@@ -196,6 +197,7 @@ private fun AnimatedVehicleCard(
     onDetails: () -> Unit,
     onReports: () -> Unit,
     onHistory: () -> Unit,
+    onAccess: () -> Unit,
     onDelete: () -> Unit
 ) {
     // Entry animation
@@ -365,6 +367,18 @@ private fun AnimatedVehicleCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("CERTIFICADOS", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
                 }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onAccess,
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("🗝️", fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("LLAVES, IMMO & ACCESO DIGITAL", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
             }
         }
     }
