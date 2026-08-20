@@ -614,25 +614,13 @@ class LocalShellManager(
                 echo "Ejecutando Antigravity: $*"
             """.trimIndent().trim()
             
-            val agyTarget = File(usrBin, "antigravity")
-            if (agyTarget.exists() && agyTarget.length() > 1024 * 1024) {
-                // Official native Google Antigravity ELF binary already present, preserve it!
-                Log.d("LocalShellManager", "Preserving official Google Antigravity ELF binary in distro")
-                val agyAlias = File(usrBin, "agy")
-                if (!agyAlias.exists()) {
-                    try {
-                        agyAlias.writeText("#!/bin/sh\nexec /usr/local/bin/antigravity \"$@\"\n")
-                        agyAlias.setExecutable(true, false)
-                    } catch (_: Exception) {}
-                }
-                return
-            }
-            agyTarget.writeText(agyScript)
-            agyTarget.setExecutable(true, false)
-            
-            val agyAlias = File(usrBin, "agy")
-            agyAlias.writeText(agyScript)
-            agyAlias.setExecutable(true, false)
+            val agyMeetTarget = File(usrBin, "agy-meet")
+            agyMeetTarget.writeText(agyScript)
+            agyMeetTarget.setExecutable(true, false)
+
+            val antigravityMeetTarget = File(usrBin, "antigravity-meet")
+            antigravityMeetTarget.writeText(agyScript)
+            antigravityMeetTarget.setExecutable(true, false)
         } catch (e: Exception) {
             Log.e("LocalShellManager", "Error injecting Antigravity into distro: ${e.message}")
         }
