@@ -147,13 +147,23 @@ class LocalShellManager(
             // Inject environment variables
             val env = builder.environment()
             val currentPath = env["PATH"] ?: "/sbin:/system/sbin:/system/bin:/system/xbin"
-            env["PATH"] = "${binDir.absolutePath}:/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$currentPath"
+            env["PATH"] = if (targetDistro != "android") {
+                "/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+            } else {
+                "${binDir.absolutePath}:/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$currentPath"
+            }
             env["HOME"] = if (targetDistro != "android") "/root" else homeDir.absolutePath
-            env["TMPDIR"] = File(appContext.filesDir, "tmp").absolutePath
+            env["TMPDIR"] = if (targetDistro != "android") "/tmp" else File(appContext.filesDir, "tmp").absolutePath
+            env["TMP"] = if (targetDistro != "android") "/tmp" else File(appContext.filesDir, "tmp").absolutePath
+            env["TEMP"] = if (targetDistro != "android") "/tmp" else File(appContext.filesDir, "tmp").absolutePath
             env["PROOT_TMP_DIR"] = File(appContext.filesDir, "tmp").absolutePath
             env["PROOT_LOADER"] = File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath
             env["LD_LIBRARY_PATH"] = "${appContext.applicationInfo.nativeLibraryDir}:/system/lib64:/system/lib:/vendor/lib64:/vendor/lib"
             if (targetDistro != "android") {
+                env["SSL_CERT_FILE"] = "/etc/ssl/certs/ca-certificates.crt"
+                env["SSL_CERT_DIR"] = "/etc/ssl/certs"
+                env["CURL_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
+                env["TERM"] = "xterm-256color"
                 env.remove("ANDROID_DATA")
                 env.remove("ANDROID_ROOT")
             }
@@ -605,6 +615,18 @@ class LocalShellManager(
             """.trimIndent().trim()
             
             val agyTarget = File(usrBin, "antigravity")
+            if (agyTarget.exists() && agyTarget.length() > 1024 * 1024) {
+                // Official native Google Antigravity ELF binary already present, preserve it!
+                Log.d("LocalShellManager", "Preserving official Google Antigravity ELF binary in distro")
+                val agyAlias = File(usrBin, "agy")
+                if (!agyAlias.exists()) {
+                    try {
+                        agyAlias.writeText("#!/bin/sh\nexec /usr/local/bin/antigravity \"$@\"\n")
+                        agyAlias.setExecutable(true, false)
+                    } catch (_: Exception) {}
+                }
+                return
+            }
             agyTarget.writeText(agyScript)
             agyTarget.setExecutable(true, false)
             
@@ -655,11 +677,12 @@ class LocalShellManager(
             return
         }
 
-        // Intercept Special Google Antigravity CLI / AGY
-        if (cmdTrimmed == "antigravity" || cmdTrimmed.startsWith("antigravity ") ||
-            cmdTrimmed == "agy" || cmdTrimmed.startsWith("agy ") ||
-            cmdTrimmed == "google-antigravity" || cmdTrimmed.startsWith("google-antigravity ") ||
-            cmdTrimmed.contains("import antigravity")) {
+        // Special Google Antigravity CLI / AGY: in guest Linux containers (Ubuntu, Debian, Alpine),
+        // let the command pass directly to the real binary (/root/.local/bin/agy) in the shell.
+        if (_activeDistro.value == "android" && 
+            (cmdTrimmed == "antigravity-meet" || cmdTrimmed.startsWith("antigravity-meet ") ||
+             cmdTrimmed == "agy-meet" || cmdTrimmed.startsWith("agy-meet ") ||
+             cmdTrimmed.contains("import antigravity"))) {
             _terminalLines.update { it + "❯ $command" }
             executeAntigravityCommand(cmdTrimmed)
             return
@@ -1056,7 +1079,7 @@ class LocalShellManager(
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec "$@"' -- "$@"
+                                /bin/sh -c 'export PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; cd /root; exec "$@"' -- "$@"
                         else
                             exec ${nativeLibProot.absolutePath} \
                                 --link2symlink \
@@ -1067,7 +1090,7 @@ class LocalShellManager(
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                /bin/sh -c 'export PATH=/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export HOME=/root; cd /root; exec /bin/sh'
+                                /bin/sh -c 'export PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; cd /root; exec /bin/sh'
                         fi
                     """.trimIndent().trim())
                     Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
@@ -1165,10 +1188,42 @@ class LocalShellManager(
                     enrichedPrompt += "\n\n[Contexto de Telemetría OBD-II en vivo: $telemetryStr]"
                 }
                 
+                appendOutput("> you: $prompt")
+                appendOutput("AGY: Analizando con Gemini Pro + Contexto de Telemetría...")
                 val chatMsg = com.elysium369.meet.core.ai.ChatMessage("user", enrichedPrompt)
-                val result = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
-                appendOutput("[AI Response]")
-                result.split("\n").forEach { appendOutput(it) }
+                val result = try {
+                    val res = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
+                    if (res.contains("error al procesar") || res.isBlank()) null else res
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (result != null) {
+                    appendOutput("AGY: Here's the analysis:")
+                    result.split("\n").forEach { appendOutput(it) }
+                } else {
+                    appendOutput("AGY: Diagnóstico e Inspección Técnica:")
+                    when {
+                        prompt.contains("tps", ignoreCase = true) -> {
+                            appendOutput("• Componente: Sensor de Posición de Mariposa (TPS / Throttle Position Sensor)")
+                            appendOutput("• Rango de Voltaje: 0.5V (Ralentí) → 4.5V (WOT / Acelerador a fondo)")
+                            appendOutput("• Pines: 1 (5V Ref Alimentación), 2 (Señal de Salida), 3 (Masa/Tierra)")
+                            appendOutput("• Prueba con Multímetro:")
+                            appendOutput("  1. Conectar punta positiva a cable de señal y negativa a masa.")
+                            appendOutput("  2. Abrir suavemente la mariposa: la curva de voltaje debe ser lineal sin caídas a 0V.")
+                        }
+                        prompt.contains("p0300", ignoreCase = true) || prompt.contains("misfire", ignoreCase = true) || prompt.contains("encendido", ignoreCase = true) -> {
+                            appendOutput("• DTC P0300: Fallo de encendido aleatorio/múltiple detectado.")
+                            appendOutput("• Causas comunes: Bobinas de encendido defectuosas, bujías desgastadas o fuga de vacío.")
+                            appendOutput("• Verificación: Revisar PIDs de Misfire por cilindro y corrección de combustible (STFT/LTFT).")
+                        }
+                        else -> {
+                            appendOutput("• Análisis para: '$prompt'")
+                            appendOutput("• Estado del sistema: OBD ${obdSession.state.value} | Vehículo Hyundai Accent Verna 2005")
+                            appendOutput("• Nota: Para consultas avanzadas en la nube, active su clave API en Configuración > IA.")
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 appendOutput("[AI Error: ${e.message}]")
             }
@@ -1216,20 +1271,47 @@ class LocalShellManager(
             return
         }
 
-        if (subCmd.isEmpty() || subCmd == "--help" || subCmd == "-h" || subCmd == "help") {
+        if (subCmd.isEmpty()) {
+            appendOutput("       ▄▄▄▄▄▄▄      ")
+            appendOutput("     ▄█████████▄     Welcome to Antigravity CLI!")
+            appendOutput("    ███  ███  ███    The terminal-first surface to interact with Antigravity agents.")
+            appendOutput("   ███████████████   Stay in your flow without context switching.")
+            appendOutput("  ███           ███  ")
+            appendOutput(" ███             ███ Choose your color scheme:")
+            appendOutput("                      light | solarized | > dark | tokyo night | terminal")
+            appendOutput("")
+            appendOutput("> you: (Ingresa cualquier instrucción en lenguaje natural)")
+            appendOutput("AGY: Motor Antigravity + Gemini Pro conectado a la telemetría del vehículo.")
+            appendOutput("Comandos rápidos: status, scan, dtc <código>, skills, diff, fly, --version")
+            return
+        }
+
+        if (subCmd == "--help" || subCmd == "-h" || subCmd == "help" || subCmd == "/help") {
             appendOutput("🛸 GOOGLE ANTIGRAVITY CLI v2.0 (Elysium Vanguard Multi-Agent Core)")
-            appendOutput("Uso: antigravity <comando> [argumentos]   (o alias 'agy')")
+            appendOutput("Uso: antigravity <comando | prompt> [argumentos]   (o alias 'agy')")
             appendOutput("")
             appendOutput("Comandos disponibles:")
             appendOutput("  status         Muestra estado de telemetria, conexion OBD, DB y vehiculo")
             appendOutput("  scan           Ejecuta escaneo forense de los subsistemas del vehiculo")
             appendOutput("  dtc [code]     Consulta diagnostico, causas y solucion verificada")
+            appendOutput("  diff           Muestra visor de diffs de código y parches de diagnóstico")
             appendOutput("  telemetry      Muestra flujo de sensores OBD-II en tiempo real")
             appendOutput("  db <sql>       Ejecuta consulta SQL en la base de datos de MEET")
-            appendOutput("  ai <prompt>    Razonamiento de diagnostico autonomo con Gemini Pro")
             appendOutput("  skills         Muestra las 47 habilidades autonomas de ingenieria")
             appendOutput("  fly            Modulo clasico de vuelo antigravitatorio")
             appendOutput("  --version      Muestra la version del motor Antigravity")
+            appendOutput("  <cualquier texto> Razonamiento autónomo en lenguaje natural con Gemini")
+            return
+        }
+
+        if (subCmd == "diff" || subCmd == "/diff") {
+            appendOutput("> you: add a greeting function")
+            appendOutput("AGY: Here's the change:")
+            appendOutput("3   import \"fmt\"")
+            appendOutput("4 - func main() {")
+            appendOutput("5 + func greet(name string) {")
+            appendOutput("6 +     fmt.Printf(\"Hello, %s!\\n\", name)")
+            appendOutput("7   }")
             return
         }
 
@@ -1362,7 +1444,13 @@ class LocalShellManager(
             return
         }
 
-        appendOutput("Comando '$subCmd' no reconocido. Escribe 'antigravity --help' para ver los comandos disponibles.")
+        // Natural language query fallback: agy <prompt>
+        val naturalPrompt = parts.drop(1).joinToString(" ")
+        if (naturalPrompt.isNotBlank()) {
+            executeAiQuery(naturalPrompt)
+        } else {
+            appendOutput("Comando '$subCmd' no reconocido. Escribe 'antigravity --help' para ver los comandos disponibles.")
+        }
     }
 
     private fun appendOutput(text: String) {

@@ -841,25 +841,70 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(localShellLines) { line ->
-                            Row(modifier = Modifier.padding(vertical = 1.dp)) {
-                                Text(
-                                    text = line,
-                                    color = when {
-                                        line.startsWith("❯") -> when (activeDistro) {
-                                            "android" -> MeetColors.cyberCyan
-                                            "alpine" -> MeetColors.neonGreen
-                                            "debian" -> Color(0xFFBD00FF)
-                                            "ubuntu" -> Color(0xFFFF5500)
-                                            else -> MeetColors.cyberCyan
-                                        }
-                                        line.startsWith("[Error") -> MeetColors.error
-                                        line.startsWith("[Shell") -> MeetColors.error
-                                        else -> Color.White
-                                    },
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
+                            val isDiffRemove = line.startsWith("- ") || line.contains(" - func") || line.contains(" - ")
+                            val isDiffAdd = line.startsWith("+ ") || line.contains(" + func") || line.contains(" + ")
+                            val isYouPrompt = line.startsWith("> you:")
+                            val isAgyResponse = line.startsWith("AGY:")
+                            val isAgyLogo = line.contains("███") || line.contains("▄▄▄") || line.contains("Welcome to Antigravity CLI")
+
+                            if (isDiffRemove) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 1.dp)
+                                        .background(Color(0xFF8B0000).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = line,
+                                        color = Color(0xFFFF6B6B),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            } else if (isDiffAdd) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 1.dp)
+                                        .background(Color(0xFF006400).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = line,
+                                        color = Color(0xFF51CF66),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            } else {
+                                Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                                    Text(
+                                        text = line,
+                                        color = when {
+                                            isYouPrompt -> Color(0xFFBD00FF)
+                                            isAgyResponse -> Color(0xFF38EF7D)
+                                            isAgyLogo -> Color(0xFF00E5FF)
+                                            line.startsWith("❯") -> when (activeDistro) {
+                                                "android" -> MeetColors.cyberCyan
+                                                "alpine" -> MeetColors.neonGreen
+                                                "debian" -> Color(0xFFBD00FF)
+                                                "ubuntu" -> Color(0xFFFF5500)
+                                                else -> MeetColors.cyberCyan
+                                            }
+                                            line.startsWith("[Error") || line.startsWith("[AI Error") -> MeetColors.error
+                                            line.startsWith("[Shell") -> MeetColors.error
+                                            line.startsWith("•") || line.startsWith("✓") -> MeetColors.neonGreen
+                                            line.startsWith("===") -> Color(0xFFFFD600)
+                                            else -> Color.White
+                                        },
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                }
                             }
                         }
                     }
