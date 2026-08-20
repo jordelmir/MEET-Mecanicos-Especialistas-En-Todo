@@ -857,7 +857,7 @@ class LocalShellManager(
             // meet-ai (alias ai)
             val aiFile = File(binDir, "ai")
             aiFile.writeText("""
-                #!/system/bin/sh
+                #!/bin/sh
                 if [ -z "$1" ]; then
                     echo "Uso: ai \"PREGUNTA\""
                     exit 1
@@ -873,7 +873,7 @@ class LocalShellManager(
             // meet-telemetry (alias telemetry)
             val telFile = File(binDir, "telemetry")
             telFile.writeText("""
-                #!/system/bin/sh
+                #!/bin/sh
                 if command -v curl >/dev/null 2>&1; then
                     curl -s http://127.0.0.1:8082/api/telemetry
                 else
@@ -885,7 +885,7 @@ class LocalShellManager(
             // meet-obd (alias obd-send)
             val obdFile = File(binDir, "obd-send")
             obdFile.writeText("""
-                #!/system/bin/sh
+                #!/bin/sh
                 if [ -z "$1" ]; then
                     echo "Uso: obd-send \"COMMAND\""
                     exit 1
@@ -898,12 +898,12 @@ class LocalShellManager(
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${obdFile.absolutePath}").waitFor()
 
-            // antigravity & agy CLI scripts
-            val agyScript = """
-                #!/system/bin/sh
+            // MEET runtime scripts (agy-meet & antigravity-meet)
+            val meetAgyScript = """
+                #!/bin/sh
                 if [ -z "$1" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ] || [ "$1" = "help" ]; then
                     echo "🛸 GOOGLE ANTIGRAVITY CLI v2.0-meet (Autonomous Agent Core)"
-                    echo "Uso: antigravity <comando> [argumentos]"
+                    echo "Uso: agy-meet <comando> [argumentos]"
                     echo ""
                     echo "Comandos disponibles:"
                     echo "  status         Muestra telemetria, conexion OBD y estado del vehiculo"
@@ -945,7 +945,7 @@ class LocalShellManager(
                 fi
                 if [ "$1" = "dtc" ]; then
                     if [ -z "$2" ]; then
-                        echo "Uso: antigravity dtc <CODIGO_DTC>"
+                        echo "Uso: agy-meet dtc <CODIGO_DTC>"
                         exit 1
                     fi
                     echo "🛸 [Antigravity Diagnostic Core] Consultando código $2..."
@@ -981,21 +981,21 @@ class LocalShellManager(
                     curl -s -X POST -d "$*" http://127.0.0.1:8082/api/ai
                     exit 0
                 fi
-                echo "Ejecutando Antigravity: $*"
+                echo "Ejecutando Antigravity MEET: $*"
             """.trimIndent().trim()
             
-            val antigravityFile = File(binDir, "antigravity")
-            antigravityFile.writeText(agyScript)
-            Runtime.getRuntime().exec("chmod 755 ${antigravityFile.absolutePath}").waitFor()
+            val agyMeetFile = File(binDir, "agy-meet")
+            agyMeetFile.writeText(meetAgyScript)
+            Runtime.getRuntime().exec("chmod 755 ${agyMeetFile.absolutePath}").waitFor()
 
-            val agyFile = File(binDir, "agy")
-            agyFile.writeText(agyScript)
-            Runtime.getRuntime().exec("chmod 755 ${agyFile.absolutePath}").waitFor()
+            val antigravityMeetFile = File(binDir, "antigravity-meet")
+            antigravityMeetFile.writeText(meetAgyScript)
+            Runtime.getRuntime().exec("chmod 755 ${antigravityMeetFile.absolutePath}").waitFor()
 
             // python / python3 helper script
             val pyHelper = File(binDir, "python3")
             pyHelper.writeText("""
-                #!/system/bin/sh
+                #!/bin/sh
                 if [ "$1" = "-c" ] && echo "$2" | grep -q "antigravity"; then
                     echo "🛸 [Python Antigravity] https://xkcd.com/353/ -> Modulo de vuelo antigravitatorio activado!"
                     echo "Vector de empuje: Estable | Elevacion orbital: 100% | Vanguard OS Core: En linea"
