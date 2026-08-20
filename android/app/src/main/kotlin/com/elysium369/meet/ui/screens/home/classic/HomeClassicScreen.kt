@@ -406,159 +406,63 @@ fun HomeClassicScreen(
                 }
             }
 
-            // ── Quick Actions Grid ──
+            // Vehicle Identification Card
             AnimatedEntrance(5) {
-                PhantomSectionHeader("Acciones Rápidas")
+                com.elysium369.meet.ui.components.VehicleIdentificationCard(viewModel = viewModel)
             }
 
-            AnimatedEntrance(6) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // ── Quick Actions Grid ──
+            PhantomSectionHeader("Acciones Rápidas")
+
+            val actions = buildList {
+                add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
+                add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
+                add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
+                add(Triple("🧬", "Vanguard DNA", MeetColors.cyberCyan) to "meet_dna")
+                add(Triple("🗝️", "Acceso & IMMO", MeetColors.neonGreen) to "vehicle_access")
+                add(Triple("📦", "Motor 3D", MeetColors.electricBlue) to "component_locator")
+                add(Triple("🔩", "Piezas", MeetColors.warning) to "parts_repairs")
+                add(Triple("⚙️", "Ajustes", MeetColors.textSecondary) to "settings")
+                add(Triple("🔍", "Hallazgos", MeetColors.neonGreen) to "findings")
+                add(Triple("🏎️", "Garage", MeetColors.cyberCyan) to "garage")
+                add(Triple("🧠", "IA", MeetColors.electricBlue) to "ai")
+                add(Triple("💻", "Terminal", MeetColors.cyberCyan) to "terminal")
+                add(Triple("🎧", "Soporte", MeetColors.warning) to "support_chat")
+                add(Triple("🚚", "Chat Flota", MeetColors.hotMagenta) to "fleet_chat_list/b1")
+                add(Triple("📄", "Reportes", MeetColors.electricBlue) to "reports")
+                add(Triple("🔮", "HUD Reflejo", MeetColors.neonGreen) to "hud")
+                add(Triple("📹", "Cámara HUD", MeetColors.electricBlue) to "dashcam")
+                add(Triple("📋", "DVIR Diario", MeetColors.cyberCyan) to "dvir")
+                add(Triple("🩺", "Salud AI", MeetColors.electricBlue) to "health_score")
+                add(Triple("📅", "Mantenimiento", MeetColors.warning) to "maintenance")
+                add(Triple("🍃", "Eco Viajes", MeetColors.neonGreen) to "trips")
+                add(Triple("📡", "Live Link", MeetColors.neonGreen) to "live_link")
+                add(Triple("🪪", "Proveedores", MeetColors.warning) to "provider_registration")
+                if (com.elysium369.meet.ride.domain.PlatformOwnerAccessPolicy
+                        .canExposeTrustCenter(platformOwnerAccess)) {
+                    add(Triple("🛡️", "Centro de Confianza", MeetColors.neonGreen) to "platform_trust_center")
+                }
+                add(Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub")
+            }
+
+            actions.chunked(2).forEachIndexed { rowIdx, row ->
+                AnimatedEntrance(6 + rowIdx) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        QuickActionCard(
-                            iconKey = "scanner",
-                            icon = "📊",
-                            label = "Scanner",
-                            accentColor = MeetColors.neonGreen,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("scanner") }
-                        )
-                        QuickActionCard(
-                            iconKey = "dtc",
-                            icon = "⚠️",
-                            label = "DTCs",
-                            accentColor = MeetColors.hotMagenta,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("dtc") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "vanguard_perito",
-                            icon = "🔍",
-                            label = "Vanguard Perito",
-                            accentColor = MeetColors.cyberCyan,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("vanguard_perito") }
-                        )
-                        QuickActionCard(
-                            iconKey = "vanguard_dna",
-                            icon = "🧬",
-                            label = "Vanguard DNA",
-                            accentColor = MeetColors.electricBlue,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("vanguard_dna") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "vehicle_access",
-                            icon = "🗝️",
-                            label = "Acceso & IMMO",
-                            accentColor = MeetColors.neonGreen,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("vehicle_access") }
-                        )
-                        QuickActionCard(
-                            iconKey = "engine_3d",
-                            icon = "⚙️",
-                            label = "Motor 3D",
-                            accentColor = MeetColors.electricBlue,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("engine_3d") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "parts_store",
-                            icon = "📦",
-                            label = "Piezas",
-                            accentColor = MeetColors.warning,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("parts_store") }
-                        )
-                        QuickActionCard(
-                            iconKey = "settings",
-                            icon = "🔧",
-                            label = "Ajustes",
-                            accentColor = MeetColors.textSecondary,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("settings") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "findings",
-                            icon = "📑",
-                            label = "Hallazgos",
-                            accentColor = MeetColors.cyberCyan,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("findings") }
-                        )
-                        QuickActionCard(
-                            iconKey = "garage",
-                            icon = "🏎️",
-                            label = "Garage",
-                            accentColor = MeetColors.electricBlue,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("garage") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "ai",
-                            icon = "🧠",
-                            label = "IA",
-                            accentColor = MeetColors.neonGreen,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("ai") }
-                        )
-                        QuickActionCard(
-                            iconKey = "terminal",
-                            icon = "💻",
-                            label = "Terminal",
-                            accentColor = MeetColors.cyberCyan,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("terminal") }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        QuickActionCard(
-                            iconKey = "support",
-                            icon = "🎧",
-                            label = "Soporte",
-                            accentColor = MeetColors.warning,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("support") }
-                        )
-                        QuickActionCard(
-                            iconKey = "fleet",
-                            icon = "🚚",
-                            label = "Chat Flota",
-                            accentColor = MeetColors.hotMagenta,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate("fleet") }
-                        )
+                        row.forEach { (meta, route) ->
+                            QuickActionCard(
+                                iconKey = route,
+                                icon = meta.first,
+                                label = meta.second,
+                                accentColor = meta.third,
+                                modifier = Modifier.weight(1f),
+                                onClick = { navController.navigate(route) }
+                            )
+                        }
+                        // Pad odd row
+                        if (row.size < 2) Spacer(Modifier.weight(1f))
                     }
                 }
             }

@@ -4032,6 +4032,45 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    private val _isReadingVin = MutableStateFlow<String?>(null)
+    val isReadingVin: StateFlow<String?> = _isReadingVin.asStateFlow()
+
+    private val _vinReadFeedback = MutableStateFlow<String?>(null)
+    val vinReadFeedback: StateFlow<String?> = _vinReadFeedback.asStateFlow()
+
+    fun clearVinFeedback() {
+        _vinReadFeedback.value = null
+    }
+
+    fun readAndSaveVinFromEcu(vehicle: Vehicle) {
+        viewModelScope.launch {
+            if (obdSession.state.value != ObdState.CONNECTED) {
+                _vinReadFeedback.value = "⚠️ El escáner OBD-II no está conectado. Conéctalo al vehículo para leer el VIN de la ECU."
+                return@launch
+            }
+            _isReadingVin.value = vehicle.id
+            _vinReadFeedback.value = "🔍 Consultando ECU de ${vehicle.make} ${vehicle.model} (Modo 09 / UDS / KWP)..."
+            try {
+                val detectedVin = obdSession.fetchVin()
+                if (detectedVin.isNotBlank() && detectedVin != "N/A" && detectedVin != "NOT_READ") {
+                    val updated = vehicle.copy(vin = detectedVin)
+                    vehicleRepository.insertVehicle(updated)
+                    if (_selectedVehicle.value?.id == vehicle.id) {
+                        _selectedVehicle.value = updated
+                    }
+                    _vinReadFeedback.value = "✓ VIN $detectedVin leído con éxito de la ECU y guardado permanentemente."
+                } else {
+                    _vinReadFeedback.value = "⚠️ La ECU no respondió con VIN estandarizado. Comprueba que el contacto/ignición esté en ON."
+                }
+            } catch (e: Exception) {
+                Log.e("ObdVM", "Error reading VIN from ECU", e)
+                _vinReadFeedback.value = "Error al leer VIN de la ECU: ${e.message}"
+            } finally {
+                _isReadingVin.value = null
+            }
+        }
+    }
+
     private suspend fun ensureDtcScanBeforeAction(force: Boolean = false) {
         if (obdSession.state.value != ObdState.CONNECTED) return
         initialDtcScanMutex.withLock {

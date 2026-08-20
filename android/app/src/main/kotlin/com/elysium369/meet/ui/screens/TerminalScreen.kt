@@ -1037,35 +1037,51 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 // Contextual quick commands list
                 val quickCommandsForDistro = when (activeDistro) {
                     "android" -> listOf(
-                        "antigravity status" to "🛸 agy-status",
-                        "antigravity --help" to "🛸 agy-help",
-                        "antigravity scan" to "🛸 agy-scan",
-                        "pip install google-antigravity" to "🛸 install-antigravity",
+                        "termux-battery-status" to "🔋 battery",
+                        "termux-toast 'Elysium Vanguard'" to "🍞 toast",
+                        "termux-vibrate -d 300" to "📳 vibrate",
+                        "termux-tts-speak 'Motor Antigravity Activo'" to "🗣️ tts",
+                        "termux-torch on" to "🔦 torch-on",
+                        "termux-torch off" to "🔦 torch-off",
+                        "termux-wifi-connectioninfo" to "📶 wifi",
+                        "termux-location" to "📍 gps",
+                        "termux-info" to "ℹ️ info",
+                        "agy-meet status" to "🛸 meet-status",
+                        "agy-meet scan" to "🛸 meet-scan",
                         "db SELECT * FROM vehicles" to "🗄️ db-vehicles",
                         "uname -a" to "🐧 kernel",
-                        "pwd" to "📍 pwd",
                         "ls" to "📁 ls",
-                        "df -h" to "💾 df",
-                        "id" to "👤 id"
+                        "df -h" to "💾 df"
                     )
                     "alpine" -> listOf(
-                        "antigravity status" to "🛸 agy-status",
-                        "apk update" to "🔄 update",
-                        "apk add python3 nodejs git" to "📦 add-deps",
-                        "antigravity --help" to "🛸 agy-help",
+                        "termux-battery-status" to "🔋 battery",
+                        "termux-toast 'Alpine Linux'" to "🍞 toast",
+                        "pkg update" to "🔄 pkg-update",
+                        "pkg install htop curl" to "📦 pkg-install",
+                        "agy-meet status" to "🛸 meet-status",
                         "ls" to "📁 ls",
                         "pwd" to "📍 pwd",
                         "whoami" to "👤 whoami"
                     )
                     "debian", "ubuntu" -> listOf(
-                        "antigravity status" to "🛸 agy-status",
-                        "pip3 install google-antigravity" to "🛸 pip-antigravity",
-                        "antigravity --help" to "🛸 antigravity-help",
-                        "antigravity scan" to "🛸 agy-scan",
-                        "apt update" to "🔄 apt-update",
+                        "agy --version" to "🛸 agy-version",
+                        "agy --help" to "🛸 agy-help",
+                        "agy-meet status" to "🛸 meet-status",
+                        "termux-battery-status" to "🔋 battery",
+                        "termux-toast 'Ubuntu Jammy'" to "🍞 toast",
+                        "termux-vibrate -d 400" to "📳 vibrate",
+                        "termux-tts-speak 'Subsistema Ubuntu en linea'" to "🗣️ tts",
+                        "termux-torch on" to "🔦 torch-on",
+                        "termux-torch off" to "🔦 torch-off",
+                        "termux-wifi-connectioninfo" to "📶 wifi",
+                        "termux-location" to "📍 gps",
+                        "termux-info" to "ℹ️ termux-info",
+                        "pkg update" to "🔄 pkg-update",
+                        "pkg install -y htop curl git" to "📦 pkg-install",
+                        "startvnc" to "🖥️ startvnc",
+                        "meet-report" to "🛡️ meet-report",
                         "ls" to "📁 ls",
-                        "pwd" to "📍 pwd",
-                        "whoami" to "👤 whoami"
+                        "pwd" to "📍 pwd"
                     )
                     else -> emptyList()
                 }

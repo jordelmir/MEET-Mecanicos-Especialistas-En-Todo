@@ -52,6 +52,8 @@ fun GarageScreen(
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
     val vehicles by viewModel.vehicles.collectAsState()
     val isDeleting by viewModel.isDeletingVehicle.collectAsState()
+    val isReadingVinId by viewModel.isReadingVin.collectAsState()
+    val vinFeedback by viewModel.vinReadFeedback.collectAsState()
 
     // Confirmation dialog state
     var vehicleToDelete by remember { mutableStateOf<Vehicle?>(null) }
@@ -115,18 +117,58 @@ fun GarageScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Text(
-                            "${vehicles.size} VEHÍCULO${if (vehicles.size > 1) "S" else ""} REGISTRADO${if (vehicles.size > 1) "S" else ""}",
-                            color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "${vehicles.size} VEHÍCULO${if (vehicles.size > 1) "S" else ""} REGISTRADO${if (vehicles.size > 1) "S" else ""}",
+                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            vinFeedback?.let { feedback ->
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (feedback.startsWith("✓")) MeetColors.neonGreen.copy(alpha = 0.15f)
+                                        else if (feedback.startsWith("⚠️")) MeetColors.warning.copy(alpha = 0.15f)
+                                        else MeetColors.electricBlue.copy(alpha = 0.15f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (feedback.startsWith("✓")) MeetColors.neonGreen
+                                        else if (feedback.startsWith("⚠️")) MeetColors.warning
+                                        else MeetColors.cyberCyan
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().clickable { viewModel.clearVinFeedback() }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = feedback,
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "✕",
+                                            color = MeetColors.textMuted,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     items(vehicles, key = { it.id }) { vehicle ->
                         AnimatedVehicleCard(
                             vehicle = vehicle,
                             isActive = vehicle.id == activeVehicle?.id,
+                            isReadingVin = isReadingVinId == vehicle.id,
                             onSelect = { viewModel.startDiagnosticSession(vehicle) },
+                            onReadVin = { viewModel.readAndSaveVinFromEcu(vehicle) },
                             onDetails = { navController.navigate("vehicle_detail/${vehicle.id}") },
                             onReports = { navController.navigate("inspection_session/${vehicle.id}") },
                             onHistory = { navController.navigate("vehicle_history/${vehicle.id}") },
@@ -187,13 +229,27 @@ fun GarageScreen(
             isDestructive = true
         )
     }
+
+    // ─── VIN Read Feedback Dialog ───
+    vinFeedback?.let { feedback ->
+        EliteDialog(
+            title = if (feedback.startsWith("✓")) "VIN Guardado con Éxito" else if (feedback.startsWith("⚠️")) "Aviso de Conexión ECU" else "Lectura de VIN",
+            message = feedback,
+            onDismiss = { viewModel.clearVinFeedback() },
+            onConfirm = { viewModel.clearVinFeedback() },
+            confirmText = "ENTENDIDO",
+            isDestructive = false
+        )
+    }
 }
 
 @Composable
 private fun AnimatedVehicleCard(
     vehicle: Vehicle,
     isActive: Boolean,
+    isReadingVin: Boolean,
     onSelect: () -> Unit,
+    onReadVin: () -> Unit,
     onDetails: () -> Unit,
     onReports: () -> Unit,
     onHistory: () -> Unit,
@@ -288,16 +344,39 @@ private fun AnimatedVehicleCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    if (vehicle.vin != "NOT_READ") {
-                        Text("VIN: ${vehicle.vin}", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                    val hasValidVin = vehicle.vin.isNotBlank() && vehicle.vin != "NOT_READ" && vehicle.vin != "N/A"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            if (hasValidVin) "VIN: ${vehicle.vin}" else "VIN: N/A",
+                            color = if (hasValidVin) MeetColors.neonGreen else MeetColors.textMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (hasValidVin) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        if (hasValidVin) {
+                            Surface(
+                                color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(3.dp)
+                            ) {
+                                Text(
+                                    "ECU",
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
                     }
-                    if (vehicle.plate != "NOT_SET") {
+                    if (vehicle.plate != "NOT_SET" && vehicle.plate.isNotBlank()) {
                         Text("Placa: ${vehicle.plate}", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
                     }
-                    if (vehicle.engine != "N/A") {
+                    if (vehicle.engine != "N/A" && vehicle.engine.isNotBlank()) {
                         Text(
                             vehicle.engine,
-                            color = MeetColors.cyberCyan.copy(alpha = 0.6f),
+                            color = MeetColors.cyberCyan.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -328,7 +407,53 @@ private fun AnimatedVehicleCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ── LEER VIN (OBD-II) Dedicated Action Button ──
+            val hasValidVin = vehicle.vin.isNotBlank() && vehicle.vin != "NOT_READ" && vehicle.vin != "N/A"
+
+            OutlinedButton(
+                onClick = onReadVin,
+                enabled = !isReadingVin,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (hasValidVin) MeetColors.neonGreen.copy(alpha = 0.08f) else MeetColors.electricBlue.copy(alpha = 0.15f),
+                    contentColor = if (hasValidVin) MeetColors.neonGreen else MeetColors.cyberCyan
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (hasValidVin) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.cyberCyan.copy(alpha = 0.7f)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                if (isReadingVin) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MeetColors.cyberCyan
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "LEYENDO ECU FÍSICA...",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.sp
+                    )
+                } else {
+                    Text(if (hasValidVin) "🧬" else "⚡", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (hasValidVin) "LEER VIN DE NUEVO (OBD-II)" else "LEER VIN (OBD-II ECU FÍSICA)",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
             OutlinedButton(
                 onClick = onDetails,
                 modifier = Modifier.fillMaxWidth().height(40.dp),

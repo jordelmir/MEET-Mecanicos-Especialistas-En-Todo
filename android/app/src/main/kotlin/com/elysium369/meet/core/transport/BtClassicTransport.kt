@@ -5,6 +5,9 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
+import com.elysium369.meet.core.obd.ConnectMethod
+import com.elysium369.meet.core.obd.KnownGoodAdapterStore
+import com.elysium369.meet.core.obd.TransportType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -127,6 +130,24 @@ class BtClassicTransport(
                 connectionMethods.add("Insecure Reflection CH2" to { invokeReflectiveInsecureSocketCreation(device, 2) })
                 connectionMethods.add("Reflection CH2" to { invokeReflectiveSocketCreation(device, 2) })
 
+                // Prioritize known successful connect method for this device if previously recorded
+                val knownProfile = KnownGoodAdapterStore.getProfile(macAddress)
+                val preferredName = when (knownProfile?.preferredConnectMethod) {
+                    ConnectMethod.REFLECTION_CH1 -> "Insecure Reflection CH1"
+                    ConnectMethod.INSECURE_SPP -> "Insecure SPP"
+                    ConnectMethod.STANDARD_SPP -> "Standard SPP"
+                    ConnectMethod.REFLECTION_CH2 -> "Insecure Reflection CH2"
+                    else -> null
+                }
+                if (preferredName != null) {
+                    val idx = connectionMethods.indexOfFirst { it.first.equals(preferredName, ignoreCase = true) }
+                    if (idx > 0) {
+                        val item = connectionMethods.removeAt(idx)
+                        connectionMethods.add(0, item)
+                        Log.i(TAG, "⚡ Prioritizing known successful connect method: ${item.first}")
+                    }
+                }
+
                 var lastException: Exception? = null
 
                 for ((methodName, createSocket) in connectionMethods) {
@@ -134,7 +155,7 @@ class BtClassicTransport(
                     Log.i(TAG, "→ Trying method: $methodName")
                     try {
                         cleanup()
-                        delay(100)
+                        delay(60)
                         
                         socket = try {
                             createSocket()
@@ -151,15 +172,15 @@ class BtClassicTransport(
                             continue
                         }
                         
-                        Log.d(TAG, "  Socket created, attempting connect natively (active watchdog 7000ms)...")
+                        Log.d(TAG, "  Socket created, attempting connect natively (active watchdog 7500ms)...")
                         // Always ensure discovery is cancelled immediately before the blocking connect call
                         runCatching { bluetoothAdapter.cancelDiscovery() }
 
                         val currentSocket = socket ?: continue
                         val watchdogJob = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                            delay(7000L)
+                            delay(7500L)
                             if (!currentSocket.isConnected) {
-                                Log.w(TAG, "  ✗ Active watchdog triggered at 7000ms; forcibly unblocking connect() via socket.close()")
+                                Log.w(TAG, "  ✗ Active watchdog triggered at 7500ms; forcibly unblocking connect() via socket.close()")
                                 runCatching { currentSocket.close() }
                             }
                         }
@@ -167,7 +188,7 @@ class BtClassicTransport(
                         try {
                             currentSocket.connect()
                         } catch (e: Exception) {
-                            if (System.currentTimeMillis() - methodStart >= 6800L) {
+                            if (System.currentTimeMillis() - methodStart >= 7300L) {
                                 throw TransportConnectTimeout("Bluetooth connect watchdog timeout on method: $methodName")
                             }
                             throw e
@@ -183,6 +204,23 @@ class BtClassicTransport(
                             Log.i(TAG, "  ✓ $methodName CONNECTED in ${elapsed}ms")
                             Log.i(TAG, "═══ BT CONNECT SUCCESS ═══ Total: ${System.currentTimeMillis() - connectStartTime}ms")
                             
+                            val methodEnum = when {
+                                methodName.contains("CH1", true) -> ConnectMethod.REFLECTION_CH1
+                                methodName.contains("Insecure SPP", true) -> ConnectMethod.INSECURE_SPP
+                                methodName.contains("Standard SPP", true) -> ConnectMethod.STANDARD_SPP
+                                methodName.contains("CH2", true) -> ConnectMethod.REFLECTION_CH2
+                                else -> ConnectMethod.REFLECTION_CH1
+                            }
+                            try {
+                                KnownGoodAdapterStore.recordSuccess(
+                                    fingerprint = macAddress,
+                                    transportType = TransportType.BLUETOOTH_CLASSIC,
+                                    connectMethod = methodEnum,
+                                    protocol = knownProfile?.preferredProtocol,
+                                    connectDurationMs = elapsed
+                                )
+                            } catch (_: Exception) {}
+
                             // Start Continuous Reader Worker Thread
                             startReaderWorker()
                             return@withContext
@@ -199,7 +237,7 @@ class BtClassicTransport(
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
                         cleanup()
-                        delay(250)
+                        delay(200)
                     }
                 }
                 
@@ -252,6 +290,7 @@ class BtClassicTransport(
     private fun cleanup() {
         readerJob?.cancel()
         readerJob = null
+        runCatching { rawOutputStream?.flush() }
         runCatching { rawInputStream?.close() }
         runCatching { rawOutputStream?.close() }
         runCatching { socket?.close() }
@@ -267,6 +306,7 @@ class BtClassicTransport(
         mutex.withLock {
             withContext(Dispatchers.IO) {
                 cleanup()
+                delay(120)
             }
         }
     }

@@ -3206,7 +3206,7 @@ class ObdSession(
         if (_state.value != ObdState.CONNECTED) return "N/A"
         
         // Multi-protocol VIN candidate commands
-        val vinCommands = listOf("0902", "22F190", "1A90", "2100")
+        val vinCommands = listOf("0902", "22F190", "1A90", "2100", "2101", "22F187", "22F189")
         for (cmd in vinCommands) {
             try {
                 val response = sendRawCommand(cmd)
@@ -3214,12 +3214,61 @@ class ObdSession(
                 if (vin.isNotBlank() && vin != "N/A") {
                     _vin.value = vin
                     Log.i(TAG, "✓ VIN captured via $cmd: $vin")
+                    val address = targetAddress ?: "unknown"
+                    val protoEnum = ObdProtocol.values().find { it.displayName.equals(detectedProtocol, ignoreCase = true) } ?: ObdProtocol.AUTO
+                    val prof = ElmNegotiator.AdapterProfile(
+                        chipVersion = adapterVersion,
+                        isClone = isCloneAdapter,
+                        isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("vLinker", true),
+                        detectedProtocol = protoEnum,
+                        baseDelayMs = baseDelayMs,
+                        maxLineLength = maxLineLength,
+                        vin = vin
+                    )
+                    AdapterFingerprint(context).saveProfile(address, prof, vin)
                     return vin
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "VIN probe $cmd failed: ${e.message}")
             }
         }
+
+        // Dedicated CAN Header probe for stubborn/split-bus ECUs (7E0 Engine, 7DF Broadcast, 18DAF110 29-bit)
+        val canHeaderProbes = listOf(
+            "ATSH 7E0" to "0902",
+            "ATSH 7E0" to "22F190",
+            "ATSH 7DF" to "0902",
+            "ATSH 18DAF110" to "0902",
+            "ATSH 18DB33F1" to "0902"
+        )
+        for ((headerCmd, readCmd) in canHeaderProbes) {
+            try {
+                sendRawCommand(headerCmd)
+                val response = sendRawCommand(readCmd)
+                val vin = CanMultiFrameParser.decodeVin(response)
+                if (vin.isNotBlank() && vin != "N/A") {
+                    _vin.value = vin
+                    Log.i(TAG, "✓ VIN captured via $headerCmd -> $readCmd: $vin")
+                    val address = targetAddress ?: "unknown"
+                    val protoEnum = ObdProtocol.values().find { it.displayName.equals(detectedProtocol, ignoreCase = true) } ?: ObdProtocol.AUTO
+                    val prof = ElmNegotiator.AdapterProfile(
+                        chipVersion = adapterVersion,
+                        isClone = isCloneAdapter,
+                        isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("vLinker", true),
+                        detectedProtocol = protoEnum,
+                        baseDelayMs = baseDelayMs,
+                        maxLineLength = maxLineLength,
+                        vin = vin
+                    )
+                    AdapterFingerprint(context).saveProfile(address, prof, vin)
+                    // Reset header to default broadcast
+                    runCatching { sendRawCommand("ATSH 7DF") }
+                    return vin
+                }
+            } catch (_: Exception) {}
+        }
+        runCatching { sendRawCommand("ATSH 7DF") }
+
         return "N/A"
     }
 
@@ -3901,38 +3950,39 @@ class ObdSession(
     private suspend fun initializeAdapter() {
         val t = transport ?: throw ObdConnectionException("Transport no disponible")
         val address = targetAddress ?: "unknown"
+        val activeVin = _vin.value?.takeIf { it.isNotBlank() && it != "N/A" }
         val fingerprint = AdapterFingerprint(context)
-        val cachedProfile = fingerprint.getProfile(address)
+        val cachedProfile = fingerprint.getProfile(address, activeVin)
 
-        Log.i(TAG, "── INIT ADAPTER START ── (cached=${cachedProfile != null})")
+        Log.i(TAG, "── INIT ADAPTER START ── (cached=${cachedProfile != null}, vin=$activeVin)")
 
         val negotiator = ElmNegotiator(t)
         var profile: ElmNegotiator.AdapterProfile? = null
 
-        val hint = cachedProfile?.detectedProtocol
-        if (hint != null && hint != ObdProtocol.AUTO) {
-            profile = negotiator.negotiateFastPath(hint) { status ->
+        if (cachedProfile != null && cachedProfile.detectedProtocol != ObdProtocol.AUTO) {
+            profile = negotiator.negotiateFastPath(cachedProfile) { status ->
                 _statusMessage.value = status
             }
         }
 
         if (profile == null) {
             profile = negotiator.negotiate(
-                hintProtocol = hint ?: ObdProtocol.AUTO
+                hintProtocol = cachedProfile?.detectedProtocol ?: ObdProtocol.AUTO
             ) { status ->
                 _statusMessage.value = status
             }
         }
 
         // Save for next time
-        fingerprint.saveProfile(address, profile)
+        fingerprint.saveProfile(address, profile, activeVin)
         runCatching {
             KnownGoodAdapterStore.recordSuccess(
                 fingerprint = address,
                 transportType = if (targetAddress?.startsWith("BLE_") == true) TransportType.BLUETOOTH_LE else TransportType.BLUETOOTH_CLASSIC,
                 connectMethod = ConnectMethod.REFLECTION_CH1,
                 protocol = profile.detectedProtocol.name,
-                connectDurationMs = profile.baseDelayMs
+                connectDurationMs = profile.baseDelayMs,
+                preferredInitRecipe = profile.recipeId
             )
         }
 

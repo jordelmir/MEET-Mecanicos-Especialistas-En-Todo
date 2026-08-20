@@ -16,42 +16,91 @@ class ElmNegotiator(private val transport: TransportInterface) {
         val isSTN: Boolean,
         val detectedProtocol: ObdProtocol,
         val baseDelayMs: Long,
-        val maxLineLength: Int
+        val maxLineLength: Int,
+        val ecuHeader: String? = null,
+        val initCommands: List<String> = emptyList(),
+        val recipeId: String? = null,
+        val vin: String? = null
     )
 
     /**
      * Fast-path reconnection for known good adapter + vehicle pairing.
-     * Skips full ATZ reset and manual sweeps.
+     * Applies exact memorized protocol, header, baud and init sequence with dedicated focus.
      */
     suspend fun negotiateFastPath(
-        knownProtocol: ObdProtocol,
+        knownProfile: AdapterProfile,
         onProgress: (String) -> Unit
     ): AdapterProfile? {
+        val knownProtocol = knownProfile.detectedProtocol
         if (knownProtocol == ObdProtocol.AUTO) return null
         return runCatching {
-            onProgress("Reconexión rápida (${knownProtocol.displayName})...")
+            onProgress("Reconexión ultra-rápida (${knownProtocol.displayName})...")
+            Log.i(TAG, "── FAST-PATH ECU RECONNECT ── Protocol=${knownProtocol.name}, Header=${knownProfile.ecuHeader}")
             transport.drain()
-            transport.write("\r".toByteArray())
-            delay(30)
+            for (i in 1..3) {
+                transport.write("\r".toByteArray())
+                delay(30)
+            }
             transport.drain()
 
-            // Quick sync
-            val ati = sendWithTimeout("ATI\r", 600)
-            if (!isValidIdResponse(ati)) return@runCatching null
+            // Quick sync with generous timeout
+            var ati = sendWithTimeout("ATI\r", 1200)
+            if (!isValidIdResponse(ati)) {
+                ati = sendWithTimeout("AT WS\r", 1200)
+                if (!isValidIdResponse(ati)) {
+                    ati = knownProfile.chipVersion
+                }
+            }
 
-            val isClone = detectClone(ati)
-            val chipVersion = parseChipVersion(ati)
-            val isSTN = ati.contains("STN", true) || ati.contains("vLinker", true)
+            val isClone = if (isValidIdResponse(ati)) detectClone(ati) else knownProfile.isClone
+            val chipVersion = if (isValidIdResponse(ati)) parseChipVersion(ati) else knownProfile.chipVersion
+            val isSTN = ati.contains("STN", true) || ati.contains("vLinker", true) || knownProfile.isSTN
 
-            // Essential init
-            sendWithTimeout("ATE0\r", 400)
+            // Essential init commands
+            sendWithTimeout("ATE0\r", 500)
+            sendWithTimeout("ATL0\r", 400)
+            sendWithTimeout("ATS0\r", 400)
             sendWithTimeout("ATH0\r", 400)
-            sendWithTimeout("ATCAF1\r", 400)
-            sendWithTimeout("ATSP${knownProtocol.atspCode}\r", 600)
+            sendWithTimeout("ATCAF1\r", 500)
+            sendWithTimeout("ATAL\r", 400)
+            sendWithTimeout("ATAT1\r", 400)
 
-            // Fast Probe ECU
-            val resp = sendWithTimeout("0100\r", 1500)
-            if (!isPositivePidSupportResponse(resp)) return@runCatching null
+            // Apply memorized protocol
+            sendWithTimeout("ATSP${knownProtocol.atspCode}\r", 800)
+
+            // Legacy K-Line / ISO baud rate if applicable
+            if (knownProtocol in setOf(ObdProtocol.KWP2000_FAST, ObdProtocol.KWP2000, ObdProtocol.ISO9141)) {
+                sendWithTimeout("ATIB10\r", 600)
+            }
+
+            // Apply specific custom header or init commands if known
+            if (!knownProfile.ecuHeader.isNullOrBlank()) {
+                sendWithTimeout("ATSH${knownProfile.ecuHeader}\r", 600)
+            }
+            for (cmd in knownProfile.initCommands) {
+                if (cmd.isNotBlank() && !cmd.startsWith("ATSP", ignoreCase = true)) {
+                    sendWithTimeout("$cmd\r", 500)
+                }
+            }
+
+            // Dedicated focus on known ECU: Up to 3 attempts with 4500ms timeout
+            var positiveResponse = false
+            for (attempt in 1..3) {
+                onProgress("Enlazando ECU memorizada (${knownProtocol.displayName}) [$attempt/3]...")
+                val resp = sendWithTimeout("0100\r", 4500)
+                Log.d(TAG, "Fast-path probe attempt $attempt response: '$resp'")
+                if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp) || isPositivePidSupportResponse(resp)) {
+                    positiveResponse = true
+                    Log.i(TAG, "✓ Fast-path SUCCESS on attempt $attempt!")
+                    break
+                }
+                delay(300)
+            }
+
+            if (!positiveResponse) {
+                Log.w(TAG, "Fast-path failed after 3 focused attempts, falling back to full negotiation")
+                return@runCatching null
+            }
 
             applyRuntimeSettings(knownProtocol, isClone)
             AdapterProfile(
@@ -60,9 +109,30 @@ class ElmNegotiator(private val transport: TransportInterface) {
                 isSTN = isSTN,
                 detectedProtocol = knownProtocol,
                 baseDelayMs = runtimeBaseDelay(knownProtocol, isClone),
-                maxLineLength = if (isClone) 64 else 512
+                maxLineLength = if (isClone) 64 else 512,
+                ecuHeader = knownProfile.ecuHeader,
+                initCommands = knownProfile.initCommands,
+                recipeId = knownProfile.recipeId,
+                vin = knownProfile.vin
             )
         }.getOrNull()
+    }
+
+    suspend fun negotiateFastPath(
+        knownProtocol: ObdProtocol,
+        onProgress: (String) -> Unit
+    ): AdapterProfile? {
+        return negotiateFastPath(
+            AdapterProfile(
+                chipVersion = "ELM327",
+                isClone = true,
+                isSTN = false,
+                detectedProtocol = knownProtocol,
+                baseDelayMs = 40L,
+                maxLineLength = 256
+            ),
+            onProgress
+        )
     }
 
     /**
@@ -79,9 +149,9 @@ class ElmNegotiator(private val transport: TransportInterface) {
         
         // 1. Physical Warm-up
         onProgress("Sincronizando enlace físico...")
-        for (i in 1..2) {
+        for (i in 1..3) {
             transport.write("\r".toByteArray())
-            delay(50)
+            delay(40)
         }
         transport.drain()
 
@@ -91,7 +161,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         for (attempt in 1..3) {
             idResponse = sendWithTimeout("ATZ\r", 2500)
             if (isValidIdResponse(idResponse)) {
-                delay(1000) // Essential post-reset stabilization for clone UARTs
+                delay(800) // Essential post-reset stabilization for clone UARTs
                 transport.drain()
                 break
             }
@@ -99,12 +169,12 @@ class ElmNegotiator(private val transport: TransportInterface) {
             if (attempt == 2) {
                 idResponse = sendWithTimeout("AT WS\r", 2000)
                 if (isValidIdResponse(idResponse)) {
-                    delay(800)
+                    delay(600)
                     transport.drain()
                     break
                 }
             }
-            delay(500)
+            delay(400)
             transport.drain()
         }
 
@@ -130,7 +200,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         onProgress("Adaptador: $chipVersion")
 
         // 3. Stabilization
-        delay(if (isClone) 800 else 100)
+        delay(if (isClone) 600 else 100)
         transport.drain()
 
         // 4. Initial AT Configuration
@@ -142,7 +212,9 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
         // 5. Protocol Negotiation
         onProgress("Buscando protocolo del vehículo...")
-        val protocol = sweepProtocols(hintProtocol, negotiationDelay, onProgress)
+        val protocolResult = sweepProtocols(hintProtocol, negotiationDelay, onProgress)
+        val protocol = protocolResult.first
+        val recipe = protocolResult.second
         val baseDelay = runtimeBaseDelay(protocol, isClone)
         applyRuntimeSettings(protocol, isClone)
 
@@ -154,7 +226,10 @@ class ElmNegotiator(private val transport: TransportInterface) {
             isSTN = isSTN,
             detectedProtocol = protocol,
             baseDelayMs = baseDelay,
-            maxLineLength = if (isClone) 64 else 512
+            maxLineLength = if (isClone) 64 else 512,
+            ecuHeader = recipe?.requestHeader,
+            initCommands = recipe?.initCommands ?: emptyList(),
+            recipeId = recipe?.id
         )
     }
 
@@ -162,19 +237,22 @@ class ElmNegotiator(private val transport: TransportInterface) {
         hint: ObdProtocol,
         baseDelay: Long,
         onProgress: (String) -> Unit
-    ): ObdProtocol {
+    ): Pair<ObdProtocol, com.elysium369.meet.core.obd.recipes.VehicleLinkRecipe?> {
         // Step 5a: Try hint first if specific
         if (hint != ObdProtocol.AUTO) {
-            onProgress("Probando protocolo guardado: ${hint.displayName}...")
+            onProgress("Probando protocolo previo: ${hint.displayName}...")
             sendWithTimeout("ATSP${hint.atspCode}\r", 1000)
             if (hint in setOf(ObdProtocol.KWP2000_FAST, ObdProtocol.KWP2000, ObdProtocol.ISO9141)) {
                 sendWithTimeout("ATIB10\r", 600) // Set ISO baud rate to 10400
             }
             delay(baseDelay)
-            val resp = sendWithTimeout("0100\r", 4000)
-            if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
-                Log.i(TAG, "✓ Fast-probe SUCCESS on hinted protocol: ${hint.displayName}")
-                return hint
+            for (attempt in 1..2) {
+                val resp = sendWithTimeout("0100\r", 4000)
+                if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
+                    Log.i(TAG, "✓ Fast-probe SUCCESS on hinted protocol: ${hint.displayName}")
+                    return Pair(hint, null)
+                }
+                delay(200)
             }
             Log.w(TAG, "Hint protocol ${hint.name} failed, proceeding to structured recipe execution")
         }
@@ -198,7 +276,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
             if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
                 Log.i(TAG, "✓ ECU SYNCHRONIZED via recipe: ${recipe.displayName}")
-                return recipe.protocol
+                return Pair(recipe.protocol, recipe)
             }
         }
 
@@ -210,7 +288,7 @@ class ElmNegotiator(private val transport: TransportInterface) {
         for (attempt in 1..2) {
             val resp = sendWithTimeout("0100\r", 5000)
             if (com.elysium369.meet.core.obd.handshake.Pid00HandshakeDecoder.isPositivePid00Response(resp)) {
-                return detectActiveProtocol()
+                return Pair(detectActiveProtocol(), null)
             }
             if (resp.contains("UNABLE") || resp.contains("ERROR")) break
             delay(400)
