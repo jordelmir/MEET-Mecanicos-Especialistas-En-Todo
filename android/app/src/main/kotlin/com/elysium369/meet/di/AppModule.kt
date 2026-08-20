@@ -3693,6 +3693,67 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_57_58 = object : Migration(57, 58) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS vehicle_access_credentials (
+                    credentialId TEXT PRIMARY KEY NOT NULL,
+                    vehicleId TEXT NOT NULL,
+                    slotNumber INTEGER NOT NULL,
+                    label TEXT NOT NULL,
+                    credentialType TEXT NOT NULL,
+                    authority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    permissionsJson TEXT NOT NULL,
+                    transponderFamily TEXT,
+                    remoteFrequency TEXT,
+                    batteryHealthPercent INTEGER,
+                    isPrimaryOwner INTEGER NOT NULL,
+                    validFromEpochMs INTEGER NOT NULL,
+                    validUntilEpochMs INTEGER,
+                    lastVerifiedAtEpochMs INTEGER,
+                    proofHash TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_access_credentials_vehicleId ON vehicle_access_credentials(vehicleId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS vehicle_access_grants (
+                    grantId TEXT PRIMARY KEY NOT NULL,
+                    vehicleId TEXT NOT NULL,
+                    recipientName TEXT NOT NULL,
+                    recipientRole TEXT NOT NULL,
+                    permissionsJson TEXT NOT NULL,
+                    validFromEpochMs INTEGER NOT NULL,
+                    validUntilEpochMs INTEGER NOT NULL,
+                    isVehicleEnforced INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    revocationReason TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_access_grants_vehicleId ON vehicle_access_grants(vehicleId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS vehicle_access_audit_events (
+                    eventId TEXT PRIMARY KEY NOT NULL,
+                    vehicleId TEXT NOT NULL,
+                    timestampEpochMs INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    credentialType TEXT NOT NULL,
+                    outcome TEXT NOT NULL,
+                    evidenceHash TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_access_audit_events_vehicleId ON vehicle_access_audit_events(vehicleId)")
+        }
+    }
 
     @Provides
     @Singleton
@@ -3737,7 +3798,8 @@ object AppModule {
             MIGRATION_53_54,
             MIGRATION_54_55,
             MIGRATION_55_56,
-            MIGRATION_56_57
+            MIGRATION_56_57,
+            MIGRATION_57_58
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
