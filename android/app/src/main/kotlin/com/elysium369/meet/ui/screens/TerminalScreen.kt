@@ -84,6 +84,8 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     val localShellLines by viewModel.localShellLines.collectAsState()
     val activeDistro by viewModel.activeDistro.collectAsState()
     val installedDistros by viewModel.installedDistros.collectAsState()
+    val installingDistro by viewModel.localShellManager.installingDistro.collectAsState()
+    val installProgress by viewModel.localShellManager.installProgress.collectAsState()
     
     var isSending by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -739,32 +741,62 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                             lineHeight = 16.sp,
                             modifier = Modifier.padding(horizontal = 12.dp)
                         )
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
                         
-                        Button(
-                            onClick = {
-                                viewModel.localShellManager.executeCommand("pkg install $activeDistro")
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = when (activeDistro) {
-                                    "alpine" -> MeetColors.neonGreen
-                                    "debian" -> Color(0xFFBD00FF)
-                                    "ubuntu" -> Color(0xFFFF5500)
-                                    else -> MeetColors.cyberCyan
-                                }
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                        ) {
-                            Text(
-                                text = "📥 DESCARGAR E INSTALAR $distroTitle",
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                color = Color.White
-                            )
+                        if (installingDistro == activeDistro) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black.copy(alpha = 0.4f))
+                                    .padding(16.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = when (activeDistro) {
+                                        "alpine" -> MeetColors.neonGreen
+                                        "debian" -> Color(0xFFBD00FF)
+                                        "ubuntu" -> Color(0xFFFF5500)
+                                        else -> MeetColors.cyberCyan
+                                    },
+                                    modifier = Modifier.size(32.dp),
+                                    strokeWidth = 3.dp
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = installProgress.ifEmpty { "Descargando e instalando $distroTitle..." },
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    viewModel.localShellManager.installDistro(activeDistro)
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = when (activeDistro) {
+                                        "alpine" -> MeetColors.neonGreen
+                                        "debian" -> Color(0xFFBD00FF)
+                                        "ubuntu" -> Color(0xFFFF5500)
+                                        else -> MeetColors.cyberCyan
+                                    }
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                            ) {
+                                Text(
+                                    text = "📥 DESCARGAR E INSTALAR $distroTitle",
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -960,32 +992,32 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 // Contextual quick commands list
                 val quickCommandsForDistro = when (activeDistro) {
                     "android" -> listOf(
-                        "ls" to "📁 ls",
-                        "pwd" to "📍 pwd",
-                        "getprop" to "⚙️ props",
-                        "pm list packages" to "📦 pkgs",
-                        "df -h" to "💾 df",
+                        "antigravity status" to "🛸 agy-status",
+                        "antigravity --help" to "🛸 agy-help",
+                        "antigravity scan" to "🛸 agy-scan",
+                        "pip install google-antigravity" to "🛸 install-antigravity",
+                        "db SELECT * FROM vehicles" to "🗄️ db-vehicles",
                         "uname -a" to "🐧 kernel",
-                        "id" to "👤 id",
-                        "netstat -an" to "🌐 netstat",
-                        "top -n 1" to "⚡ top",
-                        "logcat -d -t 50" to "📝 logcat"
+                        "pwd" to "📍 pwd",
+                        "ls" to "📁 ls",
+                        "df -h" to "💾 df",
+                        "id" to "👤 id"
                     )
                     "alpine" -> listOf(
+                        "antigravity status" to "🛸 agy-status",
                         "apk update" to "🔄 update",
                         "apk add python3 nodejs git" to "📦 add-deps",
-                        "python3 -v" to "🐍 python3",
-                        "node -v" to "🟢 nodejs",
+                        "antigravity --help" to "🛸 agy-help",
                         "ls" to "📁 ls",
                         "pwd" to "📍 pwd",
                         "whoami" to "👤 whoami"
                     )
                     "debian", "ubuntu" -> listOf(
-                        "apt update" to "🔄 apt-update",
-                        "apt install -y python3 python3-pip python3-venv git" to "📦 install-python",
+                        "antigravity status" to "🛸 agy-status",
                         "pip3 install google-antigravity" to "🛸 pip-antigravity",
                         "antigravity --help" to "🛸 antigravity-help",
-                        "python3 -c \"import antigravity\"" to "🐍 run-python",
+                        "antigravity scan" to "🛸 agy-scan",
+                        "apt update" to "🔄 apt-update",
                         "ls" to "📁 ls",
                         "pwd" to "📍 pwd",
                         "whoami" to "👤 whoami"
