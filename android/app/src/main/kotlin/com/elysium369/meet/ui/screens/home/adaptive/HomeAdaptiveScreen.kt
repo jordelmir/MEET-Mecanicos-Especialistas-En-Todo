@@ -32,6 +32,8 @@ import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.*
 import com.elysium369.meet.ui.home.HomeExperience
+import com.elysium369.meet.ui.navigation.MeetDestinations
+import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.screens.home.components.HomeExperiencePreviewBanner
 import com.elysium369.meet.ui.screens.home.components.HomeExperienceSelectionDialog
 import com.elysium369.meet.ui.screens.home.components.HomeExperienceSwitcherHeaderButton
@@ -182,7 +184,7 @@ fun HomeAdaptiveScreen(
                             .clip(CircleShape)
                             .background(MeetColors.cardBackground)
                             .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.3f), CircleShape)
-                            .clickable { navController.navigate("settings") }
+                            .clickable { navController.safeNavigate(MeetDestinations.SETTINGS) }
                             .then(Modifier.pulseOnHover()),
                         contentAlignment = Alignment.Center
                     ) {
@@ -203,7 +205,7 @@ fun HomeAdaptiveScreen(
                 borderColor = if (obdState == ObdState.CONNECTED) MeetColors.neonGreen.copy(alpha = 0.4f) else MeetColors.electricBlue.copy(alpha = 0.3f),
                 backgroundColor = Color(0xFF0C1524),
                 shape = RoundedCornerShape(16.dp),
-                onClick = { navController.navigate("garage") },
+                onClick = { navController.safeNavigate(MeetDestinations.GARAGE) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -321,7 +323,7 @@ fun HomeAdaptiveScreen(
                 prioritizedActions.forEach { action ->
                     AdaptiveActionCard(
                         action = action,
-                        onActionClick = { navController.navigate(action.destination) }
+                        onActionClick = { navController.safeNavigate(action.destination) }
                     )
                 }
             }
@@ -350,7 +352,7 @@ fun HomeAdaptiveScreen(
                             rowModules.forEach { module ->
                                 AdaptiveModuleTile(
                                     module = module,
-                                    onClick = { navController.navigate(module.destination) },
+                                    onClick = { navController.safeNavigate(module.destination) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }

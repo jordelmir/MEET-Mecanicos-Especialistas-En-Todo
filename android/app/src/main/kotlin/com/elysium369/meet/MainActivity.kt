@@ -808,6 +808,79 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     },
                 )
             }
+            composable("ai") {
+                AiDiagnosticScreen(
+                    dtcCode = "",
+                    onBack = { navController.popBackStack() },
+                    viewModel = obdViewModel,
+                    onNavigateToSettings = { navController.navigate("ai_settings") },
+                    onRequestMechanic = { info ->
+                        navController.navigate("mechanic_service?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onRequestPart = { info ->
+                        navController.navigate("part_request?vehicleInfo=${java.net.URLEncoder.encode(info, "UTF-8")}")
+                    },
+                    onOpenComponent3d = { navController.navigate("component_locator") }
+                )
+            }
+            composable("dtcs") {
+                DtcScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("vanguard_perito") {
+                MeetPeritoScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("vanguard_dna") {
+                MeetDnaScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("engine_3d") {
+                ComponentLocatorScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("parts_store") {
+                MarketplaceScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("mechanic_services") {
+                val repairViewModel: RepairNetworkViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                RepairNetworkScreen(navController = navController, viewModel = repairViewModel, obdViewModel = obdViewModel)
+            }
+            composable("tow_truck") {
+                TowTruckServiceScreen(viewModel = obdViewModel, onNavigateBack = { navController.popBackStack() })
+            }
+            composable("trust_center") {
+                PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.popBackStack() })
+            }
+            composable("trip_log") {
+                TripScreen(trips = trips, isPremium = isPremium, onExportPdf = { obdViewModel.exportTripToPdf(it) })
+            }
+            composable("live_stream") {
+                LiveLinkScreen(navController = navController, liveLinkServer = liveLinkServer, viewModel = obdViewModel)
+            }
+            composable("protocol_learning") {
+                AdaptationScreen(navController = navController, viewModel = obdViewModel)
+            }
+            composable("adapter_diagnostics") {
+                CloneTestScreen(onRunTest = { obdViewModel.runAdapterCloneTest() })
+            }
+            composable("ride_home") {
+                com.elysium369.meet.ui.screens.RideServiceScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenDriverRegistration = {
+                        navController.navigate("provider_registration")
+                    },
+                )
+            }
+            composable("fleet") {
+                val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                FleetChatListScreen(navController = navController, viewModel = chatViewModel, businessId = "fleet_default", onBack = { navController.popBackStack() })
+            }
+            composable("support") {
+                val vehicle by obdViewModel.selectedVehicle.collectAsState()
+                val vehicleLabel = vehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Genérico"
+                SupportChatScreen(onBack = { navController.popBackStack() }, vehicleInfo = vehicleLabel)
+            }
+            composable("battery_health") {
+                HealthScoreScreen(navController = navController, viewModel = obdViewModel)
+            }
         }
         }
     }
