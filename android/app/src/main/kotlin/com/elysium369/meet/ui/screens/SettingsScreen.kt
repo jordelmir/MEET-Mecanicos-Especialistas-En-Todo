@@ -924,6 +924,82 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             }
 
             // ============================================================
+            //  SECCIÓN: PANTALLA DE INICIO (EXPERIENCIA DUAL HOME)
+            // ============================================================
+            item {
+                val homeExperienceRepo = remember {
+                    com.elysium369.meet.ui.home.DefaultHomeExperienceRepository(context)
+                }
+                val currentHomeExp by homeExperienceRepo.selectedExperience.collectAsState()
+
+                Column {
+                    PhantomSectionHeader(label = "PANTALLA DE INICIO (EXPERIENCIA)", accentColor = MeetColors.neonGreen)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.neonGreen,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                "Elige cómo deseas visualizar y navegar en la pantalla de inicio de MEET:",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp
+                            )
+
+                            // Classic Option
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (currentHomeExp == com.elysium369.meet.ui.home.HomeExperience.CLASSIC) MeetColors.neonGreen.copy(alpha = 0.08f) else Color.Transparent)
+                                    .clickable { homeExperienceRepo.setExperience(com.elysium369.meet.ui.home.HomeExperience.CLASSIC) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = currentHomeExp == com.elysium369.meet.ui.home.HomeExperience.CLASSIC,
+                                    onClick = { homeExperienceRepo.setExperience(com.elysium369.meet.ui.home.HomeExperience.CLASSIC) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = MeetColors.neonGreen)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Vanguard Classic", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Todos los módulos y accesos directos visibles en cuadrícula.", color = MeetColors.textMuted, fontSize = 11.sp)
+                                }
+                            }
+
+                            // Adaptive Option
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (currentHomeExp == com.elysium369.meet.ui.home.HomeExperience.ADAPTIVE) MeetColors.neonGreen.copy(alpha = 0.08f) else Color.Transparent)
+                                    .clickable { homeExperienceRepo.setExperience(com.elysium369.meet.ui.home.HomeExperience.ADAPTIVE) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = currentHomeExp == com.elysium369.meet.ui.home.HomeExperience.ADAPTIVE,
+                                    onClick = { homeExperienceRepo.setExperience(com.elysium369.meet.ui.home.HomeExperience.ADAPTIVE) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = MeetColors.neonGreen)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Vanguard Command", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Inicio inteligente: prioriza vehículo activo, fallas y acciones AHORA.", color = MeetColors.textMuted, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
             //  SECCIÓN: PERSONALIZACIÓN DEL TEMA (System Theme Customizer)
             // ============================================================
             item {
