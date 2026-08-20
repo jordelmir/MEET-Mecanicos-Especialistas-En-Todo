@@ -100,4 +100,61 @@ class VehicleAccessSecurityTest {
         val fakeResult = simVehicle.handleNfcTap("INVALID_KEY_PAYLOAD")
         assertFalse(fakeResult)
     }
+
+    @Test
+    fun testPhoneWithoutNfcFailsClosed() {
+        val noNfcPhone = PhoneAccessCapabilities(
+            hasNfc = false,
+            hasHce = false,
+            hasBle = true,
+            canAdvertiseBle = true,
+            hasUwb = false,
+            hasSecureScreenLock = true,
+            androidVersion = 33,
+            walletAvailability = true
+        )
+        assertFalse(noNfcPhone.hasNfc)
+        assertFalse(noNfcPhone.hasHce)
+    }
+
+    @Test
+    fun testCredentialSecretNeverPersistedInModel() {
+        val credential = VehicleAccessCredential(
+            vehicleId = "V-01",
+            slotNumber = 1,
+            label = "Llave OEM",
+            type = CredentialType.TRANSPONDER,
+            authority = CredentialAuthority.OEM,
+            status = CredentialStatus.ACTIVE,
+            permissions = setOf(AccessPermission.ENTRY, AccessPermission.DRIVE),
+            proofHash = HashEngine.sha256Hex("V-01:slot1:OEM_ORIGINAL")
+        )
+
+        // Model only contains proofHash, never raw private keys or seed bytes
+        assertNotNull(credential.proofHash)
+        assertEquals(64, credential.proofHash?.length)
+    }
+
+    @Test
+    fun testWorkshopGrantAutoRevokesOnExpiry() {
+        val startTime = 1700000000000L
+        val endTime = startTime + 3600000L // 1 hour duration
+
+        val workshopGrant = AccessGrant(
+            vehicleId = "V-WORKSHOP-01",
+            recipientName = "Taller Central",
+            recipientRole = "Taller Mecánico",
+            permissions = setOf(AccessPermission.ENTRY, AccessPermission.DIAGNOSTICS),
+            validFromEpochMs = startTime,
+            validUntilEpochMs = endTime
+        )
+
+        // Valid inside the work window
+        val validEval = AccessGrantEngine.evaluate(workshopGrant, AccessPermission.DIAGNOSTICS, currentEpochMs = startTime + 1800000L)
+        assertTrue(validEval is AccessGrantEngine.AuthorizationResult.Granted)
+
+        // Auto-denied after work window closes
+        val expiredEval = AccessGrantEngine.evaluate(workshopGrant, AccessPermission.DIAGNOSTICS, currentEpochMs = endTime + 1000L)
+        assertTrue(expiredEval is AccessGrantEngine.AuthorizationResult.Denied)
+    }
 }

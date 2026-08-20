@@ -127,8 +127,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         FindingDiagnosticSnapshotEntity::class,
         FindingSnapshotExchangeRefEntity::class,
         DiagnosticSessionIntegrityEntity::class,
+
+        // VEHICLE ACCESS & IMMO
+        com.elysium369.meet.data.local.entities.VehicleAccessCredentialEntity::class,
+        com.elysium369.meet.data.local.entities.AccessGrantEntity::class,
+        com.elysium369.meet.data.local.entities.AccessAuditEventEntity::class,
     ],
-    version = 57,
+    version = 58,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -189,4 +194,7 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun diagnosticSnapshotDao(): DiagnosticSnapshotDao
     abstract fun diagnosticEvidenceDao(): DiagnosticEvidenceDao
     abstract fun diagnosticFindingDao(): DiagnosticFindingDao
+
+    // VEHICLE ACCESS & IMMO DAO
+    abstract fun vehicleAccessDao(): com.elysium369.meet.data.local.dao.VehicleAccessDao
 }
