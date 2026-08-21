@@ -2,12 +2,6 @@ package com.elysium369.meet.core.terminal
 
 import android.content.Context
 import android.util.Log
-import com.elysium369.meet.core.obd.ObdSession
-import com.elysium369.meet.core.obd.ObdState
-import com.elysium369.meet.data.supabase.VehicleRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -16,27 +10,27 @@ import java.io.File
  * directly into the terminal PATH (`$PREFIX/bin/meet`, `$HOME/../bin/meet`).
  * 
  * Provides instantaneous command-line control of ECU diagnostics, CAN frame dumping,
- * real-time PID streaming, forensic DTC analysis, and vehicle identity binding.
+ * real-time PID streaming, forensic DTC analysis, and EVAIR AI reasoning.
  */
 object ElysiumAutomotiveCliBridge {
 
     private const val TAG = "ElysiumCliBridge"
 
-    fun installCliBinaries(context: Context, port: Int = 18492) {
+    fun installCliBinaries(context: Context, port: Int = 18492, evairPort: Int = 8765) {
         try {
             val binDir = File(context.filesDir, "bin")
             if (!binDir.exists()) binDir.mkdirs()
 
             // 1. Install 'meet' CLI binary
             val meetScript = File(binDir, "meet")
-            val meetContent = generateMeetCliScript(port)
+            val meetContent = generateMeetCliScript(port, evairPort)
             meetScript.writeText(meetContent)
             meetScript.setExecutable(true, false)
             meetScript.setReadable(true, false)
 
             // 2. Install 'elysium' alias / complementary binary
             val elysiumScript = File(binDir, "elysium")
-            val elysiumContent = generateElysiumCliScript(port)
+            val elysiumContent = generateElysiumCliScript()
             elysiumScript.writeText(elysiumContent)
             elysiumScript.setExecutable(true, false)
             elysiumScript.setReadable(true, false)
@@ -47,12 +41,14 @@ object ElysiumAutomotiveCliBridge {
         }
     }
 
-    private fun generateMeetCliScript(port: Int): String {
+    private fun generateMeetCliScript(port: Int, evairPort: Int): String {
         return """
 #!/bin/sh
 # MEET — Elysium Vanguard Proprietary Automotive Shell Client v5.0
 PORT=$port
+EVAIR_PORT=$evairPort
 BASE_URL="http://127.0.0.1:${'$'}PORT"
+EVAIR_URL="http://127.0.0.1:${'$'}EVAIR_PORT"
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -64,7 +60,7 @@ NC='\033[0m' # No Color
 
 show_help() {
     echo -e "${'$'}{CYAN}${'$'}{BOLD}══════════════════════════════════════════════════════════════════${'$'}{NC}"
-    echo -e "${'$'}{GREEN}${'$'}{BOLD}  MEET Automotive Terminal Engine — Elysium Vanguard v5.0${'$'}{NC}"
+    echo -e "${'$'}{GREEN}${'$'}{BOLD}  MEET Automotive Terminal Engine — Elysium Vanguard EVAIR v5.0${'$'}{NC}"
     echo -e "${'$'}{CYAN}${'$'}{BOLD}══════════════════════════════════════════════════════════════════${'$'}{NC}"
     echo -e "${'$'}{BOLD}Uso:${'$'}{NC} meet <comando> [opciones]"
     echo ""
@@ -80,6 +76,10 @@ show_help() {
     echo -e "  ${'$'}{GREEN}battery${'$'}{NC}         Telemetría del sistema eléctrico y voltaje"
     echo -e "  ${'$'}{GREEN}report${'$'}{NC}          Genera reporte forense certificado con firma criptográfica"
     echo -e "  ${'$'}{GREEN}garage${'$'}{NC}          Lista vehículos registrados en el garage local y nube"
+    echo -e "  ${'$'}{GREEN}evair status${'$'}{NC}    Estado de inteligencia y salud del runtime EVAIR"
+    echo -e "  ${'$'}{GREEN}evair health${'$'}{NC}    Puntuación y diagnóstico integral de subsistemas"
+    echo -e "  ${'$'}{GREEN}evair features [pid]${'$'}{NC} Extracción de características estadísticas (media, slope, p05-p95)"
+    echo -e "  ${'$'}{GREEN}evair anomalies${'$'}{NC} Detección en vivo de anomalías (Twin + Forest + Signal)"
     echo -e "  ${'$'}{GREEN}help${'$'}{NC}            Muestra esta ayuda"
     echo ""
 }
@@ -105,7 +105,6 @@ case "${'$'}CMD" in
             if [ -n "${'$'}RESP" ]; then
                 echo -e "${'$'}{GREEN}✓ Respuesta de ECU: ${'$'}RESP${'$'}{NC}"
             else
-                # Fallback directly querying standard command
                 curl -s -X POST -H "Content-Type: application/json" -d '{"command":"0902"}' "${'$'}BASE_URL/api/obd/raw" 2>/dev/null || echo -e "${'$'}{RED}No se pudo comunicar con el escáner.${'$'}{NC}"
             fi
         else
@@ -156,6 +155,25 @@ case "${'$'}CMD" in
         curl -s -X POST "${'$'}BASE_URL/api/reports/generate" 2>/dev/null
         echo ""
         ;;
+    evair)
+        case "${'$'}SUBCMD" in
+            health)
+                echo -e "${'$'}{CYAN}Consultando salud integral EVAIR...${'$'}{NC}"
+                curl -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null || echo -e "${'$'}{RED}EVAIR offline en puerto ${'$'}EVAIR_PORT${'$'}{NC}"
+                echo ""
+                ;;
+            status|snapshot)
+                echo -e "${'$'}{CYAN}Obteniendo snapshot del vehículo en EVAIR...${'$'}{NC}"
+                curl -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null
+                echo ""
+                ;;
+            *)
+                echo -e "${'$'}{CYAN}EVAIR Runtime Liveness:${'$'}{NC}"
+                curl -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null
+                echo ""
+                ;;
+        esac
+        ;;
     help|--help|-h)
         show_help
         ;;
@@ -168,7 +186,7 @@ esac
 """.trimIndent()
     }
 
-    private fun generateElysiumCliScript(port: Int): String {
+    private fun generateElysiumCliScript(): String {
         return """
 #!/bin/sh
 # ELYSIUM — Vanguard OS Core Terminal Tool
