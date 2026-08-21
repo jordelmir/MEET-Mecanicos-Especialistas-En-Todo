@@ -44,6 +44,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import com.elysium369.meet.ui.terminal.InteractiveTerminalCanvas
+import com.elysium369.meet.ui.terminal.TerminalTouchBar
+import com.elysium369.meet.core.terminal.ElysiumInteractivePtySession
 
 data class TerminalLine(
     val text: String,
@@ -80,6 +83,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
     var showUdsWizard by remember { mutableStateOf(false) }
     
     var activeTerminalTab by remember { mutableStateOf("OBD") } // "OBD" or "ANDROID"
+    var isInteractiveTuiMode by remember { mutableStateOf(true) }
     var localCommandInput by remember { mutableStateOf("") }
     val localShellLines by viewModel.localShellLines.collectAsState()
     val activeDistro by viewModel.activeDistro.collectAsState()
@@ -801,283 +805,324 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     }
                 }
             } else {
-                // CRT terminal console area
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MeetColors.backgroundDeep)
-                        .border(
-                            1.dp,
-                            when (activeDistro) {
-                                "android" -> MeetColors.cyberCyan
-                                "alpine" -> MeetColors.neonGreen
-                                "debian" -> Color(0xFFBD00FF)
-                                "ubuntu" -> Color(0xFFFF5500)
-                                else -> MeetColors.cyberCyan
-                            }.copy(alpha = 0.15f),
-                            RoundedCornerShape(10.dp)
-                        )
-                        .drawWithContent {
-                            drawContent()
-                            // CRT Scanlines Effect
-                            val scanlineSpacing = 6.dp.toPx()
-                            val scanlineHeight = 1.5.dp.toPx()
-                            var y = 0f
-                            while (y < size.height) {
-                                drawRect(
-                                    color = Color.Black.copy(alpha = 0.12f),
-                                    topLeft = androidx.compose.ui.geometry.Offset(0f, y),
-                                    size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
-                                )
-                                y += scanlineSpacing
-                            }
-                        }
-                        .padding(8.dp)
-                ) {
-                    LazyColumn(
-                        state = localListState,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(localShellLines) { line ->
-                            val isDiffRemove = line.startsWith("- ") || line.contains(" - func") || line.contains(" - ")
-                            val isDiffAdd = line.startsWith("+ ") || line.contains(" + func") || line.contains(" + ")
-                            val isYouPrompt = line.startsWith("> you:")
-                            val isAgyResponse = line.startsWith("AGY:")
-                            val isAgyLogo = line.contains("███") || line.contains("▄▄▄") || line.contains("Welcome to Antigravity CLI")
-
-                            if (isDiffRemove) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 1.dp)
-                                        .background(Color(0xFF8B0000).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = line,
-                                        color = Color(0xFFFF6B6B),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            } else if (isDiffAdd) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 1.dp)
-                                        .background(Color(0xFF006400).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = line,
-                                        color = Color(0xFF51CF66),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            } else {
-                                Row(modifier = Modifier.padding(vertical = 1.dp)) {
-                                    Text(
-                                        text = line,
-                                        color = when {
-                                            isYouPrompt -> Color(0xFFBD00FF)
-                                            isAgyResponse -> Color(0xFF38EF7D)
-                                            isAgyLogo -> Color(0xFF00E5FF)
-                                            line.startsWith("❯") -> when (activeDistro) {
-                                                "android" -> MeetColors.cyberCyan
-                                                "alpine" -> MeetColors.neonGreen
-                                                "debian" -> Color(0xFFBD00FF)
-                                                "ubuntu" -> Color(0xFFFF5500)
-                                                else -> MeetColors.cyberCyan
-                                            }
-                                            line.startsWith("[Error") || line.startsWith("[AI Error") -> MeetColors.error
-                                            line.startsWith("[Shell") -> MeetColors.error
-                                            line.startsWith("•") || line.startsWith("✓") -> MeetColors.neonGreen
-                                            line.startsWith("===") -> Color(0xFFFFD600)
-                                            else -> Color.White
-                                        },
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
+                val interactiveSession = remember(activeDistro) {
+                    viewModel.localShellManager.getOrCreateInteractiveSession(activeDistro)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Action button bar for Restart Shell next to console input
+                // ═══ MODE TOGGLE (VT100 TUI vs BATCH LOGS) ═══
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(bottom = 6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(6.dp)),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Button(
-                        onClick = {
-                            viewModel.localShellManager.restartShell()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MeetColors.cardBackgroundLighter,
-                            contentColor = when (activeDistro) {
-                                "android" -> MeetColors.cyberCyan
-                                "alpine" -> MeetColors.neonGreen
-                                "debian" -> Color(0xFFBD00FF)
-                                "ubuntu" -> Color(0xFFFF5500)
-                                else -> MeetColors.cyberCyan
-                            }
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isInteractiveTuiMode) MeetColors.neonGreen.copy(alpha = 0.2f) else Color.Transparent)
+                            .clickable { isInteractiveTuiMode = true }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "REINICIAR ENTORNOS",
+                            text = "⚡ VT100 INTERACTIVO (TUI)",
+                            color = if (isInteractiveTuiMode) MeetColors.neonGreen else MeetColors.textSecondary,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
+                            fontSize = 10.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (!isInteractiveTuiMode) MeetColors.cyberCyan.copy(alpha = 0.2f) else Color.Transparent)
+                            .clickable { isInteractiveTuiMode = false }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "📜 REGISTRO DE COMANDOS",
+                            color = if (!isInteractiveTuiMode) MeetColors.cyberCyan else MeetColors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
                         )
                     }
                 }
 
-                // ═══ VIRTUAL KEY ROW (Pro Unix/Terminal Keys) ═══
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val virtualKeys = listOf(
-                        "TAB" to { localCommandInput += "\t" },
-                        "CTRL+C" to { viewModel.localShellManager.executeCommand("\u0003") },
-                        "ESC" to { viewModel.localShellManager.executeCommand("\u001B") },
-                        "|" to { localCommandInput += " | " },
-                        "~" to { localCommandInput += "~" },
-                        "/" to { localCommandInput += "/" },
-                        "-" to { localCommandInput += "-" },
-                        "$" to { localCommandInput += "$" },
-                        "CLEAR" to { viewModel.localShellManager.clearTerminal() }
+                if (isInteractiveTuiMode) {
+                    // ═══ VT100 HARDWARE CANVAS (Interactive TUI for vim, nano, htop, python) ═══
+                    InteractiveTerminalCanvas(
+                        session = interactiveSession,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
-                    items(virtualKeys) { (keyLabel, action) ->
-                        AssistChip(
-                            onClick = { action() },
-                            label = {
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // ═══ TOUCH BAR (Pro Modifier & Navigation Row) ═══
+                    TerminalTouchBar(
+                        session = interactiveSession,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Direct input injection field
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = localCommandInput,
+                            onValueChange = { localCommandInput = it },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MeetColors.neonGreen,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = MeetColors.backgroundDeep,
+                                unfocusedContainerColor = MeetColors.backgroundDeep,
+                                cursorColor = MeetColors.neonGreen,
+                                focusedBorderColor = MeetColors.neonGreen,
+                                unfocusedBorderColor = MeetColors.neonGreen.copy(alpha = 0.3f)
+                            ),
+                            placeholder = {
                                 Text(
-                                    keyLabel,
-                                    color = when (activeDistro) {
-                                        "android" -> MeetColors.cyberCyan
-                                        "alpine" -> MeetColors.neonGreen
-                                        "debian" -> Color(0xFFBD00FF)
-                                        "ubuntu" -> Color(0xFFFF5500)
-                                        else -> MeetColors.cyberCyan
-                                    },
+                                    "Escribe o pulsa teclas (htop, vim, python3, meet...)",
+                                    color = MeetColors.textMuted,
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 11.sp
                                 )
                             },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MeetColors.backgroundDeep
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Send,
+                                keyboardType = KeyboardType.Text
                             ),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = MeetColors.borderSubtle
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    if (localCommandInput.isNotEmpty()) {
+                                        interactiveSession.writeString(localCommandInput + "\n")
+                                        localCommandInput = ""
+                                    }
+                                }
                             ),
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                    }
-                }
-
-                // Command input row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val activeColor = when (activeDistro) {
-                        "android" -> MeetColors.cyberCyan
-                        "alpine" -> MeetColors.neonGreen
-                        "debian" -> Color(0xFFBD00FF)
-                        "ubuntu" -> Color(0xFFFF5500)
-                        else -> MeetColors.cyberCyan
-                    }
-                    OutlinedTextField(
-                        value = localCommandInput,
-                        onValueChange = { localCommandInput = it },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = activeColor,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = MeetColors.backgroundDeep,
-                            unfocusedContainerColor = MeetColors.backgroundDeep,
-                            cursorColor = activeColor,
-                            focusedBorderColor = activeColor,
-                            unfocusedBorderColor = activeColor.copy(alpha = 0.25f)
-                        ),
-                        placeholder = {
-                            Text(
-                                when (activeDistro) {
-                                    "android" -> "meet status, meet vin read, ls -la..."
-                                    "alpine" -> "apk update, meet status, python3..."
-                                    "debian", "ubuntu" -> "meet status, agy --version, python3..."
-                                    else -> "Comando de consola..."
-                                },
-                                color = MeetColors.textMuted,
+                            textStyle = LocalTextStyle.current.copy(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 13.sp
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Button(
+                            onClick = {
+                                if (localCommandInput.isNotEmpty()) {
+                                    interactiveSession.writeString(localCommandInput + "\n")
+                                    localCommandInput = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MeetColors.neonGreen,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(52.dp)
+                        ) {
+                            Text("SEND", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                        }
+                    }
+                } else {
+                    // ═══ CRT BATCH LOG CONSOLE AREA ═══
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MeetColors.backgroundDeep)
+                            .border(
+                                1.dp,
+                                when (activeDistro) {
+                                    "android" -> MeetColors.cyberCyan
+                                    "alpine" -> MeetColors.neonGreen
+                                    "debian" -> Color(0xFFBD00FF)
+                                    "ubuntu" -> Color(0xFFFF5500)
+                                    else -> MeetColors.cyberCyan
+                                }.copy(alpha = 0.15f),
+                                RoundedCornerShape(10.dp)
                             )
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Send,
-                            keyboardType = KeyboardType.Text
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onSend = {
+                            .drawWithContent {
+                                drawContent()
+                                val scanlineSpacing = 6.dp.toPx()
+                                val scanlineHeight = 1.5.dp.toPx()
+                                var y = 0f
+                                while (y < size.height) {
+                                    drawRect(
+                                        color = Color.Black.copy(alpha = 0.12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(0f, y),
+                                        size = androidx.compose.ui.geometry.Size(size.width, scanlineHeight)
+                                    )
+                                    y += scanlineSpacing
+                                }
+                            }
+                            .padding(8.dp)
+                    ) {
+                        LazyColumn(
+                            state = localListState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(localShellLines) { line ->
+                                val isDiffRemove = line.startsWith("- ") || line.contains(" - func") || line.contains(" - ")
+                                val isDiffAdd = line.startsWith("+ ") || line.contains(" + func") || line.contains(" + ")
+                                val isYouPrompt = line.startsWith("> you:")
+                                val isAgyResponse = line.startsWith("AGY:")
+                                val isAgyLogo = line.contains("███") || line.contains("▄▄▄") || line.contains("Welcome to Antigravity CLI")
+
+                                if (isDiffRemove) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 1.dp)
+                                            .background(Color(0xFF8B0000).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(text = line, color = Color(0xFFFF6B6B), fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
+                                    }
+                                } else if (isDiffAdd) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 1.dp)
+                                            .background(Color(0xFF006400).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(text = line, color = Color(0xFF51CF66), fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
+                                    }
+                                } else {
+                                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                                        Text(
+                                            text = line,
+                                            color = when {
+                                                isYouPrompt -> Color(0xFFBD00FF)
+                                                isAgyResponse -> Color(0xFF38EF7D)
+                                                isAgyLogo -> Color(0xFF00E5FF)
+                                                line.startsWith("❯") -> when (activeDistro) {
+                                                    "android" -> MeetColors.cyberCyan
+                                                    "alpine" -> MeetColors.neonGreen
+                                                    "debian" -> Color(0xFFBD00FF)
+                                                    "ubuntu" -> Color(0xFFFF5500)
+                                                    else -> MeetColors.cyberCyan
+                                                }
+                                                line.startsWith("[Error") || line.startsWith("[AI Error") -> MeetColors.error
+                                                line.startsWith("[Shell") -> MeetColors.error
+                                                line.startsWith("•") || line.startsWith("✓") -> MeetColors.neonGreen
+                                                line.startsWith("===") -> Color(0xFFFFD600)
+                                                else -> Color.White
+                                            },
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Command input row for batch mode
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val activeColor = when (activeDistro) {
+                            "android" -> MeetColors.cyberCyan
+                            "alpine" -> MeetColors.neonGreen
+                            "debian" -> Color(0xFFBD00FF)
+                            "ubuntu" -> Color(0xFFFF5500)
+                            else -> MeetColors.cyberCyan
+                        }
+                        OutlinedTextField(
+                            value = localCommandInput,
+                            onValueChange = { localCommandInput = it },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = activeColor,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = MeetColors.backgroundDeep,
+                                unfocusedContainerColor = MeetColors.backgroundDeep,
+                                cursorColor = activeColor,
+                                focusedBorderColor = activeColor,
+                                unfocusedBorderColor = activeColor.copy(alpha = 0.25f)
+                            ),
+                            placeholder = {
+                                Text(
+                                    when (activeDistro) {
+                                        "android" -> "meet status, meet vin read, ls -la..."
+                                        "alpine" -> "apk update, meet status, python3..."
+                                        "debian", "ubuntu" -> "meet status, agy --version, python3..."
+                                        else -> "Comando de consola..."
+                                    },
+                                    color = MeetColors.textMuted,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Send,
+                                keyboardType = KeyboardType.Text
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    val cmd = localCommandInput.trim()
+                                    if (cmd.isNotEmpty()) {
+                                        viewModel.localShellManager.executeCommand(cmd)
+                                        localCommandInput = ""
+                                    }
+                                }
+                            ),
+                            textStyle = LocalTextStyle.current.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 14.sp
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Button(
+                            onClick = {
                                 val cmd = localCommandInput.trim()
                                 if (cmd.isNotEmpty()) {
                                     viewModel.localShellManager.executeCommand(cmd)
                                     localCommandInput = ""
                                 }
-                            }
-                        ),
-                        textStyle = LocalTextStyle.current.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 14.sp
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Button(
-                        onClick = {
-                            val cmd = localCommandInput.trim()
-                            if (cmd.isNotEmpty()) {
-                                viewModel.localShellManager.executeCommand(cmd)
-                                localCommandInput = ""
-                            }
-                        },
-                        enabled = localCommandInput.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = activeColor,
-                            contentColor = MeetColors.backgroundDeep,
-                            disabledContainerColor = MeetColors.backgroundDark
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(56.dp)
-                    ) {
-                        Text(
-                            "RUN",
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 16.sp
-                        )
+                            },
+                            enabled = localCommandInput.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = activeColor,
+                                contentColor = MeetColors.backgroundDeep,
+                                disabledContainerColor = MeetColors.backgroundDark
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(56.dp)
+                        ) {
+                            Text(
+                                "RUN",
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 16.sp
+                            )
+                        }
                     }
                 }
 

@@ -98,6 +98,16 @@ class LocalShellManager(
     )
     val terminalLines: StateFlow<List<String>> = _terminalLines.asStateFlow()
 
+    private val interactiveSessions = java.util.concurrent.ConcurrentHashMap<String, com.elysium369.meet.core.terminal.ElysiumInteractivePtySession>()
+
+    fun getOrCreateInteractiveSession(distro: String = _activeDistro.value): com.elysium369.meet.core.terminal.ElysiumInteractivePtySession {
+        return interactiveSessions.computeIfAbsent(distro) { d ->
+            com.elysium369.meet.core.terminal.ElysiumInteractivePtySession(appContext, d).apply {
+                start()
+            }
+        }
+    }
+
     init {
         setupDirectories()
         startControlServer()
@@ -181,9 +191,9 @@ class LocalShellManager(
             val env = builder.environment()
             val currentPath = env["PATH"] ?: "/sbin:/system/sbin:/system/bin:/system/xbin"
             env["PATH"] = if (targetDistro != "android") {
-                "/bin/meet:/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin:/opt/elysium/bin:/bin/meet"
             } else {
-                "${binDir.absolutePath}:/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$currentPath"
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${binDir.absolutePath}:$currentPath"
             }
             env["HOME"] = if (targetDistro != "android") "/root" else homeDir.absolutePath
             env["TMPDIR"] = if (targetDistro != "android") "/tmp" else File(appContext.filesDir, "tmp").absolutePath
@@ -728,31 +738,39 @@ class LocalShellManager(
             val pkgScript = File(usrBin, "pkg")
             pkgScript.writeText("""
                 #!/bin/sh
-                ACTION="${'$'}1"
-                shift
-                if command -v apt-get >/dev/null 2>&1; then
-                    case "${'$'}ACTION" in
-                        install|i) apt-get update && apt-get install -y "${'$'}@";;
-                        update|u) apt-get update;;
-                        upgrade) apt-get update && apt-get upgrade -y;;
-                        remove|uninstall|r) apt-get remove -y "${'$'}@";;
-                        search|s) apt-cache search "${'$'}@";;
-                        list-installed|list) dpkg -l;;
-                        clean) apt-get clean;;
-                        *) echo "Uso: pkg [install|update|upgrade|search|remove|list-installed|clean]";;
+                set -eu
+                subcommand="${'$'}{1:-}"
+                if [ -z "${'$'}subcommand" ]; then
+                    if command -v apt >/dev/null 2>&1; then exec apt; elif command -v apk >/dev/null 2>&1; then exec apk; else exit 1; fi
+                fi
+                shift || true
+                if command -v apt >/dev/null 2>&1; then
+                    case "${'$'}subcommand" in
+                        update) exec apt update "${'$'}@" ;;
+                        upgrade) exec apt upgrade -y "${'$'}@" ;;
+                        install|i) exec apt install -y "${'$'}@" ;;
+                        uninstall|remove|r) exec apt remove -y "${'$'}@" ;;
+                        purge) exec apt purge -y "${'$'}@" ;;
+                        search|s) exec apt search "${'$'}@" ;;
+                        show) exec apt show "${'$'}@" ;;
+                        autoremove) exec apt autoremove -y "${'$'}@" ;;
+                        clean) exec apt clean "${'$'}@" ;;
+                        list-installed|list) exec dpkg -l "${'$'}@" ;;
+                        *) printf 'pkg: unsupported subcommand: %s\n' "${'$'}subcommand" >&2; exit 2 ;;
                     esac
                 elif command -v apk >/dev/null 2>&1; then
-                    case "${'$'}ACTION" in
-                        install|i) apk add "${'$'}@";;
-                        update|u) apk update;;
-                        upgrade) apk upgrade;;
-                        remove|uninstall|r) apk del "${'$'}@";;
-                        search|s) apk search "${'$'}@";;
-                        list-installed|list) apk info;;
-                        *) echo "Uso: pkg [install|update|upgrade|search|remove|list-installed]";;
+                    case "${'$'}subcommand" in
+                        update) exec apk update "${'$'}@" ;;
+                        upgrade) exec apk upgrade "${'$'}@" ;;
+                        install|i) exec apk add "${'$'}@" ;;
+                        uninstall|remove|r) exec apk del "${'$'}@" ;;
+                        search|s) exec apk search "${'$'}@" ;;
+                        list-installed|list) exec apk info "${'$'}@" ;;
+                        *) printf 'pkg: unsupported subcommand: %s\n' "${'$'}subcommand" >&2; exit 2 ;;
                     esac
                 else
-                    echo "[MEET Elysium Vanguard] Gestor de paquetes"
+                    printf 'pkg: no package manager found\n' >&2
+                    exit 1
                 fi
             """.trimIndent().trim())
             pkgScript.setExecutable(true, false)
@@ -760,20 +778,18 @@ class LocalShellManager(
             val startVnc = File(usrBin, "startvnc")
             startVnc.writeText("""
                 #!/bin/sh
-                echo "🖥️  [MEET Elysium Vanguard - Servidor VNC/X11]"
+                set -eu
                 if ! command -v vncserver >/dev/null 2>&1; then
-                    echo "Para iniciar el escritorio gráfico XFCE4:"
-                    echo "  1. Ejecute: pkg install xfce4 xfce4-terminal tigervnc-standalone-server dbus-x11"
-                    echo "  2. Inicie con: startvnc"
-                    echo "  3. Conéctese a 127.0.0.1:5901"
-                else
-                    export USER=root
-                    export HOME=/root
-                    mkdir -p /root/.vnc
-                    vncserver -kill :1 2>/dev/null || true
-                    vncserver :1 -geometry 1280x720 -depth 24
-                    echo "✓ Servidor VNC activo en 127.0.0.1:5901 (Display :1)"
+                    printf 'startvnc: TigerVNC is not installed.\n' >&2
+                    printf 'Install with: pkg install tigervnc-standalone-server xfce4 dbus-x11\n' >&2
+                    exit 1
                 fi
+                export USER=root
+                export HOME=/root
+                mkdir -p /root/.vnc
+                vncserver -kill :1 >/dev/null 2>&1 || true
+                vncserver :1 -localhost yes -geometry 1920x1080 -depth 24
+                printf 'VNC running: 127.0.0.1:5901 (Display :1)\n'
             """.trimIndent().trim())
             startVnc.setExecutable(true, false)
 
@@ -819,18 +835,6 @@ class LocalShellManager(
         val cmdTrimmed = command.trim()
         if (cmdTrimmed.isEmpty()) return
 
-        // Intercept Special Install Nodejs command
-        if (cmdTrimmed == "pkg install nodejs" || cmdTrimmed == "pkg install node") {
-            _terminalLines.update { it + "❯ $command" }
-            _terminalLines.update { it + "[Elysium Vanguard-Termux] Android 10+ (targetSDK 34) restringe la ejecución de binarios ELF descargados dinámicamente." }
-            _terminalLines.update { it + "[Elysium Vanguard-Termux] Para ejecutar Node.js, Claude Code o Gemini CLI y conectarse a esta APK:" }
-            _terminalLines.update { it + "  1. Instale Termux en su dispositivo desde F-Droid." }
-            _terminalLines.update { it + "  2. En Termux ejecute: pkg install nodejs" }
-            _terminalLines.update { it + "  3. Instale sus herramientas globales (ej. npm install -g @google/generative-ai)." }
-            _terminalLines.update { it + "  4. Ejecute sus herramientas apuntando al servidor local de esta app en http://127.0.0.1:8082" }
-            _terminalLines.update { it + "     Ejemplo: curl -X POST -d \"SELECT * FROM trips\" http://127.0.0.1:8082/api/db" }
-            return
-        }
 
         // Intercept Special Install Linux command
         if (cmdTrimmed.startsWith("pkg install ")) {
@@ -841,6 +845,12 @@ class LocalShellManager(
                 installDistro(targetDistro)
                 return
             }
+        }
+
+        // Clear terminal command
+        if (cmdTrimmed == "clear" || cmdTrimmed == "reset") {
+            clearTerminal()
+            return
         }
 
         // Intercept Special Install Google Antigravity command
@@ -896,7 +906,7 @@ class LocalShellManager(
                 val builder = if (isDistro) {
                     File(distroDir, "dev/pts").mkdirs()
                     val safeCmd = command.replace("\"", "\\\"")
-                    val ptyScript = "if command -v script >/dev/null 2>&1; then script -qec \"$safeCmd\" /dev/null; else $command; fi"
+                    val ptyScript = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin:/opt/elysium/bin:/bin/meet; export HOME=/root; export TERM=xterm-256color; export COLORTERM=truecolor; if command -v script >/dev/null 2>&1; then script -qec \"$safeCmd\" /dev/null; else $command; fi"
                     val args = listOf(
                         nativeLibProot.absolutePath,
                         "--link2symlink",
@@ -921,9 +931,9 @@ class LocalShellManager(
                 val env = builder.environment()
                 val currentPath = env["PATH"] ?: "/sbin:/system/sbin:/system/bin:/system/xbin"
                 env["PATH"] = if (isDistro) {
-                    "/bin/meet:/root/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+                    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin:/opt/elysium/bin:/bin/meet"
                 } else {
-                    "${binDir.absolutePath}:/bin/meet:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$currentPath"
+                    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${binDir.absolutePath}:$currentPath"
                 }
                 env["HOME"] = if (isDistro) "/root" else homeDir.absolutePath
                 env["TMPDIR"] = if (isDistro) "/tmp" else File(appContext.filesDir, "tmp").absolutePath
@@ -1227,59 +1237,12 @@ class LocalShellManager(
             antigravityMeetFile.writeText(meetAgyScript)
             Runtime.getRuntime().exec("chmod 755 ${antigravityMeetFile.absolutePath}").waitFor()
 
-            // python / python3 helper script
-            val pyHelper = File(binDir, "python3")
-            pyHelper.writeText("""
-                #!/bin/sh
-                if [ "$1" = "-c" ] && echo "$2" | grep -q "antigravity"; then
-                    echo "🛸 [Python Antigravity] https://xkcd.com/353/ -> Modulo de vuelo antigravitatorio activado!"
-                    echo "Vector de empuje: Estable | Elevacion orbital: 100% | Vanguard OS Core: En linea"
-                    exit 0
-                fi
-                echo "Python 3.11 (Google Antigravity Environment)"
-                echo "Para ejecutar scripts completos de Python, use el contenedor Linux (Alpine/Debian) o Termux."
-            """.trimIndent().trim())
-            Runtime.getRuntime().exec("chmod 755 ${pyHelper.absolutePath}").waitFor()
-
-            val pyHelperAlias = File(binDir, "python")
-            pyHelperAlias.writeText("""
-                #!/system/bin/sh
-                exec ${pyHelper.absolutePath} "$@"
-            """.trimIndent().trim())
-            Runtime.getRuntime().exec("chmod 755 ${pyHelperAlias.absolutePath}").waitFor()
-
-            // pip / pip3 helper script
-            val pipHelper = File(binDir, "pip3")
-            pipHelper.writeText("""
-                #!/system/bin/sh
-                if [ "$1" = "install" ] && echo "$*" | grep -q "antigravity"; then
-                    echo "Collecting google-antigravity"
-                    echo "  Downloading google_antigravity-2.0.0-py3-none-any.whl (4.2 MB)"
-                    echo "Installing collected packages: google-antigravity"
-                    echo "Successfully installed google-antigravity-2.0.0"
-                    exit 0
-                fi
-                echo "pip 24.0 (Google Antigravity Sandbox)"
-                echo "Uso: pip install <paquete>"
-            """.trimIndent().trim())
-            Runtime.getRuntime().exec("chmod 755 ${pipHelper.absolutePath}").waitFor()
-
-            val pipHelperAlias = File(binDir, "pip")
-            pipHelperAlias.writeText("""
-                #!/system/bin/sh
-                exec ${pipHelper.absolutePath} "$@"
-            """.trimIndent().trim())
-            Runtime.getRuntime().exec("chmod 755 ${pipHelperAlias.absolutePath}").waitFor()
-
-            // node helper script
-
-            // npx helper script
-            val npxHelper = File(binDir, "npx")
-            npxHelper.writeText("""
-                #!/system/bin/sh
-                echo "[Elysium Vanguard-Termux] Use npx desde la app Termux en su dispositivo o dentro de Ubuntu."
-            """.trimIndent().trim())
-            Runtime.getRuntime().exec("chmod 755 ${npxHelper.absolutePath}").waitFor()
+            // Clean up any stale fake binary shims
+            File(binDir, "python3").delete()
+            File(binDir, "python").delete()
+            File(binDir, "pip3").delete()
+            File(binDir, "pip").delete()
+            File(binDir, "npx").delete()
 
             // Termux API suite on Host
             val hostTermuxBattery = File(binDir, "termux-battery-status")
@@ -1345,10 +1308,40 @@ class LocalShellManager(
             val hostPkg = File(binDir, "pkg")
             hostPkg.writeText("""
                 #!/bin/sh
-                echo "📦 [MEET Elysium Vanguard - Gestor de Paquetes]"
-                echo "Para instalar paquetes completos de desarrollo (apt / apk / python / clang / nodejs):"
-                echo "  1. Seleccione la pestaña Ubuntu o Debian arriba."
-                echo "  2. Ejecute: pkg install <paquete> (ej: pkg install htop curl git python3)"
+                set -eu
+                subcommand="${'$'}{1:-}"
+                if [ -z "${'$'}subcommand" ]; then
+                    if command -v apt >/dev/null 2>&1; then exec apt; elif command -v apk >/dev/null 2>&1; then exec apk; else exit 1; fi
+                fi
+                shift || true
+                if command -v apt >/dev/null 2>&1; then
+                    case "${'$'}subcommand" in
+                        update) exec apt update "${'$'}@" ;;
+                        upgrade) exec apt upgrade -y "${'$'}@" ;;
+                        install|i) exec apt install -y "${'$'}@" ;;
+                        uninstall|remove|r) exec apt remove -y "${'$'}@" ;;
+                        purge) exec apt purge -y "${'$'}@" ;;
+                        search|s) exec apt search "${'$'}@" ;;
+                        show) exec apt show "${'$'}@" ;;
+                        autoremove) exec apt autoremove -y "${'$'}@" ;;
+                        clean) exec apt clean "${'$'}@" ;;
+                        list-installed|list) exec dpkg -l "${'$'}@" ;;
+                        *) printf 'pkg: unsupported subcommand: %s\n' "${'$'}subcommand" >&2; exit 2 ;;
+                    esac
+                elif command -v apk >/dev/null 2>&1; then
+                    case "${'$'}subcommand" in
+                        update) exec apk update "${'$'}@" ;;
+                        upgrade) exec apk upgrade "${'$'}@" ;;
+                        install|i) exec apk add "${'$'}@" ;;
+                        uninstall|remove|r) exec apk del "${'$'}@" ;;
+                        search|s) exec apk search "${'$'}@" ;;
+                        list-installed|list) exec apk info "${'$'}@" ;;
+                        *) printf 'pkg: unsupported subcommand: %s\n' "${'$'}subcommand" >&2; exit 2 ;;
+                    esac
+                else
+                    printf 'pkg: no package manager available\n' >&2
+                    exit 1
+                fi
             """.trimIndent().trim())
             Runtime.getRuntime().exec("chmod 755 ${hostPkg.absolutePath}").waitFor()
 
@@ -1390,7 +1383,7 @@ class LocalShellManager(
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                /bin/sh -c 'export PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; export COLORTERM=truecolor; export COLUMNS=80; export LINES=24; cd /root; exec "$@"' -- "$@"
+                                /bin/sh -c 'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin:/opt/elysium/bin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; export COLORTERM=truecolor; export COLUMNS=80; export LINES=24; cd /root; exec "$@"' -- "$@"
                         else
                             exec ${nativeLibProot.absolutePath} \
                                 --link2symlink \
@@ -1402,7 +1395,7 @@ class LocalShellManager(
                                 -b /sys \
                                 -b /proc \
                                 -b ${binDir.absolutePath}:/bin/meet \
-                                /bin/sh -c 'export PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; export COLORTERM=truecolor; export COLUMNS=80; export LINES=24; cd /root; exec /bin/sh'
+                                /bin/sh -c 'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin:/opt/elysium/bin:/bin/meet; export HOME=/root; export TMPDIR=/tmp; export TMP=/tmp; export TEMP=/tmp; export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt; export SSL_CERT_DIR=/etc/ssl/certs; export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt; export TERM=xterm-256color; export COLORTERM=truecolor; export COLUMNS=80; export LINES=24; cd /root; exec /bin/sh'
                         fi
                     """.trimIndent().trim())
                     Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
@@ -1775,7 +1768,11 @@ class LocalShellManager(
     }
 
     fun clearTerminal() {
-        _terminalLines.value = listOf("❯ ")
+        _terminalLines.value = emptyList()
+        interactiveSessions.values.forEach { session ->
+            session.emulator.reset()
+            session.writeBytes(byteArrayOf(0x0C))
+        }
     }
 
     private fun getSystemDnsServers(): List<String> {

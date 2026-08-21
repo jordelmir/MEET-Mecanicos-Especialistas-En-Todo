@@ -24,7 +24,7 @@ class WorkshopServiceCatalogTest {
         assertTrue("Tow truck role is required", "TOW_TRUCK" in roleIds)
         assertTrue("Parts store role is required", "PARTS_STORE" in roleIds)
         assertTrue("Prepurchase inspector role is required", "PREPURCHASE_INSPECTOR" in roleIds)
-        assertEquals(17, WorkshopServiceCatalog.providerRoles.size)
+        assertEquals(22, WorkshopServiceCatalog.providerRoles.size)
     }
 
     @Test

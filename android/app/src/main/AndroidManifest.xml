@@ -81,6 +81,12 @@
             android:foregroundServiceType="connectedDevice"
             android:exported="false" />
             
+        <service
+            android:name=".core.terminal.ElysiumTerminalService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false"
+            tools:ignore="ForegroundServicePermission" />
+            
         <receiver android:name=".widget.MeetWidget" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

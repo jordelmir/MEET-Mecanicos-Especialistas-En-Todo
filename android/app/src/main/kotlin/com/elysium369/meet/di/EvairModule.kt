@@ -37,6 +37,12 @@ object EvairModule {
 
     @Provides
     @Singleton
+    fun provideDiagnosticReasoningEngine(): DiagnosticReasoningEngine {
+        return DiagnosticReasoningEngine()
+    }
+
+    @Provides
+    @Singleton
     fun provideTelemetryCollector(
         obdSession: ObdSession,
     ): TelemetryCollector {

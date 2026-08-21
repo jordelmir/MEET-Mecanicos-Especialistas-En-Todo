@@ -647,6 +647,28 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable("elysium_ai") {
+                val evairViewModel: com.elysium369.meet.ui.ElysiumAiViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                ElysiumAiScreen(
+                    facade = evairViewModel.facade,
+                    gateway = evairViewModel.gateway,
+                    stateEngine = evairViewModel.stateEngine,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToTerminal = { navController.navigate("terminal") },
+                    onNavigateToLiveTelemetry = { navController.navigate("scanner") }
+                )
+            }
+            composable("evair") {
+                val evairViewModel: com.elysium369.meet.ui.ElysiumAiViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                ElysiumAiScreen(
+                    facade = evairViewModel.facade,
+                    gateway = evairViewModel.gateway,
+                    stateEngine = evairViewModel.stateEngine,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToTerminal = { navController.navigate("terminal") },
+                    onNavigateToLiveTelemetry = { navController.navigate("scanner") }
+                )
+            }
             composable("vehicle_access") {
                 com.elysium369.meet.ui.screens.vehicleaccess.VehicleAccessDashboardScreen(
                     navController = navController,
