@@ -225,18 +225,30 @@ class ObdSession(
     // ── Adapter & Vehicle Identification (Exposed as StateFlows for UI) ──
     private val _adapterVersion = MutableStateFlow("")
     val adapterVersionFlow: StateFlow<String> = _adapterVersion.asStateFlow()
-    private var adapterVersion: String = ""
+    var adapterVersion: String = ""
         set(value) { field = value; _adapterVersion.value = value }
+
+    var isSTN: Boolean = false
 
     private val _isCloneAdapter = MutableStateFlow(true)
     val isCloneAdapterFlow: StateFlow<Boolean> = _isCloneAdapter.asStateFlow()
-    private var isCloneAdapter: Boolean = true
+    var isCloneAdapter: Boolean = true
         set(value) { field = value; _isCloneAdapter.value = value }
 
     private val _detectedProtocol = MutableStateFlow("")
     val detectedProtocolFlow: StateFlow<String> = _detectedProtocol.asStateFlow()
-    internal var detectedProtocol: String = ""
+    var detectedProtocol: String = ""
         set(value) { field = value; _detectedProtocol.value = value }
+
+    suspend fun scanDtcErrors(): List<String> {
+        val report = readProfessionalDtcScan()
+        return report.records.map { it.code }.distinct()
+    }
+
+    suspend fun clearDtcErrors(): Boolean {
+        val result = clearDtcs()
+        return result is ClearDtcResult.Verified || result is ClearDtcResult.PartiallyVerified || result is ClearDtcResult.AcceptedButNotVerified
+    }
 
     private val _calibrationId = MutableStateFlow<String?>(null)
     val calibrationId: StateFlow<String?> = _calibrationId.asStateFlow()
@@ -756,7 +768,7 @@ class ObdSession(
                 updateQos(System.currentTimeMillis() - cycleStartTime)
                 cycleCount++
 
-                // Adaptive delay: keep a real hardware cadence without overheating the phone.
+                // Dynamic Adaptive Auto-Pacing based on physical bus speed (CAN 500k vs K-Line/J1850 10.4k)
                 val supportedPidKeys = supportedPids.map { "01${String.format("%02X", it)}" }.toSet()
                 val adapterProfile = adapterQualityProfiler.profile(
                     adapterName = targetAddress,
@@ -771,9 +783,19 @@ class ObdSession(
                     adapterQuality = adapterProfile,
                     qos = _qosMetrics.value
                 )
+                val isSlowPhysicalBus = detectedProtocol.contains("ISO 9141", ignoreCase = true) ||
+                    detectedProtocol.contains("ISO9141", ignoreCase = true) ||
+                    detectedProtocol.contains("KWP", ignoreCase = true) ||
+                    detectedProtocol.contains("J1850", ignoreCase = true)
+                val minDelay = when {
+                    isSlowPhysicalBus -> 65L // Safe cadence for slow UART/K-Line buffers
+                    _highSpeedMode.value && (pollingPlan.highPerformanceMode || isSTN) -> 12L // High-speed CAN 500k burst
+                    else -> 40L
+                }
+                val maxDelay = if (isSlowPhysicalBus) 350L else 200L
                 val targetDelay = (1000f / pollingPlan.commandsPerSecondLimit)
                     .toLong()
-                    .coerceIn(if (_highSpeedMode.value && pollingPlan.highPerformanceMode) 25L else 60L, 250L)
+                    .coerceIn(minDelay, maxDelay)
                 if (targetDelay > 0) delay(timeMillis = targetDelay)
             }
         }

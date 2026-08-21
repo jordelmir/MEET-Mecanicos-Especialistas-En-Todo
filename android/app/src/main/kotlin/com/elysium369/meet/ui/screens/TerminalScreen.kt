@@ -945,6 +945,55 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     }
                 }
 
+                // ═══ VIRTUAL KEY ROW (Pro Unix/Terminal Keys) ═══
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val virtualKeys = listOf(
+                        "TAB" to { localCommandInput += "\t" },
+                        "CTRL+C" to { viewModel.localShellManager.executeCommand("\u0003") },
+                        "ESC" to { viewModel.localShellManager.executeCommand("\u001B") },
+                        "|" to { localCommandInput += " | " },
+                        "~" to { localCommandInput += "~" },
+                        "/" to { localCommandInput += "/" },
+                        "-" to { localCommandInput += "-" },
+                        "$" to { localCommandInput += "$" },
+                        "CLEAR" to { viewModel.localShellManager.clearTerminal() }
+                    )
+                    items(virtualKeys) { (keyLabel, action) ->
+                        AssistChip(
+                            onClick = { action() },
+                            label = {
+                                Text(
+                                    keyLabel,
+                                    color = when (activeDistro) {
+                                        "android" -> MeetColors.cyberCyan
+                                        "alpine" -> MeetColors.neonGreen
+                                        "debian" -> Color(0xFFBD00FF)
+                                        "ubuntu" -> Color(0xFFFF5500)
+                                        else -> MeetColors.cyberCyan
+                                    },
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MeetColors.backgroundDeep
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MeetColors.borderSubtle
+                            ),
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                    }
+                }
+
                 // Command input row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -973,9 +1022,9 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         placeholder = {
                             Text(
                                 when (activeDistro) {
-                                    "android" -> "ls -la, pm list packages, df..."
-                                    "alpine" -> "apk update, apk add nodejs, python3..."
-                                    "debian", "ubuntu" -> "apt update, apt install -y python3..."
+                                    "android" -> "meet status, meet vin read, ls -la..."
+                                    "alpine" -> "apk update, meet status, python3..."
+                                    "debian", "ubuntu" -> "meet status, agy --version, python3..."
                                     else -> "Comando de consola..."
                                 },
                                 color = MeetColors.textMuted,
@@ -1037,49 +1086,49 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 // Contextual quick commands list
                 val quickCommandsForDistro = when (activeDistro) {
                     "android" -> listOf(
+                        "meet status" to "⚡ meet status",
+                        "meet vin read" to "🧬 meet vin read",
+                        "meet dtc scan" to "🔍 meet dtc scan",
+                        "meet dtc clear" to "🧹 meet dtc clear",
+                        "meet ecu ping" to "📡 meet ecu ping",
+                        "meet can dump" to "📊 meet can dump",
+                        "meet live rpm,speed,temp" to "📈 meet live",
+                        "meet battery" to "🔋 meet battery",
+                        "meet garage" to "🏎️ meet garage",
                         "termux-battery-status" to "🔋 battery",
                         "termux-toast 'Elysium Vanguard'" to "🍞 toast",
                         "termux-vibrate -d 300" to "📳 vibrate",
                         "termux-tts-speak 'Motor Antigravity Activo'" to "🗣️ tts",
                         "termux-torch on" to "🔦 torch-on",
                         "termux-torch off" to "🔦 torch-off",
-                        "termux-wifi-connectioninfo" to "📶 wifi",
                         "termux-location" to "📍 gps",
-                        "termux-info" to "ℹ️ info",
-                        "agy-meet status" to "🛸 meet-status",
-                        "agy-meet scan" to "🛸 meet-scan",
-                        "db SELECT * FROM vehicles" to "🗄️ db-vehicles",
                         "uname -a" to "🐧 kernel",
-                        "ls" to "📁 ls",
+                        "ls -la" to "📁 ls",
                         "df -h" to "💾 df"
                     )
                     "alpine" -> listOf(
-                        "termux-battery-status" to "🔋 battery",
-                        "termux-toast 'Alpine Linux'" to "🍞 toast",
+                        "meet status" to "⚡ meet status",
+                        "meet vin read" to "🧬 meet vin read",
+                        "meet dtc scan" to "🔍 meet dtc scan",
                         "pkg update" to "🔄 pkg-update",
                         "pkg install htop curl" to "📦 pkg-install",
-                        "agy-meet status" to "🛸 meet-status",
                         "ls" to "📁 ls",
                         "pwd" to "📍 pwd",
                         "whoami" to "👤 whoami"
                     )
                     "debian", "ubuntu" -> listOf(
+                        "meet status" to "⚡ meet status",
+                        "meet vin read" to "🧬 meet vin read",
+                        "meet dtc scan" to "🔍 meet dtc scan",
+                        "meet ecu ping" to "📡 meet ecu ping",
                         "agy --version" to "🛸 agy-version",
                         "agy --help" to "🛸 agy-help",
-                        "agy-meet status" to "🛸 meet-status",
                         "termux-battery-status" to "🔋 battery",
                         "termux-toast 'Ubuntu Jammy'" to "🍞 toast",
-                        "termux-vibrate -d 400" to "📳 vibrate",
-                        "termux-tts-speak 'Subsistema Ubuntu en linea'" to "🗣️ tts",
-                        "termux-torch on" to "🔦 torch-on",
-                        "termux-torch off" to "🔦 torch-off",
-                        "termux-wifi-connectioninfo" to "📶 wifi",
-                        "termux-location" to "📍 gps",
-                        "termux-info" to "ℹ️ termux-info",
                         "pkg update" to "🔄 pkg-update",
                         "pkg install -y htop curl git" to "📦 pkg-install",
+                        "python3 -V" to "🐍 python3",
                         "startvnc" to "🖥️ startvnc",
-                        "meet-report" to "🛡️ meet-report",
                         "ls" to "📁 ls",
                         "pwd" to "📍 pwd"
                     )

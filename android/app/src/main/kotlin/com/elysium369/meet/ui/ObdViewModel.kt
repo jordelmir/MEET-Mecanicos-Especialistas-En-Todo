@@ -443,7 +443,7 @@ class ObdViewModel @Inject constructor(
     private val predictionEventDao: com.elysium369.meet.data.local.dao.PredictionEventDao,
     private val healthSnapshotDao: com.elysium369.meet.data.local.dao.HealthSnapshotDao,
     private val phoneSpeedTracker: PhoneSpeedTracker,
-    private val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager,
+    val voiceFeedbackManager: com.elysium369.meet.core.audio.VoiceFeedbackManager,
     private val voiceCommandManager: com.elysium369.meet.core.audio.VoiceCommandManager,
     private val gaugeStyleManager: com.elysium369.meet.ui.components.gauges.GaugeStyleManager,
     private val meetDnaEngine: com.elysium369.meet.core.dna.MeetDnaEngine,
@@ -3142,6 +3142,12 @@ class ObdViewModel @Inject constructor(
         performanceCalculator.vehicleMassKg = _vehicleMass.value
         performanceCalculator.drivetrainLossPercent = _drivetrainLoss.value
 
+        // Pre-warm OBD link in background if enabled and paired adapter available
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(1500) // allow UI initial render to finish
+            preWarmObdConnection()
+        }
+
         // Wire real-time OBD traffic capture to the terminal log
         obdSession.setTrafficListener(object : ObdTrafficListener {
             override fun onCommandSent(command: String) {
@@ -4067,6 +4073,36 @@ class ObdViewModel @Inject constructor(
                 _vinReadFeedback.value = "Error al leer VIN de la ECU: ${e.message}"
             } finally {
                 _isReadingVin.value = null
+            }
+        }
+    }
+
+    /**
+     * Pre-Warm Link: Silently handshakes with last known good adapter in background.
+     * Yields instantaneous (0ms) connection when user reaches Scanner, DTCs or Garage.
+     */
+    fun preWarmObdConnection() {
+        if (connectionState.value == ObdState.CONNECTED || connectionState.value == ObdState.CONNECTING) return
+        val lastAddress = lastAdapterAddress?.takeIf { it.isNotBlank() }
+            ?: context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE).getString("last_adapter_address", null)
+        if (!lastAddress.isNullOrBlank()) {
+            try {
+                val btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                if (btAdapter != null && btAdapter.isEnabled) {
+                    val isPaired = btAdapter.bondedDevices?.any { it.address.equals(lastAddress, ignoreCase = true) } == true
+                    if (isPaired) {
+                        Log.i("ObdVM", "⚡ Pre-warming OBD connection in background for known adapter $lastAddress...")
+                        viewModelScope.launch(Dispatchers.IO) {
+                            try {
+                                connect(lastAddress)
+                            } catch (e: Exception) {
+                                Log.w("ObdVM", "Pre-warm background attempt non-fatal notice: ${e.message}")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ObdVM", "Pre-warm check notice: ${e.message}")
             }
         }
     }

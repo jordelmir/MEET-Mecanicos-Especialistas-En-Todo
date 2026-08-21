@@ -73,6 +73,13 @@ fun TowTruckServiceScreen(
         return
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.voiceFeedbackManager.speak(
+            es = "Sección de Auxilio Vial y Grúas activa. Puedes solicitar grúas de plataforma o arrastre geolocalizadas.",
+            en = "Roadside Assistance and Tow Trucks active. You can request geo-located flatbed or tow units."
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -92,6 +99,14 @@ fun TowTruckServiceScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        viewModel.voiceFeedbackManager.speak(
+                            es = "Sección de Auxilio Vial y Grúas activa. Monitoreo en tiempo real con choferes verificados.",
+                            en = "Roadside Assistance and Tow Trucks active. Real-time tracking with verified drivers."
+                        )
+                    }) {
+                        Icon(Icons.Default.VolumeUp, "Voz Asistente", tint = TowTruckColors.cyanAccent)
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)

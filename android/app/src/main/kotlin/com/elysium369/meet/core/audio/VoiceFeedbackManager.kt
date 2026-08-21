@@ -191,6 +191,121 @@ open class VoiceFeedbackManager @Inject constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Domain Voice Guidance Copilot (Viajes, Grúas, Mecánicos, Repuestos, Servicios & Ferretería)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    fun guideRideStatus(step: String, driverName: String? = null, plate: String? = null, etaMinutes: Int? = null) {
+        when (step.uppercase()) {
+            "SEARCHING" -> speak(
+                es = "Buscando conductores certificados cercanos para tu viaje seguro.",
+                en = "Searching for nearby certified drivers for your ride."
+            )
+            "DRIVER_ASSIGNED" -> {
+                val driverText = if (!driverName.isNullOrBlank()) "con $driverName" else ""
+                val plateText = if (!plate.isNullOrBlank()) ", vehículo placa $plate" else ""
+                val etaText = if (etaMinutes != null) ", tiempo estimado de llegada $etaMinutes minutos" else ""
+                speak(
+                    es = "Conductor asignado $driverText $plateText $etaText. Tu viaje está protegido por telemetría Elysium.",
+                    en = "Driver assigned $driverText $plateText $etaText. Your trip is protected by Elysium telemetry."
+                )
+            }
+            "IN_PROGRESS" -> speak(
+                es = "Viaje iniciado. Monitoreando ruta, velocidad y seguridad en tiempo real.",
+                en = "Trip started. Monitoring route, speed and security in real time."
+            )
+            "ARRIVED" -> speak(
+                es = "Has llegado a tu destino. Gracias por viajar con Elysium Mobility.",
+                en = "You have arrived at your destination. Thank you for riding with Elysium Mobility."
+            )
+        }
+    }
+
+    fun guideTowTruckStatus(step: String, driverName: String? = null, etaMinutes: Int? = null, truckType: String? = null) {
+        when (step.uppercase()) {
+            "SEARCHING" -> speak(
+                es = "Localizando unidades de grúa de plataforma y arrastre en tu zona geográfica.",
+                en = "Locating flatbed and towing units in your geographic area."
+            )
+            "ASSIGNED" -> {
+                val nameText = if (!driverName.isNullOrBlank()) "a cargo de $driverName" else ""
+                val etaText = if (etaMinutes != null) ", llegada estimada en $etaMinutes minutos" else ""
+                val typeText = if (!truckType.isNullOrBlank()) "de tipo $truckType" else "asistencia vial"
+                speak(
+                    es = "Grúa $typeText confirmada $nameText $etaText. Mantén las luces de emergencia encendidas.",
+                    en = "Tow truck confirmed $nameText $etaText. Please keep hazard lights active."
+                )
+            }
+            "ON_SITE" -> speak(
+                es = "Unidad de asistencia vial en sitio. Procediendo a maniobra de aseguramiento del vehículo.",
+                en = "Roadside assistance unit on site. Securing vehicle for transit."
+            )
+        }
+    }
+
+    fun guideMechanicStatus(step: String, shopName: String? = null, dtcCode: String? = null) {
+        when (step.uppercase()) {
+            "SEARCHING" -> {
+                val dtcText = if (!dtcCode.isNullOrBlank()) "para el código de falla $dtcCode" else ""
+                speak(
+                    es = "Buscando mecánicos y talleres certificados especialistas $dtcText.",
+                    en = "Searching for certified mechanics and workshops specialized $dtcText."
+                )
+            }
+            "BID_RECEIVED" -> {
+                val nameText = if (!shopName.isNullOrBlank()) "de $shopName" else ""
+                speak(
+                    es = "Has recibido una nueva propuesta técnica $nameText con garantía de mano de obra y evidencia OBD.",
+                    en = "You received a new technical proposal $nameText with warranty and OBD evidence."
+                )
+            }
+            "DIAGNOSIS_STARTED" -> speak(
+                es = "Diagnóstico mecánico en proceso. Registrando lecturas de sensores y evidencia fotográfica.",
+                en = "Mechanical diagnosis in progress. Capturing sensor telemetry and photo evidence."
+            )
+        }
+    }
+
+    fun guidePartsMarketplaceStatus(step: String, partName: String? = null, offersCount: Int? = null, bestPrice: Double? = null) {
+        when (step.uppercase()) {
+            "SEARCHING" -> {
+                val partText = if (!partName.isNullOrBlank()) "para $partName" else "de tu solicitud"
+                speak(
+                    es = "Publicando solicitud $partText con verificación de compatibilidad exacta por VIN.",
+                    en = "Publishing parts request $partText with exact VIN compatibility verification."
+                )
+            }
+            "OFFERS_RECEIVED" -> {
+                val countText = if (offersCount != null && offersCount > 1) "$offersCount cotizaciones disponibles" else "nueva cotización disponible"
+                val priceText = if (bestPrice != null) ", mejor precio desde ¢${String.format("%,.0f", bestPrice)}" else ""
+                speak(
+                    es = "Repuesteras han ofertado piezas compatibles. $countText $priceText.",
+                    en = "Auto parts stores submitted bids. $countText $priceText."
+                )
+            }
+        }
+    }
+
+    fun guideHardwareAndTradesStatus(step: String, materialName: String? = null, hasHardwareOffer: Boolean = false, hasTradeOffer: Boolean = false) {
+        when (step.uppercase()) {
+            "WELCOME" -> speak(
+                es = "Sección Ferretería y Servicios del Hogar activa. Puedes solicitar materiales de ferretería y plomeros o electricistas ofrecerán su instalación profesional.",
+                en = "Hardware and Trades Marketplace active. Request materials and certified plumbers or electricians will offer professional installation."
+            )
+            "REQUEST_PUBLISHED" -> {
+                val matText = if (!materialName.isNullOrBlank()) "de $materialName" else "de materiales"
+                speak(
+                    es = "Solicitud $matText en subasta abierta. Notificando a ferreterías y profesionales de instalación de tu zona.",
+                    en = "Hardware request in open auction. Notifying local hardware stores and certified trade installers."
+                )
+            }
+            "DUAL_OFFER_READY" -> speak(
+                es = "Tienes ofertas disponibles: Ferretería ofrece los materiales y el especialista técnico ofrece la mano de obra. Puedes elegir el Combo Llave en Mano con descuento.",
+                en = "Dual bids available: Hardware store offers the materials and the technician offers installation. Turnkey combo discount available."
+            )
+        }
+    }
+
     fun shutdown() {
         tts?.stop()
         tts?.shutdown()

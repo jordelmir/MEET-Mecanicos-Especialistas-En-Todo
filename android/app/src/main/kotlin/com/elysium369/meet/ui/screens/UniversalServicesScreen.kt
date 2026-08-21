@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -64,7 +65,11 @@ fun UniversalServicesScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshProviderRoles()
         viewModel.detectCurrentLocation(context)
+        viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("WELCOME")
     }
+
+    var selectedDomain by rememberSaveableCompat { mutableStateOf("TODOS") }
+    val domains = remember { listOf("TODOS", "Ferretería & Materiales", "Hogar", "Movilidad", "Automotriz", "Profesional", "Digital", "Logística") }
 
     Scaffold(
         containerColor = MeetColors.backgroundDark,
@@ -72,8 +77,8 @@ fun UniversalServicesScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("ELYSIUM · SERVICIOS", color = Color.White, fontWeight = FontWeight.Black)
-                        Text("Físicos · digitales · híbridos", color = MeetColors.cyberCyan, fontSize = 10.sp)
+                        Text("ELYSIUM · SERVICIOS Y FERRETERÍA", color = Color.White, fontWeight = FontWeight.Black)
+                        Text("Subastas de materiales · Mano de obra · Combos llave en mano", color = MeetColors.cyberCyan, fontSize = 10.sp)
                     }
                 },
                 navigationIcon = {
@@ -82,6 +87,9 @@ fun UniversalServicesScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("WELCOME") }) {
+                        Icon(Icons.Default.VolumeUp, "Voz Asistente", tint = MeetColors.neonGreen)
+                    }
                     Text(if (providerMode) "PROVEEDOR" else "CLIENTE", color = MeetColors.neonGreen, fontSize = 10.sp)
                     Switch(
                         checked = providerMode,
@@ -114,9 +122,9 @@ fun UniversalServicesScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("¿Qué necesitas? Plomería, diseño, tutoría…") },
+                    placeholder = { Text("¿Qué necesitas? Tubos PVC, plomero, cerradura, cables…") },
                     leadingIcon = { Icon(Icons.Default.Search, null) },
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
@@ -124,20 +132,42 @@ fun UniversalServicesScreen(
                         unfocusedBorderColor = Color(0xFF6B2D91),
                     ),
                 )
+
+                // Category Filter Chips
+                androidx.compose.foundation.lazy.LazyRow(
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(domains) { domain ->
+                        FilterChip(
+                            selected = selectedDomain == domain,
+                            onClick = { selectedDomain = domain },
+                            label = { Text(domain, fontSize = 11.sp, fontWeight = if (selectedDomain == domain) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
+                                selectedLabelColor = MeetColors.cyberCyan,
+                            )
+                        )
+                    }
+                }
+
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item {
                         Text(
-                            "SOLICITUD → OFERTAS → ASIGNACIÓN → EJECUCIÓN → PAGO REGISTRADO → EVIDENCIA",
+                            "SUBASTA DUAL: FERRETERÍAS VENDEN MATERIALES + PLOMEROS/ELECTRICISTAS OFRECEN COLOCARLOS",
                             color = Color(0xFFC85CFF),
                             fontWeight = FontWeight.Black,
                             fontSize = 10.sp,
                             lineHeight = 15.sp,
                         )
                     }
-                    items(UniversalServiceCatalog.search(query), key = { it.id }) { service ->
+                    val filteredServices = UniversalServiceCatalog.search(query).filter {
+                        selectedDomain == "TODOS" || it.domain.equals(selectedDomain, ignoreCase = true)
+                    }
+                    items(filteredServices, key = { it.id }) { service ->
                         UniversalServiceCard(service) { selected = service }
                     }
                     item {
@@ -190,7 +220,8 @@ fun UniversalServicesScreen(
                     serviceMetadata = metadata,
                     dtcCodes = emptyList(),
                 )
-                Toast.makeText(context, "Solicitud publicada para recibir ofertas", Toast.LENGTH_LONG).show()
+                viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("REQUEST_PUBLISHED", materialName = title)
+                Toast.makeText(context, "Solicitud de subasta publicada. Ferreterías y profesionales han sido notificados.", Toast.LENGTH_LONG).show()
                 selected = null
             },
         )
@@ -247,28 +278,122 @@ private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: (
 @Composable
 private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRequestEntity, context: Context) {
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
+    val materialBids = bids.filter { it.shopName.contains("Ferreter", true) || it.message.contains("material", true) || it.message.contains("tubo", true) }
+    val laborBids = bids.filter { it.shopName.contains("Plomer", true) || it.shopName.contains("Electr", true) || it.shopName.contains("Instalad", true) || it.message.contains("mano de obra", true) || it.message.contains("colocar", true) || it.message.contains("instal", true) }
+    val hasDualCombo = materialBids.isNotEmpty() && laborBids.isNotEmpty()
+
+    LaunchedEffect(bids.size) {
+        if (hasDualCombo) {
+            viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("DUAL_OFFER_READY")
+        }
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, if (request.status == "OPEN") MeetColors.neonGreen else MeetColors.cyberCyan),
+        border = BorderStroke(1.dp, if (hasDualCombo) MeetColors.neonGreen else if (request.status == "OPEN") MeetColors.cyberCyan else Color.Gray),
+        shape = RoundedCornerShape(14.dp)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(request.problem, color = Color.White, fontWeight = FontWeight.Black)
-            Text("${request.status} · Oferta base ₡${request.priceOffer.toLong()}", color = MeetColors.cyberCyan)
-            bids.forEach { bid ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(Modifier.weight(1f)) {
-                        Text(bid.shopName, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("₡${bid.price.toLong()} · garantía ${bid.warrantyDays} días", color = MeetColors.textSecondary, fontSize = 11.sp)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(request.problem, color = Color.White, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                Surface(
+                    color = if (request.status == "OPEN") MeetColors.neonGreen.copy(alpha = 0.15f) else Color(0x33FFFFFF),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        if (request.status == "OPEN") "SUBASTA ACTIVA" else request.status,
+                        color = if (request.status == "OPEN") MeetColors.neonGreen else Color.LightGray,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Text("Oferta base: ₡${String.format("%,.0f", request.priceOffer)} · ${request.location}", color = MeetColors.cyberCyan, fontSize = 11.sp)
+            if (request.description.isNotBlank()) {
+                Text(request.description, color = MeetColors.textSecondary, fontSize = 11.sp)
+            }
+
+            // ── Combo Dual Llave en Mano Card (Ferretería + Mano de Obra) ──
+            if (hasDualCombo && request.status == "OPEN") {
+                val bestMaterial = materialBids.minByOrNull { it.price }!!
+                val bestLabor = laborBids.minByOrNull { it.price }!!
+                val comboPrice = (bestMaterial.price + bestLabor.price) * 0.95 // 5% combo discount
+
+                Surface(
+                    color = Color(0xFF132B20),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MeetColors.neonGreen)
+                ) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("⭐ COMBO LLAVE EN MANO (Material + Instalación)", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            Text("-5% Ahorro", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        }
+                        Text("• Ferretería: ${bestMaterial.shopName} (₡${String.format("%,.0f", bestMaterial.price)})", color = Color.White, fontSize = 11.sp)
+                        Text("• Especialista: ${bestLabor.shopName} (₡${String.format("%,.0f", bestLabor.price)})", color = Color.White, fontSize = 11.sp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Total Combo: ₡${String.format("%,.0f", comboPrice)}", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                            Button(
+                                onClick = {
+                                    viewModel.acceptBid(request.requestId, bestMaterial.bidId, context)
+                                    viewModel.acceptBid(request.requestId, bestLabor.bidId, context)
+                                    viewModel.voiceFeedbackManager.speak(
+                                        es = "Combo llave en mano aceptado. Se ha notificado a la ferretería y al instalador calificado.",
+                                        en = "Turnkey combo accepted. Notified hardware store and certified installer."
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("ACEPTAR COMBO", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            }
+                        }
                     }
-                    if (request.status == "OPEN") {
-                        Button(onClick = { viewModel.acceptBid(request.requestId, bid.bidId, context) }) {
-                            Text("ACEPTAR")
+                }
+            }
+
+            // Individual Bids List
+            bids.forEach { bid ->
+                val isHardware = bid.shopName.contains("Ferreter", true) || bid.message.contains("material", true)
+                val isLabor = bid.shopName.contains("Plomer", true) || bid.shopName.contains("Electr", true) || bid.shopName.contains("Instal", true)
+
+                Surface(
+                    color = Color(0x22FFFFFF),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(if (isHardware) "🔩" else if (isLabor) "🛠️" else "💼", fontSize = 12.sp)
+                                Text(bid.shopName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Text("₡${String.format("%,.0f", bid.price)} · Garantía ${bid.warrantyDays} días", color = MeetColors.cyberCyan, fontSize = 11.sp)
+                            if (bid.message.isNotBlank()) {
+                                Text(bid.message, color = MeetColors.textSecondary, fontSize = 10.sp, maxLines = 1)
+                            }
+                        }
+                        if (request.status == "OPEN") {
+                            Button(
+                                onClick = {
+                                    viewModel.acceptBid(request.requestId, bid.bidId, context)
+                                    viewModel.voiceFeedbackManager.speak(
+                                        es = "Propuesta de ${bid.shopName} aceptada exitosamente.",
+                                        en = "Proposal from ${bid.shopName} accepted successfully."
+                                    )
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("ACEPTAR", fontSize = 10.sp)
+                            }
                         }
                     }
                 }
             }
             Text(
-                "Pago: ${request.escrowStatus ?: "NONE"}. Una oferta aceptada no se muestra como pagada hasta recibir confirmación real.",
+                "Protección de Pago Elysium Escrow: fondos liberados contra entrega y verificación de evidencia.",
                 color = MeetColors.textMuted,
                 fontSize = 9.sp,
             )

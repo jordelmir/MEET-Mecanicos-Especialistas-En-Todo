@@ -102,6 +102,7 @@ class LocalShellManager(
         setupDirectories()
         startControlServer()
         checkAndInstallBusybox()
+        com.elysium369.meet.core.terminal.ElysiumAutomotiveCliBridge.installCliBinaries(appContext, LocalControlServer.CONTROL_PORT)
     }
 
     private fun setupDirectories() {
@@ -1929,6 +1930,140 @@ class LocalControlServer(
                         }
                     }
 
+                    get("/api/obd/status") {
+                        try {
+                            val state = obdSession.state.value
+                            val proto = obdSession.detectedProtocol
+                            val version = obdSession.adapterVersion
+                            val vin = obdSession.vin.value
+                            val live = obdSession.liveData.value
+                            val voltage = live["BATTERY_VOLTAGE"] ?: live["12V"] ?: 13.8f
+                            val json = JSONObject().apply {
+                                put("state", state.name)
+                                put("protocol", proto.ifBlank { "NONE" })
+                                put("adapter_version", version)
+                                put("vin", vin ?: "NOT_READ")
+                                put("battery_voltage", voltage)
+                                put("is_connected", state == ObdState.CONNECTED)
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    post("/api/obd/read-vin") {
+                        try {
+                            val vinResult = obdSession.fetchVin()
+                            val json = JSONObject().apply {
+                                put("success", !vinResult.isNullOrBlank())
+                                put("vin", vinResult ?: "NOT_READ")
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    get("/api/obd/dtcs") {
+                        try {
+                            val dtcs = obdSession.scanDtcErrors()
+                            val jsonArray = JSONArray()
+                            dtcs.forEach { code -> jsonArray.put(code) }
+                            val json = JSONObject().apply {
+                                put("count", dtcs.size)
+                                put("dtcs", jsonArray)
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    post("/api/obd/clear-dtcs") {
+                        try {
+                            val success = obdSession.clearDtcErrors()
+                            val json = JSONObject().apply {
+                                put("success", success)
+                                put("message", if (success) "Códigos de falla borrados exitosamente de la ECU" else "ECU rechazó el borrado de códigos")
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    get("/api/obd/ping") {
+                        try {
+                            val start = System.currentTimeMillis()
+                            val resp = obdSession.sendRawCommand("0100")
+                            val latency = System.currentTimeMillis() - start
+                            val json = JSONObject().apply {
+                                put("latency_ms", latency)
+                                put("response", resp)
+                                put("bus_healthy", !resp.contains("ERROR") && !resp.contains("UNABLE"))
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    get("/api/obd/can-dump") {
+                        try {
+                            val rawResponse = obdSession.sendRawCommand("ATMA")
+                            val json = JSONObject().apply {
+                                put("stream", rawResponse)
+                            }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    get("/api/obd/live") {
+                        try {
+                            val live = obdSession.liveData.value
+                            val json = JSONObject()
+                            live.forEach { (k, v) -> json.put(k, v) }
+                            call.respondText(json.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
+                    get("/api/garage/vehicles") {
+                        try {
+                            val dbFile = appContext.getDatabasePath("meet_database")
+                            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                                dbFile.absolutePath,
+                                null,
+                                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                            )
+                            val jsonArray = JSONArray()
+                            db.use { database ->
+                                database.rawQuery("SELECT id, make, model, year, vin, plate, engine, is_active FROM vehicles", null).use { cursor ->
+                                    while (cursor.moveToNext()) {
+                                        val obj = JSONObject().apply {
+                                            put("id", cursor.getString(0))
+                                            put("make", cursor.getString(1))
+                                            put("model", cursor.getString(2))
+                                            put("year", cursor.getInt(3))
+                                            put("vin", cursor.getString(4))
+                                            put("plate", cursor.getString(5))
+                                            put("engine", cursor.getString(6))
+                                            put("is_active", cursor.getInt(7) == 1)
+                                        }
+                                        jsonArray.put(obj)
+                                    }
+                                }
+                            }
+                            call.respondText(jsonArray.toString(2), ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
+                        }
+                    }
+
                     // ===== TERMUX-API HARDWARE SUITE =====
                     get("/api/termux/battery") {
                         try {
@@ -2244,7 +2379,7 @@ class LocalControlServer(
         }.getOrDefault(false)
     }
 
-    private companion object {
+    companion object {
         const val CONTROL_HOST = "127.0.0.1"
         const val CONTROL_PORT = 8082
     }

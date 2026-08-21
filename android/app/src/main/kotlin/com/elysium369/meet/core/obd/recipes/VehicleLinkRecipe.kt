@@ -131,15 +131,51 @@ data class VehicleLinkRecipe(
             probeTimeoutMs = 4000L
         )
 
+        val HYUNDAI_KLINE_G4ED_AUTO = VehicleLinkRecipe(
+            id = "HYUNDAI_KLINE_G4ED_AUTO",
+            displayName = "Hyundai G4ED 1.6L Auto (Kefico/Siemens AT)",
+            manufacturer = "HYUNDAI",
+            protocol = ObdProtocol.KWP2000_FAST,
+            requestHeader = "8110F1",
+            initCommands = listOf("ATIB10", "ATAL", "ATKW0", "ATWM8110F13E"),
+            probeTimeoutMs = 4500L,
+            provenance = "HYUNDAI_ACCENT_VERNA_G4ED_2005"
+        )
+
+        val NISSAN_KLINE_CONSULT2 = VehicleLinkRecipe(
+            id = "NISSAN_KLINE_CONSULT2",
+            displayName = "Nissan Consult-II K-Line (ECM 0x12)",
+            manufacturer = "NISSAN",
+            protocol = ObdProtocol.KWP2000_FAST,
+            requestHeader = "8112F1",
+            initCommands = listOf("ATIB10", "ATAL"),
+            probeTimeoutMs = 4500L,
+            provenance = "NISSAN_CONSULT_II_SPEC"
+        )
+
+        val RENAULT_KLINE_KWP = VehicleLinkRecipe(
+            id = "RENAULT_KLINE_KWP",
+            displayName = "Renault/Dacia KWP2000 Physical (0x7A)",
+            manufacturer = "RENAULT",
+            protocol = ObdProtocol.KWP2000,
+            requestHeader = "817AF1",
+            initCommands = listOf("ATIB10", "ATAL"),
+            probeTimeoutMs = 4500L,
+            provenance = "RENAULT_CLIP_KWP_SPEC"
+        )
+
         val ALL_RECIPES = listOf(
             GENERIC_CAN_11BIT_500K,
             GENERIC_CAN_29BIT_500K,
             GENERIC_CAN_11BIT_250K,
             GENERIC_CAN_29BIT_250K,
+            HYUNDAI_KLINE_G4ED_AUTO,
             HYUNDAI_KLINE_FAST_KEFICO,
             HYUNDAI_KLINE_FAST_BROADCAST,
             HYUNDAI_KLINE_ISO9141,
             TOYOTA_KLINE_ISO9141,
+            NISSAN_KLINE_CONSULT2,
+            RENAULT_KLINE_KWP,
             VAG_KLINE_KWP1281,
             FORD_J1850_PWM,
             GM_J1850_VPW

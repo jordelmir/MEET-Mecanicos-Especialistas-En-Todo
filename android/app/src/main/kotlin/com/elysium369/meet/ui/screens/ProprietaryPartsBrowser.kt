@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -132,6 +133,14 @@ fun ProprietaryPartsBrowser(
             .filter { query.isBlank() || it.nameOriginal.contains(query, ignoreCase = true) }
             .take(400)
             .toList()
+    }
+
+    LaunchedEffect(Unit) {
+        val voice = com.elysium369.meet.core.audio.VoiceFeedbackManager(context)
+        voice.speak(
+            es = "Catálogo de Repuestos y Compatibilidad VIN activa. Explora piezas originales, OEM y esquemas técnicos 3D.",
+            en = "Parts Catalog and VIN Compatibility active. Explore genuine, OEM parts and 3D technical schematics."
+        )
     }
 
     LaunchedEffect(query, selectedFamily, selectedSystemId, selectedRole, searchRepository) {
@@ -308,6 +317,7 @@ private fun ProprietaryCatalogList(
     onOpenTechnicalAtlases: () -> Unit,
     onOpenGuidedPilot: () -> Unit
 ) {
+    val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
@@ -319,6 +329,15 @@ private fun ProprietaryCatalogList(
             Column(Modifier.weight(1f)) {
                 Text("Piezas", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
                 Text(PROPRIETARY_VEHICLE_LABEL, color = MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            IconButton(onClick = {
+                val voice = com.elysium369.meet.core.audio.VoiceFeedbackManager(context)
+                voice.speak(
+                    es = "Catálogo Propietario Elysium: Búsqueda de piezas por VIN, verificación de torque y esquemas 3D interactivos.",
+                    en = "Elysium Proprietary Catalog: VIN parts matching, torque verification and 3D interactive views."
+                )
+            }) {
+                Icon(Icons.Default.VolumeUp, contentDescription = "Voz Asistente", tint = MeetColors.cyberCyan)
             }
             OutlinedButton(onClick = onOpenGuidedPilot) {
                 Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(15.dp))

@@ -24,6 +24,11 @@ object UniversalServiceCatalog {
     private val allModalities = UniversalServiceModality.entries.toSet()
 
     val definitions = listOf(
+        service("hardware_materials", "Ferretería & Materiales", "Ferretería y Materiales (Tubos, Grifería, Cables)", "🔩", physical()),
+        service("hardware_plumbing_install", "Ferretería & Materiales", "Plomería: Tubos, Válvulas e Instalación", "🚰", physical()),
+        service("hardware_electrical_install", "Ferretería & Materiales", "Electricidad: Cableado, Breakers e Instalación", "⚡", physical(), "ELEVATED"),
+        service("hardware_locksmith", "Ferretería & Materiales", "Cerrajería: Cerraduras, Cilindros e Instalación", "🔐", physical()),
+        service("hardware_construction", "Ferretería & Materiales", "Construcción: Cemento, Fijación y Mano de Obra", "🧱", physical()),
         service("home_cleaning", "Hogar", "Limpieza residencial", "🧹", physical()),
         service("plumbing", "Hogar", "Plomería", "🚰", physical()),
         service("electrical_home", "Hogar", "Electricidad residencial", "⚡", physical(), "ELEVATED"),

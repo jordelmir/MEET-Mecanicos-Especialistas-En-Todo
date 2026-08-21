@@ -167,6 +167,13 @@ fun RepairNetworkScreen(
         return
     }
 
+    LaunchedEffect(Unit) {
+        obdViewModel.voiceFeedbackManager.speak(
+            es = "Red de Reparaciones y Talleres Certificados activa. Conecta con mecánicos especializados y repuestos con compatibilidad verificada por VIN.",
+            en = "Repair Network and Certified Workshops active. Connect with specialized mechanics and VIN-verified compatible parts."
+        )
+    }
+
     Scaffold(
         containerColor = MeetColors.backgroundDark,
         topBar = {
@@ -175,6 +182,18 @@ fun RepairNetworkScreen(
                 onBackClick = { navController.popBackStack() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
+                    IconButton(onClick = {
+                        obdViewModel.voiceFeedbackManager.speak(
+                            es = "Red Mecánica Elysium: Consultoría de fallas DTC, cotizaciones de talleres y compra de repuestos en tiempo real.",
+                            en = "Elysium Mechanical Network: DTC troubleshooting, workshop quotes and parts marketplace in real time."
+                        )
+                    }) {
+                        AnimatedNeonIcon(
+                            Icons.Default.VolumeUp,
+                            contentDescription = "Voz Asistente",
+                            tint = MeetColors.neonGreen
+                        )
+                    }
                     IconButton(onClick = { showRegistrationScreen = true }) {
                         AnimatedNeonIcon(
                             Icons.Default.Badge,

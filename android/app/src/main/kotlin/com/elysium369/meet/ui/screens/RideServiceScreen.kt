@@ -199,6 +199,13 @@ fun RideServiceScreen(
         )
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.voiceFeedbackManager.speak(
+            es = "Bienvenido a Elysium Viajes y Movilidad Segura. Puedes solicitar un viaje con tarifa transparente y conductores verificados.",
+            en = "Welcome to Elysium Rides and Mobility. Request a safe ride with transparent fares and verified drivers."
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -307,6 +314,14 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        IconButton(onClick = {
+                            viewModel.voiceFeedbackManager.speak(
+                                es = "Elysium Viajes: Monitoreo de seguridad satelital, telemetría y subasta de tarifas en tiempo real.",
+                                en = "Elysium Rides: Real-time satellite security tracking and transparent fare bidding."
+                            )
+                        }) {
+                            Icon(Icons.Default.VolumeUp, "Voz Asistente", tint = MeetColors.neonGreen)
+                        }
                         Text(
                             text = projectionConnectionState.rideProjectionStatusLabel(),
                             color = projectionConnectionState.rideProjectionStatusColor(),

@@ -156,6 +156,18 @@ enum class ServiceCategory(
         supportsRemoteByDefault = true,
         supportsMobileByDefault = true,
     ),
+    HARDWARE_AND_TRADES(
+        displayName = "Ferretería y Oficios (Plomería, Electricidad, Cerrajería)",
+        defaultTools = listOf("herramienta de fontaneria/electricidad", "catalogo de materiales", "vehiculo de entrega"),
+        defaultEvidence = listOf(EvidenceType.BEFORE_PHOTO, EvidenceType.AFTER_PHOTO, EvidenceType.RECEIPT, EvidenceType.PROVIDER_NOTE),
+        defaultDurationMin = 60,
+        basePriceMinCrc = 10000,
+        basePriceMaxCrc = 85000,
+        defaultRisk = RiskLevel.MEDIUM,
+        requiresObdByDefault = false,
+        supportsRemoteByDefault = true,
+        supportsMobileByDefault = true,
+    ),
 }
 
 data class ServiceDefinition(
@@ -219,6 +231,11 @@ object WorkshopServiceCatalog {
         role("ACCESSORY_INSTALLER", "Instalador accesorios/alarma/audio/GPS", "portafolio_instalaciones", "herramienta_electrica", categories = listOf(ServiceCategory.ELECTRICAL_ELECTRONIC)),
         role("MOTORCYCLE_TECH", "Tecnico motos", "herramienta_motos", "marcas_soportadas", categories = allRepairCategories()),
         role("MACHINERY_GENERATOR_TECH", "Tecnico maquinaria/generadores", "equipo_diagnostico_maquinaria", "transporte_equipo", categories = listOf(ServiceCategory.ENGINE, ServiceCategory.ELECTRICAL_ELECTRONIC, ServiceCategory.DIAGNOSTIC)),
+        role("HARDWARE_STORE", "Ferretería / Venta de Materiales", "catalogo_materiales", "zonas_entrega", categories = listOf(ServiceCategory.HARDWARE_AND_TRADES, ServiceCategory.PARTS)),
+        role("PLUMBER_TECH", "Plomero / Fontanero Profesional", "herramientas_fontaneria", "experiencia_plomeria", categories = listOf(ServiceCategory.HARDWARE_AND_TRADES)),
+        role("ELECTRICIAN_TECH", "Electricista Residencial / Industrial", "multimetro", "herramienta_electrica", categories = listOf(ServiceCategory.HARDWARE_AND_TRADES, ServiceCategory.ELECTRICAL_ELECTRONIC)),
+        role("LOCKSMITH_TECH", "Cerrajero Profesional", "ganzuas_maquinas_corte", "herramienta_cerrajeria", categories = listOf(ServiceCategory.HARDWARE_AND_TRADES)),
+        role("CONSTRUCTION_HANDYMAN", "Maestro de Obras / Reparaciones del Hogar", "herramienta_general", "portafolio_trabajos", categories = listOf(ServiceCategory.HARDWARE_AND_TRADES)),
     )
 
     val servicePackages: List<ServicePackageDefinition> = listOf(
@@ -344,6 +361,18 @@ object WorkshopServiceCatalog {
             "Entrega local",
             "Confirmacion compatibilidad",
             "Garantia",
+        ),
+        ServiceCategory.HARDWARE_AND_TRADES to listOf(
+            "Venta y Envio de Tuberia y Conexiones PVC/CPVC/Cobre",
+            "Instalacion de Tuberia y Fontaneria por Plomero Certificado",
+            "Suministro de Griferia, Llaves y Valvulas",
+            "Instalacion y Reparacion de Griferia / Sanitarios",
+            "Venta de Cableado Electrico, Breakers y Centros de Carga",
+            "Instalacion Electrica Residencial y Diagnostico de Cortos",
+            "Venta de Cerraduras de Alta Seguridad y Cilindros",
+            "Instalacion y Apertura de Cerraduras por Cerrajero",
+            "Materiales de Construccion y Fijacion (Tornilleria, Cemento, Selladores)",
+            "Mano de Obra General / Reparaciones Integrales del Hogar"
         ),
     ).flatMap { (category, names) ->
         names.map { service(category, it) }
