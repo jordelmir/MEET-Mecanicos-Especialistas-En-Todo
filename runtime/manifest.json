@@ -1,0 +1,31 @@
+{
+  "$schema": "https://elysium369.com/schemas/v1/runtime-manifest.json",
+  "runtimeVersion": "1.0.0",
+  "buildTimestamp": 1771234567890,
+  "targetArchitecture": "arm64-v8a",
+  "minAndroidSdk": 29,
+  "signingAuthority": "Elysium Vanguard Cryptographic Root",
+  "components": [
+    {
+      "name": "antigravity-headless",
+      "version": "2.4.0",
+      "binaryPath": "bin/agy",
+      "sha256": "4a72d3e189bd102c918a24e9dbef843a9f07a68e3bc489c7d1e89cf208479e12",
+      "requiredPermissions": [
+        "EXECUTE_ISOLATED"
+      ]
+    },
+    {
+      "name": "elysium-vehicle-mcp",
+      "version": "1.0.0",
+      "binaryPath": "elysium_vehicle_mcp/server.py",
+      "sha256": "6b23f8902cd4981a3fe8742c019dbe42a781b490f23058a9e871cd4f5e0892ac",
+      "entrypoint": "python3 server.py"
+    }
+  ],
+  "securityPolicies": {
+    "enforceSha256Verification": true,
+    "allowDynamicWritableCodeExecution": false,
+    "requireLoopbackTokenAuth": true
+  }
+}
