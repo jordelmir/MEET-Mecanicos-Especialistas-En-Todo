@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvairDiagnosticResult",
+  "description": "Deterministic structured diagnostic reasoning contract for EVAIR agents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "severity",
+    "summary",
+    "hypotheses",
+    "recommendedTests"
+  ],
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": [
+        "INFO",
+        "WARNING",
+        "CRITICAL"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "hypotheses": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "cause",
+          "confidence",
+          "supportingEvidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cause": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "supportingEvidence": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": [
+                "source",
+                "key",
+                "value"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "reliability": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0
+                }
+              }
+            }
+          },
+          "contradictingEvidence": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": [
+                "source",
+                "key",
+                "value"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "missingEvidence": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "recommendedTests": {
+      "type": "array",
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "required": [
+          "testId",
+          "reason"
+        ],
+        "properties": {
+          "testId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expectedInformationGain": {
+            "type": "number"
+          },
+          "estimatedCost": {
+            "type": "string"
+          },
+          "requiredTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "evidenceUsed": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

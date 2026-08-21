@@ -1,11 +1,18 @@
 package com.elysium369.meet.di
 
+import com.elysium369.meet.core.diagnostics.DiagnosticReasoningEngine
 import com.elysium369.meet.core.dna.MeetDnaEngine
+import com.elysium369.meet.core.evair.agent.AntigravityGateway
+import com.elysium369.meet.core.evair.agent.AutomotiveAgentGateway
 import com.elysium369.meet.core.evair.baseline.VehicleBaselineEngine
+import com.elysium369.meet.core.evair.bridge.DefaultVehicleToolFacade
+import com.elysium369.meet.core.evair.bridge.VehicleRuntimeServer
+import com.elysium369.meet.core.evair.bridge.VehicleToolFacade
 import com.elysium369.meet.core.evair.safety.VehicleSafetyBroker
 import com.elysium369.meet.core.evair.state.VehicleStateEngine
 import com.elysium369.meet.core.evair.telemetry.AnomalyDetector
 import com.elysium369.meet.core.evair.telemetry.TelemetryCollector
+import com.elysium369.meet.core.health.PredictiveHealthEngine
 import com.elysium369.meet.core.obd.ObdSession
 import com.elysium369.meet.core.twin.VehicleTwinEngine
 import com.elysium369.meet.data.local.dao.VehicleDnaDao
@@ -63,5 +70,39 @@ object EvairModule {
         anomalyDetector: AnomalyDetector,
     ): VehicleStateEngine {
         return VehicleStateEngine(obdSession, telemetryCollector, anomalyDetector)
+    }
+
+    @Provides
+    @Singleton
+    fun provideVehicleToolFacade(
+        obdSession: ObdSession,
+        vehicleStateEngine: VehicleStateEngine,
+        baselineEngine: VehicleBaselineEngine,
+        anomalyDetector: AnomalyDetector,
+        healthEngine: PredictiveHealthEngine,
+    ): VehicleToolFacade {
+        return DefaultVehicleToolFacade(
+            obdSession = obdSession,
+            vehicleStateEngine = vehicleStateEngine,
+            baselineEngine = baselineEngine,
+            anomalyDetector = anomalyDetector,
+            healthEngine = healthEngine
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideVehicleRuntimeServer(
+        facade: VehicleToolFacade,
+    ): VehicleRuntimeServer {
+        return VehicleRuntimeServer(facade)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAutomotiveAgentGateway(
+        deterministicEngine: DiagnosticReasoningEngine,
+    ): AutomotiveAgentGateway {
+        return AntigravityGateway(deterministicEngine)
     }
 }
