@@ -1,0 +1,12 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "elysium-automotive",
+  "version": "1.0.0",
+  "description": "Elysium Vanguard Automotive Intelligence & Diagnostics Plugin for Google Antigravity",
+  "author": "Elysium Vanguard Engineering",
+  "capabilities": {
+    "mcp": true,
+    "skills": true,
+    "agents": true
+  }
+}

@@ -1,0 +1,11 @@
+{"timestampMs":1000,"pid":"010C","value":780.0,"unit":"RPM","quality":"GOOD"}
+{"timestampMs":1100,"pid":"010C","value":710.0,"unit":"RPM","quality":"GOOD"}
+{"timestampMs":1200,"pid":"010C","value":820.0,"unit":"RPM","quality":"GOOD"}
+{"timestampMs":1300,"pid":"010C","value":690.0,"unit":"RPM","quality":"GOOD"}
+{"timestampMs":1400,"pid":"0105","value":91.0,"unit":"°C","quality":"GOOD"}
+{"timestampMs":1500,"pid":"0106","value":18.5,"unit":"%","quality":"GOOD"}
+{"timestampMs":1600,"pid":"0107","value":12.2,"unit":"%","quality":"GOOD"}
+{"timestampMs":1700,"pid":"0142","value":14.15,"unit":"V","quality":"GOOD"}
+{"timestampMs":1800,"pid":"010B","value":34.5,"unit":"kPa","quality":"GOOD"}
+{"timestampMs":1900,"pid":"DTC","value":"P0301","category":"CONFIRMED","description":"Cylinder 1 Misfire Detected"}
+{"timestampMs":2000,"pid":"MODE06_CYL1_MISFIRE","value":48.0,"threshold":12.0,"status":"FAIL"}

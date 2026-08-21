@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "elysium-vehicle": {
+      "command": "python3",
+      "args": [
+        "runtime/elysium_vehicle_mcp/server.py"
+      ],
+      "env": {
+        "MEET_RUNTIME_URL": "http://127.0.0.1:8765"
+      }
+    }
+  }
+}
