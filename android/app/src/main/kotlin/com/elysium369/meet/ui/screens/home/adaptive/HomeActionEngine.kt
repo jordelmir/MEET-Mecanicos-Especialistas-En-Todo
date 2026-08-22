@@ -115,11 +115,11 @@ object HomeActionEngine {
                     id = "ACT_ALL_CLEAR",
                     priority = HomeActionPriority.LOW,
                     category = HomeActionCategory.SYSTEM_NOTICE,
-                    title = "Sistemas en Estado Nominal",
-                    subtitle = "No hay fallas activas registradas. Puedes realizar un escaneo preventivo o consultar la IA.",
+                    title = "Sin alertas activas con datos disponibles",
+                    subtitle = "No se observaron anomalías en la cobertura actual. Realiza un escaneo completo para validar monitores.",
                     destination = MeetDestinations.SCANNER,
                     buttonLabel = "INICIAR ESCANEO",
-                    glyph = "✅"
+                    glyph = "📋"
                 )
             )
         }

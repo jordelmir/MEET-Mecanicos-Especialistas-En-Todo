@@ -407,47 +407,51 @@ class ObdSession(
     private val transportLifecycleMutex = Mutex()
     private val transportGenerationId = java.util.concurrent.atomic.AtomicLong(0L)
 
-    fun setTargetAddress(address: String) {
+    suspend fun setTargetAddressSequentially(address: String) {
         val normalizedAddress = address.trim()
         this.targetAddress = normalizedAddress
         val currentGen = transportGenerationId.incrementAndGet()
 
-        val oldTransport = transport
-        transport = null
-        if (oldTransport != null) {
-            scope.launch(Dispatchers.IO) {
-                transportLifecycleMutex.withLock {
-                    runCatching { oldTransport.disconnect() }
+        transportLifecycleMutex.withLock {
+            val oldTransport = transport
+            transport = null
+            if (oldTransport != null) {
+                runCatching { oldTransport.disconnect() }
+            }
+
+            val isBleAddress = normalizedAddress.startsWith("ble://", ignoreCase = true)
+            val bleMac = normalizedAddress.substringAfter("://", missingDelimiterValue = "")
+            val isBluetoothMac = bluetoothMacRegex.matches(normalizedAddress)
+            val networkAddress = normalizedAddress.removePrefix("tcp://")
+            isDoIpMode = !isBluetoothMac && !isBleAddress && networkAddress.endsWith(":13400")
+
+            val newTransport: TransportInterface? = when {
+                normalizedAddress == "SIMULATOR" -> com.elysium369.meet.core.transport.SimulatedTransport()
+                isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac) -> {
+                    val device = bluetoothAdapter.getRemoteDevice(bleMac)
+                    BleTransport(context, device)
                 }
+                !isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":")) -> {
+                    val separatorIndex = networkAddress.lastIndexOf(':').takeIf { it > 0 }
+                    val ip = separatorIndex?.let { networkAddress.substring(0, it) } ?: networkAddress
+                    val port = separatorIndex
+                        ?.let { networkAddress.substring(it + 1).toIntOrNull() }
+                        ?: if (isDoIpMode) 13400 else 35000
+                    WifiTransport(ip, port)
+                }
+                bluetoothAdapter != null -> BtClassicTransport(normalizedAddress, bluetoothAdapter)
+                else -> null
+            }
+
+            if (currentGen == transportGenerationId.get()) {
+                transport = newTransport
             }
         }
+    }
 
-        val isBleAddress = normalizedAddress.startsWith("ble://", ignoreCase = true)
-        val bleMac = normalizedAddress.substringAfter("://", missingDelimiterValue = "")
-        val isBluetoothMac = bluetoothMacRegex.matches(normalizedAddress)
-        val networkAddress = normalizedAddress.removePrefix("tcp://")
-        isDoIpMode = !isBluetoothMac && !isBleAddress && networkAddress.endsWith(":13400")
-
-        val newTransport: TransportInterface? = when {
-            normalizedAddress == "SIMULATOR" -> com.elysium369.meet.core.transport.SimulatedTransport()
-            isBleAddress && bluetoothAdapter != null && bluetoothMacRegex.matches(bleMac) -> {
-                val device = bluetoothAdapter.getRemoteDevice(bleMac)
-                BleTransport(context, device)
-            }
-            !isBluetoothMac && (networkAddress.contains(".") || networkAddress.contains(":")) -> {
-                val separatorIndex = networkAddress.lastIndexOf(':').takeIf { it > 0 }
-                val ip = separatorIndex?.let { networkAddress.substring(0, it) } ?: networkAddress
-                val port = separatorIndex
-                    ?.let { networkAddress.substring(it + 1).toIntOrNull() }
-                    ?: if (isDoIpMode) 13400 else 35000
-                WifiTransport(ip, port)
-            }
-            bluetoothAdapter != null -> BtClassicTransport(normalizedAddress, bluetoothAdapter)
-            else -> null
-        }
-
-        if (currentGen == transportGenerationId.get()) {
-            transport = newTransport
+    fun setTargetAddress(address: String) {
+        scope.launch(Dispatchers.IO) {
+            setTargetAddressSequentially(address)
         }
     }
 

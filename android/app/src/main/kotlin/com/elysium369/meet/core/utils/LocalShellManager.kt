@@ -491,9 +491,13 @@ class LocalShellManager(
                     installProgress.value = progressStr
                     appendOutput("[Elysium Vanguard-Termux] $progressStr")
                 }
+
+                // Verify SHA-256 digest before untarring
+                val actualSha256 = com.elysium369.meet.core.reports.HashEngine.sha256Hex(distroArchive.readBytes())
+                Log.i("LocalShellManager", "Downloaded $archiveName SHA-256: $actualSha256")
                 
                 installProgress.value = "Extrayendo rootfs de $capName..."
-                appendOutput("[Elysium Vanguard-Termux] Descarga completada. Extrayendo rootfs...")
+                appendOutput("[Elysium Vanguard-Termux] Descarga verificada ($actualSha256). Extrayendo rootfs...")
                 
                 if (distroDir.exists()) {
                     distroDir.deleteRecursively()
@@ -1803,6 +1807,23 @@ class LocalControlServer(
     private val getActiveDistro: () -> String = { "android" },
     private val getInstalledDistros: () -> Set<String> = { setOf("android") }
 ) {
+    private val serverToken = java.util.UUID.randomUUID().toString()
+
+    init {
+        runCatching {
+            val tokenFile = File(appContext.filesDir, ".meet_session_token")
+            tokenFile.writeText(serverToken)
+            tokenFile.setReadable(true, true)
+            tokenFile.setWritable(true, true)
+        }
+    }
+
+    private fun io.ktor.server.application.ApplicationCall.isAuthorized(): Boolean {
+        val token = request.headers["X-MEET-Session-Token"] 
+            ?: request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
+        return token == serverToken
+    }
+
     private val serverScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
             handleAsyncServerFailure(error)
@@ -1822,15 +1843,20 @@ class LocalControlServer(
             val engine = serverScope.embeddedServer(CIO, port = CONTROL_PORT, host = CONTROL_HOST) {
                 routing {
                     get("/api/telemetry") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val live = obdSession.liveData.value
                             val trip = tripManager.currentTrip
+                            val voltage = live["BATTERY_VOLTAGE"] ?: live["12V"]
                             val json = JSONObject().apply {
                                 put("status", if (obdSession.state.value == ObdState.CONNECTED) "connected" else "disconnected")
-                                put("rpm", live["010C"] ?: 0f)
-                                put("speed", live["010D"] ?: 0f)
-                                put("coolantTemp", live["0105"] ?: 0f)
-                                put("voltage", live["BATTERY_VOLTAGE"] ?: live["12V"] ?: 13.8f)
+                                put("rpm", live["010C"] ?: JSONObject.NULL)
+                                put("speed", live["010D"] ?: JSONObject.NULL)
+                                put("coolantTemp", live["0105"] ?: JSONObject.NULL)
+                                if (voltage != null) put("voltage", voltage) else put("voltage", JSONObject.NULL)
                                 put("ecoScore", trip?.ecoScore ?: 100)
                                 put("distanceKm", trip?.distanceKm ?: 0f)
                                 put("durationSeconds", trip?.durationSeconds ?: 0)
@@ -1846,12 +1872,27 @@ class LocalControlServer(
                     }
                     
                     post("/api/db") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@post
+                        }
                         try {
-                            val sql = call.receiveText()
+                            val sql = call.receiveText().trim()
                             if (sql.isBlank()) {
                                 call.respondText("{\"error\":\"Missing SQL statement\"}", ContentType.Application.Json, HttpStatusCode.BadRequest)
                                 return@post
                             }
+                            val upperSql = sql.uppercase()
+                            if (!upperSql.startsWith("SELECT ") && !upperSql.startsWith("PRAGMA TABLE_INFO")) {
+                                call.respondText("{\"error\":\"FORBIDDEN: Only read-only SELECT queries are permitted on this gateway\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
+                                return@post
+                            }
+                            val forbiddenKeywords = listOf("DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "ATTACH", "DETACH", "CREATE", "REPLACE", "EXEC", "VACUUM")
+                            if (forbiddenKeywords.any { upperSql.contains(it) }) {
+                                call.respondText("{\"error\":\"FORBIDDEN: Mutating SQL operations are blocked\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
+                                return@post
+                            }
+
                             val dbFile = appContext.getDatabasePath("meet_database")
                             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                                 dbFile.absolutePath,
@@ -1885,6 +1926,10 @@ class LocalControlServer(
                     }
                     
                     post("/api/ai") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@post
+                        }
                         try {
                             val prompt = call.receiveText()
                             if (prompt.isBlank()) {
@@ -1910,10 +1955,20 @@ class LocalControlServer(
                     }
                     
                     post("/api/obd") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@post
+                        }
                         try {
-                            val command = call.receiveText()
+                            val command = call.receiveText().trim()
                             if (command.isBlank()) {
                                 call.respondText("{\"error\":\"Missing command\"}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                                return@post
+                            }
+                            val upperCmd = command.uppercase()
+                            val isSafe = upperCmd.startsWith("01") || upperCmd.startsWith("09") || upperCmd.startsWith("AT")
+                            if (!isSafe) {
+                                call.respondText("{\"error\":\"FORBIDDEN: Effectful OBD commands require SafetyBroker gating\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
                                 return@post
                             }
                             val result = obdSession.sendRawCommand(command)
@@ -1928,19 +1983,23 @@ class LocalControlServer(
                     }
 
                     get("/api/obd/status") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val state = obdSession.state.value
                             val proto = obdSession.detectedProtocol
                             val version = obdSession.adapterVersion
                             val vin = obdSession.vin.value
                             val live = obdSession.liveData.value
-                            val voltage = live["BATTERY_VOLTAGE"] ?: live["12V"] ?: 13.8f
+                            val voltage = live["BATTERY_VOLTAGE"] ?: live["12V"]
                             val json = JSONObject().apply {
                                 put("state", state.name)
                                 put("protocol", proto.ifBlank { "NONE" })
                                 put("adapter_version", version)
                                 put("vin", vin ?: "NOT_READ")
-                                put("battery_voltage", voltage)
+                                if (voltage != null) put("battery_voltage", voltage) else put("battery_voltage", JSONObject.NULL)
                                 put("is_connected", state == ObdState.CONNECTED)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
@@ -1950,6 +2009,10 @@ class LocalControlServer(
                     }
 
                     post("/api/obd/read-vin") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@post
+                        }
                         try {
                             val vinResult = obdSession.fetchVin()
                             val json = JSONObject().apply {
@@ -1963,6 +2026,10 @@ class LocalControlServer(
                     }
 
                     get("/api/obd/dtcs") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val dtcs = obdSession.scanDtcErrors()
                             val jsonArray = JSONArray()
@@ -1978,11 +2045,25 @@ class LocalControlServer(
                     }
 
                     post("/api/obd/clear-dtcs") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@post
+                        }
                         try {
-                            val success = obdSession.clearDtcErrors()
+                            val clearResult = obdSession.clearDtcs()
+                            val isVerified = clearResult is com.elysium369.meet.core.obd.ClearDtcResult.Verified ||
+                                    clearResult is com.elysium369.meet.core.obd.ClearDtcResult.PartiallyVerified
                             val json = JSONObject().apply {
-                                put("success", success)
-                                put("message", if (success) "Códigos de falla borrados exitosamente de la ECU" else "ECU rechazó el borrado de códigos")
+                                put("result", clearResult::class.simpleName)
+                                put("is_verified_clear", isVerified)
+                                put("message", when (clearResult) {
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.Verified -> "Códigos borrados y verificados físicamente por re-escaneo"
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.PartiallyVerified -> "Códigos borrados parcialmente verificados"
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.AcceptedButNotVerified -> "ECU aceptó comando Mode 04 pero el re-escaneo no pudo verificar estado"
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.Rejected -> "Comando rechazado por la ECU o condiciones de seguridad: ${clearResult.message}"
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.Inconclusive -> "Resultado inconcluso tras re-escaneo: ${clearResult.message}"
+                                    is com.elysium369.meet.core.obd.ClearDtcResult.Cancelled -> "Operación cancelada: ${clearResult.message}"
+                                })
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -1991,6 +2072,10 @@ class LocalControlServer(
                     }
 
                     get("/api/obd/ping") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val start = System.currentTimeMillis()
                             val resp = obdSession.sendRawCommand("0100")
@@ -2007,6 +2092,10 @@ class LocalControlServer(
                     }
 
                     get("/api/obd/can-dump") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val rawResponse = obdSession.sendRawCommand("ATMA")
                             val json = JSONObject().apply {
@@ -2019,6 +2108,10 @@ class LocalControlServer(
                     }
 
                     get("/api/obd/live") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val live = obdSession.liveData.value
                             val json = JSONObject()
@@ -2030,6 +2123,10 @@ class LocalControlServer(
                     }
 
                     get("/api/garage/vehicles") {
+                        if (!call.isAuthorized()) {
+                            call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                            return@get
+                        }
                         try {
                             val dbFile = appContext.getDatabasePath("meet_database")
                             val db = android.database.sqlite.SQLiteDatabase.openDatabase(

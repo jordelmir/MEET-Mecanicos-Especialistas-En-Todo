@@ -30,20 +30,9 @@ class OemCloudAccessProvider {
         command: String,
         permission: AccessPermission
     ): Result<OemCommandReceipt> {
-        val now = System.currentTimeMillis()
-        val oemTrackingId = "OEM-CMD-" + HashEngine.sha256Hex("$vehicleId:$command:$now").take(16).uppercase()
-        val evidencePayload = "$vehicleId:$vin:$command:$permission:$now:$oemTrackingId"
-        val proof = HashEngine.sha256Hex(evidencePayload)
-
-        val receipt = OemCommandReceipt(
-            receiptId = "RCP-" + HashEngine.sha256Hex("RECEIPT:$evidencePayload").take(12).uppercase(),
-            vehicleId = vehicleId,
-            command = command,
-            executedAtEpochMs = now,
-            oemTrackingId = oemTrackingId,
-            evidenceHash = proof
+        // Enforce Strict Truth: No synthetic cloud receipts when no real OEM provider gateway is active
+        return Result.failure(
+            IllegalStateException("OEM_CLOUD_NOT_CONFIGURED: Sin integración OEM activa ni credenciales autorizadas para el vehículo ($vehicleId)")
         )
-
-        return Result.success(receipt)
     }
 }

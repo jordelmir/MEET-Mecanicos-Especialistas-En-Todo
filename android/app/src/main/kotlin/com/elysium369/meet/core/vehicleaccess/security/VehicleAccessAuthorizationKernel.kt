@@ -47,21 +47,20 @@ object VehicleAccessAuthorizationKernel {
 
     /**
      * Signs an access command or provisioning request with the hardware-backed private key.
+     * Throws SecurityException if Keystore is unavailable — NEVER falls back to an insecure hash.
      */
     fun signAuthorizationPayload(payload: String): String {
         return runCatching {
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             val privateKeyEntry = keyStore.getEntry(ACCESS_SIGNING_KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
-                ?: return HashEngine.sha256Hex("FALLBACK_PROOF:$payload")
+                ?: throw SecurityException("SIGNATURE_UNAVAILABLE: Keystore private key alias missing")
 
             val signature = Signature.getInstance("SHA256withECDSA")
             signature.initSign(privateKeyEntry.privateKey)
             signature.update(payload.toByteArray(Charsets.UTF_8))
             val signedBytes = signature.sign()
             signedBytes.joinToString("") { "%02x".format(it) }
-        }.getOrElse {
-            HashEngine.sha256Hex("AUTH_PROOF:$payload")
-        }
+        }.getOrThrow()
     }
 
     /**

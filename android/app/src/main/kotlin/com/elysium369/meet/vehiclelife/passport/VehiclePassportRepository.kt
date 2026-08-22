@@ -35,7 +35,7 @@ class DefaultVehiclePassportRepository @Inject constructor(
             vehicleContext = vehicleContext,
             plate = "NOT_SET",
             registrationDateUtc = null,
-            isTitleVerified = true
+            isTitleVerified = false // Strict truth: Title verification requires verified registry authority
         )
 
         val healthSection = PassportHealthSection(
@@ -51,9 +51,10 @@ class DefaultVehiclePassportRepository @Inject constructor(
             recentMilestones = allEvents.take(10)
         )
 
+        val costEventsCount = allEvents.count { it.type == com.elysium369.meet.core.vehiclelife.VehicleLifeEventType.COST }
         val financialSection = PassportFinancialSummary(
-            totalInvested = Money.zero(CurrencyCode.USD),
-            recordedInvoicesCount = allEvents.count { it.type == com.elysium369.meet.core.vehiclelife.VehicleLifeEventType.COST }
+            totalInvested = null, // No synthetic USD 0: missing financial record means NO_DATA
+            recordedInvoicesCount = costEventsCount
         )
 
         val rawPayload = "${vehicleContext.vehicleId}:${vehicleContext.vin}:${allEvents.size}:$healthScore"

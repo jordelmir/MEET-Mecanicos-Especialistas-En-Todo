@@ -49,56 +49,11 @@ class VehicleAccessManager(private val context: Context) {
                 year in 2008..2017 -> "CAN ISO 15765-4 (Transponder 4D / 8A / Hitag-AES)"
                 else -> "UDS ISO 14229 / CAN FD (Smart Proximity PEPS AES-128)"
             },
-            bcmStatus = "Enlace BCM Verificado por OBD",
+            bcmStatus = "No verificado por hardware / OBD",
             authoritySource = if (isModernCar) CredentialAuthority.OEM else CredentialAuthority.MEET_NATIVE
         )
         _vehicleCapabilities.value = vCaps
-
-        // Initialize default Digital Twin of keys for this vehicle
-        if (_credentials.value.isEmpty()) {
-            val initialKeys = listOf(
-                VehicleAccessCredential(
-                    vehicleId = vehicleId,
-                    slotNumber = 1,
-                    label = "Llave Principal #1 (Original OEM)",
-                    type = if (isModernCar) CredentialType.SMART_KEY else CredentialType.TRANSPONDER,
-                    authority = CredentialAuthority.OEM,
-                    status = CredentialStatus.ACTIVE,
-                    permissions = setOf(AccessPermission.ENTRY, AccessPermission.DRIVE, AccessPermission.TRUNK, AccessPermission.REMOTE_COMMANDS),
-                    transponderFamily = if (year <= 2007) "ID-46 Crypto (PCF7936)" else "AES-128 Smart",
-                    remoteFrequency = "315.00 MHz",
-                    batteryHealthPercent = 95,
-                    isPrimaryOwner = true,
-                    proofHash = HashEngine.sha256Hex("$vehicleId:slot1:OEM_ORIGINAL")
-                ),
-                VehicleAccessCredential(
-                    vehicleId = vehicleId,
-                    slotNumber = 2,
-                    label = "Llave de Repuesto #2 (Valet / Duplicado)",
-                    type = CredentialType.MECHANICAL,
-                    authority = CredentialAuthority.CERTIFIED_LOCKSMITH,
-                    status = CredentialStatus.ACTIVE,
-                    permissions = setOf(AccessPermission.ENTRY, AccessPermission.DRIVE),
-                    transponderFamily = if (year <= 2007) "ID-46 Clone" else "Hitag Pro",
-                    batteryHealthPercent = 88,
-                    isPrimaryOwner = false,
-                    proofHash = HashEngine.sha256Hex("$vehicleId:slot2:LOCKSMITH_SPARE")
-                )
-            )
-            _credentials.value = initialKeys
-
-            val initialEvents = listOf(
-                AccessAuditEvent(
-                    vehicleId = vehicleId,
-                    action = "SINCRONIZACIÓN INICIAL DE SISTEMA IMMO",
-                    actor = "MEET Vanguard Security Engine",
-                    credentialType = CredentialType.TRANSPONDER,
-                    outcome = "AUTORIZADO",
-                    evidenceHash = HashEngine.sha256Hex("$vehicleId:init_audit")
-                )
-            )
-            _auditTimeline.value = initialEvents
-        }
+        // Strict Truth: No synthetic keys are manufactured. If inventory is empty, it remains empty until enrolled.
     }
 
     fun addGrant(grant: AccessGrant) {

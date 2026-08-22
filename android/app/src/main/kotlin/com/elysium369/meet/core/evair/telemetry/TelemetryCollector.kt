@@ -63,7 +63,7 @@ class TelemetryCollector @Inject constructor(
 
         val quality = when (sample.quality) {
             TelemetryQuality.VALID -> DataQuality.GOOD
-            TelemetryQuality.OUT_OF_RANGE -> DataQuality.GOOD
+            TelemetryQuality.OUT_OF_RANGE -> DataQuality.INVALID
             TelemetryQuality.STALE -> DataQuality.STALE
             TelemetryQuality.SIMULATED, TelemetryQuality.MANUAL -> DataQuality.ESTIMATED
             else -> DataQuality.INVALID

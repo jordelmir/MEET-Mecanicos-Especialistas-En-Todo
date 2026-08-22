@@ -34,7 +34,7 @@ class VehicleFinancialLedgerTest {
                 entryId = "EXP_02",
                 vehicleId = "V-001",
                 category = ExpenseCategory.MAINTENANCE,
-                state = FinancialState.INVOICED,
+                state = FinancialState.PAID,
                 amount = Money(15000L, CurrencyCode.USD), // $150.00
                 description = "Cambio de Aceite Sintético y Filtro"
             )

@@ -19,7 +19,8 @@ data class Money(
 
     operator fun plus(other: Money): Money {
         require(currency == other.currency) { "Cannot add distinct currencies: $currency and ${other.currency}" }
-        return Money(amountMinor + other.amountMinor, currency)
+        val sum = Math.addExact(amountMinor, other.amountMinor)
+        return Money(sum, currency)
     }
 
     operator fun minus(other: Money): Money {
@@ -30,7 +31,8 @@ data class Money(
 
     operator fun times(multiplier: Int): Money {
         require(multiplier >= 0) { "Multiplier cannot be negative: $multiplier" }
-        return Money(amountMinor * multiplier, currency)
+        val product = Math.multiplyExact(amountMinor, multiplier.toLong())
+        return Money(product, currency)
     }
 
     operator fun div(divisor: Long): Money {
@@ -61,12 +63,14 @@ data class Money(
 
         fun fromMajor(amountMajor: Long, currency: CurrencyCode): Money {
             val factor = if (currency.decimalPlaces == 2) 100L else 1L
-            return Money(amountMajor * factor, currency)
+            val minor = Math.multiplyExact(amountMajor, factor)
+            return Money(minor, currency)
         }
 
         fun fromMajorUnits(amountMajor: Long, amountMinorCents: Long, currency: CurrencyCode): Money {
             val factor = if (currency.decimalPlaces == 2) 100L else 1L
-            return Money(amountMajor * factor + amountMinorCents, currency)
+            val minor = Math.addExact(Math.multiplyExact(amountMajor, factor), amountMinorCents)
+            return Money(minor, currency)
         }
     }
 }

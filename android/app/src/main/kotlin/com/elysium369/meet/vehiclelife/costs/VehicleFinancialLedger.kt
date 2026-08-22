@@ -75,11 +75,15 @@ class DefaultVehicleFinancialLedgerRepository @Inject constructor() : VehicleFin
         val vehicleEntries = getEntriesForVehicle(vehicleId)
         val defaultCurrency = vehicleEntries.firstOrNull()?.amount?.currency ?: CurrencyCode.USD
 
-        val paidEntries = vehicleEntries.filter { it.state == FinancialState.PAID || it.state == FinancialState.INVOICED }
-        val quotedEntries = vehicleEntries.filter { it.state == FinancialState.QUOTED || it.state == FinancialState.AUTHORIZED }
+        // Strict financial truth: ONLY FinancialState.PAID represents disbursed money. INVOICED is pending.
+        val paidEntries = vehicleEntries.filter { it.state == FinancialState.PAID && it.amount.currency == defaultCurrency }
+        val quotedEntries = vehicleEntries.filter { 
+            (it.state == FinancialState.QUOTED || it.state == FinancialState.AUTHORIZED || it.state == FinancialState.INVOICED) &&
+            it.amount.currency == defaultCurrency
+        }
 
-        val totalPaidAmountMinor = paidEntries.sumOf { it.amount.amountMinor }
-        val totalQuotedAmountMinor = quotedEntries.sumOf { it.amount.amountMinor }
+        val totalPaidAmountMinor = paidEntries.fold(0L) { acc, entry -> Math.addExact(acc, entry.amount.amountMinor) }
+        val totalQuotedAmountMinor = quotedEntries.fold(0L) { acc, entry -> Math.addExact(acc, entry.amount.amountMinor) }
 
         val totalPaid = Money(totalPaidAmountMinor, defaultCurrency)
         val totalQuoted = Money(totalQuotedAmountMinor, defaultCurrency)
@@ -88,7 +92,18 @@ class DefaultVehicleFinancialLedgerRepository @Inject constructor() : VehicleFin
             Money(totalPaidAmountMinor / totalKmDriven, defaultCurrency)
         } else null
 
-        val monthlyAverage = Money(totalPaidAmountMinor / 12.coerceAtLeast(1), defaultCurrency)
+        // Observation window calculation based on recorded timestamps
+        val observationMonths = if (paidEntries.size >= 2) {
+            val minDate = paidEntries.minOf { it.dateUtc }
+            val maxDate = paidEntries.maxOf { it.dateUtc }
+            val spanMs = maxDate - minDate
+            val months = (spanMs / (30L * 24 * 60 * 60 * 1000L)).toInt()
+            months.coerceAtLeast(1)
+        } else {
+            1
+        }
+
+        val monthlyAverage = Money(totalPaidAmountMinor / observationMonths, defaultCurrency)
 
         return TcoMetrics(
             totalPaid = totalPaid,

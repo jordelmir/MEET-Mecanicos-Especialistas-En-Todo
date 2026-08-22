@@ -51,13 +51,15 @@ fun VehicleAccessDashboardScreen(
 
     LaunchedEffect(selectedVehicle) {
         val vehicle = selectedVehicle
-        accessManager.initializeForVehicle(
-            vehicleId = vehicle?.id ?: "V-DEMO-01",
-            make = vehicle?.make ?: "Hyundai",
-            model = vehicle?.model ?: "Accent Verna",
-            year = vehicle?.year ?: 2005,
-            vin = vehicle?.vin
-        )
+        if (vehicle != null) {
+            accessManager.initializeForVehicle(
+                vehicleId = vehicle.id,
+                make = vehicle.make,
+                model = vehicle.model,
+                year = vehicle.year,
+                vin = vehicle.vin
+            )
+        }
     }
 
     Scaffold(
@@ -82,8 +84,8 @@ fun VehicleAccessDashboardScreen(
             item {
                 EliteCard(
                     backgroundColor = MeetColors.backgroundDark,
-                    borderColor = MeetColors.neonGreen.copy(alpha = 0.4f),
-                    glowColor = MeetColors.neonGreen,
+                    borderColor = if (selectedVehicle != null) MeetColors.neonGreen.copy(alpha = 0.4f) else MeetColors.textMuted.copy(alpha = 0.3f),
+                    glowColor = if (selectedVehicle != null) MeetColors.neonGreen else Color.Transparent,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -93,13 +95,13 @@ fun VehicleAccessDashboardScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "${selectedVehicle?.make ?: "Hyundai"} ${selectedVehicle?.model ?: "Accent Verna"} (${selectedVehicle?.year ?: 2005})",
+                                    if (selectedVehicle != null) "${selectedVehicle?.make} ${selectedVehicle?.model} (${selectedVehicle?.year})" else "Ningún vehículo seleccionado",
                                     color = Color.White,
                                     fontWeight = FontWeight.Black,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    "VIN: ${selectedVehicle?.vin?.ifBlank { "PENDIENTE POR OBD" } ?: "PENDIENTE POR OBD"}",
+                                    "VIN: ${selectedVehicle?.vin?.ifBlank { "PENDIENTE POR OBD" } ?: "NO ASIGNADO"}",
                                     color = MeetColors.textSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace
@@ -107,11 +109,23 @@ fun VehicleAccessDashboardScreen(
                             }
                             Box(
                                 modifier = Modifier
-                                    .background(MeetColors.neonGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                    .border(1.dp, MeetColors.neonGreen, RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (selectedVehicle != null) MeetColors.neonGreen.copy(alpha = 0.15f) else MeetColors.textMuted.copy(alpha = 0.15f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (selectedVehicle != null) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.textMuted.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    )
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text("BCM ONLINE", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(
+                                    if (selectedVehicle != null) "INICIALIZADO" else "SIN VEHÍCULO",
+                                    color = if (selectedVehicle != null) MeetColors.neonGreen else MeetColors.textMuted,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
                             }
                         }
 
@@ -121,7 +135,7 @@ fun VehicleAccessDashboardScreen(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Protocolo IMMO:", color = MeetColors.textMuted, fontSize = 12.sp)
-                            Text(vehicleCaps?.immoProtocol ?: "ISO 9141-2 (Transponder ID46)", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(vehicleCaps?.immoProtocol ?: "No detectado / Requiere OBD", color = MeetColors.cyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

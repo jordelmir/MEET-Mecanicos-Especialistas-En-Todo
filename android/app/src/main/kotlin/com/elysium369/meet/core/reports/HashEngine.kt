@@ -59,9 +59,13 @@ object HashEngine {
     }
 
     fun sha256Hex(input: String): String {
+        return sha256Hex(input.toByteArray(Charsets.UTF_8))
+    }
+
+    fun sha256Hex(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+        val hashBytes = digest.digest(bytes)
+        return hashBytes.joinToString("") { "%02x".format(it) }
     }
 
     fun hashReport(draft: DraftReport): String =

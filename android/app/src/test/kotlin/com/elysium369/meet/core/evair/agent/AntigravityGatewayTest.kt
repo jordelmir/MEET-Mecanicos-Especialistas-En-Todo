@@ -57,7 +57,7 @@ class AntigravityGatewayTest {
     }
 
     @Test
-    fun `gateway reports nominal status when no DTCs are present`() = runBlocking {
+    fun `gateway reports honest no DTC observed status when no DTCs are present`() = runBlocking {
         val snapshot = createSnapshot(emptyList())
         val request = DiagnosticAgentRequest(
             requestId = "req_diag_nominal",
@@ -70,7 +70,8 @@ class AntigravityGatewayTest {
         assertTrue(result is EvairResult.Success)
         val diagnostic = (result as EvairResult.Success).value
         assertEquals(DiagnosticSeverity.INFO, diagnostic.severity)
-        assertTrue(diagnostic.hypotheses.first().confidence >= 0.90)
+        assertTrue(diagnostic.summary.contains("No se observaron códigos DTC", ignoreCase = true))
+        assertTrue(diagnostic.hypotheses.first().cause.contains("No se observaron códigos de falla", ignoreCase = true))
     }
 
     private fun createSnapshot(dtcs: List<DtcSnapshot>): VehicleSnapshot {

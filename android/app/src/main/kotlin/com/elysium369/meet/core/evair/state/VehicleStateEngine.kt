@@ -198,27 +198,28 @@ class VehicleStateEngine @Inject constructor(
         val vin = obdSession.vin.value
 
         val isConnected = obdState == ObdState.CONNECTED
+        val detectedProto = obdSession.detectedProtocol.takeIf { it.isNotBlank() && it != "NONE" }
 
         return VehicleSnapshot(
             timestampMs = nowMs,
             monotonicTimestampNs = nowMonoNs,
             vehicle = VehicleIdentity(
-                vehicleId = vin ?: "VEHICLE_LOCAL",
+                vehicleId = vin ?: "SESSION_${obdState.name}",
                 vin = vin,
                 make = null,
                 model = null,
                 year = null,
                 engineType = null,
                 transmissionType = null,
-                label = if (vin != null) "Vehículo ($vin)" else "Vehículo Conectado"
+                label = if (vin != null) "Vehículo ($vin)" else "Enlace OBD (${obdState.name})"
             ),
             connection = ConnectionSnapshot(
                 phase = obdState.name,
                 hasRealEcuLink = isConnected,
-                protocol = "ISO 15765-4 (CAN)",
-                adapterQuality = "OPTIMAL",
-                transport = "BT_CLASSIC",
-                latencyMs = 35L
+                protocol = detectedProto,
+                adapterQuality = if (isConnected) "CONNECTED" else null,
+                transport = if (isConnected) "ACTIVE_TRANSPORT" else null,
+                latencyMs = null // Strictly null when not actively timed
             ),
             engine = EngineSnapshot(
                 rpm = getDoubleValue("010C", liveData, samples),

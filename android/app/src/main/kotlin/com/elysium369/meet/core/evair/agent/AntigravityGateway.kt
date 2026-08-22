@@ -151,12 +151,13 @@ class AntigravityGateway @Inject constructor(
         } else {
             hypotheses.add(
                 DiagnosticHypothesis(
-                    id = "hyp_normal",
-                    cause = "Todos los parámetros y monitores se encuentran dentro del rango nominal",
-                    confidence = 0.95,
+                    id = "hyp_no_dtc_observed",
+                    cause = "No se observaron códigos de falla (DTC) bajo la cobertura del escaneo actual",
+                    confidence = 0.85,
                     supportingEvidence = listOf(
-                        DiagnosticEvidence(EvidenceSource.LIVE_PID, "DTC_COUNT", "0", reliability = 1.0)
-                    )
+                        DiagnosticEvidence(EvidenceSource.DTC, "NO_DTC", "0 DTCs reportados en cobertura actual", reliability = 0.90)
+                    ),
+                    missingEvidence = listOf("Inspección física de componentes mecánicos", "Prueba de monitores I/M no completados")
                 )
             )
         }
@@ -169,7 +170,7 @@ class AntigravityGateway @Inject constructor(
 
         return DiagnosticResult(
             severity = severity,
-            summary = if (dtcCodes.isNotEmpty()) "Se detectaron ${dtcCodes.size} códigos DTC activos que requieren atención diagnóstica." else "Sistema en condiciones nominales de operación.",
+            summary = if (dtcCodes.isNotEmpty()) "Se detectaron ${dtcCodes.size} códigos DTC activos que requieren atención diagnóstica." else "No se observaron códigos DTC en la cobertura actual de escaneo.",
             hypotheses = hypotheses,
             recommendedTests = recommendedTests,
             requestId = request.requestId,
