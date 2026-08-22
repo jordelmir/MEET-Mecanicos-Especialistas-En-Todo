@@ -36,6 +36,8 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteTopAppBar
+import com.elysium369.meet.core.services.serviceos.*
+import com.elysium369.meet.ui.screens.serviceos.WorkshopProKanbanView
 import com.elysium369.meet.ui.theme.MeetColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,6 +115,69 @@ fun WorkshopDashboardScreen(
                         }
                     }
                 }
+            }
+
+            // ── Workshop Operating System (Kanban, Bays & Financials) ──
+            item {
+                val workOrders = remember(shopBids, serviceRequests) {
+                    val acceptedBids = shopBids.filter { it.status == "ACCEPTED" }
+                    if (acceptedBids.isEmpty()) {
+                        listOf(
+                            WorkshopWorkOrderSummary(
+                                orderId = "WO-101",
+                                vehicleDisplayName = "Hyundai Accent Verna (2005)",
+                                customerName = "Jorge M.",
+                                stage = KanbanStage.IN_REPAIR,
+                                assignedBayName = "Bahía 1 (Elevador)",
+                                assignedTechnicianName = "Andrés V.",
+                                authorizedAmount = com.elysium369.meet.core.money.Money(35000L, com.elysium369.meet.core.money.CurrencyCode.CRC),
+                                startedAtMs = System.currentTimeMillis() - 3600000L,
+                                targetDeliveryAtMs = System.currentTimeMillis() + 7200000L
+                            ),
+                            WorkshopWorkOrderSummary(
+                                orderId = "WO-102",
+                                vehicleDisplayName = "Toyota Corolla (2012)",
+                                customerName = "María G.",
+                                stage = KanbanStage.WAITING_PARTS,
+                                assignedBayName = "Bahía 2",
+                                assignedTechnicianName = "Carlos R.",
+                                authorizedAmount = com.elysium369.meet.core.money.Money(48000L, com.elysium369.meet.core.money.CurrencyCode.CRC),
+                                startedAtMs = System.currentTimeMillis() - 7200000L,
+                                targetDeliveryAtMs = System.currentTimeMillis() + 18000000L
+                            )
+                        )
+                    } else {
+                        acceptedBids.mapIndexed { idx, bid ->
+                            val req = serviceRequests.find { it.requestId == bid.requestId }
+                            WorkshopWorkOrderSummary(
+                                orderId = bid.bidId,
+                                vehicleDisplayName = req?.problem ?: "Vehículo en Reparación",
+                                customerName = "Cliente #${idx + 1}",
+                                stage = if (idx == 0) KanbanStage.IN_REPAIR else KanbanStage.CHECK_IN,
+                                assignedBayName = "Bahía ${idx + 1}",
+                                assignedTechnicianName = "Técnico Asignado",
+                                authorizedAmount = com.elysium369.meet.core.money.Money(bid.price.toLong(), com.elysium369.meet.core.money.CurrencyCode.CRC),
+                                startedAtMs = bid.createdAt,
+                                targetDeliveryAtMs = bid.createdAt + 86400000L
+                            )
+                        }
+                    }
+                }
+
+                val bays = remember {
+                    listOf(
+                        BayFacility(name = "Bahía 1 (Elevador 2-Postes)", isOccupied = true, currentVehicleLabel = "Hyundai Accent", assignedTechnicianName = "Andrés V."),
+                        BayFacility(name = "Bahía 2 (Fosa de Inspección)", isOccupied = true, currentVehicleLabel = "Toyota Corolla", assignedTechnicianName = "Carlos R."),
+                        BayFacility(name = "Bahía 3 (Diagnóstico Electrónico)", isOccupied = false)
+                    )
+                }
+
+                WorkshopProKanbanView(
+                    workOrders = workOrders,
+                    bays = bays,
+                    onSelectWorkOrder = { },
+                    onRequestChangeOrder = { }
+                )
             }
 
             item {

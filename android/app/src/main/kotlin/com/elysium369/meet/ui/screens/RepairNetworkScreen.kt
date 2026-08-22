@@ -1050,92 +1050,22 @@ fun RepairNetworkScreen(
             }
         }
 
-        // ── Create Request Dialog ──
+        // ── Smart Service Request Composer V2 ──
         if (showCreateDialog) {
-            AlertDialog(
-                onDismissRequest = { showCreateDialog = false },
-                containerColor = MeetColors.backgroundDeep,
-                title = { Text("Publicar Solicitud de Servicio", color = Color.White) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            "Incluye qué falla, cuándo ocurre, si el auto se puede mover y cualquier DTC o diagnóstico previo.",
-                            color = MeetColors.textSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
-                        )
-                        OutlinedTextField(
-                            value = problemInput,
-                            onValueChange = { problemInput = it },
-                            label = { Text("Problema / Necesidad", color = MeetColors.textSecondary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
-                        )
-                        OutlinedTextField(
-                            value = descInput,
-                            onValueChange = { descInput = it },
-                            label = { Text("Descripción Detallada y evidencia", color = MeetColors.textSecondary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
-                        )
-                        OutlinedTextField(
-                            value = locationInput,
-                            onValueChange = { locationInput = it },
-                            label = { Text("Ubicación", color = MeetColors.textSecondary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MeetColors.neonGreen)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf("HIGH" to "Hoy", "MEDIUM" to "Próximo turno", "LOW" to "Programable").forEach { (value, label) ->
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (priorityInput == value) MeetColors.neonGreen.copy(alpha = 0.14f) else MeetColors.backgroundDark)
-                                        .border(1.dp, if (priorityInput == value) MeetColors.neonGreen else MeetColors.borderSubtle, RoundedCornerShape(8.dp))
-                                        .clickable { priorityInput = value }
-                                        .padding(vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (priorityInput == value) Color.White else MeetColors.textSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (problemInput.isNotBlank() && selectedVehicle != null) {
-                                obdViewModel.createServiceRequest(
-                                    vehicleId = selectedVehicle!!.id,
-                                    problem = problemInput,
-                                    description = descInput,
-                                    location = locationInput,
-                                    priority = priorityInput
-                                )
-                                showCreateDialog = false
-                                problemInput = ""
-                                descInput = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen)
-                    ) {
-                        Text("PUBLICAR", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showCreateDialog = false }) {
-                        Text("CANCELAR", color = MeetColors.textSecondary)
-                    }
+            com.elysium369.meet.ui.screens.serviceos.SmartServiceRequestComposerDialog(
+                activeVehicle = selectedVehicle,
+                activeDtcs = activeDtcs,
+                onDismiss = { showCreateDialog = false },
+                onSubmit = { request ->
+                    val vid = selectedVehicle?.id ?: "V_LOCAL"
+                    obdViewModel.createServiceRequest(
+                        vehicleId = vid,
+                        problem = request.evidence.userReportedSymptom,
+                        description = "${request.evidence.userSymptomCategory} | ${request.mobility.displayName} | ${request.preferredModality.displayName}",
+                        location = request.locationZone.approximateZoneName,
+                        priority = if (request.urgency == com.elysium369.meet.core.services.serviceos.ServiceRequestUrgency.URGENT_BREAKDOWN) "HIGH" else "MEDIUM"
+                    )
+                    showCreateDialog = false
                 }
             )
         }
