@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "android/**"
+      - "supabase/**"
+      - "runtime/**"
       - "tests/diagnostics/**"
       - "tests/parity/**"
       - "tools/**"
@@ -12,6 +14,8 @@ on:
     branches: [main]
     paths:
       - "android/**"
+      - "supabase/**"
+      - "runtime/**"
       - "tests/diagnostics/**"
       - "tests/parity/**"
       - "tools/**"
@@ -229,12 +233,14 @@ jobs:
           merge-multiple: true
       - name: Generate proof status only from job outcomes and artifact bytes
         run: |
+          VERSION_NAME=$(grep 'versionName =' android/app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep 'versionCode =' android/app/build.gradle.kts | head -n1 | sed -E 's/.*= *([0-9]+).*/\1/')
           python3 tools/vehicle-truth/generate-proof-status.py \
-            --output docs/generated/4.17-proof-status.json \
+            --output docs/generated/proof-status.json \
             --commit "${GITHUB_SHA}" \
             --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            --version-name "4.17.0" \
-            --version-code 45 \
+            --version-name "${VERSION_NAME}" \
+            --version-code "${VERSION_CODE}" \
             --gate "release-gates=${{ needs.release-gates.result }}" \
             --artifact "debug-apk=proof-artifacts/app-debug.apk" \
             --artifact "release-apk=proof-artifacts/app-release.apk" \
@@ -246,4 +252,4 @@ jobs:
           name: meet-proof-status-${{ github.sha }}
           retention-days: 90
           if-no-files-found: error
-          path: docs/generated/4.17-proof-status.json
+          path: docs/generated/proof-status.json

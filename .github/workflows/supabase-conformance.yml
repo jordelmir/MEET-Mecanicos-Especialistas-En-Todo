@@ -57,7 +57,26 @@ jobs:
             WHERE routine_schema = 'public' 
               AND routine_name IN (
                 'transition_repair_work_order_v1',
+                'transition_repair_work_order_client_v1',
                 'meet_emit_vanguard_event_v2',
                 'meet_is_platform_owner'
               );
           "
+
+      - name: Verify Sensitive RPC Privilege Boundaries (No Public/Anon/Authenticated Execute on Service Role RPCs)
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          LEAKED_PRIVILEGES=$(psql -h localhost -U postgres -d postgres -t -A -c "
+            SELECT COUNT(*) FROM information_schema.routine_privileges 
+            WHERE routine_schema = 'public'
+              AND routine_name IN ('meet_emit_vanguard_event_v2', 'transition_repair_work_order_v1')
+              AND grantee IN ('public', 'anon', 'authenticated')
+              AND privilege_type = 'EXECUTE';
+          ")
+          echo "Leaked execution privileges count: ${LEAKED_PRIVILEGES}"
+          if [ "${LEAKED_PRIVILEGES}" -ne 0 ]; then
+            echo "ERROR: Privileged service_role RPCs are accessible to unprivileged grantees!"
+            exit 1
+          fi
+          echo "Privilege boundaries verified: PASS"

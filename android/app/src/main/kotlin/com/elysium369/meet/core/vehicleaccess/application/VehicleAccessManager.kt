@@ -90,7 +90,7 @@ class VehicleAccessManager(private val context: Context) {
             action = "DECLARACIÓN DE LLAVE PERDIDA / BLOQUEADA",
             actor = "Propietario Principal",
             type = CredentialType.TRANSPONDER,
-            outcome = "BLOQUEADO"
+            outcome = "MEET_MARKED_LOST (Registrado en app; requiere prueba/reprogramación física de BCM)"
         )
     }
 
@@ -98,13 +98,18 @@ class VehicleAccessManager(private val context: Context) {
         val phone = _phoneCapabilities.value
         val vehicle = _vehicleCapabilities.value
 
+        if (vehicle == null) {
+            onResult(false, "Bloqueado: Ningún vehículo activo seleccionado para autorizar comandos.")
+            return
+        }
+
         if (!phone.hasSecureScreenLock) {
             onResult(false, "Bloqueado: Se requiere bloqueo de pantalla seguro en tu teléfono para autorizar comandos.")
             return
         }
 
         recordAuditEvent(
-            vehicleId = vehicle?.vehicleId ?: "",
+            vehicleId = vehicle.vehicleId,
             action = "COMANDO CRÍTICO: $actionName",
             actor = "Propietario (Autenticado)",
             type = CredentialType.DIGITAL_KEY,

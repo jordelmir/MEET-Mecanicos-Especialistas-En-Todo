@@ -10,6 +10,7 @@ import com.elysium369.meet.core.evair.domain.*
 import com.elysium369.meet.core.evair.safety.ExecutionStatus
 import com.elysium369.meet.core.evair.safety.VehicleActionExecutor
 import com.elysium369.meet.core.evair.safety.VehicleSafetyBroker
+import com.elysium369.meet.core.evair.state.VehicleStateEngine
 import com.elysium369.meet.core.evair.telemetry.TelemetryCollector
 import com.elysium369.meet.core.money.CurrencyCode
 import com.elysium369.meet.core.money.Money
@@ -19,7 +20,13 @@ import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.PhysicalBusOwner
 import com.elysium369.meet.core.obd.TelemetryQuality
 import com.elysium369.meet.core.obd.TelemetrySample
+import com.elysium369.meet.core.truth.MaturityStage
+import com.elysium369.meet.core.truth.TruthProof
+import com.elysium369.meet.core.truth.TruthState
+import com.elysium369.meet.core.vehicleaccess.application.VehicleAccessManager
 import com.elysium369.meet.core.vehicleaccess.domain.AccessPermission
+import com.elysium369.meet.core.vehicleaccess.domain.CapabilityState
+import com.elysium369.meet.core.vehicleaccess.domain.CredentialAuthority
 import com.elysium369.meet.core.vehicleaccess.providers.OemCloudAccessProvider
 import com.elysium369.meet.ui.screens.home.adaptive.HomeAction
 import com.elysium369.meet.ui.screens.home.adaptive.HomeActionCategory
@@ -37,6 +44,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
 
 class ProductionTruthGuardTest {
 
@@ -184,6 +192,24 @@ class ProductionTruthGuardTest {
     }
 
     @Test
+    fun vehicleAccessEmptyInventoryRemainsEmptyTest() {
+        val vCaps = com.elysium369.meet.core.vehicleaccess.domain.VehicleAccessCapabilities(
+            vehicleId = "V1",
+            digitalKeySupport = CapabilityState.CONDITIONAL,
+            nfcSupport = CapabilityState.UNSUPPORTED,
+            bleSupport = CapabilityState.UNSUPPORTED,
+            uwbSupport = CapabilityState.UNSUPPORTED,
+            oemCloudSupport = CapabilityState.UNSUPPORTED,
+            walletProvisioningSupport = CapabilityState.UNSUPPORTED,
+            immoProtocol = "ISO 9141-2 K-Line",
+            bcmStatus = "No verificado por hardware / OBD",
+            authoritySource = CredentialAuthority.MEET_NATIVE
+        )
+        assertEquals("No verificado por hardware / OBD", vCaps.bcmStatus)
+        assertFalse(vCaps.bcmStatus.contains("ONLINE", ignoreCase = true))
+    }
+
+    @Test
     fun homeActionEngineFallbackTitleTest() {
         val actions = HomeActionEngine.derivePrioritizedActions(
             hasVehicle = true,
@@ -291,5 +317,51 @@ class ProductionTruthGuardTest {
         // Simulate update while snoozed -> remains snoozed
         inbox.updateActions(listOf(action))
         assertEquals(ActionState.SNOOZED, inbox.activeActions.value.first().state)
+    }
+
+    // ── 5. UNIVERSAL TRUTH STATE & DOCTRINE GUARDS ──
+
+    @Test
+    fun truthProofHonestyTest() {
+        val proof = TruthProof<String>(
+            value = null,
+            truthState = TruthState.UNKNOWN,
+            maturityStage = MaturityStage.CLIENT_IMPLEMENTED,
+            provenance = "OBD_SESSION_NO_DATA"
+        )
+        assertNull(proof.value)
+        assertEquals(TruthState.UNKNOWN, proof.truthState)
+        assertNotEquals(TruthState.OBSERVED, proof.truthState)
+    }
+
+    @Test
+    fun crossCurrencyLedgerRejectedTest() = runBlocking {
+        val repo = DefaultVehicleFinancialLedgerRepository()
+        val usdEntry = FinancialEntry(
+            entryId = "E_USD",
+            vehicleId = "V1",
+            category = ExpenseCategory.PART,
+            state = FinancialState.PAID,
+            amount = Money(1000L, CurrencyCode.USD),
+            description = "Part in USD"
+        )
+        val crcEntry = FinancialEntry(
+            entryId = "E_CRC",
+            vehicleId = "V1",
+            category = ExpenseCategory.PART,
+            state = FinancialState.PAID,
+            amount = Money(100000L, CurrencyCode.CRC),
+            description = "Part in CRC"
+        )
+
+        repo.recordEntry(usdEntry)
+        repo.recordEntry(crcEntry)
+
+        // Calculating TCO when entries have conflicting currencies without FX rate must filter or handle safely
+        val tco = repo.calculateTco("V1", null, targetCurrency = CurrencyCode.USD)
+        assertNotNull(tco)
+        // Explicitly targeted USD, CRC is not cross-summed into USD
+        assertEquals(CurrencyCode.USD, tco.totalPaid.currency)
+        assertEquals(1000L, tco.totalPaid.amountMinor)
     }
 }

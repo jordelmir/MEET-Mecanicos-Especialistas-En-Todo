@@ -55,7 +55,7 @@ interface VehicleFinancialLedgerRepository {
     val entries: StateFlow<List<FinancialEntry>>
     suspend fun recordEntry(entry: FinancialEntry)
     suspend fun getEntriesForVehicle(vehicleId: String): List<FinancialEntry>
-    suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?): TcoMetrics
+    suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?, targetCurrency: CurrencyCode? = null): TcoMetrics
 }
 
 @Singleton
@@ -71,9 +71,9 @@ class DefaultVehicleFinancialLedgerRepository @Inject constructor() : VehicleFin
         return _entries.value.filter { it.vehicleId == vehicleId }
     }
 
-    override suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?): TcoMetrics {
+    override suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?, targetCurrency: CurrencyCode?): TcoMetrics {
         val vehicleEntries = getEntriesForVehicle(vehicleId)
-        val defaultCurrency = vehicleEntries.firstOrNull()?.amount?.currency ?: CurrencyCode.USD
+        val defaultCurrency = targetCurrency ?: vehicleEntries.firstOrNull()?.amount?.currency ?: CurrencyCode.USD
 
         // Strict financial truth: ONLY FinancialState.PAID represents disbursed money. INVOICED is pending.
         val paidEntries = vehicleEntries.filter { it.state == FinancialState.PAID && it.amount.currency == defaultCurrency }
