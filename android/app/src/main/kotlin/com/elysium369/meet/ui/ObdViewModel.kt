@@ -3750,6 +3750,22 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    fun cancelConnection() {
+        viewModelScope.launch {
+            voiceFeedbackManager.speak("Conexión cancelada.", "Connection cancelled.")
+            obdSession.disconnect()
+            context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
+        }
+    }
+
+    fun forceResetConnection() {
+        viewModelScope.launch {
+            voiceFeedbackManager.speak("Reiniciando interfaz de conexión y liberando puertos.", "Resetting connection interface and releasing ports.")
+            obdSession.disconnect()
+            context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
+        }
+    }
+
     fun resetTrip() {
         obdSession.resetTrip()
     }

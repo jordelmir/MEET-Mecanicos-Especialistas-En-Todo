@@ -4887,6 +4887,7 @@ class ObdSession(
     }
 
     fun disconnect() {
+        transportGenerationId.incrementAndGet()
         val sessionIdToFinish = currentVanguardSessionId
         if (sessionIdToFinish != null) {
             val modulesJson = networkModulesJson()
@@ -4915,16 +4916,95 @@ class ObdSession(
         heartbeatJob?.cancel()
         activeTestJob?.cancel()
         keepAliveManager.stop()
-        scope.launch { try { transport?.disconnect() } catch (_: Exception) { } }
+        
+        val activeTransport = transport
+        transport = null
+        scope.launch(Dispatchers.IO) {
+            transportLifecycleMutex.withLock {
+                try {
+                    activeTransport?.disconnect()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error during transport disconnect: ${e.message}")
+                }
+            }
+        }
+        
         _state.value = ObdState.DISCONNECTED
         _statusMessage.value = "Desconectado"
+        detectedProtocol = ""
+        adapterVersion = ""
+        _vin.value = null
         _liveData.value = emptyMap()
         _liveSensorStates.value = emptyMap()
         _activeTestStatus.value = ActiveTestStatus()
+        sensorSmoother.resetAll()
+        commandQueue.clear()
+        
         // Clear identification data
         _calibrationId.value = null
         _ecuName.value = null
         // Reset calculated sensor accumulators
+        lastSpeedKph = 0f
+        lastSpeedTimestampMs = 0L
+        tripDistanceKm = 0.0
+        tripFuelUsedL = 0.0
+        tripStartTimeMs = 0L
+        speedAccumulator = 0.0
+        speedSampleCount = 0
+    }
+
+    suspend fun disconnectSequentially() {
+        transportGenerationId.incrementAndGet()
+        val sessionIdToFinish = currentVanguardSessionId
+        if (sessionIdToFinish != null) {
+            val modulesJson = networkModulesJson()
+            val dtcsJson = org.json.JSONArray(_allDetectedDtcs.value.toList()).toString()
+            val mode06Json = mode06Json()
+            val derivedJson = derivedStatesJson()
+            runCatching {
+                sessionRecorder.finishSession(
+                    ObdSessionFinishContext(
+                        sessionId = sessionIdToFinish,
+                        ecuModulesJson = modulesJson,
+                        dtcsJson = dtcsJson,
+                        mode06Json = mode06Json,
+                        derivedMetricsJson = derivedJson,
+                        reconnectCount = recoveryFailureCount
+                    )
+                )
+            }.onFailure { Log.w(TAG, "Vanguard session finish failed: ${it.message}") }
+            currentVanguardSessionId = null
+        }
+        isRunning = false
+        currentJob?.cancel()
+        pollingJob?.cancel()
+        heartbeatJob?.cancel()
+        activeTestJob?.cancel()
+        keepAliveManager.stop()
+
+        transportLifecycleMutex.withLock {
+            val activeTransport = transport
+            transport = null
+            try {
+                activeTransport?.disconnect()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error closing transport: ${e.message}")
+            }
+        }
+
+        _state.value = ObdState.DISCONNECTED
+        _statusMessage.value = "Desconectado"
+        detectedProtocol = ""
+        adapterVersion = ""
+        _vin.value = null
+        _liveData.value = emptyMap()
+        _liveSensorStates.value = emptyMap()
+        _activeTestStatus.value = ActiveTestStatus()
+        sensorSmoother.resetAll()
+        commandQueue.clear()
+
+        _calibrationId.value = null
+        _ecuName.value = null
         lastSpeedKph = 0f
         lastSpeedTimestampMs = 0L
         tripDistanceKm = 0.0

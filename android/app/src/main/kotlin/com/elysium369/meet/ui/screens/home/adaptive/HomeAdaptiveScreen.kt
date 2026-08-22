@@ -295,6 +295,34 @@ fun HomeAdaptiveScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+
+                    // ── Connection Action Bar ──
+                    when (obdState) {
+                        ObdState.CONNECTED -> {
+                            EliteButton(
+                                text = "DESCONECTAR ESCÁNER",
+                                onClick = { viewModel.disconnect() },
+                                color = MeetColors.error,
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            )
+                        }
+                        ObdState.CONNECTING, ObdState.NEGOTIATING -> {
+                            EliteButton(
+                                text = "CANCELAR CONEXIÓN",
+                                onClick = { viewModel.cancelConnection() },
+                                color = MeetColors.warning,
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            )
+                        }
+                        else -> {
+                            EliteButton(
+                                text = "CONECTAR ESCÁNER OBD",
+                                onClick = { navController.safeNavigate("connect") },
+                                color = MeetColors.neonGreen,
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            )
+                        }
+                    }
                 }
             }
 

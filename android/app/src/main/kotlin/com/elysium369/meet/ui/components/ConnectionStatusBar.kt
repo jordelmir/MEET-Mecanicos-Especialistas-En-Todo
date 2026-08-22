@@ -97,7 +97,24 @@ fun ConnectionStatusBar(
                 }
 
                 if (state == ObdState.CONNECTING || state == ObdState.NEGOTIATING) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = com.elysium369.meet.ui.theme.MeetColors.warning, strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), color = com.elysium369.meet.ui.theme.MeetColors.warning, strokeWidth = 2.dp)
+                    com.elysium369.meet.ui.components.EliteTextButton(
+                        text = "CANCELAR",
+                        onClick = { viewModel.cancelConnection() },
+                        color = com.elysium369.meet.ui.theme.MeetColors.warning
+                    )
+                } else if (state == ObdState.CONNECTED) {
+                    com.elysium369.meet.ui.components.EliteTextButton(
+                        text = "DESCONECTAR",
+                        onClick = { viewModel.disconnect() },
+                        color = com.elysium369.meet.ui.theme.MeetColors.error
+                    )
+                } else if (state == ObdState.ERROR) {
+                    com.elysium369.meet.ui.components.EliteTextButton(
+                        text = "REINICIAR",
+                        onClick = { viewModel.forceResetConnection() },
+                        color = com.elysium369.meet.ui.theme.MeetColors.hotMagenta
+                    )
                 }
             }
 

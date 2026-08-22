@@ -364,4 +364,19 @@ class ProductionTruthGuardTest {
         assertEquals(CurrencyCode.USD, tco.totalPaid.currency)
         assertEquals(1000L, tco.totalPaid.amountMinor)
     }
+
+    @Test
+    fun disconnectCancelsConnectingAndFreesTransportTest() = runBlocking {
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val supervisor = com.elysium369.meet.core.obd.ConnectionSupervisor(testScope)
+
+        val transport = supervisor.switchTransport("SIMULATOR") {
+            com.elysium369.meet.core.transport.SimulatedTransport()
+        }
+        assertNotNull(transport)
+
+        // Switching / disconnecting clears old transport
+        supervisor.disconnect()
+        assertEquals(com.elysium369.meet.core.obd.TransportHealth.DISCONNECTED, supervisor.health.value.transport)
+    }
 }

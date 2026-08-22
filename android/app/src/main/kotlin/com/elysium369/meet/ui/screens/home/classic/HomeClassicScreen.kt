@@ -394,13 +394,31 @@ fun HomeClassicScreen(
                                 }
                             }
                         }
-                        if (obdState != ObdState.CONNECTED) {
-                            EliteButton(
-                                text = "CONECTAR",
-                                onClick = { navController.navigate("connect") },
-                                color = MeetColors.neonGreen,
-                                modifier = Modifier.height(36.dp)
-                            )
+                        when (obdState) {
+                            ObdState.CONNECTED -> {
+                                EliteButton(
+                                    text = "DESCONECTAR",
+                                    onClick = { viewModel.disconnect() },
+                                    color = MeetColors.error,
+                                    modifier = Modifier.height(36.dp)
+                                )
+                            }
+                            ObdState.CONNECTING, ObdState.NEGOTIATING -> {
+                                EliteButton(
+                                    text = "CANCELAR",
+                                    onClick = { viewModel.cancelConnection() },
+                                    color = MeetColors.warning,
+                                    modifier = Modifier.height(36.dp)
+                                )
+                            }
+                            else -> {
+                                EliteButton(
+                                    text = "CONECTAR",
+                                    onClick = { navController.navigate("connect") },
+                                    color = MeetColors.neonGreen,
+                                    modifier = Modifier.height(36.dp)
+                                )
+                            }
                         }
                     }
                 }

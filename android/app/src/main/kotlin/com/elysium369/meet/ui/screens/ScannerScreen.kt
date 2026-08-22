@@ -327,12 +327,35 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        if (state == ObdState.DISCONNECTED) {
-                            com.elysium369.meet.ui.components.EliteTextButton(
-                                onClick = { navController.navigate("connect") },
-                                text = if (isSpanish) "CONECTAR" else "CONNECT",
-                                color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
-                            )
+                        when (state) {
+                            ObdState.CONNECTED -> {
+                                com.elysium369.meet.ui.components.EliteTextButton(
+                                    onClick = { viewModel.disconnect() },
+                                    text = if (isSpanish) "DESCONECTAR" else "DISCONNECT",
+                                    color = com.elysium369.meet.ui.theme.MeetColors.error
+                                )
+                            }
+                            ObdState.CONNECTING, ObdState.NEGOTIATING -> {
+                                com.elysium369.meet.ui.components.EliteTextButton(
+                                    onClick = { viewModel.cancelConnection() },
+                                    text = if (isSpanish) "CANCELAR" else "CANCEL",
+                                    color = com.elysium369.meet.ui.theme.MeetColors.warning
+                                )
+                            }
+                            ObdState.ERROR -> {
+                                com.elysium369.meet.ui.components.EliteTextButton(
+                                    onClick = { viewModel.forceResetConnection() },
+                                    text = if (isSpanish) "REINICIAR" else "RESET",
+                                    color = com.elysium369.meet.ui.theme.MeetColors.hotMagenta
+                                )
+                            }
+                            else -> {
+                                com.elysium369.meet.ui.components.EliteTextButton(
+                                    onClick = { navController.navigate("connect") },
+                                    text = if (isSpanish) "CONECTAR" else "CONNECT",
+                                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                                )
+                            }
                         }
                     }
                 )
