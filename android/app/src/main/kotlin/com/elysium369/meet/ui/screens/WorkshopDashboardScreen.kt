@@ -66,7 +66,12 @@ fun WorkshopDashboardScreen(
             EliteTopAppBar(
                 title = "WORKSHOP PRO DASHBOARD\nGestión de Ofertas y Agenda",
                 onBackClick = { navController.popBackStack() },
-                backgroundColor = MeetColors.backgroundDark
+                backgroundColor = MeetColors.backgroundDark,
+                actions = {
+                    IconButton(onClick = { navController.navigate("messages?serviceVertical=repair") }) {
+                        Icon(Icons.Default.Chat, "Mensajes", tint = MeetColors.cyberCyan)
+                    }
+                },
             )
         }
     ) { padding ->

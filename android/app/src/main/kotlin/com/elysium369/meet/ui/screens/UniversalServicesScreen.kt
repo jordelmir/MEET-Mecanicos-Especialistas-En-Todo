@@ -41,6 +41,7 @@ private const val UNIVERSAL_PREFIX = "universal:"
 fun UniversalServicesScreen(
     viewModel: ObdViewModel,
     onBack: () -> Unit,
+    onOpenMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val preferences = remember {
@@ -87,6 +88,9 @@ fun UniversalServicesScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenMessages) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)
+                    }
                     IconButton(onClick = { viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("WELCOME") }) {
                         Icon(Icons.Default.VolumeUp, "Voz Asistente", tint = MeetColors.neonGreen)
                     }

@@ -43,6 +43,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.CarRepair
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
@@ -182,6 +183,13 @@ fun RepairNetworkScreen(
                 onBackClick = { navController.popBackStack() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
+                    IconButton(onClick = { navController.navigate("messages?serviceVertical=repair") }) {
+                        AnimatedNeonIcon(
+                            Icons.Default.Chat,
+                            contentDescription = "Mensajes del servicio",
+                            tint = MeetColors.cyberCyan,
+                        )
+                    }
                     IconButton(onClick = {
                         obdViewModel.voiceFeedbackManager.speak(
                             es = "Red Mecánica Elysium: Consultoría de fallas DTC, cotizaciones de talleres y compra de repuestos en tiempo real.",

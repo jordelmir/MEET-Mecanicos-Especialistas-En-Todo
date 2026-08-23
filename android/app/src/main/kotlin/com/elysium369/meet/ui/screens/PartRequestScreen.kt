@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -303,7 +304,8 @@ fun PartRequestScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
     prefilledAtlasPartId: String? = null,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var isStoreMode by remember { mutableStateOf(false) }
@@ -342,6 +344,9 @@ fun PartRequestScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenMessages) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = PartColors.cyanAccent)
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)

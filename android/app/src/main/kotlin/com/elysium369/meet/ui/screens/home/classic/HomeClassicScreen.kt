@@ -433,6 +433,7 @@ fun HomeClassicScreen(
             PhantomSectionHeader("Acciones Rápidas")
 
             val actions = buildList {
+                add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to "messages")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")

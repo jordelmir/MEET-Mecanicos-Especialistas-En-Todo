@@ -8646,23 +8646,6 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    fun openRideCallDialer(context: Context, phone: String?): Boolean {
-        val normalized = phone.orEmpty().filter { it.isDigit() || it == '+' }
-        if (normalized.count(Char::isDigit) < 7) return false
-        return try {
-            context.startActivity(
-                android.content.Intent(
-                    android.content.Intent.ACTION_DIAL,
-                    android.net.Uri.parse("tel:${android.net.Uri.encode(normalized)}"),
-                ),
-            )
-            true
-        } catch (error: Exception) {
-            Log.e("ObdViewModel", "No dialer is available for ride call", error)
-            false
-        }
-    }
-
     // Preset messages management
     fun addDriverPresetMessage(msg: String) {
         val list = _driverPresetMessages.value.toMutableList()

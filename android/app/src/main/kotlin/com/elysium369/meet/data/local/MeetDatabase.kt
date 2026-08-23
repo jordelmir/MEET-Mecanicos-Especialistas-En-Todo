@@ -87,6 +87,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         RideChatMessageEntity::class,
         RideCommandOutboxEntity::class,
 
+        // ELYSIUM COMMUNICATIONS CORE
+        CommunicationConversationEntity::class,
+        CommunicationParticipantEntity::class,
+        CommunicationEventEntity::class,
+        CommunicationReceiptEntity::class,
+        CommunicationCallEntity::class,
+
         // IDENTITY VERIFICATION
         DriverVerificationEntity::class,
         PassengerVerificationEntity::class,
@@ -133,7 +140,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         com.elysium369.meet.data.local.entities.AccessGrantEntity::class,
         com.elysium369.meet.data.local.entities.AccessAuditEventEntity::class,
     ],
-    version = 58,
+    version = 59,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -179,6 +186,9 @@ abstract class MeetDatabase : RoomDatabase() {
     // MEET RIDES DAO
     abstract fun rideDao(): RideDao
     abstract fun rideCommandOutboxDao(): RideCommandOutboxDao
+
+    // ELYSIUM COMMUNICATIONS CORE DAO
+    abstract fun communicationDao(): CommunicationDao
 
     // ELYSIUM VANGUARD TELEMETRY DAO
     abstract fun vanguardTelemetryDao(): VanguardTelemetryDao

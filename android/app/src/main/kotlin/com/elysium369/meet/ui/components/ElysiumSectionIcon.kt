@@ -74,7 +74,7 @@ private fun elysiumIconVector(rawKey: String): ImageVector? {
         "findings", "search" -> Icons.Default.Search
         "garage", "vehicle", "vehicles", "car" -> Icons.Default.List
         "ai", "health_score", "expert_diagnostic" -> Icons.Default.Psychology
-        "support_chat", "support", "fleet_chat_list", "chat" -> Icons.Default.Chat
+        "messages", "support_chat", "support", "fleet_chat_list", "chat" -> Icons.Default.Chat
         "reports", "dvir", "manuals", "vehicle_manuals", "provider_registration" -> Icons.Default.AssignmentInd
         "hud", "performance", "speed" -> Icons.Default.Speed
         "dashcam", "oscilloscope" -> Icons.Default.Tune

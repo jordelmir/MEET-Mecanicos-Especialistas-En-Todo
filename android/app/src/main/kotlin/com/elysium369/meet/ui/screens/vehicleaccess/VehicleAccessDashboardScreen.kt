@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +67,12 @@ fun VehicleAccessDashboardScreen(
         topBar = {
             EliteTopAppBar(
                 title = "VANGUARD ACCESS & IMMO",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                actions = {
+                    IconButton(onClick = { navController.navigate("messages?serviceVertical=vehicle_access") }) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },

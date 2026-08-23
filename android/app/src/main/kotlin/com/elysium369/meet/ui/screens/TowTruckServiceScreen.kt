@@ -51,7 +51,8 @@ private object TowTruckColors {
 fun TowTruckServiceScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val isDriverMode by viewModel.towTruckDriverMode.collectAsState()
@@ -99,6 +100,9 @@ fun TowTruckServiceScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenMessages) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = TowTruckColors.cyanAccent)
+                    }
                     IconButton(onClick = {
                         viewModel.voiceFeedbackManager.speak(
                             es = "Sección de Auxilio Vial y Grúas activa. Monitoreo en tiempo real con choferes verificados.",

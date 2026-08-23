@@ -66,6 +66,17 @@ android {
             ?: localProps.getProperty(legacySupabaseApiKey, "")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
+        // Public HTTPS endpoint only. LiveKit API secrets and participant tokens
+        // are minted server-side and are never embedded in the APK.
+        val communicationCallTokenUrl = localProps.getProperty(
+            "ELYSIUM_COMMUNICATION_CALL_TOKEN_URL",
+            "",
+        )
+        buildConfigField(
+            "String",
+            "COMMUNICATION_CALL_TOKEN_URL",
+            "\"$communicationCallTokenUrl\"",
+        )
 
         // Car2DB API (opcional). Si no se configura, la app funciona en modo "solo genéricos".
         val car2DbApiKey = localProps.getProperty("CAR2DB_API_KEY", "")
@@ -313,6 +324,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:storage-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.2.3")
+    implementation("io.livekit:livekit-android:2.28.0")
     implementation(platform("io.ktor:ktor-bom:2.3.13"))
     implementation("io.ktor:ktor-client-android")
     implementation("io.ktor:ktor-client-okhttp")

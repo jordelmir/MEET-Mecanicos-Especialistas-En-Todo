@@ -26,6 +26,7 @@ object MeetDestinations {
     const val PROTOCOL_LEARNING = "adaptation"
     const val ADAPTER_DIAGNOSTICS = "clone_test"
     const val LIVE_STREAM = "live_link"
+    const val MESSAGES = "messages"
     const val MECHANIC_SERVICES = "repair_network"
     const val TOW_TRUCK = "tow_truck_service"
     const val PARTS_STORE = "marketplace"
@@ -46,4 +47,3 @@ fun androidx.navigation.NavController.safeNavigate(route: String) {
         android.util.Log.e("Navigation", "Failed to navigate to route: $route", e)
     }
 }
-

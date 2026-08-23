@@ -108,6 +108,7 @@ fun RideServiceScreen(
     prefilledVehicleInfo: String? = null,
     onNavigateBack: () -> Unit = {},
     onOpenDriverRegistration: () -> Unit = {},
+    onOpenMessages: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -314,6 +315,9 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        IconButton(onClick = { onOpenMessages(activeRide?.requestId) }) {
+                            Icon(Icons.Default.Chat, "Mensajes", tint = MeetColors.cyberCyan)
+                        }
                         IconButton(onClick = {
                             viewModel.voiceFeedbackManager.speak(
                                 es = "Elysium Viajes: Monitoreo de seguridad satelital, telemetría y subasta de tarifas en tiempo real.",
@@ -383,7 +387,8 @@ fun RideServiceScreen(
                     viewModel = viewModel,
                     ride = activeRide!!,
                     isDriver = driverMode,
-                    onCloseRide = { viewModel.selectActiveRide(null) }
+                    onCloseRide = { viewModel.selectActiveRide(null) },
+                    onOpenMessages = { onOpenMessages(activeRide!!.requestId) },
                 )
             } else {
                 if (driverMode) {
@@ -2491,7 +2496,8 @@ fun ActiveRidePanel(
     viewModel: ObdViewModel,
     ride: RideRequestEntity,
     isDriver: Boolean,
-    onCloseRide: () -> Unit
+    onCloseRide: () -> Unit,
+    onOpenMessages: () -> Unit,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -3565,26 +3571,17 @@ fun ActiveRidePanel(
                     }
                     Spacer(Modifier.height(10.dp))
                     OutlinedButton(
-                        onClick = {
-                            val phone = if (isDriver) ride.passengerPhone else ride.assignedDriverPhone
-                            if (!viewModel.openRideCallDialer(context, phone)) {
-                                Toast.makeText(
-                                    context,
-                                    "Número de contacto no disponible. Usa el chat del viaje.",
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            }
-                        },
+                        onClick = onOpenMessages,
                         modifier = Modifier.fillMaxWidth(),
                         border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = .75f)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
                     ) {
-                        Icon(Icons.Default.Call, contentDescription = null)
+                        Icon(Icons.Default.Chat, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("LLAMAR CON EL TELÉFONO", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        Text("MENSAJES Y LLAMADA ELYSIUM", fontWeight = FontWeight.Black, fontSize = 11.sp)
                     }
                     Text(
-                        text = "Abre el marcador del dispositivo; la llamada no se presenta como anónima ni enmascarada.",
+                        text = "El número permanece privado. Las llamadas externas no se abren desde este flujo.",
                         color = MeetColors.textMuted,
                         fontSize = 9.sp,
                         lineHeight = 12.sp,

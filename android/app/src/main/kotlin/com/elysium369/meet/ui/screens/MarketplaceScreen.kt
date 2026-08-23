@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CarRepair
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
@@ -87,6 +88,13 @@ fun MarketplaceScreen(
                 onBackClick = { navController.popBackStack() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
+                    IconButton(onClick = { navController.navigate("messages?serviceVertical=parts") }) {
+                        AnimatedNeonIcon(
+                            Icons.Default.Chat,
+                            contentDescription = "Mensajes de repuestos",
+                            tint = MeetColors.neonGreen,
+                        )
+                    }
                     IconButton(onClick = { navController.navigate("workshop_dashboard") }) {
                         AnimatedNeonIcon(
                             Icons.Default.CarRepair,

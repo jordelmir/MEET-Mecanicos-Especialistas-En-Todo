@@ -258,6 +258,23 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel
                 )
             }
+            composable(
+                route = "messages?serviceVertical={serviceVertical}&serviceReferenceId={serviceReferenceId}&serviceTitle={serviceTitle}",
+                arguments = listOf(
+                    navArgument("serviceVertical") { defaultValue = "" },
+                    navArgument("serviceReferenceId") { defaultValue = "" },
+                    navArgument("serviceTitle") { defaultValue = "" },
+                ),
+            ) { backStack ->
+                MessagesScreen(
+                    onBack = { navController.popBackStack() },
+                    serviceVertical = backStack.arguments?.getString("serviceVertical")?.takeIf(String::isNotBlank),
+                    serviceReferenceId = backStack.arguments?.getString("serviceReferenceId")?.takeIf(String::isNotBlank),
+                    serviceTitle = backStack.arguments?.getString("serviceTitle")
+                        ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                        ?.takeIf(String::isNotBlank),
+                )
+            }
             composable("scanner") {
                 ScannerScreen(
                     navController = navController,
@@ -690,6 +707,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onBack = { navController.popBackStack() },
                     onOpenGarage = { navController.navigate("garage") },
                     onOpenTow = { navController.navigate("tow_truck_service") },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=inspection") },
                 )
             }
             composable("theory_exam_preparation") {
@@ -703,6 +721,7 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 UniversalServicesScreen(
                     viewModel = obdViewModel,
                     onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
                 )
             }
             composable("provider_registration") {
@@ -785,7 +804,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 com.elysium369.meet.ui.screens.TowTruckServiceScreen(
                     viewModel = obdViewModel,
                     prefilledVehicleInfo = vehicleInfo,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=tow") },
                 )
             }
             composable(
@@ -807,7 +827,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onNavigateBack = { navController.popBackStack() },
                     onPostScanRequested = { vehicleId ->
                         navController.navigate("inspection_session/$vehicleId")
-                    }
+                    },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=repair") },
                 )
             }
             composable(
@@ -834,7 +855,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     prefilledAtlasPartId = backStack.arguments
                         ?.getString("atlasPartId")
                         ?.takeIf { it.isNotBlank() },
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=parts") },
                 )
             }
             composable("ride_service") {
@@ -843,6 +865,13 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onNavigateBack = { navController.popBackStack() },
                     onOpenDriverRegistration = {
                         navController.navigate("provider_registration")
+                    },
+                    onOpenMessages = { referenceId ->
+                        navController.navigate(
+                            referenceId?.let {
+                                "messages?serviceVertical=ride&serviceReferenceId=$it&serviceTitle=Viaje%20Elysium"
+                            } ?: "messages?serviceVertical=ride"
+                        )
                     },
                 )
             }
@@ -881,7 +910,11 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 RepairNetworkScreen(navController = navController, viewModel = repairViewModel, obdViewModel = obdViewModel)
             }
             composable("tow_truck") {
-                TowTruckServiceScreen(viewModel = obdViewModel, onNavigateBack = { navController.popBackStack() })
+                TowTruckServiceScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=tow") },
+                )
             }
             composable("trust_center") {
                 PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.popBackStack() })
@@ -904,6 +937,13 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     onNavigateBack = { navController.popBackStack() },
                     onOpenDriverRegistration = {
                         navController.navigate("provider_registration")
+                    },
+                    onOpenMessages = { referenceId ->
+                        navController.navigate(
+                            referenceId?.let {
+                                "messages?serviceVertical=ride&serviceReferenceId=$it&serviceTitle=Viaje%20Elysium"
+                            } ?: "messages?serviceVertical=ride"
+                        )
                     },
                 )
             }

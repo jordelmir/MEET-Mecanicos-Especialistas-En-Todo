@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,7 +58,8 @@ fun MechanicServiceScreen(
     viewModel: ObdViewModel,
     prefilledVehicleInfo: String? = null,
     onNavigateBack: () -> Unit = {},
-    onPostScanRequested: (vehicleId: String) -> Unit = {}
+    onPostScanRequested: (vehicleId: String) -> Unit = {},
+    onOpenMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var isMechanicMode by remember { mutableStateOf(false) }
@@ -106,6 +108,9 @@ fun MechanicServiceScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenMessages) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MechanicColors.cyanAccent)
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)

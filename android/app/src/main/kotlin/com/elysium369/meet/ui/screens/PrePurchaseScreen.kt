@@ -192,7 +192,12 @@ fun PrePurchaseScreen(
             EliteTopAppBar(
                 title = "DIAGNÓSTICO CLÍNICO",
                 subtitle = "INSPECCIÓN PRE-COMPRA",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                actions = {
+                    IconButton(onClick = { navController.navigate("messages?serviceVertical=inspection") }) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)
+                    }
+                },
             )
         },
         containerColor = MeetColors.backgroundDeep

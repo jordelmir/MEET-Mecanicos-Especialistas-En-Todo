@@ -3755,6 +3755,116 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_58_59 = object : Migration(58, 59) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_conversations (
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    serviceVertical TEXT,
+                    serviceReferenceId TEXT,
+                    requestState TEXT NOT NULL,
+                    proofState TEXT NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL,
+                    lastEventAtEpochMs INTEGER,
+                    PRIMARY KEY(conversationId, ownerPrincipalId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_conversations_ownerPrincipalId_lastEventAtEpochMs ON communication_conversations(ownerPrincipalId, lastEventAtEpochMs)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_communication_conversations_ownerPrincipalId_serviceVertical_serviceReferenceId ON communication_conversations(ownerPrincipalId, serviceVertical, serviceReferenceId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_participants (
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    participantPrincipalId TEXT NOT NULL,
+                    displayName TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    membershipState TEXT NOT NULL,
+                    isVerifiedProvider INTEGER NOT NULL,
+                    joinedAtEpochMs INTEGER NOT NULL,
+                    revokedAtEpochMs INTEGER,
+                    PRIMARY KEY(conversationId, ownerPrincipalId, participantPrincipalId),
+                    FOREIGN KEY(conversationId, ownerPrincipalId)
+                        REFERENCES communication_conversations(conversationId, ownerPrincipalId)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_participants_conversationId_ownerPrincipalId ON communication_participants(conversationId, ownerPrincipalId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_participants_ownerPrincipalId_participantPrincipalId ON communication_participants(ownerPrincipalId, participantPrincipalId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_events (
+                    eventId TEXT NOT NULL PRIMARY KEY,
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    senderPrincipalId TEXT NOT NULL,
+                    senderDeviceId TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    localCiphertextBase64 TEXT NOT NULL,
+                    localNonceBase64 TEXT NOT NULL,
+                    remoteEnvelopeJson TEXT,
+                    replyToEventId TEXT,
+                    syncState TEXT NOT NULL,
+                    serverSequence INTEGER,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    receivedAtEpochMs INTEGER,
+                    FOREIGN KEY(conversationId, ownerPrincipalId)
+                        REFERENCES communication_conversations(conversationId, ownerPrincipalId)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_events_conversationId_ownerPrincipalId_createdAtEpochMs ON communication_events(conversationId, ownerPrincipalId, createdAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_events_ownerPrincipalId_syncState ON communication_events(ownerPrincipalId, syncState)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_communication_events_conversationId_serverSequence ON communication_events(conversationId, serverSequence)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_events_conversationId_ownerPrincipalId ON communication_events(conversationId, ownerPrincipalId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_receipts (
+                    eventId TEXT NOT NULL,
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    readerPrincipalId TEXT NOT NULL,
+                    receiptType TEXT NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(eventId, ownerPrincipalId, readerPrincipalId, receiptType)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_receipts_ownerPrincipalId_conversationId ON communication_receipts(ownerPrincipalId, conversationId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_calls (
+                    callId TEXT NOT NULL PRIMARY KEY,
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    mediaType TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    transportProofState TEXT NOT NULL,
+                    startedAtEpochMs INTEGER NOT NULL,
+                    answeredAtEpochMs INTEGER,
+                    endedAtEpochMs INTEGER,
+                    failureCode TEXT
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_calls_ownerPrincipalId_startedAtEpochMs ON communication_calls(ownerPrincipalId, startedAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_calls_conversationId ON communication_calls(conversationId)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -3799,7 +3909,8 @@ object AppModule {
             MIGRATION_54_55,
             MIGRATION_55_56,
             MIGRATION_56_57,
-            MIGRATION_57_58
+            MIGRATION_57_58,
+            MIGRATION_58_59
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -3996,6 +4107,11 @@ object AppModule {
         db: MeetDatabase
     ): com.elysium369.meet.ride.data.local.RideCommandOutboxDao =
         db.rideCommandOutboxDao()
+
+    @Provides
+    fun provideCommunicationDao(
+        db: MeetDatabase,
+    ): com.elysium369.meet.data.local.dao.CommunicationDao = db.communicationDao()
 
     @Provides
     @Singleton

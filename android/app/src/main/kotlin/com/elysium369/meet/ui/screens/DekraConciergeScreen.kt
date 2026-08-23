@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.LocalShipping
@@ -40,6 +41,7 @@ fun DekraConciergeScreen(
     onBack: () -> Unit,
     onOpenGarage: () -> Unit,
     onOpenTow: () -> Unit,
+    onOpenMessages: () -> Unit = {},
 ) {
     val vehicle by viewModel.selectedVehicle.collectAsState()
     val activeDtcs by viewModel.activeDtcs.collectAsState()
@@ -82,6 +84,11 @@ fun DekraConciergeScreen(
                 title = "MEET → DEKRA\nConcierge de Inspección",
                 onBackClick = onBack,
                 backgroundColor = MeetColors.backgroundDark,
+                actions = {
+                    IconButton(onClick = onOpenMessages) {
+                        Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)
+                    }
+                },
             )
         },
     ) { padding ->
