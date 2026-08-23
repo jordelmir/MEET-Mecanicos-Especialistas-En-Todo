@@ -29,7 +29,12 @@ jobs:
         run: |
           supabase db start
           supabase db reset --local --no-seed
-          supabase status -o env >> "$GITHUB_ENV"
+          # `status -o env` quotes values for shell evaluation. GitHub's env
+          # file preserves those quotes literally, which makes psql fall back
+          # to a local socket. Export only the unquoted database URL.
+          DB_URL_VALUE=$(supabase status -o env | sed -n 's/^DB_URL="\([^"]*\)"$/\1/p')
+          test -n "$DB_URL_VALUE"
+          echo "DB_URL=$DB_URL_VALUE" >> "$GITHUB_ENV"
 
       - name: Verify Core Schemas & Functions Exist
         run: |
