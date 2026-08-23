@@ -92,16 +92,68 @@ Reglas:
 
 ## 5. Cobertura de verticales
 
-| Vertical | Transacción | Evidencia mínima antes de liquidar |
-| --- | --- | --- |
-| Reparación/taller | `REPAIR_SERVICE` | orden aceptada, diagnóstico, evidencia antes/después, trabajo ejecutado, importe final y confirmación del flujo de cierre |
-| Grúa/rescate | `TOW_SERVICE` | origen/destino contratados, llegada, recogida y entrega con tiempos/ubicación o evidencia equivalente |
-| Viaje | `RIDE_SERVICE` | conductor y vehículo verificados, recorrido iniciado/finalizado, monto contratado y ausencia de disputa activa |
-| Repuestos | `PARTS_ORDER` | SKU/OEM o compatibilidad declarada, estado del artículo, entrega y recepción; VIN/OEM cuando se afirme aplicabilidad |
-| Inspección | `INSPECTION_SERVICE` | alcance, checklist, informe firmado/hash y entrega al cliente |
-| Servicios Elysium | `UNIVERSAL_SERVICE` | plantilla de evidencia según definición, modalidad y nivel de riesgo |
+| Vertical | Transacción | Evidencia mínima antes de liquidar | Imágenes por paso |
+| --- | --- | --- | --- |
+| Reparación/taller | `REPAIR_SERVICE` | orden aceptada, diagnóstico, evidencia antes/después, trabajo ejecutado, importe final y confirmación del flujo de cierre | obligatorias |
+| Grúa/rescate | `TOW_SERVICE` | origen/destino contratados, llegada, recogida y entrega con tiempos/ubicación o evidencia equivalente | obligatorias |
+| Viaje | `RIDE_SERVICE` | conductor y vehículo verificados, recorrido iniciado/finalizado, monto contratado y ausencia de disputa activa | excluidas de este sistema |
+| Repuestos | `PARTS_ORDER` | SKU/OEM o compatibilidad declarada, estado del artículo, entrega y recepción; VIN/OEM cuando se afirme aplicabilidad | obligatorias |
+| Inspección | `INSPECTION_SERVICE` | alcance, checklist, informe firmado/hash y entrega al cliente | obligatorias |
+| Servicios Elysium | `UNIVERSAL_SERVICE` | plantilla de evidencia según definición, modalidad y nivel de riesgo | obligatorias |
 
 El motor no debe imponer una única evidencia genérica. Cada `service_definition` referencia una `evidence_policy_version`.
+
+### 5.1 Evidencia visual obligatoria por momento
+
+Todo servicio distinto de `RIDE_SERVICE` se descompone en uno o más pasos de ejecución. Cada paso declarado exige, como mínimo, un conjunto visual `BEFORE` y otro `AFTER` antes de poder completarse.
+
+Ejemplo:
+
+```text
+Paso: Cambiar tubo de refrigerante
+  BEFORE -> tubo instalado, daño/fuga y área de trabajo antes de intervenir
+  AFTER  -> tubo nuevo instalado, conexiones terminadas y área final
+```
+
+No es suficiente subir dos imágenes genéricas al final de la orden. Cada imagen queda vinculada a:
+
+- orden, versión contractual y paso concreto;
+- fase `BEFORE` o `AFTER`;
+- autor autenticado y rol;
+- hora declarada por el dispositivo y hora recibida por el servidor;
+- origen `CAMERA_CAPTURE`, `GALLERY_IMPORT`, `DOCUMENT_RENDER` o `SCREEN_CAPTURE`;
+- hash SHA-256, tipo MIME, tamaño y dimensiones;
+- manifiesto de lote y versión de evidencia;
+- consentimiento/advertencia de privacidad cuando corresponda.
+
+El flujo por paso es:
+
+```text
+DECLARED
+  -> BEFORE_REQUIRED
+  -> BEFORE_COMPLETE
+  -> WORK_IN_PROGRESS
+  -> AFTER_REQUIRED
+  -> AFTER_COMPLETE
+  -> REVIEWABLE
+  -> ACCEPTED | DISPUTED
+```
+
+Reglas autoritativas:
+
+- No se puede iniciar normalmente un paso sin al menos una imagen `BEFORE` válida.
+- No se puede marcar completado sin al menos una imagen `AFTER` válida.
+- No se puede enviar la orden a satisfacción ni liquidación si cualquier paso obligatorio está incompleto.
+- Reemplazar o borrar una imagen ya publicada está prohibido. Una corrección crea una nueva versión y conserva la anterior.
+- Las imágenes importadas de galería se rotulan como tales; nunca se presentan como captura en vivo.
+- La app calcula el hash local, pero el backend vuelve a calcularlo al cerrar la carga.
+- La comparación antes/después ayuda a revisar, pero ningún algoritmo afirma por sí solo que el trabajo fue correcto.
+- El cliente puede disputar un paso específico y señalar la imagen o ausencia correspondiente.
+- En una emergencia de seguridad, el proveedor puede diferir la captura previa con un motivo tipado y evidencia tan pronto sea seguro; la excepción no permite liquidar sin revisión administrativa.
+
+Para servicios físicos, las imágenes representan el objeto, espacio o condición intervenida. Para servicios digitales o profesionales, representan el estado/entregable inicial y el resultado visible, con redacción y controles de privacidad cuando haya información sensible. Si el servicio no puede documentarse visualmente sin exponer datos protegidos, el proveedor solicita una excepción de privacidad; MEET define evidencia sustituta y la liquidación requiere revisión humana.
+
+Los viajes se excluyen expresamente de esta obligación por paso. Sus controles existentes de conductor, ruta, llegada y finalización continúan vigentes, pero no se les añade un requisito de fotografías antes/después.
 
 ## 6. Ciclo financiero canónico
 
@@ -189,6 +241,10 @@ Las migraciones serán aditivas y usarán UUID, timestamps del servidor, `versio
 - `commission_policies`: código, vertical, 500 bps, base, redondeo, vigencia y estado.
 - `evidence_policies`: requisitos por vertical, modalidad, riesgo y versión.
 - `service_financial_contracts`: instantánea inmutable del contrato aceptado, precio, moneda, comisión, partes y hashes de términos/evidencia.
+- `service_execution_steps`: pasos congelados por orden, secuencia, descripción, riesgo y estado de evidencia.
+- `service_step_evidence_sets`: fase `BEFORE`/`AFTER`, paso, versión, manifiesto y estado de revisión.
+- `service_media_objects`: objeto privado, autor, origen, metadatos seguros, hash calculado por servidor y estado de carga.
+- `service_evidence_exceptions`: excepción de emergencia o privacidad, motivo tipado, evidencia sustituta y decisión administrativa.
 
 ### 8.2 Fondos y conciliación
 
@@ -217,6 +273,11 @@ Los siguientes contratos se implementan como funciones transaccionales versionad
 - `reconcile_funding_v1(funding_intent_id, external_event_id, idempotency_key)` — automático firmado o administrador autorizado.
 - `reserve_order_funds_v1(order_id, contract_version, idempotency_key)`
 - `submit_completion_proof_v1(order_id, evidence_manifest_hash, idempotency_key)`
+- `declare_service_step_v1(order_id, title, sequence, expected_version, idempotency_key)`
+- `request_step_media_upload_v1(step_id, phase, media_metadata, idempotency_key)`
+- `finalize_step_media_upload_v1(upload_id, client_sha256, idempotency_key)`
+- `complete_service_step_v1(step_id, before_manifest_sha256, after_manifest_sha256, expected_version, idempotency_key)`
+- `request_evidence_exception_v1(step_id, reason_code, substitute_manifest_sha256, idempotency_key)`
 - `accept_service_result_v1(order_id, expected_version, idempotency_key)`
 - `open_service_dispute_v1(order_id, reason_code, evidence_manifest_hash, idempotency_key)`
 - `decide_service_settlement_v1(order_id, decision, rationale, expected_version, idempotency_key)` — autoridad administrativa.
@@ -261,12 +322,15 @@ Mientras no exista API bancaria, el piloto puede crear referencias y una bandeja
 - Pantalla de pago genera referencia e instrucciones SINPE, importe exacto y vencimiento.
 - Estado `Verificando transferencia` hasta conciliación real.
 - Línea de tiempo: financiado, reservado, trabajo iniciado, evidencia recibida, revisión, liquidación y cierre.
+- Línea de tiempo visual por pasos con comparación lado a lado `Antes`/`Después`, descripción y estado de revisión.
 - Revisión final compara contrato, entregables y evidencia; ofrece `Aceptar resultado` y `Reportar problema` con consecuencias claras.
 - El saldo se presenta por buckets y origen; nunca como un único número ambiguo.
 
 ### 11.2 Proveedor
 
 - Antes de ofertar acepta el contrato de comisión del 5%.
+- Antes de iniciar, ve el checklist de pasos y captura el `Antes`; al terminar cada uno, captura el `Después` desde el mismo flujo.
+- La cámara guía encuadre, enfoque y repetición sin afirmar autenticidad que el dispositivo no pueda probar.
 - Cada oferta muestra bruto, comisión estimada y neto estimado.
 - Tras liquidación muestra bruto capturado, comisión exacta y neto pagable.
 - El retiro requiere identidad y destino verificados.
@@ -334,6 +398,7 @@ Un proceso diario produce una prueba de conciliación firmada con saldos inicial
 ### Fase 2 — Evidencia y satisfacción
 
 - Manifiestos de evidencia por vertical, revisión del cliente, disputas y consola del propietario.
+- Captura visual antes/después por cada paso no-viaje, almacenamiento privado, hashes y excepciones controladas.
 
 ### Fase 3 — SINPE controlado
 
@@ -374,6 +439,9 @@ Cada fase es aditiva. Ninguna sustituye las máquinas de reparación, viajes o m
 ### Android
 
 - UI nunca convierte montos mediante `Double`.
+- todos los servicios no-viaje bloquean la finalización si falta `BEFORE` o `AFTER` en cualquier paso obligatorio.
+- viajes permanecen fuera del requisito visual sin perder sus verificaciones propias.
+- carga interrumpida, reintento, imagen duplicada, hash divergente y corrección versionada no pierden ni sustituyen evidencia publicada.
 - proceso recreado, offline y reintentos no duplican comandos.
 - estado local obsoleto no muestra fondos disponibles ni permite aceptar dos veces.
 - instalación, lanzamiento, navegación, proceso en primer plano y ausencia de crash en Android físico.
@@ -401,6 +469,7 @@ El sistema está listo para producción únicamente cuando:
 7. Cada vertical exige su evidencia real antes de ser elegible para liberación.
 8. Las puertas jurídicas, empresariales, bancarias, fiscales y de identidad están documentadas como cumplidas.
 9. Los tests financieros, de concurrencia, seguridad, CI, APK y Android físico están verdes con evidencia conservada.
+10. Toda orden no-viaje conserva un par `BEFORE`/`AFTER` verificable por cada paso obligatorio, mientras `RIDE_SERVICE` permanece explícitamente fuera de ese requisito visual.
 
 ## 18. Fuentes regulatorias de diseño
 
