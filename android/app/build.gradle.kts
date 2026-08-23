@@ -50,10 +50,10 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 36
-        // Source identity is independent from verification state. 4.16.0/code 44
-        // remains the latest verified artifact until the 4.17 proof gates pass.
-        versionCode = 46
-        versionName = "4.20.0"
+        // Release identity for the integrated Vehicle Truth hardening, DEKRA
+        // concierge and 2026 Theory Exam Academy publication.
+        versionCode = 47
+        versionName = "4.21.0"
 
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
