@@ -32,8 +32,13 @@ revoke execute on function public.ride_mirror_wallet_ledger_entry(uuid)
     from authenticated;
 revoke execute on function public.recalculate_provider_reputation_v1(uuid)
     from authenticated;
-revoke execute on function public.rls_auto_enable()
-    from authenticated;
+do $optional_legacy_rls_helper$
+begin
+    if to_regprocedure('public.rls_auto_enable()') is not null then
+        revoke execute on function public.rls_auto_enable() from authenticated;
+    end if;
+end;
+$optional_legacy_rls_helper$;
 
 -- Legacy RPCs trusted caller-supplied actor/reviewer identifiers. They remain
 -- available to service_role for controlled maintenance, but not to clients.
