@@ -102,11 +102,11 @@ class DashboardViewModel @Inject constructor(
                                 _aiInsight.value = response.text.trim().replace(".", "").uppercase()
                             },
                             onFailure = {
-                                _aiInsight.value = "SISTEMA NOMINAL • SIN ANOMALÍAS"
+                                _aiInsight.value = "ANÁLISIS IA NO DISPONIBLE • SIN CONCLUSIÓN"
                             }
                         )
                     } catch (e: Exception) {
-                        _aiInsight.value = "SISTEMA NOMINAL • SIN ANOMALÍAS"
+                        _aiInsight.value = "ANÁLISIS IA NO DISPONIBLE • SIN CONCLUSIÓN"
                     }
                 }
             }

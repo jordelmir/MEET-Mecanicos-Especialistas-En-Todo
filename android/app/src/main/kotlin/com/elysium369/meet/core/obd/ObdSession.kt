@@ -42,9 +42,14 @@ enum class PhysicalBusOwner {
     IDLE,
     NETWORK_DISCOVERY,
     DIAGNOSTIC_SCAN,
+    FREEZE_FRAME,
+    READINESS,
+    MODE_06,
     OSCILLOSCOPE,
     ACTIVE_TEST,
     DTC_CLEAR,
+    VIN_READ,
+    EVAIR_READ,
     TERMINAL_READ,
 }
 
@@ -161,6 +166,8 @@ class ObdSession(
     val vin: StateFlow<String?> = _vin.asStateFlow()
 
     private var transport: TransportInterface? = null
+    val activeTransportName: String?
+        get() = transport?.javaClass?.simpleName
     private var isRunning = false
     @Volatile
     private var isPollingPaused = false
@@ -245,10 +252,12 @@ class ObdSession(
         return report.records.map { it.code }.distinct()
     }
 
-    suspend fun clearDtcErrors(): Boolean {
-        val result = clearDtcs()
-        return result is ClearDtcResult.Verified || result is ClearDtcResult.PartiallyVerified || result is ClearDtcResult.AcceptedButNotVerified
-    }
+    @Deprecated(
+        message = "Boolean cannot represent accepted, partial, inconclusive and verified clear outcomes. Use clearDtcs().",
+        level = DeprecationLevel.ERROR,
+    )
+    suspend fun clearDtcErrors(): Boolean =
+        error("Legacy clear API retired: use clearDtcs() and inspect ClearDtcResult")
 
     private val _calibrationId = MutableStateFlow<String?>(null)
     val calibrationId: StateFlow<String?> = _calibrationId.asStateFlow()
@@ -449,13 +458,13 @@ class ObdSession(
         }
     }
 
-    fun setTargetAddress(address: String) {
-        scope.launch(Dispatchers.IO) {
-            setTargetAddressSequentially(address)
-        }
+    suspend fun setTargetAddress(address: String) = setTargetAddressSequentially(address)
+
+    suspend fun connect() = transportLifecycleMutex.withLock {
+        connectOwned()
     }
 
-    suspend fun connect() {
+    private suspend fun connectOwned() {
         if (_state.value == ObdState.CONNECTED || _state.value == ObdState.CONNECTING) return
 
         val currentGen = transportGenerationId.get()
@@ -502,6 +511,12 @@ class ObdSession(
                     withTimeout(90000) {
                         initializeAdapter()
                     }
+                }
+
+                if (currentGen != transportGenerationId.get() || transport !== activeTransport) {
+                    Log.w(TAG, "Discarding stale connect success for generation $currentGen")
+                    runCatching { activeTransport.disconnect() }
+                    return
                 }
 
                 // Reset smoother on new successful connection
@@ -565,7 +580,7 @@ class ObdSession(
                 _statusMessage.value = "Identificando vehículo..."
                 scope.launch {
                     try {
-                        fetchVin()
+                        readVinFromVehicle()
                         fetchCalibrationId()
                         fetchEcuName()
                         _statusMessage.value = if (_vin.value != null && _vin.value != "N/A") {
@@ -2176,7 +2191,10 @@ class ObdSession(
      * Reads Freeze Frame data for a specific DTC (Mode 02).
      * @param dtc The fault code to query.
      */
-    suspend fun readFreezeFrame(dtc: String): FreezeFrameReadResult {
+    suspend fun readFreezeFrame(dtc: String): FreezeFrameReadResult =
+        withExclusivePhysicalBus(PhysicalBusOwner.FREEZE_FRAME) { readFreezeFrameOwned(dtc) }
+
+    private suspend fun readFreezeFrameOwned(dtc: String): FreezeFrameReadResult {
         val results = mutableMapOf<String, String>()
         val rawExchanges = linkedMapOf<String, String>()
         val requestedDtc = dtc.trim().uppercase()
@@ -3228,31 +3246,47 @@ class ObdSession(
         return "No se pudo verificar aceptación de borrado: $reason.$adapterNotice"
     }
 
-    suspend fun fetchVin(): String {
-        if (_state.value != ObdState.CONNECTED) return "N/A"
-        
+    /**
+     * Reads a VIN from a physical ECU and returns the exact exchange that proved it.
+     * Metadata, cached profiles and user-entered VINs are deliberately not fallbacks.
+     */
+    suspend fun readVinFromVehicle(): VinReadResult {
+        if (_state.value != ObdState.CONNECTED) {
+            return VinReadResult(
+                outcome = VinReadOutcome.NOT_CONNECTED,
+                capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
+            )
+        }
+        return withExclusivePhysicalBus(PhysicalBusOwner.VIN_READ) {
+            readVinFromVehicleOwned()
+        }
+    }
+
+    private suspend fun readVinFromVehicleOwned(): VinReadResult {
+        var receivedResponse = false
+        var lastInvalidResponse: String? = null
+
         // Multi-protocol VIN candidate commands
-        val vinCommands = listOf("0902", "22F190", "1A90", "2100", "2101", "22F187", "22F189")
+        val vinCommands = listOf("0902", "22F190", "1A90", "2100", "2101")
         for (cmd in vinCommands) {
             try {
                 val response = sendRawCommand(cmd)
-                val vin = CanMultiFrameParser.decodeVin(response)
-                if (vin.isNotBlank() && vin != "N/A") {
-                    _vin.value = vin
-                    Log.i(TAG, "✓ VIN captured via $cmd: $vin")
-                    val address = targetAddress ?: "unknown"
-                    val protoEnum = ObdProtocol.values().find { it.displayName.equals(detectedProtocol, ignoreCase = true) } ?: ObdProtocol.AUTO
-                    val prof = ElmNegotiator.AdapterProfile(
-                        chipVersion = adapterVersion,
-                        isClone = isCloneAdapter,
-                        isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("vLinker", true),
-                        detectedProtocol = protoEnum,
-                        baseDelayMs = baseDelayMs,
-                        maxLineLength = maxLineLength,
-                        vin = vin
+                receivedResponse = receivedResponse || response.isMeaningfulObdResponse()
+                lastInvalidResponse = response.takeIf { it.isMeaningfulObdResponse() }
+                val vin = response
+                    .takeIf { it.acknowledgesVinCommand(cmd) }
+                    ?.let(CanMultiFrameParser::decodeVin)
+                    ?.let(VinValidator::normalize)
+                if (vin != null) {
+                    persistVerifiedVin(vin)
+                    return VinReadResult(
+                        outcome = VinReadOutcome.VERIFIED,
+                        vin = vin,
+                        command = cmd,
+                        rawResponse = response,
+                        protocol = detectedProtocol,
+                        capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
                     )
-                    AdapterFingerprint(context).saveProfile(address, prof, vin)
-                    return vin
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "VIN probe $cmd failed: ${e.message}")
@@ -3271,31 +3305,83 @@ class ObdSession(
             try {
                 sendRawCommand(headerCmd)
                 val response = sendRawCommand(readCmd)
-                val vin = CanMultiFrameParser.decodeVin(response)
-                if (vin.isNotBlank() && vin != "N/A") {
-                    _vin.value = vin
-                    Log.i(TAG, "✓ VIN captured via $headerCmd -> $readCmd: $vin")
-                    val address = targetAddress ?: "unknown"
-                    val protoEnum = ObdProtocol.values().find { it.displayName.equals(detectedProtocol, ignoreCase = true) } ?: ObdProtocol.AUTO
-                    val prof = ElmNegotiator.AdapterProfile(
-                        chipVersion = adapterVersion,
-                        isClone = isCloneAdapter,
-                        isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("vLinker", true),
-                        detectedProtocol = protoEnum,
-                        baseDelayMs = baseDelayMs,
-                        maxLineLength = maxLineLength,
-                        vin = vin
+                receivedResponse = receivedResponse || response.isMeaningfulObdResponse()
+                lastInvalidResponse = response.takeIf { it.isMeaningfulObdResponse() }
+                val vin = response
+                    .takeIf { it.acknowledgesVinCommand(readCmd) }
+                    ?.let(CanMultiFrameParser::decodeVin)
+                    ?.let(VinValidator::normalize)
+                if (vin != null) {
+                    persistVerifiedVin(vin)
+                    return VinReadResult(
+                        outcome = VinReadOutcome.VERIFIED,
+                        vin = vin,
+                        command = readCmd,
+                        header = headerCmd,
+                        rawResponse = response,
+                        protocol = detectedProtocol,
+                        capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
                     )
-                    AdapterFingerprint(context).saveProfile(address, prof, vin)
-                    // Reset header to default broadcast
-                    runCatching { sendRawCommand("ATSH 7DF") }
-                    return vin
                 }
             } catch (_: Exception) {}
+            finally {
+                runCatching { sendRawCommand("ATSH 7DF") }
+            }
         }
-        runCatching { sendRawCommand("ATSH 7DF") }
+        return VinReadResult(
+            outcome = if (receivedResponse) VinReadOutcome.INVALID_RESPONSE else VinReadOutcome.NO_RESPONSE,
+            rawResponse = lastInvalidResponse,
+            protocol = detectedProtocol,
+            capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
+        )
+    }
 
-        return "N/A"
+    private fun String.isMeaningfulObdResponse(): Boolean {
+        val normalized = uppercase().replace(" ", "")
+        return isNotBlank() && normalized !in setOf("NODATA", "?", "ERROR", "STOPPED")
+    }
+
+    private fun String.acknowledgesVinCommand(command: String): Boolean {
+        val compact = uppercase().replace(Regex("[^A-F0-9]"), "")
+        val positivePrefix = when (command.uppercase().replace(" ", "")) {
+            "0902" -> "4902"
+            "22F190" -> "62F190"
+            "1A90" -> "5A90"
+            "2100" -> "6100"
+            "2101" -> "6101"
+            else -> return false
+        }
+        if (compact.contains(positivePrefix)) return true
+
+        // Some gateways return a decoded ASCII VIN without the service bytes.
+        // Accept only a standalone canonical VIN line, never arbitrary banner text.
+        return lineSequence()
+            .map(String::trim)
+            .any { VinValidator.normalize(it) != null }
+    }
+
+    private fun persistVerifiedVin(vin: String) {
+        _vin.value = vin
+        Log.i(TAG, "✓ VIN physically verified: $vin")
+        val address = targetAddress ?: "unknown"
+        val protoEnum = ObdProtocol.values().find {
+            it.displayName.equals(detectedProtocol, ignoreCase = true)
+        } ?: ObdProtocol.AUTO
+        val profile = ElmNegotiator.AdapterProfile(
+            chipVersion = adapterVersion,
+            isClone = isCloneAdapter,
+            isSTN = adapterVersion.contains("STN", true) || adapterVersion.contains("vLinker", true),
+            detectedProtocol = protoEnum,
+            baseDelayMs = baseDelayMs,
+            maxLineLength = maxLineLength,
+            vin = vin,
+        )
+        AdapterFingerprint(context).saveProfile(address, profile, vin)
+    }
+
+    @Deprecated("Use readVinFromVehicle() and inspect its physical evidence outcome")
+    suspend fun fetchVin(): String {
+        return readVinFromVehicle().vin ?: "N/A"
     }
 
     /**
@@ -3364,7 +3450,10 @@ class ObdSession(
         }
     }
 
-    suspend fun readReadinessMonitors(): ReadinessResult? {
+    suspend fun readReadinessMonitors(): ReadinessResult? =
+        withExclusivePhysicalBus(PhysicalBusOwner.READINESS) { readReadinessMonitorsOwned() }
+
+    private suspend fun readReadinessMonitorsOwned(): ReadinessResult? {
         if (_state.value != ObdState.CONNECTED) return null
         return try {
             val response = sendRawCommand("0101")
@@ -3407,9 +3496,14 @@ class ObdSession(
                 monitors.add(MonitorStatus("EGR/VVT", (c and 0x80) != 0, (d and 0x80) == 0))
             }
 
-            ReadinessResult(milOn, dtcCount, monitors.filter { it.available })
+            ReadinessResult(milOn, dtcCount, monitors.filter { it.available }).also {
+                _readinessResult.value = it
+            }
         } catch (_: Exception) { null }
     }
+
+    private val _readinessResult = MutableStateFlow<ReadinessResult?>(null)
+    val readinessResult: StateFlow<ReadinessResult?> = _readinessResult.asStateFlow()
 
     // ═══════════════════════════════════════════════
     // MODE $06 — NONCONTINUOUS MONITOR TEST RESULTS
@@ -3457,7 +3551,10 @@ class ObdSession(
      * 2. Queries each supported MID.
      * 3. Uses Mode06Parser for expert decoding and pro-tips.
      */
-    suspend fun readMode06Results(): List<Mode06TestResult> {
+    suspend fun readMode06Results(): List<Mode06TestResult> =
+        withExclusivePhysicalBus(PhysicalBusOwner.MODE_06) { readMode06ResultsOwned() }
+
+    private suspend fun readMode06ResultsOwned(): List<Mode06TestResult> {
         if (_state.value != ObdState.CONNECTED) return emptyList()
 
         _statusMessage.value = "Iniciando escaneo profundo de monitores (Mode $06)..."
@@ -3871,7 +3968,7 @@ class ObdSession(
      * Attempts to read the vehicle odometer.
      * Uses Standard Mode 01 PID A6 if supported, or common fallback PIDs.
      */
-    suspend fun readOdometer(): Float {
+    suspend fun readOdometer(): Float? {
         if (_state.value != ObdState.CONNECTED) return 0f
 
         val vinVal = vin.value ?: ""
@@ -3966,7 +4063,7 @@ class ObdSession(
             }
         }
 
-        return 0f
+        return null
     }
 
     // ═══════════════════════════════════════════════════
@@ -4366,6 +4463,14 @@ class ObdSession(
         }
     }
 
+    /** Synchronous active-test entry point for callers that must retain terminal proof. */
+    suspend fun executeActiveTestForEvair(test: ActiveTest): ActiveTestStatus {
+        withExclusivePhysicalBus(PhysicalBusOwner.ACTIVE_TEST) {
+            runActiveTestOwned(test)
+        }
+        return _activeTestStatus.value
+    }
+
     private suspend fun runActiveTestOwned(test: ActiveTest) {
         var activationRequested = false
         var activationAcknowledged = false
@@ -4738,6 +4843,40 @@ class ObdSession(
         }
     }
 
+    /** Restricted physical read surface for EVAIR. Arbitrary adapter commands are not accepted. */
+    suspend fun readPidsForEvair(pids: Set<String>): List<PhysicalPidReadEvidence> {
+        require(pids.isNotEmpty()) { "At least one PID is required" }
+        require(_state.value == ObdState.CONNECTED) { "OBD vehicle is not connected" }
+        val canonical = pids.map { it.trim().uppercase() }.distinct()
+        canonical.forEach { command ->
+            require(command.matches(Regex("^[0-9A-F]{4,6}$"))) { "Malformed PID command: $command" }
+            val mode = command.take(2)
+            val pid = command.drop(2)
+            require(PidRegistry.getPid(mode, pid) != null) {
+                "PID is not registered for physical reading: $command"
+            }
+        }
+        return withExclusivePhysicalBus(PhysicalBusOwner.EVAIR_READ) {
+            canonical.map { command ->
+                val response = sendRawCommand(command)
+                val requestedService = command.take(2).toInt(16)
+                val expectedPrefix = "%02X%s".format(
+                    (requestedService + 0x40) and 0xFF,
+                    command.drop(2),
+                )
+                val normalized = CanMultiFrameParser.parse(response)
+                    .replace(Regex("[^0-9A-Fa-f]"), "")
+                    .uppercase()
+                PhysicalPidReadEvidence(
+                    command = command,
+                    rawResponse = response,
+                    acknowledgedByEcu = normalized.contains(expectedPrefix),
+                    capturedAtMonotonicMs = System.nanoTime() / 1_000_000L,
+                )
+            }
+        }
+    }
+
     internal suspend fun executeTerminalRead(command: String): String =
         withExclusivePhysicalBus(PhysicalBusOwner.TERMINAL_READ) {
             val protocolBefore = detectedProtocol
@@ -4936,6 +5075,7 @@ class ObdSession(
         _vin.value = null
         _liveData.value = emptyMap()
         _liveSensorStates.value = emptyMap()
+        clearVehicleScopedTruth()
         _activeTestStatus.value = ActiveTestStatus()
         sensorSmoother.resetAll()
         commandQueue.clear()
@@ -4999,6 +5139,7 @@ class ObdSession(
         _vin.value = null
         _liveData.value = emptyMap()
         _liveSensorStates.value = emptyMap()
+        clearVehicleScopedTruth()
         _activeTestStatus.value = ActiveTestStatus()
         sensorSmoother.resetAll()
         commandQueue.clear()
@@ -5012,6 +5153,16 @@ class ObdSession(
         tripStartTimeMs = 0L
         speedAccumulator = 0.0
         speedSampleCount = 0
+    }
+
+    private fun clearVehicleScopedTruth() {
+        _telemetrySamples.value = emptyMap()
+        _freezeFrame.value = emptyMap()
+        _allDetectedDtcs.value = emptySet()
+        _lastDtcScanReport.value = null
+        _mode06Results.value = emptyList()
+        _readinessResult.value = null
+        _activeTestEvidence.value = emptyList()
     }
 
     private fun networkModulesJson(): String {

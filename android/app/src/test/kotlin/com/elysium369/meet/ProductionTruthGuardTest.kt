@@ -89,7 +89,7 @@ class ProductionTruthGuardTest {
     fun vehicleActionCannotReportUnexecutedSuccessTest() = runBlocking {
         val broker = VehicleSafetyBroker(getPhysicalBusOwner = { PhysicalBusOwner.IDLE })
 
-        // ObdSession is null -> must return SIMULATED and isSuccess = false
+        // ObdSession is null -> dispatch must fail closed, never be represented as a successful envelope.
         val executor = VehicleActionExecutor(broker, null)
         val action = ProposedVehicleAction(
             actionId = "ACT_READ_01",
@@ -115,10 +115,9 @@ class ProductionTruthGuardTest {
         )
 
         val result = executor.executeAction(action, snapshot, userConfirmed = true)
-        assertTrue(result is EvairResult.Success)
-        val execution = (result as EvairResult.Success).value
-        assertEquals(ExecutionStatus.SIMULATED, execution.status)
-        assertFalse(execution.isSuccess)
+        assertTrue(result is EvairResult.Failure)
+        val failure = result as EvairResult.Failure
+        assertTrue(failure.error is EvairError.VehicleDisconnected)
     }
 
     @Test

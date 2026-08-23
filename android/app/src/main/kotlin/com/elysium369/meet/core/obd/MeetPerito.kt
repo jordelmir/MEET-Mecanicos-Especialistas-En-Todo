@@ -25,7 +25,9 @@ data class VehicleInspectionReport(
     val recommendation: String,
     val createdAt: Long,
     val category: String, // Excelente, Bueno, Requiere atención, Alto riesgo
-    val dimensionsDetails: Map<String, String> // 10 dimensions detailed text
+    val dimensionsDetails: Map<String, String>, // 10 dimensions detailed text
+    val evidenceCoveragePct: Int = 0,
+    val isConclusive: Boolean = false,
 )
 
 @Singleton
@@ -44,29 +46,34 @@ class MeetPerito @Inject constructor() {
         freezeFrame: Map<String, String>?,
         liveData: Map<String, Float>,
         odometerKmCluster: Long,
-        readinessMonitors: Map<String, Boolean>
+        readinessMonitors: Map<String, Boolean>,
+        dtcScanComplete: Boolean = false,
+        freezeFrameReadComplete: Boolean = false,
     ): VehicleInspectionReport {
         val criticalIssues = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         val details = mutableMapOf<String, String>()
         var score = 100
         var repairCost = 0.0
+        var coveredDimensions = 0
 
         val resolvedVin = vin ?: "DESCONOCIDO"
 
         // 1. Dimension VIN (Fusión de validación SAE J272 de VinDecoder)
-        if (resolvedVin.length != 17 || resolvedVin.contains("?") || resolvedVin == "DESCONOCIDO") {
+        if (VinValidator.normalize(resolvedVin) == null) {
             score -= 5
             warnings.add("VIN no detectado o inválido: '$resolvedVin'")
             details["VIN"] = "❌ No detectado o formato inválido"
         } else {
-            val isVinValid = VinDecoder.validateCheckDigit(resolvedVin)
+            coveredDimensions++
+            val requiresNorthAmericanCheckDigit = resolvedVin.first() in '1'..'5'
+            val isVinValid = !requiresNorthAmericanCheckDigit || VinDecoder.validateCheckDigit(resolvedVin)
             if (!isVinValid) {
                 score -= 20 // Penalización severa por posible clonación o fraude
-                criticalIssues.add("Fallo de Check Digit SAE J272: Posible alteración o clonación del VIN de la ECU ('$resolvedVin')")
-                details["VIN"] = "❌ VIN INVÁLIDO (Fallo Check Digit SAE J272)"
+                criticalIssues.add("Check digit ISO 3779/49 CFR inválido para VIN norteamericano ('$resolvedVin')")
+                details["VIN"] = "❌ VIN norteamericano con check digit inválido"
             } else {
-                details["VIN"] = "✅ Detectado y verificado (SAE J272): $resolvedVin"
+                details["VIN"] = "✅ VIN físico con formato canónico: $resolvedVin"
             }
         }
 
@@ -98,9 +105,12 @@ class MeetPerito @Inject constructor() {
                 }
             }
             details["DTC_ACTIVOS"] = "❌ $count códigos activos detectados. Penalización -$penalty pts."
-        } else {
+        } else if (dtcScanComplete) {
             details["DTC_ACTIVOS"] = "✅ Sin códigos de falla activos."
+        } else {
+            details["DTC_ACTIVOS"] = "ℹ️ Sin evidencia de un escaneo completo de DTC activos."
         }
+        if (dtcScanComplete) coveredDimensions++
 
         // 3. Dimension DTC Pendientes
         if (pendingDtcs.isNotEmpty()) {
@@ -110,70 +120,85 @@ class MeetPerito @Inject constructor() {
             warnings.add("Códigos DTC pendientes: $count detectados (${pendingDtcs.joinToString(", ")})")
             repairCost += (count * 60.0)
             details["DTC_PENDIENTES"] = "⚠️ $count códigos pendientes. Penalización -$penalty pts."
-        } else {
+        } else if (dtcScanComplete) {
             details["DTC_PENDIENTES"] = "✅ Sin códigos pendientes."
+        } else {
+            details["DTC_PENDIENTES"] = "ℹ️ Sin evidencia de un escaneo completo de DTC pendientes."
         }
+        if (dtcScanComplete) coveredDimensions++
 
         // 4. Dimension Freeze Frame
         if (!freezeFrame.isNullOrEmpty()) {
             score -= 10
             warnings.add("Datos de Freeze Frame capturados en ECU")
             details["FREEZE_FRAME"] = "❌ Registrado en ECU. Indica falla recurrente. Penalización -10 pts."
-        } else {
+        } else if (freezeFrameReadComplete) {
             details["FREEZE_FRAME"] = "✅ Sin capturas de Freeze Frame guardadas."
+        } else {
+            details["FREEZE_FRAME"] = "ℹ️ Freeze Frame no verificado en esta inspección."
         }
+        if (freezeFrameReadComplete) coveredDimensions++
 
         // 5. Fuel Trims (LTFT)
-        val ltft = liveData["LTFT_B1"] ?: liveData["ltft_b1"] ?: liveData["0107"] ?: 0f
-        val absLtft = abs(ltft)
-        if (absLtft > 15f) {
+        val ltft = liveData["LTFT_B1"] ?: liveData["ltft_b1"] ?: liveData["0107"]
+        val absLtft = ltft?.let(::abs)
+        if (ltft != null && absLtft != null && absLtft > 15f) {
             score -= 15
             criticalIssues.add("Fuel Trim fuera de rango (${String.format(Locale.US, "%.1f", ltft)}%) - Mezcla muy pobre/rica")
             repairCost += 120.0
             details["FUEL_TRIMS"] = "❌ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Anómalo, normal ±10%). Penalización -15 pts."
-        } else if (absLtft > 10f) {
+        } else if (ltft != null && absLtft != null && absLtft > 10f) {
             score -= 5
             warnings.add("Fuel Trim al límite (${String.format(Locale.US, "%.1f", ltft)}%)")
             details["FUEL_TRIMS"] = "⚠️ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Ligeramente desviado). Penalización -5 pts."
-        } else {
+        } else if (ltft != null) {
             details["FUEL_TRIMS"] = "✅ LTFT: ${String.format(Locale.US, "%.1f", ltft)}% (Normal)."
+        } else {
+            details["FUEL_TRIMS"] = "ℹ️ LTFT no disponible: sin evidencia física para evaluar."
         }
+        if (ltft != null) coveredDimensions++
 
         // 6. Temperatura (Coolant Temp)
-        val ect = liveData["COOLANT"] ?: liveData["coolant"] ?: liveData["0105"] ?: 90f
-        if (ect > 115f) {
+        val ect = liveData["COOLANT"] ?: liveData["coolant"] ?: liveData["0105"]
+        if (ect != null && ect > 115f) {
             score -= 30
             criticalIssues.add("Sobrecalentamiento severo del motor (${ect.roundToInt()}°C)")
             repairCost += 400.0
             details["TEMPERATURA"] = "❌ ECT: ${ect.roundToInt()}°C (Severo). Penalización -30 pts."
-        } else if (ect > 105f) {
+        } else if (ect != null && ect > 105f) {
             score -= 15
             criticalIssues.add("Temperatura elevada del motor (${ect.roundToInt()}°C)")
             repairCost += 150.0
             details["TEMPERATURA"] = "❌ ECT: ${ect.roundToInt()}°C (Elevada). Penalización -15 pts."
-        } else if (ect < 70f) {
+        } else if (ect != null && ect < 70f) {
             score -= 5
             warnings.add("Motor trabaja frío (${ect.roundToInt()}°C) - Termostato defectuoso")
             repairCost += 80.0
             details["TEMPERATURA"] = "⚠️ ECT: ${ect.roundToInt()}°C (Baja). Penalización -5 pts."
-        } else {
+        } else if (ect != null) {
             details["TEMPERATURA"] = "✅ ECT: ${ect.roundToInt()}°C (Normal, 75°C - 100°C)."
+        } else {
+            details["TEMPERATURA"] = "ℹ️ ECT no disponible: sin evidencia física para evaluar."
         }
+        if (ect != null) coveredDimensions++
 
         // 7. Voltaje
-        val voltage = liveData["VOLTAGE"] ?: liveData["voltage"] ?: liveData["CTRL_VOLTAGE"] ?: liveData["ELM_VOLTAGE"] ?: liveData["0142"] ?: 13.8f
-        if (voltage < 12.0f || voltage > 15.5f) {
+        val voltage = liveData["VOLTAGE"] ?: liveData["voltage"] ?: liveData["CTRL_VOLTAGE"] ?: liveData["ELM_VOLTAGE"] ?: liveData["0142"]
+        if (voltage != null && (voltage < 12.0f || voltage > 15.5f)) {
             score -= 15
             criticalIssues.add("Voltaje de alternador/batería fuera de rango (${String.format(Locale.US, "%.1f", voltage)}V)")
             repairCost += 200.0
             details["VOLTAJE"] = "❌ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Muy bajo/alto). Penalización -15 pts."
-        } else if (voltage < 13.2f || voltage > 14.9f) {
+        } else if (voltage != null && (voltage < 13.2f || voltage > 14.9f)) {
             score -= 5
             warnings.add("Voltaje subóptimo de carga (${String.format(Locale.US, "%.1f", voltage)}V)")
             details["VOLTAJE"] = "⚠️ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Carga débil/inestable). Penalización -5 pts."
-        } else {
+        } else if (voltage != null) {
             details["VOLTAJE"] = "✅ Voltaje: ${String.format(Locale.US, "%.1f", voltage)}V (Estable)."
+        } else {
+            details["VOLTAJE"] = "ℹ️ Voltaje no disponible: sin evidencia física para evaluar."
         }
+        if (voltage != null) coveredDimensions++
 
         // 8. Sensores Críticos (MAF / MAP / O2)
         val maf = liveData["MAF"] ?: liveData["maf"] ?: liveData["0110"]
@@ -190,9 +215,12 @@ class MeetPerito @Inject constructor() {
             warnings.add("Lecturas anómalas en sensores de admisión/combustión (MAF/MAP/O2)")
             repairCost += 150.0
             details["SENSORES"] = "❌ Sensores con valores anómalos. Penalización -10 pts."
-        } else {
+        } else if (maf != null && map != null && o2 != null) {
             details["SENSORES"] = "✅ Sensores MAF/MAP/O2 respondiendo normalmente."
+        } else {
+            details["SENSORES"] = "ℹ️ Cobertura incompleta de MAF/MAP/O2; no se declara normalidad."
         }
+        if (maf != null && map != null && o2 != null) coveredDimensions++
 
         // 9. Kilometraje OBD (vs Odometer Cluster)
         // Usualmente PID 01A6 o 0131 en OBD2
@@ -208,8 +236,9 @@ class MeetPerito @Inject constructor() {
             }
         } else {
             // No se pudo leer kilometraje por OBD (suele ocurrir en autos antiguos)
-            details["KILOMETRAJE"] = "ℹ️ Kilometraje en ECU no disponible (se asume tablero: ${odometerKmCluster}km)."
+            details["KILOMETRAJE"] = "ℹ️ Kilometraje en ECU no disponible; el tablero no se usa como sustituto de evidencia ECU."
         }
+        if (obdOdometer > 0f && odometerKmCluster > 0L) coveredDimensions++
 
         // 10. Estado General / Readiness Monitors
         val totalMonitors = readinessMonitors.size
@@ -218,15 +247,20 @@ class MeetPerito @Inject constructor() {
             score -= 10
             warnings.add("Múltiples monitores de emisiones incompletos ($incompleteMonitors de $totalMonitors)")
             details["ESTADO_GENERAL"] = "⚠️ Monitores de preparación incompletos. Penalización -10 pts."
-        } else {
+        } else if (totalMonitors > 0) {
             details["ESTADO_GENERAL"] = "✅ Monitores OBD listos para inspección de emisiones."
+        } else {
+            details["ESTADO_GENERAL"] = "ℹ️ Readiness no disponible; estado de emisiones desconocido."
         }
+        if (totalMonitors > 0) coveredDimensions++
 
         // Clamp score
-        val finalScore = score.coerceIn(0, 100)
+        val evidenceCoveragePct = coveredDimensions * 10
+        val isConclusive = coveredDimensions >= 7
+        val finalScore = if (isConclusive) score.coerceIn(0, 100) else (score.coerceIn(0, 100) * coveredDimensions / 10)
 
         // Categorize
-        val category = when (finalScore) {
+        val category = if (!isConclusive) "No concluyente" else when (finalScore) {
             in 90..100 -> "Excelente"
             in 80..89 -> "Bueno"
             in 60..79 -> "Requiere atención"
@@ -235,8 +269,9 @@ class MeetPerito @Inject constructor() {
 
         // Generate recommendations
         val recommendation = when {
-            finalScore >= 90 -> "Vehículo en condiciones extraordinarias. Sin fallas mecánicas ni electrónicas activas. Compra altamente recomendada."
-            finalScore >= 80 -> "Vehículo en buen estado general. Se identificaron advertencias menores. Recomendable proceder negociando costos menores."
+            !isConclusive -> "Inspección no concluyente: cobertura física ${evidenceCoveragePct}%. Completa las lecturas faltantes y una inspección mecánica antes de decidir."
+            finalScore >= 90 -> "La evidencia OBD cubierta no muestra anomalías relevantes. Esto no sustituye inspección física ni prueba de carretera."
+            finalScore >= 80 -> "La evidencia OBD cubierta muestra condición favorable con advertencias menores; confirma con inspección física."
             finalScore >= 60 -> "Atención: El vehículo presenta múltiples advertencias y fallas pendientes de reparación. Requiere mantenimiento a corto plazo."
             else -> "ALTO RIESGO: Se detectaron fallas críticas o discrepancias de kilometraje graves. Recomendamos suspender la compra o realizar una inspección física a fondo."
         }
@@ -252,7 +287,9 @@ class MeetPerito @Inject constructor() {
             recommendation = recommendation,
             createdAt = System.currentTimeMillis(),
             category = category,
-            dimensionsDetails = details
+            dimensionsDetails = details,
+            evidenceCoveragePct = evidenceCoveragePct,
+            isConclusive = isConclusive,
         )
 
         // Persist report as JSON locally

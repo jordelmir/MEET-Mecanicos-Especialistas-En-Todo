@@ -94,9 +94,9 @@ fun MaintenanceScreen(
     var expenses by remember { mutableStateOf(loadExpenses(context)) }
 
     // Derived values
-    val voltage = liveData["0142"] ?: 12.6f
-    val coolantTemp = liveData["0105"] ?: 90f
-    val avgEcoScore = if (trips.isNotEmpty()) trips.map { it.ecoScore }.average().toInt() else 85
+    val voltage = liveData["0142"]
+    val coolantTemp = liveData["0105"]
+    val avgEcoScore = trips.takeIf { it.isNotEmpty() }?.map { it.ecoScore }?.average()?.toInt()
     val currentOdoLong = currentOdometer.toLong()
 
     val overdueCount = alerts.count { (it.nextDueKm - currentOdoLong) <= 0 }
@@ -672,24 +672,21 @@ fun MaintenanceScreen(
                     // TAB 3: Análisis FODA Vehicular
                     val strengthsList = remember(voltage, activeDtcs, healthScore) {
                         val list = mutableListOf<String>()
-                        if (voltage >= 12.3f) {
+                        if (voltage != null && voltage >= 12.3f) {
                             list.add("Batería saludable (${((voltage * 10).toInt() / 10f)}V)")
-                        }
-                        if (activeDtcs.isEmpty()) {
-                            list.add("Sin fallas de motor activas")
                         }
                         if (healthScore >= 80) {
                             list.add("Salud general óptima (${healthScore}%)")
                         }
                         if (list.isEmpty()) {
-                            list.add("Sistemas operativos base OK")
+                            list.add("Sin evidencia suficiente para declarar fortalezas")
                         }
                         list
                     }
 
                     val opportunitiesList = remember(avgEcoScore, alerts) {
                         val list = mutableListOf<String>()
-                        list.add("Eco-driving: Mejorar aceleración (+8% km)")
+                        list.add("Revisar hábitos de conducción con historial medido")
                         list.add("Programar mantenimientos preventivos")
                         list.add("Monitorear voltajes en arranque frío")
                         list
@@ -706,11 +703,11 @@ fun MaintenanceScreen(
                         if (pendingDtcs.isNotEmpty()) {
                             list.add("${pendingDtcs.size} falla${if (pendingDtcs.size > 1) "s" else ""} pendiente${if (pendingDtcs.size > 1) "s" else ""}")
                         }
-                        if (avgEcoScore < 75) {
+                        if (avgEcoScore != null && avgEcoScore < 75) {
                             list.add("Eco Score bajo (${avgEcoScore}/100)")
                         }
                         if (list.isEmpty()) {
-                            list.add("Monitoreo continuo activo")
+                            list.add("Sin debilidades confirmadas con la evidencia disponible")
                         }
                         list
                     }
@@ -720,14 +717,14 @@ fun MaintenanceScreen(
                         if (activeDtcs.isNotEmpty()) {
                             list.add("Check Engine Encendido (${activeDtcs.size} DTCs)")
                         }
-                        if (voltage < 11.8f) {
+                        if (voltage != null && voltage < 11.8f) {
                             list.add("Batería Crítica (${((voltage * 10).toInt() / 10f)}V)")
                         }
-                        if (coolantTemp > 105f) {
+                        if (coolantTemp != null && coolantTemp > 105f) {
                             list.add("Sobrecalentamiento (${coolantTemp.toInt()}°C)")
                         }
                         if (list.isEmpty()) {
-                            list.add("Sin amenazas críticas detectadas")
+                            list.add("Sin amenazas confirmadas con la evidencia disponible")
                         }
                         list
                     }

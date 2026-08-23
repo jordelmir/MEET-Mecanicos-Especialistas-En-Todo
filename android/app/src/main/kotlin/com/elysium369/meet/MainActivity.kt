@@ -30,6 +30,7 @@ import androidx.navigation.navArgument
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.FleetChatViewModel
 import com.elysium369.meet.ui.RepairNetworkViewModel
+import com.elysium369.meet.ui.TheoryExamViewModel
 import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.screens.*
 import com.elysium369.meet.ui.screens.chat.*
@@ -681,6 +682,21 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     navController = navController,
                     viewModel = repairViewModel,
                     obdViewModel = obdViewModel
+                )
+            }
+            composable("dekra_concierge") {
+                DekraConciergeScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenGarage = { navController.navigate("garage") },
+                    onOpenTow = { navController.navigate("tow_truck_service") },
+                )
+            }
+            composable("theory_exam_preparation") {
+                val theoryViewModel: TheoryExamViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                TheoryExamPreparationScreen(
+                    viewModel = theoryViewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable("universal_services") {

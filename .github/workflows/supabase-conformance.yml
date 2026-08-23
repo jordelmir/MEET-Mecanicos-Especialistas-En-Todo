@@ -16,58 +16,37 @@ jobs:
   migration-conformance:
     name: Supabase Migration & Schema Conformance
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1 branch, pinned
+        with:
+          version: 2.115.0
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Apply Supabase Migrations in Clean Database
-        env:
-          PGPASSWORD: postgrespassword
+      - name: Apply migrations to a clean Supabase-compatible database
         run: |
-          echo "Applying migrations in alphabetical order..."
-          for sql_file in $(ls -1 supabase/migrations/*.sql | sort); do
-            echo "----------------------------------------"
-            echo "Executing: $sql_file"
-            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=0 -f "$sql_file"
-          done
-          echo "All migrations processed successfully."
+          supabase db start
+          supabase db reset --local --no-seed
+          supabase status -o env >> "$GITHUB_ENV"
 
       - name: Verify Core Schemas & Functions Exist
-        env:
-          PGPASSWORD: postgrespassword
         run: |
-          psql -h localhost -U postgres -d postgres -c "
-            SELECT routine_name FROM information_schema.routines 
+          FOUND=$(psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
+            SELECT COUNT(DISTINCT routine_name) FROM information_schema.routines
             WHERE routine_schema = 'public' 
               AND routine_name IN (
                 'transition_repair_work_order_v1',
                 'transition_repair_work_order_client_v1',
                 'meet_emit_vanguard_event_v2',
                 'meet_is_platform_owner'
-              );
-          "
+              );")
+          test "$FOUND" -eq 4
 
       - name: Verify Sensitive RPC Privilege Boundaries (No Public/Anon/Authenticated Execute on Service Role RPCs)
-        env:
-          PGPASSWORD: postgrespassword
         run: |
-          LEAKED_PRIVILEGES=$(psql -h localhost -U postgres -d postgres -t -A -c "
+          LEAKED_PRIVILEGES=$(psql "$DB_URL" -v ON_ERROR_STOP=1 -t -A -c "
             SELECT COUNT(*) FROM information_schema.routine_privileges 
             WHERE routine_schema = 'public'
               AND routine_name IN ('meet_emit_vanguard_event_v2', 'transition_repair_work_order_v1')

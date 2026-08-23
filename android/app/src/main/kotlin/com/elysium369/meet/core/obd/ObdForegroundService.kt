@@ -105,7 +105,7 @@ class ObdForegroundService : Service() {
         }
         
         if (obdSession.state.value != ObdState.CONNECTED && !adapterAddress.isNullOrBlank()) {
-            obdSession.setTargetAddress(adapterAddress)
+            serviceScope.launch { obdSession.setTargetAddressSequentially(adapterAddress) }
         }
 
         telemetryJob?.cancel()
@@ -207,7 +207,7 @@ class ObdForegroundService : Service() {
                             delay(backoffMs)
                             runCatching {
                                 if (connectionState.value != ObdState.CONNECTED) {
-                                    obdSession.setTargetAddress(adapterAddress)
+                                    obdSession.setTargetAddressSequentially(adapterAddress)
                                     obdSession.connect()
                                     if (connectionState.value == ObdState.CONNECTED) {
                                         obdSession.startLivePolling()

@@ -414,7 +414,7 @@ private fun AnimatedVehicleCard(
 
             OutlinedButton(
                 onClick = onReadVin,
-                enabled = !isReadingVin,
+                enabled = !isReadingVin && isActive,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(42.dp),
@@ -445,7 +445,11 @@ private fun AnimatedVehicleCard(
                     Text(if (hasValidVin) "🧬" else "⚡", fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        if (hasValidVin) "LEER VIN DE NUEVO (OBD-II)" else "LEER VIN (OBD-II ECU FÍSICA)",
+                        when {
+                            !isActive -> "ACTIVA EL VEHÍCULO PARA LEER VIN"
+                            hasValidVin -> "LEER VIN DE NUEVO (OBD-II)"
+                            else -> "LEER VIN (OBD-II ECU FÍSICA)"
+                        },
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 0.5.sp

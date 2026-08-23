@@ -41,7 +41,8 @@ class VehicleRuntimeServer @Inject constructor(
     private val isRunning = AtomicBoolean(false)
 
     val host: String = "127.0.0.1"
-    val port: Int = 8765
+    // Keep the private loopback runtime distinct from the user-opt-in LiveLink port (8765).
+    val port: Int = 18765
 
     // Ephemeral 32-byte cryptographic session token
     val sessionToken: String = generateSessionToken()

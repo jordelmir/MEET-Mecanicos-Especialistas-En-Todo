@@ -48,11 +48,11 @@ fun Map<String, Float>.resolveGaugeValue(pid: String): Float? {
     val speed = this["010D"] ?: this["SPEED"] ?: this["speed"]
     val map = this["010B"] ?: this["MAP"] ?: this["map"]
     val ect = this["0105"] ?: this["COOLANT"] ?: this["coolant"]
-    val iat = this["010F"] ?: this["IAT"] ?: 25f
-    val load = this["0104"] ?: this["ENGINE_LOAD"] ?: 0f
+    val iat = this["010F"] ?: this["IAT"]
+    val load = this["0104"] ?: this["ENGINE_LOAD"]
 
     // Synthesize MAF from MAP and RPM if physical MAF is missing (Speed-Density engines like Hyundai Alpha 1.6L)
-    val synthMaf = if (map != null && rpm != null && rpm > 0f) {
+    val synthMaf = if (map != null && rpm != null && rpm > 0f && iat != null && load != null) {
         val displacementL = 1.6f
         val ve = (0.75f + (load / 100f) * 0.20f).coerceIn(0.70f, 0.95f)
         val tempK = iat + 273.15f
@@ -87,27 +87,22 @@ fun Map<String, Float>.resolveGaugeValue(pid: String): Float? {
             }
         }
         "0142", "42", "VOLTAGE", "ATRV", "AT RV" -> {
-            return this["ATRV"] ?: this["AT RV"] ?: this["ELM_VOLTAGE"] ?: this["BATTERY_VOLTAGE"] ?: 13.8f
+            return this["ATRV"] ?: this["AT RV"] ?: this["ELM_VOLTAGE"] ?: this["BATTERY_VOLTAGE"]
         }
         "CALC_MIL_STATUS" -> {
-            val dtcCount = this["CALC_DTC_COUNT"] ?: 0f
+            val dtcCount = this["CALC_DTC_COUNT"] ?: return null
             return if (dtcCount > 0f) 1f else 0f
         }
-        "CALC_OBD_STANDARD" -> return 6f // EOBD / ISO 9141-2
+        "CALC_OBD_STANDARD" -> return null
         "CALC_CURRENT_TIME" -> {
             val cal = java.util.Calendar.getInstance()
             return (cal.get(java.util.Calendar.HOUR_OF_DAY) * 100 + cal.get(java.util.Calendar.MINUTE)).toFloat()
         }
         "CALC_FUEL_ECON" -> {
-            return if (load in 1f..45f && (speed ?: 0f) > 10f) 1f else 0f
-        }
-        "010A", "0A", "FUEL_PRESSURE" -> {
-            if (map != null) {
-                return (350f - (101.3f - map)).coerceIn(200f, 400f)
+            if (load != null && speed != null) {
+                return if (load in 1f..45f && speed > 10f) 1f else 0f
             }
-        }
-        "0133", "33", "BARO" -> {
-            return (map ?: 101.3f).coerceIn(80f, 105f)
+            return null
         }
     }
 

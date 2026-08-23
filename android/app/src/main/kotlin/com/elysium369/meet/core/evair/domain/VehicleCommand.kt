@@ -50,6 +50,7 @@ sealed interface VehicleCommand {
     @Serializable
     data class ReadFreezeFrame(
         override val requestId: String,
+        val dtc: String,
     ) : VehicleCommand {
         override val safetyLevel: SafetyLevel = SafetyLevel.READ_ONLY
     }

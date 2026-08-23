@@ -33,8 +33,7 @@ fun VehicleAccessDashboardScreen(
     navController: NavController,
     viewModel: ObdViewModel
 ) {
-    val context = LocalContext.current
-    val accessManager = remember { VehicleAccessManager(context) }
+    val accessManager = viewModel.vehicleAccessManager
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val phoneCaps by accessManager.phoneCapabilities.collectAsState()
     val vehicleCaps by accessManager.vehicleCapabilities.collectAsState()
@@ -228,7 +227,7 @@ fun VehicleAccessDashboardScreen(
                                 onClick = {
                                     accessManager.markKeyLost(cred.credentialId)
                                     coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Llave marcada como extraviada. Inmovilizador actualizado.")
+                                        snackbarHostState.showSnackbar("Llave marcada como extraviada en MEET. El inmovilizador no fue reprogramado.")
                                     }
                                 },
                                 color = MeetColors.error,
@@ -295,7 +294,7 @@ fun VehicleAccessDashboardScreen(
                                         onClick = {
                                             accessManager.revokeGrant(grant.grantId, "Revocado por propietario")
                                             coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("Acceso para ${grant.recipientName} revocado instantáneamente.")
+                                                snackbarHostState.showSnackbar("Acceso revocado en MEET; confirma aparte la revocación OEM si aplica.")
                                             }
                                         },
                                         color = MeetColors.error

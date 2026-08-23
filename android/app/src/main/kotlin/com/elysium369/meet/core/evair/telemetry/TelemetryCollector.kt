@@ -8,12 +8,14 @@ import com.elysium369.meet.core.evair.domain.TelemetryPoint
 import com.elysium369.meet.core.evair.domain.TelemetryWindow
 import com.elysium369.meet.core.obd.ObdDataSource
 import com.elysium369.meet.core.obd.ObdSession
+import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.TelemetryQuality
 import com.elysium369.meet.core.obd.TelemetrySample
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -33,6 +35,7 @@ class TelemetryCollector @Inject constructor(
     private val ringBuffers = ConcurrentHashMap<String, TelemetryRingBuffer>()
     private val parameterNames = ConcurrentHashMap<String, String>()
     private val parameterUnits = ConcurrentHashMap<String, String>()
+    private val lastRecordedMonotonicMs = ConcurrentHashMap<String, Long>()
 
     init {
         startObservation()
@@ -40,12 +43,19 @@ class TelemetryCollector @Inject constructor(
 
     private fun startObservation() {
         scope.launch {
-            obdSession.telemetrySamples.collectLatest { samplesMap ->
+            obdSession.state.combine(obdSession.telemetrySamples) { state, samples -> state to samples }
+                .collectLatest { (state, samplesMap) ->
+                if (state != ObdState.CONNECTED) {
+                    clear()
+                    return@collectLatest
+                }
                 val nowWallMs = System.currentTimeMillis()
                 val nowMonoNs = SystemClock.elapsedRealtimeNanos()
 
-                for ((pid, sample) in samplesMap) {
-                    recordSample(pid, sample, nowWallMs, nowMonoNs)
+                for (sample in samplesMap.values.distinctBy { it.pid }) {
+                    val previousTimestamp = lastRecordedMonotonicMs.put(sample.pid, sample.timestampMonotonicMs)
+                    if (previousTimestamp == sample.timestampMonotonicMs) continue
+                    recordSample(sample.pid, sample, nowWallMs, nowMonoNs)
                 }
             }
         }
@@ -164,5 +174,6 @@ class TelemetryCollector @Inject constructor(
         ringBuffers.values.forEach { it.clear() }
         parameterNames.clear()
         parameterUnits.clear()
+        lastRecordedMonotonicMs.clear()
     }
 }

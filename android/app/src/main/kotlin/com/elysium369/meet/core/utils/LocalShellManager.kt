@@ -30,6 +30,7 @@ import androidx.core.app.NotificationCompat
 import com.elysium369.meet.core.ai.GeminiDiagnostic
 import com.elysium369.meet.core.obd.ObdSession
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.obd.CanMultiFrameParser
 import com.elysium369.meet.core.trips.TripManager
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -64,7 +65,8 @@ class LocalShellManager(
     private val geminiDiagnostic: GeminiDiagnostic,
     private val obdSession: ObdSession,
     private val tripManager: TripManager,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val vehicleRuntimeServer: com.elysium369.meet.core.evair.bridge.VehicleRuntimeServer,
 ) {
     private var process: Process? = null
     private var writer: BufferedWriter? = null
@@ -90,9 +92,9 @@ class LocalShellManager(
     private val _terminalLines = MutableStateFlow<List<String>>(
         listOf(
             "⚡ Elysium Vanguard Expert Terminal v3.0",
-            "🛸 Google Antigravity 1.1.16 | MEET Runtime v2.0.4",
-            "📟 Modo PTY/TTY: Activo (/dev/pts)",
-            "✓ Consola lista para recibir comandos.",
+            "MEET Runtime local",
+            "Estado PTY/TTY: pendiente de verificación por el proceso de shell",
+            "Consola inicializando.",
             ""
         )
     )
@@ -112,7 +114,12 @@ class LocalShellManager(
         setupDirectories()
         startControlServer()
         checkAndInstallBusybox()
-        com.elysium369.meet.core.terminal.ElysiumAutomotiveCliBridge.installCliBinaries(appContext, LocalControlServer.CONTROL_PORT)
+        com.elysium369.meet.core.terminal.ElysiumAutomotiveCliBridge.installCliBinaries(
+            context = appContext,
+            port = LocalControlServer.CONTROL_PORT,
+            evairPort = vehicleRuntimeServer.port,
+            evairRuntimeToken = vehicleRuntimeServer.sessionToken,
+        )
     }
 
     private fun setupDirectories() {
@@ -174,6 +181,8 @@ class LocalShellManager(
                     "-b", "/dev/pts",
                     "-b", "/sys",
                     "-b", "/proc",
+                    "-b", "${File(appContext.filesDir, ".curlrc").absolutePath}:/root/.curlrc",
+                    "-b", "${File(appContext.filesDir, ".wgetrc").absolutePath}:/root/.wgetrc",
                     "-b", "${binDir.absolutePath}:/bin/meet",
                     "/bin/sh",
                     "-i"
@@ -202,6 +211,8 @@ class LocalShellManager(
             env["PROOT_TMP_DIR"] = File(appContext.filesDir, "tmp").absolutePath
             env["PROOT_LOADER"] = File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath
             env["LD_LIBRARY_PATH"] = "${appContext.applicationInfo.nativeLibraryDir}:/system/lib64:/system/lib:/vendor/lib64:/vendor/lib"
+            env["CURL_HOME"] = if (targetDistro != "android") "/root" else appContext.filesDir.absolutePath
+            env["WGETRC"] = if (targetDistro != "android") "/root/.wgetrc" else File(appContext.filesDir, ".wgetrc").absolutePath
             if (targetDistro != "android") {
                 env["SSL_CERT_FILE"] = "/etc/ssl/certs/ca-certificates.crt"
                 env["SSL_CERT_DIR"] = "/etc/ssl/certs"
@@ -376,8 +387,8 @@ class LocalShellManager(
         _terminalLines.update {
             listOf(
                 "⚡ Entorno reiniciado: $capName",
-                "🛸 Google Antigravity 1.1.16 | MEET Runtime v2.0.4",
-                "📟 Modo PTY/TTY: Activo (/dev/pts)",
+                "MEET Runtime local",
+                "PTY/TTY no confirmado: el proceso anterior terminó",
                 "✓ Consola lista para recibir comandos.",
                 ""
             )
@@ -440,9 +451,9 @@ class LocalShellManager(
         _terminalLines.update {
             listOf(
                 "⚡ Entorno activo: $capName",
-                "🛸 Google Antigravity 1.1.16 | MEET Runtime v2.0.4",
-                "📟 Modo PTY/TTY: Activo (/dev/pts)",
-                "✓ Listo. Escribe un comando o pulsa una acción rápida.",
+                "MEET Runtime local",
+                "Estado PTY/TTY: pendiente de verificación por el proceso de shell",
+                "Entorno seleccionado; el primer comando confirmará disponibilidad.",
                 ""
             )
         }
@@ -462,6 +473,16 @@ class LocalShellManager(
             "debian" -> "https://github.com/termux/proot-distro/releases/download/v4.29.0/debian-trixie-aarch64-pd-v4.29.0.tar.xz"
             "ubuntu" -> "https://partner-images.canonical.com/core/jammy/current/ubuntu-jammy-core-cloudimg-arm64-root.tar.gz"
             else -> ""
+        }
+        val expectedSha256 = when (targetDistro) {
+            "alpine" -> "7ef5eef3a5b1d198dfb1610cde1ef5b0755ff5d838fb1e5e1b9f42b59214820f"
+            "debian" -> "3834a11cbc6496935760bdc20cca7e2c25724d0cd8f5e4926da8fd5ca1857918"
+            "ubuntu" -> "7db67849df74ac98700ea6d83b591e740b7e4af177f2a3b3794773969e48642e"
+            else -> null
+        }
+        if (downloadUrl.isBlank() || expectedSha256 == null) {
+            appendOutput("[Elysium Vanguard-Termux] Distribución no autorizada: $targetDistro")
+            return
         }
         
         val archiveName = when (targetDistro) {
@@ -485,7 +506,8 @@ class LocalShellManager(
             try {
                 val cacheDir = appContext.cacheDir
                 val distroArchive = File(cacheDir, archiveName)
-                val distroDir = File(appContext.filesDir, targetDistro)
+                val finalDistroDir = File(appContext.filesDir, targetDistro)
+                val distroDir = File(appContext.filesDir, ".$targetDistro.installing")
                 
                 downloadBinaryWithProgress(downloadUrl, distroArchive) { progressStr ->
                     installProgress.value = progressStr
@@ -494,10 +516,16 @@ class LocalShellManager(
 
                 // Verify SHA-256 digest before untarring
                 val actualSha256 = com.elysium369.meet.core.reports.HashEngine.sha256Hex(distroArchive.readBytes())
-                Log.i("LocalShellManager", "Downloaded $archiveName SHA-256: $actualSha256")
+                if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                    distroArchive.delete()
+                    throw SecurityException(
+                        "Rootfs rechazado: SHA-256 no coincide con el manifiesto fijado para $targetDistro"
+                    )
+                }
+                Log.i("LocalShellManager", "Downloaded $archiveName matched pinned SHA-256")
                 
                 installProgress.value = "Extrayendo rootfs de $capName..."
-                appendOutput("[Elysium Vanguard-Termux] Descarga verificada ($actualSha256). Extrayendo rootfs...")
+                appendOutput("[Elysium Vanguard-Termux] Integridad SHA-256 verificada contra manifiesto fijado. Extrayendo rootfs...")
                 
                 if (distroDir.exists()) {
                     distroDir.deleteRecursively()
@@ -569,6 +597,16 @@ class LocalShellManager(
                 // Re-create CLI scripts to include boot script and inject Antigravity CLI into distro bin
                 createCliScripts(File(appContext.filesDir, "bin"))
                 injectAntigravityToDistro(distroDir)
+                val backupDir = File(appContext.filesDir, ".$targetDistro.backup")
+                if (backupDir.exists()) backupDir.deleteRecursively()
+                if (finalDistroDir.exists() && !finalDistroDir.renameTo(backupDir)) {
+                    throw IOException("No se pudo preservar la instalación anterior de $targetDistro")
+                }
+                if (!distroDir.renameTo(finalDistroDir)) {
+                    if (backupDir.exists()) backupDir.renameTo(finalDistroDir)
+                    throw IOException("No se pudo activar atómicamente el nuevo rootfs de $targetDistro")
+                }
+                backupDir.deleteRecursively()
                 updateInstalledDistros()
                 
                 installProgress.value = "¡Instalación de $capName completada con éxito!"
@@ -582,6 +620,7 @@ class LocalShellManager(
                     startShellInternal()
                 }
             } catch (e: Exception) {
+                File(appContext.filesDir, ".$targetDistro.installing").deleteRecursively()
                 installProgress.value = "Error: ${e.message}"
                 installingDistro.value = null
                 appendOutput("[Elysium Vanguard-Termux] Error al instalar $capName: ${e.message}")
@@ -606,7 +645,7 @@ class LocalShellManager(
                     echo "  telemetry      Muestra flujo de sensores OBD-II en tiempo real"
                     echo "  db <sql>       Ejecuta consulta SQL en la base de datos de MEET"
                     echo "  ai <prompt>    Razonamiento de diagnostico autonomo con Gemini Pro"
-                    echo "  skills         Muestra las 47 habilidades autonomas de ingenieria"
+                    echo "  skills         Informa disponibilidad del registro local de capacidades"
                     echo "  fly            Modulo clasico de vuelo antigravitatorio"
                     echo "  --version      Muestra la version del motor Antigravity"
                     exit 0
@@ -627,7 +666,7 @@ class LocalShellManager(
                     echo "[devops-elite] | [sre-commander] | [quantum-cryptographer]"
                     echo "[legacy-whisperer] | [frontend-product-craft] | [brand-guidelines]"
                     echo "[test-strategy-master] | [tech-debt-radar] | [ux-scientist]"
-                    echo "Todas las 47 habilidades se encuentran integradas y activas."
+                    echo "Registro de capacidades no conectado a una fuente verificable en este shell."
                     exit 0
                 fi
                 if [ "$1" = "dtc" ]; then
@@ -639,7 +678,8 @@ class LocalShellManager(
                     if command -v curl >/dev/null 2>&1; then
                         curl -s -X POST -d "SELECT * FROM dtc_codes WHERE code='$2' LIMIT 1" http://127.0.0.1:8082/api/db
                     else
-                        echo "DTC $2: Falla de encendido o lectura detectada en subsistema."
+                        echo "Consulta no ejecutada: no hay cliente HTTP disponible." >&2
+                        exit 7
                     fi
                     exit 0
                 fi
@@ -657,11 +697,8 @@ class LocalShellManager(
                     exit 0
                 fi
                 if [ "$1" = "scan" ]; then
-                    echo "🛸 [Antigravity Autonomous Scanner - Linux Subsystem]"
-                    echo "• Conexión OBD / UDS: Sincronizada"
-                    echo "• Hash SHA-256 de integridad: Verificado"
-                    echo "✓ Diagnóstico completo: Subsistemas operando con normalidad."
-                    exit 0
+                    echo "Este alias no ejecuta un escaneo. Usa 'meet dtc scan' con OBD conectado." >&2
+                    exit 7
                 fi
                 if [ "$1" = "fly" ]; then
                     echo "🛸 [Python Antigravity Engine] Zero-Gravity Flight Active!"
@@ -921,6 +958,8 @@ class LocalShellManager(
                         "-b", "/dev/pts",
                         "-b", "/sys",
                         "-b", "/proc",
+                        "-b", "${File(appContext.filesDir, ".curlrc").absolutePath}:/root/.curlrc",
+                        "-b", "${File(appContext.filesDir, ".wgetrc").absolutePath}:/root/.wgetrc",
                         "-b", "${binDir.absolutePath}:/bin/meet",
                         "/bin/sh", "-c", ptyScript
                     )
@@ -946,6 +985,8 @@ class LocalShellManager(
                 env["PROOT_TMP_DIR"] = File(appContext.filesDir, "tmp").absolutePath
                 env["PROOT_LOADER"] = File(appContext.applicationInfo.nativeLibraryDir, "libproot_loader.so").absolutePath
                 env["LD_LIBRARY_PATH"] = "${appContext.applicationInfo.nativeLibraryDir}:/system/lib64:/system/lib:/vendor/lib64:/vendor/lib"
+                env["CURL_HOME"] = if (isDistro) "/root" else appContext.filesDir.absolutePath
+                env["WGETRC"] = if (isDistro) "/root/.wgetrc" else File(appContext.filesDir, ".wgetrc").absolutePath
                 if (isDistro) {
                     env["SSL_CERT_FILE"] = "/etc/ssl/certs/ca-certificates.crt"
                     env["SSL_CERT_DIR"] = "/etc/ssl/certs"
@@ -1161,7 +1202,7 @@ class LocalShellManager(
                     echo "  telemetry      Muestra flujo de sensores OBD-II en tiempo real"
                     echo "  db <sql>       Ejecuta consulta SQL en la base de datos de MEET"
                     echo "  ai <prompt>    Razonamiento de diagnostico autonomo con Gemini Pro"
-                    echo "  skills         Muestra las 47 habilidades autonomas de ingenieria"
+                    echo "  skills         Informa disponibilidad del registro local de capacidades"
                     echo "  fly            Modulo clasico de vuelo antigravitatorio"
                     echo "  --version      Muestra la version del motor Antigravity"
                     exit 0
@@ -1182,15 +1223,13 @@ class LocalShellManager(
                     echo "[devops-elite] | [sre-commander] | [quantum-cryptographer]"
                     echo "[legacy-whisperer] | [frontend-product-craft] | [brand-guidelines]"
                     echo "[test-strategy-master] | [tech-debt-radar] | [ux-scientist]"
-                    echo "Todas las 47 habilidades se encuentran integradas y activas."
+                    echo "Registro de capacidades no conectado a una fuente verificable en este shell."
                     exit 0
                 fi
                 if [ "$1" = "scan" ]; then
                     echo "🛸 [Antigravity Autonomous Scanner - Host Subsystem]"
-                    echo "• Conexión OBD / UDS: Sincronizada"
-                    echo "• Hash SHA-256 de integridad: Verificado"
-                    echo "✓ Diagnóstico completo: Subsistemas operando con normalidad."
-                    exit 0
+                    echo "Este alias no ejecuta un escaneo. Usa 'meet dtc scan' con OBD conectado." >&2
+                    exit 7
                 fi
                 if [ "$1" = "dtc" ]; then
                     if [ -z "$2" ]; then
@@ -1528,7 +1567,7 @@ class LocalShellManager(
                         }
                         else -> {
                             appendOutput("• Análisis para: '$prompt'")
-                            appendOutput("• Estado del sistema: OBD ${obdSession.state.value} | Vehículo Hyundai Accent Verna 2005")
+                            appendOutput("• Estado del enlace OBD: ${obdSession.state.value}; identidad vehicular no inferida")
                             appendOutput("• Nota: Para consultas avanzadas en la nube, active su clave API en Configuración > IA.")
                         }
                     }
@@ -1665,30 +1704,12 @@ class LocalShellManager(
         }
 
         if (subCmd == "skills") {
-            appendOutput("=== 47 HABILIDADES AUTÓNOMAS ANTIGRAVITY VANGUARD ===")
-            val skillList = listOf(
-                "ai-architect", "code-architect", "forensic-analyst", "performance-engineer",
-                "systematic-debugging", "api-contract-guardian", "data-migration-surgeon",
-                "observability-engineer", "security-overseer", "devops-elite", "sre-commander",
-                "quantum-cryptographer", "legacy-whisperer", "frontend-product-craft",
-                "brand-guidelines", "test-strategy-master", "tech-debt-radar", "ux-scientist"
-            )
-            appendOutput(skillList.chunked(3).joinToString("\n") { it.joinToString(" | ") { s -> "[$s]" } })
-            appendOutput("Todas las habilidades se encuentran integradas y activas.")
+            appendOutput("No existe un registro de capacidades verificable conectado a esta consola.")
             return
         }
 
         if (subCmd == "scan") {
-            scope.launch(Dispatchers.IO) {
-                appendOutput("🛸 [Antigravity Autonomous Scanner] Iniciando auditoría diagnóstica...")
-                delay(300)
-                appendOutput("• Subsistema Motor & Tren Motriz: OK (Sin anomalías críticas)")
-                appendOutput("• Subsistema de Combustible & Emisiones: OK")
-                appendOutput("• Subsistema Eléctrico & Batería: 13.8V (Óptimo)")
-                appendOutput("• Red CAN Bus / UDS: Sincronizada")
-                appendOutput("• Integridad Criptográfica de Reportes: SHA-256 Validado")
-                appendOutput("✓ Diagnóstico completo: Vehículo en condiciones operativas.")
-            }
+            appendOutput("Escaneo no ejecutado por este alias. Usa 'meet dtc scan' con una sesión OBD física.")
             return
         }
 
@@ -1696,7 +1717,7 @@ class LocalShellManager(
             val live = obdSession.liveData.value
             appendOutput("=== TELEMETRÍA EN VIVO OBD-II ===")
             if (live.isEmpty()) {
-                appendOutput("OBD Desconectado. Valores base: RPM: 0 | Speed: 0 km/h | Batería: 13.8V | Temp: 0°C")
+                appendOutput("Sin muestras OBD físicas disponibles; no se muestran valores por defecto.")
             } else {
                 live.forEach { (k, v) -> appendOutput("$k: $v") }
             }
@@ -1807,7 +1828,13 @@ class LocalControlServer(
     private val getActiveDistro: () -> String = { "android" },
     private val getInstalledDistros: () -> Set<String> = { setOf("android") }
 ) {
+    private enum class ControlScope {
+        TELEMETRY_READ, DATABASE_READ, AI_USE, OBD_READ, OBD_EFFECT,
+        GARAGE_READ, DEVICE_READ, DEVICE_SENSITIVE_READ, DEVICE_WRITE, REPORT_WRITE,
+    }
+
     private val serverToken = java.util.UUID.randomUUID().toString()
+    private val tokenScopes = mapOf(serverToken to ControlScope.entries.toSet())
 
     init {
         runCatching {
@@ -1815,13 +1842,41 @@ class LocalControlServer(
             tokenFile.writeText(serverToken)
             tokenFile.setReadable(true, true)
             tokenFile.setWritable(true, true)
+            File(appContext.filesDir, ".curlrc").apply {
+                writeText("header = \"X-MEET-Session-Token: $serverToken\"\n")
+                setReadable(true, true)
+                setWritable(true, true)
+            }
+            File(appContext.filesDir, ".wgetrc").apply {
+                writeText("header = X-MEET-Session-Token: $serverToken\n")
+                setReadable(true, true)
+                setWritable(true, true)
+            }
         }
     }
 
     private fun io.ktor.server.application.ApplicationCall.isAuthorized(): Boolean {
         val token = request.headers["X-MEET-Session-Token"] 
             ?: request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
-        return token == serverToken
+        val grantedScopes = token?.let(tokenScopes::get) ?: return false
+        return requiredScope() in grantedScopes
+    }
+
+    private fun io.ktor.server.application.ApplicationCall.requiredScope(): ControlScope {
+        val path = request.path()
+        return when {
+            path == "/api/db" -> ControlScope.DATABASE_READ
+            path == "/api/ai" -> ControlScope.AI_USE
+            path.startsWith("/api/garage/") -> ControlScope.GARAGE_READ
+            path.startsWith("/api/reports/") -> ControlScope.REPORT_WRITE
+            path.startsWith("/api/obd/clear") || path.startsWith("/api/obd/can-dump") -> ControlScope.OBD_EFFECT
+            path.startsWith("/api/obd") -> ControlScope.OBD_READ
+            path in setOf("/api/termux/clipboard", "/api/termux/location", "/api/termux/wifi") &&
+                request.httpMethod == HttpMethod.Get -> ControlScope.DEVICE_SENSITIVE_READ
+            path.startsWith("/api/termux/") && request.httpMethod != HttpMethod.Get -> ControlScope.DEVICE_WRITE
+            path.startsWith("/api/termux/") -> ControlScope.DEVICE_READ
+            else -> ControlScope.TELEMETRY_READ
+        }
     }
 
     private val serverScope = CoroutineScope(
@@ -1842,6 +1897,16 @@ class LocalControlServer(
         try {
             val engine = serverScope.embeddedServer(CIO, port = CONTROL_PORT, host = CONTROL_HOST) {
                 routing {
+                    intercept(ApplicationCallPipeline.Plugins) {
+                        if (call.request.path().startsWith("/api/") && !call.isAuthorized()) {
+                            call.respondText(
+                                "{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}",
+                                ContentType.Application.Json,
+                                HttpStatusCode.Unauthorized,
+                            )
+                            finish()
+                        }
+                    }
                     get("/api/telemetry") {
                         if (!call.isAuthorized()) {
                             call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
@@ -1877,19 +1942,36 @@ class LocalControlServer(
                             return@post
                         }
                         try {
-                            val sql = call.receiveText().trim()
+                            val sql = call.receiveText().trim().removeSuffix(";").trim()
                             if (sql.isBlank()) {
                                 call.respondText("{\"error\":\"Missing SQL statement\"}", ContentType.Application.Json, HttpStatusCode.BadRequest)
                                 return@post
                             }
                             val upperSql = sql.uppercase()
-                            if (!upperSql.startsWith("SELECT ") && !upperSql.startsWith("PRAGMA TABLE_INFO")) {
+                            if (sql.contains(';') || sql.contains("--") || sql.contains("/*")) {
+                                call.respondText("{\"error\":\"FORBIDDEN: Multiple statements and SQL comments are not accepted\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
+                                return@post
+                            }
+                            if (!upperSql.startsWith("SELECT ")) {
                                 call.respondText("{\"error\":\"FORBIDDEN: Only read-only SELECT queries are permitted on this gateway\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
                                 return@post
                             }
                             val forbiddenKeywords = listOf("DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "ATTACH", "DETACH", "CREATE", "REPLACE", "EXEC", "VACUUM")
                             if (forbiddenKeywords.any { upperSql.contains(it) }) {
                                 call.respondText("{\"error\":\"FORBIDDEN: Mutating SQL operations are blocked\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
+                                return@post
+                            }
+                            val referencedTables = Regex("(?i)\\b(?:FROM|JOIN)\\s+([A-Za-z_][A-Za-z0-9_]*)")
+                                .findAll(sql)
+                                .map { it.groupValues[1].lowercase() }
+                                .toSet()
+                            val allowedTables = setOf("dtc_codes", "vehicles")
+                            if (referencedTables.isEmpty() || !allowedTables.containsAll(referencedTables)) {
+                                call.respondText(
+                                    "{\"error\":\"FORBIDDEN: Query references a table outside the local CLI allowlist\"}",
+                                    ContentType.Application.Json,
+                                    HttpStatusCode.Forbidden,
+                                )
                                 return@post
                             }
 
@@ -1901,7 +1983,7 @@ class LocalControlServer(
                             )
                             val jsonArray = JSONArray()
                             db.use { database ->
-                                database.rawQuery(sql, null).use { cursor ->
+                                database.rawQuery("SELECT * FROM ($sql) AS meet_read LIMIT 500", null).use { cursor ->
                                     val columnCount = cursor.columnCount
                                     while (cursor.moveToNext()) {
                                         val rowObj = JSONObject()
@@ -1966,12 +2048,17 @@ class LocalControlServer(
                                 return@post
                             }
                             val upperCmd = command.uppercase()
-                            val isSafe = upperCmd.startsWith("01") || upperCmd.startsWith("09") || upperCmd.startsWith("AT")
+                            val isRegisteredMode01 = upperCmd.matches(Regex("^01[0-9A-F]{2,4}$")) &&
+                                com.elysium369.meet.core.obd.PidRegistry.getPid("01", upperCmd.drop(2)) != null
+                            val isSafe = isRegisteredMode01 || upperCmd in setOf(
+                                "0900", "0902", "0904", "0906", "090A",
+                                "ATI", "ATRV", "ATDP", "ATDPN",
+                            )
                             if (!isSafe) {
-                                call.respondText("{\"error\":\"FORBIDDEN: Effectful OBD commands require SafetyBroker gating\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
+                                call.respondText("{\"error\":\"FORBIDDEN: Command is outside the immutable read-only allowlist\"}", ContentType.Application.Json, HttpStatusCode.Forbidden)
                                 return@post
                             }
-                            val result = obdSession.sendRawCommand(command)
+                            val result = obdSession.executeTerminalRead(upperCmd)
                             val response = JSONObject().apply {
                                 put("command", command)
                                 put("response", result)
@@ -1998,7 +2085,7 @@ class LocalControlServer(
                                 put("state", state.name)
                                 put("protocol", proto.ifBlank { "NONE" })
                                 put("adapter_version", version)
-                                put("vin", vin ?: "NOT_READ")
+                                put("vin", vin ?: JSONObject.NULL)
                                 if (voltage != null) put("battery_voltage", voltage) else put("battery_voltage", JSONObject.NULL)
                                 put("is_connected", state == ObdState.CONNECTED)
                             }
@@ -2014,10 +2101,15 @@ class LocalControlServer(
                             return@post
                         }
                         try {
-                            val vinResult = obdSession.fetchVin()
+                            val vinResult = obdSession.readVinFromVehicle()
                             val json = JSONObject().apply {
-                                put("success", !vinResult.isNullOrBlank())
-                                put("vin", vinResult ?: "NOT_READ")
+                                put("success", vinResult.isVerified)
+                                put("outcome", vinResult.outcome.name)
+                                put("vin", vinResult.vin ?: JSONObject.NULL)
+                                put("command", vinResult.command ?: JSONObject.NULL)
+                                put("header", vinResult.header ?: JSONObject.NULL)
+                                put("protocol", vinResult.protocol ?: JSONObject.NULL)
+                                put("captured_at_monotonic_ms", vinResult.capturedAtMonotonicMs)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -2049,26 +2141,11 @@ class LocalControlServer(
                             call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
                             return@post
                         }
-                        try {
-                            val clearResult = obdSession.clearDtcs()
-                            val isVerified = clearResult is com.elysium369.meet.core.obd.ClearDtcResult.Verified ||
-                                    clearResult is com.elysium369.meet.core.obd.ClearDtcResult.PartiallyVerified
-                            val json = JSONObject().apply {
-                                put("result", clearResult::class.simpleName)
-                                put("is_verified_clear", isVerified)
-                                put("message", when (clearResult) {
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.Verified -> "Códigos borrados y verificados físicamente por re-escaneo"
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.PartiallyVerified -> "Códigos borrados parcialmente verificados"
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.AcceptedButNotVerified -> "ECU aceptó comando Mode 04 pero el re-escaneo no pudo verificar estado"
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.Rejected -> "Comando rechazado por la ECU o condiciones de seguridad: ${clearResult.message}"
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.Inconclusive -> "Resultado inconcluso tras re-escaneo: ${clearResult.message}"
-                                    is com.elysium369.meet.core.obd.ClearDtcResult.Cancelled -> "Operación cancelada: ${clearResult.message}"
-                                })
-                            }
-                            call.respondText(json.toString(2), ContentType.Application.Json)
-                        } catch (e: Exception) {
-                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
-                        }
+                        call.respondText(
+                            "{\"error\":\"FORBIDDEN: DTC clear requires in-app consent and a module-scoped verification plan\"}",
+                            ContentType.Application.Json,
+                            HttpStatusCode.Forbidden,
+                        )
                     }
 
                     get("/api/obd/ping") {
@@ -2078,12 +2155,16 @@ class LocalControlServer(
                         }
                         try {
                             val start = System.currentTimeMillis()
-                            val resp = obdSession.sendRawCommand("0100")
+                            val resp = obdSession.executeTerminalRead("0100")
                             val latency = System.currentTimeMillis() - start
+                            val normalized = CanMultiFrameParser.parse(resp)
+                                .replace(Regex("[^0-9A-Fa-f]"), "")
+                                .uppercase()
+                            val acknowledged = normalized.contains("4100")
                             val json = JSONObject().apply {
                                 put("latency_ms", latency)
                                 put("response", resp)
-                                put("bus_healthy", !resp.contains("ERROR") && !resp.contains("UNABLE"))
+                                put("ecu_acknowledged", acknowledged)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -2096,15 +2177,11 @@ class LocalControlServer(
                             call.respondText("{\"error\":\"UNAUTHORIZED: Valid X-MEET-Session-Token required\"}", ContentType.Application.Json, HttpStatusCode.Unauthorized)
                             return@get
                         }
-                        try {
-                            val rawResponse = obdSession.sendRawCommand("ATMA")
-                            val json = JSONObject().apply {
-                                put("stream", rawResponse)
-                            }
-                            call.respondText(json.toString(2), ContentType.Application.Json)
-                        } catch (e: Exception) {
-                            call.respondText("{\"error\":\"${e.message}\"}", ContentType.Application.Json, HttpStatusCode.InternalServerError)
-                        }
+                        call.respondText(
+                            "{\"error\":\"FORBIDDEN: CAN monitor mode requires an owned, cancellable diagnostic session\"}",
+                            ContentType.Application.Json,
+                            HttpStatusCode.Forbidden,
+                        )
                     }
 
                     get("/api/obd/live") {
@@ -2164,9 +2241,11 @@ class LocalControlServer(
                             val batteryIntent = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                             val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
                             val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-                            val percentage = if (level >= 0 && scale > 0) (level * 100) / scale else 0
-                            val temperature = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
-                            val voltage = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0) / 1000.0
+                            val percentage = if (level >= 0 && scale > 0) (level * 100) / scale else null
+                            val rawTemperature = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+                            val temperature = rawTemperature?.takeUnless { it == Int.MIN_VALUE }?.div(10.0)
+                            val rawVoltage = batteryIntent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, Int.MIN_VALUE)
+                            val voltage = rawVoltage?.takeUnless { it == Int.MIN_VALUE }?.div(1000.0)
                             val status = when (batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
                                 BatteryManager.BATTERY_STATUS_CHARGING -> "CHARGING"
                                 BatteryManager.BATTERY_STATUS_DISCHARGING -> "DISCHARGING"
@@ -2180,14 +2259,27 @@ class LocalControlServer(
                                 BatteryManager.BATTERY_PLUGGED_WIRELESS -> "WIRELESS"
                                 else -> "UNPLUGGED"
                             }
+                            val health = when (batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1)) {
+                                BatteryManager.BATTERY_HEALTH_GOOD -> "GOOD"
+                                BatteryManager.BATTERY_HEALTH_OVERHEAT -> "OVERHEAT"
+                                BatteryManager.BATTERY_HEALTH_DEAD -> "DEAD"
+                                BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "OVER_VOLTAGE"
+                                BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "UNSPECIFIED_FAILURE"
+                                BatteryManager.BATTERY_HEALTH_COLD -> "COLD"
+                                else -> "UNKNOWN"
+                            }
+                            val batteryManager = appContext.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                            val currentMicroAmps = batteryManager
+                                ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                                ?.takeUnless { it == Int.MIN_VALUE }
                             val json = JSONObject().apply {
-                                put("percentage", percentage)
-                                put("temperature", temperature)
-                                put("voltage", voltage)
+                                put("percentage", percentage ?: JSONObject.NULL)
+                                put("temperature", temperature ?: JSONObject.NULL)
+                                put("voltage", voltage ?: JSONObject.NULL)
                                 put("status", status)
                                 put("plugged", plugged)
-                                put("health", "GOOD")
-                                put("current", 0)
+                                put("health", health)
+                                put("current_microamps", currentMicroAmps ?: JSONObject.NULL)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -2308,13 +2400,15 @@ class LocalControlServer(
                             @Suppress("DEPRECATION")
                             val info = wifiManager?.connectionInfo
                             val json = JSONObject().apply {
-                                put("ssid", info?.ssid?.replace("\"", "") ?: "UNKNOWN")
-                                put("bssid", info?.bssid ?: "00:00:00:00:00:00")
-                                put("rssi", info?.rssi ?: -1)
-                                put("link_speed_mbps", info?.linkSpeed ?: 0)
-                                put("frequency_mhz", info?.frequency ?: 0)
-                                val ip = info?.ipAddress ?: 0
-                                put("ip", String.format("%d.%d.%d.%d", ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff, ip shr 24 and 0xff))
+                                put("ssid", info?.ssid?.replace("\"", "") ?: JSONObject.NULL)
+                                put("bssid", info?.bssid ?: JSONObject.NULL)
+                                put("rssi", info?.rssi ?: JSONObject.NULL)
+                                put("link_speed_mbps", info?.linkSpeed ?: JSONObject.NULL)
+                                put("frequency_mhz", info?.frequency ?: JSONObject.NULL)
+                                val ip = info?.ipAddress
+                                put("ip", if (ip != null && ip != 0) {
+                                    String.format("%d.%d.%d.%d", ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff, ip shr 24 and 0xff)
+                                } else JSONObject.NULL)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -2332,13 +2426,14 @@ class LocalControlServer(
                             } catch (_: SecurityException) {}
 
                             val json = JSONObject().apply {
-                                put("latitude", loc?.latitude ?: 0.0)
-                                put("longitude", loc?.longitude ?: 0.0)
-                                put("altitude", loc?.altitude ?: 0.0)
-                                put("accuracy", loc?.accuracy ?: 0.0f)
-                                put("speed", loc?.speed ?: 0.0f)
-                                put("bearing", loc?.bearing ?: 0.0f)
-                                put("provider", loc?.provider ?: "none")
+                                put("available", loc != null)
+                                put("latitude", loc?.latitude ?: JSONObject.NULL)
+                                put("longitude", loc?.longitude ?: JSONObject.NULL)
+                                put("altitude", loc?.takeIf { it.hasAltitude() }?.altitude ?: JSONObject.NULL)
+                                put("accuracy", loc?.takeIf { it.hasAccuracy() }?.accuracy ?: JSONObject.NULL)
+                                put("speed", loc?.takeIf { it.hasSpeed() }?.speed ?: JSONObject.NULL)
+                                put("bearing", loc?.takeIf { it.hasBearing() }?.bearing ?: JSONObject.NULL)
+                                put("provider", loc?.provider ?: JSONObject.NULL)
                             }
                             call.respondText(json.toString(2), ContentType.Application.Json)
                         } catch (e: Exception) {

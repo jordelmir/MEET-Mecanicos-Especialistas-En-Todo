@@ -20,6 +20,7 @@ import com.elysium369.meet.core.evair.domain.VehicleSnapshot
 import com.elysium369.meet.core.evair.telemetry.AnomalyDetector
 import com.elysium369.meet.core.evair.telemetry.TelemetryCollector
 import com.elysium369.meet.core.obd.ObdDataSource
+import com.elysium369.meet.core.obd.DtcBucket
 import com.elysium369.meet.core.obd.ObdSession
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.TelemetrySample
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,13 +61,19 @@ class VehicleStateEngine @Inject constructor(
 
     private fun observeObdStreams() {
         scope.launch {
-            obdSession.liveData.collectLatest { liveDataMap ->
-                val samples = obdSession.telemetrySamples.value
-                val newSnapshot = buildSnapshot(liveDataMap, samples)
+            combine(
+                obdSession.liveData,
+                obdSession.telemetrySamples,
+                obdSession.lastDtcScanReport,
+                obdSession.readinessResult,
+                obdSession.state,
+            ) { liveDataMap, samples, dtcReport, readiness, _ ->
+                buildSnapshot(liveDataMap, samples, dtcReport?.records.orEmpty(), readiness)
+            }.collectLatest { newSnapshot ->
                 _snapshot.value = newSnapshot
 
                 // Check for real-time telemetry events
-                evaluateTelemetryEvents(newSnapshot, liveDataMap)
+                evaluateTelemetryEvents(newSnapshot, obdSession.liveData.value)
             }
         }
     }
@@ -191,6 +199,8 @@ class VehicleStateEngine @Inject constructor(
     private fun buildSnapshot(
         liveData: Map<String, Float>,
         samples: Map<String, TelemetrySample>,
+        dtcRecords: List<com.elysium369.meet.core.obd.DtcRecord>,
+        readinessResult: com.elysium369.meet.core.obd.ReadinessResult?,
     ): VehicleSnapshot {
         val nowMs = System.currentTimeMillis()
         val nowMonoNs = SystemClock.elapsedRealtimeNanos()
@@ -204,7 +214,7 @@ class VehicleStateEngine @Inject constructor(
             timestampMs = nowMs,
             monotonicTimestampNs = nowMonoNs,
             vehicle = VehicleIdentity(
-                vehicleId = vin ?: "SESSION_${obdState.name}",
+                vehicleId = vin ?: "UNBOUND_PHYSICAL_SESSION",
                 vin = vin,
                 make = null,
                 model = null,
@@ -217,9 +227,10 @@ class VehicleStateEngine @Inject constructor(
                 phase = obdState.name,
                 hasRealEcuLink = isConnected,
                 protocol = detectedProto,
-                adapterQuality = if (isConnected) "CONNECTED" else null,
-                transport = if (isConnected) "ACTIVE_TRANSPORT" else null,
-                latencyMs = null // Strictly null when not actively timed
+                adapterQuality = obdSession.qosMetrics.value.takeIf { isConnected && it.totalRequests > 0 }
+                    ?.let { "reliability=${it.reliability}" },
+                transport = obdSession.activeTransportName.takeIf { isConnected },
+                latencyMs = obdSession.qosMetrics.value.latencyMs.toLong().takeIf { isConnected && it > 0L },
             ),
             engine = EngineSnapshot(
                 rpm = getDoubleValue("010C", liveData, samples),
@@ -251,8 +262,20 @@ class VehicleStateEngine @Inject constructor(
                 o2B1S1Voltage = getDoubleValue("0114", liveData, samples),
                 o2B1S2Voltage = getDoubleValue("0115", liveData, samples)
             ),
-            dtcs = emptyList(),
-            readiness = emptyMap(),
+            dtcs = dtcRecords.map { record ->
+                DtcSnapshot(
+                    code = record.code,
+                    category = when (record.bucket) {
+                        DtcBucket.PENDING -> DtcCategory.PENDING
+                        DtcBucket.PERMANENT -> DtcCategory.PERMANENT
+                        DtcBucket.ACTIVE, DtcBucket.HISTORY -> DtcCategory.CONFIRMED
+                    },
+                    description = null,
+                )
+            },
+            readiness = readinessResult?.monitors?.associate { monitor ->
+                monitor.name to if (monitor.complete) "COMPLETE" else "INCOMPLETE"
+            }.orEmpty(),
             activeWarnings = emptyList(),
             dataSource = if (isConnected) VehicleDataSource.REAL_OBD else VehicleDataSource.OFFLINE
         )

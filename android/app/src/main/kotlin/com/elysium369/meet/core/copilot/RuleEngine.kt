@@ -40,9 +40,9 @@ class RuleEngine @Inject constructor(
         }
 
         // Rule 1: Voltage
-        val voltage = liveData["0142"] ?: liveData["VOLTAGE"] ?: liveData["AT RV"] ?: 13.8f
+        val voltage = liveData["0142"] ?: liveData["VOLTAGE"] ?: liveData["AT RV"]
         val minVoltLimit = if (isEngineRunning) 13.0f else 12.0f
-        if (voltage < minVoltLimit) {
+        if (voltage != null && voltage < minVoltLimit) {
             triggerEvent(
                 CopilotEventType.VOLTAJE_BAJO,
                 AlertSeverity.WARNING,
@@ -52,15 +52,15 @@ class RuleEngine @Inject constructor(
         }
 
         // Rule 2: Coolant Temp (Sobrecalentamiento vs Temperatura Anormal)
-        val ect = liveData["0105"] ?: liveData["COOLANT"] ?: 90f
-        if (ect > 105f) {
+        val ect = liveData["0105"] ?: liveData["COOLANT"]
+        if (ect != null && ect > 105f) {
             triggerEvent(
                 CopilotEventType.SOBRECALENTAMIENTO,
                 AlertSeverity.CRITICAL,
                 "Alerta: Sobrecalentamiento severo del motor detectado. Temperatura a ${ect.toInt()} grados centígrados.",
                 "Warning: Severe engine overheating detected. Temperature is ${ect.toInt()} degrees celsius."
             )
-        } else if (ect > 100f) {
+        } else if (ect != null && ect > 100f) {
             triggerEvent(
                 CopilotEventType.TEMPERATURA_ANORMAL,
                 AlertSeverity.WARNING,
@@ -113,7 +113,7 @@ class RuleEngine @Inject constructor(
         }
 
         // Rule 6: Motor Frío (Coolant < 70°C for > 3 minutes while driving)
-        if (isEngineRunning && isDriving && ect < 70f) {
+        if (isEngineRunning && isDriving && ect != null && ect < 70f) {
             val runDuration = now - engineRunningStartTime
             if (runDuration > 180_000L && !isColdEngineAlertSent) {
                 isColdEngineAlertSent = true

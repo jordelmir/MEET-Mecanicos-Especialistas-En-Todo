@@ -90,12 +90,12 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
-        listOf(49, 50, 52, 53, 54, 55, 56).forEach { startVersion ->
-            val databaseName = "diagnostic-migration-$startVersion-to-57"
+        listOf(49, 50, 52, 53, 54, 55, 56, 57).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-58"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                57,
+                58,
                 true,
                 *migrationsFrom(startVersion),
             ).use { db ->
@@ -147,8 +147,8 @@ class DiagnosticMigrationConformanceTest {
     }
 
     @Test
-    fun staged50To57PreservesDistinctRawIdentityAndFindingCausalityColumns() {
-        val databaseName = "diagnostic-migration-staged-50-to-57"
+    fun staged50To58PreservesDistinctRawIdentityAndFindingCausalityColumns() {
+        val databaseName = "diagnostic-migration-staged-50-to-58"
         helper.createDatabase(databaseName, 50).apply {
             insertLegacyEvent("event-a", "session-a", 100L, 200L)
             insertLegacyEvent("event-b", "session-b", 300L, 400L)
@@ -156,7 +156,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            57,
+            58,
             true,
             *migrationsFrom(50),
         ).use { db ->
@@ -174,7 +174,7 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun sameUdsRawIdentityWithDifferentFailureTypeRemainsTwoFindings() {
-        val databaseName = "diagnostic-migration-uds-failure-types-to-57"
+        val databaseName = "diagnostic-migration-uds-failure-types-to-58"
         helper.createDatabase(databaseName, 51).apply {
             insertRawUdsEvent("uds-ft-11", 0x11, 100L)
             insertRawUdsEvent("uds-ft-22", 0x22, 200L)
@@ -182,7 +182,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            57,
+            58,
             true,
             *migrationsFrom(51),
         ).use { db ->
@@ -211,6 +211,7 @@ class DiagnosticMigrationConformanceTest {
         if (startVersion <= 54) add(AppModule.MIGRATION_54_55)
         if (startVersion <= 55) add(AppModule.MIGRATION_55_56)
         if (startVersion <= 56) add(AppModule.MIGRATION_56_57)
+        if (startVersion <= 57) add(AppModule.MIGRATION_57_58)
     }.toTypedArray()
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(

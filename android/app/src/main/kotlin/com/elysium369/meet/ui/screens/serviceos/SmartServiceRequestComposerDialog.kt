@@ -281,7 +281,7 @@ fun SmartServiceRequestComposerDialog(
                                         approximateRadiusKm = 5.0
                                     ),
                                     evidence = ServiceEvidencePayload(
-                                        vehicleId = activeVehicle?.id ?: "V_LOCAL",
+                                        vehicleId = requireNotNull(activeVehicle).id,
                                         vehicleDisplayName = vehicleLabel,
                                         maskedVin = maskedVin,
                                         activeDtcs = activeDtcs,
@@ -293,7 +293,10 @@ fun SmartServiceRequestComposerDialog(
                                 onSubmit(request)
                             },
                             color = MeetColors.neonGreen,
-                            modifier = Modifier.weight(1f).height(42.dp)
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            isEnabled = activeVehicle != null &&
+                                locationZoneText.isNotBlank() &&
+                                (symptomDetail.isNotBlank() || userSymptomCategory.isNotBlank()),
                         )
                     }
                 }

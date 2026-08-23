@@ -208,6 +208,21 @@ data class RideClaimFeedback(
     val emittedAtEpochMs: Long = System.currentTimeMillis(),
 )
 
+sealed class DekraConciergeSubmissionState {
+    data object Idle : DekraConciergeSubmissionState()
+    data object Publishing : DekraConciergeSubmissionState()
+    data class Saved(
+        val requestId: String,
+        val cloudPublished: Boolean,
+    ) : DekraConciergeSubmissionState()
+    data class Failed(val message: String) : DekraConciergeSubmissionState()
+}
+
+private val dekraConciergeJson = Json {
+    encodeDefaults = true
+    explicitNulls = false
+}
+
 @Serializable
 private data class RemotePartRequest(
     val requestId: String,
@@ -465,6 +480,8 @@ class ObdViewModel @Inject constructor(
     private val rideCommandRepository: RideCommandRepository,
     private val rideRemoteProjectionRepository: RideRemoteProjectionRepository,
     private val activePrincipalKernel: ActivePrincipalKernel,
+    private val vehicleRuntimeServer: com.elysium369.meet.core.evair.bridge.VehicleRuntimeServer,
+    val vehicleAccessManager: com.elysium369.meet.core.vehicleaccess.application.VehicleAccessManager,
     val entitlementManager: com.elysium369.meet.core.monetization.EntitlementManager,
     val adGateManager: com.elysium369.meet.core.monetization.AdGateManager,
     val usageMeter: com.elysium369.meet.core.monetization.UsageMeter,
@@ -557,7 +574,8 @@ class ObdViewModel @Inject constructor(
         geminiDiagnostic,
         obdSession,
         tripManager,
-        shellScope
+        shellScope,
+        vehicleRuntimeServer,
     )
     val localShellLines: StateFlow<List<String>> = localShellManager.terminalLines
     val activeDistro: StateFlow<String> = localShellManager.activeDistro
@@ -962,6 +980,12 @@ class ObdViewModel @Inject constructor(
     val openPartRequests: StateFlow<List<PartRequestEntity>> = marketplaceDao.getOpenPartRequests()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private val _dekraConciergeSubmission = MutableStateFlow<DekraConciergeSubmissionState>(
+        DekraConciergeSubmissionState.Idle,
+    )
+    val dekraConciergeSubmission: StateFlow<DekraConciergeSubmissionState> =
+        _dekraConciergeSubmission.asStateFlow()
+
     // Shop/Workshop bids derived dynamically
     private val _shopId = MutableStateFlow<String?>(null)
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -987,7 +1011,9 @@ class ObdViewModel @Inject constructor(
         serviceId: String? = null,
         serviceCategory: String? = null,
         dtcCodes: List<String> = activeDtcs.value,
-        serviceMetadata: String = ""
+        serviceMetadata: String = "",
+        requestId: String = UUID.randomUUID().toString(),
+        createdAtMs: Long = System.currentTimeMillis(),
     ) {
         val catalogService = WorkshopServiceCatalog.serviceById(serviceId)
         val enrichedDescription = buildString {
@@ -1006,7 +1032,7 @@ class ObdViewModel @Inject constructor(
         }.trim()
 
         val request = ServiceRequestEntity(
-            requestId = UUID.randomUUID().toString(),
+            requestId = requestId,
             vehicleId = vehicleId,
             problem = problem,
             priority = priority,
@@ -1015,7 +1041,7 @@ class ObdViewModel @Inject constructor(
             radiusKm = 15.0,
             status = "OPEN",
             autoDtcCode = dtcCodes.firstOrNull() ?: activeDtcs.value.firstOrNull(),
-            createdAt = System.currentTimeMillis(),
+            createdAt = createdAtMs,
             latitude = latitude,
             longitude = longitude,
             phone = phone,
@@ -1031,6 +1057,128 @@ class ObdViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("ObdViewModel", "Failed to create service request", e)
             }
+        }
+    }
+
+    fun createServiceRequestV2(
+        request: com.elysium369.meet.core.services.serviceos.ServiceRequestV2,
+    ) {
+        val evidence = request.evidence
+        val metadata = org.json.JSONObject().apply {
+            put("schema", "MEET_SERVICE_REQUEST_V2")
+            put("request_id", request.id)
+            put("created_at_ms", request.createdAtMs)
+            put("urgency", request.urgency.name)
+            put("mobility", request.mobility.name)
+            put("preferred_modality", request.preferredModality.name)
+            put("state", request.state.name)
+            put("location_zone", org.json.JSONObject().apply {
+                put("name", request.locationZone.approximateZoneName)
+                put("radius_km", request.locationZone.approximateRadiusKm)
+                put("latitude", request.locationZone.latitude ?: org.json.JSONObject.NULL)
+                put("longitude", request.locationZone.longitude ?: org.json.JSONObject.NULL)
+                put("exact_address_masked", request.locationZone.exactAddressMasked)
+            })
+            put("evidence", org.json.JSONObject().apply {
+                put("vehicle_id", evidence.vehicleId)
+                put("vehicle_display_name", evidence.vehicleDisplayName)
+                put("masked_vin", evidence.maskedVin ?: org.json.JSONObject.NULL)
+                put("active_dtcs", org.json.JSONArray(evidence.activeDtcs))
+                put("freeze_frame_summary", evidence.freezeFrameSummary ?: org.json.JSONObject.NULL)
+                put("odometer_km", evidence.odometertKm ?: org.json.JSONObject.NULL)
+                put("battery_voltage", evidence.batteryVoltage ?: org.json.JSONObject.NULL)
+                put("symptom", evidence.userReportedSymptom)
+                put("symptom_category", evidence.userSymptomCategory)
+                put("photo_uris", org.json.JSONArray(evidence.photoUris))
+                put("video_uris", org.json.JSONArray(evidence.videoUris))
+                put("audio_uris", org.json.JSONArray(evidence.audioUris))
+            })
+            request.estimatedBudget?.let { budget ->
+                put("estimated_budget", org.json.JSONObject().apply {
+                    put("amount_minor", budget.amountMinor)
+                    put("currency", budget.currency.name)
+                })
+            }
+        }.toString()
+
+        createServiceRequest(
+            vehicleId = evidence.vehicleId,
+            problem = evidence.userReportedSymptom,
+            description = evidence.userSymptomCategory,
+            location = request.locationZone.approximateZoneName,
+            priority = if (request.urgency == com.elysium369.meet.core.services.serviceos.ServiceRequestUrgency.URGENT_BREAKDOWN) "HIGH" else "MEDIUM",
+            latitude = request.locationZone.latitude ?: 0.0,
+            longitude = request.locationZone.longitude ?: 0.0,
+            dtcCodes = evidence.activeDtcs,
+            serviceMetadata = metadata,
+            requestId = request.id,
+            createdAtMs = request.createdAtMs,
+        )
+    }
+
+    fun publishDekraConciergeRequest(
+        request: com.elysium369.meet.core.services.dekra.DekraConciergeRequest,
+    ) {
+        val validationErrors =
+            com.elysium369.meet.core.services.dekra.DekraConciergePolicy.validate(request)
+        if (validationErrors.isNotEmpty()) {
+            _dekraConciergeSubmission.value = DekraConciergeSubmissionState.Failed(
+                "La solicitud está incompleta o el plan de traslado no es seguro.",
+            )
+            return
+        }
+        if (_dekraConciergeSubmission.value is DekraConciergeSubmissionState.Publishing) return
+
+        _dekraConciergeSubmission.value = DekraConciergeSubmissionState.Publishing
+        viewModelScope.launch(Dispatchers.IO) {
+            val metadata = dekraConciergeJson.encodeToString(request)
+            val description = buildString {
+                appendLine("[MEET_DEKRA_CONCIERGE_V1]")
+                appendLine(metadata)
+                appendLine("[/MEET_DEKRA_CONCIERGE_V1]")
+                appendLine()
+                appendLine("Servicio de custodia, prechequeo y traslado a inspección técnica vehicular.")
+                appendLine("El resultado es emitido exclusivamente por DEKRA; MEET no garantiza aprobación.")
+                appendLine("La tarifa oficial DEKRA y la tarifa del servicio MEET se cotizan por separado.")
+            }.trim()
+            val entity = ServiceRequestEntity(
+                requestId = request.id,
+                vehicleId = request.vehicleId,
+                problem = "Traslado y acompañamiento a DEKRA",
+                priority = "MEDIUM",
+                description = description,
+                location = request.pickupZone,
+                radiusKm = 15.0,
+                status = "OPEN",
+                autoDtcCode = request.activeDtcs.firstOrNull(),
+                createdAt = request.createdAtMs,
+                phone = request.contactPhone,
+                priceOffer = 0.0,
+            )
+
+            try {
+                marketplaceDao.insertRequest(entity)
+                val cloudPublished = runCatching {
+                    SupabaseManager.client.postgrest["service_requests"].insert(entity)
+                }.onFailure {
+                    Log.w("ObdViewModel", "DEKRA concierge saved locally; cloud unavailable", it)
+                }.isSuccess
+                _dekraConciergeSubmission.value = DekraConciergeSubmissionState.Saved(
+                    requestId = request.id,
+                    cloudPublished = cloudPublished,
+                )
+            } catch (error: Exception) {
+                Log.e("ObdViewModel", "Failed to persist DEKRA concierge request", error)
+                _dekraConciergeSubmission.value = DekraConciergeSubmissionState.Failed(
+                    "No fue posible guardar la solicitud. Revisa el almacenamiento e inténtalo de nuevo.",
+                )
+            }
+        }
+    }
+
+    fun resetDekraConciergeSubmission() {
+        if (_dekraConciergeSubmission.value !is DekraConciergeSubmissionState.Publishing) {
+            _dekraConciergeSubmission.value = DekraConciergeSubmissionState.Idle
         }
     }
 
@@ -1080,6 +1228,22 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val bid = marketplaceDao.getBidById(bidId)
+                val requestBeforeAcceptance = marketplaceDao.getRequestById(requestId)
+                if (requestBeforeAcceptance?.description?.contains("[MEET_DEKRA_CONCIERGE_V1]") == true) {
+                    val eligible = bid?.let { candidate -> hasEligibleDekraProvider(candidate.shopId) } == true
+                    if (!eligible) {
+                        withContext(Dispatchers.Main) {
+                            context?.let {
+                                android.widget.Toast.makeText(
+                                    it,
+                                    "Esta oferta no tiene un conductor de transporte verificado con licencia registrada.",
+                                    android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        }
+                        return@launch
+                    }
+                }
                 val accepted = marketplaceDao.acceptBidAtomically(
                     requestId = requestId,
                     bidId = bidId,
@@ -1124,6 +1288,21 @@ class ObdViewModel @Inject constructor(
     fun takeMechanicRequest(requestId: String, mechanicId: String, mechanicName: String, mechanicPhone: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = marketplaceDao.getRequestById(requestId)
+            if (request?.description?.contains("[MEET_DEKRA_CONCIERGE_V1]") == true) {
+                val eligible = hasEligibleDekraProvider(mechanicId)
+                if (!eligible) {
+                    withContext(Dispatchers.Main) {
+                        context?.let {
+                            android.widget.Toast.makeText(
+                                it,
+                                "Este servicio requiere un conductor de transporte verificado con licencia registrada.",
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                    return@launch
+                }
+            }
             val accepted = request != null && marketplaceDao.takeMechanicRequestAtomically(
                 requestId = requestId,
                 mechanicId = mechanicId,
@@ -1142,6 +1321,18 @@ class ObdViewModel @Inject constructor(
             }
         }
     }
+
+    private suspend fun hasEligibleDekraProvider(userId: String): Boolean =
+        providerProfileDao.getActiveProfilesForUser(userId).first().any { profile ->
+            com.elysium369.meet.core.services.dekra.DekraProviderEligibilityPolicy.isEligible(
+                com.elysium369.meet.core.services.dekra.DekraProviderSnapshot(
+                    providerType = profile.providerType,
+                    active = profile.isActive,
+                    verified = profile.verified,
+                    licenseNumber = profile.licenseNumber,
+                ),
+            )
+        }
 
     fun completeMechanicRequest(requestId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -2366,6 +2557,10 @@ class ObdViewModel @Inject constructor(
     fun runMeetPeritoInspection() {
         val vehicle = _selectedVehicle.value ?: return
         viewModelScope.launch {
+            if (obdSession.state.value != ObdState.CONNECTED) {
+                _vinReadFeedback.value = "⚠️ El peritaje requiere una sesión OBD física conectada."
+                return@launch
+            }
             _isInspectingPerito.value = true
             _activePeritoReport.value = null
             _peritoConsoleLogs.value = emptyList()
@@ -2378,6 +2573,7 @@ class ObdViewModel @Inject constructor(
                 _peritoConsoleLogs.value = ArrayList(logs)
             }
 
+            try {
             voiceFeedbackManager.speak("Iniciando peritaje clínico Elysium Vanguard Perito.", "Starting Elysium Vanguard Perito clinical vehicle check.")
             
             // Step 1: VIN
@@ -2385,51 +2581,55 @@ class ObdViewModel @Inject constructor(
             addLog("📡 Estableciendo comunicación con ECU mediante protocolo OBD2...")
             delay(1000)
             addLog("🔍 Solicitando VIN del vehículo (PID 09 02)...")
-            val vinVal = _vin.value ?: vehicle.vin
-            delay(1200)
-            addLog("ℹ️ VIN detectado: $vinVal")
+            val vinProof = obdSession.readVinFromVehicle()
+            val vinVal = vinProof.vin
+            addLog(vinVal?.let { "ℹ️ VIN verificado físicamente: $it (${vinProof.command})" }
+                ?: "⚠️ VIN no verificado: ${vinProof.outcome}")
             
             // Step 2: DTC Activos
             _currentPeritoStep.value = 2
             addLog("⚠️ Solicitando códigos de falla activos (Mode 03)...")
-            delay(1000)
-            val dtcs = activeDtcs.value
+            val diagnosticReport = obdSession.readProfessionalDtcScan()
+            val dtcs = diagnosticReport.codesForBucket(DtcBucket.ACTIVE)
             addLog("ℹ️ DTCs activos encontrados: ${dtcs.size}")
 
             // Step 3: DTC Pendientes
             _currentPeritoStep.value = 3
             addLog("⏳ Solicitando códigos de falla pendientes (Mode 07)...")
-            delay(1000)
-            val pDtcs = pendingDtcs.value
+            val pDtcs = diagnosticReport.codesForBucket(DtcBucket.PENDING)
             addLog("ℹ️ DTCs pendientes encontrados: ${pDtcs.size}")
 
             // Step 4: Freeze Frame
             _currentPeritoStep.value = 4
             addLog("📦 Solicitando captura de pantalla de falla congelada (Freeze Frame Mode 02)...")
-            delay(1200)
-            val ff = _freezeFrameData.value
-            addLog("ℹ️ Registro de Freeze Frame: ${if (ff.isEmpty()) "Vacío" else "${ff.size} parámetros"}")
+            val freezeFrameDtc = (dtcs + pDtcs).firstOrNull()
+            val freezeFrameResult = freezeFrameDtc?.let { obdSession.readFreezeFrame(it) }
+            val ff = freezeFrameResult?.values.orEmpty()
+            val freezeFrameReadComplete = freezeFrameResult?.outcome == FreezeFrameOutcome.MATCHED ||
+                (freezeFrameDtc == null && diagnosticReport.completeness == ScanCompleteness.COMPLETE)
+            addLog("ℹ️ Freeze Frame: ${freezeFrameResult?.outcome ?: "NO_APLICA_SIN_DTC_EN_SCAN_COMPLETO"}")
 
             // Step 5: Fuel Trims
             _currentPeritoStep.value = 5
             addLog("⛽ Analizando sensores de ajuste de mezcla (Long Term Fuel Trims)...")
             delay(1000)
-            val trim = _liveData.value["LTFT_B1"] ?: _liveData.value["ltft_b1"] ?: 0f
-            addLog("ℹ️ LTFT Banco 1: ${String.format("%.1f", trim)}%")
+            val trim = _liveData.value["LTFT_B1"] ?: _liveData.value["ltft_b1"]
+            addLog(trim?.let { "ℹ️ LTFT Banco 1: ${String.format("%.1f", it)}%" }
+                ?: "⚠️ LTFT no disponible; no se asumirá 0%.")
 
             // Step 6: Coolant Temperature
             _currentPeritoStep.value = 6
             addLog("🌡️ Leyendo sensor de temperatura del refrigerante (ECT PID 01 05)...")
             delay(1000)
-            val ect = _liveData.value["COOLANT"] ?: _liveData.value["coolant"] ?: 90f
-            addLog("ℹ️ ECT: ${ect.toInt()}°C")
+            val ect = _liveData.value["COOLANT"] ?: _liveData.value["coolant"]
+            addLog(ect?.let { "ℹ️ ECT: ${it.toInt()}°C" } ?: "⚠️ ECT no disponible; no se asumirá una temperatura normal.")
 
             // Step 7: Alternator/Battery Voltage
             _currentPeritoStep.value = 7
             addLog("🔋 Midiendo voltaje del alternador y regulación eléctrica...")
             delay(1000)
-            val volt = _liveData.value["VOLTAGE"] ?: _liveData.value["voltage"] ?: 13.8f
-            addLog("ℹ️ Voltaje del sistema: ${String.format("%.1f", volt)}V")
+            val volt = _liveData.value["VOLTAGE"] ?: _liveData.value["voltage"]
+            addLog(volt?.let { "ℹ️ Voltaje del sistema: ${String.format("%.1f", it)}V" } ?: "⚠️ Voltaje no disponible; no se asumirá 13.8 V.")
 
             // Step 8: Critical admission sensors
             _currentPeritoStep.value = 8
@@ -2443,20 +2643,25 @@ class ObdViewModel @Inject constructor(
             _currentPeritoStep.value = 9
             addLog("🚗 Solicitando kilometraje almacenado en ECU (odómetro OBD)...")
             delay(1000)
-            val obdOdo = _liveData.value["DISTANCE_WITH_MIL"] ?: _liveData.value["distance_with_mil"] ?: -1f
-            addLog("ℹ️ Kilometraje tablero: ${currentOdometer.value.toInt()} km | Kilometraje ECU: ${if (obdOdo > 0) "${obdOdo.toInt()} km" else "No soportado"}")
+            val obdOdo = obdSession.readOdometer()
+            addLog("ℹ️ Kilometraje tablero: ${currentOdometer.value.toInt()} km | Kilometraje ECU: ${obdOdo?.let { "${it.toInt()} km" } ?: "No disponible"}")
 
             // Step 10: General State / Readiness
             _currentPeritoStep.value = 10
             addLog("🔬 Verificando estado general de monitores de emisiones (Readiness)...")
             delay(1000)
-            val readiness = _readinessMonitors.value?.monitors?.associate { it.name to it.complete } ?: emptyMap()
+            val readinessResult = obdSession.readReadinessMonitors()
+            _readinessMonitors.value = readinessResult
+            val readiness = readinessResult?.monitors?.associate { it.name to it.complete } ?: emptyMap()
             addLog("ℹ️ Monitores listos: ${readiness.count { it.value }}/${readiness.size}")
             delay(800)
 
             addLog("⚡ Compilando diagnóstico y generando reporte clínico Elysium Vanguard Perito...")
             delay(1500)
 
+            val inspectionLiveData = _liveData.value.toMutableMap().apply {
+                obdOdo?.let { put("DISTANCE_WITH_MIL", it) }
+            }
             val report = meetPerito.performInspection(
                 context = context,
                 vehicleId = vehicle.id,
@@ -2464,18 +2669,25 @@ class ObdViewModel @Inject constructor(
                 activeDtcs = dtcs,
                 pendingDtcs = pDtcs,
                 freezeFrame = ff.ifEmpty { null },
-                liveData = _liveData.value,
+                liveData = inspectionLiveData,
                 odometerKmCluster = currentOdometer.value.toLong(),
-                readinessMonitors = readiness
+                readinessMonitors = readiness,
+                dtcScanComplete = diagnosticReport.completeness == ScanCompleteness.COMPLETE,
+                freezeFrameReadComplete = freezeFrameReadComplete,
             )
 
             _activePeritoReport.value = report
-            _isInspectingPerito.value = false
             voiceFeedbackManager.speak(
                 "Evaluación finalizada. Puntuación: ${report.score0to100} de 100. Categoría: ${report.category}.",
                 "Evaluation complete. Score: ${report.score0to100} out of 100. Category: ${report.category}."
             )
             loadPeritoHistory()
+            } catch (e: Exception) {
+                addLog("✗ Peritaje interrumpido sin conclusión: ${e.message ?: e::class.simpleName}")
+                android.util.Log.e("ObdVM", "Physical Perito inspection failed", e)
+            } finally {
+                _isInspectingPerito.value = false
+            }
         }
     }
 
@@ -3644,10 +3856,10 @@ class ObdViewModel @Inject constructor(
             .edit()
             .putString("last_adapter_address", address)
             .apply()
-        obdSession.setTargetAddress(address)
         beginUnboundPhysicalSession(address)
         hasCompletedInitialDtcScan = false
         viewModelScope.launch {
+            obdSession.setTargetAddressSequentially(address)
             obdSession.connect()
             if (obdSession.state.value == ObdState.CONNECTED) {
                 runPostConnectDtcFirstStartup()
@@ -3672,11 +3884,11 @@ class ObdViewModel @Inject constructor(
     private suspend fun runPostConnectDtcFirstStartup() {
         if (obdSession.state.value != ObdState.CONNECTED) return
         runCatching {
-            val detectedVin = obdSession.fetchVin()
+            val detectedVin = obdSession.readVinFromVehicle().vin ?: return@runCatching
             _vin.value = detectedVin
             detectManufacturer(detectedVin)
             bindVehicleFromObservedVin(detectedVin)
-            _currentOdometer.value = obdSession.readOdometer()
+            obdSession.readOdometer()?.let { _currentOdometer.value = it }
         }.onFailure { e ->
             android.util.Log.e("ObdVM", "Vehicle identity binding failed", e)
             addTerminalLog(
@@ -4066,6 +4278,10 @@ class ObdViewModel @Inject constructor(
 
     fun readAndSaveVinFromEcu(vehicle: Vehicle) {
         viewModelScope.launch {
+            if (_selectedVehicle.value?.id != vehicle.id) {
+                _vinReadFeedback.value = "⚠️ Activa primero este vehículo en Garage. La lectura física no se asociará a una tarjeta inactiva."
+                return@launch
+            }
             if (obdSession.state.value != ObdState.CONNECTED) {
                 _vinReadFeedback.value = "⚠️ El escáner OBD-II no está conectado. Conéctalo al vehículo para leer el VIN de la ECU."
                 return@launch
@@ -4073,16 +4289,28 @@ class ObdViewModel @Inject constructor(
             _isReadingVin.value = vehicle.id
             _vinReadFeedback.value = "🔍 Consultando ECU de ${vehicle.make} ${vehicle.model} (Modo 09 / UDS / KWP)..."
             try {
-                val detectedVin = obdSession.fetchVin()
-                if (detectedVin.isNotBlank() && detectedVin != "N/A" && detectedVin != "NOT_READ") {
+                val vinResult = obdSession.readVinFromVehicle()
+                val detectedVin = vinResult.vin
+                if (vinResult.isVerified && detectedVin != null) {
+                    val existingVin = VinValidator.normalize(vehicle.vin)
+                    if (existingVin != null && existingVin != detectedVin) {
+                        _vinReadFeedback.value = "⚠️ Conflicto de identidad: la ECU reportó $detectedVin, pero este vehículo conserva $existingVin. No se sobrescribió el Garage."
+                        return@launch
+                    }
                     val updated = vehicle.copy(vin = detectedVin)
                     vehicleRepository.insertVehicle(updated)
                     if (_selectedVehicle.value?.id == vehicle.id) {
                         _selectedVehicle.value = updated
                     }
-                    _vinReadFeedback.value = "✓ VIN $detectedVin leído con éxito de la ECU y guardado permanentemente."
+                    val route = listOfNotNull(vinResult.header, vinResult.command).joinToString(" → ")
+                    _vinReadFeedback.value = "✓ VIN $detectedVin verificado físicamente por $route (${vinResult.protocol ?: "protocolo OBD detectado"}) y guardado."
                 } else {
-                    _vinReadFeedback.value = "⚠️ La ECU no respondió con VIN estandarizado. Comprueba que el contacto/ignición esté en ON."
+                    _vinReadFeedback.value = when (vinResult.outcome) {
+                        VinReadOutcome.NOT_CONNECTED -> "⚠️ El enlace OBD se desconectó antes de consultar la ECU."
+                        VinReadOutcome.NO_RESPONSE -> "⚠️ Ninguna ECU respondió a las consultas VIN. Confirma contacto en ON y compatibilidad del adaptador."
+                        VinReadOutcome.INVALID_RESPONSE -> "⚠️ La ECU respondió, pero no entregó un VIN ISO 3779 válido de 17 caracteres. No se guardó ningún valor."
+                        VinReadOutcome.VERIFIED -> "Error de contrato: la prueba VIN fue marcada verificada sin un VIN válido."
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("ObdVM", "Error reading VIN from ECU", e)
@@ -4103,6 +4331,15 @@ class ObdViewModel @Inject constructor(
             ?: context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE).getString("last_adapter_address", null)
         if (!lastAddress.isNullOrBlank()) {
             try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.BLUETOOTH_CONNECT,
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    Log.i("ObdVM", "Pre-warm skipped: BLUETOOTH_CONNECT permission is not granted")
+                    return
+                }
                 val btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
                 if (btAdapter != null && btAdapter.isEnabled) {
                     val isPaired = btAdapter.bondedDevices?.any { it.address.equals(lastAddress, ignoreCase = true) } == true
@@ -5500,7 +5737,7 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun readVin(): String? {
-        val detectedVin = obdSession.fetchVin()
+        val detectedVin = obdSession.readVinFromVehicle().vin ?: return null
         _vin.value = detectedVin
         detectManufacturer(detectedVin)
         bindVehicleFromObservedVin(detectedVin)
@@ -5822,12 +6059,11 @@ class ObdViewModel @Inject constructor(
     fun markMaintenanceDone(alert: MaintenanceAlertEntity) {
         viewModelScope.launch {
             // Fetch real odometer from ECU if available
-            val currentOdo = obdSession.readOdometer()
-            val currentOdoLong = currentOdo.toLong()
-            val nextDue = if (currentOdoLong > 0) currentOdoLong + alert.intervalKm else alert.nextDueKm + alert.intervalKm
+            val currentOdoLong = obdSession.readOdometer()?.toLong()
+            val nextDue = if (currentOdoLong != null && currentOdoLong > 0) currentOdoLong + alert.intervalKm else alert.nextDueKm + alert.intervalKm
 
             val updatedAlert = alert.copy(
-                lastDoneKm = if (currentOdoLong > 0) currentOdoLong else alert.nextDueKm,
+                lastDoneKm = if (currentOdoLong != null && currentOdoLong > 0) currentOdoLong else alert.nextDueKm,
                 nextDueKm = nextDue
             )
             maintenanceAlertDao.insertAlert(updatedAlert)

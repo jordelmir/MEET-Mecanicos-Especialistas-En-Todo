@@ -27,14 +27,16 @@ class MeetPeritoTest {
                 "0142" to 13.8f  // Voltage
             ),
             odometerKmCluster = 120000L,
-            readinessMonitors = emptyMap()
+            readinessMonitors = mapOf("MISFIRE" to true, "FUEL" to true),
+            dtcScanComplete = true,
+            freezeFrameReadComplete = true,
         )
 
         // It should pass with excellent score because VIN is valid and there are no faults
         assertTrue(report.score0to100 >= 95)
         assertEquals("Excelente", report.category)
         assertTrue(report.criticalIssues.isEmpty())
-        assertTrue("verificado (SAE J272)" in (report.dimensionsDetails["VIN"] ?: ""))
+        assertTrue("formato canónico" in (report.dimensionsDetails["VIN"] ?: ""))
     }
 
     @Test
@@ -57,12 +59,14 @@ class MeetPeritoTest {
                 "0142" to 13.8f  // Voltage
             ),
             odometerKmCluster = 120000L,
-            readinessMonitors = emptyMap()
+            readinessMonitors = mapOf("MISFIRE" to true, "FUEL" to true),
+            dtcScanComplete = true,
+            freezeFrameReadComplete = true,
         )
 
         // Should have a critical issue for the bad VIN and drop the score significantly
         assertTrue(report.score0to100 <= 80)
-        assertTrue(report.criticalIssues.any { "Check Digit SAE J272" in it })
-        assertEquals("❌ VIN INVÁLIDO (Fallo Check Digit SAE J272)", report.dimensionsDetails["VIN"])
+        assertTrue(report.criticalIssues.any { "check digit" in it.lowercase() })
+        assertEquals("❌ VIN norteamericano con check digit inválido", report.dimensionsDetails["VIN"])
     }
 }

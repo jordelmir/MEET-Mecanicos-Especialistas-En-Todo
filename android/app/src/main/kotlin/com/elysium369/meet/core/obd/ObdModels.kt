@@ -16,6 +16,43 @@ data class MonitorStatus(
     val complete: Boolean
 )
 
+enum class VinReadOutcome {
+    VERIFIED,
+    NOT_CONNECTED,
+    NO_RESPONSE,
+    INVALID_RESPONSE,
+}
+
+/** Immutable proof of a physical VIN query. A VIN is never inferred from vehicle metadata. */
+data class VinReadResult(
+    val outcome: VinReadOutcome,
+    val vin: String? = null,
+    val command: String? = null,
+    val header: String? = null,
+    val rawResponse: String? = null,
+    val protocol: String? = null,
+    val capturedAtMonotonicMs: Long,
+) {
+    val isVerified: Boolean
+        get() = outcome == VinReadOutcome.VERIFIED && vin != null
+}
+
+internal object VinValidator {
+    private val canonicalVin = Regex("^[A-HJ-NPR-Z0-9]{17}$")
+
+    fun normalize(candidate: String): String? = candidate
+        .trim()
+        .uppercase()
+        .takeIf(canonicalVin::matches)
+}
+
+data class PhysicalPidReadEvidence(
+    val command: String,
+    val rawResponse: String,
+    val acknowledgedByEcu: Boolean,
+    val capturedAtMonotonicMs: Long,
+)
+
 
 data class QosMetrics(
     val cmdsPerSecond: Float = 0f,

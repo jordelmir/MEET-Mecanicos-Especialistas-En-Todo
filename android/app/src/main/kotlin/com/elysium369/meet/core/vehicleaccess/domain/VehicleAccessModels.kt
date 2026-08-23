@@ -21,6 +21,7 @@ enum class CredentialType(val displayName: String) {
  * Root authority managing or issuing the access credential.
  */
 enum class CredentialAuthority(val displayName: String) {
+    UNKNOWN("Autoridad no verificada"),
     OEM("Fabricante del Vehículo (OEM)"),
     GOOGLE_WALLET("Google Wallet Digital Car Key"),
     OEM_APP("Aplicación Oficial del Fabricante"),
@@ -92,7 +93,7 @@ data class VehicleAccessCapabilities(
     val walletProvisioningSupport: CapabilityState,
     val immoProtocol: String = "ISO 9141-2 / K-Line (Transponder ID46/Megamos)",
     val bcmStatus: String = "Enlace BCM Disponible vía OBD",
-    val authoritySource: CredentialAuthority = CredentialAuthority.MEET_NATIVE,
+    val authoritySource: CredentialAuthority = CredentialAuthority.UNKNOWN,
     val lastVerifiedAt: Long = System.currentTimeMillis()
 )
 

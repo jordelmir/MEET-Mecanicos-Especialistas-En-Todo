@@ -17,20 +17,31 @@ object ElysiumAutomotiveCliBridge {
 
     private const val TAG = "ElysiumCliBridge"
 
-    fun installCliBinaries(context: Context, port: Int = 18492, evairPort: Int = 8765) {
+    fun installCliBinaries(
+        context: Context,
+        port: Int = 18492,
+        evairPort: Int = 18765,
+        evairRuntimeToken: String,
+    ) {
         try {
             val binDir = File(context.filesDir, "bin")
             if (!binDir.exists()) binDir.mkdirs()
+            val tokenFile = File(context.filesDir, ".meet_session_token").absolutePath
+            val evairTokenFile = File(context.filesDir, ".elysium_runtime_token").apply {
+                writeText(evairRuntimeToken)
+                setReadable(true, true)
+                setWritable(true, true)
+            }.absolutePath
 
             // 1. Install 'meet' CLI binary
             val meetScript = File(binDir, "meet")
-            meetScript.writeText(generateMeetCliScript(port, evairPort))
+            meetScript.writeText(generateMeetCliScript(port, evairPort, tokenFile, evairTokenFile))
             meetScript.setExecutable(true, false)
             meetScript.setReadable(true, false)
 
             // 2. Install 'elysium' CLI binary
             val elysiumScript = File(binDir, "elysium")
-            elysiumScript.writeText(generateElysiumCliScript(port, evairPort))
+            elysiumScript.writeText(generateElysiumCliScript(port, evairPort, tokenFile))
             elysiumScript.setExecutable(true, false)
             elysiumScript.setReadable(true, false)
 
@@ -54,10 +65,10 @@ object ElysiumAutomotiveCliBridge {
                     val optElysiumBin = File(distroDir, "opt/elysium/bin")
                     optElysiumBin.mkdirs()
                     
-                    File(optElysiumBin, "meet").writeText(generateMeetCliScript(port, evairPort))
+                    File(optElysiumBin, "meet").writeText(generateMeetCliScript(port, evairPort, tokenFile, evairTokenFile))
                     File(optElysiumBin, "meet").setExecutable(true, false)
                     
-                    File(optElysiumBin, "elysium").writeText(generateElysiumCliScript(port, evairPort))
+                    File(optElysiumBin, "elysium").writeText(generateElysiumCliScript(port, evairPort, tokenFile))
                     File(optElysiumBin, "elysium").setExecutable(true, false)
                     
                     File(optElysiumBin, "pkg").writeText(generatePkgWrapperScript())
@@ -74,7 +85,7 @@ object ElysiumAutomotiveCliBridge {
         }
     }
 
-    private fun generateMeetCliScript(port: Int, evairPort: Int): String {
+    private fun generateMeetCliScript(port: Int, evairPort: Int, tokenFile: String, evairTokenFile: String): String {
         return """
 #!/bin/sh
 # MEET — Elysium Vanguard Proprietary Automotive Shell Client v5.0
@@ -84,6 +95,29 @@ PORT=$port
 EVAIR_PORT=$evairPort
 BASE_URL="http://127.0.0.1:${'$'}PORT"
 EVAIR_URL="http://127.0.0.1:${'$'}EVAIR_PORT"
+TOKEN_FILE="$tokenFile"
+EVAIR_TOKEN_FILE="$evairTokenFile"
+
+curl() {
+    TOKEN=${'$'}(command cat "${'$'}TOKEN_FILE" 2>/dev/null || true)
+    if [ -z "${'$'}TOKEN" ]; then
+        TOKEN=${'$'}(command sed -n 's/^header = "X-MEET-Session-Token: \(.*\)"/\1/p' "${'$'}{CURL_HOME:-/root}/.curlrc" 2>/dev/null || true)
+    fi
+    if [ -z "${'$'}TOKEN" ]; then
+        printf 'MEET control token unavailable\n' >&2
+        return 97
+    fi
+    command curl -f -H "X-MEET-Session-Token: ${'$'}TOKEN" "${'$'}@"
+}
+
+evair_curl() {
+    EVAIR_TOKEN=${'$'}(command cat "${'$'}EVAIR_TOKEN_FILE" 2>/dev/null || true)
+    if [ -z "${'$'}EVAIR_TOKEN" ]; then
+        printf 'EVAIR runtime token unavailable\n' >&2
+        return 97
+    fi
+    command curl -f -H "X-Elysium-Runtime-Token: ${'$'}EVAIR_TOKEN" "${'$'}@"
+}
 
 JSON_MODE=0
 QUIET_MODE=0
@@ -111,13 +145,13 @@ show_help() {
     printf '  \033[0;32mvin read\033[0m        Lee el VIN físico desde la ECU (Modo 09 / UDS / KWP)\n'
     printf '  \033[0;32mvin get\033[0m         Muestra el VIN activo en memoria y vehículo\n'
     printf '  \033[0;32mdtc scan\033[0m        Escaneo forense de códigos de falla\n'
-    printf '  \033[0;32mdtc clear\033[0m       Borrado de fallas con verificación de ECU\n'
+    printf '  \033[0;32mdtc clear\033[0m       Requiere flujo autorizado dentro de la app\n'
     printf '  \033[0;32mecu ping\033[0m        Mide latencia y tiempo de respuesta de la ECU\n'
-    printf '  \033[0;32mcan dump\033[0m        Captura tramas de datos crudas del bus CAN\n'
+    printf '  \033[0;32mcan dump\033[0m        Requiere sesión CAN dedicada dentro de la app\n'
     printf '  \033[0;32mlive [pids]\033[0m     Transmisión en tiempo real de PIDs (ej: meet live rpm,speed)\n'
     printf '  \033[0;32mbattery\033[0m         Telemetría del sistema eléctrico\n'
     printf '  \033[0;32mgarage\033[0m          Lista vehículos registrados en garage local\n'
-    printf '  \033[0;32mreport\033[0m          Genera reporte forense certificado\n'
+    printf '  \033[0;32mreport\033[0m          Requiere flujo certificado dentro de la app\n'
     printf '  \033[0;32mevair status\033[0m    Estado de inteligencia y salud EVAIR\n'
     printf '  \033[0;32mevair health\033[0m    Puntuación y diagnóstico integral\n'
     printf '  \033[0;32mhelp\033[0m            Muestra esta ayuda\n\n'
@@ -136,7 +170,7 @@ SUBCMD="${'$'}{2:-}"
 
 # Check backend status helper
 is_obd_connected() {
-    STATE=${'$'}(curl -s "${'$'}BASE_URL/api/obd/status" 2>/dev/null | grep -o '"connected":true' || true)
+    STATE=${'$'}(curl -s "${'$'}BASE_URL/api/obd/status" 2>/dev/null | grep -o '"is_connected"[[:space:]]*:[[:space:]]*true' || true)
     if [ -n "${'$'}STATE" ]; then
         return 0
     fi
@@ -152,7 +186,7 @@ case "${'$'}CMD" in
             else
                 printf '\033[0;31mServicio MEET desconectado o no disponible en puerto %s\033[0m\n' "${'$'}PORT" >&2
             fi
-            exit 0
+            exit 7
         fi
         if [ ${'$'}JSON_MODE -eq 1 ]; then
             printf '%s\n' "${'$'}RESP"
@@ -179,12 +213,8 @@ case "${'$'}CMD" in
                 printf '\033[1;33m⚡ Iniciando lectura multi-protocolo de VIN desde ECU física...\033[0m\n'
             fi
             RESP=${'$'}(curl -s -X POST "${'$'}BASE_URL/api/obd/read-vin" 2>/dev/null || true)
-            if [ -n "${'$'}RESP" ] && [ "${'$'}RESP" != "N/A" ]; then
-                if [ ${'$'}JSON_MODE -eq 1 ]; then
-                    printf '{"success":true,"vin":"%s"}\n' "${'$'}RESP"
-                else
-                    printf '\033[0;32m✓ VIN decodificado: %s\033[0m\n' "${'$'}RESP"
-                fi
+            if printf '%s' "${'$'}RESP" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
+                printf '%s\n' "${'$'}RESP"
                 exit 0
             else
                 if [ ${'$'}JSON_MODE -eq 1 ]; then
@@ -195,7 +225,7 @@ case "${'$'}CMD" in
                 exit 6
             fi
         else
-            RESP=${'$'}(curl -s "${'$'}BASE_URL/api/vehicle/active" 2>/dev/null || true)
+            RESP=${'$'}(curl -s "${'$'}BASE_URL/api/obd/status" 2>/dev/null || true)
             if [ -n "${'$'}RESP" ]; then
                 printf '%s\n' "${'$'}RESP"
                 exit 0
@@ -208,19 +238,8 @@ case "${'$'}CMD" in
 
     dtc)
         if [ "${'$'}SUBCMD" = "clear" ]; then
-            if ! is_obd_connected; then
-                if [ ${'$'}JSON_MODE -eq 1 ]; then
-                    printf '{"success":false,"error":{"code":"OBD_NOT_CONNECTED","message":"No active OBD session."}}\n' >&2
-                else
-                    printf '\033[0;31mError: No hay sesión OBD activa para borrar DTCs.\033[0m\n' >&2
-                fi
-                exit 3
-            fi
-            if [ ${'$'}QUIET_MODE -eq 0 ] && [ ${'$'}JSON_MODE -eq 0 ]; then
-                printf '\033[1;33m⚠️  Enviando orden de borrado de códigos de falla a la ECU...\033[0m\n'
-            fi
-            curl -s -X POST "${'$'}BASE_URL/api/obd/clear-dtcs" 2>/dev/null
-            exit 0
+            printf '{"success":false,"error":{"code":"IN_APP_AUTHORIZATION_REQUIRED","message":"DTC clear requires in-app consent and module-scoped verification."}}\n' >&2
+            exit 8
         else
             if ! is_obd_connected; then
                 if [ ${'$'}JSON_MODE -eq 1 ]; then
@@ -233,7 +252,7 @@ case "${'$'}CMD" in
             if [ ${'$'}QUIET_MODE -eq 0 ] && [ ${'$'}JSON_MODE -eq 0 ]; then
                 printf '\033[0;36m🔍 Escaneando códigos de diagnóstico (DTCs)...\033[0m\n'
             fi
-            curl -s "${'$'}BASE_URL/api/obd/dtcs" 2>/dev/null
+            curl -s "${'$'}BASE_URL/api/obd/dtcs" 2>/dev/null || exit 7
             exit 0
         fi
         ;;
@@ -248,7 +267,7 @@ case "${'$'}CMD" in
                 fi
                 exit 3
             fi
-            curl -s "${'$'}BASE_URL/api/obd/ping" 2>/dev/null
+            curl -s "${'$'}BASE_URL/api/obd/ping" 2>/dev/null || exit 7
             exit 0
         else
             curl -s "${'$'}BASE_URL/api/obd/profile" 2>/dev/null
@@ -257,12 +276,8 @@ case "${'$'}CMD" in
         ;;
 
     can)
-        if ! is_obd_connected; then
-            printf '{"success":false,"error":{"code":"OBD_NOT_CONNECTED","message":"No active OBD session."}}\n' >&2
-            exit 3
-        fi
-        curl -s "${'$'}BASE_URL/api/obd/can-dump" 2>/dev/null
-        exit 0
+        printf '{"success":false,"error":{"code":"IN_APP_SESSION_REQUIRED","message":"CAN dump requires an owned cancellable diagnostic session."}}\n' >&2
+        exit 8
         ;;
 
     live)
@@ -271,35 +286,34 @@ case "${'$'}CMD" in
             exit 3
         fi
         PIDS="${'$'}{2:-rpm,speed,temp}"
-        curl -s "${'$'}BASE_URL/api/obd/live?pids=${'$'}PIDS" 2>/dev/null
+        curl -s "${'$'}BASE_URL/api/obd/live?pids=${'$'}PIDS" 2>/dev/null || exit 7
         exit 0
         ;;
 
     battery)
-        curl -s "${'$'}BASE_URL/api/termux/battery" 2>/dev/null || termux-battery-status 2>/dev/null || true
-        exit 0
+        curl -s "${'$'}BASE_URL/api/termux/battery" 2>/dev/null || termux-battery-status 2>/dev/null || exit 7
         ;;
 
     garage)
-        curl -s "${'$'}BASE_URL/api/garage/vehicles" 2>/dev/null
+        curl -s "${'$'}BASE_URL/api/garage/vehicles" 2>/dev/null || exit 7
         exit 0
         ;;
 
     report)
-        curl -s -X POST "${'$'}BASE_URL/api/reports/generate" 2>/dev/null
-        exit 0
+        printf '{"success":false,"error":{"code":"IN_APP_CERTIFICATION_REQUIRED","message":"Certified report generation requires the in-app evidence flow."}}\n' >&2
+        exit 8
         ;;
 
     evair)
         case "${'$'}SUBCMD" in
             health)
-                curl -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null || printf '{"error":"EVAIR runtime offline"}\n' >&2
+                command curl -f -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null || exit 7
                 ;;
             status|snapshot)
-                curl -s "${'$'}EVAIR_URL/v1/vehicle/snapshot" 2>/dev/null || printf '{"error":"EVAIR snapshot unavailable"}\n' >&2
+                evair_curl -s "${'$'}EVAIR_URL/v1/vehicle/snapshot" 2>/dev/null || exit 7
                 ;;
             *)
-                curl -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null
+                command curl -f -s "${'$'}EVAIR_URL/v1/health" 2>/dev/null || exit 7
                 ;;
         esac
         exit 0
@@ -319,11 +333,21 @@ esac
 """.trimIndent()
     }
 
-    private fun generateElysiumCliScript(port: Int, evairPort: Int): String {
+    private fun generateElysiumCliScript(port: Int, evairPort: Int, tokenFile: String): String {
         return """
 #!/bin/sh
 # ELYSIUM — Vanguard OS Core System & Diagnostic Administration CLI
 set -u
+
+TOKEN_FILE="$tokenFile"
+curl() {
+    TOKEN=${'$'}(command cat "${'$'}TOKEN_FILE" 2>/dev/null || true)
+    if [ -z "${'$'}TOKEN" ]; then
+        TOKEN=${'$'}(command sed -n 's/^header = "X-MEET-Session-Token: \(.*\)"/\1/p' "${'$'}{CURL_HOME:-/root}/.curlrc" 2>/dev/null || true)
+    fi
+    [ -n "${'$'}TOKEN" ] || return 97
+    command curl -f -H "X-MEET-Session-Token: ${'$'}TOKEN" "${'$'}@"
+}
 
 subcommand="${'$'}{1:-}"
 

@@ -277,6 +277,8 @@ fun RepairNetworkScreen(
                     onOpenTowTruck = { navController.navigate("tow_truck_service") },
                     onOpenParts = { navController.navigate("part_request") },
                     onOpenRide = { navController.navigate("ride_service") },
+                    onOpenDekra = { navController.navigate("dekra_concierge") },
+                    onOpenTheoryExam = { navController.navigate("theory_exam_preparation") },
                     onOpenUniversalServices = { navController.navigate("universal_services") },
                     onOpenCommunityCases = { navController.navigate("community_cases") }
                 )
@@ -1057,14 +1059,7 @@ fun RepairNetworkScreen(
                 activeDtcs = activeDtcs,
                 onDismiss = { showCreateDialog = false },
                 onSubmit = { request ->
-                    val vid = selectedVehicle?.id ?: "V_LOCAL"
-                    obdViewModel.createServiceRequest(
-                        vehicleId = vid,
-                        problem = request.evidence.userReportedSymptom,
-                        description = "${request.evidence.userSymptomCategory} | ${request.mobility.displayName} | ${request.preferredModality.displayName}",
-                        location = request.locationZone.approximateZoneName,
-                        priority = if (request.urgency == com.elysium369.meet.core.services.serviceos.ServiceRequestUrgency.URGENT_BREAKDOWN) "HIGH" else "MEDIUM"
-                    )
+                    obdViewModel.createServiceRequestV2(request)
                     showCreateDialog = false
                 }
             )
@@ -1612,6 +1607,8 @@ private fun RepairNetworkWorkflowGuide(
     onOpenTowTruck: () -> Unit,
     onOpenParts: () -> Unit,
     onOpenRide: () -> Unit,
+    onOpenDekra: () -> Unit,
+    onOpenTheoryExam: () -> Unit,
     onOpenUniversalServices: () -> Unit,
     onOpenCommunityCases: () -> Unit
 ) {
@@ -1651,6 +1648,24 @@ private fun RepairNetworkWorkflowGuide(
                 color = MeetColors.cyberCyan,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp
+            )
+
+            RepairNetworkQuickActionCard(
+                title = "Te llevamos a DEKRA",
+                subtitle = "Cita · prechequeo · custodia · traslado · resultado",
+                icon = "✓",
+                accentColor = Color(0xFF20D5C6),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenDekra,
+            )
+
+            RepairNetworkQuickActionCard(
+                title = "Academia Examen Teórico",
+                subtitle = "Auto + moto 2026 · lecciones · repaso · simulacro",
+                icon = "🎓",
+                accentColor = Color(0xFFFFC857),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenTheoryExam,
             )
 
             // Grid of 4 actions (2 rows of 2)

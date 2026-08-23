@@ -308,6 +308,15 @@ fun MeetPeritoScreen(
 
                                     Spacer(modifier = Modifier.height(20.dp))
 
+                                    Text(
+                                        "COBERTURA DE EVIDENCIA: ${report.evidenceCoveragePct}%${if (report.isConclusive) "" else " · NO CONCLUYENTE"}",
+                                        color = if (report.isConclusive) MeetColors.cyberCyan else MeetColors.warning,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp,
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
                                     // Repair Cost Alert Card
                                     Row(
                                         modifier = Modifier
@@ -333,7 +342,8 @@ fun MeetPeritoScreen(
                                             fontSize = 12.sp
                                         )
                                         Text(
-                                            "$${report.estimatedRepairCost} USD",
+                                            if (report.estimatedRepairCost > 0) "$${report.estimatedRepairCost} USD"
+                                            else "SIN ESTIMACIÓN DERIVADA",
                                             color = if (report.estimatedRepairCost > 0) MeetColors.error else MeetColors.neonGreen,
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Black,

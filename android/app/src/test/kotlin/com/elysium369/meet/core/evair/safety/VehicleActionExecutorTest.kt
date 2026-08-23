@@ -51,8 +51,8 @@ class VehicleActionExecutorTest {
         val resultWithoutConfirm = executor.executeAction(action, stationarySnapshot, userConfirmed = false)
         assertTrue(resultWithoutConfirm is EvairResult.Failure)
 
-        val resultWithConfirm = executor.executeAction(action, stationarySnapshot, userConfirmed = true)
-        assertTrue(resultWithConfirm is EvairResult.Success)
+        val resultWithConfirmButNoPhysicalSession = executor.executeAction(action, stationarySnapshot, userConfirmed = true)
+        assertTrue(resultWithConfirmButNoPhysicalSession is EvairResult.Failure)
     }
 
     private fun createSnapshot(speedKph: Double): VehicleSnapshot {

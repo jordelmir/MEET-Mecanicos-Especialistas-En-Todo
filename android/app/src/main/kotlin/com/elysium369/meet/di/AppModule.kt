@@ -3973,6 +3973,10 @@ object AppModule {
     @Provides
     fun provideProviderProfileDao(db: MeetDatabase): ProviderProfileDao = db.providerProfileDao()
 
+    @Provides
+    fun provideVehicleAccessDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.VehicleAccessDao =
+        db.vehicleAccessDao()
+
     // KNOWLEDGE GRAPH DAO
     @Provides
     fun provideDtcKnowledgeGraphDao(db: MeetDatabase): DtcKnowledgeGraphDao = db.dtcKnowledgeGraphDao()
