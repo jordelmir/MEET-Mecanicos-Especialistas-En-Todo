@@ -246,6 +246,8 @@ Las migraciones serán aditivas y usarán UUID, timestamps del servidor, `versio
 - `service_media_objects`: objeto privado, autor, origen, metadatos seguros, hash calculado por servidor y estado de carga.
 - `service_evidence_exceptions`: excepción de emergencia o privacidad, motivo tipado, evidencia sustituta y decisión administrativa.
 
+La implementación aprovecha los contratos existentes `repair_evidence` y `report_evidence` mediante referencias/adaptadores hacia el manifiesto canónico; no copia archivos ni rompe hashes históricos. Las filas heredadas permanecen legibles con procedencia `LEGACY_UNSCOPED_STEP` hasta que puedan asociarse de forma inequívoca. La evidencia de viajes y sus tablas permanecen intactas y fuera del nuevo gate visual.
+
 ### 8.2 Fondos y conciliación
 
 - `funding_intents`: referencia única, actor, importe esperado, moneda, expiración y orden opcional.
