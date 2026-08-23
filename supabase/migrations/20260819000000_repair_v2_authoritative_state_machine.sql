@@ -65,8 +65,12 @@ EXCEPTION WHEN undefined_table THEN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.meet_emit_vanguard_event_v2 FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.meet_emit_vanguard_event_v2 TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.meet_emit_vanguard_event_v2(
+  TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT
+) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.meet_emit_vanguard_event_v2(
+  TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT
+) TO service_role;
 
 -- 2. Authoritative State Machine RPC for Repair Work Orders
 CREATE OR REPLACE FUNCTION public.transition_repair_work_order_v1(
@@ -337,5 +341,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.transition_repair_work_order_v1 FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.transition_repair_work_order_v1 TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.transition_repair_work_order_v1(
+  UUID, UUID, TEXT, TEXT, TEXT, JSONB, TEXT, INT
+) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.transition_repair_work_order_v1(
+  UUID, UUID, TEXT, TEXT, TEXT, JSONB, TEXT, INT
+) TO service_role;

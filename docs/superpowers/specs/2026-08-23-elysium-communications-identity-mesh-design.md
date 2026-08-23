@@ -1,7 +1,7 @@
 # Elysium Communications and Vanguard Mesh — Product and System Design
 
 **Date:** 2026-08-23
-**Status:** Concept approved; written specification pending user review
+**Status:** Approved for implementation by the user
 **Scope:** Identity, discovery, privacy, blocking, presence, receipts, internet messaging and voluntary infrastructure-free communication
 
 ## 1. Product decision
@@ -45,6 +45,10 @@ Every UI state and receipt must preserve these distinctions.
 - A display name and avatar are presentation fields and are not proof of
   identity.
 - A verified email address is an optional discovery and recovery alias.
+- A telephone number may be an optional exact-search alias, but is never an
+  authentication or recovery dependency. Without SMS, its state remains
+  `DECLARED` unless it is bound through a trusted-device or mutually verified
+  in-person ceremony; the UI must show that distinction.
 - A rotating QR code and opaque deep link allow private invitations without
   revealing email or internal identifiers.
 - Telephone numbers are not required for registration, discovery, login,
@@ -66,6 +70,8 @@ Every UI state and receipt must preserve these distinctions.
 ### 3.3 Discovery
 
 - Exact `@ElysiumID`, rotating QR/link and verified email are supported.
+- Exact telephone lookup is supported only when the target opted in; results
+  expose whether the alias is declared or cryptographically verified.
 - There is no enumerable global people directory by default.
 - Email lookup returns the minimum message-request profile only when the target
   enabled email discovery.
@@ -73,6 +79,9 @@ Every UI state and receipt must preserve these distinctions.
   space permits dictionary reversal.
 - Private address-book discovery requires an independently reviewed OPRF or PSI
   design. Until that exists, users select individual addresses to look up.
+- Offline email or telephone resolution uses a previously verified identity-key
+  mapping cached on the device. A device without that mapping never pretends it
+  can query a global registry while offline.
 - Provider and service discovery is separate from personal-account discovery
   and exposes only fields authorized by the provider profile.
 
@@ -149,6 +158,24 @@ envelope. They cannot decrypt the conversation, attachment keys, service proof
 or precise location.
 
 ## 7. Vanguard Mesh architecture
+
+### 7.0 Offline pairing ceremonies
+
+Two devices may establish a contact without internet through any one of these
+explicit ceremonies:
+
+- scan a signed, expiring Elysium contact QR;
+- enter a short rendezvous code and compare the same safety words on both
+  screens;
+- choose a rotating nearby invitation and approve it on both devices;
+- tap an NFC contact card when both devices support NFC;
+- import a signed Elysium contact card from a message, file or existing contact;
+- select a cached verified email or telephone mapping already stored locally.
+
+Raw email, telephone, internal principal ID and stable public key fingerprints
+are never placed in BLE advertisements. Private nearby alias equality requires
+an independently reviewed PSI/OPRF-style protocol, strict attempt limits and
+target consent; it cannot be replaced by a reversible hash.
 
 ### 7.1 Transport ladder
 

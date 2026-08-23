@@ -77,6 +77,13 @@ android {
             "COMMUNICATION_CALL_TOKEN_URL",
             "\"$communicationCallTokenUrl\"",
         )
+        // Public distribution source while Elysium is not yet published in an app store.
+        // The native Android share sheet decides which installed app sends the invitation.
+        val elysiumDownloadUrl = localProps.getProperty(
+            "ELYSIUM_DOWNLOAD_URL",
+            "https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/latest",
+        )
+        buildConfigField("String", "ELYSIUM_DOWNLOAD_URL", "\"$elysiumDownloadUrl\"")
 
         // Car2DB API (opcional). Si no se configura, la app funciona en modo "solo genéricos".
         val car2DbApiKey = localProps.getProperty("CAR2DB_API_KEY", "")

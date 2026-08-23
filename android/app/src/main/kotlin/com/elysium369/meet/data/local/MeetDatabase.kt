@@ -93,6 +93,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         CommunicationEventEntity::class,
         CommunicationReceiptEntity::class,
         CommunicationCallEntity::class,
+        CommunicationIdentityProfileEntity::class,
+        CommunicationPrivacySettingsEntity::class,
+        CommunicationRelationshipEntity::class,
+        CommunicationLocalBlockEntity::class,
+        CommunicationPresenceLeaseEntity::class,
+        CommunicationMeshPeerEntity::class,
+        CommunicationMeshOutboxEntity::class,
 
         // IDENTITY VERIFICATION
         DriverVerificationEntity::class,
@@ -140,7 +147,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         com.elysium369.meet.data.local.entities.AccessGrantEntity::class,
         com.elysium369.meet.data.local.entities.AccessAuditEventEntity::class,
     ],
-    version = 59,
+    version = 60,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

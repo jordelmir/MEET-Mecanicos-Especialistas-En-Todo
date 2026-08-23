@@ -151,7 +151,7 @@ BEGIN
 
   -- 7. Compute Canonical Command Hash for Strict Anti-Equivocation Idempotency
   v_canonical_command_hash := encode(
-    digest(
+    extensions.digest(
       p_work_order_id::text || ':' ||
       v_from_status || ':' ||
       p_to_status || ':' ||
@@ -471,7 +471,7 @@ BEGIN
 
   v_idempotency_key := 'admin_override_' || gen_random_uuid()::text;
   v_canonical_command_hash := encode(
-    digest(
+    extensions.digest(
       p_work_order_id::text || ':' || v_from_status || ':' || p_to_status || ':' ||
       p_expected_version::text || ':' || v_caller_uid::text || ':' ||
       p_ticket_reference || ':' || p_override_reason,

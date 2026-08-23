@@ -5,7 +5,7 @@
 -- 1. Table: vehicle_access_credentials (Digital Twin of keys & credentials)
 CREATE TABLE IF NOT EXISTS public.vehicle_access_credentials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    vehicle_id UUID NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    vehicle_id UUID NOT NULL REFERENCES public.cloud_vehicles(id) ON DELETE CASCADE,
     slot_number INT NOT NULL DEFAULT 1,
     label TEXT NOT NULL,
     credential_type TEXT NOT NULL, -- 'DIGITAL_KEY', 'TRANSPONDER', 'REMOTE', 'MECHANICAL', 'SMART_KEY'
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_access_credentials (
 -- 2. Table: vehicle_access_grants (Delegated temporary access e.g. Valet / Workshop)
 CREATE TABLE IF NOT EXISTS public.vehicle_access_grants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    vehicle_id UUID NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    vehicle_id UUID NOT NULL REFERENCES public.cloud_vehicles(id) ON DELETE CASCADE,
     issuer_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     recipient_name TEXT NOT NULL,
     recipient_role TEXT NOT NULL, -- 'Familiar', 'Valet Parking', 'Taller Mecánico', 'Conductor Flota'
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_access_grants (
 -- 3. Table: vehicle_access_events (Immutable cryptographic audit log)
 CREATE TABLE IF NOT EXISTS public.vehicle_access_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    vehicle_id UUID NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
+    vehicle_id UUID NOT NULL REFERENCES public.cloud_vehicles(id) ON DELETE CASCADE,
     actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     actor_label TEXT NOT NULL,
     action TEXT NOT NULL,
@@ -64,9 +64,9 @@ CREATE POLICY "Users can view credentials for their vehicles"
     FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM public.vehicles
-            WHERE public.vehicles.id = vehicle_access_credentials.vehicle_id
-            AND public.vehicles.user_id = auth.uid()
+            SELECT 1 FROM public.cloud_vehicles
+            WHERE public.cloud_vehicles.id = vehicle_access_credentials.vehicle_id
+            AND public.cloud_vehicles.user_id = auth.uid()::text
         )
     );
 
@@ -75,9 +75,9 @@ CREATE POLICY "Users can manage credentials for their vehicles"
     FOR ALL
     USING (
         EXISTS (
-            SELECT 1 FROM public.vehicles
-            WHERE public.vehicles.id = vehicle_access_credentials.vehicle_id
-            AND public.vehicles.user_id = auth.uid()
+            SELECT 1 FROM public.cloud_vehicles
+            WHERE public.cloud_vehicles.id = vehicle_access_credentials.vehicle_id
+            AND public.cloud_vehicles.user_id = auth.uid()::text
         )
     );
 
@@ -91,8 +91,8 @@ CREATE POLICY "Users can view audit events for their vehicles"
     FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM public.vehicles
-            WHERE public.vehicles.id = vehicle_access_events.vehicle_id
-            AND public.vehicles.user_id = auth.uid()
+            SELECT 1 FROM public.cloud_vehicles
+            WHERE public.cloud_vehicles.id = vehicle_access_events.vehicle_id
+            AND public.cloud_vehicles.user_id = auth.uid()::text
         )
     );

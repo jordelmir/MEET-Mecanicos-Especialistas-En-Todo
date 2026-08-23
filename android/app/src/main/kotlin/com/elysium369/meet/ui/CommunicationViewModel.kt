@@ -8,6 +8,13 @@ import com.elysium369.meet.communications.DecryptedMessage
 import com.elysium369.meet.communications.ElysiumCommunicationRepository
 import com.elysium369.meet.communications.SendMessageOutcome
 import com.elysium369.meet.communications.StartCallOutcome
+import com.elysium369.meet.communications.BlockedContact
+import com.elysium369.meet.communications.CommunicationPrivacySettings
+import com.elysium369.meet.communications.ContactRequestOutcome
+import com.elysium369.meet.communications.ContactSearchOutcome
+import com.elysium369.meet.communications.ContactSearchResult
+import com.elysium369.meet.communications.ElysiumContact
+import com.elysium369.meet.communications.ElysiumIdentityProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,6 +34,14 @@ class CommunicationViewModel @Inject constructor(
     val conversations: StateFlow<List<ConversationSummary>> = repository.conversations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val callState: StateFlow<CallConnectionState> = repository.callState
+    val identity: StateFlow<ElysiumIdentityProfile?> = repository.identity
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val privacy: StateFlow<CommunicationPrivacySettings> = repository.privacy
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CommunicationPrivacySettings())
+    val contacts: StateFlow<List<ElysiumContact>> = repository.contacts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val blockedContacts: StateFlow<List<BlockedContact>> = repository.blockedContacts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val selectedConversationId = MutableStateFlow<String?>(null)
     val selectedConversation: StateFlow<ConversationSummary?> = selectedConversationId
@@ -38,10 +53,81 @@ class CommunicationViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val notice = MutableStateFlow<String?>(null)
+    val searchOutcome = MutableStateFlow<ContactSearchOutcome?>(null)
+    val searchInProgress = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch { repository.initializeSocialDefaults() }
+    }
 
     fun selectConversation(id: String?) {
         selectedConversationId.value = id
         notice.value = null
+    }
+
+    fun searchContact(query: String) {
+        viewModelScope.launch {
+            searchInProgress.value = true
+            searchOutcome.value = repository.searchContact(query)
+            searchInProgress.value = false
+        }
+    }
+
+    fun clearSearch() {
+        searchOutcome.value = null
+    }
+
+    fun requestContact(contact: ContactSearchResult) {
+        viewModelScope.launch {
+            when (val outcome = repository.requestContact(contact)) {
+                is ContactRequestOutcome.Created -> {
+                    selectedConversationId.value = outcome.conversationId
+                    notice.value = "Solicitud enviada. Los mensajes se habilitan cuando la otra persona acepta."
+                }
+                ContactRequestOutcome.AuthenticationRequired -> notice.value = "Inicia sesión para enviar una solicitud de conversación."
+                ContactRequestOutcome.Blocked -> notice.value = "Este contacto está bloqueado."
+                ContactRequestOutcome.ServiceUnavailable -> notice.value = "No se pudo crear la solicitud en el servidor. Inténtalo de nuevo."
+            }
+        }
+    }
+
+    fun saveIdentity(elysiumId: String, displayName: String, about: String, phone: String?) {
+        viewModelScope.launch {
+            notice.value = runCatching { repository.saveIdentity(elysiumId, displayName, about, phone) }
+                .fold(
+                    onSuccess = { synced ->
+                        if (synced) "Identidad Elysium guardada y sincronizada." else "Identidad guardada en este dispositivo. Inicia sesión para publicarla."
+                    },
+                    onFailure = { error ->
+                        when (error.message) {
+                            "INVALID_ELYSIUM_ID" -> "El ID debe tener 3–32 caracteres: letras, números, punto, guion o guion bajo."
+                            "INVALID_DISPLAY_NAME" -> "El nombre visible es obligatorio."
+                            else -> "No se pudo guardar la identidad."
+                        }
+                    },
+                )
+        }
+    }
+
+    fun savePrivacy(settings: CommunicationPrivacySettings) {
+        viewModelScope.launch {
+            val synced = repository.savePrivacy(settings)
+            notice.value = if (synced) "Privacidad sincronizada." else "Privacidad aplicada localmente; sincronización pendiente."
+        }
+    }
+
+    fun block(contact: ElysiumContact) {
+        viewModelScope.launch {
+            val synced = repository.blockContact(contact)
+            notice.value = if (synced) "${contact.displayName} fue bloqueado en todos tus dispositivos." else "${contact.displayName} fue bloqueado en este dispositivo."
+        }
+    }
+
+    fun unblock(contact: BlockedContact) {
+        viewModelScope.launch {
+            val success = repository.unblockContact(contact)
+            notice.value = if (success) "${contact.displayName} fue desbloqueado." else "No se pudo confirmar el desbloqueo con el servidor."
+        }
     }
 
     fun openServiceContext(vertical: String, referenceId: String, title: String) {

@@ -90,17 +90,53 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
-        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58).forEach { startVersion ->
-            val databaseName = "diagnostic-migration-$startVersion-to-59"
+        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58, 59).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-60"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                59,
+                60,
                 true,
                 *migrationsFrom(startVersion),
             ).use { db ->
                 db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
             }
+        }
+    }
+
+    @Test
+    fun migration59To60CreatesOwnerScopedIdentityPrivacyBlocksAndMeshProjection() {
+        val databaseName = "communications-migration-59-to-60"
+        helper.createDatabase(databaseName, 59).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            60,
+            true,
+            AppModule.MIGRATION_59_60,
+        ).use { db ->
+            val expectedTables = setOf(
+                "communication_identity_profiles",
+                "communication_privacy_settings",
+                "communication_relationships",
+                "communication_local_blocks",
+                "communication_presence_leases",
+                "communication_mesh_peers",
+                "communication_mesh_outbox",
+            )
+            db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+                val existing = buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                assertEquals(emptySet<String>(), expectedTables - existing)
+            }
+            db.query("PRAGMA table_info(communication_identity_profiles)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val names = buildSet { while (cursor.moveToNext()) add(cursor.getString(nameColumn)) }
+                assertFalse(names.contains("emailAlias"))
+                assertFalse(names.contains("phoneAlias"))
+                assertEquals(true, names.contains("emailAliasCiphertextBase64"))
+                assertEquals(true, names.contains("phoneAliasCiphertextBase64"))
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
         }
     }
 
@@ -172,8 +208,8 @@ class DiagnosticMigrationConformanceTest {
     }
 
     @Test
-    fun staged50To59PreservesDistinctRawIdentityAndFindingCausalityColumns() {
-        val databaseName = "diagnostic-migration-staged-50-to-59"
+    fun staged50To60PreservesDistinctRawIdentityAndFindingCausalityColumns() {
+        val databaseName = "diagnostic-migration-staged-50-to-60"
         helper.createDatabase(databaseName, 50).apply {
             insertLegacyEvent("event-a", "session-a", 100L, 200L)
             insertLegacyEvent("event-b", "session-b", 300L, 400L)
@@ -181,7 +217,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            59,
+            60,
             true,
             *migrationsFrom(50),
         ).use { db ->
@@ -199,7 +235,7 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun sameUdsRawIdentityWithDifferentFailureTypeRemainsTwoFindings() {
-        val databaseName = "diagnostic-migration-uds-failure-types-to-59"
+        val databaseName = "diagnostic-migration-uds-failure-types-to-60"
         helper.createDatabase(databaseName, 51).apply {
             insertRawUdsEvent("uds-ft-11", 0x11, 100L)
             insertRawUdsEvent("uds-ft-22", 0x22, 200L)
@@ -207,7 +243,7 @@ class DiagnosticMigrationConformanceTest {
         }
         helper.runMigrationsAndValidate(
             databaseName,
-            59,
+            60,
             true,
             *migrationsFrom(51),
         ).use { db ->
@@ -238,6 +274,7 @@ class DiagnosticMigrationConformanceTest {
         if (startVersion <= 56) add(AppModule.MIGRATION_56_57)
         if (startVersion <= 57) add(AppModule.MIGRATION_57_58)
         if (startVersion <= 58) add(AppModule.MIGRATION_58_59)
+        if (startVersion <= 59) add(AppModule.MIGRATION_59_60)
     }.toTypedArray()
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(

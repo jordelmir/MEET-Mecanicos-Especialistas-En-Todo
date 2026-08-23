@@ -3865,6 +3865,146 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_59_60 = object : Migration(59, 60) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_identity_profiles (
+                    ownerPrincipalId TEXT NOT NULL PRIMARY KEY,
+                    elysiumId TEXT NOT NULL,
+                    displayName TEXT NOT NULL,
+                    about TEXT NOT NULL,
+                    identityState TEXT NOT NULL,
+                    emailAliasCiphertextBase64 TEXT,
+                    emailAliasNonceBase64 TEXT,
+                    emailVerificationState TEXT NOT NULL,
+                    phoneAliasCiphertextBase64 TEXT,
+                    phoneAliasNonceBase64 TEXT,
+                    phoneVerificationState TEXT NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_communication_identity_profiles_elysiumId ON communication_identity_profiles(elysiumId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_privacy_settings (
+                    ownerPrincipalId TEXT NOT NULL PRIMARY KEY,
+                    findByElysiumId TEXT NOT NULL,
+                    findByEmail TEXT NOT NULL,
+                    findByPhone TEXT NOT NULL,
+                    profilePhotoVisibility TEXT NOT NULL,
+                    profileVisibility TEXT NOT NULL,
+                    lastActiveVisibility TEXT NOT NULL,
+                    onlineVisibility TEXT NOT NULL,
+                    readReceiptsEnabled INTEGER NOT NULL,
+                    typingIndicatorsEnabled INTEGER NOT NULL,
+                    callPermission TEXT NOT NULL,
+                    groupInvitePermission TEXT NOT NULL,
+                    meshDiscoverability TEXT NOT NULL,
+                    relayParticipation TEXT NOT NULL,
+                    relayOnlyWhileCharging INTEGER NOT NULL,
+                    relayMinimumBatteryPercent INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_relationships (
+                    ownerPrincipalId TEXT NOT NULL,
+                    peerPrincipalId TEXT NOT NULL,
+                    peerElysiumId TEXT,
+                    peerDisplayName TEXT NOT NULL,
+                    relationshipState TEXT NOT NULL,
+                    initiatedByMe INTEGER NOT NULL,
+                    aliasProofState TEXT NOT NULL,
+                    emailLookupToken TEXT,
+                    phoneLookupToken TEXT,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, peerPrincipalId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_relationships_ownerPrincipalId_relationshipState ON communication_relationships(ownerPrincipalId, relationshipState)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_relationships_ownerPrincipalId_peerElysiumId ON communication_relationships(ownerPrincipalId, peerElysiumId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_local_blocks (
+                    ownerPrincipalId TEXT NOT NULL,
+                    blockedPrincipalId TEXT NOT NULL,
+                    blockedDisplayName TEXT NOT NULL,
+                    reasonCode TEXT NOT NULL,
+                    syncState TEXT NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, blockedPrincipalId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_local_blocks_ownerPrincipalId_createdAtEpochMs ON communication_local_blocks(ownerPrincipalId, createdAtEpochMs)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_presence_leases (
+                    ownerPrincipalId TEXT NOT NULL,
+                    peerPrincipalId TEXT NOT NULL,
+                    reachability TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    lastSeenAtEpochMs INTEGER NOT NULL,
+                    expiresAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, peerPrincipalId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_presence_leases_ownerPrincipalId_expiresAtEpochMs ON communication_presence_leases(ownerPrincipalId, expiresAtEpochMs)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_mesh_peers (
+                    ownerPrincipalId TEXT NOT NULL,
+                    rotatingPeerId TEXT NOT NULL,
+                    transport TEXT NOT NULL,
+                    capabilityFlags INTEGER NOT NULL,
+                    trustState TEXT NOT NULL,
+                    firstSeenAtEpochMs INTEGER NOT NULL,
+                    lastSeenAtEpochMs INTEGER NOT NULL,
+                    expiresAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, rotatingPeerId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_mesh_peers_ownerPrincipalId_lastSeenAtEpochMs ON communication_mesh_peers(ownerPrincipalId, lastSeenAtEpochMs)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS communication_mesh_outbox (
+                    meshEnvelopeId TEXT NOT NULL PRIMARY KEY,
+                    ownerPrincipalId TEXT NOT NULL,
+                    conversationId TEXT NOT NULL,
+                    eventId TEXT NOT NULL,
+                    destinationToken TEXT NOT NULL,
+                    encryptedEnvelopeBase64 TEXT NOT NULL,
+                    priority INTEGER NOT NULL,
+                    currentHopCount INTEGER NOT NULL,
+                    maxHopCount INTEGER NOT NULL,
+                    custodyState TEXT NOT NULL,
+                    attemptCount INTEGER NOT NULL,
+                    expiresAtEpochMs INTEGER NOT NULL,
+                    nextAttemptAtEpochMs INTEGER NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_mesh_outbox_ownerPrincipalId_custodyState_nextAttemptAtEpochMs ON communication_mesh_outbox(ownerPrincipalId, custodyState, nextAttemptAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_communication_mesh_outbox_ownerPrincipalId_conversationId ON communication_mesh_outbox(ownerPrincipalId, conversationId)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_communication_mesh_outbox_eventId ON communication_mesh_outbox(eventId)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -3910,7 +4050,8 @@ object AppModule {
             MIGRATION_55_56,
             MIGRATION_56_57,
             MIGRATION_57_58,
-            MIGRATION_58_59
+            MIGRATION_58_59,
+            MIGRATION_59_60
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
