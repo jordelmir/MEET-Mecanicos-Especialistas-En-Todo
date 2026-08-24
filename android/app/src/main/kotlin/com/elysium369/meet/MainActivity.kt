@@ -34,7 +34,10 @@ import com.elysium369.meet.ui.TheoryExamViewModel
 import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.screens.*
 import com.elysium369.meet.ui.screens.chat.*
+import com.elysium369.meet.ui.screens.humanity.CapabilityPassportScreen
 import com.elysium369.meet.ui.screens.humanity.LearningHubScreen
+import com.elysium369.meet.ui.screens.humanity.MissionDetailScreen
+import com.elysium369.meet.ui.screens.humanity.MultimeterSimulationScreen
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
@@ -723,7 +726,32 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     viewModel = obdViewModel,
                     onBack = { navController.popBackStack() },
                     onOpenDrivingTheory = { navController.navigate("theory_exam_preparation") },
-                    onOpenMissionDetail = { /* Handled in detail */ }
+                    onOpenMissionDetail = { missionId -> navController.navigate("mission_detail/$missionId") },
+                    onOpenMultimeterSimulation = { navController.navigate("multimeter_simulation") },
+                    onOpenCapabilityPassport = { navController.navigate("capability_passport") },
+                )
+            }
+            composable(
+                route = "mission_detail/{missionId}",
+                arguments = listOf(navArgument("missionId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val missionId = backStackEntry.arguments?.getString("missionId") ?: ""
+                MissionDetailScreen(
+                    missionId = missionId,
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenSimulation = { navController.navigate("multimeter_simulation") }
+                )
+            }
+            composable("multimeter_simulation") {
+                MultimeterSimulationScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("capability_passport") {
+                CapabilityPassportScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("universal_services") {

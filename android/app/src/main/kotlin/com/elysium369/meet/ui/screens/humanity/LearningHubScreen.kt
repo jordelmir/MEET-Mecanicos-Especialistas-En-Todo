@@ -30,6 +30,8 @@ fun LearningHubScreen(
     onBack: () -> Unit,
     onOpenDrivingTheory: () -> Unit,
     onOpenMissionDetail: (String) -> Unit = {},
+    onOpenMultimeterSimulation: () -> Unit = {},
+    onOpenCapabilityPassport: () -> Unit = {},
 ) {
     val activeDtcs by viewModel.detectedDtcs.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -205,6 +207,58 @@ fun LearningHubScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                         )
+                    }
+                }
+            }
+
+            // Quick Access: Multimeter Lab & Passport
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenMultimeterSimulation() },
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "⚡ MULTIMETER LAB",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary),
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Simulador de mediciones y caídas de voltaje.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            )
+                        }
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenCapabilityPassport() },
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "🎖️ PASAPORTE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary),
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Tus credenciales y evidencias SHA-256.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            )
+                        }
                     }
                 }
             }
