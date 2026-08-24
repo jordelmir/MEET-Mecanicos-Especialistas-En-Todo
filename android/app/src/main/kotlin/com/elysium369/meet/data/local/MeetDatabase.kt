@@ -146,8 +146,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         com.elysium369.meet.data.local.entities.VehicleAccessCredentialEntity::class,
         com.elysium369.meet.data.local.entities.AccessGrantEntity::class,
         com.elysium369.meet.data.local.entities.AccessAuditEventEntity::class,
+
+        // HUMAN CAPABILITY PLATFORM & EVIDENCE LEDGER
+        HumanityProgressEntity::class,
+        HumanityEvidenceEntity::class,
+        HumanityCapabilityEntity::class,
     ],
-    version = 60,
+    version = 61,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -214,4 +219,9 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // VEHICLE ACCESS & IMMO DAO
     abstract fun vehicleAccessDao(): com.elysium369.meet.data.local.dao.VehicleAccessDao
+
+    // HUMAN CAPABILITY PLATFORM DAOs
+    abstract fun humanityProgressDao(): HumanityProgressDao
+    abstract fun humanityEvidenceDao(): HumanityEvidenceDao
+    abstract fun humanityCapabilityDao(): HumanityCapabilityDao
 }

@@ -761,6 +761,28 @@ fun RepairNetworkScreen(
                                 }
                             }
 
+                            // Capability Requirement Gate
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MeetColors.cyberCyan.copy(alpha = 0.08f))
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("🎯 HABILIDAD REQUERIDA: DIAGNÓSTICO L4+", color = MeetColors.cyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("Valida tu competencia clínica con evidencia para postularte a este trabajo.", color = MeetColors.textSecondary, fontSize = 10.sp)
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                TextButton(
+                                    onClick = { navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.LEARNING_HUB) }
+                                ) {
+                                    Text("PREPARARME", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
                             Spacer(Modifier.height(12.dp))
                             EliteButton(
                                 text = "SOLICITAR REPUESTO PARA ESTE CASO",
