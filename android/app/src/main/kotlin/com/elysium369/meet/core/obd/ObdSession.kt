@@ -323,7 +323,8 @@ class ObdSession(
     }
     private var activeTestJob: Job? = null
 
-    private var consecutiveErrors = 0
+    private var consecutiveTransportFailures = 0
+    val adapterCapabilities = AdapterCapabilityProfile()
     private var isSelfHealing = false
     @Volatile private var lastLiveDataUpdateMs = 0L
     @Volatile private var lastRecoveryAttemptMs = 0L
@@ -526,7 +527,7 @@ class ObdSession(
                 _state.value = ObdState.CONNECTED
                 _statusMessage.value = "Enlace Crítico Sincronizado: $adapterVersion"
                 isRunning = true
-                consecutiveErrors = 0
+                consecutiveTransportFailures = 0
                 val connectedAt = System.currentTimeMillis()
                 lastHeartbeatTime = connectedAt
                 lastLiveDataUpdateMs = connectedAt
@@ -2759,12 +2760,12 @@ class ObdSession(
                         runCatching { sendRawCommand("ATCRA$responseId", priority = 999) }
                     }
 
+                    var udsCapable = false
                     try {
                         val probeRaw = runCatching { sendRawCommand("0100", priority = 999) }.getOrDefault("")
                         val saeObdCapable = isAliveResponse(probeRaw) &&
                             DiagnosticPduDecoder.decodeResponses(probeRaw, 0x41, 0x01)
                                 .any { it is ProtocolResponse.Positive }
-                        var udsCapable = false
                         var alive = saeObdCapable
                         rawExchanges += DtcRawExchange(
                             "0100", target, probeRaw, 0,
@@ -2791,12 +2792,16 @@ class ObdSession(
                             if (!udsAllRead.outcome.provesBucketWasRead) {
                                 queryUds("19020D", target, moduleName)
                             }
+                            runCatching { sendRawCommand("1001", priority = 999) }
                         } else if (saeObdCapable) {
                             queryStandard("03", "03", target, moduleName)
                             queryStandard("07", "07", target, moduleName)
                             queryStandard("0A", "0A", target, moduleName)
                         }
                     } finally {
+                        if (udsCapable) {
+                            runCatching { sendRawCommand("1001", priority = 999) }
+                        }
                         emitModuleCompletedNow(target, moduleName)
                         modulesCompleted = (modulesCompleted + 1).coerceAtMost(modulesPlanned)
                         emitProgress()
@@ -3032,7 +3037,7 @@ class ObdSession(
             if (DiagnosticNamespace.SAE_OBD in targetNamespaces) {
                 _statusMessage.value = "Enviando borrado SAE OBD únicamente para los hallazgos SAE del plan..."
                 runCatching { sendRawCommand("ATSH7DF", priority = 1) }
-                val response = sendRawCommand("04", priority = 1)
+                val response = sendEffectfulCommand("04", priority = 1, retryPolicy = RetryPolicy.NEVER_AFTER_WRITE)
                 commandEvidence += decodeClearCommandEvidence(
                     command = "04",
                     response = response,
@@ -3052,8 +3057,8 @@ class ObdSession(
                 return ClearDtcResult.Rejected(commandEvidence, message = message)
             }
 
-            _statusMessage.value = "✓ ECU aceptó comando de borrado. Verificando ausencia de fallas dirigida..."
-            delay(150)
+            _statusMessage.value = "✓ ECU aceptó comando de borrado. Verificando estado post-borrado..."
+            executePostClearLivenessProbe()
             val postClearReport = readProfessionalDtcScanOwned(
                 mode = DiagnosticScanMode.CLEAR_VERIFY,
                 verificationPlan = verificationPlan,
@@ -3112,6 +3117,22 @@ class ObdSession(
             runCatching { sendRawCommand("ATCAF1", priority = 1) }
             resumeLivePolling()
         }
+    }
+
+    private suspend fun executePostClearLivenessProbe(maxWaitMs: Long = 3000L): Boolean {
+        val start = System.currentTimeMillis()
+        delay(200) // Initial ECU memory reset stabilization delay
+        while (System.currentTimeMillis() - start < maxWaitMs) {
+            try {
+                val resp = sendRawCommand("0100", priority = 1)
+                val clean = resp.trim().uppercase()
+                if (clean.contains("4100") || clean.contains("41 00") || clean.contains("OK") || clean.contains("NO DATA") || clean.contains("NODATA")) {
+                    return true
+                }
+            } catch (_: Exception) {}
+            delay(300)
+        }
+        return false
     }
 
     private fun decodeClearCommandEvidence(
@@ -3191,7 +3212,7 @@ class ObdSession(
                     if (isDoIpMode) {
                         sendDoIpDiagnostic(requireNotNull(logicalTarget), "14FFFFFF")
                     } else {
-                        sendRawCommand("14FFFFFF", priority = 1)
+                        sendEffectfulCommand("14FFFFFF", priority = 1, retryPolicy = RetryPolicy.NEVER_AFTER_WRITE)
                     }
                 }
                     .getOrElse { "ERR:${it.message}" }
@@ -3217,6 +3238,18 @@ class ObdSession(
                 )
             }
         } finally {
+            // Restore UDS Default Diagnostic Session 1001 on all targeted ECUs
+            for ((target, _) in targets) {
+                val logicalTarget = target.toIntOrNull(16)
+                if (isDoIpMode && logicalTarget != null) {
+                    runCatching { sendDoIpDiagnostic(logicalTarget, "1001") }
+                } else if (!isDoIpMode) {
+                    runCatching {
+                        sendRawCommand("ATSH$target", priority = 1)
+                        sendRawCommand("1001", priority = 1)
+                    }
+                }
+            }
             if (!isDoIpMode) {
                 runCatching { sendRawCommand("ATSH7DF", priority = 1) }
                 runCatching { sendRawCommand("ATCRA", priority = 1) }
@@ -4560,11 +4593,9 @@ class ObdSession(
                         val code = pid.substring(2)
                         val def = PidRegistry.getPid(mode, code)
                         if (def != null) {
-                            var resp = sendRawCommand(pid)
+                            val resp = runCatching { sendRawCommand(pid) }.getOrDefault("")
                             if (resp.contains("ERROR") || resp.contains("NO DATA") || resp.contains("CAN ERROR")) {
-                                Log.w(TAG, "Active test PID poll failed: $pid. Reconnecting...")
-                                attemptSelfHealing()
-                                resp = sendRawCommand(pid)
+                                Log.d(TAG, "Active test PID poll: $pid returned no active measurement ($resp)")
                             }
                             val clean = CanMultiFrameParser.parse(resp).replace(" ", "")
                             val expectedPrefix = (mode.toInt(16) + 0x40).toString(16).uppercase() + code
@@ -4735,6 +4766,7 @@ class ObdSession(
                     val t = transport ?: break
                     var success = false
                     var attempts = 0
+                    var writeCompleted = false
                     val startTime = System.currentTimeMillis()
                     val maxAttempts = if (command.retryPolicy == RetryPolicy.NEVER_AFTER_WRITE) 1 else 2
 
@@ -4758,44 +4790,42 @@ class ObdSession(
                                 } else {
                                     runCatching { t.drain() }
                                     t.write("${command.query}\r".toByteArray())
+                                    writeCompleted = true
                                     readResponse(timeoutMs = 2000L)
                                 }
 
-                                val clean = response.trim().uppercase()
-                                val isHardwareOrBusError = clean.contains("CAN ERROR") || clean.contains("BUS ERROR") ||
-                                        clean.contains("STOPPED") || clean.contains("BUS BUSY") || clean.contains("FB ERROR") ||
-                                        clean.contains("BUFFER FULL") || clean.contains("UNABLE TO CONNECT") ||
-                                        clean.contains("ERR1") || clean.contains("ERR2") || clean == "?"
+                                val domain = ObdFailureDomain.classifyResponse(response)
+                                adapterCapabilities.recordOutcome(command.query, response)
 
-                                val isNoData = clean == "NO DATA" || clean == "NODATA"
-
-                                if (!isHardwareOrBusError && response.isNotBlank()) {
-                                    success = true
-                                    consecutiveErrors = 0
-                                    lastHeartbeatTime = System.currentTimeMillis()
-                                    val latency = System.currentTimeMillis() - startTime
-                                    updateQos(latency, true)
-                                    recordCommandLog(command.query, response, success = !isNoData, latencyMs = latency, retryCount = attempts)
-                                    trafficListener?.onResponseReceived(command.query, response)
-                                    command.onSuccess(response)
-                                } else {
-                                    attempts++
-                                    drainInput()
-                                }
+                                // L0 (ECU / App), L1 (Adapter capability/buffer), L2 (Vehicle Bus):
+                                // These are valid diagnostic/bus exchanges, NOT physical socket deaths.
+                                success = true
+                                consecutiveTransportFailures = 0
+                                lastHeartbeatTime = System.currentTimeMillis()
+                                val latency = System.currentTimeMillis() - startTime
+                                updateQos(latency, true)
+                                val isNoData = response.trim().uppercase().let { it == "NO DATA" || it == "NODATA" }
+                                recordCommandLog(command.query, response, success = !isNoData, latencyMs = latency, retryCount = attempts)
+                                trafficListener?.onResponseReceived(command.query, response)
+                                command.onSuccess(response)
                             }
-                            if (!success) delay(100)
                         } catch (e: Exception) {
                             attempts++
                             trafficListener?.onError(command.query, e.message ?: "Unknown error")
                             drainInput()
+
+                            // If write was already performed and policy forbids re-transmission:
+                            if (writeCompleted && (command.retryPolicy == RetryPolicy.NEVER_AFTER_WRITE || command.retryPolicy == RetryPolicy.RETRY_ON_TRANSPORT_BEFORE_WRITE_ONLY)) {
+                                break
+                            }
                             delay(100)
                         }
                     }
                     if (!success) {
-                        consecutiveErrors++
+                        consecutiveTransportFailures++
                         val latency = System.currentTimeMillis() - startTime
                         updateQos(latency, false)
-                        trafficListener?.onError(command.query, "Timeout after $attempts attempts")
+                        trafficListener?.onError(command.query, "Transport IO failure after $attempts attempts")
                         recordCommandLog(
                             command = command.query,
                             rawResponse = null,
@@ -4806,11 +4836,12 @@ class ObdSession(
                         )
                         recordClassifiedFailure(command.query, null, timeoutMs = 2000L, latencyMs = latency)
 
-                        if (consecutiveErrors >= 3 && !isSelfHealing) {
-                            scope.launch { attemptSelfHealing("command timeouts") }
+                        // ONLY true physical transport failures (L3) trigger self-healing, and ONLY when the bus is IDLE
+                        if (consecutiveTransportFailures >= 3 && !isSelfHealing && physicalBusActor.currentOwner == PhysicalBusOwner.IDLE) {
+                            scope.launch { attemptSelfHealing("transport socket failure") }
                         }
 
-                        command.onError(Exception("Timeout"))
+                        command.onError(Exception("Transport IO Failure"))
                     } else {
                         // Success - apply adaptive delay before next command (halved for speed)
                         delay(baseDelayMs / 2)
@@ -4822,15 +4853,25 @@ class ObdSession(
         }
     }
 
-    fun enqueueCommand(q: String, p: Int = 1, s: (String) -> Unit, e: (Exception) -> Unit) {
+    fun enqueueCommand(
+        q: String,
+        p: Int = 1,
+        s: (String) -> Unit,
+        e: (Exception) -> Unit,
+        retryPolicy: RetryPolicy = RetryPolicy.SAFE_IDEMPOTENT
+    ) {
         if (isRunning) {
-            commandQueue.enqueue(ObdCommand(q, p, s, e))
+            commandQueue.enqueue(ObdCommand(q, p, s, e, retryPolicy))
         } else {
             e(ObdConnectionException("OBD session not running"))
         }
     }
 
-    suspend fun sendRawCommand(command: String, priority: Int = 10): String {
+    suspend fun sendRawCommand(
+        command: String,
+        priority: Int = 10,
+        retryPolicy: RetryPolicy = RetryPolicy.SAFE_IDEMPOTENT
+    ): String {
         val activeOwner = physicalBusActor.currentOwner
         val callerOwner = currentCoroutineContext()[PhysicalBusLeaseContext]?.owner
         if (!PhysicalBusLeasePolicy.allows(activeOwner, callerOwner)) {
@@ -4838,9 +4879,17 @@ class ObdSession(
         }
         return withTimeout(15000) { // Safety timeout for all raw commands
             val deferred = CompletableDeferred<String>()
-            enqueueCommand(command, priority, { deferred.complete(it) }, { deferred.completeExceptionally(it) })
+            enqueueCommand(command, priority, { deferred.complete(it) }, { deferred.completeExceptionally(it) }, retryPolicy)
             deferred.await()
         }
+    }
+
+    suspend fun sendEffectfulCommand(
+        command: String,
+        priority: Int = 10,
+        retryPolicy: RetryPolicy = RetryPolicy.NEVER_AFTER_WRITE
+    ): String {
+        return sendRawCommand(command, priority = priority, retryPolicy = retryPolicy)
     }
 
     /** Restricted physical read surface for EVAIR. Arbitrary adapter commands are not accepted. */
@@ -4912,6 +4961,11 @@ class ObdSession(
     }
 
     private suspend fun attemptSelfHealing(reason: String = "link instability"): Boolean {
+        // Physical bus lease authority: Never break an active exclusive diagnostic lease
+        if (physicalBusActor.currentOwner != PhysicalBusOwner.IDLE) {
+            Log.w(TAG, "Self-healing suppressed: bus owned by ${physicalBusActor.currentOwner}")
+            return false
+        }
         if (isSelfHealing || !isRunning) return false
         isSelfHealing = true
         lastRecoveryAttemptMs = System.currentTimeMillis()
@@ -4928,7 +4982,7 @@ class ObdSession(
             transport?.reconnect()
             delay(700)
             initializeAdapter()
-            consecutiveErrors = 0
+            consecutiveTransportFailures = 0
             recoveryFailureCount = 0
             val recoveredAt = System.currentTimeMillis()
             lastHeartbeatTime = recoveredAt
@@ -4943,7 +4997,7 @@ class ObdSession(
         } catch (e: Exception) {
             recoveryFailureCount++
             _statusMessage.value = "Recuperación OBD falló: ${e.message ?: "sin respuesta"}"
-            consecutiveErrors = 0
+            consecutiveTransportFailures = 0
             Log.e(TAG, "Self-healing failed ($recoveryFailureCount): $reason", e)
             if (recoveryFailureCount >= 2) {
                 isRunning = false
@@ -4966,6 +5020,11 @@ class ObdSession(
             while (isRunning && isActive) {
                 delay(5000)
                 val now = System.currentTimeMillis()
+                // If bus is owned by an exclusive diagnostic operation or polling is paused, suspend heartbeat watchdog
+                if (physicalBusActor.currentOwner != PhysicalBusOwner.IDLE || isPollingPaused) {
+                    lastHeartbeatTime = now
+                    continue
+                }
                 // If no successful command in 15s while running, the link is likely frozen
                 if (now - lastHeartbeatTime > 15000 && !isSelfHealing && _state.value == ObdState.CONNECTED) {
                     _statusMessage.value = "Enlace inactivo. Re-sincronizando..."

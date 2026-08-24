@@ -453,7 +453,7 @@ class ElysiumCommunicationRepository @Inject constructor(
         kind = enumValueOrDefault(row.kind, ConversationKind.SERVICE),
         serviceVertical = row.serviceVertical,
         serviceReferenceId = row.serviceReferenceId,
-        requestState = enumValueOrDefault(row.requestState, MessageRequestState.ACCEPTED),
+        requestState = enumValueOrDefault(row.requestState, MessageRequestState.PENDING),
         lastActivityAtEpochMs = row.lastEventAtEpochMs,
         proofState = enumValueOrDefault(row.proofState, CommunicationProofState.MODEL_EXISTS),
     )
@@ -530,7 +530,7 @@ class ElysiumCommunicationRepository @Inject constructor(
             peerElysiumId.orEmpty(),
             peerDisplayName,
             medium,
-            enumValueOrDefault(aliasProofState, AliasProofState.SERVER_ASSERTED),
+            enumValueOrDefault(aliasProofState, AliasProofState.LOCAL_ONLY),
             alreadyKnown,
         )
 

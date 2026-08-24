@@ -68,8 +68,8 @@ data class ProviderOrganization(
     val verifiedEquipments: List<EquipmentItem> = emptyList(),
     val bays: List<BayFacility> = emptyList(),
     val credentials: List<CredentialCertificate> = emptyList(),
-    val customerRating: Double = 5.0,
+    val customerRating: Double? = null,
     val totalVerifiedRepairsCount: Int = 0,
-    val onTimeRatePercent: Int = 100,
+    val onTimeRatePercent: Int? = null,
     val isEmergencyModeActive: Boolean = false
 )

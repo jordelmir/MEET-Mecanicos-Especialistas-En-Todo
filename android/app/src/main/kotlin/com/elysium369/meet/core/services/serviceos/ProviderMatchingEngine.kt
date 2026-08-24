@@ -70,10 +70,16 @@ object ProviderMatchingEngine {
             }
         }
 
-        // 5. On-Time Reliability
-        if (provider.onTimeRatePercent >= 90) {
+        // 5. On-Time Reliability & Customer Feedback
+        val onTime = provider.onTimeRatePercent
+        if (onTime != null && onTime >= 90) {
             score += 5
-            positive.add("Alta puntualidad en entregas (${provider.onTimeRatePercent}%)")
+            positive.add("Alta puntualidad en entregas ($onTime%)")
+        }
+        val rating = provider.customerRating
+        if (rating != null && rating >= 4.5) {
+            score += 5
+            positive.add("Calificación de clientes destacada (${String.format("%.1f", rating)}⭐)")
         }
 
         val clampedScore = score.coerceIn(10, 99)

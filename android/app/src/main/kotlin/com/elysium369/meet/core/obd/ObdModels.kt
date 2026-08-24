@@ -275,3 +275,72 @@ data class UdsCapabilities(
     val supportsCommunicationControl: Boolean = false,
     val discoveredDids: List<String> = emptyList()
 )
+
+/**
+ * 4-Layer Diagnostic Failure Domain Taxonomy.
+ *
+ * Strict boundary separation:
+ * - L0: ECU / Application Layer (NO DATA, NRC 7F xx xx, unsupported service) -> valid response, NEVER reconnects transport.
+ * - L1: Adapter Layer (?, BUFFER FULL, STOPPED, FB ERROR, ERR1, ERR2) -> adapter capability or buffer issue, drain & downgrade, NEVER reconnects physical socket.
+ * - L2: Vehicle Bus / Protocol Layer (CAN ERROR, BUS ERROR, BUS BUSY, UNABLE TO CONNECT) -> protocol re-negotiation, NEVER drops socket initially.
+ * - L3: Physical Transport Layer (socket closed, IOException on read/write, BLE GATT disconnected) -> ONLY L3 increments transport failure count and authorizes physical reconnect.
+ */
+enum class ObdFailureDomain {
+    L0_ECU_APPLICATION,
+    L1_ADAPTER,
+    L2_VEHICLE_BUS,
+    L3_PHYSICAL_TRANSPORT;
+
+    companion object {
+        fun classifyResponse(rawResponse: String): ObdFailureDomain {
+            val clean = rawResponse.replace(">", "").trim().uppercase()
+            return when {
+                clean.contains("CAN ERROR") || clean.contains("BUS ERROR") ||
+                clean.contains("BUS BUSY") || clean.contains("UNABLE TO CONNECT") -> L2_VEHICLE_BUS
+
+                clean.contains("?") || clean.contains("BUFFER FULL") || clean.contains("STOPPED") ||
+                clean.contains("FB ERROR") || clean.contains("ERR1") || clean.contains("ERR2") -> L1_ADAPTER
+
+                clean.contains("NO DATA") || clean.contains("NODATA") || clean.contains("7F") -> L0_ECU_APPLICATION
+
+                else -> L0_ECU_APPLICATION
+            }
+        }
+    }
+}
+
+/**
+ * Tracks AT command capability memory for the connected adapter to avoid
+ * repeatedly transmitting commands that the adapter firmware rejected with '?'.
+ */
+class AdapterCapabilityProfile {
+    private val unsupportedCommands = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val supportedCommands = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun recordOutcome(command: String, response: String) {
+        val cleanCmd = command.trim().uppercase()
+        val cleanResp = response.replace(">", "").trim().uppercase()
+        if (cleanResp.contains("?")) {
+            unsupportedCommands.add(cleanCmd)
+            supportedCommands.remove(cleanCmd)
+        } else if (cleanResp.isNotEmpty() && !cleanResp.contains("ERROR")) {
+            supportedCommands.add(cleanCmd)
+            unsupportedCommands.remove(cleanCmd)
+        }
+    }
+
+    fun isSupported(command: String): Boolean {
+        val cleanCmd = command.trim().uppercase()
+        return !unsupportedCommands.contains(cleanCmd)
+    }
+
+    fun isKnownUnsupported(command: String): Boolean {
+        val cleanCmd = command.trim().uppercase()
+        return unsupportedCommands.contains(cleanCmd)
+    }
+
+    fun clear() {
+        unsupportedCommands.clear()
+        supportedCommands.clear()
+    }
+}
