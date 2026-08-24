@@ -34,6 +34,7 @@ import com.elysium369.meet.ui.TheoryExamViewModel
 import com.elysium369.meet.ui.components.gauges.GaugeStyleManager
 import com.elysium369.meet.ui.screens.*
 import com.elysium369.meet.ui.screens.chat.*
+import com.elysium369.meet.ui.screens.humanity.LearningHubScreen
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
@@ -715,6 +716,14 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                 TheoryExamPreparationScreen(
                     viewModel = theoryViewModel,
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable("learning_hub") {
+                LearningHubScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenDrivingTheory = { navController.navigate("theory_exam_preparation") },
+                    onOpenMissionDetail = { /* Handled in detail */ }
                 )
             }
             composable("universal_services") {
