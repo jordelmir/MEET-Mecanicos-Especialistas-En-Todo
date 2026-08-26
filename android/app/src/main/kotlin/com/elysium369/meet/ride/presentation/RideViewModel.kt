@@ -1683,7 +1683,7 @@ class RideViewModel @Inject constructor(
             if (!audioDir.exists()) audioDir.mkdirs()
 
             currentRecordingFile = File(audioDir, "audio_${System.currentTimeMillis()}.m4a")
-            mediaRecorder = android.media.MediaRecorder(context).apply {
+            mediaRecorder = createCompatibleMediaRecorder(context).apply {
                 setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
                 setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
@@ -1698,6 +1698,14 @@ class RideViewModel @Inject constructor(
             _isRecordingAudio.value = false
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun createCompatibleMediaRecorder(context: Context): android.media.MediaRecorder =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.media.MediaRecorder(context)
+        } else {
+            android.media.MediaRecorder()
+        }
 
     fun stopAndSendAudioRecording(requestId: String, senderId: String, senderName: String, role: String) {
         if (!_isRecordingAudio.value) return
