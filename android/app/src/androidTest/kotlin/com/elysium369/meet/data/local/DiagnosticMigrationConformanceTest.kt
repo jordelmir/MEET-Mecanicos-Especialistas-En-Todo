@@ -90,16 +90,45 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
-        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58, 59).forEach { startVersion ->
-            val databaseName = "diagnostic-migration-$startVersion-to-60"
+        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-62"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                60,
+                62,
                 true,
                 *migrationsFrom(startVersion),
             ).use { db ->
                 db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+            }
+        }
+    }
+
+    @Test
+    fun migration60To62RepairsHumanityAndCreatesOwnerScopedMarketProjections() {
+        val databaseName = "market-os-migration-60-to-62"
+        helper.createDatabase(databaseName, 60).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            62,
+            true,
+            AppModule.MIGRATION_60_61,
+            AppModule.MIGRATION_61_62,
+        ).use { db ->
+            val expectedTables = setOf(
+                "humanity_learning_progress_local",
+                "humanity_evidence_items_local",
+                "humanity_capability_records_local",
+                "market_organization_projections",
+                "legal_matter_projections",
+                "property_listing_projections",
+                "fuel_coupon_projections",
+                "market_command_outbox",
+            )
+            db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+                val existing = buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                assertEquals(emptySet<String>(), expectedTables - existing)
             }
         }
     }
@@ -275,6 +304,8 @@ class DiagnosticMigrationConformanceTest {
         if (startVersion <= 57) add(AppModule.MIGRATION_57_58)
         if (startVersion <= 58) add(AppModule.MIGRATION_58_59)
         if (startVersion <= 59) add(AppModule.MIGRATION_59_60)
+        if (startVersion <= 60) add(AppModule.MIGRATION_60_61)
+        if (startVersion <= 61) add(AppModule.MIGRATION_61_62)
     }.toTypedArray()
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(

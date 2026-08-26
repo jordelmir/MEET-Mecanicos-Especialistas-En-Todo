@@ -365,6 +365,7 @@ dependencies {
     // QR Code and Barcode Processing
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     // Bundled on-device face detector: liveness blink works offline and stores no face template.
     implementation("com.google.mlkit:face-detection:16.1.7")
 

@@ -434,6 +434,9 @@ fun HomeClassicScreen(
 
             val actions = buildList {
                 add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to "messages")
+                add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
+                add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
+                add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
