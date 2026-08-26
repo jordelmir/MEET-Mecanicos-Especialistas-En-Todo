@@ -4426,6 +4426,12 @@ object AppModule {
 
     @Provides
     fun provideMarketOsDao(db: MeetDatabase): MarketOsDao = db.marketOsDao()
+
+    @Provides
+    @Singleton
+    fun provideMarketOsRemoteGateway(
+        gateway: com.elysium369.meet.platform.marketos.data.SupabaseMarketOsRemoteGateway,
+    ): com.elysium369.meet.platform.marketos.data.MarketOsRemoteGateway = gateway
 }
 
 @kotlinx.serialization.Serializable

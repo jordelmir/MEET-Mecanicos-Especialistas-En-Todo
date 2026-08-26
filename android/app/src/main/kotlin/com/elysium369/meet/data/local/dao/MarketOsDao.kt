@@ -40,19 +40,46 @@ interface MarketOsDao {
     @Query("SELECT * FROM market_command_outbox WHERE ownerPrincipalId = :ownerId AND status IN ('PENDING','RETRYABLE') AND nextAttemptAtEpochMs <= :now ORDER BY createdAtEpochMs LIMIT :limit")
     suspend fun readyCommands(ownerId: String, now: Long, limit: Int): List<MarketCommandOutboxEntity>
 
-    @Query("UPDATE market_command_outbox SET status = 'IN_FLIGHT', updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key AND status IN ('PENDING','RETRYABLE')")
+    @Query("UPDATE market_command_outbox SET status = 'IN_FLIGHT', attemptCount = attemptCount + 1, updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key AND status IN ('PENDING','RETRYABLE') AND nextAttemptAtEpochMs <= :now")
     suspend fun acquire(ownerId: String, key: String, now: Long): Int
 
-    @Query("UPDATE market_command_outbox SET status = 'DELIVERED', lastErrorCode = NULL, updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key")
+    @Query("SELECT * FROM market_command_outbox WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key LIMIT 1")
+    suspend fun command(ownerId: String, key: String): MarketCommandOutboxEntity?
+
+    @Query("UPDATE market_command_outbox SET status = 'DELIVERED', payloadJson = '{\"redacted_after_ack\":true}', lastErrorCode = NULL, updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key AND status = 'IN_FLIGHT'")
     suspend fun markDelivered(ownerId: String, key: String, now: Long)
 
-    @Query("UPDATE market_command_outbox SET status = :status, attemptCount = attemptCount + 1, nextAttemptAtEpochMs = :nextAttempt, lastErrorCode = :errorCode, updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key")
+    @Query("UPDATE market_command_outbox SET status = :status, nextAttemptAtEpochMs = :nextAttempt, lastErrorCode = :errorCode, updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND idempotencyKey = :key AND status = 'IN_FLIGHT'")
     suspend fun markFailure(ownerId: String, key: String, status: String, nextAttempt: Long, errorCode: String, now: Long)
+
+    @Query("UPDATE market_command_outbox SET status = 'RETRYABLE', nextAttemptAtEpochMs = :now, lastErrorCode = 'STALE_LEASE_RECOVERED', updatedAtEpochMs = :now WHERE ownerPrincipalId = :ownerId AND status = 'IN_FLIGHT' AND updatedAtEpochMs <= :staleBefore")
+    suspend fun recoverStaleCommands(ownerId: String, staleBefore: Long, now: Long): Int
+
+    @Query("SELECT COUNT(*) FROM market_command_outbox WHERE ownerPrincipalId = :ownerId AND status IN ('PENDING','IN_FLIGHT','RETRYABLE')")
+    fun observePendingCommandCount(ownerId: String): Flow<Int>
 
     @Transaction
     suspend fun replaceLegalProjection(ownerId: String, rows: List<LegalMatterProjectionEntity>) {
         deleteLegalProjection(ownerId)
         upsertLegalMatters(rows)
+    }
+
+    @Transaction
+    suspend fun replaceOrganizationProjection(ownerId: String, rows: List<MarketOrganizationProjectionEntity>) {
+        clearOrganizations(ownerId)
+        upsertOrganizations(rows)
+    }
+
+    @Transaction
+    suspend fun replacePropertyProjection(ownerId: String, rows: List<PropertyListingProjectionEntity>) {
+        clearPropertyListings(ownerId)
+        upsertPropertyListings(rows)
+    }
+
+    @Transaction
+    suspend fun replaceFuelProjection(ownerId: String, rows: List<FuelCouponProjectionEntity>) {
+        clearFuelCoupons(ownerId)
+        upsertFuelCoupons(rows)
     }
 
     @Query("DELETE FROM legal_matter_projections WHERE ownerPrincipalId = :ownerId")
