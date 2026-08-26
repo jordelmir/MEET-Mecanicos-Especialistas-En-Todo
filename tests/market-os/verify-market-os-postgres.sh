@@ -75,6 +75,7 @@ migrations=(
   "$repo_root/supabase/migrations/20260826013000_market_runtime_wallet_and_realtime.sql"
   "$repo_root/supabase/migrations/20260826014000_market_vertical_operations.sql"
   "$repo_root/supabase/migrations/20260826015000_market_privacy_authority_and_evidence.sql"
+  "$repo_root/supabase/migrations/20260826160949_market_fk_index_hardening.sql"
 )
 
 for migration in "${migrations[@]}"; do
