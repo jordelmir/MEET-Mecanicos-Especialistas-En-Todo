@@ -4327,6 +4327,15 @@ object AppModule {
     ): com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase {
         return com.elysium369.meet.automotive.parts.ProcedureKnowledgeBase(context)
     }
+
+    @Provides
+    fun provideHumanityProgressDao(db: MeetDatabase): HumanityProgressDao = db.humanityProgressDao()
+
+    @Provides
+    fun provideHumanityEvidenceDao(db: MeetDatabase): HumanityEvidenceDao = db.humanityEvidenceDao()
+
+    @Provides
+    fun provideHumanityCapabilityDao(db: MeetDatabase): HumanityCapabilityDao = db.humanityCapabilityDao()
 }
 
 @kotlinx.serialization.Serializable

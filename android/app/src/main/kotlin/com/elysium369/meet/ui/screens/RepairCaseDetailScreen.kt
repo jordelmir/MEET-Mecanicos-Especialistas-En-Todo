@@ -257,6 +257,35 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
                     }
                 }
 
+                // Bridge to Learning Mission
+                EliteCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    glowColor = MeetColors.neonGreen,
+                    backgroundColor = MeetColors.backgroundDeep,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("🎓 APRENDER ESTA REPARACIÓN", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("Inicia una misión formativa guiada sobre este caso para practicar el diagnóstico y registrar evidencia.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        EliteButton(
+                            text = "APRENDER",
+                            onClick = { navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.LEARNING_HUB) },
+                            color = MeetColors.neonGreen,
+                            modifier = Modifier.height(38.dp)
+                        )
+                    }
+                }
+
                 // Symptoms
                 Column(modifier = Modifier.fillMaxWidth()) {
                     PhantomSectionHeader(label = "Síntomas Reportados", accentColor = MeetColors.cyberCyan)

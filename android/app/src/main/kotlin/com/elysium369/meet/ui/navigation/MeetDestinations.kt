@@ -38,6 +38,10 @@ object MeetDestinations {
     const val CAMPAIGNS = "reports"
     const val BATTERY_HEALTH = "health_score"
     const val CONNECT = "connect"
+    const val LEARNING_HUB = "learning_hub"
+    const val MISSION_DETAIL = "mission_detail"
+    const val MULTIMETER_SIMULATION = "multimeter_simulation"
+    const val CAPABILITY_PASSPORT = "capability_passport"
 }
 
 fun androidx.navigation.NavController.safeNavigate(route: String) {

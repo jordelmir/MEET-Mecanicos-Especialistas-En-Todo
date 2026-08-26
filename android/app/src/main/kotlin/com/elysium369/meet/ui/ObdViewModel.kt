@@ -495,6 +495,7 @@ class ObdViewModel @Inject constructor(
     val connectionState: StateFlow<ObdState> = obdSession.state
     val statusMessage: StateFlow<String> = obdSession.statusMessage
     val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
+    val detectedDtcs: StateFlow<Set<String>> = obdSession.allDetectedDtcs
 
     // --- UDS Protocol Manager (lazy, uses existing obdSession) ---
     private val udsProtocolManager by lazy {
