@@ -1,5 +1,13 @@
 package com.elysium369.meet.core.transport
 
+import com.elysium369.meet.core.obd.TransportLinkEvent
+import com.elysium369.meet.core.obd.TransportLinkState
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import java.io.IOException
 import java.util.ArrayDeque
@@ -20,6 +28,12 @@ class RecordedDiagnosticTransport(
     private var pendingReadError: String? = null
     private var connected = false
 
+    private val _linkState = MutableStateFlow<TransportLinkState>(TransportLinkState.Disconnected)
+    override val linkState: StateFlow<TransportLinkState> = _linkState.asStateFlow()
+
+    private val _linkEvents = MutableSharedFlow<TransportLinkEvent>(extraBufferCapacity = 16)
+    override val linkEvents: SharedFlow<TransportLinkEvent> = _linkEvents.asSharedFlow()
+
     override val isConnected: Boolean
         get() = connected
 
@@ -30,18 +44,22 @@ class RecordedDiagnosticTransport(
         get() = remainingFrames.size
 
     override suspend fun connect() {
+        _linkState.value = TransportLinkState.Connected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connected))
         connected = true
+    }
+
+    override fun abortConnect() {
+        connected = false
+        _linkState.value = TransportLinkState.Disconnected
     }
 
     override suspend fun disconnect() {
         connected = false
+        _linkState.value = TransportLinkState.Disconnected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
         pendingChunks.clear()
         pendingReadError = null
-    }
-
-    override suspend fun reconnect() {
-        disconnect()
-        connect()
     }
 
     override suspend fun write(data: ByteArray) {

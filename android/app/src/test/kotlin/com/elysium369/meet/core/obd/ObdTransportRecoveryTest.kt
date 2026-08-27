@@ -31,6 +31,12 @@ class ObdTransportRecoveryTest {
     }
 
     class TestInstrumentedTransport : TransportInterface {
+        private val _linkState = kotlinx.coroutines.flow.MutableStateFlow<TransportLinkState>(TransportLinkState.Connected)
+        override val linkState: kotlinx.coroutines.flow.StateFlow<TransportLinkState> = _linkState
+
+        private val _linkEvents = kotlinx.coroutines.flow.MutableSharedFlow<TransportLinkEvent>(extraBufferCapacity = 32)
+        override val linkEvents: kotlinx.coroutines.flow.SharedFlow<TransportLinkEvent> = _linkEvents
+
         val connectCount = AtomicInteger(0)
         val disconnectCount = AtomicInteger(0)
         val reconnectCount = AtomicInteger(0)
@@ -47,18 +53,18 @@ class ObdTransportRecoveryTest {
         override suspend fun connect() {
             connectCount.incrementAndGet()
             _connected = true
+            _linkState.value = TransportLinkState.Connected
+        }
+
+        override fun abortConnect() {
+            _connected = false
+            _linkState.value = TransportLinkState.Disconnected
         }
 
         override suspend fun disconnect() {
             disconnectCount.incrementAndGet()
             _connected = false
-        }
-
-        override suspend fun reconnect() {
-            reconnectCount.incrementAndGet()
-            disconnect()
-            delay(10)
-            connect()
+            _linkState.value = TransportLinkState.Disconnected
         }
 
         override suspend fun write(data: ByteArray) {

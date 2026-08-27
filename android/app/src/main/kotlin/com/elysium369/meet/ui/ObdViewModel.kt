@@ -2492,6 +2492,8 @@ class ObdViewModel @Inject constructor(
     private val _isTrainingDna = MutableStateFlow(false)
     val isTrainingDna: StateFlow<Boolean> = _isTrainingDna.asStateFlow()
 
+    val connectionTruth: StateFlow<ConnectionTruthSnapshot> = obdSession.connectionTruth
+    private var connectionJob: Job? = null
     private var lastAdapterAddress: String? = null
     private var dnaEvaluationJob: Job? = null
     private var lastDnaEvaluationAtMs: Long = 0L
@@ -3355,11 +3357,8 @@ class ObdViewModel @Inject constructor(
         performanceCalculator.vehicleMassKg = _vehicleMass.value
         performanceCalculator.drivetrainLossPercent = _drivetrainLoss.value
 
-        // Pre-warm OBD link in background if enabled and paired adapter available
-        viewModelScope.launch(Dispatchers.IO) {
-            delay(1500) // allow UI initial render to finish
-            preWarmObdConnection()
-        }
+        // Initialize remembered adapter metadata in state (Zero physical connection without explicit user intent)
+        prepareRememberedAdapter()
 
         // Wire real-time OBD traffic capture to the terminal log
         obdSession.setTrafficListener(object : ObdTrafficListener {
@@ -3850,34 +3849,43 @@ class ObdViewModel @Inject constructor(
 
     // --- Actions ---
 
-    /** Connect to an OBD2 adapter by MAC address or IP */
+    /** Connect to an OBD2 adapter by MAC address or IP under explicit user intent */
     fun connect(address: String) {
+        val isDemoAddress = address == "SIMULATOR"
         lastAdapterAddress = address
         context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE)
             .edit()
             .putString("last_adapter_address", address)
             .apply()
-        beginUnboundPhysicalSession(address)
+        if (!isDemoAddress) beginUnboundPhysicalSession(address)
         hasCompletedInitialDtcScan = false
-        viewModelScope.launch {
-            obdSession.setTargetAddressSequentially(address)
-            obdSession.connect()
-            if (obdSession.state.value == ObdState.CONNECTED) {
-                runPostConnectDtcFirstStartup()
-                startForegroundService(_selectedVehicle.value?.id ?: "active_vehicle", address)
-            }
-        }
-    }
 
-    fun startDiagnosticSession(vehicle: Vehicle) {
-        selectVehicle(vehicle)
-        beginUnboundPhysicalSession(lastAdapterAddress.orEmpty().ifBlank { "UNKNOWN_ADAPTER" })
-        hasCompletedInitialDtcScan = false
-        viewModelScope.launch {
-            obdSession.connect()
-            if (obdSession.state.value == ObdState.CONNECTED) {
-                runPostConnectDtcFirstStartup()
-                startForegroundService(_selectedVehicle.value?.id ?: vehicle.id, lastAdapterAddress)
+        val previousJob = connectionJob
+        if (previousJob != null) {
+            previousJob.cancel()
+            obdSession.cancelActiveConnectionAttempt()
+        }
+        connectionJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                previousJob?.join()
+                obdSession.setVehicleVinHint(_selectedVehicle.value?.vin)
+                obdSession.beginUserConnectionAttempt(address)
+                obdSession.setTargetAddressSequentially(address)
+                obdSession.connect()
+                if (obdSession.state.value == ObdState.CONNECTED) {
+                    if (isDemoAddress) {
+                        addTerminalLog(
+                            "[DEMO] Simulación activa. No se persistirá historial ni se afirmará conexión física.",
+                            TerminalLineType.WARNING,
+                        )
+                        obdSession.startLivePolling()
+                    } else {
+                        runPostConnectDtcFirstStartup()
+                        startForegroundService(_selectedVehicle.value?.id ?: "active_vehicle", address)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ObdVM", "Connection attempt ended or cancelled: ${e.message}")
             }
         }
     }
@@ -3944,6 +3952,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun stopSession() {
+        connectionJob?.cancel()
+        connectionJob = null
+        obdSession.requestUserDisconnect()
         viewModelScope.launch {
             voiceFeedbackManager.speak("Sesión de diagnóstico finalizada. Guardando resultados.", "Diagnostic session ended. Saving results.")
             saveSessionResults()
@@ -3955,6 +3966,9 @@ class ObdViewModel @Inject constructor(
     }
 
     fun disconnect() {
+        connectionJob?.cancel()
+        connectionJob = null
+        obdSession.requestUserDisconnect()
         viewModelScope.launch {
             voiceFeedbackManager.speak("Desconectando del vehículo. Guardando datos de sesión.", "Disconnecting from vehicle. Saving session data.")
             saveSessionResults()
@@ -3964,14 +3978,22 @@ class ObdViewModel @Inject constructor(
     }
 
     fun cancelConnection() {
-        viewModelScope.launch {
+        val jobToCancel = connectionJob
+        obdSession.cancelActiveConnectionAttempt()
+        connectionJob?.cancel()
+        connectionJob = null
+        viewModelScope.launch(Dispatchers.IO) {
+            jobToCancel?.join()
             voiceFeedbackManager.speak("Conexión cancelada.", "Connection cancelled.")
-            obdSession.disconnect()
+            obdSession.disconnectSequentially()
             context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
         }
     }
 
     fun forceResetConnection() {
+        connectionJob?.cancel()
+        connectionJob = null
+        obdSession.requestUserDisconnect()
         viewModelScope.launch {
             voiceFeedbackManager.speak("Reiniciando interfaz de conexión y liberando puertos.", "Resetting connection interface and releasing ports.")
             obdSession.disconnect()
@@ -4217,6 +4239,13 @@ class ObdViewModel @Inject constructor(
 
 
     private suspend fun saveSessionResults() {
+        if (connectionTruth.value.isDemoSession) {
+            addTerminalLog(
+                "[DEMO] Historial y sesión persistente omitidos: los datos simulados nunca se atribuyen a un vehículo real.",
+                TerminalLineType.WARNING,
+            )
+            return
+        }
         val vehicle = _selectedVehicle.value ?: return
         val currentDtcs = activeDtcs.value
         val snapshot = _liveData.value
@@ -4323,42 +4352,31 @@ class ObdViewModel @Inject constructor(
     }
 
     /**
-     * Pre-Warm Link: Silently handshakes with last known good adapter in background.
-     * Yields instantaneous (0ms) connection when user reaches Scanner, DTCs or Garage.
+     * Loads remembered adapter address in state without firing any background physical connection.
      */
-    fun preWarmObdConnection() {
-        if (connectionState.value == ObdState.CONNECTED || connectionState.value == ObdState.CONNECTING) return
+    fun prepareRememberedAdapter() {
         val lastAddress = lastAdapterAddress?.takeIf { it.isNotBlank() }
             ?: context.getSharedPreferences("elysium_obd_prefs", Context.MODE_PRIVATE).getString("last_adapter_address", null)
         if (!lastAddress.isNullOrBlank()) {
-            try {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
-                    androidx.core.content.ContextCompat.checkSelfPermission(
-                        context,
-                        android.Manifest.permission.BLUETOOTH_CONNECT,
-                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.i("ObdVM", "Pre-warm skipped: BLUETOOTH_CONNECT permission is not granted")
-                    return
-                }
-                val btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
-                if (btAdapter != null && btAdapter.isEnabled) {
-                    val isPaired = btAdapter.bondedDevices?.any { it.address.equals(lastAddress, ignoreCase = true) } == true
-                    if (isPaired) {
-                        Log.i("ObdVM", "⚡ Pre-warming OBD connection in background for known adapter $lastAddress...")
-                        viewModelScope.launch(Dispatchers.IO) {
-                            try {
-                                connect(lastAddress)
-                            } catch (e: Exception) {
-                                Log.w("ObdVM", "Pre-warm background attempt non-fatal notice: ${e.message}")
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("ObdVM", "Pre-warm check notice: ${e.message}")
-            }
+            lastAdapterAddress = lastAddress
+            Log.d("ObdVM", "Remembered adapter configured: $lastAddress (ready for explicit user connection)")
         }
+    }
+
+    fun retryLastAdapterByUserAction() {
+        val address = lastAdapterAddress?.takeIf { it.isNotBlank() } ?: return
+        connect(address)
+    }
+
+    fun copyRedactedConnectionTrace() {
+        val trace = obdSession.healthCoordinator.getTrace().exportRedacted().joinToString("\n")
+            .ifBlank { "Sin eventos de conexión registrados." }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MEET OBD Connection Trace", trace))
+    }
+
+    fun getConnectionTrace(): List<String> {
+        return obdSession.healthCoordinator.getTrace().exportRedacted()
     }
 
     private suspend fun ensureDtcScanBeforeAction(force: Boolean = false) {
@@ -4386,9 +4404,10 @@ class ObdViewModel @Inject constructor(
             "──── INICIO ${if (mode == DiagnosticScanMode.QUICK) "QUICK SCAN" else "FULL VEHICLE SCAN"} ────",
             TerminalLineType.SYSTEM,
         )
-        if (connectionState.value != ObdState.CONNECTED) {
+        val truth = connectionTruth.value
+        if (connectionState.value != ObdState.CONNECTED || !truth.isSessionReady || truth.isDemoSession) {
             addTerminalLog(
-                "⚠ Conecta un vehículo real para escanear DTCs. Elysium Vanguard ya no genera resultados simulados.",
+                "⚠ Se requiere adaptador y ECU físicos verificados para escanear DTCs. El modo demo no genera historial.",
                 TerminalLineType.WARNING
             )
             voiceFeedbackManager.speak(
@@ -5381,6 +5400,12 @@ class ObdViewModel @Inject constructor(
     }
 
     suspend fun clearDtcs(): ClearDtcResult {
+        val connectionProof = connectionTruth.value
+        if (!connectionProof.isSessionReady || connectionProof.isDemoSession) {
+            val message = "Borrado rechazado: se requiere adaptador, protocolo y ECU físicos verificados."
+            _clearDtcResult.value = message
+            return ClearDtcResult.Rejected(emptyList(), message = message)
+        }
         val bindingFailure = runCatching { requireBoundVehicleForCriticalOperation() }.exceptionOrNull()
         if (bindingFailure != null) {
             val message = bindingFailure.message.orEmpty()
@@ -5535,7 +5560,11 @@ class ObdViewModel @Inject constructor(
      * Executes a "Smart Scan" — A comprehensive health check of the vehicle.
      */
     suspend fun runSmartScan() {
-        if (connectionState.value != ObdState.CONNECTED) return
+        val truth = connectionTruth.value
+        if (connectionState.value != ObdState.CONNECTED || !truth.isSessionReady || truth.isDemoSession) {
+            _cloudSyncState.value = "Escaneo real no disponible: conecta y verifica una ECU física."
+            return
+        }
 
         _isScanning.value = true
         _cloudSyncState.value = "Iniciando Escaneo Inteligente Elite..."

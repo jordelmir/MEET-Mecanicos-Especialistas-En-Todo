@@ -7,10 +7,20 @@ import android.bluetooth.BluetoothSocket
 import android.util.Log
 import com.elysium369.meet.core.obd.ConnectMethod
 import com.elysium369.meet.core.obd.KnownGoodAdapterStore
+import com.elysium369.meet.core.obd.TransportLinkEvent
+import com.elysium369.meet.core.obd.TransportLinkState
 import com.elysium369.meet.core.obd.TransportType
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,10 +41,16 @@ class BtClassicTransport(
     private val bluetoothAdapter: BluetoothAdapter
 ) : TransportInterface {
 
+    private val _linkState = MutableStateFlow<TransportLinkState>(TransportLinkState.Disconnected)
+    override val linkState: StateFlow<TransportLinkState> = _linkState.asStateFlow()
+
+    private val _linkEvents = MutableSharedFlow<TransportLinkEvent>(extraBufferCapacity = 32)
+    override val linkEvents: SharedFlow<TransportLinkEvent> = _linkEvents.asSharedFlow()
+
     // Standard SPP UUID
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     
-    private var socket: BluetoothSocket? = null
+    @Volatile private var socket: BluetoothSocket? = null
     private var rawInputStream: InputStream? = null
     private var rawOutputStream: OutputStream? = null
     private val mutex = Mutex()
@@ -93,15 +109,21 @@ class BtClassicTransport(
         mutex.withLock {
             withContext(Dispatchers.IO) {
                 Log.i(TAG, "═══ BT CONNECT START ═══ MAC=$macAddress")
+                _linkState.value = TransportLinkState.Connecting
+                _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connecting))
                 val connectStartTime = System.currentTimeMillis()
                 
                 val device: BluetoothDevice = try {
                     bluetoothAdapter.getRemoteDevice(macAddress)
                 } catch (e: SecurityException) {
                     Log.e(TAG, "✗ Permiso de conexión Bluetooth denegado (Android 12+)", e)
+                    _linkState.value = TransportLinkState.IoFailure(e)
+                    _linkEvents.tryEmit(TransportLinkEvent.IoFailure(e, System.nanoTime() / 1_000_000L))
                     throw java.io.IOException("Falta el permiso de conexión Bluetooth (BLUETOOTH_CONNECT). Otórgalo en los ajustes del sistema.")
                 } catch (e: Exception) {
                     Log.e(TAG, "✗ MAC inválida: $macAddress", e)
+                    _linkState.value = TransportLinkState.IoFailure(e)
+                    _linkEvents.tryEmit(TransportLinkEvent.IoFailure(e, System.nanoTime() / 1_000_000L))
                     throw java.io.IOException("Dirección MAC inválida: $macAddress")
                 }
                 
@@ -154,7 +176,7 @@ class BtClassicTransport(
                     val methodStart = System.currentTimeMillis()
                     Log.i(TAG, "→ Trying method: $methodName")
                     try {
-                        cleanup()
+                        cleanupInternal()
                         delay(60)
                         
                         socket = try {
@@ -221,35 +243,53 @@ class BtClassicTransport(
                                 )
                             } catch (_: Exception) {}
 
+                            _linkState.value = TransportLinkState.Connected
+                            _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connected))
+
                             // Start Continuous Reader Worker Thread
                             startReaderWorker()
                             return@withContext
                         } else {
                             Log.w(TAG, "  ✗ $methodName socket.connect() returned but isConnected=false")
-                            cleanup()
+                            cleanupInternal()
                         }
+                    } catch (cancelled: CancellationException) {
+                        cleanupInternal()
+                        throw cancelled
                     } catch (e: Exception) {
                         if (e is SecurityException) {
                             Log.e(TAG, "✗ Permiso de conexión Bluetooth denegado durante el enlace", e)
+                            _linkState.value = TransportLinkState.IoFailure(e)
+                            _linkEvents.tryEmit(TransportLinkEvent.IoFailure(e, System.nanoTime() / 1_000_000L))
                             throw java.io.IOException("Falta el permiso de conexión Bluetooth (BLUETOOTH_CONNECT). Otórgalo en los ajustes del sistema.")
                         }
                         val elapsed = System.currentTimeMillis() - methodStart
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
-                        cleanup()
+                        cleanupInternal()
                         delay(200)
                     }
                 }
                 
                 Log.e(TAG, "═══ BT CONNECT FAILED ═══ All methods exhausted. Total: ${System.currentTimeMillis() - connectStartTime}ms")
+                val finalEx = lastException ?: java.io.IOException("ELITE LINK FAILURE: El adaptador no respondió a ninguna estrategia de enlace.")
+                _linkState.value = TransportLinkState.IoFailure(finalEx)
+                _linkEvents.tryEmit(TransportLinkEvent.IoFailure(finalEx, System.nanoTime() / 1_000_000L))
+
                 // Format error nicely for UI if it's the classic socket read failed error
                 val errMsg = lastException?.message ?: ""
                 if (errMsg.contains("read failed, socket might closed") || errMsg.contains("timeout")) {
                     throw java.io.IOException("No se pudo enlazar al ELM327. Verifica que el adaptador tenga alimentación y que el Bluetooth esté encendido.")
                 }
-                throw lastException ?: java.io.IOException("ELITE LINK FAILURE: El adaptador no respondió a ninguna estrategia de enlace.")
+                throw finalEx
             }
         }
+    }
+
+    override fun abortConnect() {
+        runCatching { socket?.close() }
+        _linkState.value = TransportLinkState.Disconnected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
     }
 
     private fun startReaderWorker() {
@@ -261,9 +301,10 @@ class BtClassicTransport(
         readerJob = CoroutineScope(Dispatchers.IO).launch {
             val buf = ByteArray(2048)
             try {
-                while (socket?.isConnected == true) {
+                while (socket?.isConnected == true && isActive) {
                     val bytesRead = stream.read(buf)
                     if (bytesRead > 0) {
+                        _linkEvents.tryEmit(TransportLinkEvent.BytesReceived(bytesRead, System.nanoTime() / 1_000_000L))
                         synchronized(rxMutex) {
                             if (rxBuffer.size() + bytesRead > MAX_RX_BUFFER_SIZE) {
                                 Log.w(TAG, "Bluetooth Classic rxBuffer bounded overflow protection triggered; resetting buffer")
@@ -272,22 +313,28 @@ class BtClassicTransport(
                             rxBuffer.write(buf, 0, bytesRead)
                         }
                     } else if (bytesRead < 0) {
+                        // EOF reached — Remote device physically disconnected
+                        val timestamp = System.nanoTime() / 1_000_000L
+                        Log.w(TAG, "Bluetooth Classic stream returned EOF (-1) — Remote physical link closed")
+                        _linkState.value = TransportLinkState.RemoteClosed("Bluetooth stream EOF", timestamp)
+                        _linkEvents.tryEmit(TransportLinkEvent.RemoteClosed("Bluetooth stream EOF", timestamp))
+                        cleanupInternal()
                         break
                     }
                 }
-            } catch (_: Exception) {
-                // Expected when socket is closed on disconnect
+            } catch (e: Exception) {
+                if (_linkState.value is TransportLinkState.Connected) {
+                    val timestamp = System.nanoTime() / 1_000_000L
+                    Log.w(TAG, "Bluetooth Classic reader caught IO exception: ${e.message}")
+                    _linkState.value = TransportLinkState.RemoteClosed("Reader IO failure: ${e.message}", timestamp)
+                    _linkEvents.tryEmit(TransportLinkEvent.RemoteClosed("Reader IO failure: ${e.message}", timestamp))
+                    cleanupInternal()
+                }
             }
         }
     }
 
-    override suspend fun reconnect() {
-        disconnect()
-        delay(500)
-        connect()
-    }
-
-    private fun cleanup() {
+    private fun cleanupInternal() {
         readerJob?.cancel()
         readerJob = null
         runCatching { rawOutputStream?.flush() }
@@ -305,7 +352,11 @@ class BtClassicTransport(
     override suspend fun disconnect() {
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                cleanup()
+                _linkState.value = TransportLinkState.Closing
+                _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Closing))
+                cleanupInternal()
+                _linkState.value = TransportLinkState.Disconnected
+                _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
                 delay(120)
             }
         }
@@ -318,9 +369,13 @@ class BtClassicTransport(
                 try {
                     out.write(data)
                     out.flush()
+                    _linkEvents.tryEmit(TransportLinkEvent.BytesSent(data.size, System.nanoTime() / 1_000_000L))
                 } catch (e: Exception) {
                     if (socket?.isConnected != true) {
-                        cleanup()
+                        val timestamp = System.nanoTime() / 1_000_000L
+                        _linkState.value = TransportLinkState.RemoteClosed("Broken Pipe", timestamp)
+                        _linkEvents.tryEmit(TransportLinkEvent.RemoteClosed("Broken Pipe", timestamp))
+                        cleanupInternal()
                         throw TransportRemoteClosed("Broken Pipe: El adaptador cerró la conexión.")
                     }
                     throw TransportWriteFailure("Send Failure: ${e.message}", e)

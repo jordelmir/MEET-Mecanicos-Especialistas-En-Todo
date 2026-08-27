@@ -104,7 +104,7 @@ class VehicleActionExecutor @Inject constructor(
             else -> 30_000L
         }
         val session = obdSession
-        if (session == null || session.state.value != com.elysium369.meet.core.obd.ObdState.CONNECTED) {
+        if (session == null || !session.connectionTruth.value.isSessionReady || session.connectionTruth.value.isDemoSession) {
             return@withContext EvairResult.Failure(
                 EvairError.VehicleDisconnected(reason = "Acción autorizada, pero no existe un enlace OBD físico conectado.")
             )

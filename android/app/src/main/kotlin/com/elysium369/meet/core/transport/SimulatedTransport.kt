@@ -1,6 +1,14 @@
 package com.elysium369.meet.core.transport
 
 import android.util.Log
+import com.elysium369.meet.core.obd.TransportLinkEvent
+import com.elysium369.meet.core.obd.TransportLinkState
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 import kotlin.random.Random
@@ -8,6 +16,12 @@ import kotlin.random.Random
 class SimulatedTransport : TransportInterface {
     private val TAG = "SimulatedTransport"
     
+    private val _linkState = MutableStateFlow<TransportLinkState>(TransportLinkState.Disconnected)
+    override val linkState: StateFlow<TransportLinkState> = _linkState.asStateFlow()
+
+    private val _linkEvents = MutableSharedFlow<TransportLinkEvent>(extraBufferCapacity = 16)
+    override val linkEvents: SharedFlow<TransportLinkEvent> = _linkEvents.asSharedFlow()
+
     private var _isConnected = false
     override val isConnected: Boolean
         get() = _isConnected
@@ -17,20 +31,26 @@ class SimulatedTransport : TransportInterface {
 
     override suspend fun connect() {
         Log.i(TAG, "Connecting to virtual OBD simulator...")
+        _linkState.value = TransportLinkState.Connecting
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connecting))
         delay(800)
         _isConnected = true
+        _linkState.value = TransportLinkState.Connected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connected))
         Log.i(TAG, "Virtual OBD simulator connected.")
+    }
+
+    override fun abortConnect() {
+        _isConnected = false
+        _linkState.value = TransportLinkState.Disconnected
     }
 
     override suspend fun disconnect() {
         Log.i(TAG, "Disconnecting virtual OBD simulator...")
         _isConnected = false
+        _linkState.value = TransportLinkState.Disconnected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
         delay(200)
-    }
-
-    override suspend fun reconnect() {
-        disconnect()
-        connect()
     }
 
     override suspend fun write(data: ByteArray) {

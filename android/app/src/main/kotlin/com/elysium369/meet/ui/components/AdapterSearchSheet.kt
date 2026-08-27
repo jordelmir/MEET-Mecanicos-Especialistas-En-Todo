@@ -771,7 +771,6 @@ fun AdapterSearchSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Option to connect to Virtual Simulator
             EliteCard(
                 backgroundColor = MeetColors.neonGreen.copy(alpha = 0.05f),
                 borderColor = MeetColors.neonGreen.copy(alpha = 0.25f),
@@ -786,14 +785,7 @@ fun AdapterSearchSheet(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(MeetColors.neonGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🎮", fontSize = 18.sp)
-                    }
+                    Text("🎮", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -803,19 +795,20 @@ fun AdapterSearchSheet(
                             fontSize = 13.sp
                         )
                         Text(
-                            text = "Sincroniza telemetría en vivo sin un carro real.",
+                            text = "Entrenamiento rotulado; nunca cuenta como conexión física.",
                             color = MeetColors.textSecondary,
                             fontSize = 11.sp
                         )
                     }
                     Text(
-                        text = "CONECTAR ›",
+                        text = "ABRIR DEMO ›",
                         color = MeetColors.neonGreen,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black
                     )
                 }
             }
+
 
             Spacer(modifier = Modifier.height(24.dp))
         }

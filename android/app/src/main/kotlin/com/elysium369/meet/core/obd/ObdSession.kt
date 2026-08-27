@@ -141,6 +141,9 @@ class ObdSession(
     private val _state = MutableStateFlow(ObdState.DISCONNECTED)
     val state: StateFlow<ObdState> = _state.asStateFlow()
 
+    val healthCoordinator = ObdLinkHealthCoordinator()
+    val connectionTruth: StateFlow<ConnectionTruthSnapshot> = healthCoordinator.truth
+
     private val _statusMessage = MutableStateFlow("")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
@@ -416,6 +419,52 @@ class ObdSession(
 
     private val transportLifecycleMutex = Mutex()
     private val transportGenerationId = java.util.concurrent.atomic.AtomicLong(0L)
+    private val connectionAttemptGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+    private var transportStateJob: Job? = null
+    private var transportEventJob: Job? = null
+    @Volatile private var vehicleVinHint: String? = null
+
+    fun setVehicleVinHint(vin: String?) {
+        vehicleVinHint = vin?.let(VinValidator::normalize)
+    }
+
+    fun beginUserConnectionAttempt(address: String): ConnectionAttempt {
+        val attempt = ConnectionAttempt(
+            attemptId = java.util.UUID.randomUUID().toString(),
+            adapterAddress = address,
+            generation = connectionAttemptGeneration.incrementAndGet(),
+        )
+        healthCoordinator.onUserConnectRequested(attempt)
+        return attempt
+    }
+
+    fun cancelActiveConnectionAttempt() {
+        transportGenerationId.incrementAndGet()
+        healthCoordinator.onUserCancelled("User cancelled active connection attempt")
+        transport?.abortConnect()
+        healthCoordinator.onTransportStateChanged(TransportLinkState.Disconnected)
+        isRunning = false
+        currentJob?.cancel()
+        pollingJob?.cancel()
+        heartbeatJob?.cancel()
+        keepAliveManager.stop()
+        _state.value = ObdState.DISCONNECTED
+        _statusMessage.value = "Conexión cancelada"
+    }
+
+    fun requestUserDisconnect() {
+        transportGenerationId.incrementAndGet()
+        healthCoordinator.onUserDisconnected()
+        transport?.abortConnect()
+        healthCoordinator.onTransportStateChanged(TransportLinkState.Disconnected)
+        isRunning = false
+        currentJob?.cancel()
+        pollingJob?.cancel()
+        heartbeatJob?.cancel()
+        keepAliveManager.stop()
+        _state.value = ObdState.DISCONNECTED
+        _statusMessage.value = "Desconectando"
+    }
 
     suspend fun setTargetAddressSequentially(address: String) {
         val normalizedAddress = address.trim()
@@ -423,6 +472,8 @@ class ObdSession(
         val currentGen = transportGenerationId.incrementAndGet()
 
         transportLifecycleMutex.withLock {
+            transportStateJob?.cancel()
+            transportEventJob?.cancel()
             val oldTransport = transport
             transport = null
             if (oldTransport != null) {
@@ -455,6 +506,35 @@ class ObdSession(
 
             if (currentGen == transportGenerationId.get()) {
                 transport = newTransport
+                if (newTransport != null) {
+                    transportStateJob = scope.launch(Dispatchers.IO) {
+                        newTransport.linkState.collect { linkState ->
+                            if (currentGen != transportGenerationId.get()) return@collect
+                            healthCoordinator.onTransportStateChanged(linkState)
+                            if (linkState is TransportLinkState.RemoteClosed || linkState is TransportLinkState.IoFailure) {
+                                if (_state.value == ObdState.CONNECTED || _state.value == ObdState.CONNECTING || _state.value == ObdState.NEGOTIATING) {
+                                    Log.w(TAG, "Physical transport dropped: $linkState — setting ObdState.DISCONNECTED")
+                                    _state.value = ObdState.DISCONNECTED
+                                    _statusMessage.value = "Adaptador desconectado físicamente."
+                                    isRunning = false
+                                    pollingJob?.cancel()
+                                    commandQueue.clear()
+                                    keepAliveManager.stop()
+                                }
+                            }
+                        }
+                    }
+                    transportEventJob = scope.launch(Dispatchers.IO) {
+                        newTransport.linkEvents.collect { event ->
+                            if (currentGen != transportGenerationId.get()) return@collect
+                            when (event) {
+                                is TransportLinkEvent.BytesReceived -> healthCoordinator.onPhysicalRxProof(event.count)
+                                is TransportLinkEvent.BytesSent -> healthCoordinator.onPhysicalTxProof(event.count)
+                                else -> Unit
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -468,7 +548,18 @@ class ObdSession(
     private suspend fun connectOwned() {
         if (_state.value == ObdState.CONNECTED || _state.value == ObdState.CONNECTING) return
 
+        if (healthCoordinator.truth.value.intent != ConnectionIntent.CONNECT_REQUESTED) {
+            Log.w(TAG, "connectOwned rejected: ConnectionIntent is DISCONNECTED")
+            throw ConnectionIntentDeniedException("Physical OBD connection rejected: user intent is DISCONNECTED")
+        }
+
         val currentGen = transportGenerationId.get()
+        val isDemoTarget = targetAddress == "SIMULATOR"
+        val attempt = healthCoordinator.truth.value
+        val attemptId = attempt.attemptId ?: throw ConnectionIntentDeniedException("Missing explicit connection attempt")
+        val attemptGeneration = attempt.attemptGeneration
+        fun attemptIsCurrent(): Boolean = currentGen == transportGenerationId.get() &&
+            healthCoordinator.isCurrentAttempt(attemptId, attemptGeneration)
         val activeTransport = transport
         if (activeTransport == null) {
             _state.value = ObdState.ERROR
@@ -477,14 +568,15 @@ class ObdSession(
         }
 
         _state.value = ObdState.CONNECTING
+        healthCoordinator.onTransportStateChanged(TransportLinkState.Connecting)
         Log.i(TAG, "═══ OBD CONNECT START (max $MAX_CONNECT_ATTEMPTS attempts, generation $currentGen) ═══")
         val t0 = System.currentTimeMillis()
 
         var lastException: Exception? = null
 
         for (attempt in 1..MAX_CONNECT_ATTEMPTS) {
-            if (currentGen != transportGenerationId.get()) {
-                Log.w(TAG, "Transport target changed during connect loop, aborting attempt for stale generation $currentGen")
+            if (!attemptIsCurrent()) {
+                Log.w(TAG, "Transport target changed or connection cancelled, aborting attempt for generation $currentGen")
                 return
             }
             Log.i(TAG, "── ATTEMPT $attempt/$MAX_CONNECT_ATTEMPTS ──")
@@ -498,8 +590,10 @@ class ObdSession(
             try {
                 // 1. Physical Bluetooth/WiFi Connection
                 activeTransport.connect()
+                healthCoordinator.onTransportStateChanged(TransportLinkState.Connected)
                 Log.i(TAG, "✓ Physical link UP in ${System.currentTimeMillis()-t0}ms (attempt $attempt)")
                 
+                healthCoordinator.onElmSyncStarted()
                 if (isDoIpMode) {
                     _statusMessage.value = "Conexión DoIP OK. Activando enrutamiento..."
                     _state.value = ObdState.NEGOTIATING
@@ -509,12 +603,13 @@ class ObdSession(
                 } else {
                     _statusMessage.value = "Conexión OK. Negociando ELM327..."
                     _state.value = ObdState.NEGOTIATING
+                    healthCoordinator.onProtocolNegotiating()
                     withTimeout(90000) {
                         initializeAdapter()
                     }
                 }
 
-                if (currentGen != transportGenerationId.get() || transport !== activeTransport) {
+                if (!attemptIsCurrent() || transport !== activeTransport) {
                     Log.w(TAG, "Discarding stale connect success for generation $currentGen")
                     runCatching { activeTransport.disconnect() }
                     return
@@ -534,42 +629,44 @@ class ObdSession(
                 recoveryFailureCount = 0
                 Log.i(TAG, "═══ OBD CONNECT SUCCESS ═══ Attempt=$attempt | Total: ${System.currentTimeMillis()-t0}ms | Adapter=$adapterVersion | Protocol=$detectedProtocol")
 
-                scope.launch {
-                    currentVanguardSessionId = runCatching {
-                        sessionRecorder.startSession(
-                            ObdSessionStartContext(
-                                appVersion = BuildConfig.VERSION_NAME,
-                                vinHash = privacyGuard.vinPseudonym(_vin.value),
-                                adapterName = targetAddress?.let { if (bluetoothMacRegex.matches(it)) "Bluetooth OBD" else it },
-                                adapterMacHash = targetAddress?.takeIf { bluetoothMacRegex.matches(it) }?.let { privacyGuard.vinPseudonym(it) },
-                                adapterFirmware = adapterVersion.ifBlank { null },
-                                protocolDetected = detectedProtocol.ifBlank { null },
-                                consentGranted = privacyGuard.allowsRemoteDiagnostics(context),
-                                startedAtMs = connectedAt
-                            )
-                        )
-                    }.getOrElse { e ->
-                        Log.w(TAG, "Vanguard session recorder start failed: ${e.message}")
-                        null
-                    }
-                }
-
-                privacyGuard.remotePayload(
-                    context,
-                    listOf(
-                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("adapterType", adapterVersion, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DEVICE_ID),
-                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("notes", "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)", com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
-                        com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("protocol", detectedProtocol, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
-                    ),
-                )?.let { payload ->
+                if (!isDemoTarget) {
                     scope.launch {
-                        com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
-                            userId = "anonymous_diagnostics",
-                            adapterType = payload.fields["adapterType"].orEmpty(),
-                            notes = payload.fields["notes"].orEmpty(),
-                            protocol = payload.fields["protocol"].orEmpty(),
-                            isSuccess = true
-                        )
+                        currentVanguardSessionId = runCatching {
+                            sessionRecorder.startSession(
+                                ObdSessionStartContext(
+                                    appVersion = BuildConfig.VERSION_NAME,
+                                    vinHash = privacyGuard.vinPseudonym(_vin.value),
+                                    adapterName = targetAddress?.let { if (bluetoothMacRegex.matches(it)) "Bluetooth OBD" else it },
+                                    adapterMacHash = targetAddress?.takeIf { bluetoothMacRegex.matches(it) }?.let { privacyGuard.vinPseudonym(it) },
+                                    adapterFirmware = adapterVersion.ifBlank { null },
+                                    protocolDetected = detectedProtocol.ifBlank { null },
+                                    consentGranted = privacyGuard.allowsRemoteDiagnostics(context),
+                                    startedAtMs = connectedAt
+                                )
+                            )
+                        }.getOrElse { e ->
+                            Log.w(TAG, "Vanguard session recorder start failed: ${e.message}")
+                            null
+                        }
+                    }
+
+                    privacyGuard.remotePayload(
+                        context,
+                        listOf(
+                            com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("adapterType", adapterVersion, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DEVICE_ID),
+                            com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("notes", "SUCCESS (attempt $attempt/$MAX_CONNECT_ATTEMPTS)", com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
+                            com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("protocol", detectedProtocol, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.PUBLIC),
+                        ),
+                    )?.let { payload ->
+                        scope.launch {
+                            com.elysium369.meet.data.remote.CloudSyncRepository.logSessionTelemetry(
+                                userId = "anonymous_diagnostics",
+                                adapterType = payload.fields["adapterType"].orEmpty(),
+                                notes = payload.fields["notes"].orEmpty(),
+                                protocol = payload.fields["protocol"].orEmpty(),
+                                isSuccess = true
+                            )
+                        }
                     }
                 }
 
@@ -578,25 +675,31 @@ class ObdSession(
                 keepAliveManager.start(scope)
 
                 // ── AUTO-IDENTIFICATION: VIN + Calibration ID + ECU ──
-                _statusMessage.value = "Identificando vehículo..."
-                scope.launch {
-                    try {
-                        readVinFromVehicle()
-                        fetchCalibrationId()
-                        fetchEcuName()
-                        _statusMessage.value = if (_vin.value != null && _vin.value != "N/A") {
-                            "Vehículo identificado ✓ VIN capturado"
-                        } else {
-                            "Enlace activo. VIN no disponible."
+                if (isDemoTarget) {
+                    _statusMessage.value = "Modo demo — datos simulados, sin vehículo físico"
+                } else {
+                    _statusMessage.value = "Identificando vehículo..."
+                    scope.launch {
+                        try {
+                            readVinFromVehicle()
+                            fetchCalibrationId()
+                            fetchEcuName()
+                            _statusMessage.value = if (_vin.value != null && _vin.value != "N/A") {
+                                "Vehículo identificado ✓ VIN capturado"
+                            } else {
+                                "Enlace activo. VIN no disponible."
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Auto-identification partial: ${e.message}")
+                            _statusMessage.value = "Enlace activo. Identificación parcial."
                         }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Auto-identification partial: ${e.message}")
-                        _statusMessage.value = "Enlace activo. Identificación parcial."
                     }
                 }
 
                 return // ← EXIT: Connection successful
 
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 lastException = e
                 val msg = e.message ?: "Error desconocido"
@@ -611,6 +714,11 @@ class ObdSession(
                     try { activeTransport.drain() } catch (_: Exception) {}
                 }
 
+                if (healthCoordinator.truth.value.intent != ConnectionIntent.CONNECT_REQUESTED) {
+                    Log.i(TAG, "Connection transaction ended after terminal physical failure")
+                    break
+                }
+
                 if (attempt < MAX_CONNECT_ATTEMPTS) {
                     // Show retry UI with countdown
                     val retryDelaySec = attempt + 1 // Progressive: 2s, 3s
@@ -623,9 +731,24 @@ class ObdSession(
             }
         }
 
+        if (!attemptIsCurrent() || healthCoordinator.truth.value.intent != ConnectionIntent.CONNECT_REQUESTED) {
+            Log.i(TAG, "Connection transaction was cancelled or superseded; suppressing terminal error state")
+            runCatching { activeTransport.disconnect() }
+            return
+        }
+
         // ALL ATTEMPTS EXHAUSTED — Report final failure
         _state.value = ObdState.ERROR
         val msg = lastException?.message ?: "Error desconocido"
+        runCatching { activeTransport.disconnect() }
+        healthCoordinator.onConnectionAttemptFailed(
+            reason = msg,
+            disconnectReason = when {
+                msg.contains("permiso", ignoreCase = true) -> DisconnectReason.SECURITY_DENIED
+                msg.contains("protocolo", ignoreCase = true) || msg.contains("ECU", ignoreCase = true) -> DisconnectReason.PROTOCOL_EXHAUSTED
+                else -> DisconnectReason.HANDSHAKE_TIMEOUT
+            }
+        )
         Log.e(TAG, "═══ OBD CONNECT FAILED ═══ All $MAX_CONNECT_ATTEMPTS attempts exhausted in ${System.currentTimeMillis()-t0}ms: $msg", lastException)
         _statusMessage.value = when {
             msg.contains("Adaptador no responde") -> "Adaptador no responde tras $MAX_CONNECT_ATTEMPTS intentos. Verifica que esté encendido y el contacto del auto en ON."
@@ -635,7 +758,7 @@ class ObdSession(
             else -> "Error tras $MAX_CONNECT_ATTEMPTS intentos: $msg"
         }
 
-        privacyGuard.remotePayload(
+        if (!isDemoTarget) privacyGuard.remotePayload(
             context,
             listOf(
                 com.elysium369.meet.core.vanguard.ClassifiedTelemetryField("adapterType", adapterVersion.ifBlank { "Unknown" }, com.elysium369.meet.core.vanguard.TelemetryFieldClassification.DEVICE_ID),
@@ -1062,6 +1185,7 @@ class ObdSession(
 
     private fun updateLiveData(pid: String, value: Float) {
         lastLiveDataUpdateMs = System.currentTimeMillis()
+        healthCoordinator.onTelemetrySampleReceived()
         // 1. Apply user/auto calibration offset
         val normalizedPid = pid.uppercase().replace(" ", "")
         val corePid = normalizedPid.removePrefix("01")
@@ -4106,7 +4230,7 @@ class ObdSession(
     private suspend fun initializeAdapter() {
         val t = transport ?: throw ObdConnectionException("Transport no disponible")
         val address = targetAddress ?: "unknown"
-        val activeVin = _vin.value?.takeIf { it.isNotBlank() && it != "N/A" }
+        val activeVin = _vin.value?.takeIf { it.isNotBlank() && it != "N/A" } ?: vehicleVinHint
         val fingerprint = AdapterFingerprint(context)
         val cachedProfile = fingerprint.getProfile(address, activeVin)
 
@@ -4134,8 +4258,17 @@ class ObdSession(
         runCatching {
             KnownGoodAdapterStore.recordSuccess(
                 fingerprint = address,
-                transportType = if (targetAddress?.startsWith("BLE_") == true) TransportType.BLUETOOTH_LE else TransportType.BLUETOOTH_CLASSIC,
-                connectMethod = ConnectMethod.REFLECTION_CH1,
+                transportType = when {
+                    targetAddress?.startsWith("ble://", ignoreCase = true) == true -> TransportType.BLUETOOTH_LE
+                    targetAddress == "SIMULATOR" -> TransportType.SIMULATED
+                    targetAddress?.let { !bluetoothMacRegex.matches(it) } == true -> TransportType.WIFI
+                    else -> TransportType.BLUETOOTH_CLASSIC
+                },
+                connectMethod = when {
+                    targetAddress?.startsWith("ble://", ignoreCase = true) == true -> ConnectMethod.BLE_GATT
+                    targetAddress?.let { !bluetoothMacRegex.matches(it) && it != "SIMULATOR" } == true -> ConnectMethod.TCP_SOCKET
+                    else -> ConnectMethod.REFLECTION_CH1
+                },
                 protocol = profile.detectedProtocol.name,
                 connectDurationMs = profile.baseDelayMs,
                 preferredInitRecipe = profile.recipeId
@@ -4149,6 +4282,9 @@ class ObdSession(
         _isAdapterPro.value = !profile.isClone
         baseDelayMs = profile.baseDelayMs
         maxLineLength = profile.maxLineLength
+        healthCoordinator.onElmReady(profile.chipVersion)
+        healthCoordinator.onProtocolReady(profile.detectedProtocol)
+        healthCoordinator.onEcuReady()
 
         // Final Voltage Check
         try {
@@ -4194,6 +4330,19 @@ class ObdSession(
             _isAdapterPro.value = true
             baseDelayMs = 5L
             maxLineLength = 4096
+            healthCoordinator.onElmNotApplicable(adapterVersion)
+            healthCoordinator.onProtocolReady(ObdProtocol.DOIP_ISO13400)
+            healthCoordinator.onEcuHandshake()
+            t.write(wrapDoIpDiagnostics(doIpTargetLogicalAddress, "3E00"))
+            val semanticProbe = unwrapDoIpDiagnostics(
+                doipBytes = t.read(4096, 2_000L),
+                expectedSourceLogicalAddress = doIpTargetLogicalAddress,
+                expectedTargetLogicalAddress = doIpSourceLogicalAddress,
+            )
+            if (!semanticProbe.startsWith("7E00", ignoreCase = true)) {
+                throw ObdConnectionException("DoIP routing activo, pero ninguna ECU confirmó TesterPresent.")
+            }
+            healthCoordinator.onEcuReady()
         } else {
             throw ObdConnectionException("Fallo en activación DoIP: Tipo=${"%04X".format(payloadType)}, Estado=${"%02X".format(status)}")
         }
@@ -4518,7 +4667,7 @@ class ObdSession(
                     phase = ActiveDiagnosticTestPhase.PRECHECK,
                 )
 
-                if (_state.value != ObdState.CONNECTED) {
+                if (!connectionTruth.value.isSessionReady || connectionTruth.value.isDemoSession) {
                     _activeTestStatus.value = ActiveTestStatus(
                         isActive = false,
                         message = "Conecta un vehículo real antes de ejecutar pruebas activas.",
@@ -4895,7 +5044,9 @@ class ObdSession(
     /** Restricted physical read surface for EVAIR. Arbitrary adapter commands are not accepted. */
     suspend fun readPidsForEvair(pids: Set<String>): List<PhysicalPidReadEvidence> {
         require(pids.isNotEmpty()) { "At least one PID is required" }
-        require(_state.value == ObdState.CONNECTED) { "OBD vehicle is not connected" }
+        require(connectionTruth.value.isSessionReady && !connectionTruth.value.isDemoSession) {
+            "A physically verified OBD vehicle session is required"
+        }
         val canonical = pids.map { it.trim().uppercase() }.distinct()
         canonical.forEach { command ->
             require(command.matches(Regex("^[0-9A-F]{4,6}$"))) { "Malformed PID command: $command" }
@@ -4967,43 +5118,83 @@ class ObdSession(
             return false
         }
         if (isSelfHealing || !isRunning) return false
+        val activeTransport = transport ?: return false
+        if (!activeTransport.isConnected) {
+            Log.w(TAG, "Self-healing skipped: physical transport is not connected")
+            return false
+        }
+
         isSelfHealing = true
+        _state.value = ObdState.NEGOTIATING
         lastRecoveryAttemptMs = System.currentTimeMillis()
         val wasPollingPaused = isPollingPaused
         _statusMessage.value = "Enlace inestable. Recuperando telemetría..."
-        Log.w(TAG, "Self-healing started: $reason")
+        Log.w(TAG, "Layered self-healing started (no transport reconnect): $reason")
 
         try {
             commandQueue.clear()
             pollingJob?.cancelAndJoin()
             currentJob?.cancelAndJoin()
             keepAliveManager.stop()
-            drainInput()
-            transport?.reconnect()
-            delay(700)
-            initializeAdapter()
-            consecutiveTransportFailures = 0
-            recoveryFailureCount = 0
-            val recoveredAt = System.currentTimeMillis()
-            lastHeartbeatTime = recoveredAt
-            lastLiveDataUpdateMs = recoveredAt
-            _state.value = ObdState.CONNECTED
-            _statusMessage.value = "Telemetría recuperada. Polling activo."
-            startQueueProcessor()
-            if (!wasPollingPaused) startLivePolling()
-            keepAliveManager.start(scope)
-            Log.i(TAG, "Self-healing completed successfully")
-            return true
+
+            val recoverySuccess = healthCoordinator.executeLayeredRecovery(
+                layer = FailureLayer.L2_VEHICLE_BUS_PROTOCOL,
+                reason = reason,
+                transport = activeTransport,
+                onElmResync = {
+                    runCatching {
+                        drainInput()
+                        sendKeepAliveDirectly("\r")
+                        val ati = sendKeepAliveDirectly("ATI\r")
+                        ati.isNotBlank() && !ati.contains("?")
+                    }.getOrDefault(false)
+                },
+                onProtocolRestore = {
+                    runCatching {
+                        val address = targetAddress ?: return@runCatching false
+                        val vin = _vin.value?.takeIf { it.isNotBlank() && it != "N/A" } ?: vehicleVinHint
+                        val knownProfile = AdapterFingerprint(context).getProfile(address, vin)
+                            ?: return@runCatching false
+                        healthCoordinator.onProtocolNegotiating()
+                        val restored = ElmNegotiator(activeTransport).negotiateFastPath(knownProfile) { status ->
+                            _statusMessage.value = status
+                        } ?: return@runCatching false
+                        adapterVersion = restored.chipVersion
+                        detectedProtocol = restored.detectedProtocol.displayName
+                        baseDelayMs = restored.baseDelayMs
+                        maxLineLength = restored.maxLineLength
+                        healthCoordinator.onElmReady(restored.chipVersion)
+                        healthCoordinator.onProtocolReady(restored.detectedProtocol)
+                        healthCoordinator.onEcuReady()
+                        true
+                    }.getOrDefault(false)
+                }
+            )
+
+            if (recoverySuccess) {
+                consecutiveTransportFailures = 0
+                recoveryFailureCount = 0
+                val recoveredAt = System.currentTimeMillis()
+                lastHeartbeatTime = recoveredAt
+                lastLiveDataUpdateMs = recoveredAt
+                _state.value = ObdState.CONNECTED
+                _statusMessage.value = "Telemetría recuperada. Polling activo."
+                startQueueProcessor()
+                if (!wasPollingPaused) startLivePolling()
+                keepAliveManager.start(scope)
+                Log.i(TAG, "Layered self-healing completed successfully over live socket")
+                return true
+            } else {
+                recoveryFailureCount++
+                healthCoordinator.onEcuSilent("Layered protocol recovery failed")
+                _statusMessage.value = "Recuperación de protocolo falló: ECU sin respuesta."
+                return false
+            }
         } catch (e: Exception) {
             recoveryFailureCount++
             _statusMessage.value = "Recuperación OBD falló: ${e.message ?: "sin respuesta"}"
             consecutiveTransportFailures = 0
-            Log.e(TAG, "Self-healing failed ($recoveryFailureCount): $reason", e)
-            if (recoveryFailureCount >= 2) {
-                isRunning = false
-                _state.value = ObdState.ERROR
-                runCatching { transport?.disconnect() }
-            }
+            Log.e(TAG, "Self-healing exception ($recoveryFailureCount): $reason", e)
             return false
         } finally {
             isSelfHealing = false
@@ -5025,8 +5216,15 @@ class ObdSession(
                     lastHeartbeatTime = now
                     continue
                 }
+                if (now - lastLiveDataUpdateMs > 10000) {
+                    healthCoordinator.onTelemetryStale()
+                }
                 // If no successful command in 15s while running, the link is likely frozen
-                if (now - lastHeartbeatTime > 15000 && !isSelfHealing && _state.value == ObdState.CONNECTED) {
+                if (now - lastHeartbeatTime > 15000 &&
+                    now - lastRecoveryAttemptMs >= RECOVERY_COOLDOWN_MS &&
+                    !isSelfHealing &&
+                    (_state.value == ObdState.CONNECTED || _state.value == ObdState.NEGOTIATING)
+                ) {
                     _statusMessage.value = "Enlace inactivo. Re-sincronizando..."
                     attemptSelfHealing("heartbeat silence")
                 }
@@ -5086,6 +5284,9 @@ class ObdSession(
 
     fun disconnect() {
         transportGenerationId.incrementAndGet()
+        if (healthCoordinator.truth.value.disconnectReason != DisconnectReason.USER_CANCELLED) {
+            healthCoordinator.onUserDisconnected()
+        }
         val sessionIdToFinish = currentVanguardSessionId
         if (sessionIdToFinish != null) {
             val modulesJson = networkModulesJson()
@@ -5116,6 +5317,7 @@ class ObdSession(
         keepAliveManager.stop()
         
         val activeTransport = transport
+        activeTransport?.abortConnect()
         transport = null
         scope.launch(Dispatchers.IO) {
             transportLifecycleMutex.withLock {
@@ -5154,6 +5356,13 @@ class ObdSession(
 
     suspend fun disconnectSequentially() {
         transportGenerationId.incrementAndGet()
+        if (healthCoordinator.truth.value.disconnectReason != DisconnectReason.USER_CANCELLED) {
+            healthCoordinator.onUserDisconnected()
+        }
+        transportStateJob?.cancel()
+        transportStateJob = null
+        transportEventJob?.cancel()
+        transportEventJob = null
         val sessionIdToFinish = currentVanguardSessionId
         if (sessionIdToFinish != null) {
             val modulesJson = networkModulesJson()
@@ -5183,6 +5392,7 @@ class ObdSession(
 
         transportLifecycleMutex.withLock {
             val activeTransport = transport
+            activeTransport?.abortConnect()
             transport = null
             try {
                 activeTransport?.disconnect()

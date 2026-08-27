@@ -10,15 +10,25 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.elysium369.meet.core.obd.TransportLinkEvent
+import com.elysium369.meet.core.obd.TransportLinkState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * BleTransport — Elysium Vanguard Hardened Edition.
@@ -36,6 +46,12 @@ class BleTransport(
         private const val MAX_CONNECT_ATTEMPTS = 3
         private const val MAX_ACCUMULATOR_BYTES = 4096
     }
+
+    private val _linkState = MutableStateFlow<TransportLinkState>(TransportLinkState.Disconnected)
+    override val linkState: StateFlow<TransportLinkState> = _linkState.asStateFlow()
+
+    private val _linkEvents = MutableSharedFlow<TransportLinkEvent>(extraBufferCapacity = 32)
+    override val linkEvents: SharedFlow<TransportLinkEvent> = _linkEvents.asSharedFlow()
 
     // Standard UUIDs used across common OBD2 BLE adapters
     private val SERVICE_UUIDS = listOf(
@@ -62,6 +78,7 @@ class BleTransport(
     private val gattOperationMutex = Mutex()
 
     private val connectionGeneration = AtomicLong(0L)
+    private val abortRequested = AtomicBoolean(false)
 
     @Volatile
     private var connectionDeferred: CompletableDeferred<Boolean>? = null
@@ -101,9 +118,12 @@ class BleTransport(
             }
 
             Log.d(TAG, "onConnectionStateChange status=$status newState=$newState")
+            val timestamp = System.nanoTime() / 1_000_000L
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.w(TAG, "GATT connection status error: $status")
                 connected = false
+                _linkState.value = TransportLinkState.RemoteClosed("GATT status error: $status", timestamp)
+                _linkEvents.tryEmit(TransportLinkEvent.RemoteClosed("GATT status error: $status", timestamp))
                 connectionDeferred?.complete(false)
                 return
             }
@@ -113,7 +133,10 @@ class BleTransport(
                 connected = true
                 connectionDeferred?.complete(true)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.w(TAG, "BLE GATT STATE_DISCONNECTED received")
                 connected = false
+                _linkState.value = TransportLinkState.RemoteClosed("BLE GATT disconnected", timestamp)
+                _linkEvents.tryEmit(TransportLinkEvent.RemoteClosed("BLE GATT disconnected", timestamp))
                 connectionDeferred?.complete(false)
             }
         }
@@ -172,6 +195,7 @@ class BleTransport(
         }
 
         private fun handleIncomingBytes(value: ByteArray) {
+            _linkEvents.tryEmit(TransportLinkEvent.BytesReceived(value.size, System.nanoTime() / 1_000_000L))
             val chunk = String(value, Charsets.ISO_8859_1)
             if (responseAccumulator.length + chunk.length > MAX_ACCUMULATOR_BYTES) {
                 Log.w(TAG, "BLE accumulator overflow protection triggered; resetting buffer")
@@ -197,10 +221,14 @@ class BleTransport(
     }
 
     override suspend fun connect() {
+        abortRequested.set(false)
+        _linkState.value = TransportLinkState.Connecting
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connecting))
         var lastException: Exception? = null
 
         for (attempt in 1..MAX_CONNECT_ATTEMPTS) {
             try {
+                if (abortRequested.get()) throw CancellationException("BLE connect aborted by user")
                 Log.d(TAG, "BLE connection attempt $attempt/$MAX_CONNECT_ATTEMPTS to ${device.address}")
                 val gen = connectionGeneration.incrementAndGet()
                 disconnect()
@@ -214,6 +242,7 @@ class BleTransport(
                     deferred.await()
                 }
 
+                if (abortRequested.get()) throw CancellationException("BLE connect aborted by user")
                 if (!linkEstablished || gen != connectionGeneration.get()) {
                     disconnect()
                     continue
@@ -319,6 +348,8 @@ class BleTransport(
 
                     if (isElmReady) {
                         Log.i(TAG, "✓ BLE GATT Link and verified ELM readiness established on attempt $attempt")
+                        _linkState.value = TransportLinkState.Connected
+                        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Connected))
                         return
                     } else {
                         Log.w(TAG, "✗ BLE ELM prompt probe failed semantically on attempt $attempt (response='$probeStr')")
@@ -327,6 +358,9 @@ class BleTransport(
                 }
 
                 delay(500)
+            } catch (cancelled: CancellationException) {
+                disconnect()
+                throw cancelled
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "BLE connect attempt $attempt failed: ${e.message}")
@@ -334,10 +368,27 @@ class BleTransport(
         }
 
         disconnect()
-        throw lastException ?: TransportRemoteClosed("Error de enlace BLE: El adaptador no completó la negociación GATT/CCCD o la sonda ELM no respondió")
+        val finalEx = lastException ?: TransportRemoteClosed("Error de enlace BLE: El adaptador no completó la negociación GATT/CCCD o la sonda ELM no respondió")
+        _linkState.value = TransportLinkState.IoFailure(finalEx)
+        _linkEvents.tryEmit(TransportLinkEvent.IoFailure(finalEx, System.nanoTime() / 1_000_000L))
+        throw finalEx
+    }
+
+    override fun abortConnect() {
+        abortRequested.set(true)
+        connectionGeneration.incrementAndGet()
+        connectionDeferred?.complete(false)
+        runCatching { gatt?.disconnect() }
+        runCatching { gatt?.close() }
+        gatt = null
+        connected = false
+        _linkState.value = TransportLinkState.Disconnected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
     }
 
     override suspend fun disconnect() {
+        _linkState.value = TransportLinkState.Closing
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Closing))
         runCatching { gatt?.disconnect() }
         runCatching { gatt?.close() }
         gatt = null
@@ -349,12 +400,8 @@ class BleTransport(
         writeDeferred?.complete(false)
         writeDeferred = null
         responseAccumulator.setLength(0)
-    }
-
-    override suspend fun reconnect() {
-        disconnect()
-        delay(500)
-        connect()
+        _linkState.value = TransportLinkState.Disconnected
+        _linkEvents.tryEmit(TransportLinkEvent.StateChanged(TransportLinkState.Disconnected))
     }
 
     private var isNoResponseWrite = false
@@ -386,6 +433,7 @@ class BleTransport(
                 writeDeferred = null
                 throw TransportWriteFailure("Fallo al iniciar escritura en radio BLE")
             }
+            _linkEvents.tryEmit(TransportLinkEvent.BytesSent(data.size, System.nanoTime() / 1_000_000L))
 
             if (writeCompletion != null) {
                 val ack = withTimeoutOrNull(2000L) {

@@ -47,10 +47,44 @@ data class AdapterLinkProfile(
     val lastSuccessfulAt: Long? = null,
     val averageConnectMs: Long? = null,
     val failureCount: Int = 0,
+) {
+    fun toKnownGoodLinkProfile(vehicleBindingId: String? = null): KnownGoodLinkProfile {
+        return KnownGoodLinkProfile(
+            adapterFingerprint = adapterFingerprint,
+            vehicleBindingId = vehicleBindingId,
+            transportType = transportType,
+            connectMethod = preferredConnectMethod,
+            protocol = preferredProtocol,
+            initCommands = preferredInitRecipe?.split(";")?.filter { it.isNotBlank() } ?: emptyList(),
+            lastSuccessfulAt = lastSuccessfulAt,
+            transportReadyP50 = averageConnectMs,
+            failureCount = failureCount,
+        )
+    }
+}
+
+/**
+ * Unified known connection profile binding adapter fingerprint + vehicle identity.
+ */
+data class KnownGoodLinkProfile(
+    val adapterFingerprint: String,
+    val vehicleBindingId: String? = null,
+    val transportType: TransportType = TransportType.BLUETOOTH_CLASSIC,
+    val connectMethod: ConnectMethod? = null,
+    val elmIdentity: String? = null,
+    val protocol: String? = null,
+    val requestHeader: String? = null,
+    val initCommands: List<String> = emptyList(),
+    val baseDelayMs: Long = 0L,
+    val lastSuccessfulAt: Long? = null,
+    val transportReadyP50: Long? = null,
+    val ecuReadyP50: Long? = null,
+    val failureCount: Int = 0,
 )
 
 object KnownGoodAdapterStore {
     private val memoryCache = ConcurrentHashMap<String, AdapterLinkProfile>()
+    private val memoryLinkCache = ConcurrentHashMap<String, KnownGoodLinkProfile>()
     private var sharedPrefs: SharedPreferences? = null
 
     fun initialize(context: Context) {
@@ -63,6 +97,11 @@ object KnownGoodAdapterStore {
         prefs.all.forEach { (key, value) ->
             if (key.startsWith("profile_") && value is String) {
                 deserializeProfile(value)?.let { memoryCache[it.adapterFingerprint] = it }
+            } else if (key.startsWith("link_profile_") && value is String) {
+                deserializeLinkProfile(value)?.let {
+                    val cacheKey = if (it.vehicleBindingId != null) "${it.adapterFingerprint}#${it.vehicleBindingId}" else it.adapterFingerprint
+                    memoryLinkCache[cacheKey] = it
+                }
             }
         }
     }
@@ -71,6 +110,13 @@ object KnownGoodAdapterStore {
         val prefs = sharedPrefs ?: return
         val serialized = serializeProfile(profile)
         prefs.edit().putString("profile_${profile.adapterFingerprint}", serialized).apply()
+    }
+
+    private fun persistLinkProfile(profile: KnownGoodLinkProfile) {
+        val prefs = sharedPrefs ?: return
+        val serialized = serializeLinkProfile(profile)
+        val prefKey = if (profile.vehicleBindingId != null) "link_profile_${profile.adapterFingerprint}#${profile.vehicleBindingId}" else "link_profile_${profile.adapterFingerprint}"
+        prefs.edit().putString(prefKey, serialized).apply()
     }
 
     private fun serializeProfile(profile: AdapterLinkProfile): String {
@@ -105,7 +151,54 @@ object KnownGoodAdapterStore {
         )
     }
 
+    private fun serializeLinkProfile(profile: KnownGoodLinkProfile): String {
+        return listOf(
+            profile.adapterFingerprint,
+            profile.vehicleBindingId.orEmpty(),
+            profile.transportType.name,
+            profile.connectMethod?.name.orEmpty(),
+            profile.elmIdentity.orEmpty(),
+            profile.protocol.orEmpty(),
+            profile.requestHeader.orEmpty(),
+            profile.initCommands.joinToString(";"),
+            profile.baseDelayMs.toString(),
+            profile.lastSuccessfulAt?.toString().orEmpty(),
+            profile.transportReadyP50?.toString().orEmpty(),
+            profile.ecuReadyP50?.toString().orEmpty(),
+            profile.failureCount.toString(),
+        ).joinToString("|")
+    }
+
+    private fun deserializeLinkProfile(raw: String): KnownGoodLinkProfile? {
+        val parts = raw.split("|")
+        if (parts.size < 13) return null
+        return KnownGoodLinkProfile(
+            adapterFingerprint = parts[0],
+            vehicleBindingId = parts[1].ifBlank { null },
+            transportType = TransportType.fromStringOrNull(parts[2]) ?: TransportType.BLUETOOTH_CLASSIC,
+            connectMethod = ConnectMethod.fromStringOrNull(parts[3]),
+            elmIdentity = parts[4].ifBlank { null },
+            protocol = parts[5].ifBlank { null },
+            requestHeader = parts[6].ifBlank { null },
+            initCommands = parts[7].split(";").filter { it.isNotBlank() },
+            baseDelayMs = parts[8].toLongOrNull() ?: 0L,
+            lastSuccessfulAt = parts[9].toLongOrNull(),
+            transportReadyP50 = parts[10].toLongOrNull(),
+            ecuReadyP50 = parts[11].toLongOrNull(),
+            failureCount = parts[12].toIntOrNull() ?: 0,
+        )
+    }
+
     fun getProfile(fingerprint: String): AdapterLinkProfile? = memoryCache[fingerprint]
+
+    fun getLinkProfile(adapterFingerprint: String, vehicleBindingId: String? = null): KnownGoodLinkProfile? {
+        if (vehicleBindingId != null) {
+            val pairKey = "${adapterFingerprint}#${vehicleBindingId}"
+            val pairProfile = memoryLinkCache[pairKey]
+            if (pairProfile != null) return pairProfile
+        }
+        return memoryLinkCache[adapterFingerprint] ?: memoryCache[adapterFingerprint]?.toKnownGoodLinkProfile(vehicleBindingId)
+    }
 
     fun recordSuccess(
         fingerprint: String,
@@ -132,12 +225,69 @@ object KnownGoodAdapterStore {
         )
         memoryCache[fingerprint] = updated
         persistProfile(updated)
+
+        // Also update the general link profile
+        recordLinkSuccess(
+            adapterFingerprint = fingerprint,
+            vehicleBindingId = null,
+            transportType = transportType,
+            connectMethod = connectMethod,
+            protocol = protocol,
+            initCommands = preferredInitRecipe?.split(";")?.filter { it.isNotBlank() } ?: emptyList(),
+            transportDurationMs = connectDurationMs,
+        )
+    }
+
+    fun recordLinkSuccess(
+        adapterFingerprint: String,
+        vehicleBindingId: String?,
+        transportType: TransportType,
+        connectMethod: ConnectMethod?,
+        elmIdentity: String? = null,
+        protocol: String? = null,
+        requestHeader: String? = null,
+        initCommands: List<String> = emptyList(),
+        baseDelayMs: Long = 0L,
+        transportDurationMs: Long? = null,
+        ecuDurationMs: Long? = null,
+    ) {
+        val cacheKey = if (vehicleBindingId != null) "${adapterFingerprint}#${vehicleBindingId}" else adapterFingerprint
+        val existing = memoryLinkCache[cacheKey]
+        val updated = KnownGoodLinkProfile(
+            adapterFingerprint = adapterFingerprint,
+            vehicleBindingId = vehicleBindingId,
+            transportType = transportType,
+            connectMethod = connectMethod ?: existing?.connectMethod,
+            elmIdentity = elmIdentity ?: existing?.elmIdentity,
+            protocol = protocol ?: existing?.protocol,
+            requestHeader = requestHeader ?: existing?.requestHeader,
+            initCommands = if (initCommands.isNotEmpty()) initCommands else existing?.initCommands ?: emptyList(),
+            baseDelayMs = if (baseDelayMs > 0) baseDelayMs else existing?.baseDelayMs ?: 0L,
+            lastSuccessfulAt = System.currentTimeMillis(),
+            transportReadyP50 = if (existing?.transportReadyP50 != null && transportDurationMs != null) {
+                (existing.transportReadyP50 + transportDurationMs) / 2
+            } else transportDurationMs ?: existing?.transportReadyP50,
+            ecuReadyP50 = if (existing?.ecuReadyP50 != null && ecuDurationMs != null) {
+                (existing.ecuReadyP50 + ecuDurationMs) / 2
+            } else ecuDurationMs ?: existing?.ecuReadyP50,
+            failureCount = 0,
+        )
+        memoryLinkCache[cacheKey] = updated
+        persistLinkProfile(updated)
     }
 
     fun recordFailure(fingerprint: String) {
-        val existing = memoryCache[fingerprint] ?: return
-        val updated = existing.copy(failureCount = existing.failureCount + 1)
-        memoryCache[fingerprint] = updated
-        persistProfile(updated)
+        val existing = memoryCache[fingerprint]
+        if (existing != null) {
+            val updated = existing.copy(failureCount = existing.failureCount + 1)
+            memoryCache[fingerprint] = updated
+            persistProfile(updated)
+        }
+        val existingLink = memoryLinkCache[fingerprint]
+        if (existingLink != null) {
+            val updatedLink = existingLink.copy(failureCount = existingLink.failureCount + 1)
+            memoryLinkCache[fingerprint] = updatedLink
+            persistLinkProfile(updatedLink)
+        }
     }
 }

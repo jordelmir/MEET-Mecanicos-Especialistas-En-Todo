@@ -43,16 +43,25 @@ fun ConnectionStatusBar(
         ), label = "ledPulse"
     )
 
-    val stateColor = when (state) {
-        ObdState.CONNECTED -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
-        ObdState.CONNECTING, ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
-        ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
+    val truth by viewModel.connectionTruth.collectAsState()
+    var showDiagnosticsSheet by remember { mutableStateOf(false) }
+
+    val stateColor = when {
+        truth.isDemoSession && state == ObdState.CONNECTED -> com.elysium369.meet.ui.theme.MeetColors.electricBlue
+        state == ObdState.CONNECTED && truth.isSessionReady -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+        state == ObdState.CONNECTED && truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> com.elysium369.meet.ui.theme.MeetColors.warning
+        state == ObdState.CONNECTING || state == ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
+        state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
         else -> MeetColors.textMuted
     }
 
     val bgBrush = Brush.horizontalGradient(
         listOf(stateColor.copy(alpha = 0.08f), com.elysium369.meet.ui.theme.MeetColors.backgroundDark, stateColor.copy(alpha = 0.04f))
     )
+
+    if (showDiagnosticsSheet) {
+        ConnectionDiagnosticsSheet(viewModel = viewModel, onDismiss = { showDiagnosticsSheet = false })
+    }
 
     Surface(
         color = Color.Transparent,
@@ -74,10 +83,15 @@ fun ConnectionStatusBar(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = when (state) {
-                            ObdState.DISCONNECTED -> "DESCONECTADO"
+                            ObdState.DISCONNECTED -> if (truth.disconnectReason == com.elysium369.meet.core.obd.DisconnectReason.REMOTE_CLOSED || truth.disconnectReason == com.elysium369.meet.core.obd.DisconnectReason.IO_FAILURE) "ESCÁNER DESCONECTADO" else "DESCONECTADO"
                             ObdState.CONNECTING -> if (statusMessage.contains("Reintentando") || statusMessage.contains("Intento")) "RECONECTANDO..." else "CONECTANDO..."
                             ObdState.NEGOTIATING -> "NEGOCIANDO PROTOCOLO"
-                            ObdState.CONNECTED -> "ENLACE ACTIVO"
+                            ObdState.CONNECTED -> when {
+                                truth.isDemoSession -> "DEMO / SIMULACIÓN"
+                                truth.isSessionReady -> "SESIÓN OBD VERIFICADA"
+                                truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> "ENLACE DEGRADADO (ECU EN SILENCIO)"
+                                else -> "ENLACE NO VERIFICADO"
+                            }
                             ObdState.ERROR -> "ERROR DE CONEXIÓN"
                         },
                         color = stateColor, fontSize = 10.sp, fontWeight = FontWeight.Black,
@@ -115,6 +129,15 @@ fun ConnectionStatusBar(
                         onClick = { viewModel.forceResetConnection() },
                         color = com.elysium369.meet.ui.theme.MeetColors.hotMagenta
                     )
+                } else if (state == ObdState.DISCONNECTED &&
+                    (truth.disconnectReason == com.elysium369.meet.core.obd.DisconnectReason.REMOTE_CLOSED ||
+                        truth.disconnectReason == com.elysium369.meet.core.obd.DisconnectReason.IO_FAILURE)
+                ) {
+                    com.elysium369.meet.ui.components.EliteTextButton(
+                        text = "REINTENTAR",
+                        onClick = { viewModel.retryLastAdapterByUserAction() },
+                        color = com.elysium369.meet.ui.theme.MeetColors.warning
+                    )
                 }
             }
 
@@ -126,10 +149,13 @@ fun ConnectionStatusBar(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // ELM Connection Status
-                    val elmConnected = state == ObdState.NEGOTIATING || state == ObdState.CONNECTED
+                    val elmConnected = truth.elmState == com.elysium369.meet.core.obd.ElmLinkState.READY ||
+                        truth.elmState == com.elysium369.meet.core.obd.ElmLinkState.NOT_APPLICABLE
                     val elmColor = if (elmConnected) com.elysium369.meet.ui.theme.MeetColors.neonGreen else if (state == ObdState.CONNECTING) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.error
                     val elmText = when {
-                        state == ObdState.CONNECTED || state == ObdState.NEGOTIATING -> "Conectado"
+                        truth.elmState == com.elysium369.meet.core.obd.ElmLinkState.READY -> "Listo"
+                        truth.elmState == com.elysium369.meet.core.obd.ElmLinkState.NOT_APPLICABLE -> "No aplica (DoIP)"
+                        truth.elmState == com.elysium369.meet.core.obd.ElmLinkState.SYNCING -> "Sincronizando"
                         state == ObdState.CONNECTING -> "Conectando"
                         state == ObdState.ERROR -> "Error"
                         else -> "—"
@@ -137,21 +163,44 @@ fun ConnectionStatusBar(
                     DualStatusItem("ELM:", elmText, elmColor, adapterVer.ifBlank { null })
 
                     // ECU Connection Status
-                    val ecuConnected = state == ObdState.CONNECTED
+                    val ecuResponsive = truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.RESPONSIVE
                     val ecuColor = when {
-                        ecuConnected -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                        ecuResponsive -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                        truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> com.elysium369.meet.ui.theme.MeetColors.warning
                         state == ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
                         state == ObdState.CONNECTING -> MeetColors.textMuted
                         state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
                         else -> MeetColors.textMuted
                     }
                     val ecuText = when {
-                        ecuConnected -> "Conectada"
+                        ecuResponsive -> "Conectada"
+                        truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> "Sin respuesta"
                         state == ObdState.NEGOTIATING -> "Negociando"
                         state == ObdState.ERROR -> "Error"
                         else -> "Esperando"
                     }
-                    DualStatusItem("ECU:", ecuText, ecuColor, if (protocol.isNotBlank() && ecuConnected) protocol else null)
+                    DualStatusItem("ECU:", ecuText, ecuColor, if (protocol.isNotBlank() && (ecuResponsive || state == ObdState.CONNECTED)) protocol else null)
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    val transportConnected = truth.transportState is com.elysium369.meet.core.obd.TransportLinkState.Connected
+                    DualStatusItem(
+                        "TRANSPORTE:",
+                        if (truth.isDemoSession) "Demo" else if (transportConnected) "Conectado" else "No conectado",
+                        if (truth.isDemoSession) MeetColors.electricBlue else if (transportConnected) MeetColors.neonGreen else MeetColors.textMuted,
+                        null
+                    )
+                    val telemetryLive = truth.telemetryState == com.elysium369.meet.core.obd.TelemetryLinkState.ACTIVE
+                    DualStatusItem(
+                        "DATOS:",
+                        if (telemetryLive) "En vivo" else if (truth.telemetryState == com.elysium369.meet.core.obd.TelemetryLinkState.STALE) "Pausados" else "Inactivos",
+                        if (telemetryLive) MeetColors.neonGreen else if (truth.telemetryState == com.elysium369.meet.core.obd.TelemetryLinkState.STALE) MeetColors.warning else MeetColors.textMuted,
+                        null
+                    )
                 }
 
                 // ── Row 3: Clone Warning ──
@@ -164,6 +213,36 @@ fun ConnectionStatusBar(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
+                }
+                if (showQos) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Recuperaciones ${truth.softRecoveryCount}/${truth.protocolRecoveryCount} · Pérdidas ${truth.physicalLinkLossCount}" +
+                                (truth.disconnectReason?.let { " · Última: $it" } ?: ""),
+                            color = MeetColors.textMuted,
+                            fontSize = 8.sp,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            com.elysium369.meet.ui.components.EliteTextButton(
+                                text = "PANEL FORENSE",
+                                onClick = { showDiagnosticsSheet = true },
+                                color = MeetColors.neonGreen
+                            )
+                            com.elysium369.meet.ui.components.EliteTextButton(
+                                text = "COPIAR TRACE",
+                                onClick = { viewModel.copyRedactedConnectionTrace() },
+                                color = MeetColors.electricBlue
+                            )
+                        }
+                    }
                 }
             }
         }

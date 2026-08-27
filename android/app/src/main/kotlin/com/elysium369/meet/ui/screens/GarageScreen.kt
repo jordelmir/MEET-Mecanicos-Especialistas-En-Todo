@@ -167,7 +167,7 @@ fun GarageScreen(
                             vehicle = vehicle,
                             isActive = vehicle.id == activeVehicle?.id,
                             isReadingVin = isReadingVinId == vehicle.id,
-                            onSelect = { viewModel.startDiagnosticSession(vehicle) },
+                            onSelect = { viewModel.selectVehicle(vehicle) },
                             onReadVin = { viewModel.readAndSaveVinFromEcu(vehicle) },
                             onDetails = { navController.navigate("vehicle_detail/${vehicle.id}") },
                             onReports = { navController.navigate("inspection_session/${vehicle.id}") },
