@@ -1683,7 +1683,13 @@ class RideViewModel @Inject constructor(
             if (!audioDir.exists()) audioDir.mkdirs()
 
             currentRecordingFile = File(audioDir, "audio_${System.currentTimeMillis()}.m4a")
-            mediaRecorder = android.media.MediaRecorder(context).apply {
+            @Suppress("DEPRECATION")
+            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                android.media.MediaRecorder(context)
+            } else {
+                android.media.MediaRecorder()
+            }
+            mediaRecorder = recorder.apply {
                 setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
                 setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
