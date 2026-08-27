@@ -13,6 +13,7 @@ import com.elysium369.meet.core.obd.DtcDatabaseLoader
 import com.elysium369.meet.core.vanguard.VanguardOutboxSyncWorker
 import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.ride.work.RideCommandSyncWorker
+import com.elysium369.meet.platform.marketos.work.MarketOsSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ class MeetApplication : Application(), Configuration.Provider {
         scheduleDatabaseMaintenance()
         scheduleVanguardCommerceOutboxSync()
         scheduleRideCommandOutboxSync()
+        scheduleMarketOsCommandOutboxSync()
 
         // Elite Cloud Dynamic Update Integration
         applicationScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -136,6 +138,28 @@ class MeetApplication : Application(), Configuration.Provider {
         android.util.Log.i(
             "ElysiumApplication",
             "Ride command outbox sync scheduled (network-gated)",
+        )
+    }
+
+    private fun scheduleMarketOsCommandOutboxSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<MarketOsSyncWorker>(
+            15,
+            TimeUnit.MINUTES,
+        )
+            .setConstraints(constraints)
+            .setInitialDelay(3, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            MarketOsSyncWorker.PERIODIC_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+        android.util.Log.i(
+            "ElysiumApplication",
+            "Market OS outbox sync scheduled (network-gated)",
         )
     }
 }

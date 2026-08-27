@@ -151,8 +151,15 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         HumanityProgressEntity::class,
         HumanityEvidenceEntity::class,
         HumanityCapabilityEntity::class,
+
+        // ELYSIUM VANGUARD MARKET OPERATING SYSTEM PROJECTIONS
+        MarketOrganizationProjectionEntity::class,
+        LegalMatterProjectionEntity::class,
+        PropertyListingProjectionEntity::class,
+        FuelCouponProjectionEntity::class,
+        MarketCommandOutboxEntity::class,
     ],
-    version = 61,
+    version = 62,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -224,4 +231,7 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun humanityProgressDao(): HumanityProgressDao
     abstract fun humanityEvidenceDao(): HumanityEvidenceDao
     abstract fun humanityCapabilityDao(): HumanityCapabilityDao
+
+    // ELYSIUM VANGUARD MARKET OPERATING SYSTEM
+    abstract fun marketOsDao(): MarketOsDao
 }

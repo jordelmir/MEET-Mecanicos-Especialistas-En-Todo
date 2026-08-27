@@ -42,6 +42,9 @@ object MeetDestinations {
     const val MISSION_DETAIL = "mission_detail"
     const val MULTIMETER_SIMULATION = "multimeter_simulation"
     const val CAPABILITY_PASSPORT = "capability_passport"
+    const val LEGAL_VANGUARD = "legal_vanguard"
+    const val PROPERTIES = "elysium_properties"
+    const val FUEL_REWARDS = "fuel_rewards"
 }
 
 fun androidx.navigation.NavController.safeNavigate(route: String) {

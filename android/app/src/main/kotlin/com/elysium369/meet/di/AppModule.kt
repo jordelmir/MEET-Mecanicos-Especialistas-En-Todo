@@ -4005,6 +4005,91 @@ object AppModule {
         }
     }
 
+    // v61 was published with the Humanity projections but without its runtime
+    // migration registration. Keep this explicit repair so existing v60 installs
+    // never need destructive fallback.
+    internal val MIGRATION_60_61 = object : Migration(60, 61) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS humanity_learning_progress_local (
+                    id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, targetType TEXT NOT NULL,
+                    targetId TEXT NOT NULL, status TEXT NOT NULL, repetitionsCount INTEGER NOT NULL,
+                    intervalDays REAL NOT NULL, easeFactor REAL NOT NULL,
+                    nextReviewEpochMs INTEGER NOT NULL, lastReviewedEpochMs INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS humanity_evidence_items_local (
+                    id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, skillId TEXT NOT NULL,
+                    missionId TEXT, evidenceType TEXT NOT NULL, executionTruth TEXT NOT NULL,
+                    evidencePayloadHash TEXT NOT NULL, metadataJson TEXT NOT NULL,
+                    createdAtEpochMs INTEGER NOT NULL, isSynced INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS humanity_capability_records_local (
+                    skillId TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, currentLevel TEXT NOT NULL,
+                    demonstratedEvidenceCount INTEGER NOT NULL, lastDemonstratedEpochMs INTEGER NOT NULL,
+                    verifiedByExpert INTEGER NOT NULL, updatedAtEpochMs INTEGER NOT NULL
+                )
+            """.trimIndent())
+        }
+    }
+
+    internal val MIGRATION_61_62 = object : Migration(61, 62) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS market_organization_projections (
+                    ownerPrincipalId TEXT NOT NULL, organizationId TEXT NOT NULL, kind TEXT NOT NULL,
+                    commercialName TEXT NOT NULL, rolesJson TEXT NOT NULL, status TEXT NOT NULL,
+                    serverVersion INTEGER NOT NULL, updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, organizationId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_market_organization_projections_ownerPrincipalId_updatedAtEpochMs ON market_organization_projections(ownerPrincipalId, updatedAtEpochMs)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS legal_matter_projections (
+                    ownerPrincipalId TEXT NOT NULL, matterId TEXT NOT NULL, categoryCode TEXT NOT NULL,
+                    humanSummary TEXT NOT NULL, state TEXT NOT NULL, disclosureLevel TEXT NOT NULL,
+                    nextDeadlineEpochMs INTEGER, serverVersion INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL, PRIMARY KEY(ownerPrincipalId, matterId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_matter_projections_ownerPrincipalId_state_updatedAtEpochMs ON legal_matter_projections(ownerPrincipalId, state, updatedAtEpochMs)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS property_listing_projections (
+                    ownerPrincipalId TEXT NOT NULL, listingId TEXT NOT NULL, propertyId TEXT NOT NULL,
+                    operation TEXT NOT NULL, propertyTypeCode TEXT NOT NULL, approximateZone TEXT NOT NULL,
+                    askingAmountMinor INTEGER NOT NULL, currency TEXT NOT NULL, trustSummaryJson TEXT NOT NULL,
+                    state TEXT NOT NULL, serverVersion INTEGER NOT NULL, updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, listingId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_property_listing_projections_ownerPrincipalId_state_updatedAtEpochMs ON property_listing_projections(ownerPrincipalId, state, updatedAtEpochMs)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS fuel_coupon_projections (
+                    ownerPrincipalId TEXT NOT NULL, couponId TEXT NOT NULL, campaignVersionId TEXT NOT NULL,
+                    benefitTitle TEXT NOT NULL, opaquePublicUrl TEXT, state TEXT NOT NULL,
+                    expiresAtEpochMs INTEGER NOT NULL, serverVersion INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL, PRIMARY KEY(ownerPrincipalId, couponId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_coupon_projections_ownerPrincipalId_state_expiresAtEpochMs ON fuel_coupon_projections(ownerPrincipalId, state, expiresAtEpochMs)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS market_command_outbox (
+                    ownerPrincipalId TEXT NOT NULL, idempotencyKey TEXT NOT NULL, commandId TEXT NOT NULL,
+                    aggregateId TEXT NOT NULL, aggregateType TEXT NOT NULL, commandType TEXT NOT NULL,
+                    expectedVersion INTEGER NOT NULL, canonicalDigest TEXT NOT NULL, payloadJson TEXT NOT NULL,
+                    payloadVersion INTEGER NOT NULL, status TEXT NOT NULL, attemptCount INTEGER NOT NULL,
+                    nextAttemptAtEpochMs INTEGER NOT NULL, lastErrorCode TEXT, createdAtEpochMs INTEGER NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL, PRIMARY KEY(ownerPrincipalId, idempotencyKey)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_market_command_outbox_ownerPrincipalId_status_nextAttemptAtEpochMs ON market_command_outbox(ownerPrincipalId, status, nextAttemptAtEpochMs)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4051,7 +4136,9 @@ object AppModule {
             MIGRATION_56_57,
             MIGRATION_57_58,
             MIGRATION_58_59,
-            MIGRATION_59_60
+            MIGRATION_59_60,
+            MIGRATION_60_61,
+            MIGRATION_61_62
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4336,6 +4423,15 @@ object AppModule {
 
     @Provides
     fun provideHumanityCapabilityDao(db: MeetDatabase): HumanityCapabilityDao = db.humanityCapabilityDao()
+
+    @Provides
+    fun provideMarketOsDao(db: MeetDatabase): MarketOsDao = db.marketOsDao()
+
+    @Provides
+    @Singleton
+    fun provideMarketOsRemoteGateway(
+        gateway: com.elysium369.meet.platform.marketos.data.SupabaseMarketOsRemoteGateway,
+    ): com.elysium369.meet.platform.marketos.data.MarketOsRemoteGateway = gateway
 }
 
 @kotlinx.serialization.Serializable

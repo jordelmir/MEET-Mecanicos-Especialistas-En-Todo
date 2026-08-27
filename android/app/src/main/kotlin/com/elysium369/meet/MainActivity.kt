@@ -38,6 +38,9 @@ import com.elysium369.meet.ui.screens.humanity.CapabilityPassportScreen
 import com.elysium369.meet.ui.screens.humanity.LearningHubScreen
 import com.elysium369.meet.ui.screens.humanity.MissionDetailScreen
 import com.elysium369.meet.ui.screens.humanity.MultimeterSimulationScreen
+import com.elysium369.meet.ui.screens.marketos.FuelRewardsHub
+import com.elysium369.meet.ui.screens.marketos.LegalVanguardHub
+import com.elysium369.meet.ui.screens.marketos.PropertiesHub
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
@@ -261,6 +264,21 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                     navController = navController,
                     viewModel = obdViewModel
                 )
+            }
+            composable("legal_vanguard") {
+                LegalVanguardHub(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=legal") },
+                )
+            }
+            composable("elysium_properties") {
+                PropertiesHub(
+                    onBack = { navController.popBackStack() },
+                    onOpenLegal = { navController.navigate("legal_vanguard") },
+                )
+            }
+            composable("fuel_rewards") {
+                FuelRewardsHub(onBack = { navController.popBackStack() })
             }
             composable(
                 route = "messages?serviceVertical={serviceVertical}&serviceReferenceId={serviceReferenceId}&serviceTitle={serviceTitle}",
