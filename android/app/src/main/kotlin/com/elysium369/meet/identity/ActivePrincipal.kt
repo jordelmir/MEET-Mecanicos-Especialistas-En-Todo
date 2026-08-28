@@ -34,6 +34,11 @@ data class ActivePrincipal private constructor(
             return ActivePrincipal("local_device_$deviceId", isAuthenticated = false)
         }
 
+        fun restoredOffline(principalId: String): ActivePrincipal {
+            require(principalId.isNotBlank()) { "Restored principal id cannot be blank" }
+            return ActivePrincipal(principalId, isAuthenticated = false)
+        }
+
         fun legacyUnknown(): ActivePrincipal =
             ActivePrincipal(OfflineOwnership.OWNER_UNKNOWN_LEGACY, isAuthenticated = false)
     }
@@ -57,29 +62,32 @@ class ActivePrincipalKernel @Inject constructor(
 ) {
     val localDeviceId: String = stableDeviceId(context)
     private val localPrincipal = ActivePrincipal.local(localDeviceId)
+    private val restoredPrincipal = PrincipalProvisioningStore.principalId(context)
+        ?.let(ActivePrincipal::restoredOffline)
 
     val activePrincipal: StateFlow<ActivePrincipal> =
         SupabaseModule.client.auth.sessionStatus
             .map { status -> status.toPrincipal(localPrincipal) }
             .distinctUntilChanged()
-            .stateIn(scope, SharingStarted.Eagerly, currentOrLocal(localPrincipal))
+            .stateIn(scope, SharingStarted.Eagerly, currentOrRestored(localPrincipal))
 
     fun current(): ActivePrincipal = activePrincipal.value
 
-    private fun currentOrLocal(fallback: ActivePrincipal): ActivePrincipal =
+    private fun currentOrRestored(fallback: ActivePrincipal): ActivePrincipal =
         SupabaseModule.client.auth.currentUserOrNull()?.id
             ?.takeIf(String::isNotBlank)
             ?.let(ActivePrincipal::authenticated)
+            ?: restoredPrincipal
             ?: fallback
 
     private fun SessionStatus.toPrincipal(fallback: ActivePrincipal): ActivePrincipal = when (this) {
         is SessionStatus.Authenticated -> session.user?.id
             ?.takeIf(String::isNotBlank)
             ?.let(ActivePrincipal::authenticated)
-            ?: currentOrLocal(fallback)
+            ?: currentOrRestored(fallback)
         is SessionStatus.NotAuthenticated -> fallback
         SessionStatus.LoadingFromStorage,
-        SessionStatus.NetworkError -> currentOrLocal(fallback)
+        SessionStatus.NetworkError -> currentOrRestored(fallback)
     }
 
     private companion object {

@@ -1,6 +1,7 @@
 package com.elysium369.meet.ride.observability
 
 import android.util.Log
+import com.elysium369.meet.observability.MeetTelemetry
 import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -74,6 +75,16 @@ object RideObservability {
 
     fun record(event: RideTelemetryEvent) {
         Log.i(TAG, encode(event))
+        MeetTelemetry.event(
+            name = "ride.${event.eventType.lowercase()}",
+            attributes = mapOf(
+                "vertical" to "RIDES",
+                "operation" to event.eventType,
+                "latencyMs" to event.latencyMs,
+                "failureCode" to event.errorCode,
+            ),
+            correlationId = event.correlationId ?: event.eventId,
+        )
     }
 
     private fun String?.safeIdentifier(): String? = this

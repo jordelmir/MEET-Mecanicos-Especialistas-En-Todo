@@ -26,6 +26,15 @@ class ActivePrincipalTest {
     }
 
     @Test
+    fun restoredOfflinePrincipalKeepsOwnershipButCannotSync() {
+        val principal = ActivePrincipal.restoredOffline("user-a")
+
+        assertEquals("user-a", principal.id)
+        assertFalse(principal.isAuthenticated)
+        assertFalse(principal.canSyncToCloud)
+    }
+
+    @Test
     fun onlyExactAuthenticatedOwnerCanSyncRow() {
         val active = ActivePrincipal.authenticated("user-b")
 

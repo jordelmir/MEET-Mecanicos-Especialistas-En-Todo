@@ -158,8 +158,13 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         PropertyListingProjectionEntity::class,
         FuelCouponProjectionEntity::class,
         MarketCommandOutboxEntity::class,
+
+        // VANGUARD CONVERGENCE V5 EVIDENCE + PRIVACY-FILTERED OFFLINE SPOOL
+        VehicleIdentityObservationEntity::class,
+        DiagnosticScanManifestEntity::class,
+        TelemetryUploadQueueEntity::class,
     ],
-    version = 62,
+    version = 63,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -234,4 +239,5 @@ abstract class MeetDatabase : RoomDatabase() {
 
     // ELYSIUM VANGUARD MARKET OPERATING SYSTEM
     abstract fun marketOsDao(): MarketOsDao
+    abstract fun vanguardConvergenceDao(): VanguardConvergenceDao
 }

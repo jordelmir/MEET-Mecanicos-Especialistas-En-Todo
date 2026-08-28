@@ -55,6 +55,12 @@ android {
         versionCode = 47
         versionName = "4.21.0"
 
+        val meetBuildSha = providers.environmentVariable("MEET_BUILD_SHA")
+            .orElse(providers.environmentVariable("GITHUB_SHA"))
+            .orElse("LOCAL_UNVERIFIED")
+            .get()
+        buildConfigField("String", "MEET_BUILD_SHA", "\"$meetBuildSha\"")
+
         // Supabase credentials from local.properties (never committed to git)
         val legacySupabaseUrlKey = "M" + "EET_SUPABASE_URL"
         val legacySupabaseApiKey = "M" + "EET_SUPABASE_KEY"

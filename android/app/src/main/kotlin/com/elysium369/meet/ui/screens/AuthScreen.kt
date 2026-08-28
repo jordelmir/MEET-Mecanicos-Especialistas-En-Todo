@@ -20,7 +20,6 @@ import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
-import com.elysium369.meet.ui.components.EliteOutlinedButton
 import com.elysium369.meet.ui.components.EliteTextButton
 import com.elysium369.meet.ui.components.ElysiumSectionIcon
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
@@ -29,7 +28,7 @@ import io.github.jan.supabase.gotrue.providers.builtin.Email
 import kotlinx.coroutines.launch
 
 @Composable
-fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
+fun AuthScreen(onAuthSuccess: () -> Unit) {
     var isLogin by remember { mutableStateOf(true) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -42,7 +41,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
         val normalizedEmail = email.trim().lowercase()
         feedback = when {
             BuildConfig.SUPABASE_URL.isBlank() || BuildConfig.SUPABASE_KEY.isBlank() ->
-                "Servicio de cuenta no configurado. Usa Entrar sin cuenta."
+                "Servicio de cuenta no configurado. La autenticación es necesaria para entrar a MEET."
             !android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches() ->
                 "Escribe un correo electrónico válido."
             password.length < 8 ->
@@ -148,13 +147,13 @@ fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
                     )
 
                     Text(
-                        if (isLogin) "Cuenta opcional" else "Crear cuenta opcional",
+                        if (isLogin) "Cuenta MEET" else "Crear cuenta MEET",
                         color = Color.White,
                         fontWeight = FontWeight.Black,
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        "Puedes entrar offline; los perfiles de proveedor se activan dentro de la APK.",
+                        "Una cuenta protege tu identidad, vehículos, evidencia y servicios. Después podrás activar capacidades profesionales desde MEET.",
                         color = MeetColors.textSecondary,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
@@ -221,14 +220,6 @@ fun AuthScreen(onAuthSuccess: () -> Unit, onOfflineMode: () -> Unit) {
                         color = MeetColors.textSecondary
                     )
 
-                    Divider(color = MeetColors.neonGreen.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 12.dp))
-
-                    EliteOutlinedButton(
-                        onClick = onOfflineMode,
-                        modifier = Modifier.fillMaxWidth(),
-                        text = "Entrar sin cuenta",
-                        color = MeetColors.electricBlue
-                    )
                 }
             }
         }

@@ -72,7 +72,7 @@ object PlatformTrustCenterGateway {
 
     suspend fun decide(applicationId: String, decision: String, reason: String) {
         SupabaseModule.client.postgrest.rpc(
-            function = "meet_owner_decide_verification_v1",
+            function = "meet_owner_decide_verification_v2",
             parameters = buildJsonObject {
                 put("p_application_id", applicationId)
                 put("p_decision", decision)

@@ -46,6 +46,8 @@ fun LegalVanguardHub(
     val pending by viewModel.pendingCommands.collectAsStateWithLifecycle()
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val triage by viewModel.legalTriage.collectAsStateWithLifecycle()
+    var legalAiConsent by remember { mutableStateOf(false) }
     var selectedCategory by remember(catalog) { mutableStateOf(catalog.firstOrNull { it.parentCode != null }?.code) }
     MarketHubScaffold("LEGAL VANGUARD", "Confidencialidad antes que distribución", Icons.Default.AccountBalance, LegalPalette, onBack) {
         TruthRibbon("CAAB y DNN se verifican por separado", "Nunca mostramos “verificado” desde una declaración.", LegalPalette)
@@ -60,8 +62,26 @@ fun LegalVanguardHub(
                 )
             }
         }
-        OutlinedTextField(value = need, onValueChange = { need = it.take(2_000) }, label = { Text("Describe tu situación") }, supportingText = { Text("La categoría la seleccionas tú; no constituye diagnóstico legal.") }, minLines = 4, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = need, onValueChange = { need = it.take(4_000) }, label = { Text("Cuéntame qué pasó") }, supportingText = { Text("La IA solo sugiere una categoría; tú decides y no constituye asesoría legal.") }, minLines = 4, modifier = Modifier.fillMaxWidth())
         Text("No incluyas nombres de contrapartes ni evidencia sensible aquí; se solicitarán en el gate cifrado.", color = Color.White.copy(alpha = .58f), fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = legalAiConsent, onCheckedChange = { legalAiConsent = it })
+            Text("Autorizo el análisis remoto con minimización de datos para recibir una sugerencia.", color = Color.White.copy(alpha = .76f), fontSize = 12.sp)
+        }
+        SecondaryAction("SUGERIR CATEGORÍA CON IA", Icons.Default.AutoAwesome) {
+            viewModel.requestLegalTriage(need, legalAiConsent)
+        }
+        LaunchedEffect(triage?.triageId) {
+            triage?.primaryCategoryCode?.let { selectedCategory = it }
+        }
+        triage?.let { suggestion ->
+            StatusCard(
+                "Sugerencia IA · ${suggestion.primaryCategoryCode}",
+                "Confianza ${(suggestion.confidence * 100).toInt()}% · ${suggestion.urgency} · taxonomía v${suggestion.taxonomyVersion}. Requiere tu confirmación.",
+                Icons.Default.AutoAwesome,
+                LegalPalette,
+            )
+        }
         PrimaryAction("CREAR SOLICITUD PRIVADA", Icons.Default.Lock, need.trim().length >= 8 && selectedCategory != null, LegalPalette) {
             viewModel.createLegalMatter(requireNotNull(selectedCategory), need)
         }

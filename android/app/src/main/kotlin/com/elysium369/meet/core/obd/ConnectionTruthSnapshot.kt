@@ -112,12 +112,39 @@ enum class ObdSessionTruthState {
 enum class DisconnectReason {
     USER_REQUESTED,
     USER_CANCELLED,
+    CLASSIC_STREAM_EOF,
+    CLASSIC_IO_EXCEPTION,
+    BLE_GATT_DISCONNECTED,
+    BLE_GATT_ERROR,
+    WIFI_EOF,
+    WIFI_IO_FAILURE,
+    ANDROID_BLUETOOTH_OFF,
+    PERMISSION_REVOKED,
+    PROCESS_TERMINATED,
     REMOTE_CLOSED,
     IO_FAILURE,
     HANDSHAKE_TIMEOUT,
     SECURITY_DENIED,
     ADAPTER_NOT_FOUND,
     PROTOCOL_EXHAUSTED,
+    UNKNOWN,
+}
+
+object DisconnectSemantics {
+    fun isExpected(reason: DisconnectReason): Boolean =
+        reason == DisconnectReason.USER_REQUESTED || reason == DisconnectReason.USER_CANCELLED
+
+    fun countsAsPhysicalLinkLoss(reason: DisconnectReason): Boolean = reason in setOf(
+        DisconnectReason.CLASSIC_STREAM_EOF,
+        DisconnectReason.CLASSIC_IO_EXCEPTION,
+        DisconnectReason.BLE_GATT_DISCONNECTED,
+        DisconnectReason.BLE_GATT_ERROR,
+        DisconnectReason.WIFI_EOF,
+        DisconnectReason.WIFI_IO_FAILURE,
+        DisconnectReason.REMOTE_CLOSED,
+        DisconnectReason.IO_FAILURE,
+        DisconnectReason.ANDROID_BLUETOOTH_OFF,
+    )
 }
 
 /**

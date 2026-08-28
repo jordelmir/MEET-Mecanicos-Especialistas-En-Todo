@@ -42,6 +42,11 @@ import com.elysium369.meet.ui.screens.marketos.FuelRewardsHub
 import com.elysium369.meet.ui.screens.marketos.LegalVanguardHub
 import com.elysium369.meet.ui.screens.marketos.PropertiesHub
 import com.elysium369.meet.core.livelink.LiveLinkServer
+import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.identity.PrincipalAccessPolicy
+import com.elysium369.meet.identity.PrincipalProvisioningStore
+import com.elysium369.meet.observability.MeetTelemetry
+import com.elysium369.meet.observability.TelemetryContext
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
@@ -58,6 +63,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Star
+import io.github.jan.supabase.gotrue.SessionStatus
+import io.github.jan.supabase.gotrue.auth
 
 val CyberpunkColorScheme = darkColorScheme(
     primary = Color(0xFF00FFD4),
@@ -157,6 +164,52 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MeetApp(obdViewModel: ObdViewModel) {
+    val context = LocalContext.current
+    val authStatus by SupabaseModule.client.auth.sessionStatus.collectAsState()
+    val currentUser = SupabaseModule.client.auth.currentUserOrNull()
+    LaunchedEffect(Unit) {
+        MeetTelemetry.configure(
+            TelemetryContext(
+                appVersion = BuildConfig.VERSION_NAME,
+                buildSha = BuildConfig.MEET_BUILD_SHA,
+                environment = if (BuildConfig.DEBUG) "debug" else "release",
+            ),
+        )
+        MeetTelemetry.event("app.startup")
+    }
+    LaunchedEffect(currentUser?.id) {
+        currentUser?.id?.let { PrincipalProvisioningStore.recordAuthenticated(context, it) }
+    }
+    val provisionedPrincipalId = PrincipalProvisioningStore.principalId(context)
+    val accessDecision = PrincipalAccessPolicy.decide(
+        session = when (authStatus) {
+            is SessionStatus.Authenticated -> PrincipalAccessPolicy.SessionEvidence.AUTHENTICATED
+            is SessionStatus.NotAuthenticated -> PrincipalAccessPolicy.SessionEvidence.NOT_AUTHENTICATED
+            SessionStatus.LoadingFromStorage -> PrincipalAccessPolicy.SessionEvidence.LOADING
+            SessionStatus.NetworkError -> PrincipalAccessPolicy.SessionEvidence.NETWORK_UNAVAILABLE
+        },
+        provisionedPrincipalId = provisionedPrincipalId,
+    )
+
+    if (accessDecision == PrincipalAccessPolicy.Decision.RESOLVING) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            CircularProgressIndicator(color = MeetColors.neonGreen)
+        }
+        return
+    }
+
+    if (accessDecision == PrincipalAccessPolicy.Decision.REQUIRE_AUTHENTICATION) {
+        AuthScreen(
+            onAuthSuccess = {
+                SupabaseModule.client.auth.currentUserOrNull()?.id?.let {
+                    PrincipalProvisioningStore.recordAuthenticated(context, it)
+                }
+                obdViewModel.syncSelectedUsageProfile()
+            },
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val liveLinkServer = remember { LiveLinkServer.shared() }
 
@@ -185,12 +238,8 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         }
     }
     
-    // Verificar si onboarding ya fue completado
-    val context = LocalContext.current
     val sharedPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-    var onboardingDone by remember { mutableStateOf(sharedPrefs.getBoolean("onboarding_completed", false)) }
-    
-    val startDestination = if (onboardingDone) "home" else "onboarding"
+    val startDestination = "home"
     
     val trips by obdViewModel.trips.collectAsState()
     val customPids by obdViewModel.customPids.collectAsState()
@@ -254,9 +303,6 @@ fun MeetApp(obdViewModel: ObdViewModel) {
                             popUpTo("auth") { inclusive = true }
                         }
                     },
-                    onOfflineMode = { navController.navigate("home") {
-                        popUpTo("auth") { inclusive = true }
-                    }}
                 )
             }
             composable("home") {

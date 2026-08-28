@@ -3,6 +3,9 @@ package com.elysium369.meet.ui.screens.marketos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.legal.data.LegalTriageGateway
+import com.elysium369.meet.legal.data.LegalTriageSuggestion
+import com.elysium369.meet.observability.MeetTelemetry
 import com.elysium369.meet.platform.marketos.data.MarketCatalogCategory
 import com.elysium369.meet.platform.marketos.data.MarketEnqueueResult
 import com.elysium369.meet.platform.marketos.data.MarketOsRepository
@@ -53,6 +56,8 @@ class MarketOsViewModel @Inject constructor(
 
     private val _legalCatalog = MutableStateFlow<List<MarketCatalogCategory>>(emptyList())
     val legalCatalog: StateFlow<List<MarketCatalogCategory>> = _legalCatalog.asStateFlow()
+    private val _legalTriage = MutableStateFlow<LegalTriageSuggestion?>(null)
+    val legalTriage: StateFlow<LegalTriageSuggestion?> = _legalTriage.asStateFlow()
     private val _connectionState = MutableStateFlow(MarketConnectionState.LOCAL_ONLY)
     val connectionState: StateFlow<MarketConnectionState> = _connectionState.asStateFlow()
     private val _notice = MutableStateFlow<String?>(null)
@@ -97,6 +102,37 @@ class MarketOsViewModel @Inject constructor(
                 },
             )
             _notice.value = result.userMessage("Solicitud jurídica")
+        }
+    }
+
+    fun requestLegalTriage(narrative: String, consent: Boolean) {
+        viewModelScope.launch {
+            _notice.value = "Analizando con privacidad y taxonomía vigente…"
+            LegalTriageGateway.triage(narrative, consent)
+                .onSuccess { suggestion ->
+                    if (_legalCatalog.value.none { it.code == suggestion.primaryCategoryCode }) {
+                        _notice.value = "La sugerencia no coincide con el catálogo vigente; no se aplicó."
+                        return@onSuccess
+                    }
+                    _legalTriage.value = suggestion
+                    _notice.value = "Sugerencia IA disponible. Tú decides si confirmarla. No es asesoría legal."
+                    MeetTelemetry.event(
+                        "legal.triage.completed",
+                        mapOf(
+                            "vertical" to "LEGAL",
+                            "resultCode" to "AI_SUGGESTED",
+                            "taxonomyVersion" to suggestion.taxonomyVersion,
+                            "urgency" to suggestion.urgency,
+                        ),
+                    )
+                }
+                .onFailure {
+                    _notice.value = "El triage IA no está disponible. No se creó ninguna clasificación automática."
+                    MeetTelemetry.event(
+                        "legal.triage.failed",
+                        mapOf("vertical" to "LEGAL", "resultCode" to "UNAVAILABLE"),
+                    )
+                }
         }
     }
 

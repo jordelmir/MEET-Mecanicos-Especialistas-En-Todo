@@ -4090,6 +4090,49 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_62_63 = object : Migration(62, 63) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS vehicle_identity_observations (
+                    ownerPrincipalId TEXT NOT NULL, identityObservationId TEXT NOT NULL,
+                    diagnosticSessionId TEXT NOT NULL, vehicleBindingId TEXT, strategy TEXT NOT NULL,
+                    transport TEXT NOT NULL, protocol TEXT NOT NULL, requestAddress TEXT,
+                    responseAddress TEXT, ecuIdentity TEXT, startedMonotonicMs INTEGER NOT NULL,
+                    completedMonotonicMs INTEGER NOT NULL, responseOutcome TEXT NOT NULL,
+                    rawResponseHash TEXT NOT NULL, parserVersion TEXT NOT NULL, vinHash TEXT,
+                    vinLength INTEGER, validationResult TEXT NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId, identityObservationId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_identity_observations_ownerPrincipalId_diagnosticSessionId ON vehicle_identity_observations(ownerPrincipalId, diagnosticSessionId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_identity_observations_ownerPrincipalId_vehicleBindingId ON vehicle_identity_observations(ownerPrincipalId, vehicleBindingId)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS diagnostic_scan_manifests (
+                    ownerPrincipalId TEXT NOT NULL, scanId TEXT NOT NULL, sessionId TEXT NOT NULL,
+                    vehicleBindingId TEXT, scanType TEXT NOT NULL, appVersion TEXT NOT NULL,
+                    buildSha TEXT NOT NULL, parserVersion TEXT NOT NULL, capabilityPackVersion TEXT,
+                    adapterFingerprintHash TEXT, transport TEXT NOT NULL, protocol TEXT NOT NULL,
+                    coverageJson TEXT NOT NULL, findingsCount INTEGER NOT NULL,
+                    warningCodesJson TEXT NOT NULL, failureDomainsJson TEXT NOT NULL,
+                    rawEvidenceMerkleRoot TEXT, completeness TEXT NOT NULL,
+                    startedAtEpochMs INTEGER NOT NULL, completedAtEpochMs INTEGER,
+                    PRIMARY KEY(ownerPrincipalId, scanId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_scan_manifests_ownerPrincipalId_sessionId ON diagnostic_scan_manifests(ownerPrincipalId, sessionId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_diagnostic_scan_manifests_ownerPrincipalId_vehicleBindingId_startedAtEpochMs ON diagnostic_scan_manifests(ownerPrincipalId, vehicleBindingId, startedAtEpochMs)")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS telemetry_upload_queue (
+                    signalId TEXT NOT NULL PRIMARY KEY, filteredPayloadJson TEXT NOT NULL,
+                    status TEXT NOT NULL, attemptCount INTEGER NOT NULL,
+                    nextAttemptAtEpochMs INTEGER NOT NULL, lastFailureCode TEXT,
+                    createdAtEpochMs INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_telemetry_upload_queue_status_nextAttemptAtEpochMs ON telemetry_upload_queue(status, nextAttemptAtEpochMs)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4138,7 +4181,8 @@ object AppModule {
             MIGRATION_58_59,
             MIGRATION_59_60,
             MIGRATION_60_61,
-            MIGRATION_61_62
+            MIGRATION_61_62,
+            MIGRATION_62_63
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

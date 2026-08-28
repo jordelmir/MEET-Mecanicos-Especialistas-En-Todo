@@ -2,6 +2,7 @@ package com.elysium369.meet.core.obd
 
 import android.util.Log
 import com.elysium369.meet.core.transport.TransportInterface
+import com.elysium369.meet.observability.MeetTelemetry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,6 +71,12 @@ class ObdLinkHealthCoordinator(
             )
         }
         trace.log("USER_CONNECT_REQUESTED", "attempt=${attempt.attemptId} target=${attempt.adapterAddress}")
+        MeetTelemetry.event(
+            name = "obd.connection_attempt",
+            attributes = mapOf("operation" to "USER_CONNECT_REQUESTED"),
+            traceId = attempt.attemptId,
+            correlationId = attempt.attemptId,
+        )
     }
 
     fun isCurrentAttempt(attemptId: String, generation: Long): Boolean {
@@ -96,6 +103,7 @@ class ObdLinkHealthCoordinator(
             )
         }
         trace.log("USER_CANCELLED", reason)
+        telemetryDisconnect(DisconnectReason.USER_CANCELLED)
     }
 
     fun onUserDisconnected() {
@@ -113,6 +121,7 @@ class ObdLinkHealthCoordinator(
         }
         trace.log("USER_DISCONNECTED")
         trace.log("SESSION_ENDED")
+        telemetryDisconnect(DisconnectReason.USER_REQUESTED)
     }
 
     fun onConnectionAttemptFailed(reason: String, disconnectReason: DisconnectReason = DisconnectReason.HANDSHAKE_TIMEOUT) {
@@ -131,6 +140,7 @@ class ObdLinkHealthCoordinator(
             )
         }
         trace.log("CONNECTION_ATTEMPT_FAILED", reason)
+        telemetryDisconnect(disconnectReason)
     }
 
     /**
@@ -181,6 +191,24 @@ class ObdLinkHealthCoordinator(
             is TransportLinkState.Connecting -> trace.log("TRANSPORT_CONNECTING")
             is TransportLinkState.Closing -> trace.log("TRANSPORT_CLOSING")
         }
+        when (state) {
+            is TransportLinkState.RemoteClosed -> telemetryDisconnect(DisconnectReason.REMOTE_CLOSED)
+            is TransportLinkState.IoFailure -> telemetryDisconnect(DisconnectReason.IO_FAILURE)
+            else -> Unit
+        }
+    }
+
+    private fun telemetryDisconnect(reason: DisconnectReason) {
+        val attemptId = _truth.value.attemptId ?: return
+        MeetTelemetry.event(
+            name = "obd.disconnect",
+            attributes = mapOf(
+                "disconnectReason" to reason.name,
+                "expected" to DisconnectSemantics.isExpected(reason),
+            ),
+            traceId = attemptId,
+            correlationId = attemptId,
+        )
     }
 
     fun onPhysicalRxProof(bytesCount: Int) {
