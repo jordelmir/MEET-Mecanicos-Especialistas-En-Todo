@@ -36,6 +36,14 @@ function env(name: string): string {
   return value;
 }
 
+function firstEnv(...names: string[]): string {
+  for (const name of names) {
+    const value = Deno.env.get(name)?.trim();
+    if (value) return value;
+  }
+  throw new Error(`MISSING_${names.join("_OR_")}`);
+}
+
 function minimizeNarrative(value: string): string {
   return value
     .normalize("NFKC")
@@ -171,13 +179,15 @@ Deno.serve(async (request) => {
     if (codes.size === 0)
       return response(503, { error: "LEGAL_TAXONOMY_UNAVAILABLE" });
 
-    const modelName = env("LEGAL_AI_MODEL");
+    const modelName = Deno.env.get("LEGAL_AI_MODEL")?.trim() || "MiniMax-M1";
+    const modelBaseUrl = firstEnv("LEGAL_AI_BASE_URL", "MARVIRUS_BASE_URL");
+    const modelApiKey = firstEnv("LEGAL_AI_API_KEY", "MARVIRUS_API_KEY");
     const modelResponse = await fetch(
-      `${env("LEGAL_AI_BASE_URL").replace(/\/$/, "")}/chat/completions`,
+      `${modelBaseUrl.replace(/\/$/, "")}/chat/completions`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${env("LEGAL_AI_API_KEY")}`,
+          Authorization: `Bearer ${modelApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
