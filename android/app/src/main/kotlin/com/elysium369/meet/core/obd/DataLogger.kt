@@ -36,14 +36,19 @@ class DataLogger @Inject constructor() {
 
     val recording: Boolean get() = isRecording
 
-    fun startRecording(context: Context, vin: String? = null): Boolean {
+    fun startRecording(context: Context, sessionIdentifier: String? = null): Boolean {
         if (isRecording) return false
         try {
             val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "ElysiumVanguard_Logs")
             dir.mkdirs()
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val vinLabel = vin?.take(8) ?: "UNKNOWN"
-            val file = File(dir, "ElysiumVanguard_${vinLabel}_$timestamp.csv")
+            val sessionLabel = sessionIdentifier?.let { 
+                java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(it.toByteArray(Charsets.UTF_8))
+                    .take(4)
+                    .joinToString("") { b -> "%02x".format(b) }
+            } ?: UUID.randomUUID().toString().take(8)
+            val file = File(dir, "ElysiumVanguard_Log_${sessionLabel}_$timestamp.csv")
             writer = FileWriter(file)
             currentFile = file
             startTimeMs = System.currentTimeMillis()
@@ -56,6 +61,7 @@ class DataLogger @Inject constructor() {
             return false
         }
     }
+
 
     fun recordSample(liveData: Map<String, Float>) {
         if (!isRecording || writer == null) return

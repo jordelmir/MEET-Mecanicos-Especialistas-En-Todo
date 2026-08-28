@@ -51,7 +51,9 @@ sealed interface TransportLinkEvent {
     data class IoFailure(val cause: Throwable, val timestampMonotonicMs: Long) : TransportLinkEvent
     data class BytesReceived(val count: Int, val timestampMonotonicMs: Long) : TransportLinkEvent
     data class BytesSent(val count: Int, val timestampMonotonicMs: Long) : TransportLinkEvent
+    data class BufferOverflow(val bytesDropped: Int, val timestampMonotonicMs: Long) : TransportLinkEvent
 }
+
 
 /**
  * Layer 1: ELM327 / STN IC readiness state.

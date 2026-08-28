@@ -55,10 +55,10 @@ class BtClassicTransport(
     private var rawOutputStream: OutputStream? = null
     private val mutex = Mutex()
 
-    // Continuous In-Memory Receive Buffer
-    private val rxBuffer = java.io.ByteArrayOutputStream(8192)
-    private val rxMutex = Any()
+    // Continuous In-Memory Low-Allocation Ring Buffer
+    private val rxRingBuffer = CircularByteRingBuffer(MAX_RX_BUFFER_SIZE)
     private var readerJob: kotlinx.coroutines.Job? = null
+
 
     // Cached Reflection Methods for Performance
     private val createRfcommMethod by lazy {
@@ -267,9 +267,9 @@ class BtClassicTransport(
                         Log.w(TAG, "  ✗ $methodName FAILED in ${elapsed}ms: ${e.javaClass.simpleName}: ${e.message}")
                         lastException = e
                         cleanupInternal()
-                        delay(200)
                     }
                 }
+
                 
                 Log.e(TAG, "═══ BT CONNECT FAILED ═══ All methods exhausted. Total: ${System.currentTimeMillis() - connectStartTime}ms")
                 val finalEx = lastException ?: java.io.IOException("ELITE LINK FAILURE: El adaptador no respondió a ninguna estrategia de enlace.")
@@ -294,9 +294,7 @@ class BtClassicTransport(
 
     private fun startReaderWorker() {
         readerJob?.cancel()
-        synchronized(rxMutex) {
-            rxBuffer.reset()
-        }
+        rxRingBuffer.reset()
         val stream = rawInputStream ?: return
         readerJob = CoroutineScope(Dispatchers.IO).launch {
             val buf = ByteArray(2048)
@@ -304,13 +302,12 @@ class BtClassicTransport(
                 while (socket?.isConnected == true && isActive) {
                     val bytesRead = stream.read(buf)
                     if (bytesRead > 0) {
-                        _linkEvents.tryEmit(TransportLinkEvent.BytesReceived(bytesRead, System.nanoTime() / 1_000_000L))
-                        synchronized(rxMutex) {
-                            if (rxBuffer.size() + bytesRead > MAX_RX_BUFFER_SIZE) {
-                                Log.w(TAG, "Bluetooth Classic rxBuffer bounded overflow protection triggered; resetting buffer")
-                                rxBuffer.reset()
-                            }
-                            rxBuffer.write(buf, 0, bytesRead)
+                        val timestampMs = System.nanoTime() / 1_000_000L
+                        _linkEvents.tryEmit(TransportLinkEvent.BytesReceived(bytesRead, timestampMs))
+                        val dropped = rxRingBuffer.write(buf, 0, bytesRead)
+                        if (dropped > 0) {
+                            Log.w(TAG, "Bluetooth Classic rx ring buffer overflow: dropped $dropped bytes")
+                            _linkEvents.tryEmit(TransportLinkEvent.BufferOverflow(dropped, timestampMs))
                         }
                     } else if (bytesRead < 0) {
                         // EOF reached — Remote device physically disconnected
@@ -344,9 +341,7 @@ class BtClassicTransport(
         socket = null
         rawInputStream = null
         rawOutputStream = null
-        synchronized(rxMutex) {
-            rxBuffer.reset()
-        }
+        rxRingBuffer.reset()
     }
 
     override suspend fun disconnect() {
@@ -385,28 +380,14 @@ class BtClassicTransport(
     }
 
     override suspend fun read(maxBytes: Int, timeoutMs: Long): ByteArray? {
-        val startTime = System.currentTimeMillis()
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            synchronized(rxMutex) {
-                val current = rxBuffer.toByteArray()
-                if (current.isNotEmpty()) {
-                    val hasPrompt = current.contains('>'.code.toByte())
-                    if (current.size >= maxBytes || hasPrompt) {
-                        rxBuffer.reset()
-                        return current
-                    }
-                }
+        val deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000L
+        while (System.nanoTime() < deadlineNanos) {
+            if (rxRingBuffer.hasPromptOrCapacity(maxBytes)) {
+                return rxRingBuffer.readAvailable()
             }
-            delay(3)
+            delay(2)
         }
-        synchronized(rxMutex) {
-            if (rxBuffer.size() > 0) {
-                val res = rxBuffer.toByteArray()
-                rxBuffer.reset()
-                return res
-            }
-        }
-        return null
+        return rxRingBuffer.readAvailable()
     }
 
     /**
@@ -414,9 +395,7 @@ class BtClassicTransport(
      * Essential for high-frequency PID polling.
      */
     override suspend fun drain() {
-        synchronized(rxMutex) {
-            rxBuffer.reset()
-        }
+        rxRingBuffer.reset()
     }
 
     override val isConnected: Boolean
@@ -426,4 +405,75 @@ class BtClassicTransport(
         private const val TAG = "EV_BT"
         private const val MAX_RX_BUFFER_SIZE = 65536
     }
+}
+
+/**
+ * CircularByteRingBuffer — Zero/low-allocation in-memory ring buffer.
+ * Provides high-speed scanning for ELM '>' prompt bytes without creating intermediate byte arrays.
+ */
+internal class CircularByteRingBuffer(val capacity: Int = 65536) {
+    private val buffer = ByteArray(capacity)
+    private var head = 0
+    private var tail = 0
+    private var count = 0
+
+    @Synchronized
+    fun write(src: ByteArray, offset: Int, length: Int): Int {
+        if (length <= 0) return 0
+        var dropped = 0
+        val space = capacity - count
+        val toWrite = if (length > capacity) {
+            dropped = length - capacity
+            capacity
+        } else {
+            if (length > space) {
+                val overflow = length - space
+                dropped = overflow
+                head = (head + overflow) % capacity
+                count -= overflow
+            }
+            length
+        }
+        val actualOffset = offset + (length - toWrite)
+        for (i in 0 until toWrite) {
+            buffer[tail] = src[actualOffset + i]
+            tail = (tail + 1) % capacity
+        }
+        count += toWrite
+        return dropped
+    }
+
+    @Synchronized
+    fun hasPromptOrCapacity(maxBytes: Int, promptByte: Byte = '>'.code.toByte()): Boolean {
+        if (count == 0) return false
+        if (count >= maxBytes) return true
+        for (i in 0 until count) {
+            val idx = (head + i) % capacity
+            if (buffer[idx] == promptByte) return true
+        }
+        return false
+    }
+
+    @Synchronized
+    fun readAvailable(): ByteArray? {
+        if (count == 0) return null
+        val result = ByteArray(count)
+        for (i in 0 until count) {
+            result[i] = buffer[(head + i) % capacity]
+        }
+        head = 0
+        tail = 0
+        count = 0
+        return result
+    }
+
+    @Synchronized
+    fun reset() {
+        head = 0
+        tail = 0
+        count = 0
+    }
+
+    @Synchronized
+    fun size(): Int = count
 }
