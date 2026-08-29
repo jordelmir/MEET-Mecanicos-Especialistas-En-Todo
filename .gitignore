@@ -68,6 +68,8 @@ android/**/local.properties
 android/gradle-8.5/
 android/gradle-8.5-bin.zip
 temp_gradle/
+server/.gradle/
+server/build/
 *.hprof
 
 # --- Android Signing ---

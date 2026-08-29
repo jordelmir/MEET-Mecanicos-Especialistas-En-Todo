@@ -7,6 +7,10 @@ plugins {
 group = "com.elysium.server"
 version = "1.0.0"
 
+kotlin {
+    jvmToolchain(17)
+}
+
 repositories {
     mavenCentral()
 }

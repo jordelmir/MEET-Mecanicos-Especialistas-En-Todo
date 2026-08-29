@@ -1,8 +1,11 @@
 package com.elysium369.meet.core.realtime
 
 import com.elysium369.meet.core.remote.RemoteResult
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.*
@@ -41,8 +44,11 @@ class ElysiumRealtimeTest {
             payload = payloadJson,
         )
 
+        val pendingEvent = async(start = CoroutineStart.UNDISPATCHED) {
+            client.events.first()
+        }
         client.publishEventForTest(envelope)
-        val received = client.events.first()
+        val received = withTimeout(1_000L) { pendingEvent.await() }
 
         assertEquals("evt-001", received.eventId)
         assertEquals("ride.state.changed", received.eventType)
