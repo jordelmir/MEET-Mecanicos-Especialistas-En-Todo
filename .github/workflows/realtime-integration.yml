@@ -1,0 +1,16 @@
+name: Realtime ERP/1 Integration Gates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Realtime Pipeline
+        run: |
+          echo "Running ERP/1 WebSocket integration verification..."

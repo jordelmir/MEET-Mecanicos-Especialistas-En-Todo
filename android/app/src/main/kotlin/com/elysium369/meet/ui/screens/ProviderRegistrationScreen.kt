@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,18 +111,16 @@ fun ProviderRegistrationScreen(
 
     // Observe view-model state
     val profiles by viewModel.userProviderProfiles.collectAsState()
-    val isMechanic by viewModel.isMechanic.collectAsState()
-    val isTowTruck by viewModel.isTowTruckDriver.collectAsState()
-    val isPartsStore by viewModel.isPartsStore.collectAsState()
     val driverVerification by viewModel.driverVerification.collectAsState()
     val isCloudSession = viewModel.currentUserId != null
 
     // Registration dialog state
-    var showRegistrationDialog by remember { mutableStateOf(false) }
-    var selectedTypeInfo by remember { mutableStateOf<ProviderTypeInfo?>(null) }
+    var showRegistrationDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedType by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedTypeInfo = providerTypes.firstOrNull { it.type == selectedType }
 
     // Driver onboarding dialog state
-    var showDriverOnboarding by remember { mutableStateOf(false) }
+    var showDriverOnboarding by rememberSaveable { mutableStateOf(false) }
 
     // Delete confirmation dialog state
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -213,14 +212,22 @@ fun ProviderRegistrationScreen(
             }
 
             items(providerTypes) { typeInfo ->
+                val canonicalType = com.elysium369.meet.core.services.kernel.ProviderType
+                    .fromDbValue(typeInfo.type)
+                val matchingProfile = profiles.firstOrNull {
+                    com.elysium369.meet.core.services.kernel.ProviderType
+                        .fromDbValue(it.providerType) == canonicalType
+                }
                 val alreadyRegistered = when (typeInfo.type) {
-                    "MECHANIC" -> isMechanic
-                    "TOW_TRUCK" -> isTowTruck
-                    "PARTS_STORE" -> isPartsStore
+                    "MECHANIC", "TOW_TRUCK", "PARTS_STORE" -> matchingProfile != null
                     "RIDE_DRIVER" -> RideVerificationPolicy.grantsAccess(driverVerification?.status)
                     else -> false
                 }
                 val statusLabel = when {
+                    typeInfo.type != "RIDE_DRIVER" && matchingProfile?.verified == true ->
+                        "Proveedor verificado"
+                    typeInfo.type != "RIDE_DRIVER" && matchingProfile != null ->
+                        "Verificación en revisión"
                     typeInfo.type != "RIDE_DRIVER" -> null
                     driverVerification?.status == "PENDING" -> "Verificación en revisión"
                     driverVerification?.status == "APPROVED" -> "Chofer verificado"
@@ -237,7 +244,7 @@ fun ProviderRegistrationScreen(
                         if (typeInfo.type == "RIDE_DRIVER") {
                             showDriverOnboarding = true
                         } else if (!alreadyRegistered) {
-                            selectedTypeInfo = typeInfo
+                            selectedType = typeInfo.type
                             showRegistrationDialog = true
                         }
                     }
@@ -253,7 +260,7 @@ fun ProviderRegistrationScreen(
             typeInfo = selectedTypeInfo!!,
             onDismiss = {
                 showRegistrationDialog = false
-                selectedTypeInfo = null
+                selectedType = null
             },
             onRegister = { businessName, ownerName, phone, location, specialties, radiusKm, licenseNumber ->
                 viewModel.registerAsProvider(
@@ -268,7 +275,7 @@ fun ProviderRegistrationScreen(
                     context = context
                 )
                 showRegistrationDialog = false
-                selectedTypeInfo = null
+                selectedType = null
             }
         )
     }
@@ -1236,22 +1243,16 @@ private fun DriverOnboardingDialog(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         when (existingVerification.status) {
-                            "APPROVED", RideVerificationPolicy.PILOT_APPROVED -> {
-                                val isPilotAccess =
-                                    existingVerification.status == RideVerificationPolicy.PILOT_APPROVED
+                            "APPROVED" -> {
                                 Text("✅", fontSize = 56.sp)
                                 Text(
-                                    if (isPilotAccess) "ACCESO PILOTO HABILITADO" else "CHOFER VERIFICADO",
+                                    "CHOFER VERIFICADO",
                                     color = MeetColors.neonGreen,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    if (isPilotAccess) {
-                                        "Tu evidencia está completa y el permiso piloto se sincroniza automáticamente. La revisión documental remota continúa pendiente."
-                                    } else {
-                                        "Tu cuenta de chofer está aprobada. Ya puedes recibir solicitudes de viaje."
-                                    },
+                                    "Tu cuenta de chofer está aprobada. Ya puedes recibir solicitudes de viaje.",
                                     color = MeetColors.textSecondary,
                                     fontSize = 14.sp,
                                     textAlign = TextAlign.Center,
@@ -1263,7 +1264,7 @@ private fun DriverOnboardingDialog(
                                 ) {
                                     Text(
                                         text = buildString {
-                                            append(if (isPilotAccess) "Habilitado localmente el " else "Aprobado el ")
+                                            append("Aprobado el ")
                                             append(
                                                 java.text.SimpleDateFormat(
                                                     "dd/MM/yyyy HH:mm",
@@ -1277,7 +1278,7 @@ private fun DriverOnboardingDialog(
                                     )
                                 }
                             }
-                            "PENDING" -> {
+                            "PENDING", RideVerificationPolicy.PILOT_APPROVED -> {
                                 Text("⏳", fontSize = 56.sp)
                                 Text(
                                     "VERIFICACIÓN EN REVISIÓN",
@@ -1356,55 +1357,60 @@ private fun DriverOnboardingDialog(
 
     // ── 6-Step Onboarding Form ───────────────────────────────────────────────
 
-    var currentStep by remember { mutableIntStateOf(0) }
+    var currentStep by rememberSaveable { mutableIntStateOf(0) }
     val totalSteps = 6
 
     // Step 1: Personal Info
-    var fullName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
+    var fullName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var dob by rememberSaveable { mutableStateOf("") }
 
     // Step-by-step document path states
-    var pathMarchamo by remember { mutableStateOf("") }
-    var pathDekra by remember { mutableStateOf("") }
-    var pathSeguro by remember { mutableStateOf("") }
-    var pathLicF by remember { mutableStateOf("") }
-    var pathLicB by remember { mutableStateOf("") }
-    var pathCedF by remember { mutableStateOf("") }
-    var pathCedB by remember { mutableStateOf("") }
-    var pathHoja by remember { mutableStateOf("") }
-    var pathSelfie by remember { mutableStateOf("") }
-    var pathSelfieCed by remember { mutableStateOf("") }
-    var pathSelfieLic by remember { mutableStateOf("") }
-    var pathVehF by remember { mutableStateOf("") }
-    var pathVehB by remember { mutableStateOf("") }
-    var pathVehI by remember { mutableStateOf("") }
+    var pathMarchamo by rememberSaveable { mutableStateOf("") }
+    var pathDekra by rememberSaveable { mutableStateOf("") }
+    var pathSeguro by rememberSaveable { mutableStateOf("") }
+    var pathLicF by rememberSaveable { mutableStateOf("") }
+    var pathLicB by rememberSaveable { mutableStateOf("") }
+    var pathCedF by rememberSaveable { mutableStateOf("") }
+    var pathCedB by rememberSaveable { mutableStateOf("") }
+    var pathHoja by rememberSaveable { mutableStateOf("") }
+    var pathSelfie by rememberSaveable { mutableStateOf("") }
+    var pathSelfieCed by rememberSaveable { mutableStateOf("") }
+    var pathSelfieLic by rememberSaveable { mutableStateOf("") }
+    var pathVehF by rememberSaveable { mutableStateOf("") }
+    var pathVehB by rememberSaveable { mutableStateOf("") }
+    var pathVehI by rememberSaveable { mutableStateOf("") }
 
     // Step 2: Vehicle Info
-    var vMake by remember { mutableStateOf("") }
-    var vModel by remember { mutableStateOf("") }
-    var vYear by remember { mutableStateOf("") }
-    var vColor by remember { mutableStateOf("") }
-    var vPlate by remember { mutableStateOf("") }
-    var vSeats by remember { mutableStateOf("") }
+    var vMake by rememberSaveable { mutableStateOf("") }
+    var vModel by rememberSaveable { mutableStateOf("") }
+    var vYear by rememberSaveable { mutableStateOf("") }
+    var vColor by rememberSaveable { mutableStateOf("") }
+    var vPlate by rememberSaveable { mutableStateOf("") }
+    var vSeats by rememberSaveable { mutableStateOf("") }
 
-    val launchVerificationPhoto = rememberVerificationPhotoCapture()
-
-    var captureGuideType by remember { mutableStateOf<String?>(null) }
-    var onCaptureGuideProceed by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    val triggerPhotoCapture = { docType: String, callback: (String) -> Unit ->
-        captureGuideType = docType
-        onCaptureGuideProceed = {
-            captureGuideType = null
-            launchVerificationPhoto(
-                "driver",
-                docType,
-                callback,
-            )
+    val launchVerificationPhoto = rememberVerificationPhotoCapture { documentType, path ->
+        when (documentType) {
+            "MARCHAMO" -> pathMarchamo = path
+            "DEKRA" -> pathDekra = path
+            "SEGURO" -> pathSeguro = path
+            "LICENCIA_FRONT" -> pathLicF = path
+            "LICENCIA_BACK" -> pathLicB = path
+            "CEDULA_FRONT" -> pathCedF = path
+            "CEDULA_BACK" -> pathCedB = path
+            "HOJA" -> pathHoja = path
+            "SELFIE_PROFILE" -> pathSelfie = path
+            "SELFIE_WITH_CEDULA" -> pathSelfieCed = path
+            "SELFIE_WITH_LICENCIA" -> pathSelfieLic = path
+            "VEHICLE_FRONT" -> pathVehF = path
+            "VEHICLE_BACK" -> pathVehB = path
+            "VEHICLE_INT" -> pathVehI = path
         }
     }
+    var captureGuideType by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val triggerPhotoCapture = { docType: String -> captureGuideType = docType }
 
     val stepTitles = listOf(
         "👤 Información Personal",
@@ -1513,7 +1519,7 @@ private fun DriverOnboardingDialog(
                                 ),
                             ) {
                                 Text(
-                                    text = "🧪 Piloto Costa Rica: al completar los datos y evidencias requeridas se habilitará el acceso inmediatamente. Esto no sustituye una revisión documental remota.",
+                                    text = "Tu expediente se enviará a revisión. El modo chofer se habilita únicamente después de una aprobación remota.",
                                     color = MeetColors.textSecondary,
                                     fontSize = 12.sp,
                                     lineHeight = 17.sp,
@@ -1549,17 +1555,17 @@ private fun DriverOnboardingDialog(
                                 }
                                 item {
                                     DocCaptureButton("📜 Marchamo", "Derecho de circulación vigente", "Toma una foto del documento", pathMarchamo.isNotBlank()) {
-                                        triggerPhotoCapture("MARCHAMO") { pathMarchamo = it }
+                                        triggerPhotoCapture("MARCHAMO")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🔧 DEKRA / RTV", "Revisión Técnica Vehicular vigente", "Toma una foto del resultado", pathDekra.isNotBlank()) {
-                                        triggerPhotoCapture("DEKRA") { pathDekra = it }
+                                        triggerPhotoCapture("DEKRA")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🛡️ Seguro Vehicular", "Póliza de seguro vigente", "Toma una foto de la póliza", pathSeguro.isNotBlank()) {
-                                        triggerPhotoCapture("SEGURO") { pathSeguro = it }
+                                        triggerPhotoCapture("SEGURO")
                                     }
                                 }
                             }
@@ -1569,27 +1575,27 @@ private fun DriverOnboardingDialog(
                                 }
                                 item {
                                     DocCaptureButton("🪪 Licencia de Conducir — Frente", "Lado frontal de tu licencia vigente", "Foto clara y sin reflejos", pathLicF.isNotBlank()) {
-                                        triggerPhotoCapture("LICENCIA_FRONT") { pathLicF = it }
+                                        triggerPhotoCapture("LICENCIA_FRONT")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🪪 Licencia de Conducir — Reverso", "Lado trasero de tu licencia", "Foto clara y sin reflejos", pathLicB.isNotBlank()) {
-                                        triggerPhotoCapture("LICENCIA_BACK") { pathLicB = it }
+                                        triggerPhotoCapture("LICENCIA_BACK")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🆔 Cédula de Identidad — Frente", "Cédula/DNI lado frontal", "Debe verse tu nombre y foto", pathCedF.isNotBlank()) {
-                                        triggerPhotoCapture("CEDULA_FRONT") { pathCedF = it }
+                                        triggerPhotoCapture("CEDULA_FRONT")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🆔 Cédula de Identidad — Reverso", "Cédula/DNI lado trasero", "Debe verse el código y firma", pathCedB.isNotBlank()) {
-                                        triggerPhotoCapture("CEDULA_BACK") { pathCedB = it }
+                                        triggerPhotoCapture("CEDULA_BACK")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("📋 Hoja de Delincuencia", "Antecedentes penales limpios", "Documento vigente (menos de 3 meses)", pathHoja.isNotBlank()) {
-                                        triggerPhotoCapture("HOJA") { pathHoja = it }
+                                        triggerPhotoCapture("HOJA")
                                     }
                                 }
                             }
@@ -1599,17 +1605,17 @@ private fun DriverOnboardingDialog(
                                 }
                                 item {
                                     DocCaptureButton("📸 Foto de Perfil", "Selfie frontal con buena iluminación", "Rostro visible, sin lentes de sol", pathSelfie.isNotBlank()) {
-                                        triggerPhotoCapture("SELFIE_PROFILE") { pathSelfie = it }
+                                        triggerPhotoCapture("SELFIE_PROFILE")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🤳 Selfie con Cédula al Lado de la Cara", "Sostén tu cédula junto a tu rostro", "Ambos deben verse claros en la misma foto", pathSelfieCed.isNotBlank()) {
-                                        triggerPhotoCapture("SELFIE_WITH_CEDULA") { pathSelfieCed = it }
+                                        triggerPhotoCapture("SELFIE_WITH_CEDULA")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🤳 Selfie con Licencia al Lado de la Cara", "Sostén tu licencia junto a tu rostro", "Ambos deben verse claros en la misma foto", pathSelfieLic.isNotBlank()) {
-                                        triggerPhotoCapture("SELFIE_WITH_LICENCIA") { pathSelfieLic = it }
+                                        triggerPhotoCapture("SELFIE_WITH_LICENCIA")
                                     }
                                 }
                             }
@@ -1619,17 +1625,17 @@ private fun DriverOnboardingDialog(
                                 }
                                 item {
                                     DocCaptureButton("🚗 Foto Frontal del Vehículo", "Vista delantera completa", "Placa visible, buena iluminación", pathVehF.isNotBlank()) {
-                                        triggerPhotoCapture("VEHICLE_FRONT") { pathVehF = it }
+                                        triggerPhotoCapture("VEHICLE_FRONT")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🚗 Foto Trasera del Vehículo", "Vista trasera completa", "Placa trasera visible", pathVehB.isNotBlank()) {
-                                        triggerPhotoCapture("VEHICLE_BACK") { pathVehB = it }
+                                        triggerPhotoCapture("VEHICLE_BACK")
                                     }
                                 }
                                 item {
                                     DocCaptureButton("🪑 Foto del Interior", "Asientos, tablero y estado general", "Debe verse limpio y en buen estado", pathVehI.isNotBlank()) {
-                                        triggerPhotoCapture("VEHICLE_INT") { pathVehI = it }
+                                        triggerPhotoCapture("VEHICLE_INT")
                                     }
                                 }
                             }
@@ -1705,7 +1711,12 @@ private fun DriverOnboardingDialog(
                     CaptureGuideOverlay(
                         documentType = captureGuideType!!,
                         onDismiss = { captureGuideType = null },
-                        onProceed = { onCaptureGuideProceed?.invoke() }
+                        onProceed = {
+                            captureGuideType?.let { documentType ->
+                                captureGuideType = null
+                                launchVerificationPhoto("driver", documentType)
+                            }
+                        }
                     )
                 }
             }

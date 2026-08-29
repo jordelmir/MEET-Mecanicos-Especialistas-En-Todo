@@ -7,6 +7,9 @@ import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.realtime.Realtime
 
 object SupabaseModule {
+    const val PASSWORD_RECOVERY_REDIRECT: String =
+        com.elysium369.meet.ui.screens.AuthRedirectPolicy.RECOVERY_REDIRECT_URL
+
     /**
      * ═══════════════════════════════════════════════════════════
      * Supabase credentials loaded from BuildConfig at compile time.
@@ -22,7 +25,10 @@ object SupabaseModule {
         supabaseKey = SUPABASE_KEY
     ) {
         install(Postgrest)
-        install(Auth)
+        install(Auth) {
+            scheme = com.elysium369.meet.ui.screens.AuthRedirectPolicy.SCHEME
+            host = com.elysium369.meet.ui.screens.AuthRedirectPolicy.HOST
+        }
         install(Storage)
         install(Realtime)
     }

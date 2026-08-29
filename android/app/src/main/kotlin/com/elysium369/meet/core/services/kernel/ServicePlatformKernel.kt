@@ -115,6 +115,7 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
     PARTS_STORE("parts_store", "Venta de Repuestos"),
     TOW_PROVIDER("tow_provider", "Operador de Grúas"),
     RIDE_DRIVER("ride_driver", "Conductor de Movilidad"),
+    SERVICE_PROVIDER("service_provider", "Proveedor de Servicios"),
     AUTO_LOCKSMITH("auto_locksmith", "Cerrajería Automotriz & Seguridad"),
     UNKNOWN("unknown", "Tipo de Proveedor Desconocido");
 
@@ -125,6 +126,7 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
             "parts_store", "part_store", "store" -> PARTS_STORE
             "tow_provider", "tow_truck", "tow", "tow_driver" -> TOW_PROVIDER
             "ride_driver", "driver", "ride" -> RIDE_DRIVER
+            "service_provider", "provider", "universal_provider" -> SERVICE_PROVIDER
             "auto_locksmith", "locksmith", "keys" -> AUTO_LOCKSMITH
             else -> values().firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: UNKNOWN
         }

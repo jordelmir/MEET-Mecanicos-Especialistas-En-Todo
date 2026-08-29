@@ -702,6 +702,12 @@ interface ProviderProfileDao {
     @Query("SELECT * FROM provider_profiles WHERE userId = :userId AND providerType = :type LIMIT 1")
     suspend fun getProfileByUserAndType(userId: String, type: String): ProviderProfileEntity?
 
+    @Query("SELECT * FROM provider_profiles WHERE userId = :userId AND lower(providerType) IN (:types) ORDER BY isActive DESC, updatedAt DESC LIMIT 1")
+    suspend fun getProfileByUserAndTypes(
+        userId: String,
+        types: List<String>,
+    ): ProviderProfileEntity?
+
     @Query("SELECT EXISTS(SELECT 1 FROM provider_profiles WHERE userId = :userId AND providerType = :type AND isActive = 1 AND verified = 1)")
     suspend fun isUserRegisteredAs(userId: String, type: String): Boolean
 

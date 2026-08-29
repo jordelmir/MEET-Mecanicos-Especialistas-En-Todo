@@ -44,6 +44,13 @@ data class ServiceVerificationSubmission(
     val evidenceManifestSha256: String? = null,
 )
 
+data class CapabilityVerificationSubmission(
+    val capability: String,
+    val profileReference: String,
+    val displayName: String,
+    val evidenceManifestSha256: String,
+)
+
 object PlatformTrustCenterGateway {
     suspend fun hasOwnerAccess(): Boolean {
         val client = SupabaseModule.client
@@ -84,10 +91,13 @@ object PlatformTrustCenterGateway {
     suspend fun submit(application: ServiceVerificationSubmission) {
         val client = SupabaseModule.client
         check(client.auth.currentUserOrNull() != null) { "Authenticated account required" }
+        val serviceType = requireNotNull(
+            ServiceVerificationTypePolicy.canonicalLegacyType(application.serviceType),
+        ) { "Unsupported verification service type" }
         client.postgrest.rpc(
             function = "meet_submit_service_verification_v1",
             parameters = buildJsonObject {
-                put("p_service_type", application.serviceType)
+                put("p_service_type", serviceType)
                 put("p_profile_reference", application.profileReference)
                 put("p_display_name", application.displayName)
                 application.businessName?.let { put("p_business_name", it) }
@@ -99,5 +109,25 @@ object PlatformTrustCenterGateway {
                 }
             },
         )
+    }
+
+    suspend fun submitCapability(application: CapabilityVerificationSubmission): String {
+        val client = SupabaseModule.client
+        check(client.auth.currentUserOrNull() != null) { "Authenticated account required" }
+        val capability = requireNotNull(
+            ServiceVerificationTypePolicy.canonicalCapability(application.capability),
+        ) { "Unsupported capability type" }
+        require(application.evidenceManifestSha256.matches(Regex("[a-f0-9]{64}"))) {
+            "Evidence manifest SHA-256 required"
+        }
+        return client.postgrest.rpc(
+            function = "meet_submit_capability_application_v1",
+            parameters = buildJsonObject {
+                put("p_capability", capability)
+                put("p_profile_reference", application.profileReference)
+                put("p_display_name", application.displayName)
+                put("p_evidence_manifest_sha256", application.evidenceManifestSha256)
+            },
+        ).decodeAs<String>()
     }
 }

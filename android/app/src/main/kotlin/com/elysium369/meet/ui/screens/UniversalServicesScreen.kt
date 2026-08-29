@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -56,10 +57,13 @@ fun UniversalServicesScreen(
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val gps by viewModel.currentGpsLocation.collectAsState()
     val myProfile = profiles.firstOrNull {
-        it.providerType == "SERVICE_PROVIDER" && it.isActive && it.verified
+        com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
+            com.elysium369.meet.core.services.kernel.ProviderType.SERVICE_PROVIDER &&
+            it.isActive &&
+            it.verified
     }
-    var providerMode by rememberSaveableCompat { mutableStateOf(false) }
-    var query by rememberSaveableCompat { mutableStateOf("") }
+    var providerMode by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<UniversalServiceDefinition?>(null) }
     var showProviderRegistration by remember { mutableStateOf(false) }
 
@@ -68,8 +72,11 @@ fun UniversalServicesScreen(
         viewModel.detectCurrentLocation(context)
         viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("WELCOME")
     }
+    LaunchedEffect(myProfile?.profileId) {
+        if (myProfile == null) providerMode = false
+    }
 
-    var selectedDomain by rememberSaveableCompat { mutableStateOf("TODOS") }
+    var selectedDomain by rememberSaveable { mutableStateOf("TODOS") }
     val domains = remember { listOf("TODOS", "Ferretería & Materiales", "Hogar", "Movilidad", "Automotriz", "Profesional", "Digital", "Logística") }
 
     Scaffold(
@@ -246,7 +253,6 @@ fun UniversalServicesScreen(
                     specialties = "Catálogo universal; requiere validar capacidades",
                     context = context,
                 )
-                providerMode = true
                 showProviderRegistration = false
             },
         )
@@ -568,6 +574,3 @@ private fun ProviderQuickRegistrationDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }
-
-@Composable
-private fun <T> rememberSaveableCompat(calculation: () -> T): T = remember(calculation = calculation)

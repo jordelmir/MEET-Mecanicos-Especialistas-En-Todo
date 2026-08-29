@@ -889,7 +889,13 @@ private fun MechanicWorkspaceView(
 ) {
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val activePrincipal by viewModel.activePrincipal.collectAsState()
-    val myProfile = profiles.firstOrNull { it.providerType == "MECHANIC" || it.providerType == "WORKSHOP" }
+    val myProfile = profiles.firstOrNull {
+        com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) in
+            setOf(
+                com.elysium369.meet.core.services.kernel.ProviderType.MECHANIC,
+                com.elysium369.meet.core.services.kernel.ProviderType.WORKSHOP,
+            )
+    }
 
     var mechanicName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Mecánica Pro") }
     var mechanicPhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }

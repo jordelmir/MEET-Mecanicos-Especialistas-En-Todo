@@ -116,13 +116,47 @@ object MeetTelemetry {
         failureCode: String,
         attributes: Map<String, Any?> = emptyMap(),
         traceId: String = UUID.randomUUID().toString(),
+        correlationId: String = traceId,
+        nowEpochMs: Long = System.currentTimeMillis(),
     ): TelemetrySignal = record(
         TelemetrySignalType.ERROR,
         name,
         attributes + ("failureCode" to failureCode),
         traceId,
+        correlationId,
+        nowEpochMs,
+    )
+
+    /** One emitted signal represents one increment. Cardinality stays controlled by policy. */
+    fun incrementCounter(
+        name: String,
+        attributes: Map<String, Any?> = emptyMap(),
+        traceId: String = UUID.randomUUID().toString(),
+        correlationId: String = traceId,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): TelemetrySignal = record(
+        TelemetrySignalType.COUNTER,
+        name,
+        attributes,
         traceId,
-        System.currentTimeMillis(),
+        correlationId,
+        nowEpochMs,
+    )
+
+    fun histogram(
+        name: String,
+        durationMs: Long,
+        attributes: Map<String, Any?> = emptyMap(),
+        traceId: String = UUID.randomUUID().toString(),
+        correlationId: String = traceId,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): TelemetrySignal = record(
+        TelemetrySignalType.HISTOGRAM,
+        name,
+        attributes + ("durationMs" to durationMs.coerceAtLeast(0L)),
+        traceId,
+        correlationId,
+        nowEpochMs,
     )
 
     fun pendingSignals(): List<TelemetrySignal> = buffer.pending()

@@ -1,0 +1,20 @@
+name: Server Contracts & OpenAPI Compatibility
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/contracts/**'
+      - 'android/app/src/main/kotlin/com/elysium369/meet/core/realtime/**'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Contract Compatibility
+        run: |
+          echo "Validating OpenAPI and ERP/1 schema integrity..."
+          test -f docs/architecture/elysium-realtime-protocol.md

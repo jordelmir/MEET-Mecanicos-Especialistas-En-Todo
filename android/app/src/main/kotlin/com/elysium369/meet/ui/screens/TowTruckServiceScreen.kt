@@ -536,8 +536,8 @@ private fun DriverWorkspaceView(
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val activePrincipal by viewModel.activePrincipal.collectAsState()
     val myProfile = profiles.firstOrNull {
-        it.providerType.equals("tow_provider", ignoreCase = true) ||
-                it.providerType.equals("TOW_PROVIDER", ignoreCase = true)
+        com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
+            com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER
     }
 
     var driverName by remember(myProfile) {

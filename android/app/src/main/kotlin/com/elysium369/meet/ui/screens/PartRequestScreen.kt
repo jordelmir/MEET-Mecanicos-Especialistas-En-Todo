@@ -1535,7 +1535,10 @@ private fun StoreWorkspaceView(
 ) {
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val activePrincipal by viewModel.activePrincipal.collectAsState()
-    val myProfile = profiles.firstOrNull { it.providerType == "PARTS_STORE" || it.providerType == "STORE" }
+    val myProfile = profiles.firstOrNull {
+        com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
+            com.elysium369.meet.core.services.kernel.ProviderType.PARTS_STORE
+    }
 
     var storeName by remember(myProfile) { mutableStateOf(myProfile?.businessName ?: "Distribuidora de Repuestos") }
     var storePhone by remember(myProfile) { mutableStateOf(myProfile?.phone ?: "") }

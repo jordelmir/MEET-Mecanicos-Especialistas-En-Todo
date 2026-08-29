@@ -107,6 +107,7 @@ import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
+import com.elysium369.meet.ride.data.remote.ServiceVerificationTypePolicy
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.identity.ActivePrincipalKernel
 import com.elysium369.meet.identity.OfflineOwnership
@@ -1461,7 +1462,27 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
                 .onSuccess { applications ->
-                    val latestByType = applications
+                    val hasPassengerApplication = applications.any {
+                        it.serviceType == "PASSENGER" && it.profileReference == "primary"
+                    }
+                    val localPassenger = if (!hasPassengerApplication) {
+                        rideDao.getPassengerVerification(localDeviceId)?.takeIf {
+                            it.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED) &&
+                                evaluatePassengerEvidence(it).isReady
+                        }
+                    } else {
+                        null
+                    }
+                    val passengerSubmitted = localPassenger?.let {
+                        submitPassengerTrustApplication(it).isSuccess
+                    } == true
+                    val reconciledApplications = if (passengerSubmitted) {
+                        runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                            .getOrDefault(applications)
+                    } else {
+                        applications
+                    }
+                    val latestByType = reconciledApplications
                         .groupBy { it.serviceType }
                         .mapValues { (_, values) -> values.maxBy { it.submittedAt } }
                     latestByType["RIDE_DRIVER"]?.let { application ->
@@ -1520,8 +1541,51 @@ class ObdViewModel @Inject constructor(
             if (currentCloudUserId() != null) {
                 runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
                     .onSuccess { applications ->
-                        val decisions = applications.associateBy { it.profileReference }
-                        providerProfileDao.getProfilesForUser(userId).first().forEach { profile ->
+                        val profiles = providerProfileDao.getProfilesForUser(userId).first()
+                        val submittedProfileReferences = applications
+                            .mapTo(mutableSetOf()) { it.profileReference }
+                        var submittedPendingProfile = false
+                        profiles
+                            .filter { profile ->
+                                profile.isActive &&
+                                    !profile.verified &&
+                                    profile.profileId !in submittedProfileReferences &&
+                                    ServiceVerificationTypePolicy.canonicalLegacyType(
+                                        profile.providerType,
+                                    ) != null
+                            }
+                            .forEach { profile ->
+                                runCatching {
+                                    PlatformTrustCenterGateway.submit(
+                                        ServiceVerificationSubmission(
+                                            serviceType = profile.providerType,
+                                            profileReference = profile.profileId,
+                                            displayName = profile.ownerName,
+                                            businessName = profile.businessName,
+                                            phone = profile.phone,
+                                            locationLabel = profile.location,
+                                            licenseReference = profile.licenseNumber
+                                                .takeIf(String::isNotBlank),
+                                        ),
+                                    )
+                                }.onSuccess {
+                                    submittedPendingProfile = true
+                                }.onFailure {
+                                    Log.w(
+                                        "MeetTrustCenter",
+                                        "Pending provider verification submission unavailable",
+                                    )
+                                }
+                            }
+                        val reconciledApplications = if (submittedPendingProfile) {
+                            runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
+                                .getOrDefault(applications)
+                        } else {
+                            applications
+                        }
+                        val decisions = reconciledApplications
+                            .associateBy { it.profileReference }
+                        profiles.forEach { profile ->
                             val decision = decisions[profile.profileId] ?: return@forEach
                             providerProfileDao.setProfileVerified(
                                 profileId = profile.profileId,
@@ -1567,16 +1631,23 @@ class ObdViewModel @Inject constructor(
     ) {
         val cloudUserId = currentCloudUserId()
         val userId = currentProviderUserId()
+        val canonicalProviderType =
+            com.elysium369.meet.core.services.kernel.ProviderType
+                .fromDbValueStrict(providerType)
 
         viewModelScope.launch(Dispatchers.IO) {
             // Idempotent: check if already registered
-            val existing = providerProfileDao.getProfileByUserAndType(userId, providerType)
+            val existing = providerProfileDao.getProfilesForUser(userId).first()
+                .firstOrNull {
+                    com.elysium369.meet.core.services.kernel.ProviderType
+                        .fromDbValue(it.providerType) == canonicalProviderType
+                }
             if (existing != null) {
                 if (!existing.isActive) {
                     providerProfileDao.setProfileActive(existing.profileId, true, System.currentTimeMillis())
                     withContext(Dispatchers.Main) {
                         context?.let {
-                            val typeLabel = providerTypeLabel(providerType)
+                            val typeLabel = providerTypeLabel(canonicalProviderType.dbValue)
                             android.widget.Toast.makeText(it, "✅ Perfil de $typeLabel reactivado", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -1585,7 +1656,7 @@ class ObdViewModel @Inject constructor(
                 }
                 withContext(Dispatchers.Main) {
                     context?.let {
-                        val typeLabel = providerTypeLabel(providerType)
+                        val typeLabel = providerTypeLabel(canonicalProviderType.dbValue)
                         android.widget.Toast.makeText(it, "✅ Ya estás registrado como $typeLabel", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -1595,7 +1666,7 @@ class ObdViewModel @Inject constructor(
             val profile = ProviderProfileEntity(
                 profileId = java.util.UUID.randomUUID().toString(),
                 userId = userId,
-                providerType = providerType,
+                providerType = canonicalProviderType.dbValue,
                 businessName = businessName,
                 ownerName = ownerName,
                 phone = phone,
@@ -1619,7 +1690,7 @@ class ObdViewModel @Inject constructor(
                 runCatching {
                     PlatformTrustCenterGateway.submit(
                         ServiceVerificationSubmission(
-                            serviceType = providerType,
+                            serviceType = canonicalProviderType.dbValue,
                             profileReference = profile.profileId,
                             displayName = ownerName,
                             businessName = businessName,
@@ -1633,7 +1704,7 @@ class ObdViewModel @Inject constructor(
 
             withContext(Dispatchers.Main) {
                 context?.let {
-                    val typeLabel = providerTypeLabel(providerType)
+                    val typeLabel = providerTypeLabel(canonicalProviderType.dbValue)
                     val message = when {
                         cloudUserId == null ->
                             "Perfil de $typeLabel guardado localmente. Inicia sesión para enviarlo a verificación."
@@ -1668,10 +1739,14 @@ class ObdViewModel @Inject constructor(
 
     /** Check if the current user can see provider-facing content for a given type */
     suspend fun canViewProviderContent(providerType: String): Boolean {
-        val canonical = com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(providerType).dbValue
-        val legacy = if (canonical == "tow_provider") "TOW_TRUCK" else providerType.uppercase()
-        return providerProfileDao.isUserRegisteredAs(currentProviderUserId(), canonical) ||
-               providerProfileDao.isUserRegisteredAs(currentProviderUserId(), legacy)
+        val canonical = com.elysium369.meet.core.services.kernel.ProviderType
+            .fromDbValueStrict(providerType)
+        return providerProfileDao.getProfilesForUser(currentProviderUserId()).first().any {
+            it.isActive &&
+                it.verified &&
+                com.elysium369.meet.core.services.kernel.ProviderType
+                    .fromDbValue(it.providerType) == canonical
+        }
     }
 
     private fun providerTypeLabel(providerType: String): String {
@@ -1680,6 +1755,7 @@ class ObdViewModel @Inject constructor(
             com.elysium369.meet.core.services.kernel.ProviderType.TOW_PROVIDER -> "Gruista"
             com.elysium369.meet.core.services.kernel.ProviderType.PARTS_STORE -> "Repuestera"
             com.elysium369.meet.core.services.kernel.ProviderType.RIDE_DRIVER -> "Chofer de Viajes"
+            com.elysium369.meet.core.services.kernel.ProviderType.SERVICE_PROVIDER -> "Proveedor de Servicios"
             com.elysium369.meet.core.services.kernel.ProviderType.AUTO_LOCKSMITH -> "Cerrajería Automotriz & Llaves"
             com.elysium369.meet.core.services.kernel.ProviderType.UNKNOWN -> "Desconocido"
         }
@@ -8526,7 +8602,6 @@ class ObdViewModel @Inject constructor(
                 // Pasajero califica al conductor
                 rideDao.updatePassengerRating(requestId, stars)
                 // Insert en la tabla global de ratings
-                val driverProfile = providerProfileDao.getProfileByUserAndType(req.assignedDriverId ?: "", "TOW_TRUCK") // o rol similar
                 val targetId = req.assignedDriverId ?: ""
                 val rating = RatingEntity(
                     ratingId = UUID.randomUUID().toString(),
@@ -8543,7 +8618,10 @@ class ObdViewModel @Inject constructor(
                 // Recalcular promedio si tiene perfil registrado
                 val avg = ratingDao.getAverageRatingForTarget("DRIVER", targetId)
                 if (avg != null) {
-                    val profile = providerProfileDao.getProfileByUserAndType(targetId, "RIDE_DRIVER")
+                    val profile = providerProfileDao.getProfileByUserAndTypes(
+                        targetId,
+                        listOf("ride_driver", "driver", "ride"),
+                    )
                     if (profile != null) {
                         providerProfileDao.updateRatingAndJobs(profile.profileId, avg, System.currentTimeMillis())
                     }
@@ -9128,7 +9206,7 @@ class ObdViewModel @Inject constructor(
             rideDao.insertDriverVerification(entity)
             enqueueDriverPilotEnrollment(entity, evidenceFiles)
             _rideVerificationNotice.emit(
-                "Acceso piloto local habilitado. El alta remota quedó en revisión y se sincronizará automáticamente.",
+                "Expediente guardado y enviado a revisión. El modo chofer seguirá bloqueado hasta la aprobación remota.",
             )
             android.util.Log.i(
                 "MeetRides",
@@ -9294,27 +9372,7 @@ class ObdViewModel @Inject constructor(
             rideDao.insertPassengerVerification(entity)
             val cloudUserId = currentCloudUserId()
             if (cloudUserId != null) {
-                val evidenceFiles = listOf(
-                    verificationFileEvidence("profile", pathProfilePhoto),
-                    verificationFileEvidence("id_front", pathCedulaFront),
-                    verificationFileEvidence("selfie_with_id", pathSelfieWithCedula),
-                )
-                val manifest = buildPassengerEvidenceManifestSha256(
-                    fullName = fullName,
-                    phone = phone,
-                    evidenceFiles = evidenceFiles,
-                )
-                runCatching {
-                    PlatformTrustCenterGateway.submit(
-                        ServiceVerificationSubmission(
-                            serviceType = "PASSENGER",
-                            profileReference = "primary",
-                            displayName = fullName,
-                            phone = phone,
-                            evidenceManifestSha256 = manifest,
-                        ),
-                    )
-                }.onFailure {
+                submitPassengerTrustApplication(entity).onFailure {
                     Log.w("MeetTrustCenter", "Passenger review submission unavailable", it)
                     _rideVerificationNotice.emit(
                         "Registro local guardado; la revisión remota está pendiente de sincronización.",
@@ -9324,6 +9382,32 @@ class ObdViewModel @Inject constructor(
             android.util.Log.i(
                 "MeetRides",
                 "Passenger verification submitted; status=${verificationDecision.status}",
+            )
+        }
+    }
+
+    private suspend fun submitPassengerTrustApplication(
+        verification: com.elysium369.meet.data.local.entities.PassengerVerificationEntity,
+    ): Result<Unit> {
+        val evidenceFiles = listOf(
+            verificationFileEvidence("profile", verification.pathProfilePhoto),
+            verificationFileEvidence("id_front", verification.pathCedulaFront),
+            verificationFileEvidence("selfie_with_id", verification.pathSelfieWithCedula),
+        )
+        val manifest = buildPassengerEvidenceManifestSha256(
+            fullName = verification.fullName,
+            phone = verification.phone,
+            evidenceFiles = evidenceFiles,
+        )
+        return runCatching {
+            PlatformTrustCenterGateway.submit(
+                ServiceVerificationSubmission(
+                    serviceType = "PASSENGER",
+                    profileReference = "primary",
+                    displayName = verification.fullName,
+                    phone = verification.phone,
+                    evidenceManifestSha256 = manifest,
+                ),
             )
         }
     }

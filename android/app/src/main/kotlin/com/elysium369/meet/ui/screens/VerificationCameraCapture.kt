@@ -8,8 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -63,35 +64,40 @@ internal object VerificationCameraPolicy {
             .ifBlank { "photo" }
 }
 
-private data class PendingVerificationCapture(
-    val file: File,
-    val onCaptured: (String) -> Unit,
-)
-
 @Composable
-internal fun rememberVerificationPhotoCapture(): (
+internal fun rememberVerificationPhotoCapture(
+    onCaptured: (documentType: String, capturedPath: String) -> Unit,
+): (
     ownerPrefix: String,
     documentType: String,
-    onCaptured: (String) -> Unit,
 ) -> Unit {
     val context = LocalContext.current
-    var pendingCapture by remember {
-        mutableStateOf<PendingVerificationCapture?>(null)
+    val latestOnCaptured by rememberUpdatedState(onCaptured)
+    var pendingCapturePath by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDocumentType by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun clearPendingCapture(deleteFile: Boolean) {
+        if (deleteFile) {
+            pendingCapturePath?.let(::File)?.takeIf(File::exists)?.delete()
+        }
+        pendingCapturePath = null
+        pendingDocumentType = null
     }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
     ) { cameraReportedSuccess ->
-        val pending = pendingCapture
-        if (pending != null) {
+        val file = pendingCapturePath?.let(::File)
+        val documentType = pendingDocumentType
+        if (file != null && documentType != null) {
             val capturedPath = VerificationCameraPolicy.completedCapturePath(
                 cameraReportedSuccess = cameraReportedSuccess,
-                file = pending.file,
+                file = file,
             )
             if (capturedPath != null) {
-                pending.onCaptured(capturedPath)
+                latestOnCaptured(documentType, capturedPath)
             } else {
-                pending.file.takeIf { it.exists() }?.delete()
+                file.takeIf(File::exists)?.delete()
                 Toast.makeText(
                     context,
                     if (cameraReportedSuccess) {
@@ -103,20 +109,19 @@ internal fun rememberVerificationPhotoCapture(): (
                 ).show()
             }
         }
-        pendingCapture = null
+        clearPendingCapture(deleteFile = false)
     }
 
-    fun launchCamera(pending: PendingVerificationCapture) {
+    fun launchCamera(file: File) {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
-                pending.file,
+                file,
             )
             takePictureLauncher.launch(uri)
         } catch (error: Exception) {
-            pendingCapture = null
-            pending.file.takeIf { it.exists() }?.delete()
+            clearPendingCapture(deleteFile = true)
             Toast.makeText(
                 context,
                 "No se pudo abrir la cámara: ${error.message ?: "error desconocido"}",
@@ -128,11 +133,11 @@ internal fun rememberVerificationPhotoCapture(): (
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        val pending = pendingCapture
-        if (granted && pending != null) {
-            launchCamera(pending)
+        val pendingFile = pendingCapturePath?.let(::File)
+        if (granted && pendingFile != null) {
+            launchCamera(pendingFile)
         } else {
-            pendingCapture = null
+            clearPendingCapture(deleteFile = true)
             Toast.makeText(
                 context,
                 "El permiso de cámara es necesario para capturar la evidencia. Puedes habilitarlo en Ajustes.",
@@ -141,19 +146,17 @@ internal fun rememberVerificationPhotoCapture(): (
         }
     }
 
-    return { ownerPrefix, documentType, onCaptured ->
-        if (pendingCapture == null) {
+    return { ownerPrefix, documentType ->
+        if (pendingCapturePath == null) {
             try {
-                val pending = PendingVerificationCapture(
-                    file = VerificationCameraPolicy.newCaptureFile(
-                        filesDir = context.filesDir,
-                        ownerPrefix = ownerPrefix,
-                        documentType = documentType,
-                        timestampEpochMs = System.currentTimeMillis(),
-                    ),
-                    onCaptured = onCaptured,
+                val file = VerificationCameraPolicy.newCaptureFile(
+                    filesDir = context.filesDir,
+                    ownerPrefix = ownerPrefix,
+                    documentType = documentType,
+                    timestampEpochMs = System.currentTimeMillis(),
                 )
-                pendingCapture = pending
+                pendingCapturePath = file.absolutePath
+                pendingDocumentType = documentType
                 when (
                     VerificationCameraPolicy.nextAction(
                         cameraPermissionGranted = ContextCompat.checkSelfPermission(
@@ -164,10 +167,10 @@ internal fun rememberVerificationPhotoCapture(): (
                 ) {
                     VerificationCameraAction.REQUEST_PERMISSION ->
                         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    VerificationCameraAction.LAUNCH_CAMERA -> launchCamera(pending)
+                    VerificationCameraAction.LAUNCH_CAMERA -> launchCamera(file)
                 }
             } catch (error: Exception) {
-                pendingCapture = null
+                clearPendingCapture(deleteFile = true)
                 Toast.makeText(
                     context,
                     "No se pudo preparar la captura: ${error.message ?: "error desconocido"}",

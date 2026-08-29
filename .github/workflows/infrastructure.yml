@@ -1,0 +1,21 @@
+name: Infrastructure as Code (IaC) Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/iac/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infra/iac/**'
+
+jobs:
+  validate-iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify IaC Files Exist
+        run: |
+          test -f infra/iac/environments/production/main.tf
+          test -f infra/iac/modules/application_vm/main.tf

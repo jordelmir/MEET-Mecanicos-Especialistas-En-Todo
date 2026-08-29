@@ -609,12 +609,12 @@ fun PassengerDashboard(
         }
     }
 
-    var showPaxVerification by remember { mutableStateOf(false) }
-    var paxName by remember { mutableStateOf("") }
-    var paxPhone by remember { mutableStateOf("") }
-    var paxProfilePhoto by remember { mutableStateOf("") }
-    var paxCedulaFront by remember { mutableStateOf("") }
-    var paxSelfieWithCedula by remember { mutableStateOf("") }
+    var showPaxVerification by rememberSaveable { mutableStateOf(false) }
+    var paxName by rememberSaveable { mutableStateOf("") }
+    var paxPhone by rememberSaveable { mutableStateOf("") }
+    var paxProfilePhoto by rememberSaveable { mutableStateOf("") }
+    var paxCedulaFront by rememberSaveable { mutableStateOf("") }
+    var paxSelfieWithCedula by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(forceRegistration, passengerVer) {
         if (forceRegistration && passengerVer == null) {
@@ -745,7 +745,7 @@ fun PassengerDashboard(
                                     Text("🔐 VERIFICAR MI IDENTIDAD", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
                                 }
                             }
-                            "PENDING" -> {
+                            "PENDING", RideVerificationPolicy.PILOT_APPROVED -> {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = MeetColors.warning.copy(alpha = 0.1f),
@@ -4119,22 +4119,16 @@ fun PaxVerificationDialog(
             paxProfilePhoto.isNotBlank() && paxCedulaFront.isNotBlank() &&
             paxSelfieWithCedula.isNotBlank()
 
-    val launchVerificationPhoto = rememberVerificationPhotoCapture()
-
-    var captureGuideType by remember { mutableStateOf<String?>(null) }
-    var onCaptureGuideProceed by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    val triggerPhotoCapture = { docType: String, callback: (String) -> Unit ->
-        captureGuideType = docType
-        onCaptureGuideProceed = {
-            captureGuideType = null
-            launchVerificationPhoto(
-                "passenger",
-                docType,
-                callback,
-            )
+    val launchVerificationPhoto = rememberVerificationPhotoCapture { documentType, path ->
+        when (documentType) {
+            "SELFIE_PROFILE" -> onProfileCapture(path)
+            "CEDULA_FRONT" -> onCedulaCapture(path)
+            "SELFIE_WITH_CEDULA" -> onSelfieCapture(path)
         }
     }
+    var captureGuideType by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val triggerPhotoCapture = { docType: String -> captureGuideType = docType }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -4189,7 +4183,7 @@ fun PaxVerificationDialog(
                                 ),
                             ) {
                                 Text(
-                                    text = "🧪 Piloto Costa Rica: al completar estos datos y fotos se habilitarán los viajes inmediatamente. La evidencia queda guardada para validación posterior.",
+                                    text = "Tu expediente se enviará a revisión. Los viajes se habilitan únicamente cuando el Centro de Confianza lo aprueba.",
                                     color = MeetColors.textSecondary,
                                     fontSize = 12.sp,
                                     lineHeight = 17.sp,
@@ -4247,19 +4241,19 @@ fun PaxVerificationDialog(
 
                         item {
                             PaxDocButton("📸 Foto de Perfil", "Foto frontal clara de tu rostro", paxProfilePhoto.isNotBlank()) {
-                                triggerPhotoCapture("SELFIE_PROFILE", onProfileCapture)
+                                triggerPhotoCapture("SELFIE_PROFILE")
                             }
                         }
 
                         item {
                             PaxDocButton("🪪 Cédula de Identidad (Frente)", "Foto legible de tu documento de identidad", paxCedulaFront.isNotBlank()) {
-                                triggerPhotoCapture("CEDULA_FRONT", onCedulaCapture)
+                                triggerPhotoCapture("CEDULA_FRONT")
                             }
                         }
 
                         item {
                             PaxDocButton("🤳 Selfie Sosteniendo Cédula", "Foto tuya sosteniendo la cédula junto a tu cara", paxSelfieWithCedula.isNotBlank()) {
-                                triggerPhotoCapture("SELFIE_WITH_CEDULA", onSelfieCapture)
+                                triggerPhotoCapture("SELFIE_WITH_CEDULA")
                             }
                         }
                     }
@@ -4288,7 +4282,12 @@ fun PaxVerificationDialog(
                     CaptureGuideOverlay(
                         documentType = captureGuideType!!,
                         onDismiss = { captureGuideType = null },
-                        onProceed = { onCaptureGuideProceed?.invoke() }
+                        onProceed = {
+                            captureGuideType?.let { documentType ->
+                                captureGuideType = null
+                                launchVerificationPhoto("passenger", documentType)
+                            }
+                        }
                     )
                 }
             }

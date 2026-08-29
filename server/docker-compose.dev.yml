@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  elysium-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENVIRONMENT=development
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/elysium_dev
+      - SUPABASE_JWT_SECRET=dev-jwt-secret-do-not-use-in-production
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=elysium
+      - POSTGRES_PASSWORD=elysium_dev_pass
+      - POSTGRES_DB=elysium_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

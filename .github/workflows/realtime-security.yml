@@ -1,0 +1,16 @@
+name: Realtime Security & RLS Conformance
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify No Secrets in Source
+        run: |
+          ! grep -r "SERVICE_ROLE_KEY" android/app/src/main/ || exit 1

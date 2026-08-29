@@ -1510,7 +1510,10 @@ class RideViewModel @Inject constructor(
 
                 val avg = ratingDao.getAverageRatingForTarget("DRIVER", targetId)
                 if (avg != null) {
-                    val profile = providerProfileDao.getProfileByUserAndType(targetId, "RIDE_DRIVER")
+                    val profile = providerProfileDao.getProfileByUserAndTypes(
+                        targetId,
+                        listOf("ride_driver", "driver", "ride"),
+                    )
                     if (profile != null) {
                         providerProfileDao.updateRatingAndJobs(profile.profileId, avg, System.currentTimeMillis())
                     }
@@ -1991,7 +1994,7 @@ class RideViewModel @Inject constructor(
             rideDao.insertDriverVerification(entity)
             enqueueDriverPilotEnrollment(entity, evidenceFiles)
             _rideVerificationNotice.emit(
-                "Acceso piloto local habilitado. El alta remota quedó en revisión y se sincronizará automáticamente.",
+                "Expediente guardado y enviado a revisión. El modo chofer seguirá bloqueado hasta la aprobación remota.",
             )
             Log.i("MeetRides", "Driver verification submitted; status=${verificationDecision.status}")
         }

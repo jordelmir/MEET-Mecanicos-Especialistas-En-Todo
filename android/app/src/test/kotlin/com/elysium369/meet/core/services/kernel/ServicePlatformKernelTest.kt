@@ -149,6 +149,7 @@ class ServicePlatformKernelTest {
         assertEquals(ProviderType.WORKSHOP, ProviderType.fromDbValue("workshop"))
         assertEquals(ProviderType.PARTS_STORE, ProviderType.fromDbValue("parts_store"))
         assertEquals(ProviderType.RIDE_DRIVER, ProviderType.fromDbValue("ride_driver"))
+        assertEquals(ProviderType.SERVICE_PROVIDER, ProviderType.fromDbValue("SERVICE_PROVIDER"))
     }
 
     @Test

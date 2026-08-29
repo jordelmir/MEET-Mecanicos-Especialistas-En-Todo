@@ -7,6 +7,7 @@ import com.elysium369.meet.ui.theme.MeetTheme
 import android.os.Bundle
 import android.os.Build
 import android.content.Context
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,7 @@ import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.identity.PrincipalAccessPolicy
 import com.elysium369.meet.identity.PrincipalProvisioningStore
 import com.elysium369.meet.observability.MeetTelemetry
+import com.elysium369.meet.observability.AuthObservability
 import com.elysium369.meet.observability.TelemetryContext
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
@@ -65,6 +67,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Star
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.handleDeeplinks
 
 val CyberpunkColorScheme = darkColorScheme(
     primary = Color(0xFF00FFD4),
@@ -95,6 +98,8 @@ val CyberpunkColorScheme = darkColorScheme(
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: ObdViewModel by viewModels()
+    private var passwordRecoveryRequested by mutableStateOf(false)
+    private var passwordRecoverySessionImported by mutableStateOf(false)
 
     companion object {
         /** Volatile flag so ObdViewModel can check BT permission status before starting the FGS. */
@@ -120,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        passwordRecoveryRequested = handleAuthenticationIntent(intent)
 
         // Pre-check if permissions are already granted (e.g. from previous session)
         bluetoothPermissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -136,9 +142,41 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MeetTheme {
-                MeetApp(viewModel)
+                MeetApp(
+                    obdViewModel = viewModel,
+                    passwordRecoveryRequested = passwordRecoveryRequested,
+                    passwordRecoverySessionReady = passwordRecoverySessionImported,
+                    onPasswordRecoveryHandled = {
+                        passwordRecoveryRequested = false
+                        passwordRecoverySessionImported = false
+                    },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        passwordRecoveryRequested = handleAuthenticationIntent(intent)
+    }
+
+    private fun handleAuthenticationIntent(intent: Intent?): Boolean {
+        val data = intent?.data
+        val isRecoveryDestination = data?.scheme == AuthRedirectPolicy.SCHEME &&
+            data.host == AuthRedirectPolicy.HOST &&
+            data.path == AuthRedirectPolicy.RECOVERY_PATH
+        val accepted = AuthRedirectPolicy.isPasswordRecoveryLink(intent?.dataString)
+        AuthObservability.recoveryLink(received = isRecoveryDestination, accepted = accepted)
+        if (accepted && intent != null) {
+            passwordRecoverySessionImported = false
+            SupabaseModule.client.handleDeeplinks(intent) {
+                passwordRecoverySessionImported = true
+            }
+        } else {
+            passwordRecoverySessionImported = false
+        }
+        return accepted
     }
 
     private fun checkPermissions() {
@@ -163,7 +201,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MeetApp(obdViewModel: ObdViewModel) {
+fun MeetApp(
+    obdViewModel: ObdViewModel,
+    passwordRecoveryRequested: Boolean = false,
+    passwordRecoverySessionReady: Boolean = false,
+    onPasswordRecoveryHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     val authStatus by SupabaseModule.client.auth.sessionStatus.collectAsState()
     val currentUser = SupabaseModule.client.auth.currentUserOrNull()
@@ -190,6 +233,22 @@ fun MeetApp(obdViewModel: ObdViewModel) {
         },
         provisionedPrincipalId = provisionedPrincipalId,
     )
+
+    if (passwordRecoveryRequested) {
+        AuthScreen(
+            initialMode = AuthFlowMode.PASSWORD_UPDATE,
+            recoverySessionReady = passwordRecoverySessionReady &&
+                authStatus is SessionStatus.Authenticated && currentUser != null,
+            onRecoveryComplete = onPasswordRecoveryHandled,
+            onAuthSuccess = {
+                SupabaseModule.client.auth.currentUserOrNull()?.id?.let {
+                    PrincipalProvisioningStore.recordAuthenticated(context, it)
+                }
+                obdViewModel.syncSelectedUsageProfile()
+            },
+        )
+        return
+    }
 
     if (accessDecision == PrincipalAccessPolicy.Decision.RESOLVING) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
