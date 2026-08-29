@@ -63,6 +63,34 @@ class AuthFlowPolicyTest {
     }
 
     @Test
+    fun `classifies invalid credentials and invalid grant correctly`() {
+        assertEquals(
+            AuthFailureCode.INVALID_CREDENTIALS,
+            AuthFailureTranslator.classify("invalid_grant"),
+        )
+        assertEquals(
+            AuthFailureCode.INVALID_CREDENTIALS,
+            AuthFailureTranslator.classify("Invalid login credentials"),
+        )
+        assertEquals(
+            AuthFailureCode.INVALID_CREDENTIALS,
+            AuthFailureTranslator.classify("invalid_credentials"),
+        )
+    }
+
+    @Test
+    fun `classifies true network errors without false positive on other words`() {
+        assertEquals(
+            AuthFailureCode.NETWORK,
+            AuthFailureTranslator.classify("java.net.UnknownHostException: Unable to resolve host"),
+        )
+        assertEquals(
+            AuthFailureCode.NETWORK,
+            AuthFailureTranslator.classify("Failed to connect to /1.2.3.4:443"),
+        )
+    }
+
+    @Test
     fun `supabase recovery proof can enter password recovery`() {
         assertTrue(
             AuthRedirectPolicy.isPasswordRecoveryLink(

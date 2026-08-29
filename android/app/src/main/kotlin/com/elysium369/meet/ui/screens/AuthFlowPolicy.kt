@@ -56,7 +56,8 @@ object AuthFailureTranslator {
     fun classify(rawMessage: String?): AuthFailureCode {
         val message = rawMessage.orEmpty().lowercase()
         return when {
-            "invalid login credentials" in message || "invalid_credentials" in message ->
+            "invalid login credentials" in message || "invalid_credentials" in message ||
+                "invalid_grant" in message || "user not found" in message ->
                 AuthFailureCode.INVALID_CREDENTIALS
             "email not confirmed" in message || "email_not_confirmed" in message ->
                 AuthFailureCode.EMAIL_NOT_CONFIRMED
@@ -64,8 +65,10 @@ object AuthFailureTranslator {
                 AuthFailureCode.WEAK_PASSWORD
             "rate limit" in message || "over_email_send_rate_limit" in message ||
                 "429" in message -> AuthFailureCode.RATE_LIMITED
-            "unable to resolve host" in message || "connect" in message ||
-                "timeout" in message || "network" in message -> AuthFailureCode.NETWORK
+            "unable to resolve host" in message || "failed to connect" in message ||
+                "connectexception" in message || "sockettimeout" in message ||
+                "network is unreachable" in message || "no address associated" in message ||
+                "timed out" in message -> AuthFailureCode.NETWORK
             else -> AuthFailureCode.UNKNOWN
         }
     }

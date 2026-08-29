@@ -27,8 +27,9 @@ for path in "${required_files[@]}"; do
   }
 done
 
-rg -q "version = 46" "$database" || {
-  echo "ride Android authority contract: FAIL (Room version not advanced)" >&2
+room_version="$(rg -o 'version = [0-9]+' "$database" | head -n 1 | tr -cd '0-9' || true)"
+[[ -n "$room_version" && "$room_version" -ge 46 ]] || {
+  echo "ride Android authority contract: FAIL (Room version must be at least 46)" >&2
   exit 1
 }
 rg -q "MIGRATION_44_45" "$module" || {
@@ -69,7 +70,7 @@ rg -q "reconcileServerSnapshot" "$worker" || {
 }
 
 for rpc in \
-  ride_create_request_v2 \
+  ride_create_request_v3 \
   ride_submit_offer_v2 \
   ride_accept_offer_v2 \
   ride_claim_request_v2 \
@@ -81,6 +82,12 @@ for rpc in \
   ride_signal_safety_v2 \
   ride_open_support_case_v2
 do
+  rg -q "\"${rpc}\"" "$gateway" || {
+    echo "ride Android authority contract: FAIL (missing RPC $rpc)" >&2
+    exit 1
+  }
+done
+for rpc in ride_driver_arrived_v3 ride_replace_stops_v3; do
   rg -q "\"${rpc}\"" "$gateway" || {
     echo "ride Android authority contract: FAIL (missing RPC $rpc)" >&2
     exit 1

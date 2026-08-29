@@ -2,6 +2,7 @@ package com.elysium369.meet.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +17,37 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.util.Locale
+
+private const val VERIFICATION_CAPTURE_TAG = "MeetVerificationCapture"
+
+private fun logVerificationCapture(
+    event: String,
+    documentType: String?,
+    error: Throwable? = null,
+) {
+    val safeDocumentType = documentType
+        ?.lowercase(Locale.ROOT)
+        ?.replace(Regex("[^a-z0-9_]+"), "_")
+        ?.take(48)
+        ?.ifBlank { "unknown" }
+        ?: "unknown"
+    val message = buildString {
+        append("event=")
+        append(event)
+        append(" document_type=")
+        append(safeDocumentType)
+        error?.let {
+            append(" error_type=")
+            append(it::class.java.simpleName.take(64))
+        }
+    }
+    if (error == null) {
+        Log.i(VERIFICATION_CAPTURE_TAG, message)
+    } else {
+        // No paths, exception messages, user identifiers, or image data in logs.
+        Log.w(VERIFICATION_CAPTURE_TAG, message)
+    }
+}
 
 internal enum class VerificationCameraAction {
     REQUEST_PERMISSION,
@@ -95,9 +127,14 @@ internal fun rememberVerificationPhotoCapture(
                 file = file,
             )
             if (capturedPath != null) {
+                logVerificationCapture("capture_succeeded", documentType)
                 latestOnCaptured(documentType, capturedPath)
             } else {
                 file.takeIf(File::exists)?.delete()
+                logVerificationCapture(
+                    event = if (cameraReportedSuccess) "capture_invalid" else "capture_cancelled",
+                    documentType = documentType,
+                )
                 Toast.makeText(
                     context,
                     if (cameraReportedSuccess) {
@@ -119,12 +156,14 @@ internal fun rememberVerificationPhotoCapture(
                 "${context.packageName}.fileprovider",
                 file,
             )
+            logVerificationCapture("camera_launched", pendingDocumentType)
             takePictureLauncher.launch(uri)
         } catch (error: Exception) {
+            logVerificationCapture("camera_launch_failed", pendingDocumentType, error)
             clearPendingCapture(deleteFile = true)
             Toast.makeText(
                 context,
-                "No se pudo abrir la cámara: ${error.message ?: "error desconocido"}",
+                "No se pudo abrir la cámara. Intenta de nuevo.",
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -135,8 +174,10 @@ internal fun rememberVerificationPhotoCapture(
     ) { granted ->
         val pendingFile = pendingCapturePath?.let(::File)
         if (granted && pendingFile != null) {
+            logVerificationCapture("permission_granted", pendingDocumentType)
             launchCamera(pendingFile)
         } else {
+            logVerificationCapture("permission_denied", pendingDocumentType)
             clearPendingCapture(deleteFile = true)
             Toast.makeText(
                 context,
@@ -157,6 +198,7 @@ internal fun rememberVerificationPhotoCapture(
                 )
                 pendingCapturePath = file.absolutePath
                 pendingDocumentType = documentType
+                logVerificationCapture("capture_started", documentType)
                 when (
                     VerificationCameraPolicy.nextAction(
                         cameraPermissionGranted = ContextCompat.checkSelfPermission(
@@ -170,10 +212,11 @@ internal fun rememberVerificationPhotoCapture(
                     VerificationCameraAction.LAUNCH_CAMERA -> launchCamera(file)
                 }
             } catch (error: Exception) {
+                logVerificationCapture("capture_prepare_failed", documentType, error)
                 clearPendingCapture(deleteFile = true)
                 Toast.makeText(
                     context,
-                    "No se pudo preparar la captura: ${error.message ?: "error desconocido"}",
+                    "No se pudo preparar la captura. Intenta de nuevo.",
                     Toast.LENGTH_LONG,
                 ).show()
             }

@@ -5,6 +5,7 @@ import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.realtime.Realtime
+import io.ktor.client.engine.okhttp.OkHttp
 
 object SupabaseModule {
     const val PASSWORD_RECOVERY_REDIRECT: String =
@@ -24,6 +25,7 @@ object SupabaseModule {
         supabaseUrl = SUPABASE_URL,
         supabaseKey = SUPABASE_KEY
     ) {
+        httpEngine = OkHttp.create()
         install(Postgrest)
         install(Auth) {
             scheme = com.elysium369.meet.ui.screens.AuthRedirectPolicy.SCHEME
