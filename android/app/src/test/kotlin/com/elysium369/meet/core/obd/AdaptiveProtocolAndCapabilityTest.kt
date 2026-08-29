@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.obd
 
+import com.elysium369.meet.core.obd.recipes.VehicleLinkRecipe
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -41,6 +42,34 @@ class AdaptiveProtocolAndCapabilityTest {
         assertEquals(DiagnosticProbeSpeed.EXHAUSTIVE_SAFE_PROBE, plan.probeSpeed)
         assertEquals(50L, plan.interCommandDelayMs)
         assertFalse(plan.enableAdaptiveTiming)
+    }
+
+    @Test
+    fun negotiationCandidatesNeverBroadcastUnrelatedOemRecipes() {
+        val unknownVehicle = VehicleLinkRecipe.negotiationCandidates(null, null)
+        assertTrue(unknownVehicle.isNotEmpty())
+        assertTrue(unknownVehicle.all { it.manufacturer == "GENERIC" })
+
+        val hyundai = VehicleLinkRecipe.negotiationCandidates("Hyundai", 2005)
+        assertTrue(hyundai.any { it.id == "HYUNDAI_KLINE_ISO9141" })
+        assertTrue(hyundai.none { it.manufacturer in setOf("TOYOTA", "VOLKSWAGEN", "FORD", "GM", "NISSAN", "RENAULT") })
+        assertEquals("HYUNDAI", hyundai.first().manufacturer)
+    }
+
+    @Test
+    fun negotiationEvidenceContainsProtocolButNoVehicleIdentity() {
+        val evidence = ElmNegotiator.NegotiationEvidence(
+            type = ElmNegotiator.EvidenceType.PROTOCOL_ATTEMPT,
+            protocol = ObdProtocol.ISO9141,
+            recipeId = "HYUNDAI_KLINE_ISO9141",
+            attemptOrdinal = 2,
+        )
+
+        assertEquals(
+            "protocol=ISO9141 recipe=HYUNDAI_KLINE_ISO9141 attempt=2",
+            evidence.redactedDetail(),
+        )
+        assertFalse(evidence.redactedDetail().contains("VIN", ignoreCase = true))
     }
 
     @Test

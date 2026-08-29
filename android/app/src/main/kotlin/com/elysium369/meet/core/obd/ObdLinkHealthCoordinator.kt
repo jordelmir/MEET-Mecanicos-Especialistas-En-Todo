@@ -255,6 +255,18 @@ class ObdLinkHealthCoordinator(
         trace.log("PROTOCOL_NEGOTIATING")
     }
 
+    fun onNegotiationEvidence(evidence: ElmNegotiator.NegotiationEvidence) {
+        trace.log(evidence.type.name, evidence.redactedDetail().ifBlank { null })
+    }
+
+    fun onMotionObservedDuringNegotiation() {
+        val current = _truth.value
+        if (current.sessionState == ObdSessionTruthState.CONNECTING || current.protocolState == ProtocolLinkState.NEGOTIATING) {
+            val alreadyRecorded = trace.getEvents().any { it.event == "MOTION_TEMPORALLY_CORRELATED" }
+            if (!alreadyRecorded) trace.log("MOTION_TEMPORALLY_CORRELATED", "source=PHONE_FUSED_SPEED")
+        }
+    }
+
     fun onProtocolReady(protocol: ObdProtocol) {
         _truth.update {
             it.copy(

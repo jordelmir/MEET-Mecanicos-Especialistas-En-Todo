@@ -114,6 +114,26 @@ class ObdManualIntentTruthKernelTest {
     }
 
     @Test
+    fun motionDuringNegotiationIsCorrelationNotCausation() {
+        val coordinator = ObdLinkHealthCoordinator()
+        coordinator.onUserConnectRequested(
+            ConnectionAttempt(
+                attemptId = UUID.randomUUID().toString(),
+                adapterAddress = "AA:BB:CC:DD:EE:FF",
+                startedAtMonotonicMs = System.nanoTime() / 1_000_000L,
+            )
+        )
+        coordinator.onProtocolNegotiating()
+
+        coordinator.onMotionObservedDuringNegotiation()
+        coordinator.onMotionObservedDuringNegotiation()
+
+        val events = coordinator.getTrace().getEvents()
+        assertEquals(1, events.count { it.event == "MOTION_TEMPORALLY_CORRELATED" })
+        assertFalse(events.any { it.event == "MOTION_REQUIRED" })
+    }
+
+    @Test
     fun testInstantEOF_TransitionsToRemoteClosed_WithoutAutonomousReconnect() = runBlocking {
         val testScope = CoroutineScope(Dispatchers.Unconfined)
         val coordinator = ObdLinkHealthCoordinator()

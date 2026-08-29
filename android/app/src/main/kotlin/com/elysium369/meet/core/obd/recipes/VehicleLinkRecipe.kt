@@ -181,6 +181,25 @@ data class VehicleLinkRecipe(
             GM_J1850_VPW
         )
 
+        private val GENERIC_RECIPES = ALL_RECIPES.filter { it.manufacturer == "GENERIC" }
+
+        /**
+         * Returns only protocol probes justified by the currently selected vehicle.
+         * Manufacturer-specific wakeups and headers must never be broadcast merely
+         * because they exist in the catalogue.
+         */
+        fun negotiationCandidates(
+            manufacturer: String?,
+            vehicleYear: Int? = null,
+        ): List<VehicleLinkRecipe> {
+            val manufacturerRecipes = getRecipesForManufacturer(manufacturer)
+            return if (manufacturerRecipes.isNotEmpty() && vehicleYear != null && vehicleYear < 2008) {
+                manufacturerRecipes + GENERIC_RECIPES
+            } else {
+                GENERIC_RECIPES + manufacturerRecipes
+            }.distinctBy(VehicleLinkRecipe::id)
+        }
+
         fun getRecipesForManufacturer(mfr: String?): List<VehicleLinkRecipe> {
             if (mfr.isNullOrBlank()) return emptyList()
             val normalized = mfr.trim().uppercase()

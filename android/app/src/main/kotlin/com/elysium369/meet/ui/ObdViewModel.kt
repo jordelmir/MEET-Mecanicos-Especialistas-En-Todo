@@ -3735,6 +3735,16 @@ class ObdViewModel @Inject constructor(
             phoneSpeedTracker.start()
         }
 
+        viewModelScope.launch {
+            phoneSpeedTracker.fusedSpeed
+                .map { speedKmh -> speedKmh >= 3f }
+                .distinctUntilChanged()
+                .filter { moving -> moving }
+                .collect {
+                    obdSession.healthCoordinator.onMotionObservedDuringNegotiation()
+                }
+        }
+
         val loadedConfig = AiConfig(
             provider = normalizeAiProvider(prefs.getString("ai_provider", "gemini") ?: "gemini"),
             apiKey = prefs.getString("ai_api_key", "") ?: "",

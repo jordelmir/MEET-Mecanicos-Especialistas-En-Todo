@@ -4240,14 +4240,20 @@ class ObdSession(
         var profile: ElmNegotiator.AdapterProfile? = null
 
         if (cachedProfile != null && cachedProfile.detectedProtocol != ObdProtocol.AUTO) {
-            profile = negotiator.negotiateFastPath(cachedProfile) { status ->
+            profile = negotiator.negotiateFastPath(
+                knownProfile = cachedProfile,
+                onEvidence = healthCoordinator::onNegotiationEvidence,
+            ) { status ->
                 _statusMessage.value = status
             }
         }
 
         if (profile == null) {
             profile = negotiator.negotiate(
-                hintProtocol = cachedProfile?.detectedProtocol ?: ObdProtocol.AUTO
+                hintProtocol = cachedProfile?.detectedProtocol ?: ObdProtocol.AUTO,
+                manufacturerHint = vehicleCapabilityContext.manufacturer,
+                vehicleYear = vehicleCapabilityContext.year,
+                onEvidence = healthCoordinator::onNegotiationEvidence,
             ) { status ->
                 _statusMessage.value = status
             }
@@ -5156,7 +5162,10 @@ class ObdSession(
                         val knownProfile = AdapterFingerprint(context).getProfile(address, vin)
                             ?: return@runCatching false
                         healthCoordinator.onProtocolNegotiating()
-                        val restored = ElmNegotiator(activeTransport).negotiateFastPath(knownProfile) { status ->
+                        val restored = ElmNegotiator(activeTransport).negotiateFastPath(
+                            knownProfile = knownProfile,
+                            onEvidence = healthCoordinator::onNegotiationEvidence,
+                        ) { status ->
                             _statusMessage.value = status
                         } ?: return@runCatching false
                         adapterVersion = restored.chipVersion
