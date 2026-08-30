@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import android.Manifest
@@ -357,7 +359,7 @@ private fun CameraPreviewAndOverlay(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { navController.popBackStack() },
+                onClick = { navController.backOrHome() },
                 modifier = Modifier
                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)

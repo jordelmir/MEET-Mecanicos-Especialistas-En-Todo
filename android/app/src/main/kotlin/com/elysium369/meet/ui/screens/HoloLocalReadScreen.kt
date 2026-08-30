@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -85,7 +87,7 @@ fun HoloLocalReadScreen(
 
             // ── HEADER ──
             HoloHeader(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.backOrHome() },
                 currentStyle = currentStyle,
                 onCycleStyle = { gaugeStyleManager.cycleNext() },
                 onCycleStyleBack = { gaugeStyleManager.cyclePrevious() }

@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -192,7 +194,7 @@ fun PrePurchaseScreen(
             EliteTopAppBar(
                 title = "DIAGNÓSTICO CLÍNICO",
                 subtitle = "INSPECCIÓN PRE-COMPRA",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 actions = {
                     IconButton(onClick = { navController.navigate("messages?serviceVertical=inspection") }) {
                         Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)

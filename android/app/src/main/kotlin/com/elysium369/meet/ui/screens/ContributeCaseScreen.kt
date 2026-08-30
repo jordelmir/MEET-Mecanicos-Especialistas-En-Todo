@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import androidx.compose.foundation.background
@@ -64,7 +66,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
             EliteTopAppBar(
                 title = "CONTRIBUIR CASO",
                 subtitle = "COMPARTE TU EXPERIENCIA TÉCNICA",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         }
@@ -343,7 +345,7 @@ fun ContributeCaseScreen(navController: NavController, viewModel: RepairNetworkV
                                 timeSpent = timeSpent,
                                 partsUsed = partsUsed,
                                 onSuccess = {
-                                    navController.popBackStack()
+                                    navController.backOrHome()
                                 }
                             )
                         }

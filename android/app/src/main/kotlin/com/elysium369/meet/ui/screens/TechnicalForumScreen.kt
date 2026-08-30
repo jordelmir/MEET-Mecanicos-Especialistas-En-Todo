@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import androidx.compose.animation.*
@@ -199,7 +201,7 @@ fun TechnicalForumScreen(navController: NavController) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { navController.popBackStack() },
+                    onClick = { navController.backOrHome() },
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(MeetColors.cardBackground)

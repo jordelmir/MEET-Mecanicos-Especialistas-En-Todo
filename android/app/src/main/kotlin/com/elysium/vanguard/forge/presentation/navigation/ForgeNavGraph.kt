@@ -1,6 +1,8 @@
 package com.elysium.vanguard.forge.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -531,8 +533,10 @@ fun ForgeNavGraph(navController: NavHostController) {
 fun ForgeEntryPoint(onClose: () -> Unit = {}) {
     val nestedController = androidx.navigation.compose.rememberNavController()
     ForgeNavGraph(navController = nestedController)
-    // onClose queda reservado para futuras versiones del módulo (botón back global).
-    // Se ignora en esta versión; no se permiten parámetros sin uso.
-    @Suppress("UNUSED_EXPRESSION")
-    onClose
+    val currentRoute = nestedController.currentBackStackEntryAsState().value?.destination?.route
+    BackHandler {
+        if (currentRoute == ForgeRoutes.HOME || !nestedController.popBackStack()) {
+            onClose()
+        }
+    }
 }

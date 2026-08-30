@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import androidx.compose.foundation.background
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,34 +110,34 @@ fun RepairNetworkScreen(
     val onlyVerifiedFilter by viewModel.onlyVerifiedFilter.collectAsState()
 
     // Dialog state for Marketplace
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var problemInput by remember { mutableStateOf("") }
-    var descInput by remember { mutableStateOf("") }
-    var locationInput by remember { mutableStateOf("San José, Costa Rica") }
-    var priorityInput by remember { mutableStateOf("MEDIUM") }
+    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    var problemInput by rememberSaveable { mutableStateOf("") }
+    var descInput by rememberSaveable { mutableStateOf("") }
+    var locationInput by rememberSaveable { mutableStateOf("San José, Costa Rica") }
+    var priorityInput by rememberSaveable { mutableStateOf("MEDIUM") }
     
-    var showPartRequestDialog by remember { mutableStateOf(false) }
-    var partServiceRequestId by remember { mutableStateOf<String?>(null) }
-    var partVehicleId by remember { mutableStateOf<String?>(null) }
-    var partDtcCode by remember { mutableStateOf<String?>(null) }
-    var partNameInput by remember { mutableStateOf("") }
-    var partNumberInput by remember { mutableStateOf("") }
-    var partQuantityInput by remember { mutableStateOf("1") }
-    var partPreferenceInput by remember { mutableStateOf("ANY") }
-    var partUrgencyInput by remember { mutableStateOf("40") }
-    var partNotesInput by remember { mutableStateOf("") }
-    var partDeliveryInput by remember { mutableStateOf("San José, Costa Rica") }
+    var showPartRequestDialog by rememberSaveable { mutableStateOf(false) }
+    var partServiceRequestId by rememberSaveable { mutableStateOf<String?>(null) }
+    var partVehicleId by rememberSaveable { mutableStateOf<String?>(null) }
+    var partDtcCode by rememberSaveable { mutableStateOf<String?>(null) }
+    var partNameInput by rememberSaveable { mutableStateOf("") }
+    var partNumberInput by rememberSaveable { mutableStateOf("") }
+    var partQuantityInput by rememberSaveable { mutableStateOf("1") }
+    var partPreferenceInput by rememberSaveable { mutableStateOf("ANY") }
+    var partUrgencyInput by rememberSaveable { mutableStateOf("40") }
+    var partNotesInput by rememberSaveable { mutableStateOf("") }
+    var partDeliveryInput by rememberSaveable { mutableStateOf("San José, Costa Rica") }
     
-    var showPartOfferDialog by remember { mutableStateOf<String?>(null) }
-    var offerStoreName by remember { mutableStateOf("") }
-    var offerBrand by remember { mutableStateOf("") }
-    var offerPartNumber by remember { mutableStateOf("") }
-    var offerCondition by remember { mutableStateOf("NEW") }
-    var offerPrice by remember { mutableStateOf("") }
-    var offerDeliveryFee by remember { mutableStateOf("0") }
-    var offerEta by remember { mutableStateOf("40") }
-    var offerWarranty by remember { mutableStateOf("30") }
-    var offerMessage by remember { mutableStateOf("") }
+    var showPartOfferDialog by rememberSaveable { mutableStateOf<String?>(null) }
+    var offerStoreName by rememberSaveable { mutableStateOf("") }
+    var offerBrand by rememberSaveable { mutableStateOf("") }
+    var offerPartNumber by rememberSaveable { mutableStateOf("") }
+    var offerCondition by rememberSaveable { mutableStateOf("NEW") }
+    var offerPrice by rememberSaveable { mutableStateOf("") }
+    var offerDeliveryFee by rememberSaveable { mutableStateOf("0") }
+    var offerEta by rememberSaveable { mutableStateOf("40") }
+    var offerWarranty by rememberSaveable { mutableStateOf("30") }
+    var offerMessage by rememberSaveable { mutableStateOf("") }
 
     // Service Contract confirmation dialog state
     var showAcceptConfirmDialog by remember { mutableStateOf(false) }
@@ -180,7 +183,7 @@ fun RepairNetworkScreen(
         topBar = {
             EliteTopAppBar(
                 title = "Elysium Vanguard REPAIR NETWORK\nStackOverflow Mecánico",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     IconButton(onClick = { navController.navigate("messages?serviceVertical=repair") }) {

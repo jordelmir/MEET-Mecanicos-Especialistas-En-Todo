@@ -34,6 +34,33 @@ object PrincipalAccessPolicy {
     }
 }
 
+/**
+ * Keeps the already-authorized UI tree alive while the session provider reloads
+ * its encrypted storage. An explicit unauthenticated result always tears it
+ * down; local continuity never upgrades cloud authority.
+ */
+object MainGraphRetentionPolicy {
+    fun shouldRender(
+        decision: PrincipalAccessPolicy.Decision,
+        graphEstablished: Boolean,
+    ): Boolean = when (decision) {
+        PrincipalAccessPolicy.Decision.ENTER_AUTHENTICATED,
+        PrincipalAccessPolicy.Decision.ENTER_PROVISIONED_OFFLINE -> true
+        PrincipalAccessPolicy.Decision.RESOLVING -> graphEstablished
+        PrincipalAccessPolicy.Decision.REQUIRE_AUTHENTICATION -> false
+    }
+
+    fun nextEstablished(
+        decision: PrincipalAccessPolicy.Decision,
+        graphEstablished: Boolean,
+    ): Boolean = when (decision) {
+        PrincipalAccessPolicy.Decision.ENTER_AUTHENTICATED,
+        PrincipalAccessPolicy.Decision.ENTER_PROVISIONED_OFFLINE -> true
+        PrincipalAccessPolicy.Decision.RESOLVING -> graphEstablished
+        PrincipalAccessPolicy.Decision.REQUIRE_AUTHENTICATION -> false
+    }
+}
+
 enum class PrincipalStatus {
     ACTIVE,
     SUSPENDED,

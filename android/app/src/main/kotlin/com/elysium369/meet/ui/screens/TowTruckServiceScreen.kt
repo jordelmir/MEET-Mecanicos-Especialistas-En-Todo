@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -247,13 +248,13 @@ private fun ClientWorkspaceView(
     val autoVehicleInfo = remember { viewModel.buildVehicleInfoForRequest() }
     val vehicleInfoToUse = prefilledVehicleInfo ?: autoVehicleInfo
 
-    var locationName by remember { mutableStateOf("") }
-    var destinationName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("+506 ") }
-    var isDolarCurrency by remember { mutableStateOf(false) } // Default: COLONES (CRC)
-    var priceOfferCrc by remember { androidx.compose.runtime.mutableFloatStateOf(25000.0f) } // Default 25,000 CRC ($50 USD)
-    var latText by remember { mutableStateOf("9.9281") }
-    var lngText by remember { mutableStateOf("-84.0907") }
+    var locationName by rememberSaveable { mutableStateOf("") }
+    var destinationName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("+506 ") }
+    var isDolarCurrency by rememberSaveable { mutableStateOf(false) } // Default: COLONES (CRC)
+    var priceOfferCrc by rememberSaveable { androidx.compose.runtime.mutableFloatStateOf(25000.0f) } // Default 25,000 CRC ($50 USD)
+    var latText by rememberSaveable { mutableStateOf("9.9281") }
+    var lngText by rememberSaveable { mutableStateOf("-84.0907") }
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
 

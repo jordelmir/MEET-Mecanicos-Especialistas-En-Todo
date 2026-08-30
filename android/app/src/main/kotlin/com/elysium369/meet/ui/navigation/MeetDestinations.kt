@@ -1,5 +1,8 @@
 package com.elysium369.meet.ui.navigation
 
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+
 /**
  * MEET Centralized Destinations Contract.
  * Guarantees that both Vanguard Classic and Vanguard Command navigate to identical targets.
@@ -52,5 +55,51 @@ fun androidx.navigation.NavController.safeNavigate(route: String) {
         navigate(route)
     } catch (e: Exception) {
         android.util.Log.e("Navigation", "Failed to navigate to route: $route", e)
+    }
+}
+
+/**
+ * One navigation contract for every visible back affordance.
+ *
+ * A regular visit pops exactly one entry. A destination reached without a
+ * usable parent (for example from a deep link) returns to Home instead of
+ * becoming a dead end. Home itself is never duplicated.
+ */
+fun NavController.backOrHome(): Boolean = when (
+    MeetBackStackPolicy.action(
+        currentRoute = currentDestination?.route,
+        hasPreviousEntry = previousBackStackEntry != null,
+    )
+) {
+    MeetBackStackPolicy.Action.POP_ONE -> if (popBackStack()) true else navigateHomeFallback()
+    MeetBackStackPolicy.Action.NAVIGATE_HOME -> navigateHomeFallback()
+    MeetBackStackPolicy.Action.STAY_HOME -> false
+}
+
+/** Save and restore each top-level branch instead of recreating it on every tap. */
+fun NavController.navigateTopLevel(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private fun NavController.navigateHomeFallback(): Boolean {
+    navigate(MeetDestinations.HOME) {
+        popUpTo(graph.findStartDestination().id) { inclusive = false }
+        launchSingleTop = true
+        restoreState = true
+    }
+    return true
+}
+
+object MeetBackStackPolicy {
+    enum class Action { POP_ONE, NAVIGATE_HOME, STAY_HOME }
+
+    fun action(currentRoute: String?, hasPreviousEntry: Boolean): Action = when {
+        currentRoute == MeetDestinations.HOME -> Action.STAY_HOME
+        hasPreviousEntry -> Action.POP_ONE
+        else -> Action.NAVIGATE_HOME
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -519,18 +520,18 @@ private fun ClientWorkspaceView(
         }
     }
 
-    var partName by remember(atlasElement) { mutableStateOf(atlasElement?.nameOriginal.orEmpty()) }
-    var partNumber by remember { mutableStateOf("") }
-    var partCategory by remember(atlasElement) { mutableStateOf(atlasElement?.systemId.orEmpty()) }
-    var sourceContext by remember(atlasElement) {
+    var partName by rememberSaveable(atlasElement) { mutableStateOf(atlasElement?.nameOriginal.orEmpty()) }
+    var partNumber by rememberSaveable { mutableStateOf("") }
+    var partCategory by rememberSaveable(atlasElement) { mutableStateOf(atlasElement?.systemId.orEmpty()) }
+    var sourceContext by rememberSaveable(atlasElement) {
         mutableStateOf(if (atlasElement == null) "MANUAL" else "FROM_3D_COMPONENT")
     }
-    var quantity by remember { mutableStateOf(1) }
-    var partPosition by remember { mutableStateOf("N/A") }
-    var oemPreference by remember { mutableStateOf("ANY") }
-    var locationName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("+506 ") }
-    var customerNotes by remember(atlasElement) {
+    var quantity by rememberSaveable { mutableStateOf(1) }
+    var partPosition by rememberSaveable { mutableStateOf("N/A") }
+    var oemPreference by rememberSaveable { mutableStateOf("ANY") }
+    var locationName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("+506 ") }
+    var customerNotes by rememberSaveable(atlasElement) {
         mutableStateOf(
             atlasElement?.let {
                 "Referencia canónica MEET: ${it.canonicalId}. " +
@@ -539,8 +540,8 @@ private fun ClientWorkspaceView(
             }.orEmpty(),
         )
     }
-    var latText by remember { mutableStateOf("9.9281") }
-    var lngText by remember { mutableStateOf("-84.0907") }
+    var latText by rememberSaveable { mutableStateOf("9.9281") }
+    var lngText by rememberSaveable { mutableStateOf("-84.0907") }
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()

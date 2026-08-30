@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
@@ -85,7 +87,7 @@ fun MarketplaceScreen(
         topBar = {
             EliteTopAppBar(
                 title = "Elysium Vanguard MARKETPLACE\nServicios Automotrices VIP",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     IconButton(onClick = { navController.navigate("messages?serviceVertical=parts") }) {

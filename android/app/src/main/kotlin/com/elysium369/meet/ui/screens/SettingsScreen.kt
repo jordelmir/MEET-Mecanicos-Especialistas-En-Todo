@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -156,7 +158,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
         topBar = {
             EliteTopAppBar(
                 title = "Ajustes Avanzados\nConfiguración del Sistema",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         },

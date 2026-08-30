@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import android.content.Context
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,19 +67,19 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
     
     // Preferences for Workshop branding
     val sharedPrefs = remember { context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE) }
-    var workshopName by remember { mutableStateOf(sharedPrefs.getString("workshop_name", "") ?: "") }
-    var workshopAddress by remember { mutableStateOf(sharedPrefs.getString("workshop_address", "") ?: "") }
-    var workshopPhone by remember { mutableStateOf(sharedPrefs.getString("workshop_phone", "") ?: "") }
-    var workshopEmail by remember { mutableStateOf(sharedPrefs.getString("workshop_email", "") ?: "") }
+    var workshopName by rememberSaveable { mutableStateOf(sharedPrefs.getString("workshop_name", "") ?: "") }
+    var workshopAddress by rememberSaveable { mutableStateOf(sharedPrefs.getString("workshop_address", "") ?: "") }
+    var workshopPhone by rememberSaveable { mutableStateOf(sharedPrefs.getString("workshop_phone", "") ?: "") }
+    var workshopEmail by rememberSaveable { mutableStateOf(sharedPrefs.getString("workshop_email", "") ?: "") }
 
     // Customization states
-    var selectedTheme by remember { mutableStateOf("ELYSIUM_CYAN") }
-    var scanMode by remember { mutableStateOf("PRE_SCAN") } // PRE_SCAN or POST_SCAN
-    var includeDtcs by remember { mutableStateOf(true) }
-    var includeAi by remember { mutableStateOf(true) }
-    var includeGraphs by remember { mutableStateOf(true) }
-    var includePredictive by remember { mutableStateOf(true) }
-    var includeBranding by remember { mutableStateOf(true) }
+    var selectedTheme by rememberSaveable { mutableStateOf("ELYSIUM_CYAN") }
+    var scanMode by rememberSaveable { mutableStateOf("PRE_SCAN") } // PRE_SCAN or POST_SCAN
+    var includeDtcs by rememberSaveable { mutableStateOf(true) }
+    var includeAi by rememberSaveable { mutableStateOf(true) }
+    var includeGraphs by rememberSaveable { mutableStateOf(true) }
+    var includePredictive by rememberSaveable { mutableStateOf(true) }
+    var includeBranding by rememberSaveable { mutableStateOf(true) }
 
     var isGenerating by remember { mutableStateOf(false) }
     var currentStepIndex by remember { mutableStateOf(0) }
@@ -97,7 +100,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
         topBar = {
             EliteTopAppBar(
                 title = "REPORTES PRE/POST SCAN",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         },

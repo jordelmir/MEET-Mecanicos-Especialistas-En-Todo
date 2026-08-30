@@ -903,13 +903,13 @@ private fun RegistrationFormDialog(
         licenseNumber: String
     ) -> Unit
 ) {
-    var businessName by remember { mutableStateOf("") }
-    var ownerName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var specialties by remember { mutableStateOf("") }
-    var radiusKm by remember { mutableFloatStateOf(25f) }
-    var licenseNumber by remember { mutableStateOf("") }
+    var businessName by rememberSaveable { mutableStateOf("") }
+    var ownerName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var location by rememberSaveable { mutableStateOf("") }
+    var specialties by rememberSaveable { mutableStateOf("") }
+    var radiusKm by rememberSaveable { mutableFloatStateOf(25f) }
+    var licenseNumber by rememberSaveable { mutableStateOf("") }
 
     val isFormValid = businessName.isNotBlank() &&
             ownerName.isNotBlank() &&

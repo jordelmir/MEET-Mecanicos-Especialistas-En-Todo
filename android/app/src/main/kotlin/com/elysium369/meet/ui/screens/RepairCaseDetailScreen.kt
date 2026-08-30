@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import androidx.compose.foundation.background
@@ -48,7 +50,7 @@ fun RepairCaseDetailScreen(navController: NavController, caseId: String, viewMod
         topBar = {
             EliteTopAppBar(
                 title = "DETALLE DE CASO",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     activeCase?.let { case ->

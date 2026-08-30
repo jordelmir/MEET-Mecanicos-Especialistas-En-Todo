@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -1349,7 +1351,7 @@ fun DtcRepairGuideScreen(
             EliteTopAppBar(
                 title = "GUÍA DE REPARACIÓN",
                 subtitle = "Código DTC: $dtcCode",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.backOrHome() }
             )
         },
         containerColor = Color.Transparent

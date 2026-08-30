@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,7 +52,7 @@ fun CommunityCasesScreen(
         topBar = {
             EliteTopAppBar(
                 title = "📚 CASOS COMUNITARIOS Y SOLUCIONES\nBase de Conocimiento Verificada",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
                     IconButton(onClick = { showFilters = !showFilters }) {

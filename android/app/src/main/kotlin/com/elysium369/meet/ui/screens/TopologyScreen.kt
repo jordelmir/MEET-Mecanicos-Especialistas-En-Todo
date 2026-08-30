@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
@@ -74,7 +76,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
         topBar = {
             EliteTopAppBar(
                 title = "MAPA TÁCTICO DE NODOS",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         },

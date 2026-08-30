@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -68,7 +70,7 @@ fun FindingsScreen(
             EliteTopAppBar(
                 title = "HALLAZGOS DIAGNÓSTICOS",
                 subtitle = activeVehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Genérico",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.backOrHome() }
             )
         },
         containerColor = Color.Transparent

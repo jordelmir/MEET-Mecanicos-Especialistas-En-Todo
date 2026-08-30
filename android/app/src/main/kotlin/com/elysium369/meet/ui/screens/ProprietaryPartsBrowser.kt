@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -240,7 +242,7 @@ fun ProprietaryPartsBrowser(
                 selectedFamilyId = selectedFamilyId,
                 selectedSystemId = selectedSystemId,
                 selectedRole = selectedRole,
-                onBack = { navController.popBackStack() },
+                onBack = { navController.backOrHome() },
                 onQueryChanged = { query = it },
                 onFamilySelected = { familyId ->
                     selectedFamilyId = familyId

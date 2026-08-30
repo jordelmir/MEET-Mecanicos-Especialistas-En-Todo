@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 import com.elysium369.meet.ui.components.ElysiumSectionIcon
 
@@ -69,7 +71,7 @@ fun GarageScreen(
                         append("${vehicles.size} VEHÍCULO${if (vehicles.size != 1) "S" else ""}")
                     }
                 },
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
             )
         },

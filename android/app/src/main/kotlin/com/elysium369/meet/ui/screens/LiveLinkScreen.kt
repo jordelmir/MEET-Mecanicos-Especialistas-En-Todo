@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import android.content.ClipboardManager
@@ -128,7 +130,7 @@ fun LiveLinkScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { navController.popBackStack() },
+                onClick = { navController.backOrHome() },
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MeetColors.cardBackground)

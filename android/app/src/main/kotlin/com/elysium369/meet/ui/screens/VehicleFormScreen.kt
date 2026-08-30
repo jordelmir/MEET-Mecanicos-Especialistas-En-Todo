@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,21 +51,21 @@ fun VehicleFormScreen(
     fun t(es: String, en: String): String = if (lang == "es") es else en
 
     // Basic Info
-    var make by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var year by remember { mutableStateOf("") }
+    var make by rememberSaveable { mutableStateOf("") }
+    var model by rememberSaveable { mutableStateOf("") }
+    var year by rememberSaveable { mutableStateOf("") }
     
     // Detailed Spec
-    var engineDisplacement by remember { mutableStateOf("") }
-    var engineTech by remember { mutableStateOf("") }
-    var transmission by remember { mutableStateOf("") }
-    var transmissionType by remember { mutableStateOf("") }
-    var fuelType by remember { mutableStateOf("") }
-    var plate by remember { mutableStateOf("") }
-    var vin by remember { mutableStateOf("") }
+    var engineDisplacement by rememberSaveable { mutableStateOf("") }
+    var engineTech by rememberSaveable { mutableStateOf("") }
+    var transmission by rememberSaveable { mutableStateOf("") }
+    var transmissionType by rememberSaveable { mutableStateOf("") }
+    var fuelType by rememberSaveable { mutableStateOf("") }
+    var plate by rememberSaveable { mutableStateOf("") }
+    var vin by rememberSaveable { mutableStateOf("") }
     
     // Dropdown state
-    var transmissionExpanded by remember { mutableStateOf(false) }
+    var transmissionExpanded by rememberSaveable { mutableStateOf(false) }
     val transmissionOptions = listOf(
         t("Automática (AT)", "Automatic (AT)"),
         t("Manual (MT)", "Manual (MT)"),
@@ -72,7 +75,7 @@ fun VehicleFormScreen(
         t("Tiptronic / Shiftable", "Tiptronic / Shiftable")
     )
     
-    var fuelTypeExpanded by remember { mutableStateOf(false) }
+    var fuelTypeExpanded by rememberSaveable { mutableStateOf(false) }
     val fuelTypeOptions = listOf(
         t("Gasolina / Bencina", "Gasoline"),
         t("Diésel / Gasóleo", "Diesel"),
@@ -83,7 +86,7 @@ fun VehicleFormScreen(
         t("Flex Fuel (E85)", "Flex Fuel")
     )
 
-    var engineTechExpanded by remember { mutableStateOf(false) }
+    var engineTechExpanded by rememberSaveable { mutableStateOf(false) }
     val engineTechOptions = listOf(
         "NATURAL ASPIRATED",
         "TURBOCHARGED",
@@ -126,7 +129,7 @@ fun VehicleFormScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = { navController.backOrHome() }) {
                         AnimatedNeonIcon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = neonCyan)
                     }
                 },
@@ -417,7 +420,7 @@ fun VehicleFormScreen(
                         coroutineScope.launch {
                             saveSuccess = true
                             delay(1200) // Show success animation
-                            navController.popBackStack()
+                            navController.backOrHome()
                         }
                     }
                 },

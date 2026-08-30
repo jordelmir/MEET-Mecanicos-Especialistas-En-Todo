@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -100,7 +102,7 @@ fun HealthScoreScreen(
             EliteTopAppBar(
                 title = "SALUD PREDICTIVA",
                 subtitle = "EXPEDIENTE MÉDICO VIVO",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         }

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -247,20 +248,20 @@ private fun ClientWorkspaceView(
     val autoVehicleInfo = remember { viewModel.buildVehicleInfoForRequest() }
     val vehicleInfoToUse = prefilledVehicleInfo ?: autoVehicleInfo
 
-    var problemText by remember { mutableStateOf("") }
-    var descriptionText by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf("MEDIUM") }
-    var locationName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("+506 ") }
-    var isDolarCurrency by remember { mutableStateOf(false) }
-    var priceOfferCrc by remember { androidx.compose.runtime.mutableFloatStateOf(25000.0f) }
-    var latText by remember { mutableStateOf("9.9281") }
-    var lngText by remember { mutableStateOf("-84.0907") }
+    var problemText by rememberSaveable { mutableStateOf("") }
+    var descriptionText by rememberSaveable { mutableStateOf("") }
+    var priority by rememberSaveable { mutableStateOf("MEDIUM") }
+    var locationName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("+506 ") }
+    var isDolarCurrency by rememberSaveable { mutableStateOf(false) }
+    var priceOfferCrc by rememberSaveable { androidx.compose.runtime.mutableFloatStateOf(25000.0f) }
+    var latText by rememberSaveable { mutableStateOf("9.9281") }
+    var lngText by rememberSaveable { mutableStateOf("-84.0907") }
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val selectedVehicle by viewModel.selectedVehicle.collectAsState()
     val activeDtcs by viewModel.activeDtcs.collectAsState()
-    var selectedServiceId by remember {
+    var selectedServiceId by rememberSaveable {
         mutableStateOf(
             WorkshopServiceCatalog.bestServicesForDtcs(activeDtcs).firstOrNull()?.id
                 ?: WorkshopServiceCatalog.enabledServicesForCategory(ServiceCategory.DIAGNOSTIC).first().id

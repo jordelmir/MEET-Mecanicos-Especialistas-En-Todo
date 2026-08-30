@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.vehicleaccess
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -67,7 +69,7 @@ fun VehicleAccessDashboardScreen(
         topBar = {
             EliteTopAppBar(
                 title = "VANGUARD ACCESS & IMMO",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 actions = {
                     IconButton(onClick = { navController.navigate("messages?serviceVertical=vehicle_access") }) {
                         Icon(Icons.Default.Chat, "Mensajes del servicio", tint = MeetColors.cyberCyan)

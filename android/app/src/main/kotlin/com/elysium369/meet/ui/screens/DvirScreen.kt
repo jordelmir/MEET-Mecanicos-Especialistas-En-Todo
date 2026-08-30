@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Path as AndroidPath
@@ -83,7 +85,7 @@ fun DvirScreen(
             EliteTopAppBar(
                 title = "DVIR PRE-VIAJE",
                 subtitle = "Reporte de Seguridad Diario",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.backOrHome() }
             )
         }
     ) { padding ->

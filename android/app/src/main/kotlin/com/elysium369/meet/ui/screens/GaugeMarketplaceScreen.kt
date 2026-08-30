@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -235,7 +237,7 @@ fun GaugeMarketplaceScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = { navController.backOrHome() }) {
                             AnimatedNeonIcon(
                                 Icons.Default.ArrowBack,
                                 contentDescription = "Back",
@@ -526,7 +528,7 @@ fun GaugeMarketplaceScreen(
                     // Apply config to the DIY editor
                     gaugeStyleManager.importDiyConfig(config)
                     showPreviewSheet = false
-                    navController.popBackStack()
+                    navController.backOrHome()
                 }
             )
         }

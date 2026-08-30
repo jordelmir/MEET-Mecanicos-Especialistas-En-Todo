@@ -50,10 +50,10 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 36
-        // Trust Center Delivery V2: durable registrations, AAL2 review,
-        // Realtime reconciliation and correlated observability.
-        versionCode = 48
-        versionName = "4.22.0"
+        // Navigation continuity: retained auth graph, ordered back stack and
+        // saveable transactional drafts across recreation.
+        versionCode = 49
+        versionName = "4.22.1"
 
         val meetBuildSha = providers.environmentVariable("MEET_BUILD_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))

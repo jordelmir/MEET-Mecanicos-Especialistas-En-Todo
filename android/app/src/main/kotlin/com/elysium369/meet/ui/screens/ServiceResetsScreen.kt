@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 
 import androidx.compose.animation.animateColorAsState
@@ -75,7 +77,7 @@ fun ServiceResetsScreen(navController: NavController, viewModel: com.elysium369.
         topBar = {
             EliteTopAppBar(
                 title = "SERVICE RESETS ELITE",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         },

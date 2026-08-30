@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -125,7 +127,7 @@ fun HudScreen(
                 EliteTopAppBar(
                     title = "HUD REFLEJO",
                     subtitle = "Proyección para Parabrisas",
-                    onBackClick = { navController.popBackStack() },
+                    onBackClick = { navController.backOrHome() },
                     backgroundColor = Color.Black
                 )
                 HudMirrorToggleBar(isMirrored = isMirrored, onToggle = { isMirrored = !isMirrored })

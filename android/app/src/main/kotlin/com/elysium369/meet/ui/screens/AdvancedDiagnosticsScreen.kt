@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -102,7 +104,7 @@ fun AdvancedDiagnosticsScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = { navController.backOrHome() }) {
                         AnimatedNeonIcon(Icons.Filled.ArrowBack, "Volver", tint = MeetColors.textPrimary)
                     }
                 },

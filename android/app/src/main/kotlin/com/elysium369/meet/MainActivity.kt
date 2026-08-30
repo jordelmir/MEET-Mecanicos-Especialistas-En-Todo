@@ -9,6 +9,7 @@ import android.os.Build
 import android.content.Context
 import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
@@ -42,9 +44,13 @@ import com.elysium369.meet.ui.screens.humanity.MultimeterSimulationScreen
 import com.elysium369.meet.ui.screens.marketos.FuelRewardsHub
 import com.elysium369.meet.ui.screens.marketos.LegalVanguardHub
 import com.elysium369.meet.ui.screens.marketos.PropertiesHub
+import com.elysium369.meet.ui.navigation.backOrHome
+import com.elysium369.meet.ui.navigation.navigateTopLevel
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.identity.PrincipalAccessPolicy
+import com.elysium369.meet.identity.MainGraphRetentionPolicy
+import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.identity.PrincipalProvisioningStore
 import com.elysium369.meet.observability.MeetTelemetry
 import com.elysium369.meet.observability.AuthObservability
@@ -245,6 +251,30 @@ fun MeetApp(
         },
         provisionedPrincipalId = provisionedPrincipalId,
     )
+    // Keep the controller and runtime attachment above transient auth states.
+    // Supabase briefly emits LoadingFromStorage when the app resumes; creating
+    // these below that gate used to dispose the graph, reset screen state and
+    // stop the shared runtime even though the user had not signed out.
+    val navController = rememberNavController()
+    val liveLinkServer = remember { LiveLinkServer.shared() }
+    var mainGraphEstablished by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(accessDecision) {
+        mainGraphEstablished = MainGraphRetentionPolicy.nextEstablished(
+            decision = accessDecision,
+            graphEstablished = mainGraphEstablished,
+        )
+    }
+
+    if (MainGraphRetentionPolicy.shouldRender(accessDecision, mainGraphEstablished)) {
+        DisposableEffect(obdViewModel, liveLinkServer) {
+            obdViewModel.attachLiveLinkServer(liveLinkServer)
+            onDispose {
+                liveLinkServer.stop()
+                obdViewModel.detachLiveLinkServer()
+            }
+        }
+    }
 
     if (passwordRecoveryRequested) {
         AuthScreen(
@@ -263,7 +293,9 @@ fun MeetApp(
         return
     }
 
-    if (accessDecision == PrincipalAccessPolicy.Decision.RESOLVING) {
+    if (!MainGraphRetentionPolicy.shouldRender(accessDecision, mainGraphEstablished) &&
+        accessDecision == PrincipalAccessPolicy.Decision.RESOLVING
+    ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
             CircularProgressIndicator(color = MeetColors.neonGreen)
         }
@@ -283,9 +315,6 @@ fun MeetApp(
         return
     }
 
-    val navController = rememberNavController()
-    val liveLinkServer = remember { LiveLinkServer.shared() }
-
     // Navigation collector for voice commands
     LaunchedEffect(Unit) {
         obdViewModel.navigationEvent.collect { route ->
@@ -302,15 +331,6 @@ fun MeetApp(
         }
     }
 
-    // Stop server when leaving composition
-    DisposableEffect(Unit) {
-        obdViewModel.attachLiveLinkServer(liveLinkServer)
-        onDispose { 
-            liveLinkServer.stop()
-            obdViewModel.detachLiveLinkServer()
-        }
-    }
-    
     val sharedPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
     val startDestination = "home"
     
@@ -319,6 +339,7 @@ fun MeetApp(
     val isPremium by obdViewModel.isPremium.collectAsState()
     val animatedIconStyle by rememberAnimatedIconStyle(context)
     val animatedIconClock = rememberAnimatedIconClock(animatedIconStyle)
+    val activeRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
     CompositionLocalProvider(
         LocalAnimatedIconStyle provides animatedIconStyle,
@@ -386,18 +407,18 @@ fun MeetApp(
             }
             composable("legal_vanguard") {
                 LegalVanguardHub(
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=legal") },
                 )
             }
             composable("elysium_properties") {
                 PropertiesHub(
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenLegal = { navController.navigate("legal_vanguard") },
                 )
             }
             composable("fuel_rewards") {
-                FuelRewardsHub(onBack = { navController.popBackStack() })
+                FuelRewardsHub(onBack = { navController.backOrHome() })
             }
             composable(
                 route = "messages?serviceVertical={serviceVertical}&serviceReferenceId={serviceReferenceId}&serviceTitle={serviceTitle}",
@@ -408,7 +429,7 @@ fun MeetApp(
                 ),
             ) { backStack ->
                 MessagesScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     serviceVertical = backStack.arguments?.getString("serviceVertical")?.takeIf(String::isNotBlank),
                     serviceReferenceId = backStack.arguments?.getString("serviceReferenceId")?.takeIf(String::isNotBlank),
                     serviceTitle = backStack.arguments?.getString("serviceTitle")
@@ -471,7 +492,7 @@ fun MeetApp(
                         make = vehicle.make,
                         model = vehicle.model,
                         year = vehicle.year,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.backOrHome() }
                     )
                 }
             }
@@ -492,7 +513,7 @@ fun MeetApp(
                 val dtcCode = backStack.arguments?.getString("dtcCode") ?: ""
                 AiDiagnosticScreen(
                     dtcCode = dtcCode,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     viewModel = obdViewModel,
                     onNavigateToSettings = { navController.navigate("ai_settings") },
                     onRequestMechanic = { info ->
@@ -547,7 +568,7 @@ fun MeetApp(
                 AiDiagnosticScreen(
                     dtcCode = "",
                     initialGroundedContext = atlasContext,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     viewModel = obdViewModel,
                     onNavigateToSettings = { navController.navigate("ai_settings") },
                     onRequestMechanic = { info ->
@@ -563,7 +584,7 @@ fun MeetApp(
                 val vehicle by obdViewModel.selectedVehicle.collectAsState()
                 val vehicleLabel = vehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Genérico"
                 SupportChatScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     vehicleInfo = vehicleLabel
                 )
             }
@@ -597,7 +618,7 @@ fun MeetApp(
                     vehicleVin = vehicle?.vin,
                     vehicleOdometerKm = null,
                     obdConnected = obdState == com.elysium369.meet.core.obd.ObdState.CONNECTED,
-                    onClose = { navController.popBackStack() }
+                    onClose = { navController.backOrHome() }
                 )
             }
             composable("vehicle_history/{vehicleId}") { backStack ->
@@ -608,7 +629,7 @@ fun MeetApp(
                 VehicleHistoryScreen(
                     vehicleId = vehicleId,
                     vehicleLabel = vehicle?.let { "${it.year} ${it.make} ${it.model}" } ?: vehicleId,
-                    onClose = { navController.popBackStack() },
+                    onClose = { navController.backOrHome() },
                     onOpenReport = { reportId ->
                         navController.navigate("inspection_session/$vehicleId")
                     }
@@ -616,7 +637,7 @@ fun MeetApp(
             }
             composable("oscilloscope") {
                 OscilloscopeScreen(
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     viewModel = obdViewModel
                 )
             }
@@ -624,7 +645,7 @@ fun MeetApp(
                 com.elysium369.meet.ui.screens.ExpertDiagnosticScreen(
                     viewModel = obdViewModel,
                     navController = navController,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.backOrHome() }
                 )
             }
             composable("vehicle_manuals") {
@@ -647,7 +668,7 @@ fun MeetApp(
                 val keyStore = remember { com.elysium369.meet.ai.data.AiSecureKeyStoreImpl(context) }
                 val registry = remember { com.elysium369.meet.ai.data.AiProviderRegistry(keyStore) }
                 com.elysium369.meet.ai.ui.AiSettingsScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     registry = registry,
                     keyStore = keyStore
                 )
@@ -662,7 +683,7 @@ fun MeetApp(
                     navController = navController,
                     viewModel = chatViewModel,
                     businessId = businessId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.backOrHome() }
                 )
             }
             composable("fleet_chat_detail") { backStack ->
@@ -672,14 +693,14 @@ fun MeetApp(
                 val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel(parentEntry)
                 FleetChatDetailScreen(
                     viewModel = chatViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     navController = navController
                 )
             }
             composable("premium") {
                 PremiumScreen(
                     viewModel = obdViewModel,
-                    onClose = { navController.popBackStack() }
+                    onClose = { navController.backOrHome() }
                 )
             }
             composable("health_score") {
@@ -732,10 +753,10 @@ fun MeetApp(
             }
             composable("connect") {
                 AdapterSearchSheet(
-                    onDismiss = { navController.popBackStack() },
+                    onDismiss = { navController.backOrHome() },
                     onConnect = { name, mac -> 
                         obdViewModel.connect(mac)
-                        navController.popBackStack()
+                        navController.backOrHome()
                     }
                 )
             }
@@ -747,7 +768,7 @@ fun MeetApp(
             composable("maintenance") {
                 MaintenanceScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.backOrHome() }
                 )
             }
             composable("custom_pid") {
@@ -755,7 +776,7 @@ fun MeetApp(
                     customPids = customPids,
                     onAddCustomPid = { obdViewModel.addCustomPid(it) },
                     onSyncPids = { obdViewModel.syncCustomPidsFromCloud() },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.backOrHome() }
                 )
             }
             composable("pre_purchase") {
@@ -812,7 +833,7 @@ fun MeetApp(
                     facade = evairViewModel.facade,
                     gateway = evairViewModel.gateway,
                     stateEngine = evairViewModel.stateEngine,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onNavigateToTerminal = { navController.navigate("terminal") },
                     onNavigateToLiveTelemetry = { navController.navigate("scanner") }
                 )
@@ -823,7 +844,7 @@ fun MeetApp(
                     facade = evairViewModel.facade,
                     gateway = evairViewModel.gateway,
                     stateEngine = evairViewModel.stateEngine,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onNavigateToTerminal = { navController.navigate("terminal") },
                     onNavigateToLiveTelemetry = { navController.navigate("scanner") }
                 )
@@ -845,7 +866,7 @@ fun MeetApp(
             composable("dekra_concierge") {
                 DekraConciergeScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenGarage = { navController.navigate("garage") },
                     onOpenTow = { navController.navigate("tow_truck_service") },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=inspection") },
@@ -855,13 +876,13 @@ fun MeetApp(
                 val theoryViewModel: TheoryExamViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 TheoryExamPreparationScreen(
                     viewModel = theoryViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                 )
             }
             composable("learning_hub") {
                 LearningHubScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenDrivingTheory = { navController.navigate("theory_exam_preparation") },
                     onOpenMissionDetail = { missionId -> navController.navigate("mission_detail/$missionId") },
                     onOpenMultimeterSimulation = { navController.navigate("multimeter_simulation") },
@@ -876,38 +897,38 @@ fun MeetApp(
                 MissionDetailScreen(
                     missionId = missionId,
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenSimulation = { navController.navigate("multimeter_simulation") }
                 )
             }
             composable("multimeter_simulation") {
                 MultimeterSimulationScreen(
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.backOrHome() }
                 )
             }
             composable("capability_passport") {
                 CapabilityPassportScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.backOrHome() }
                 )
             }
             composable("universal_services") {
                 UniversalServicesScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
                 )
             }
             composable("provider_registration") {
                 ProviderRegistrationScreen(
                     viewModel = obdViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.backOrHome() }
                 )
             }
             composable("platform_trust_center") {
                 PlatformTrustCenterScreen(
                     viewModel = obdViewModel,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                 )
             }
             composable("repair_case_detail/{caseId}") { backStack ->
@@ -978,7 +999,7 @@ fun MeetApp(
                 com.elysium369.meet.ui.screens.TowTruckServiceScreen(
                     viewModel = obdViewModel,
                     prefilledVehicleInfo = vehicleInfo,
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=tow") },
                 )
             }
@@ -998,7 +1019,7 @@ fun MeetApp(
                 com.elysium369.meet.ui.screens.MechanicServiceScreen(
                     viewModel = obdViewModel,
                     prefilledVehicleInfo = vehicleInfo,
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onPostScanRequested = { vehicleId ->
                         navController.navigate("inspection_session/$vehicleId")
                     },
@@ -1029,14 +1050,14 @@ fun MeetApp(
                     prefilledAtlasPartId = backStack.arguments
                         ?.getString("atlasPartId")
                         ?.takeIf { it.isNotBlank() },
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=parts") },
                 )
             }
             composable("ride_service") {
                 com.elysium369.meet.ui.screens.RideServiceScreen(
                     viewModel = obdViewModel,
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onOpenDriverRegistration = {
                         navController.navigate("provider_registration")
                     },
@@ -1052,7 +1073,7 @@ fun MeetApp(
             composable("ai") {
                 AiDiagnosticScreen(
                     dtcCode = "",
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.backOrHome() },
                     viewModel = obdViewModel,
                     onNavigateToSettings = { navController.navigate("ai_settings") },
                     onRequestMechanic = { info ->
@@ -1086,12 +1107,12 @@ fun MeetApp(
             composable("tow_truck") {
                 TowTruckServiceScreen(
                     viewModel = obdViewModel,
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=tow") },
                 )
             }
             composable("trust_center") {
-                PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.popBackStack() })
+                PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.backOrHome() })
             }
             composable("trip_log") {
                 TripScreen(trips = trips, isPremium = isPremium, onExportPdf = { obdViewModel.exportTripToPdf(it) })
@@ -1108,7 +1129,7 @@ fun MeetApp(
             composable("ride_home") {
                 com.elysium369.meet.ui.screens.RideServiceScreen(
                     viewModel = obdViewModel,
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = { navController.backOrHome() },
                     onOpenDriverRegistration = {
                         navController.navigate("provider_registration")
                     },
@@ -1123,17 +1144,20 @@ fun MeetApp(
             }
             composable("fleet") {
                 val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                FleetChatListScreen(navController = navController, viewModel = chatViewModel, businessId = "fleet_default", onBack = { navController.popBackStack() })
+                FleetChatListScreen(navController = navController, viewModel = chatViewModel, businessId = "fleet_default", onBack = { navController.backOrHome() })
             }
             composable("support") {
                 val vehicle by obdViewModel.selectedVehicle.collectAsState()
                 val vehicleLabel = vehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Genérico"
-                SupportChatScreen(onBack = { navController.popBackStack() }, vehicleInfo = vehicleLabel)
+                SupportChatScreen(onBack = { navController.backOrHome() }, vehicleInfo = vehicleLabel)
             }
             composable("battery_health") {
                 HealthScoreScreen(navController = navController, viewModel = obdViewModel)
             }
         }
+        }
+        BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {
+            navController.backOrHome()
         }
     }
 }
@@ -1152,7 +1176,7 @@ fun MeetBottomNavigation(navController: NavController) {
             icon = { AnimatedNeonIcon(Icons.Default.Home, "Home") },
             label = { Text("Inicio", fontSize = 10.sp) },
             selected = currentRoute == "home",
-            onClick = { navController.navigate("home") { launchSingleTop = true; restoreState = true } },
+            onClick = { navController.navigateTopLevel("home") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeetColors.neonGreen,
                 selectedTextColor = MeetColors.neonGreen,
@@ -1165,7 +1189,7 @@ fun MeetBottomNavigation(navController: NavController) {
             icon = { AnimatedNeonIcon(Icons.Default.Build, "Scanner") },
             label = { Text("Scanner", fontSize = 10.sp) },
             selected = currentRoute == "scanner",
-            onClick = { navController.navigate("scanner") { launchSingleTop = true } },
+            onClick = { navController.navigateTopLevel("scanner") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeetColors.cyberCyan,
                 selectedTextColor = MeetColors.cyberCyan,
@@ -1178,7 +1202,7 @@ fun MeetBottomNavigation(navController: NavController) {
             icon = { AnimatedNeonIcon(Icons.Default.Warning, "DTCs") },
             label = { Text("DTCs", fontSize = 10.sp) },
             selected = currentRoute == "dtc",
-            onClick = { navController.navigate("dtc") { launchSingleTop = true } },
+            onClick = { navController.navigateTopLevel("dtc") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeetColors.error,
                 selectedTextColor = MeetColors.error,
@@ -1191,7 +1215,7 @@ fun MeetBottomNavigation(navController: NavController) {
             icon = { AnimatedNeonIcon(Icons.Default.List, "Garage") },
             label = { Text("Garage", fontSize = 10.sp) },
             selected = currentRoute == "garage",
-            onClick = { navController.navigate("garage") { launchSingleTop = true } },
+            onClick = { navController.navigateTopLevel("garage") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeetColors.electricBlue,
                 selectedTextColor = MeetColors.electricBlue,
@@ -1204,7 +1228,7 @@ fun MeetBottomNavigation(navController: NavController) {
             icon = { AnimatedNeonIcon(Icons.Default.Star, "PRO") },
             label = { Text("PRO", fontSize = 10.sp) },
             selected = currentRoute == "pro_hub",
-            onClick = { navController.navigate("pro_hub") { launchSingleTop = true } },
+            onClick = { navController.navigateTopLevel("pro_hub") },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = MeetColors.hotMagenta,
                 selectedTextColor = MeetColors.hotMagenta,

@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
@@ -175,7 +177,7 @@ fun VehicleManualsScreen(
             EliteTopAppBar(
                 title = "CENTRO DE MANUALES",
                 subtitle = "Manuales y Diagramas de Taller",
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.backOrHome() }
             )
         },
         containerColor = Color.Transparent

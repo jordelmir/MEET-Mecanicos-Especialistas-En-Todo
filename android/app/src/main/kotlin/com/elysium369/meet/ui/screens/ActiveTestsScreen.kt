@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.backOrHome
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -56,7 +58,7 @@ fun ActiveTestsScreen(navController: NavController, viewModel: com.elysium369.me
             EliteTopAppBar(
                 title = "PRUEBAS ACTIVAS ELITE",
                 subtitle = "CONTROL BIDIRECCIONAL & TELEMETRÍA",
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark
             )
         },

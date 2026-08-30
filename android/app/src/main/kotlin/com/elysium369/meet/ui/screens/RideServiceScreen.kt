@@ -558,10 +558,10 @@ fun PassengerDashboard(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val allRides by viewModel.rideRequests.collectAsState()
 
-    var destAddress by remember { mutableStateOf("") }
-    var destLatitude by remember { mutableDoubleStateOf(0.0) }
-    var destLongitude by remember { mutableDoubleStateOf(0.0) }
-    var destinationPlaceId by remember { mutableStateOf<String?>(null) }
+    var destAddress by rememberSaveable { mutableStateOf("") }
+    var destLatitude by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var destLongitude by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var destinationPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var destinationSuggestions by remember { mutableStateOf(emptyList<RidePlaceSuggestion>()) }
     var destinationSearchLoading by remember { mutableStateOf(false) }
     var destinationSearchFailed by remember { mutableStateOf(false) }
@@ -569,7 +569,7 @@ fun PassengerDashboard(
     var pickupPin by remember { mutableStateOf<RideGeoPoint?>(null) }
     var pendingMapPin by remember { mutableStateOf<RideGeoPoint?>(null) }
     var stops by remember { mutableStateOf(emptyList<RideStopSnapshot>()) }
-    var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
+    var paymentMethod by rememberSaveable { mutableStateOf(RidePaymentMethod.CASH) }
     val placeSearchProvider = remember {
         resilientRidePlaceSearchProvider(
             primaryEndpoint = BuildConfig.RIDE_GEOCODER_URL,
@@ -588,8 +588,8 @@ fun PassengerDashboard(
     val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
     var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
 
-    var offerPrice by remember { mutableDoubleStateOf(2_400.0) }
-    var isUsd by remember { mutableStateOf(false) }
+    var offerPrice by rememberSaveable { mutableDoubleStateOf(2_400.0) }
+    var isUsd by rememberSaveable { mutableStateOf(false) }
     var fareMode by rememberSaveable { mutableStateOf(RideFareMode.OPEN_BID) }
 
     // Passenger verification state
