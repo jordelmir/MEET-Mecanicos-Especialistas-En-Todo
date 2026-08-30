@@ -1510,7 +1510,7 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun currentProviderUserId(): String {
-        return activePrincipalKernel.current().id
+        return currentCloudUserId() ?: activePrincipalKernel.current().id
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1550,7 +1550,7 @@ class ObdViewModel @Inject constructor(
                                 profile.isActive &&
                                     !profile.verified &&
                                     profile.profileId !in submittedProfileReferences &&
-                                    ServiceVerificationTypePolicy.canonicalLegacyType(
+                                    ServiceVerificationTypePolicy.canonicalSubmissionType(
                                         profile.providerType,
                                     ) != null
                             }
@@ -1615,7 +1615,7 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    /** Register user as a provider (MECHANIC, TOW_TRUCK, or PARTS_STORE) */
+    /** Register an authenticated user in any supported service-provider category. */
     fun registerAsProvider(
         providerType: String,
         businessName: String,
@@ -1630,7 +1630,17 @@ class ObdViewModel @Inject constructor(
         context: android.content.Context? = null
     ) {
         val cloudUserId = currentCloudUserId()
-        val userId = currentProviderUserId()
+        if (cloudUserId == null) {
+            context?.let {
+                android.widget.Toast.makeText(
+                    it,
+                    "Inicia sesión antes de enviar una solicitud de proveedor.",
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+            return
+        }
+        val userId = cloudUserId
         val canonicalProviderType =
             com.elysium369.meet.core.services.kernel.ProviderType
                 .fromDbValueStrict(providerType)
@@ -1660,6 +1670,9 @@ class ObdViewModel @Inject constructor(
                         android.widget.Toast.makeText(it, "✅ Ya estás registrado como $typeLabel", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
+                // A previous remote attempt may have failed. Reconcile and retry
+                // instead of treating the local row as proof of delivery.
+                refreshProviderRoles()
                 return@launch
             }
 
@@ -1686,29 +1699,25 @@ class ObdViewModel @Inject constructor(
 
             providerProfileDao.insertProfile(profile)
 
-            val cloudSubmission = if (cloudUserId != null) {
-                runCatching {
-                    PlatformTrustCenterGateway.submit(
-                        ServiceVerificationSubmission(
-                            serviceType = canonicalProviderType.dbValue,
-                            profileReference = profile.profileId,
-                            displayName = ownerName,
-                            businessName = businessName,
-                            phone = phone,
-                            locationLabel = location,
-                            licenseReference = licenseNumber.takeIf { it.isNotBlank() },
-                        ),
-                    )
-                }
-            } else null
+            val cloudSubmission = runCatching {
+                PlatformTrustCenterGateway.submit(
+                    ServiceVerificationSubmission(
+                        serviceType = canonicalProviderType.dbValue,
+                        profileReference = profile.profileId,
+                        displayName = ownerName,
+                        businessName = businessName,
+                        phone = phone,
+                        locationLabel = location,
+                        licenseReference = licenseNumber.takeIf { it.isNotBlank() },
+                    ),
+                )
+            }
 
             withContext(Dispatchers.Main) {
                 context?.let {
                     val typeLabel = providerTypeLabel(canonicalProviderType.dbValue)
                     val message = when {
-                        cloudUserId == null ->
-                            "Perfil de $typeLabel guardado localmente. Inicia sesión para enviarlo a verificación."
-                        cloudSubmission?.isSuccess == true ->
+                        cloudSubmission.isSuccess ->
                             "Solicitud de $typeLabel enviada al Centro de Confianza. Estado: pendiente."
                         else ->
                             "Perfil guardado localmente; la verificación remota está pendiente de sincronización."
@@ -1718,6 +1727,26 @@ class ObdViewModel @Inject constructor(
             }
 
             refreshProviderRoles()
+        }
+    }
+
+    /**
+     * Replays every durable local trust application after authentication and
+     * reconciles authoritative decisions. Safe to call on every app/session resume.
+     */
+    fun syncPendingTrustApplications() {
+        if (currentCloudUserId() == null) return
+        refreshProviderRoles()
+        refreshOwnTrustDecisions()
+        viewModelScope.launch(Dispatchers.IO) {
+            val driver = rideDao.getDriverVerification(localDeviceId)
+            if (
+                driver != null &&
+                driver.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED) &&
+                evaluateDriverEvidence(driver).isReady
+            ) {
+                enqueueDriverPilotEnrollment(driver)
+            }
         }
     }
 
@@ -3405,6 +3434,7 @@ class ObdViewModel @Inject constructor(
                     .apply()
                 refreshProviderRoles()
                 if (principal.isAuthenticated) {
+                    syncPendingTrustApplications()
                     withContext(Dispatchers.IO) {
                         vehicleRepository.syncVehiclesFromCloud(principal.id)
                     }
@@ -9126,6 +9156,12 @@ class ObdViewModel @Inject constructor(
         pathVehicleInterior: String
     ) {
         viewModelScope.launch {
+            if (currentCloudUserId() == null) {
+                _rideVerificationNotice.emit(
+                    "Inicia sesión antes de enviar tu expediente de chofer.",
+                )
+                return@launch
+            }
             val now = System.currentTimeMillis()
             val evidenceFiles = listOf(
                 verificationFileEvidence("license_front", pathLicenciaFront),
@@ -9333,6 +9369,12 @@ class ObdViewModel @Inject constructor(
         pathSelfieWithCedula: String
     ) {
         viewModelScope.launch {
+            if (currentCloudUserId() == null) {
+                _rideVerificationNotice.emit(
+                    "Inicia sesión antes de enviar tu verificación de pasajero.",
+                )
+                return@launch
+            }
             val now = System.currentTimeMillis()
             val evidence = RideVerificationEvidencePolicy.evaluatePassenger(
                 fullName = fullName,

@@ -25,13 +25,25 @@ class ServiceVerificationTypePolicyTest {
 
     @Test
     fun `every server capability has an explicit client identifier`() {
-        assertEquals(12, ServiceVerificationTypePolicy.capabilityTypes.size)
+        assertEquals(13, ServiceVerificationTypePolicy.capabilityTypes.size)
         assertTrue("WORKSHOP" in ServiceVerificationTypePolicy.capabilityTypes)
+        assertTrue("AUTO_LOCKSMITH" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("LAWYER" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("NOTARY" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("PROPERTY_BROKER" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("PROPERTY_SELLER" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("FUEL_STATION_STAFF" in ServiceVerificationTypePolicy.capabilityTypes)
         assertTrue("FLEET_OPERATOR" in ServiceVerificationTypePolicy.capabilityTypes)
+    }
+
+    @Test
+    fun `every provider registration alias enters the unified review queue`() {
+        assertEquals("WORKSHOP", ServiceVerificationTypePolicy.canonicalSubmissionType("workshop"))
+        assertEquals(
+            "AUTO_LOCKSMITH",
+            ServiceVerificationTypePolicy.canonicalSubmissionType("auto_locksmith"),
+        )
+        assertEquals("TOW_TRUCK", ServiceVerificationTypePolicy.canonicalSubmissionType("tow_provider"))
+        assertNull(ServiceVerificationTypePolicy.canonicalSubmissionType("platform_owner"))
     }
 }

@@ -83,6 +83,22 @@ private val providerTypes = listOf(
         specialtiesPlaceholder = "Ej: Motor, Transmisión, Carrocería, Eléctrico…"
     ),
     ProviderTypeInfo(
+        type = "WORKSHOP",
+        icon = "🏭",
+        label = "Taller",
+        subtitle = "Administra servicios, especialistas y capacidad de un taller",
+        accentColor = MeetColors.cyberCyan,
+        specialtiesPlaceholder = "Ej: Diagnóstico, Motor, Carrocería, Híbridos…"
+    ),
+    ProviderTypeInfo(
+        type = "AUTO_LOCKSMITH",
+        icon = "🔑",
+        label = "Cerrajería automotriz",
+        subtitle = "Ofrece apertura, llaves, inmovilizadores y programación",
+        accentColor = MeetColors.warning,
+        specialtiesPlaceholder = "Ej: Llaves, Inmovilizador, Apertura, ECU…"
+    ),
+    ProviderTypeInfo(
         type = "RIDE_DRIVER",
         icon = "🚗",
         label = "Chofer de Viajes",
@@ -103,7 +119,7 @@ fun ProviderRegistrationScreen(
     val context = LocalContext.current
 
     LaunchedEffect(viewModel) {
-        viewModel.refreshOwnTrustDecisions()
+        viewModel.syncPendingTrustApplications()
         viewModel.rideVerificationNotice.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
@@ -218,10 +234,10 @@ fun ProviderRegistrationScreen(
                     com.elysium369.meet.core.services.kernel.ProviderType
                         .fromDbValue(it.providerType) == canonicalType
                 }
-                val alreadyRegistered = when (typeInfo.type) {
-                    "MECHANIC", "TOW_TRUCK", "PARTS_STORE" -> matchingProfile != null
-                    "RIDE_DRIVER" -> RideVerificationPolicy.grantsAccess(driverVerification?.status)
-                    else -> false
+                val alreadyRegistered = if (typeInfo.type == "RIDE_DRIVER") {
+                    driverVerification != null
+                } else {
+                    matchingProfile != null
                 }
                 val statusLabel = when {
                     typeInfo.type != "RIDE_DRIVER" && matchingProfile?.verified == true ->
@@ -241,6 +257,14 @@ fun ProviderRegistrationScreen(
                     alreadyRegistered = alreadyRegistered,
                     statusLabel = statusLabel,
                     onClick = {
+                        if (!isCloudSession) {
+                            Toast.makeText(
+                                context,
+                                "Inicia sesión para enviar una solicitud al Centro de Confianza.",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                            return@RegistrationTypeCard
+                        }
                         if (typeInfo.type == "RIDE_DRIVER") {
                             showDriverOnboarding = true
                         } else if (!alreadyRegistered) {
@@ -794,7 +818,8 @@ private fun RegistrationTypeCard(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Tu perfil está activo y visible para clientes",
+                        text = statusLabel
+                            ?: "Perfil local creado; la autoridad todavía no ha confirmado su estado.",
                         color = MeetColors.textMuted,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center

@@ -50,6 +50,7 @@ fun FleetChatListScreen(
 
     // Active selected business ID
     LaunchedEffect(businessId) {
+        viewModel.syncPendingFleetOperatorApplications()
         if (businessId.isNotEmpty()) {
             viewModel.selectBusiness(businessId)
         }
@@ -188,9 +189,13 @@ fun FleetChatListScreen(
                     text = "Registrar",
                     onClick = {
                         if (bizName.isNotBlank()) {
-                            viewModel.createBusinessProfile(bizName, taxId.takeIf { it.isNotBlank() })
-                            showCreateBusinessDialog = false
-                            Toast.makeText(context, "Empresa registrada con éxito", Toast.LENGTH_SHORT).show()
+                            viewModel.createBusinessProfile(
+                                bizName,
+                                taxId.takeIf { it.isNotBlank() },
+                            ) { success, message ->
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                if (success) showCreateBusinessDialog = false
+                            }
                         }
                     }
                 )

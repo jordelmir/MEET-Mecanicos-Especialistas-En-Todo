@@ -231,3 +231,43 @@ select
     ) as non_winners
 from public.ride_concurrency_results;
 SQL
+
+# Compile and exercise the late-August legacy RPC repairs against the same
+# authoritative command schema. The production presence table uses PostGIS;
+# this narrow test double keeps this gate portable while preserving every
+# column and constraint used by auto-match.
+psql "${psql_args[@]}" <<'SQL'
+alter table public.ride_driver_vehicles
+    add column if not exists make text,
+    add column if not exists model text,
+    add column if not exists model_year integer,
+    add column if not exists color text,
+    add column if not exists plate_masked text;
+
+create table public.ride_driver_presence (
+    driver_id uuid primary key references public.ride_profiles(user_id) on delete cascade,
+    vehicle_id uuid references public.ride_driver_vehicles(id) on delete set null,
+    tenant_id uuid not null default '00000000-0000-0000-0000-00000000e1a1'
+        references public.ride_tenants(id),
+    availability text not null default 'OFFLINE' check (
+        availability in (
+            'OFFLINE', 'AVAILABLE', 'OFFERING', 'RESERVED',
+            'FINISHING_CURRENT_TRIP', 'EN_ROUTE_TO_PICKUP',
+            'PICKUP_WAITING', 'IN_TRIP', 'PAUSED', 'SUSPENDED', 'STALE'
+        )
+    ),
+    current_trip_id uuid references public.ride_requests(id) on delete set null,
+    updated_at timestamptz not null default now()
+);
+SQL
+
+for migration in \
+  20260825040000_ride_driver_reputation.sql \
+  20260825050000_ride_auto_match.sql \
+  20260825080000_ride_demand_pricing_payment_guardian_jurisdiction.sql \
+  20260829020000_ride_legacy_schema_drift_hardening.sql; do
+  psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/$migration" >/dev/null
+done
+
+psql "${psql_args[@]}" \
+  -f "$repo_root/tests/ride/ride-schema-drift-hardening-integration.sql"

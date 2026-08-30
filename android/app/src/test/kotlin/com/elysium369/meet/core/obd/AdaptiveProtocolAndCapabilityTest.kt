@@ -42,6 +42,9 @@ class AdaptiveProtocolAndCapabilityTest {
         assertEquals(DiagnosticProbeSpeed.EXHAUSTIVE_SAFE_PROBE, plan.probeSpeed)
         assertEquals(50L, plan.interCommandDelayMs)
         assertFalse(plan.enableAdaptiveTiming)
+        assertEquals("ATAT0", ElmNegotiator.adaptiveTimingCommand("ELM327 v2.1"))
+        assertEquals("ATAT1", ElmNegotiator.adaptiveTimingCommand("ELM327 v1.5"))
+        assertEquals("ATAT1", ElmNegotiator.adaptiveTimingCommand("STN1170 v4.2"))
     }
 
     @Test
@@ -54,6 +57,8 @@ class AdaptiveProtocolAndCapabilityTest {
         assertTrue(hyundai.any { it.id == "HYUNDAI_KLINE_ISO9141" })
         assertTrue(hyundai.none { it.manufacturer in setOf("TOYOTA", "VOLKSWAGEN", "FORD", "GM", "NISSAN", "RENAULT") })
         assertEquals("HYUNDAI", hyundai.first().manufacturer)
+        assertEquals("HYUNDAI_KLINE_ISO9141", hyundai.first().id)
+        assertEquals("686AF1", hyundai.first().requestHeader)
     }
 
     @Test
@@ -70,6 +75,41 @@ class AdaptiveProtocolAndCapabilityTest {
             evidence.redactedDetail(),
         )
         assertFalse(evidence.redactedDetail().contains("VIN", ignoreCase = true))
+    }
+
+    @Test
+    fun elmBannerIsReadyBeforeProtocolAndEcuFrameIsOnlyHandshakeEvidence() {
+        val coordinator = ObdLinkHealthCoordinator()
+        coordinator.onUserConnectRequested(
+            ConnectionAttempt(
+                attemptId = "attempt-obd-evidence",
+                adapterAddress = "AA:BB:CC:DD:EE:FF",
+                generation = 1,
+            )
+        )
+        coordinator.onTransportStateChanged(TransportLinkState.Connected)
+        coordinator.onElmSyncStarted()
+        coordinator.onProtocolNegotiating()
+        coordinator.onNegotiationEvidence(
+            ElmNegotiator.NegotiationEvidence(
+                ElmNegotiator.EvidenceType.ELM_BANNER_RECEIVED,
+                detail = "adapter_class=CLONE_COMPATIBLE",
+            )
+        )
+
+        assertEquals(ElmLinkState.READY, coordinator.truth.value.elmState)
+        assertEquals(ProtocolLinkState.NEGOTIATING, coordinator.truth.value.protocolState)
+        assertEquals(EcuLinkState.UNKNOWN, coordinator.truth.value.ecuState)
+
+        coordinator.onNegotiationEvidence(
+            ElmNegotiator.NegotiationEvidence(
+                ElmNegotiator.EvidenceType.FIRST_VALID_ECU_FRAME,
+                protocol = ObdProtocol.ISO9141,
+                attemptOrdinal = 1,
+            )
+        )
+        assertEquals(EcuLinkState.UNKNOWN, coordinator.truth.value.ecuState)
+        assertTrue(coordinator.getTrace().getEvents().any { it.event == "ECU_HANDSHAKE" })
     }
 
     @Test

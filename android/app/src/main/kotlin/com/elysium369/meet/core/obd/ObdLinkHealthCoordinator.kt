@@ -257,6 +257,21 @@ class ObdLinkHealthCoordinator(
 
     fun onNegotiationEvidence(evidence: ElmNegotiator.NegotiationEvidence) {
         trace.log(evidence.type.name, evidence.redactedDetail().ifBlank { null })
+        when (evidence.type) {
+            ElmNegotiator.EvidenceType.ELM_BANNER_RECEIVED -> {
+                val now = System.nanoTime() / 1_000_000L
+                _truth.update {
+                    it.copy(
+                        elmState = ElmLinkState.READY,
+                        elmIdentity = "ELM327-compatible",
+                        elmLastProofMonotonicMs = now,
+                    )
+                }
+                trace.log("ELM_READY", "banner_verified")
+            }
+            ElmNegotiator.EvidenceType.FIRST_VALID_ECU_FRAME -> onEcuHandshake()
+            else -> Unit
+        }
     }
 
     fun onMotionObservedDuringNegotiation() {

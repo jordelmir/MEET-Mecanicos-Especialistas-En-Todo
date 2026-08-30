@@ -61,6 +61,7 @@ CREATE OR REPLACE FUNCTION public.elysium_publish_outbox_event(
 ) RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_event_id UUID;
@@ -103,3 +104,12 @@ BEGIN
     RETURN v_event_id;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.elysium_publish_outbox_event(
+    TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TEXT, TEXT, JSONB,
+    UUID, UUID, TEXT, TEXT, TEXT
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.elysium_publish_outbox_event(
+    TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TEXT, TEXT, JSONB,
+    UUID, UUID, TEXT, TEXT, TEXT
+) TO service_role;

@@ -1917,6 +1917,12 @@ class RideViewModel @Inject constructor(
         pathVehicleInterior: String
     ) {
         viewModelScope.launch {
+            if (currentCloudUserId() == null) {
+                _rideVerificationNotice.emit(
+                    "Inicia sesión antes de enviar tu expediente de chofer.",
+                )
+                return@launch
+            }
             val now = System.currentTimeMillis()
             val evidenceFiles = listOf(
                 verificationFileEvidence("license_front", pathLicenciaFront),
@@ -2112,6 +2118,12 @@ class RideViewModel @Inject constructor(
         pathSelfieWithCedula: String
     ) {
         viewModelScope.launch {
+            if (currentCloudUserId() == null) {
+                _rideVerificationNotice.emit(
+                    "Inicia sesión antes de enviar tu verificación de pasajero.",
+                )
+                return@launch
+            }
             val now = System.currentTimeMillis()
             val evidence = RideVerificationEvidencePolicy.evaluatePassenger(
                 fullName = fullName,

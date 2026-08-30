@@ -11,12 +11,15 @@ import com.elysium369.meet.data.local.dao.FleetDao
 import com.elysium369.meet.data.local.dao.VehicleDao
 import com.elysium369.meet.data.local.entities.*
 import com.elysium369.meet.data.supabase.SupabaseManager
+import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -364,8 +367,19 @@ class FleetChatViewModel @Inject constructor(
     /**
      * Create a business profile
      */
-    fun createBusinessProfile(name: String, taxId: String? = null) {
+    fun createBusinessProfile(
+        name: String,
+        taxId: String? = null,
+        onResult: (Boolean, String) -> Unit = { _, _ -> },
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
+            val authenticatedUserId = SupabaseManager.client.auth.currentUserOrNull()?.id
+            if (authenticatedUserId == null) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "Inicia sesión antes de registrar una empresa de flota.")
+                }
+                return@launch
+            }
             val profile = BusinessProfileEntity(
                 id = "b_${UUID.randomUUID().toString().take(6)}",
                 name = name,
@@ -373,10 +387,60 @@ class FleetChatViewModel @Inject constructor(
                 planType = "PREMIUM_FLEET",
                 maxVehicles = 50,
                 createdAt = System.currentTimeMillis(),
-                ownerUserId = currentUserId
+                ownerUserId = authenticatedUserId
             )
             fleetDao.insertBusinessProfile(profile)
             _selectedBusinessId.value = profile.id
+            val delivery = runCatching {
+                PlatformTrustCenterGateway.submit(
+                    ServiceVerificationSubmission(
+                        serviceType = "FLEET_OPERATOR",
+                        profileReference = profile.id,
+                        displayName = name.trim(),
+                        businessName = name.trim(),
+                    ),
+                )
+            }
+            withContext(Dispatchers.Main) {
+                if (delivery.isSuccess) {
+                    onResult(
+                        true,
+                        "Empresa creada y solicitud enviada al Centro de Confianza. Estado: pendiente.",
+                    )
+                } else {
+                    onResult(
+                        true,
+                        "Empresa guardada; la solicitud remota queda pendiente y se reintentará al abrir este panel.",
+                    )
+                }
+            }
+        }
+    }
+
+    /** Replays locally durable fleet applications that have no remote receipt yet. */
+    fun syncPendingFleetOperatorApplications() {
+        val authenticatedUserId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val delivered = PlatformTrustCenterGateway.loadOwnApplications()
+                    .asSequence()
+                    .filter { it.serviceType == "FLEET_OPERATOR" }
+                    .mapTo(mutableSetOf()) { it.profileReference }
+                fleetDao.getBusinessProfilesForOwner(authenticatedUserId).first()
+                    .filterNot { it.id in delivered }
+                    .forEach { profile ->
+                        PlatformTrustCenterGateway.submit(
+                            ServiceVerificationSubmission(
+                                serviceType = "FLEET_OPERATOR",
+                                profileReference = profile.id,
+                                displayName = profile.name,
+                                businessName = profile.name,
+                            ),
+                        )
+                    }
+            }.onFailure {
+                Log.w("MeetTrustCenter", "Fleet operator review sync unavailable", it)
+            }
         }
     }
 

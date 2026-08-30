@@ -88,7 +88,9 @@ data class VehicleLinkRecipe(
             displayName = "Hyundai/Kia ISO 9141-2 Physical",
             manufacturer = "HYUNDAI",
             protocol = ObdProtocol.ISO9141,
-            requestHeader = "686A10",
+            // SAE OBD functional request header. The ELM327 specification uses
+            // 68 6A F1 for ISO 9141; 0x10 is not the tester source address.
+            requestHeader = "686AF1",
             initCommands = listOf("ATIB10", "ATAL"),
             probeTimeoutMs = 5000L
         )
@@ -194,7 +196,19 @@ data class VehicleLinkRecipe(
         ): List<VehicleLinkRecipe> {
             val manufacturerRecipes = getRecipesForManufacturer(manufacturer)
             return if (manufacturerRecipes.isNotEmpty() && vehicleYear != null && vehicleYear < 2008) {
-                manufacturerRecipes + GENERIC_RECIPES
+                // Older vehicles justify trying their standard OBD legacy path
+                // before spending time on OEM-specific KWP wake-up variants.
+                manufacturerRecipes.sortedWith(
+                    compareBy<VehicleLinkRecipe> {
+                        when (it.protocol) {
+                            ObdProtocol.ISO9141 -> 0
+                            ObdProtocol.KWP2000_FAST -> 1
+                            ObdProtocol.KWP2000 -> 2
+                            ObdProtocol.J1850_PWM, ObdProtocol.J1850_VPW -> 3
+                            else -> 4
+                        }
+                    }.thenByDescending { it.confidence }
+                ) + GENERIC_RECIPES
             } else {
                 GENERIC_RECIPES + manufacturerRecipes
             }.distinctBy(VehicleLinkRecipe::id)

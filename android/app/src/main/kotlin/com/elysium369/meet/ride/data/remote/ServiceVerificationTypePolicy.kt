@@ -23,6 +23,7 @@ object ServiceVerificationTypePolicy {
         "PARTS_STORE",
         "SERVICE_PROVIDER",
         "WORKSHOP",
+        "AUTO_LOCKSMITH",
         "LAWYER",
         "NOTARY",
         "PROPERTY_BROKER",
@@ -45,6 +46,14 @@ object ServiceVerificationTypePolicy {
     fun canonicalCapability(rawValue: String): String? {
         val legacy = canonicalLegacyType(rawValue)
         if (legacy != null && legacy != "PASSENGER") return legacy
-        return rawValue.trim().uppercase(Locale.ROOT).takeIf(capabilityTypes::contains)
+        val normalized = rawValue.trim().uppercase(Locale.ROOT)
+        val canonical = when (normalized) {
+            "LOCKSMITH", "KEYS" -> "AUTO_LOCKSMITH"
+            else -> normalized
+        }
+        return canonical.takeIf(capabilityTypes::contains)
     }
+
+    fun canonicalSubmissionType(rawValue: String): String? =
+        canonicalLegacyType(rawValue) ?: canonicalCapability(rawValue)
 }

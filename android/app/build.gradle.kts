@@ -50,10 +50,10 @@ android {
         applicationId = "com.elysium369.meet"
         minSdk = 26
         targetSdk = 36
-        // Release identity for the integrated Vehicle Truth hardening, DEKRA
-        // concierge and 2026 Theory Exam Academy publication.
-        versionCode = 47
-        versionName = "4.21.0"
+        // Trust Center Delivery V2: durable registrations, AAL2 review,
+        // Realtime reconciliation and correlated observability.
+        versionCode = 48
+        versionName = "4.22.0"
 
         val meetBuildSha = providers.environmentVariable("MEET_BUILD_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))

@@ -32,6 +32,7 @@ object TelemetryPrivacyPolicy {
         "confirmedModules", "attemptedModules", "completedModules", "plannedServices",
         "completedServices", "taxonomyVersion", "triageState", "urgency",
         "capability", "activationState", "reviewDecision", "queueAgeBucket",
+        "queueStatus", "itemCount", "connectionState", "retryOrdinal",
         "androidVersion", "deviceFamily", "networkType", "sampled",
     )
     private val controlledValue = Regex("[A-Za-z0-9_.:/-]{1,96}")

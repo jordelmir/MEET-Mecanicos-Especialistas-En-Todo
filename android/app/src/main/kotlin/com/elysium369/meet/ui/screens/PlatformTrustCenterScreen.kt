@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -41,16 +43,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.core.share.QrCodeImage
+import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.observability.TrustCenterObservability
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.TrustQueueSnapshot
+import com.elysium369.meet.ride.data.remote.TrustRealtimeSignal
 import com.elysium369.meet.ride.data.remote.TrustVerificationApplication
 import com.elysium369.meet.ride.domain.PlatformOwnerAccess
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import com.elysium369.meet.ui.theme.MeetColors
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.mfa.FactorType
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+private const val TRUST_QUEUE_HEARTBEAT_MS = 30_000L
+
+private enum class TrustRealtimeState { CONNECTING, LIVE, RECOVERING, OFFLINE }
+
+private data class TrustMfaState(
+    val isAal2: Boolean = false,
+    val verifiedFactorId: String? = null,
+)
+
+private data class TrustMfaEnrollment(
+    val factorId: String,
+    val uri: String,
+    val secret: String,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,32 +94,110 @@ fun PlatformTrustCenterScreen(
 ) {
     val access by viewModel.platformOwnerAccess.collectAsState()
     var filter by remember { mutableStateOf("PENDING") }
-    var applications by remember { mutableStateOf<List<TrustVerificationApplication>>(emptyList()) }
+    var snapshot by remember { mutableStateOf(TrustQueueSnapshot()) }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var realtimeState by remember { mutableStateOf(TrustRealtimeState.CONNECTING) }
+    var lastSyncEpochMs by remember { mutableStateOf<Long?>(null) }
+    var mfaState by remember { mutableStateOf(TrustMfaState()) }
+    var mfaEnrollment by remember { mutableStateOf<TrustMfaEnrollment?>(null) }
+    var mfaDialogVisible by remember { mutableStateOf(false) }
     var pendingDecision by remember {
         mutableStateOf<Pair<TrustVerificationApplication, String>?>(null)
     }
     val scope = rememberCoroutineScope()
+    val reloadMutex = remember { Mutex() }
 
-    fun reload() {
+    suspend fun reloadNow() {
         if (access != PlatformOwnerAccess.GRANTED) return
-        scope.launch {
+        reloadMutex.withLock {
             loading = true
-            message = null
             runCatching { PlatformTrustCenterGateway.loadQueue(filter) }
-                .onSuccess { applications = it }
-                .onFailure {
-                    applications = emptyList()
-                    message = "No se pudo cargar la cola. La autorización falló cerrada."
+                .onSuccess {
+                    snapshot = it
+                    lastSyncEpochMs = System.currentTimeMillis()
+                    if (message?.startsWith("Sincronización") == true) message = null
+                }
+                .onFailure { error ->
+                    message = "Sincronización temporalmente interrumpida; se conserva la última cola y el reintento es automático. Código: ${TrustCenterObservability.failureCode(error)}."
                 }
             loading = false
         }
     }
 
+    fun reload() {
+        if (access == PlatformOwnerAccess.GRANTED) scope.launch { reloadNow() }
+    }
+
+    suspend fun refreshMfaState() {
+        val mfa = SupabaseModule.client.auth.mfa
+        val factors = mfa.retrieveFactorsForCurrentUser()
+        mfaState = TrustMfaState(
+            isAal2 = mfa.loggedInUsingMfa,
+            verifiedFactorId = factors.firstOrNull { it.isVerified }?.id,
+        )
+    }
+
+    fun prepareMfa() {
+        scope.launch {
+            loading = true
+            message = null
+            runCatching {
+                val mfa = SupabaseModule.client.auth.mfa
+                val factors = mfa.retrieveFactorsForCurrentUser()
+                val verified = factors.firstOrNull { it.isVerified }
+                if (verified != null) {
+                    mfaState = mfaState.copy(verifiedFactorId = verified.id)
+                    mfaEnrollment = null
+                    mfaDialogVisible = true
+                } else {
+                    factors.filterNot { it.isVerified }.forEach { mfa.unenroll(it.id) }
+                    val factor = mfa.enroll(factorType = FactorType.TOTP)
+                    mfaEnrollment = TrustMfaEnrollment(
+                        factorId = factor.id,
+                        uri = factor.data.uri,
+                        secret = factor.data.secret,
+                    )
+                    mfaDialogVisible = true
+                }
+            }.onFailure { error ->
+                message = "No se pudo preparar el segundo factor. Código: ${TrustCenterObservability.failureCode(error)}."
+            }
+            loading = false
+        }
+    }
+
     LaunchedEffect(Unit) { viewModel.refreshPlatformOwnerAccess() }
+    LaunchedEffect(access) {
+        if (access == PlatformOwnerAccess.GRANTED) {
+            runCatching { refreshMfaState() }.onFailure {
+                message = "No se pudo comprobar el segundo factor. Las decisiones quedan bloqueadas."
+            }
+        }
+    }
     LaunchedEffect(access, filter) {
-        if (access == PlatformOwnerAccess.GRANTED) reload()
+        if (access != PlatformOwnerAccess.GRANTED) return@LaunchedEffect
+        realtimeState = TrustRealtimeState.CONNECTING
+        reloadNow()
+        launch {
+            while (currentCoroutineContext().isActive) {
+                delay(TRUST_QUEUE_HEARTBEAT_MS)
+                reloadNow()
+            }
+        }
+        PlatformTrustCenterGateway.realtimeWakeUps()
+            .retryWhen { _, attempt ->
+                realtimeState = TrustRealtimeState.RECOVERING
+                TrustCenterObservability.realtime("RECOVERING", attempt + 1)
+                delay((2_000L shl attempt.coerceAtMost(5).toInt()).coerceAtMost(60_000L))
+                true
+            }
+            .collectLatest { signal ->
+                realtimeState = TrustRealtimeState.LIVE
+                if (signal == TrustRealtimeSignal.CHANGE || signal == TrustRealtimeSignal.SUBSCRIBED) {
+                    reloadNow()
+                }
+            }
     }
 
     Scaffold(
@@ -132,16 +244,69 @@ fun PlatformTrustCenterScreen(
                                     fontSize = 13.sp,
                                     modifier = Modifier.padding(top = 6.dp),
                                 )
+                                Text(
+                                    "Realtime: ${realtimeLabel(realtimeState)} · respaldo REST cada 30 s" +
+                                        (lastSyncEpochMs?.let { " · última conciliación ${java.text.DateFormat.getTimeInstance().format(java.util.Date(it))}" } ?: ""),
+                                    color = realtimeColor(realtimeState),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                                TextButton(onClick = ::reload, enabled = !loading) {
+                                    Text("ACTUALIZAR AHORA")
+                                }
                             }
                         }
                     }
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("PENDING", "APPROVED", "REJECTED", "SUSPENDED").forEach { status ->
+                        EliteCard(
+                            glowColor = if (mfaState.isAal2) MeetColors.neonGreen else MeetColors.warning,
+                            borderColor = if (mfaState.isAal2) MeetColors.neonGreen.copy(alpha = .35f) else MeetColors.warning.copy(alpha = .35f),
+                            backgroundColor = MeetColors.cardBackground,
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                Text(
+                                    if (mfaState.isAal2) "SEGUNDO FACTOR VERIFICADO" else "SEGUNDO FACTOR REQUERIDO PARA DECIDIR",
+                                    color = if (mfaState.isAal2) MeetColors.neonGreen else MeetColors.warning,
+                                    fontWeight = FontWeight.Black,
+                                )
+                                Text(
+                                    if (mfaState.isAal2) {
+                                        "La sesión cumple AAL2; aprobar, rechazar o suspender queda habilitado."
+                                    } else {
+                                        "Puedes revisar la cola, pero el servidor bloqueará cualquier decisión hasta validar una app autenticadora."
+                                    },
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 5.dp),
+                                )
+                                if (!mfaState.isAal2) {
+                                    Button(
+                                        onClick = ::prepareMfa,
+                                        enabled = !loading,
+                                        modifier = Modifier.padding(top = 10.dp),
+                                    ) {
+                                        Text(if (mfaState.verifiedFactorId == null) "ACTIVAR MFA" else "VALIDAR MFA")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf("PENDING", "APPROVED", "REJECTED", "SUSPENDED", "ALL").forEach { status ->
                                 FilterChip(
                                     selected = filter == status,
                                     onClick = { filter = status },
-                                    label = { Text(statusLabel(status), fontSize = 11.sp) },
+                                    label = {
+                                        Text(
+                                            "${statusLabel(status)} ${queueCount(snapshot, status)}",
+                                            fontSize = 11.sp,
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -149,7 +314,7 @@ fun PlatformTrustCenterScreen(
                     message?.let { item { Text(it, color = MeetColors.warning) } }
                     if (loading) {
                         item { CircularProgressIndicator(color = MeetColors.cyberCyan) }
-                    } else if (applications.isEmpty()) {
+                    } else if (snapshot.items.isEmpty()) {
                         item {
                             Text(
                                 "No hay registros en esta cola.",
@@ -158,9 +323,10 @@ fun PlatformTrustCenterScreen(
                             )
                         }
                     } else {
-                        items(applications, key = { it.id }) { application ->
+                        items(snapshot.items, key = { it.id }) { application ->
                             TrustApplicationCard(
                                 application = application,
+                                canDecide = mfaState.isAal2,
                                 onDecision = { decision -> pendingDecision = application to decision },
                             )
                         }
@@ -196,7 +362,48 @@ fun PlatformTrustCenterScreen(
                         message = "Decisión ${statusLabel(decision).lowercase()} registrada y auditada."
                         reload()
                     }.onFailure {
-                        message = "La decisión no se guardó. No se modificó el estado del registro."
+                        val code = TrustCenterObservability.failureCode(it)
+                        message = if (code == "AAL2_REQUIRED") {
+                            "El servidor exige segundo factor. Valida MFA y vuelve a intentar; no se modificó el registro."
+                        } else {
+                            "La decisión no se guardó. No se modificó el registro. Código: $code."
+                        }
+                        loading = false
+                    }
+                }
+            },
+        )
+    }
+
+    if (mfaDialogVisible) {
+        TrustMfaDialog(
+            enrollment = mfaEnrollment,
+            onDismiss = {
+                mfaDialogVisible = false
+                mfaEnrollment = null
+            },
+            onConfirm = { code ->
+                val factorId = mfaEnrollment?.factorId ?: mfaState.verifiedFactorId
+                if (factorId == null) {
+                    message = "No existe un segundo factor disponible. Actívalo nuevamente."
+                } else {
+                    scope.launch {
+                        loading = true
+                        runCatching {
+                            SupabaseModule.client.auth.mfa.createChallengeAndVerify(
+                                factorId = factorId,
+                                code = code,
+                                saveSession = true,
+                            )
+                            refreshMfaState()
+                        }.onSuccess {
+                            mfaDialogVisible = false
+                            mfaEnrollment = null
+                            message = "Segundo factor verificado. Las decisiones sensibles están habilitadas."
+                            reloadNow()
+                        }.onFailure { error ->
+                            message = "El código MFA no se validó. Intenta con el código vigente. Código: ${TrustCenterObservability.failureCode(error)}."
+                        }
                         loading = false
                     }
                 }
@@ -206,8 +413,53 @@ fun PlatformTrustCenterScreen(
 }
 
 @Composable
+private fun TrustMfaDialog(
+    enrollment: TrustMfaEnrollment?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var code by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (enrollment == null) "Validar segundo factor" else "Activar segundo factor") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (enrollment != null) {
+                    Text("Escanea este QR con una app autenticadora. El secreto no debe compartirse.")
+                    QrCodeImage(
+                        text = enrollment.uri,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+                    )
+                    Text("Entrada manual", fontWeight = FontWeight.Bold)
+                    SelectionContainer {
+                        Text(enrollment.secret, color = MeetColors.warning)
+                    }
+                } else {
+                    Text("Escribe el código vigente de seis dígitos de tu app autenticadora.")
+                }
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.filter(Char::isDigit).take(6) },
+                    label = { Text("Código de 6 dígitos") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(code) }, enabled = code.length == 6) {
+                Text("VERIFICAR")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR") } },
+    )
+}
+
+@Composable
 private fun TrustApplicationCard(
     application: TrustVerificationApplication,
+    canDecide: Boolean,
     onDecision: (String) -> Unit,
 ) {
     EliteCard(
@@ -229,6 +481,7 @@ private fun TrustApplicationCard(
             application.locationLabel?.let { TrustLine("Zona", it) }
             application.licenseReference?.let { TrustLine("Licencia/registro", it) }
             TrustLine("Solicitud", application.submittedAt)
+            application.correlationId?.let { TrustLine("Seguimiento", it.take(12)) }
             TrustLine(
                 "Evidencia",
                 application.evidenceManifestSha256?.let { "Manifiesto SHA-256 ${it.take(12)}…" }
@@ -240,11 +493,39 @@ private fun TrustApplicationCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { onDecision("APPROVED") },
-                        enabled = application.evidenceManifestSha256 != null || application.licenseReference != null,
+                        enabled = canDecide,
                         colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                     ) { Text("APROBAR", fontWeight = FontWeight.Black) }
-                    OutlinedButton(onClick = { onDecision("REJECTED") }) { Text("RECHAZAR") }
-                    TextButton(onClick = { onDecision("SUSPENDED") }) { Text("SUSPENDER") }
+                    OutlinedButton(
+                        onClick = { onDecision("REJECTED") },
+                        enabled = canDecide,
+                    ) { Text("RECHAZAR") }
+                    TextButton(
+                        onClick = { onDecision("SUSPENDED") },
+                        enabled = canDecide,
+                    ) { Text("SUSPENDER") }
+                }
+            } else if (application.status == "APPROVED") {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { onDecision("SUSPENDED") },
+                    enabled = canDecide,
+                ) { Text("SUSPENDER CAPACIDAD") }
+            } else if (application.status == "SUSPENDED") {
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onDecision("APPROVED") },
+                        enabled = canDecide,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MeetColors.neonGreen,
+                            contentColor = Color.Black,
+                        ),
+                    ) { Text("REACTIVAR") }
+                    OutlinedButton(
+                        onClick = { onDecision("REJECTED") },
+                        enabled = canDecide,
+                    ) { Text("RECHAZAR") }
                 }
             }
         }
@@ -301,6 +582,13 @@ private fun serviceLabel(type: String): String = when (type.lowercase()) {
     "mechanic", "workshop" -> "Mecánico / taller"
     "parts_store" -> "Repuestera"
     "service_provider" -> "Proveedor de servicios"
+    "auto_locksmith" -> "Cerrajería automotriz"
+    "lawyer" -> "Profesional legal"
+    "notary" -> "Notaría"
+    "property_broker" -> "Corredor inmobiliario"
+    "property_seller" -> "Vendedor de propiedad"
+    "fuel_station_staff" -> "Personal de estación de combustible"
+    "fleet_operator" -> "Operador de flota"
     else -> type
 }
 
@@ -309,6 +597,7 @@ private fun statusLabel(status: String): String = when (status) {
     "APPROVED" -> "Aprobados"
     "REJECTED" -> "Rechazados"
     "SUSPENDED" -> "Suspendidos"
+    "ALL" -> "Todos"
     else -> status
 }
 
@@ -317,4 +606,26 @@ private fun statusColor(status: String): Color = when (status) {
     "REJECTED" -> MeetColors.error
     "SUSPENDED" -> MeetColors.warning
     else -> MeetColors.cyberCyan
+}
+
+private fun queueCount(snapshot: TrustQueueSnapshot, status: String): Int = when (status) {
+    "PENDING" -> snapshot.counts.pending
+    "APPROVED" -> snapshot.counts.approved
+    "REJECTED" -> snapshot.counts.rejected
+    "SUSPENDED" -> snapshot.counts.suspended
+    else -> snapshot.counts.all
+}
+
+private fun realtimeLabel(state: TrustRealtimeState): String = when (state) {
+    TrustRealtimeState.CONNECTING -> "conectando"
+    TrustRealtimeState.LIVE -> "en vivo"
+    TrustRealtimeState.RECOVERING -> "reconectando"
+    TrustRealtimeState.OFFLINE -> "sin conexión"
+}
+
+private fun realtimeColor(state: TrustRealtimeState): Color = when (state) {
+    TrustRealtimeState.LIVE -> MeetColors.neonGreen
+    TrustRealtimeState.CONNECTING -> MeetColors.cyberCyan
+    TrustRealtimeState.RECOVERING -> MeetColors.warning
+    TrustRealtimeState.OFFLINE -> MeetColors.error
 }

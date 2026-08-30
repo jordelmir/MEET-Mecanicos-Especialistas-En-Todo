@@ -11,13 +11,40 @@ guardian_migration="$repo_root/supabase/migrations/20260730050000_ride_guardian_
 support_migration="$repo_root/supabase/migrations/20260730060000_ride_support_cases.sql"
 tenant_migration="$repo_root/supabase/migrations/20260730070000_ride_tenant_boundary.sql"
 usage_roles_migration="$repo_root/supabase/migrations/20260816010000_authenticated_usage_roles.sql"
+schema_drift_migration="$repo_root/supabase/migrations/20260829020000_ride_legacy_schema_drift_hardening.sql"
 
 if [[ ! -f "$migration" || ! -f "$ledger_migration" ||
       ! -f "$command_migration" || ! -f "$flow_migration" ||
       ! -f "$enrollment_migration" || ! -f "$guardian_migration" ||
       ! -f "$support_migration" || ! -f "$tenant_migration" ||
-      ! -f "$usage_roles_migration" ]]; then
+      ! -f "$usage_roles_migration" || ! -f "$schema_drift_migration" ]]; then
   echo "ride migration contract: FAIL (migration missing)" >&2
+  exit 1
+fi
+
+rg -q "create table if not exists public\.ride_trip_feedback" "$schema_drift_migration" || {
+  echo "ride migration contract: FAIL (durable trip feedback missing)" >&2
+  exit 1
+}
+rg -q "public\.ride_accept_offer_v2" "$schema_drift_migration" || {
+  echo "ride migration contract: FAIL (auto-match does not delegate to command kernel)" >&2
+  exit 1
+}
+rg -q "BANK_CONFIRMATION_REQUIRES_TRUSTED_INGESTION" "$schema_drift_migration" || {
+  echo "ride migration contract: FAIL (bank proof boundary missing)" >&2
+  exit 1
+}
+rg -q "AUTHORITATIVE_FARE_REQUIRED" "$schema_drift_migration" || {
+  echo "ride migration contract: FAIL (authoritative payment amount guard missing)" >&2
+  exit 1
+}
+if rg -q "agreed_fare_minor|offered_fare_minor.*ride_offers|estimated_arrival_minutes|o\.status" \
+  "$schema_drift_migration"; then
+  echo "ride migration contract: FAIL (legacy ride column drift reintroduced)" >&2
+  exit 1
+fi
+if rg -qi "coalesce\([^)]*,[[:space:]]*3000\)" "$schema_drift_migration"; then
+  echo "ride migration contract: FAIL (synthetic payment fallback reintroduced)" >&2
   exit 1
 fi
 

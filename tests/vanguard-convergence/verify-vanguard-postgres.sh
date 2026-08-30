@@ -33,7 +33,11 @@ create role service_role nologin;
 create schema auth;
 create schema extensions;
 create extension pgcrypto with schema extensions;
-create table auth.users(id uuid primary key default extensions.gen_random_uuid());
+create table auth.users(
+  id uuid primary key default extensions.gen_random_uuid(),
+  email text,
+  email_confirmed_at timestamptz
+);
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
@@ -88,6 +92,8 @@ create table public.service_verification_audit_events(
   actor_id uuid not null references auth.users(id), event_type text not null,
   from_status text,to_status text not null,reason text,created_at timestamptz not null default now()
 );
+grant select on public.service_verification_applications,
+  public.service_verification_audit_events to authenticated;
 create or replace function public.meet_bootstrap_platform_owner() returns trigger
 language plpgsql security definer set search_path='' as $$ begin return new; end $$;
 create trigger meet_bootstrap_platform_owner_trigger after insert on auth.users
@@ -167,5 +173,11 @@ do $$ begin
   end if;
 end $$;
 SQL
+
+psql "${psql_args[@]}" \
+  -f "$repo_root/supabase/migrations/20260829010000_platform_trust_center_delivery_realtime.sql" \
+  >/dev/null
+psql "${psql_args[@]}" \
+  -f "$repo_root/tests/vanguard-convergence/trust-center-delivery-integration.sql"
 
 echo "Vanguard Convergence PostgreSQL: PASS"

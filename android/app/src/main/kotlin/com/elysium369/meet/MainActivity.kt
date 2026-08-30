@@ -111,9 +111,18 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val btGranted = permissions.entries
-            .filter { it.key.contains("BLUETOOTH") }
-            .any { it.value }
+        val btGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_SCAN,
+            ).all { permission ->
+                permissions[permission] == true ||
+                    checkSelfPermission(permission) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        } else {
+            true
+        }
         bluetoothPermissionsGranted = btGranted || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
 
         if (!btGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -130,7 +139,7 @@ class MainActivity : ComponentActivity() {
         // Pre-check if permissions are already granted (e.g. from previous session)
         bluetoothPermissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                android.content.pm.PackageManager.PERMISSION_GRANTED &&
             checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED
         } else {
@@ -221,7 +230,10 @@ fun MeetApp(
         MeetTelemetry.event("app.startup")
     }
     LaunchedEffect(currentUser?.id) {
-        currentUser?.id?.let { PrincipalProvisioningStore.recordAuthenticated(context, it) }
+        currentUser?.id?.let {
+            PrincipalProvisioningStore.recordAuthenticated(context, it)
+            obdViewModel.syncPendingTrustApplications()
+        }
     }
     val provisionedPrincipalId = PrincipalProvisioningStore.principalId(context)
     val accessDecision = PrincipalAccessPolicy.decide(
@@ -245,6 +257,7 @@ fun MeetApp(
                     PrincipalProvisioningStore.recordAuthenticated(context, it)
                 }
                 obdViewModel.syncSelectedUsageProfile()
+                obdViewModel.syncPendingTrustApplications()
             },
         )
         return
@@ -264,6 +277,7 @@ fun MeetApp(
                     PrincipalProvisioningStore.recordAuthenticated(context, it)
                 }
                 obdViewModel.syncSelectedUsageProfile()
+                obdViewModel.syncPendingTrustApplications()
             },
         )
         return
