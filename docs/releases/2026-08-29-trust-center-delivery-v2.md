@@ -59,9 +59,10 @@ se selecciona el protocolo. Esto evita gastar la mayor parte de la ventana de
 conexión en rutas menos probables y evita iniciar ISO con una cabecera dirigida
 incorrecta.
 
-Los adaptadores que se identifican como `ELM327 v2.1` y caen en la clasificación
-de clon de alto riesgo usan temporización determinista (`ATAT0`); los adaptadores
-compatibles conservan temporización adaptativa conservadora. Una conexión solo
+Los adaptadores que se identifican como `ELM327 v2.1` se reconocen como clones
+y usan temporización determinista orientada a estabilidad (`ATAT0`); los demás
+adaptadores compatibles conservan temporización adaptativa conservadora. Esta
+clasificación no los presenta como peligrosos ni bloquea su uso. Una conexión solo
 se declara verificada después de decodificar una respuesta Mode 01 PID 00 válida:
 el banner ELM demuestra únicamente que el adaptador respondió, nunca que una ECU
 respondió.

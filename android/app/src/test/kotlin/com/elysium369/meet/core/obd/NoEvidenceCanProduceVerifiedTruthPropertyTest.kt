@@ -26,7 +26,7 @@ import java.security.MessageDigest
  * 4. NO BASELINE != 100% HEALTH
  * 5. NO PII IN OPERATIONAL TELEMETRY BY DEFAULT
  * 6. TAMPERED DATA NEVER PASSES MERKLE VERIFICATION
- * 7. DEFECTIVE ADAPTER CLONES NEVER GET FAST-PATH TIMINGS
+ * 7. ELM327 V2.1 CLONES USE STABILITY-FIRST TIMINGS
  */
 class NoEvidenceCanProduceVerifiedTruthPropertyTest {
 
@@ -168,14 +168,14 @@ class NoEvidenceCanProduceVerifiedTruthPropertyTest {
     }
 
     // ----------------------------------------------------
-    // Invariant 7: Defective Adapter Clones Never Receive Fast-Path Timings
+    // Invariant 7: ELM327 v2.1 clones use stability-first timings
     // ----------------------------------------------------
     @Test
-    fun invariant7_defectiveCloneAdapterEnforcesSafetyDelays() {
+    fun invariant7_v21CloneAdapterUsesStabilityDelays() {
         val plan = AdaptiveProtocolNegotiatorV2.compilePlan("ELM327 v2.1")
-        assertEquals(AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH, plan.adapterRiskTier)
-        assertEquals(DiagnosticProbeSpeed.EXHAUSTIVE_SAFE_PROBE, plan.probeSpeed)
-        assertTrue("Defective clone must have >= 50ms delay", plan.interCommandDelayMs >= 50L)
-        assertFalse("Defective clone must disable aggressive ATAT timing", plan.enableAdaptiveTiming)
+        assertEquals(AdapterCompatibilityTier.ELM327_V21_CLONE, plan.adapterCompatibilityTier)
+        assertEquals(DiagnosticProbeSpeed.STABILITY_FIRST_PROBE, plan.probeSpeed)
+        assertTrue("v2.1 clone must have >= 50ms stability delay", plan.interCommandDelayMs >= 50L)
+        assertFalse("v2.1 clone must use deterministic ATAT timing", plan.enableAdaptiveTiming)
     }
 }

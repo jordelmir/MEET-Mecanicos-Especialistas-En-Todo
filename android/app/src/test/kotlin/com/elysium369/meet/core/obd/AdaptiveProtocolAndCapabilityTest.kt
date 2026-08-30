@@ -7,12 +7,12 @@ import org.junit.Test
 class AdaptiveProtocolAndCapabilityTest {
 
     @Test
-    fun adapterRiskClassification() {
-        assertEquals(AdapterRiskTier.GENUINE_STN, AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk("STN2120 v5.1.0"))
-        assertEquals(AdapterRiskTier.GENUINE_OBDLINK, AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk("OBDLink MX+ Bluetooth"))
-        assertEquals(AdapterRiskTier.GENUINE_CANDLELIGHT, AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk("gs_usb candlelight firmware"))
-        assertEquals(AdapterRiskTier.COMPATIBLE_V15, AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk("ELM327 v1.5"))
-        assertEquals(AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH, AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk("ELM327 v2.1"))
+    fun adapterCompatibilityClassification() {
+        assertEquals(AdapterCompatibilityTier.GENUINE_STN, AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility("STN2120 v5.1.0"))
+        assertEquals(AdapterCompatibilityTier.GENUINE_OBDLINK, AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility("OBDLink MX+ Bluetooth"))
+        assertEquals(AdapterCompatibilityTier.GENUINE_CANDLELIGHT, AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility("gs_usb candlelight firmware"))
+        assertEquals(AdapterCompatibilityTier.COMPATIBLE_V15, AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility("ELM327 v1.5"))
+        assertEquals(AdapterCompatibilityTier.ELM327_V21_CLONE, AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility("ELM327 v2.1"))
     }
 
     @Test
@@ -23,7 +23,7 @@ class AdaptiveProtocolAndCapabilityTest {
             vehicleYear = 2021
         )
 
-        assertEquals(AdapterRiskTier.GENUINE_STN, plan.adapterRiskTier)
+        assertEquals(AdapterCompatibilityTier.GENUINE_STN, plan.adapterCompatibilityTier)
         assertEquals(DiagnosticProbeSpeed.OPTIMIZED_STANDARD, plan.probeSpeed)
         assertEquals("ISO_15765_4_CAN_11BIT_500K", plan.preferredCandidate.protocolId)
         assertEquals(0L, plan.interCommandDelayMs)
@@ -31,15 +31,15 @@ class AdaptiveProtocolAndCapabilityTest {
     }
 
     @Test
-    fun planCompilationForDefectiveCloneAddsDelaysAndDisablesATAT() {
+    fun planCompilationForV21CloneUsesStabilityTiming() {
         val plan = AdaptiveProtocolNegotiatorV2.compilePlan(
             adapterVersionString = "ELM327 v2.1 Chinese Clone",
             cachedSuccessfulProtocol = null,
             vehicleYear = 2018
         )
 
-        assertEquals(AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH, plan.adapterRiskTier)
-        assertEquals(DiagnosticProbeSpeed.EXHAUSTIVE_SAFE_PROBE, plan.probeSpeed)
+        assertEquals(AdapterCompatibilityTier.ELM327_V21_CLONE, plan.adapterCompatibilityTier)
+        assertEquals(DiagnosticProbeSpeed.STABILITY_FIRST_PROBE, plan.probeSpeed)
         assertEquals(50L, plan.interCommandDelayMs)
         assertFalse(plan.enableAdaptiveTiming)
         assertEquals("ATAT0", ElmNegotiator.adaptiveTimingCommand("ELM327 v2.1"))

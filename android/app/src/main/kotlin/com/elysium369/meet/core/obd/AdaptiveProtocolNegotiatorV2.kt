@@ -3,20 +3,20 @@ package com.elysium369.meet.core.obd
 import android.util.Log
 import kotlinx.serialization.Serializable
 
-enum class AdapterRiskTier {
+enum class AdapterCompatibilityTier {
     GENUINE_STN,
     GENUINE_OBDLINK,
     GENUINE_CANDLELIGHT,
     COMPATIBLE_V15,
-    LOW_COST_CLONE_RISK_MEDIUM,
-    DEFECTIVE_CLONE_RISK_HIGH,
+    LOW_COST_CLONE,
+    ELM327_V21_CLONE,
     UNKNOWN_ADAPTER,
 }
 
 enum class DiagnosticProbeSpeed {
     FAST_PATH_CACHED,
     OPTIMIZED_STANDARD,
-    EXHAUSTIVE_SAFE_PROBE,
+    STABILITY_FIRST_PROBE,
 }
 
 @Serializable
@@ -29,7 +29,7 @@ data class ProtocolCandidate(
 )
 
 data class ProtocolNegotiationPlan(
-    val adapterRiskTier: AdapterRiskTier,
+    val adapterCompatibilityTier: AdapterCompatibilityTier,
     val probeSpeed: DiagnosticProbeSpeed,
     val preferredCandidate: ProtocolCandidate,
     val fallbackCandidates: List<ProtocolCandidate>,
@@ -39,7 +39,7 @@ data class ProtocolNegotiationPlan(
 
 /**
  * AdaptiveProtocolNegotiatorV2 — Compiles deterministic protocol negotiation plans
- * based on adapter fingerprints, clone risks, and vehicle history.
+ * based on adapter fingerprints, compatibility characteristics, and vehicle history.
  */
 object AdaptiveProtocolNegotiatorV2 {
 
@@ -85,17 +85,17 @@ object AdaptiveProtocolNegotiatorV2 {
         priority = 4,
     )
 
-    fun evaluateAdapterRisk(adapterVersionString: String?): AdapterRiskTier {
-        if (adapterVersionString == null) return AdapterRiskTier.UNKNOWN_ADAPTER
+    fun evaluateAdapterCompatibility(adapterVersionString: String?): AdapterCompatibilityTier {
+        if (adapterVersionString == null) return AdapterCompatibilityTier.UNKNOWN_ADAPTER
         val upper = adapterVersionString.uppercase()
         return when {
-            upper.contains("STN") -> AdapterRiskTier.GENUINE_STN
-            upper.contains("OBDLINK") -> AdapterRiskTier.GENUINE_OBDLINK
-            upper.contains("GS_USB") || upper.contains("CANDLELIGHT") -> AdapterRiskTier.GENUINE_CANDLELIGHT
-            upper.contains("V1.5") -> AdapterRiskTier.COMPATIBLE_V15
-            upper.contains("V2.1") || upper.contains("ELM327 V2.1") -> AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH
-            upper.contains("V2.2") || upper.contains("V2.3") -> AdapterRiskTier.LOW_COST_CLONE_RISK_MEDIUM
-            else -> AdapterRiskTier.UNKNOWN_ADAPTER
+            upper.contains("STN") -> AdapterCompatibilityTier.GENUINE_STN
+            upper.contains("OBDLINK") -> AdapterCompatibilityTier.GENUINE_OBDLINK
+            upper.contains("GS_USB") || upper.contains("CANDLELIGHT") -> AdapterCompatibilityTier.GENUINE_CANDLELIGHT
+            upper.contains("V1.5") -> AdapterCompatibilityTier.COMPATIBLE_V15
+            upper.contains("V2.1") || upper.contains("ELM327 V2.1") -> AdapterCompatibilityTier.ELM327_V21_CLONE
+            upper.contains("V2.2") || upper.contains("V2.3") -> AdapterCompatibilityTier.LOW_COST_CLONE
+            else -> AdapterCompatibilityTier.UNKNOWN_ADAPTER
         }
     }
 
@@ -104,18 +104,18 @@ object AdaptiveProtocolNegotiatorV2 {
         cachedSuccessfulProtocol: String? = null,
         vehicleYear: Int? = null,
     ): ProtocolNegotiationPlan {
-        val riskTier = evaluateAdapterRisk(adapterVersionString)
+        val compatibilityTier = evaluateAdapterCompatibility(adapterVersionString)
 
-        val interCommandDelay = when (riskTier) {
-            AdapterRiskTier.GENUINE_STN, AdapterRiskTier.GENUINE_OBDLINK, AdapterRiskTier.GENUINE_CANDLELIGHT -> 0L
-            AdapterRiskTier.COMPATIBLE_V15 -> 10L
-            AdapterRiskTier.LOW_COST_CLONE_RISK_MEDIUM -> 25L
-            AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH -> 50L
-            AdapterRiskTier.UNKNOWN_ADAPTER -> 20L
+        val interCommandDelay = when (compatibilityTier) {
+            AdapterCompatibilityTier.GENUINE_STN, AdapterCompatibilityTier.GENUINE_OBDLINK, AdapterCompatibilityTier.GENUINE_CANDLELIGHT -> 0L
+            AdapterCompatibilityTier.COMPATIBLE_V15 -> 10L
+            AdapterCompatibilityTier.LOW_COST_CLONE -> 25L
+            AdapterCompatibilityTier.ELM327_V21_CLONE -> 50L
+            AdapterCompatibilityTier.UNKNOWN_ADAPTER -> 20L
         }
 
-        val enableAdaptiveTiming = when (riskTier) {
-            AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH -> false // Clones hang with ATAT1/ATAT2
+        val enableAdaptiveTiming = when (compatibilityTier) {
+            AdapterCompatibilityTier.ELM327_V21_CLONE -> false // Deterministic timing is more stable across v2.1 clone firmware variants.
             else -> true
         }
 
@@ -146,16 +146,16 @@ object AdaptiveProtocolNegotiatorV2 {
 
         val probeSpeed = if (cachedSuccessfulProtocol != null) {
             DiagnosticProbeSpeed.FAST_PATH_CACHED
-        } else if (riskTier == AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH) {
-            DiagnosticProbeSpeed.EXHAUSTIVE_SAFE_PROBE
+        } else if (compatibilityTier == AdapterCompatibilityTier.ELM327_V21_CLONE) {
+            DiagnosticProbeSpeed.STABILITY_FIRST_PROBE
         } else {
             DiagnosticProbeSpeed.OPTIMIZED_STANDARD
         }
 
-        Log.i(TAG, "Compiled negotiation plan: Risk=$riskTier, Speed=$probeSpeed, Preferred=${preferred.protocolId}, InterDelay=${interCommandDelay}ms")
+        Log.i(TAG, "Compiled negotiation plan: Compatibility=$compatibilityTier, Speed=$probeSpeed, Preferred=${preferred.protocolId}, InterDelay=${interCommandDelay}ms")
 
         return ProtocolNegotiationPlan(
-            adapterRiskTier = riskTier,
+            adapterCompatibilityTier = compatibilityTier,
             probeSpeed = probeSpeed,
             preferredCandidate = preferred,
             fallbackCandidates = fallbacks,

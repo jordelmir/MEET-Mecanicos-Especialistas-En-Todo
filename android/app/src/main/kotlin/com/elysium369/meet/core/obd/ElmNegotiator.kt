@@ -19,8 +19,8 @@ class ElmNegotiator(private val transport: TransportInterface) {
         internal fun adaptiveTimingCommand(
             adapterVersionString: String?,
         ): String = if (
-            AdaptiveProtocolNegotiatorV2.evaluateAdapterRisk(adapterVersionString) ==
-            AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH
+            AdaptiveProtocolNegotiatorV2.evaluateAdapterCompatibility(adapterVersionString) ==
+            AdapterCompatibilityTier.ELM327_V21_CLONE
         ) {
             "ATAT0"
         } else {

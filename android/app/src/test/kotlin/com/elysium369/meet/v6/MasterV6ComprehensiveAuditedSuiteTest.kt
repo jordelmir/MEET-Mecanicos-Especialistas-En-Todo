@@ -63,14 +63,14 @@ class MasterV6ComprehensiveAuditedSuiteTest {
             adapterVersionString = "STN1170 v4.2",
             cachedSuccessfulProtocol = "ISO_15765_4_CAN_11BIT_500K",
         )
-        assertEquals(AdapterRiskTier.GENUINE_STN, plan.adapterRiskTier)
+        assertEquals(AdapterCompatibilityTier.GENUINE_STN, plan.adapterCompatibilityTier)
         assertEquals(DiagnosticProbeSpeed.FAST_PATH_CACHED, plan.probeSpeed)
     }
 
     @Test
     fun failedFastPathFallsBackSafelyTest() {
         val plan = AdaptiveProtocolNegotiatorV2.compilePlan("ELM327 v2.1")
-        assertEquals(AdapterRiskTier.DEFECTIVE_CLONE_RISK_HIGH, plan.adapterRiskTier)
+        assertEquals(AdapterCompatibilityTier.ELM327_V21_CLONE, plan.adapterCompatibilityTier)
         assertTrue(plan.interCommandDelayMs >= 50L)
     }
 
