@@ -1384,7 +1384,7 @@ class ObdViewModel @Inject constructor(
     }
 
     val currentUserId: String? get() = currentCloudUserId()
-    val currentRideActorId: String get() = localDeviceId
+    val currentRideActorId: String get() = activePrincipalKernel.current().id
 
     private val _usageProfileSyncState = MutableStateFlow(
         context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
@@ -1468,7 +1468,7 @@ class ObdViewModel @Inject constructor(
     }
 
     fun refreshOwnTrustDecisions() {
-        if (currentCloudUserId() == null) return
+        val actorId = currentCloudUserId() ?: return
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
                 .onSuccess { applications ->
@@ -1476,7 +1476,7 @@ class ObdViewModel @Inject constructor(
                         it.serviceType == "PASSENGER" && it.profileReference == "primary"
                     }
                     val localPassenger = if (!hasPassengerApplication) {
-                        rideDao.getPassengerVerification(localDeviceId)?.takeIf {
+                        rideDao.getPassengerVerification(actorId)?.takeIf {
                             it.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED) &&
                                 evaluatePassengerEvidence(it).isReady
                         }
@@ -1498,7 +1498,7 @@ class ObdViewModel @Inject constructor(
                     latestByType["RIDE_DRIVER"]?.let { application ->
                         val now = System.currentTimeMillis()
                         rideDao.updateDriverVerificationStatus(
-                            driverId = localDeviceId,
+                            driverId = actorId,
                             status = application.status,
                             approvedAt = now.takeIf { application.status == "APPROVED" },
                             updatedAt = now,
@@ -1507,7 +1507,7 @@ class ObdViewModel @Inject constructor(
                     latestByType["PASSENGER"]?.let { application ->
                         val now = System.currentTimeMillis()
                         rideDao.updatePassengerVerificationStatus(
-                            passengerId = localDeviceId,
+                            passengerId = actorId,
                             status = application.status,
                             approvedAt = now.takeIf { application.status == "APPROVED" },
                         )
@@ -1745,11 +1745,11 @@ class ObdViewModel @Inject constructor(
      * reconciles authoritative decisions. Safe to call on every app/session resume.
      */
     fun syncPendingTrustApplications() {
-        if (currentCloudUserId() == null) return
+        val actorId = currentCloudUserId() ?: return
         refreshProviderRoles()
         refreshOwnTrustDecisions()
         viewModelScope.launch(Dispatchers.IO) {
-            val driver = rideDao.getDriverVerification(localDeviceId)
+            val driver = rideDao.getDriverVerification(actorId)
             if (
                 driver != null &&
                 driver.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED) &&
@@ -2014,12 +2014,34 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    private var serviceMarketplaceCloudPollingEnabled = true
+
     // Background periodic task to poll/sync local Room data with Supabase for Marketplace
     fun startMarketplaceSync() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                runCatching { syncServiceMarketplaceFromCloud() }
-                    .onFailure { Log.w("ObdViewModel", "Service marketplace cloud sync unavailable", it) }
+                if (serviceMarketplaceCloudPollingEnabled) {
+                    runCatching { syncServiceMarketplaceFromCloud() }
+                        .onFailure { error ->
+                            if (
+                                MarketplaceCloudSyncPolicy.isMissingLegacyServiceSchema(
+                                    error.message,
+                                )
+                            ) {
+                                serviceMarketplaceCloudPollingEnabled = false
+                                Log.w(
+                                    "ObdViewModel",
+                                    "Legacy service marketplace cloud poll disabled; local records remain available",
+                                )
+                            } else {
+                                Log.w(
+                                    "ObdViewModel",
+                                    "Service marketplace cloud sync unavailable",
+                                    error,
+                                )
+                            }
+                        }
+                }
                 runCatching { syncPartsMarketplaceFromCloud() }
                     .onFailure { Log.w("ObdViewModel", "Parts marketplace cloud sync unavailable", it) }
                 delay(10000L) // Poll every 10 seconds
@@ -9159,7 +9181,13 @@ class ObdViewModel @Inject constructor(
 
     // ── Driver verification state ────────────────────────────────────────────
     val driverVerification: StateFlow<com.elysium369.meet.data.local.entities.DriverVerificationEntity?> =
-        rideDao.getDriverVerificationFlow(localDeviceId)
+        activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+            if (principal.isAuthenticated) {
+                rideDao.getDriverVerificationFlow(principal.id)
+            } else {
+                flowOf(null)
+            }
+        }
             .onEach { verification ->
                 if (
                     BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
@@ -9199,7 +9227,13 @@ class ObdViewModel @Inject constructor(
 
     // ── Passenger verification state ─────────────────────────────────────────
     val passengerVerification: StateFlow<com.elysium369.meet.data.local.entities.PassengerVerificationEntity?> =
-        rideDao.getPassengerVerificationFlow(localDeviceId)
+        activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+            if (principal.isAuthenticated) {
+                rideDao.getPassengerVerificationFlow(principal.id)
+            } else {
+                flowOf(null)
+            }
+        }
             .onEach { verification ->
                 if (
                     BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
@@ -9336,7 +9370,8 @@ class ObdViewModel @Inject constructor(
         pathVehicleInterior: String
     ) {
         viewModelScope.launch {
-            if (currentCloudUserId() == null) {
+            val actorId = currentCloudUserId()
+            if (actorId == null) {
                 _rideVerificationNotice.emit(
                     "Inicia sesión antes de enviar tu expediente de chofer.",
                 )
@@ -9389,7 +9424,7 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
             val entity = com.elysium369.meet.data.local.entities.DriverVerificationEntity(
-                driverId = localDeviceId,
+                driverId = actorId,
                 fullName = fullName,
                 phone = phone,
                 email = email,
@@ -9549,7 +9584,8 @@ class ObdViewModel @Inject constructor(
         pathSelfieWithCedula: String
     ) {
         viewModelScope.launch {
-            if (currentCloudUserId() == null) {
+            val actorId = currentCloudUserId()
+            if (actorId == null) {
                 _rideVerificationNotice.emit(
                     "Inicia sesión antes de enviar tu verificación de pasajero.",
                 )
@@ -9581,7 +9617,7 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
             val entity = com.elysium369.meet.data.local.entities.PassengerVerificationEntity(
-                passengerId = localDeviceId,
+                passengerId = actorId,
                 fullName = fullName,
                 phone = phone,
                 pathProfilePhoto = pathProfilePhoto,
@@ -9675,7 +9711,7 @@ class ObdViewModel @Inject constructor(
      */
     fun deleteDriverVerification() {
         viewModelScope.launch {
-            rideDao.deleteDriverVerification(localDeviceId)
+            currentCloudUserId()?.let { rideDao.deleteDriverVerification(it) }
         }
     }
 
@@ -9684,7 +9720,7 @@ class ObdViewModel @Inject constructor(
      */
     fun deletePassengerVerification() {
         viewModelScope.launch {
-            rideDao.deletePassengerVerification(localDeviceId)
+            currentCloudUserId()?.let { rideDao.deletePassengerVerification(it) }
         }
     }
 

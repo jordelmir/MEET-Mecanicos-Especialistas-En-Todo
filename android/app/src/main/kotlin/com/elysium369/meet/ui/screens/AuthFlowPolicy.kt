@@ -43,6 +43,30 @@ object AuthFormPolicy {
         if (password == confirmation) null else "Las contraseñas no coinciden."
 }
 
+/**
+ * Prevents a stale authenticated session from being mistaken for the account
+ * whose credentials were just submitted. Account data may only be rendered
+ * after the requested email and the authenticated session agree.
+ */
+object AuthSessionIdentityPolicy {
+    fun matchesRequestedAccount(
+        requestedEmail: String,
+        authenticatedEmail: String?,
+    ): Boolean {
+        val normalizedAuthenticatedEmail = authenticatedEmail
+            ?.let(AuthFormPolicy::normalizeEmail)
+            ?.takeIf(String::isNotBlank)
+            ?: return false
+        return AuthFormPolicy.normalizeEmail(requestedEmail) == normalizedAuthenticatedEmail
+    }
+
+    fun mustInvalidateExistingSession(
+        requestedEmail: String,
+        authenticatedEmail: String?,
+    ): Boolean = authenticatedEmail != null &&
+        !matchesRequestedAccount(requestedEmail, authenticatedEmail)
+}
+
 enum class AuthFailureCode {
     INVALID_CREDENTIALS,
     EMAIL_NOT_CONFIRMED,

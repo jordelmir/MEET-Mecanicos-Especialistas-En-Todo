@@ -437,6 +437,7 @@ fun HomeClassicScreen(
                 add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
+                add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to "ride_service")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")

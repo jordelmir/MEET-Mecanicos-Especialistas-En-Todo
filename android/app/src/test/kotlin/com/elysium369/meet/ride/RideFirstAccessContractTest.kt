@@ -28,6 +28,18 @@ class RideFirstAccessContractTest {
         assertTrue(screen.contains("REGISTRARME PARA VIAJAR"))
         assertTrue(screen.contains("REGISTRARME COMO CHOFER"))
         assertTrue(screen.contains("COMPLETAR REGISTRO DE CHOFER"))
+        assertTrue(screen.contains("BoxWithConstraints"))
+        assertTrue(screen.contains("verticalScroll(rememberScrollState())"))
         assertTrue(activity.contains("navController.navigate(\"provider_registration\")"))
+    }
+
+    @Test
+    fun `classic home exposes rides without requiring an experience switch`() {
+        val classicHome = projectFile(
+            "src/main/kotlin/com/elysium369/meet/ui/screens/home/classic/HomeClassicScreen.kt",
+        ).readText()
+
+        assertTrue(classicHome.contains("\"MEET Rides\""))
+        assertTrue(classicHome.contains("to \"ride_service\""))
     }
 }

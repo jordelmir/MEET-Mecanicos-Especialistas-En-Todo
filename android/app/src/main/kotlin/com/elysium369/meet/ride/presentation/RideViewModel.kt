@@ -102,7 +102,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -228,7 +230,7 @@ class RideViewModel @Inject constructor(
 
     val localDeviceId: String = activePrincipalKernel.localDeviceId
     val activePrincipal = activePrincipalKernel.activePrincipal
-    val currentRideActorId: String get() = localDeviceId
+    val currentRideActorId: String get() = activePrincipalKernel.current().id
 
     private val _currentGpsLocation = MutableStateFlow<GpsLocationInfo?>(null)
     val currentGpsLocation: StateFlow<GpsLocationInfo?> = _currentGpsLocation.asStateFlow()
@@ -317,7 +319,13 @@ class RideViewModel @Inject constructor(
     val rideVerificationNotice: SharedFlow<String> = _rideVerificationNotice.asSharedFlow()
 
     val driverVerification: StateFlow<DriverVerificationEntity?> =
-        rideDao.getDriverVerificationFlow(localDeviceId)
+        activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+            if (principal.isAuthenticated) {
+                rideDao.getDriverVerificationFlow(principal.id)
+            } else {
+                flowOf(null)
+            }
+        }
             .onEach { verification ->
                 if (
                     BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
@@ -350,7 +358,13 @@ class RideViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     val passengerVerification: StateFlow<PassengerVerificationEntity?> =
-        rideDao.getPassengerVerificationFlow(localDeviceId)
+        activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+            if (principal.isAuthenticated) {
+                rideDao.getPassengerVerificationFlow(principal.id)
+            } else {
+                flowOf(null)
+            }
+        }
             .onEach { verification ->
                 if (
                     BuildConfig.RIDE_LOCAL_VERIFICATION_AUTO_APPROVE &&
@@ -1917,7 +1931,8 @@ class RideViewModel @Inject constructor(
         pathVehicleInterior: String
     ) {
         viewModelScope.launch {
-            if (currentCloudUserId() == null) {
+            val actorId = currentCloudUserId()
+            if (actorId == null) {
                 _rideVerificationNotice.emit(
                     "Inicia sesión antes de enviar tu expediente de chofer.",
                 )
@@ -1967,7 +1982,7 @@ class RideViewModel @Inject constructor(
                 return@launch
             }
             val entity = DriverVerificationEntity(
-                driverId = localDeviceId,
+                driverId = actorId,
                 fullName = fullName,
                 phone = phone,
                 email = email,
@@ -2118,7 +2133,8 @@ class RideViewModel @Inject constructor(
         pathSelfieWithCedula: String
     ) {
         viewModelScope.launch {
-            if (currentCloudUserId() == null) {
+            val actorId = currentCloudUserId()
+            if (actorId == null) {
                 _rideVerificationNotice.emit(
                     "Inicia sesión antes de enviar tu verificación de pasajero.",
                 )
@@ -2147,7 +2163,7 @@ class RideViewModel @Inject constructor(
                 return@launch
             }
             val entity = PassengerVerificationEntity(
-                passengerId = localDeviceId,
+                passengerId = actorId,
                 fullName = fullName,
                 phone = phone,
                 pathProfilePhoto = pathProfilePhoto,
@@ -2229,13 +2245,13 @@ class RideViewModel @Inject constructor(
 
     fun deleteDriverVerification() {
         viewModelScope.launch {
-            rideDao.deleteDriverVerification(localDeviceId)
+            currentCloudUserId()?.let { rideDao.deleteDriverVerification(it) }
         }
     }
 
     fun deletePassengerVerification() {
         viewModelScope.launch {
-            rideDao.deletePassengerVerification(localDeviceId)
+            currentCloudUserId()?.let { rideDao.deletePassengerVerification(it) }
         }
     }
 

@@ -406,7 +406,7 @@ private fun RideFirstAccessGateway(
     onPassengerRegistration: () -> Unit,
     onDriverRegistration: () -> Unit,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -417,21 +417,29 @@ private fun RideFirstAccessGateway(
             .padding(20.dp),
         contentAlignment = Alignment.Center,
     ) {
+        val compact = maxHeight < 600.dp || maxWidth < 360.dp
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 560.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xD90A1726)),
             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = .58f)),
             shape = RoundedCornerShape(26.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 18.dp),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 26.dp),
+                modifier = Modifier
+                    .padding(
+                        horizontal = if (compact) 16.dp else 22.dp,
+                        vertical = if (compact) 16.dp else 26.dp,
+                    )
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
             ) {
                 Box(
                     modifier = Modifier
-                        .size(82.dp)
+                        .size(if (compact) 60.dp else 82.dp)
                         .background(
                             Brush.radialGradient(
                                 listOf(MeetColors.cyberCyan.copy(alpha = .42f), Color.Transparent),
@@ -445,14 +453,14 @@ private fun RideFirstAccessGateway(
                         Icons.Default.Route,
                         contentDescription = null,
                         tint = MeetColors.neonGreen,
-                        modifier = Modifier.size(42.dp),
+                        modifier = Modifier.size(if (compact) 31.dp else 42.dp),
                     )
                 }
                 Text(
                     "ACTIVA TU CUENTA DE VIAJES",
                     color = Color.White,
                     fontWeight = FontWeight.Black,
-                    fontSize = 20.sp,
+                    fontSize = if (compact) 17.sp else 20.sp,
                     textAlign = TextAlign.Center,
                 )
                 Text(

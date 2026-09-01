@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.identity.PrincipalProvisioningStore
 import com.elysium369.meet.observability.AuthObservability
 import com.elysium369.meet.observability.AuthOperation
 import com.elysium369.meet.ui.components.EliteButton
@@ -38,6 +40,7 @@ fun AuthScreen(
     recoverySessionReady: Boolean = false,
     onRecoveryComplete: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     var mode by remember(initialMode) { mutableStateOf(initialMode) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -78,20 +81,42 @@ fun AuthScreen(
         scope.launch {
             var outcomeRecorded = false
             try {
+                if (operationMode == AuthFlowMode.LOGIN || operationMode == AuthFlowMode.SIGN_UP) {
+                    val existingEmail = SupabaseModule.client.auth.currentUserOrNull()?.email
+                    if (
+                        AuthSessionIdentityPolicy.mustInvalidateExistingSession(
+                            requestedEmail = normalizedEmail,
+                            authenticatedEmail = existingEmail,
+                        )
+                    ) {
+                        SupabaseModule.client.auth.signOut()
+                        PrincipalProvisioningStore.clear(context)
+                    }
+                }
                 when (operationMode) {
                     AuthFlowMode.LOGIN -> {
                         SupabaseModule.client.auth.signInWith(Email) {
                             this.email = normalizedEmail
                             this.password = password
                         }
-                        if (SupabaseModule.client.auth.currentUserOrNull() != null) {
+                        val authenticatedUser = SupabaseModule.client.auth.currentUserOrNull()
+                        if (
+                            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                                requestedEmail = normalizedEmail,
+                                authenticatedEmail = authenticatedUser?.email,
+                            )
+                        ) {
                             AuthObservability.succeeded(attempt, "AUTHENTICATED")
                             outcomeRecorded = true
                             onAuthSuccess()
                         } else {
-                            AuthObservability.failed(attempt, "SESSION_NOT_ESTABLISHED")
+                            if (authenticatedUser != null) {
+                                SupabaseModule.client.auth.signOut()
+                                PrincipalProvisioningStore.clear(context)
+                            }
+                            AuthObservability.failed(attempt, "SESSION_IDENTITY_MISMATCH")
                             outcomeRecorded = true
-                            feedback = "No se pudo establecer una sesión autenticada."
+                            feedback = "No se pudo establecer la sesión de esta cuenta. Intenta de nuevo."
                         }
                     }
                     AuthFlowMode.SIGN_UP -> {
@@ -99,7 +124,13 @@ fun AuthScreen(
                             this.email = normalizedEmail
                             this.password = password
                         }
-                        if (SupabaseModule.client.auth.currentUserOrNull() != null) {
+                        val authenticatedUser = SupabaseModule.client.auth.currentUserOrNull()
+                        if (
+                            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                                requestedEmail = normalizedEmail,
+                                authenticatedEmail = authenticatedUser?.email,
+                            )
+                        ) {
                             AuthObservability.succeeded(attempt, "AUTHENTICATED")
                             outcomeRecorded = true
                             onAuthSuccess()
@@ -138,9 +169,28 @@ fun AuthScreen(
                 if (outcomeRecorded) {
                     feedback = "La cuenta respondió correctamente, pero la sincronización local no terminó. Reabre MEET."
                 } else {
-                    val failure = AuthFailureTranslator.classify(error.message)
-                    AuthObservability.failed(attempt, failure.name)
-                    feedback = AuthFailureTranslator.userMessage(operationMode, error.message)
+                    val authenticatedUser = SupabaseModule.client.auth.currentUserOrNull()
+                    val requestedSessionEstablished =
+                        operationMode in setOf(AuthFlowMode.LOGIN, AuthFlowMode.SIGN_UP) &&
+                            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                                requestedEmail = normalizedEmail,
+                                authenticatedEmail = authenticatedUser?.email,
+                            )
+                    if (requestedSessionEstablished) {
+                        AuthObservability.succeeded(attempt, "AUTHENTICATED_AFTER_CLIENT_WARNING")
+                        onAuthSuccess()
+                    } else {
+                        if (
+                            authenticatedUser != null &&
+                            operationMode in setOf(AuthFlowMode.LOGIN, AuthFlowMode.SIGN_UP)
+                        ) {
+                            runCatching { SupabaseModule.client.auth.signOut() }
+                            PrincipalProvisioningStore.clear(context)
+                        }
+                        val failure = AuthFailureTranslator.classify(error.message)
+                        AuthObservability.failed(attempt, failure.name)
+                        feedback = AuthFailureTranslator.userMessage(operationMode, error.message)
+                    }
                 }
             } finally {
                 loading = false

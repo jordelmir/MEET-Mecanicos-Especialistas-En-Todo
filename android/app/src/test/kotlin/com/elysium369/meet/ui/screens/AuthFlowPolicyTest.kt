@@ -13,6 +13,50 @@ class AuthFlowPolicyTest {
     }
 
     @Test
+    fun `login success requires the authenticated session to belong to requested email`() {
+        assertTrue(
+            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                requestedEmail = " Person@Example.COM ",
+                authenticatedEmail = "person@example.com",
+            ),
+        )
+        assertFalse(
+            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                requestedEmail = "passenger@example.com",
+                authenticatedEmail = "owner@example.com",
+            ),
+        )
+        assertFalse(
+            AuthSessionIdentityPolicy.matchesRequestedAccount(
+                requestedEmail = "passenger@example.com",
+                authenticatedEmail = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `stale session from another account must be invalidated before login`() {
+        assertTrue(
+            AuthSessionIdentityPolicy.mustInvalidateExistingSession(
+                requestedEmail = "passenger@example.com",
+                authenticatedEmail = "owner@example.com",
+            ),
+        )
+        assertFalse(
+            AuthSessionIdentityPolicy.mustInvalidateExistingSession(
+                requestedEmail = "owner@example.com",
+                authenticatedEmail = " OWNER@example.com ",
+            ),
+        )
+        assertFalse(
+            AuthSessionIdentityPolicy.mustInvalidateExistingSession(
+                requestedEmail = "owner@example.com",
+                authenticatedEmail = null,
+            ),
+        )
+    }
+
+    @Test
     fun `enforces the hosted twelve character password policy`() {
         assertEquals(
             "La contraseña debe tener al menos 12 caracteres.",
