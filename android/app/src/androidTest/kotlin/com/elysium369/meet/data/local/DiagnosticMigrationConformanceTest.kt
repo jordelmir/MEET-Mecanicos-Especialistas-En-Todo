@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.elysium369.meet.di.AppModule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,16 +91,133 @@ class DiagnosticMigrationConformanceTest {
 
     @Test
     fun everySupportedDiagnosticSchemaMigratesToCurrentWithoutForeignKeyDamage() {
-        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62).forEach { startVersion ->
-            val databaseName = "diagnostic-migration-$startVersion-to-63"
+        listOf(49, 50, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67).forEach { startVersion ->
+            val databaseName = "diagnostic-migration-$startVersion-to-68"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                63,
+                68,
                 true,
                 *migrationsFrom(startVersion),
             ).use { db ->
                 db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+            }
+        }
+    }
+
+    @Test
+    fun migration63To64CreatesDurableOwnerScopedActiveVehicleIntent() {
+        val databaseName = "active-vehicle-migration-63-to-64"
+        helper.createDatabase(databaseName, 63).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            64,
+            true,
+            AppModule.MIGRATION_63_64,
+        ).use { db ->
+            db.query("PRAGMA table_info(active_vehicle_selections)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val names = buildSet { while (cursor.moveToNext()) add(cursor.getString(nameColumn)) }
+                assertEquals(
+                    setOf("ownerPrincipalId", "vehicleId", "reason", "updatedAtEpochMs"),
+                    names,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun migration64To65CreatesEncryptedLegalEvidenceLedger() {
+        val databaseName = "legal-evidence-migration-64-to-65"
+        helper.createDatabase(databaseName, 64).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            65,
+            true,
+            AppModule.MIGRATION_64_65,
+        ).use { db ->
+            val expected = setOf(
+                "legal_cases_local",
+                "legal_journal_events",
+                "legal_evidence_items",
+                "legal_custody_events",
+                "legal_reminders_local",
+                "legal_expenses_local",
+            )
+            db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+                val existing = buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                assertEquals(emptySet<String>(), expected - existing)
+            }
+            db.query("PRAGMA table_info(legal_journal_events)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val columns = buildSet { while (cursor.moveToNext()) add(cursor.getString(nameColumn)) }
+                assertFalse(columns.contains("narrative"))
+                assertEquals(true, columns.contains("narrativeCiphertextBase64"))
+                assertEquals(true, columns.contains("narrativeNonceBase64"))
+            }
+        }
+    }
+
+    @Test
+    fun migration65To66CreatesTruthfulFuelTransactionAndServerRewardLedgers() {
+        val databaseName = "fuel-ledger-migration-65-to-66"
+        helper.createDatabase(databaseName, 65).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            66,
+            true,
+            AppModule.MIGRATION_65_66,
+        ).use { db ->
+            val expected = setOf(
+                "fuel_transactions_local",
+                "fuel_reward_ledger_local",
+                "fuel_station_price_observations",
+            )
+            db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+                val existing = buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                assertEquals(emptySet<String>(), expected - existing)
+            }
+        }
+    }
+
+    @Test
+    fun migration66To67AddsOptionalOdometerWithoutInventingDistance() {
+        val databaseName = "fuel-consumption-migration-66-to-67"
+        helper.createDatabase(databaseName, 66).close()
+
+        helper.runMigrationsAndValidate(
+            databaseName,
+            67,
+            true,
+            AppModule.MIGRATION_66_67,
+        ).use { db ->
+            db.query("PRAGMA table_info(fuel_transactions_local)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val columns = buildSet { while (cursor.moveToNext()) add(cursor.getString(nameColumn)) }
+                assertTrue(columns.contains("fuelType"))
+                assertTrue(columns.contains("odometerMeters"))
+                assertTrue(columns.contains("distanceSincePreviousMeters"))
+            }
+        }
+    }
+
+    @Test
+    fun migration67To68CreatesOwnerScopedActiveRidePointer() {
+        val databaseName = "active-ride-migration-67-to-68"
+        helper.createDatabase(databaseName, 67).close()
+        helper.runMigrationsAndValidate(
+            databaseName,
+            68,
+            true,
+            AppModule.MIGRATION_67_68,
+        ).use { db ->
+            db.query("PRAGMA table_info(active_ride_selections)").use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                val columns = buildSet { while (cursor.moveToNext()) add(cursor.getString(nameColumn)) }
+                assertEquals(setOf("ownerPrincipalId", "rideRequestId", "updatedAtEpochMs"), columns)
             }
         }
     }
@@ -311,6 +429,11 @@ class DiagnosticMigrationConformanceTest {
         if (startVersion <= 60) add(AppModule.MIGRATION_60_61)
         if (startVersion <= 61) add(AppModule.MIGRATION_61_62)
         if (startVersion <= 62) add(AppModule.MIGRATION_62_63)
+        if (startVersion <= 63) add(AppModule.MIGRATION_63_64)
+        if (startVersion <= 64) add(AppModule.MIGRATION_64_65)
+        if (startVersion <= 65) add(AppModule.MIGRATION_65_66)
+        if (startVersion <= 66) add(AppModule.MIGRATION_66_67)
+        if (startVersion <= 67) add(AppModule.MIGRATION_67_68)
     }.toTypedArray()
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyEvent(

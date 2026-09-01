@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,6 +58,7 @@ fun MessagesScreen(
     val blocked by viewModel.blockedContacts.collectAsStateWithLifecycle()
     val searchOutcome by viewModel.searchOutcome.collectAsStateWithLifecycle()
     val searching by viewModel.searchInProgress.collectAsStateWithLifecycle()
+    val voiceNoteState by viewModel.voiceNoteState.collectAsStateWithLifecycle()
     var pane by remember { mutableStateOf(MessagesPane.INBOX) }
     val context = LocalContext.current
 
@@ -73,10 +75,18 @@ fun MessagesScreen(
     val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.startCall() else viewModel.microphonePermissionDenied()
     }
+    val voiceMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) viewModel.startVoiceNote() else viewModel.microphonePermissionDenied()
+    }
     val startCall = {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             viewModel.startCall()
         } else microphone.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    val startVoiceNote = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            viewModel.startVoiceNote()
+        } else voiceMicrophone.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     LaunchedEffect(serviceVertical, serviceReferenceId, serviceTitle) {
@@ -110,7 +120,15 @@ fun MessagesScreen(
             )
             notice?.let { HonestBanner(it) }
             when {
-                selected != null -> ConversationBody(selected!!, messages) { text, clear -> viewModel.sendText(text, clear) }
+                selected != null -> ConversationBody(
+                    conversation = selected!!,
+                    messages = messages,
+                    voiceNoteState = voiceNoteState,
+                    onSend = viewModel::sendText,
+                    onStartVoice = startVoiceNote,
+                    onStopVoice = viewModel::stopAndSendVoiceNote,
+                    onCancelVoice = viewModel::cancelVoiceNote,
+                )
                 pane == MessagesPane.INBOX -> Inbox(conversations, contacts, serviceVertical, { viewModel.selectConversation(it.id) }) { pane = it }
                 pane == MessagesPane.DISCOVER -> DiscoverPane(searchOutcome, searching, viewModel::searchContact, viewModel::requestContact, invite)
                 pane == MessagesPane.CONTACTS -> ContactsPane(contacts, viewModel::block, invite)
@@ -378,31 +396,98 @@ private fun BlockedPane(blocked: List<BlockedContact>, onUnblock: (BlockedContac
 }
 
 @Composable
-private fun ConversationBody(conversation: ConversationSummary, messages: List<DecryptedMessage>, onSend: (String, () -> Unit) -> Unit) {
-    var text by remember(conversation.id) { mutableStateOf("") }
+private fun ConversationBody(
+    conversation: ConversationSummary,
+    messages: List<DecryptedMessage>,
+    voiceNoteState: VoiceNoteRecordingState,
+    onSend: (String, String?, () -> Unit) -> Unit,
+    onStartVoice: () -> Unit,
+    onStopVoice: (String?) -> Unit,
+    onCancelVoice: () -> Unit,
+) {
+    var text by rememberSaveable(conversation.id) { mutableStateOf("") }
+    var search by rememberSaveable(conversation.id) { mutableStateOf("") }
+    var replyToEventId by rememberSaveable(conversation.id) { mutableStateOf<String?>(null) }
+    val visibleMessages = remember(messages, search) {
+        if (search.isBlank()) messages else messages.filter { it.body.contains(search.trim(), ignoreCase = true) }
+    }
+    val recordingThisConversation = voiceNoteState is VoiceNoteRecordingState.Recording &&
+        voiceNoteState.conversationId == conversation.id
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().background(MeetColors.cyberCyan.copy(alpha = .08f)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Lock, null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
             Text(if ((conversation.participantCount ?: 0) < 2) "Esperando participante autorizado · envío bloqueado" else "Cifrado local activo · transporte remoto sujeto a configuración", color = MeetColors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
         }
+        OutlinedTextField(
+            value = search,
+            onValueChange = { search = it.take(160) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+            leadingIcon = { Icon(Icons.Outlined.Search, null) },
+            placeholder = { Text("Buscar en esta conversación") },
+            singleLine = true,
+        )
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Spacer(Modifier.height(4.dp)) }
-            items(messages, key = { it.id }) { MessageBubble(it) }
+            items(visibleMessages, key = { it.id }) { message ->
+                MessageBubble(message) { replyToEventId = message.id }
+            }
             if (messages.isEmpty()) item { EmptyPanel("Escribe cuando la otra persona esté autorizada.") }
+            else if (visibleMessages.isEmpty()) item { EmptyPanel("No hay mensajes que coincidan con la búsqueda.") }
+        }
+        replyToEventId?.let { replyId ->
+            val replied = messages.firstOrNull { it.id == replyId }
+            Row(Modifier.fillMaxWidth().background(MeetColors.cyberCyan.copy(alpha = .08f)).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Respondiendo a: ${replied?.body?.take(80) ?: "mensaje"}", color = MeetColors.cyberCyan, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                IconButton({ replyToEventId = null }) { Icon(Icons.Outlined.Close, "Cancelar respuesta") }
+            }
         }
         Row(Modifier.fillMaxWidth().background(MeetColors.cardBackground).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (recordingThisConversation) {
+                IconButton({ onStopVoice(replyToEventId); replyToEventId = null }) {
+                    Icon(Icons.Outlined.StopCircle, "Detener y guardar nota", tint = MeetColors.error)
+                }
+                IconButton(onCancelVoice) { Icon(Icons.Outlined.Delete, "Descartar nota", tint = MeetColors.warning) }
+            } else {
+                IconButton(onStartVoice) { Icon(Icons.Outlined.Mic, "Grabar nota de voz", tint = MeetColors.neonGreen) }
+            }
             OutlinedTextField(text, { text = it.take(4000) }, Modifier.weight(1f), placeholder = { Text("Escribe un mensaje") }, maxLines = 4)
-            IconButton({ onSend(text) { text = "" } }, enabled = text.isNotBlank()) { Icon(Icons.Outlined.Send, "Enviar", tint = MeetColors.cyberCyan) }
+            IconButton({
+                onSend(text, replyToEventId) {
+                    text = ""
+                    replyToEventId = null
+                }
+            }, enabled = text.isNotBlank() && !recordingThisConversation) { Icon(Icons.Outlined.Send, "Enviar", tint = MeetColors.cyberCyan) }
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: DecryptedMessage) {
+private fun MessageBubble(message: DecryptedMessage, onReply: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.isMine) Arrangement.End else Arrangement.Start) {
         Column(Modifier.fillMaxWidth(.82f).background(if (message.isMine) MeetColors.electricBlue.copy(alpha = .28f) else MeetColors.cardBackground, RoundedCornerShape(16.dp)).padding(12.dp)) {
-            Text(message.body, color = if (message.decryptionFailed) MeetColors.warning else Color.White)
+            message.replyToEventId?.let { Text("↪ Respuesta", color = MeetColors.cyberCyan, fontSize = 9.sp) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (message.eventType == "VOICE_NOTE" && message.localMediaPath != null) {
+                    IconButton({ playVoiceNote(message.localMediaPath) }) {
+                        Icon(Icons.Outlined.PlayCircle, "Reproducir nota de voz", tint = MeetColors.neonGreen)
+                    }
+                }
+                Text(message.body, color = if (message.decryptionFailed) MeetColors.warning else Color.White, modifier = Modifier.weight(1f))
+                IconButton(onReply) { Icon(Icons.Outlined.Reply, "Responder", tint = MeetColors.cyberCyan) }
+            }
             Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.createdAtEpochMs)) + " · " + message.deliveryState, color = MeetColors.textSecondary, fontSize = 9.sp, modifier = Modifier.align(Alignment.End).padding(top = 4.dp))
+        }
+    }
+}
+
+private fun playVoiceNote(path: String) {
+    runCatching {
+        android.media.MediaPlayer().apply {
+            setDataSource(path)
+            setOnCompletionListener { it.release() }
+            setOnErrorListener { player, _, _ -> player.release(); true }
+            prepare()
+            start()
         }
     }
 }

@@ -1,10 +1,14 @@
 package com.elysium369.meet.ui.screens.marketos
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.identity.ActivePrincipalKernel
 import com.elysium369.meet.legal.data.LegalTriageGateway
 import com.elysium369.meet.legal.data.LegalTriageSuggestion
+import com.elysium369.meet.legal.domain.LegalEvidenceLedger
+import com.elysium369.meet.fuel.domain.FuelLedger
+import com.elysium369.meet.vehicle.ActiveVehicleKernel
 import com.elysium369.meet.observability.MeetTelemetry
 import com.elysium369.meet.platform.marketos.data.MarketCatalogCategory
 import com.elysium369.meet.platform.marketos.data.MarketEnqueueResult
@@ -37,6 +41,9 @@ enum class MarketConnectionState { LOCAL_ONLY, CONNECTING, LIVE, RECOVERING, AUT
 class MarketOsViewModel @Inject constructor(
     private val repository: MarketOsRepository,
     private val principalKernel: ActivePrincipalKernel,
+    private val legalEvidenceLedger: LegalEvidenceLedger,
+    private val fuelLedger: FuelLedger,
+    private val activeVehicleKernel: ActiveVehicleKernel,
 ) : ViewModel() {
     val organizations = repository.organizations.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
@@ -52,6 +59,21 @@ class MarketOsViewModel @Inject constructor(
     )
     val pendingCommands = repository.pendingCommands.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), 0,
+    )
+    val legalTimeline = legalEvidenceLedger.timeline.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
+    )
+    val legalCases = legalEvidenceLedger.cases.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
+    )
+    val legalEvidence = legalEvidenceLedger.evidence.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
+    )
+    val fuelTransactions = fuelLedger.transactions.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
+    )
+    val confirmedFuelRewards = fuelLedger.confirmedRewards.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
     )
 
     private val _legalCatalog = MutableStateFlow<List<MarketCatalogCategory>>(emptyList())
@@ -102,6 +124,45 @@ class MarketOsViewModel @Inject constructor(
                 },
             )
             _notice.value = result.userMessage("Solicitud jurídica")
+        }
+    }
+
+    fun recordLegalJournal(narrative: String) {
+        viewModelScope.launch {
+            runCatching { legalEvidenceLedger.recordQuickJournal(narrative) }
+                .onSuccess { _notice.value = "Entrada cifrada guardada en tu línea de tiempo local." }
+                .onFailure { _notice.value = "No se guardó la entrada: revisa que tenga al menos 3 caracteres." }
+        }
+    }
+
+    fun createLegalCase(title: String) {
+        viewModelScope.launch {
+            runCatching {
+                legalEvidenceLedger.createCase(
+                    title = title,
+                    vehicleId = activeVehicleKernel.activeVehicle.value?.id,
+                )
+            }.onSuccess {
+                _notice.value = "Caso local cifrado creado; la vinculación al vehículo activo quedó preservada."
+            }.onFailure {
+                _notice.value = "No se creó el caso: usa un título de al menos 3 caracteres."
+            }
+        }
+    }
+
+    fun attachLegalEvidence(uri: Uri, mediaType: String, eventId: String?) {
+        viewModelScope.launch {
+            runCatching {
+                legalEvidenceLedger.attachOriginalEvidence(
+                    sourceUri = uri,
+                    mediaType = mediaType,
+                    eventId = eventId,
+                )
+            }.onSuccess {
+                _notice.value = "Original copiado al almacenamiento privado y registrado con SHA-256."
+            }.onFailure {
+                _notice.value = "No se pudo preservar el archivo original; no se creó evidencia parcial."
+            }
         }
     }
 
@@ -165,6 +226,42 @@ class MarketOsViewModel @Inject constructor(
                 },
             )
             _notice.value = result.userMessage("Reclamo de compra")
+        }
+    }
+
+    fun recordFuelPurchase(amountCrc: String, liters: String, stationId: String, odometerKm: String) {
+        viewModelScope.launch {
+            val amountMinor = runCatching {
+                java.math.BigDecimal(amountCrc.trim().replace(',', '.'))
+                    .movePointRight(2).longValueExact()
+            }.getOrNull()
+            val volumeMilliLiters = runCatching {
+                java.math.BigDecimal(liters.trim().replace(',', '.'))
+                    .movePointRight(3).longValueExact()
+            }.getOrNull()
+            val odometerMeters = odometerKm.trim().takeIf(String::isNotBlank)?.let { raw ->
+                runCatching {
+                    java.math.BigDecimal(raw.replace(',', '.')).movePointRight(3).longValueExact()
+                }.getOrNull()
+            }
+            if (amountMinor == null || volumeMilliLiters == null || (odometerKm.isNotBlank() && odometerMeters == null)) {
+                _notice.value = "Monto o volumen inválido; no se guardó la compra."
+                return@launch
+            }
+            runCatching {
+                fuelLedger.recordDeclaredPurchase(
+                    amountMinor = amountMinor,
+                    currency = "CRC",
+                    volumeMilliLiters = volumeMilliLiters,
+                    vehicleId = activeVehicleKernel.activeVehicle.value?.id,
+                    stationId = stationId,
+                    odometerMeters = odometerMeters,
+                )
+            }.onSuccess {
+                _notice.value = "Compra declarada guardada. No genera recompensa hasta confirmación del servidor."
+            }.onFailure {
+                _notice.value = "No se guardó la compra: revisa monto y litros."
+            }
         }
     }
 

@@ -30,6 +30,9 @@ data class DecryptedMessage(
     val isMine: Boolean,
     val createdAtEpochMs: Long,
     val deliveryState: String,
+    val eventType: String = "TEXT",
+    val replyToEventId: String? = null,
+    val localMediaPath: String? = null,
     val decryptionFailed: Boolean = false,
 )
 

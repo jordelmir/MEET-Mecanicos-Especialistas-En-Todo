@@ -415,10 +415,14 @@ fun MeetApp(
                 PropertiesHub(
                     onBack = { navController.backOrHome() },
                     onOpenLegal = { navController.navigate("legal_vanguard") },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=property") },
                 )
             }
             composable("fuel_rewards") {
-                FuelRewardsHub(onBack = { navController.backOrHome() })
+                FuelRewardsHub(
+                    onBack = { navController.backOrHome() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=fuel") },
+                )
             }
             composable(
                 route = "messages?serviceVertical={serviceVertical}&serviceReferenceId={serviceReferenceId}&serviceTitle={serviceTitle}",

@@ -142,12 +142,6 @@ fun RideServiceScreen(
         viewModel.refreshOwnTrustDecisions()
         viewModel.startRideProjectionSync()
     }
-    DisposableEffect(viewModel) {
-        onDispose {
-            viewModel.stopRideProjectionSync()
-        }
-    }
-
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
     val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()

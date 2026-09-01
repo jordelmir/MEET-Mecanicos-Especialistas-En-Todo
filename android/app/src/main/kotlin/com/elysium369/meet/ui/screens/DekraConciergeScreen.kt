@@ -73,10 +73,6 @@ fun DekraConciergeScreen(
     val consentsReady = precheckAuthorized && custodyAuthorized &&
         independentResultAcknowledged && officialFeeAcknowledged && stationRulesAcknowledged
 
-    DisposableEffect(Unit) {
-        onDispose { viewModel.resetDekraConciergeSubmission() }
-    }
-
     Scaffold(
         containerColor = MeetColors.backgroundDark,
         topBar = {

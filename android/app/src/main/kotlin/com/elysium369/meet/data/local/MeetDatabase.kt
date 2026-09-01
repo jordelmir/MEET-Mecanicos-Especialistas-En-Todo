@@ -11,6 +11,16 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
 @Database(
     entities = [
         VehicleEntity::class,
+        ActiveVehicleSelectionEntity::class,
+        LegalCaseEntity::class,
+        LegalJournalEventEntity::class,
+        LegalEvidenceItemEntity::class,
+        LegalCustodyEventEntity::class,
+        LegalReminderEntity::class,
+        LegalExpenseEntity::class,
+        FuelTransactionEntity::class,
+        FuelRewardLedgerEntryEntity::class,
+        FuelStationPriceObservationEntity::class,
         DiagnosticSessionEntity::class,
         DtcEventEntity::class,
         TripEntity::class,
@@ -83,6 +93,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
 
         // MEET RIDES
         RideRequestEntity::class,
+        ActiveRideSelectionEntity::class,
         RideOfferEntity::class,
         RideChatMessageEntity::class,
         RideCommandOutboxEntity::class,
@@ -164,12 +175,15 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         DiagnosticScanManifestEntity::class,
         TelemetryUploadQueueEntity::class,
     ],
-    version = 63,
+    version = 68,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class MeetDatabase : RoomDatabase() {
     abstract fun vehicleDao(): VehicleDao
+    abstract fun activeVehicleSelectionDao(): ActiveVehicleSelectionDao
+    abstract fun legalEvidenceDao(): LegalEvidenceDao
+    abstract fun fuelLedgerDao(): FuelLedgerDao
     abstract fun sessionDao(): DiagnosticSessionDao
     abstract fun dtcDao(): DtcDao
     abstract fun tripDao(): TripDao

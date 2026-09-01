@@ -735,6 +735,15 @@ enum class RideOfferAcceptanceOutcome {
 
 @Dao
 interface RideDao {
+    @Query("SELECT * FROM active_ride_selections WHERE ownerPrincipalId = :ownerPrincipalId LIMIT 1")
+    suspend fun getActiveRideSelection(ownerPrincipalId: String): ActiveRideSelectionEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertActiveRideSelection(selection: ActiveRideSelectionEntity)
+
+    @Query("DELETE FROM active_ride_selections WHERE ownerPrincipalId = :ownerPrincipalId")
+    suspend fun clearActiveRideSelection(ownerPrincipalId: String)
+
     @Query("SELECT * FROM ride_requests ORDER BY createdAt DESC")
     fun getAllRequestsFlow(): Flow<List<RideRequestEntity>>
 

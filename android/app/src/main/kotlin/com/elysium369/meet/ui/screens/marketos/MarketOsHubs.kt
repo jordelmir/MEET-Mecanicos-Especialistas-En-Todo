@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -22,9 +23,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elysium369.meet.fuel.domain.OpaqueQrToken
+import com.elysium369.meet.observability.MeetTelemetry
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
@@ -47,11 +51,74 @@ fun LegalVanguardHub(
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
     val triage by viewModel.legalTriage.collectAsStateWithLifecycle()
+    val timeline by viewModel.legalTimeline.collectAsStateWithLifecycle()
+    val cases by viewModel.legalCases.collectAsStateWithLifecycle()
+    val evidence by viewModel.legalEvidence.collectAsStateWithLifecycle()
+    var journalEntry by rememberSaveable { mutableStateOf("") }
+    var caseTitle by rememberSaveable { mutableStateOf("") }
     var legalAiConsent by remember { mutableStateOf(false) }
     var selectedCategory by remember(catalog) { mutableStateOf(catalog.firstOrNull { it.parentCode != null }?.code) }
+    val evidencePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.attachLegalEvidence(uri, "DOCUMENT", timeline.firstOrNull()?.eventId)
+    }
     MarketHubScaffold("LEGAL VANGUARD", "Confidencialidad antes que distribución", Icons.Default.AccountBalance, LegalPalette, onBack) {
         TruthRibbon("CAAB y DNN se verifican por separado", "Nunca mostramos “verificado” desde una declaración.", LegalPalette)
         SyncRibbon(connection, pending, LegalPalette, viewModel::refreshNow)
+        SectionTitle("Diario probatorio", "Local, cifrado y separado de la contratación jurídica.", LegalPalette)
+        OutlinedTextField(
+            value = journalEntry,
+            onValueChange = { journalEntry = it.take(20_000) },
+            label = { Text("¿Qué ocurrió?") },
+            supportingText = { Text("Se guarda como declaración; adjuntar evidencia no la convierte automáticamente en verificada.") },
+            minLines = 3,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        PrimaryAction("GUARDAR EN MI LÍNEA DE TIEMPO", Icons.Default.HistoryEdu, journalEntry.trim().length >= 3, LegalPalette) {
+            viewModel.recordLegalJournal(journalEntry)
+            journalEntry = ""
+        }
+        if (timeline.isEmpty()) {
+            StatusCard("SIN ENTRADAS", "Tu línea de tiempo local aún no contiene hechos declarados.", Icons.Default.Timeline, LegalPalette)
+        } else {
+            timeline.take(3).forEach { event ->
+                StatusCard(
+                    event.eventType.replace('_', ' '),
+                    "${event.truthState} · ${java.time.Instant.ofEpochMilli(event.occurredAtEpochMs)}\n${event.narrative}",
+                    Icons.Default.Timeline,
+                    LegalPalette,
+                )
+            }
+        }
+        SecondaryAction("ADJUNTAR ORIGINAL AL ÚLTIMO SUCESO", Icons.Default.AttachFile) {
+            evidencePicker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/*"))
+        }
+        if (evidence.isNotEmpty()) {
+            StatusCard(
+                "${evidence.size} ORIGINALES/DERIVADOS PRESERVADOS",
+                "SHA-256 registra integridad técnica; no declara admisibilidad ni prueba por sí solo la narración.",
+                Icons.Default.Fingerprint,
+                LegalPalette,
+            )
+        }
+        SectionTitle("Casos", "Agrupa sucesos sin duplicar ni alterar el registro diario.", LegalPalette)
+        OutlinedTextField(
+            value = caseTitle,
+            onValueChange = { caseTitle = it.take(240) },
+            label = { Text("Nombre del caso") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        PrimaryAction("CREAR CASO LOCAL", Icons.Default.FolderSpecial, caseTitle.trim().length >= 3, LegalPalette) {
+            viewModel.createLegalCase(caseTitle)
+            caseTitle = ""
+        }
+        cases.take(3).forEach { legalCase ->
+            StatusCard(
+                legalCase.title,
+                "${legalCase.state} · actualizado ${java.time.Instant.ofEpochMilli(legalCase.updatedAtEpochMs)}",
+                Icons.Default.Folder,
+                LegalPalette,
+            )
+        }
         SectionTitle("¿Qué pasó?", "No necesitas conocer la materia jurídica.", LegalPalette)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             catalog.filter { it.parentCode != null }.take(12).forEach { category ->
@@ -99,6 +166,7 @@ fun LegalVanguardHub(
 fun PropertiesHub(
     onBack: () -> Unit,
     onOpenLegal: () -> Unit,
+    onOpenMessages: () -> Unit = {},
     viewModel: MarketOsViewModel = hiltViewModel(),
 ) {
     var operation by remember { mutableStateOf("VENTA") }
@@ -133,12 +201,14 @@ fun PropertiesHub(
         ClaimRow("Gravámenes", "Desconocido; no significa libre", false, PropertyPalette)
         ClaimRow("Inspección física", "No realizada", false, PropertyPalette)
         PrimaryAction("SOLICITAR DUE DILIGENCE LEGAL", Icons.Default.Balance, true, PropertyPalette, onOpenLegal)
+        SecondaryAction("ABRIR MENSAJES DE PROPIEDADES", Icons.Default.Forum, onOpenMessages)
     }
 }
 
 @Composable
 fun FuelRewardsHub(
     onBack: () -> Unit,
+    onOpenMessages: () -> Unit = {},
     viewModel: MarketOsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -146,12 +216,44 @@ fun FuelRewardsHub(
     val coupons by viewModel.fuelCoupons.collectAsStateWithLifecycle()
     val pending by viewModel.pendingCommands.collectAsStateWithLifecycle()
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
-    val options = remember { GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).enableAutoZoom().build() }
-    val scanner = remember(context) { GmsBarcodeScanning.getClient(context, options) }
+    val transactions by viewModel.fuelTransactions.collectAsStateWithLifecycle()
+    val confirmedRewards by viewModel.confirmedFuelRewards.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
+    var purchaseAmount by rememberSaveable { mutableStateOf("") }
+    var purchaseLiters by rememberSaveable { mutableStateOf("") }
+    var stationId by rememberSaveable { mutableStateOf("") }
+    var odometerKm by rememberSaveable { mutableStateOf("") }
     MarketHubScaffold("FUEL REWARDS", "Beneficios sin alterar la tarifa regulada", Icons.Default.LocalGasStation, FuelPalette, onBack) {
         TruthRibbon("Compra ≠ recompensa", "Sólo una compra liquidada y con fuente suficiente puede emitir beneficios.", FuelPalette)
         SyncRibbon(connection, pending, FuelPalette, viewModel::refreshNow)
+        SectionTitle("Registrar carga", "La compra queda declarada; el servidor decide cualquier recompensa.", FuelPalette)
+        OutlinedTextField(purchaseAmount, { purchaseAmount = it.take(16) }, label = { Text("Monto CRC") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(purchaseLiters, { purchaseLiters = it.take(12) }, label = { Text("Litros") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(stationId, { stationId = it.take(120) }, label = { Text("Estación (opcional)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(odometerKm, { odometerKm = it.take(16) }, label = { Text("Kilometraje (opcional)") }, supportingText = { Text("Sin dos lecturas válidas, MEET no inventa consumo real.") }, modifier = Modifier.fillMaxWidth())
+        PrimaryAction("GUARDAR COMPRA DECLARADA", Icons.Default.LocalGasStation, purchaseAmount.isNotBlank() && purchaseLiters.isNotBlank(), FuelPalette) {
+            viewModel.recordFuelPurchase(purchaseAmount, purchaseLiters, stationId, odometerKm)
+            purchaseAmount = ""
+            purchaseLiters = ""
+            stationId = ""
+            odometerKm = ""
+        }
+        StatusCard(
+            "OCR DE RECIBO · SIN EJECUTAR",
+            "Una foto futura se tratará como extracción no verificada hasta revisión; nunca acreditará puntos por sí sola.",
+            Icons.Default.DocumentScanner,
+            FuelPalette,
+        )
+        notice?.let { StatusCard("Estado", it, Icons.Default.Info, FuelPalette) }
         SectionTitle("Wallet", "Los cupones reales aparecen desde tu proyección local.", FuelPalette)
+        val confirmedBalance = confirmedRewards.firstOrNull()?.balanceAfterUnits
+        StatusCard(
+            "SALDO CONFIRMADO",
+            confirmedBalance?.let { "$it unidades · autoridad del servidor" }
+                ?: "Sin saldo confirmado por el servidor.",
+            Icons.Default.AccountBalanceWallet,
+            FuelPalette,
+        )
         if (coupons.isEmpty()) {
             StatusCard("SIN BENEFICIOS CONFIRMADOS", "No hay cupones sincronizados. Escanear un QR nunca aplica beneficios sin confirmación del servidor.", Icons.Default.Wallet, FuelPalette)
         } else {
@@ -161,6 +263,23 @@ fun FuelRewardsHub(
         }
         PrimaryAction("ESCANEAR QR SIN PERMISO DE CÁMARA", Icons.Default.QrCodeScanner, true, FuelPalette) {
             scanState = "ABRIENDO SCANNER…"
+            val scanner = runCatching {
+                val options = GmsBarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                    .enableAutoZoom()
+                    .build()
+                GmsBarcodeScanning.getClient(context, options)
+            }.onFailure {
+                MeetTelemetry.recordError(
+                    name = "fuel.scanner.unavailable",
+                    failureCode = "SCANNER_INIT_FAILED",
+                    attributes = mapOf("vertical" to "fuel", "operation" to "scan_qr"),
+                )
+            }.getOrNull()
+            if (scanner == null) {
+                scanState = "SCANNER NO DISPONIBLE · FUEL REWARDS SIGUE ACTIVO"
+                return@PrimaryAction
+            }
             scanner.startScan().addOnSuccessListener { barcode ->
                 scanState = runCatching {
                     val token = OpaqueQrToken.fromPublicUrl(barcode.rawValue.orEmpty(), setOf("meet.app", "elysium-vanguard.app"))
@@ -171,10 +290,33 @@ fun FuelRewardsHub(
                 .addOnFailureListener { scanState = "SCANNER NO DISPONIBLE" }
         }
         Text(scanState, color = FuelPalette.warm, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        SectionTitle("Historial de combustible", "Transacciones locales con estado de verdad visible.", FuelPalette)
+        if (transactions.isEmpty()) {
+            StatusCard("SIN COMPRAS REGISTRADAS", "No hay transacciones locales para calcular consumo.", Icons.AutoMirrored.Filled.ReceiptLong, FuelPalette)
+        } else {
+            transactions.take(5).forEach { purchase ->
+                val consumption = com.elysium369.meet.fuel.domain.FuelConsumptionPolicy.calculate(
+                    purchase.volumeMilliLiters,
+                    purchase.distanceSincePreviousMeters,
+                )
+                StatusCard(
+                    "${purchase.currency} ${decimalMinor(purchase.amountMinor, 2)}",
+                    "${decimalMinor(purchase.volumeMilliLiters, 3)} L · ${purchase.truthState} · " +
+                        (consumption.litersPer100Km?.let { "$it L/100 km derivados de kilometraje registrado" }
+                            ?: "consumo desconocido: falta distancia válida") + " · recompensa no inferida",
+                    Icons.AutoMirrored.Filled.ReceiptLong,
+                    FuelPalette,
+                )
+            }
+        }
+        SecondaryAction("ABRIR MENSAJES DE FUEL", Icons.Default.Forum, onOpenMessages)
         SectionTitle("Regla base", "Configurable por campaña y versionada.", FuelPalette)
         StatusCard("₡5.000 → 1 unidad elegible", "₡4.999 = 0 · ₡9.999 = 1 · ₡10.000 = 2. La redención sigue siendo atómica y autoritativa.", Icons.AutoMirrored.Filled.ReceiptLong, FuelPalette)
     }
 }
+
+private fun decimalMinor(value: Long, scale: Int): String =
+    java.math.BigDecimal(value).movePointLeft(scale).stripTrailingZeros().toPlainString()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun MarketHubScaffold(title: String, subtitle: String, icon: ImageVector, palette: MarketPalette, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {

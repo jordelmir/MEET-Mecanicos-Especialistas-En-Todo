@@ -52,8 +52,8 @@ android {
         targetSdk = 36
         // Navigation continuity: retained auth graph, ordered back stack and
         // saveable transactional drafts across recreation.
-        versionCode = 49
-        versionName = "4.22.1"
+        versionCode = 50
+        versionName = "4.23.0"
 
         val meetBuildSha = providers.environmentVariable("MEET_BUILD_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))

@@ -4133,6 +4133,139 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_63_64 = object : Migration(63, 64) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS active_vehicle_selections (
+                    ownerPrincipalId TEXT NOT NULL,
+                    vehicleId TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL,
+                    PRIMARY KEY(ownerPrincipalId)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_active_vehicle_selections_vehicleId ON active_vehicle_selections(vehicleId)")
+        }
+    }
+
+    internal val MIGRATION_64_65 = object : Migration(64, 65) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_cases_local (
+                ownerPrincipalId TEXT NOT NULL, caseId TEXT NOT NULL,
+                titleCiphertextBase64 TEXT NOT NULL, titleNonceBase64 TEXT NOT NULL,
+                state TEXT NOT NULL, vehicleId TEXT, rideId TEXT, propertyId TEXT,
+                revision INTEGER NOT NULL, createdAtEpochMs INTEGER NOT NULL,
+                updatedAtEpochMs INTEGER NOT NULL, PRIMARY KEY(ownerPrincipalId, caseId)
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_cases_local_ownerPrincipalId_updatedAtEpochMs ON legal_cases_local(ownerPrincipalId, updatedAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_cases_local_ownerPrincipalId_vehicleId ON legal_cases_local(ownerPrincipalId, vehicleId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_cases_local_ownerPrincipalId_rideId ON legal_cases_local(ownerPrincipalId, rideId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_cases_local_ownerPrincipalId_propertyId ON legal_cases_local(ownerPrincipalId, propertyId)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_journal_events (
+                eventId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                caseId TEXT, eventType TEXT NOT NULL, narrativeCiphertextBase64 TEXT NOT NULL,
+                narrativeNonceBase64 TEXT NOT NULL, source TEXT NOT NULL, truthState TEXT NOT NULL,
+                occurredAtEpochMs INTEGER NOT NULL, capturedAtEpochMs INTEGER NOT NULL,
+                revisionOfEventId TEXT, tombstonedAtEpochMs INTEGER
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_journal_events_ownerPrincipalId_occurredAtEpochMs ON legal_journal_events(ownerPrincipalId, occurredAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_journal_events_ownerPrincipalId_caseId_occurredAtEpochMs ON legal_journal_events(ownerPrincipalId, caseId, occurredAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_journal_events_revisionOfEventId ON legal_journal_events(revisionOfEventId)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_evidence_items (
+                evidenceId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                caseId TEXT, eventId TEXT, mediaType TEXT NOT NULL, privateUri TEXT NOT NULL,
+                contentSha256 TEXT NOT NULL, truthState TEXT NOT NULL, custodyState TEXT NOT NULL,
+                capturedAtEpochMs INTEGER NOT NULL, derivativeOfEvidenceId TEXT
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_evidence_items_ownerPrincipalId_caseId_capturedAtEpochMs ON legal_evidence_items(ownerPrincipalId, caseId, capturedAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_evidence_items_eventId ON legal_evidence_items(eventId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_evidence_items_contentSha256 ON legal_evidence_items(contentSha256)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_evidence_items_derivativeOfEvidenceId ON legal_evidence_items(derivativeOfEvidenceId)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_custody_events (
+                custodyEventId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                evidenceId TEXT NOT NULL, action TEXT NOT NULL, actorPrincipalId TEXT NOT NULL,
+                occurredAtEpochMs INTEGER NOT NULL, previousEventHash TEXT, eventHash TEXT NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_custody_events_ownerPrincipalId_evidenceId_occurredAtEpochMs ON legal_custody_events(ownerPrincipalId, evidenceId, occurredAtEpochMs)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_legal_custody_events_eventHash ON legal_custody_events(eventHash)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_reminders_local (
+                reminderId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                caseId TEXT, labelCiphertextBase64 TEXT NOT NULL, labelNonceBase64 TEXT NOT NULL,
+                dueAtEpochMs INTEGER NOT NULL, state TEXT NOT NULL, createdAtEpochMs INTEGER NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_reminders_local_ownerPrincipalId_dueAtEpochMs_state ON legal_reminders_local(ownerPrincipalId, dueAtEpochMs, state)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS legal_expenses_local (
+                expenseId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                caseId TEXT, amountMinor INTEGER NOT NULL, currency TEXT NOT NULL,
+                category TEXT NOT NULL, noteCiphertextBase64 TEXT NOT NULL,
+                noteNonceBase64 TEXT NOT NULL, incurredAtEpochMs INTEGER NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_legal_expenses_local_ownerPrincipalId_caseId_incurredAtEpochMs ON legal_expenses_local(ownerPrincipalId, caseId, incurredAtEpochMs)")
+        }
+    }
+
+    internal val MIGRATION_65_66 = object : Migration(65, 66) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS fuel_transactions_local (
+                transactionId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                vehicleId TEXT, rideId TEXT, stationId TEXT, amountMinor INTEGER NOT NULL,
+                currency TEXT NOT NULL, volumeMilliLiters INTEGER NOT NULL,
+                pricePerLiterMinor INTEGER, source TEXT NOT NULL, truthState TEXT NOT NULL,
+                receiptEvidenceId TEXT, occurredAtEpochMs INTEGER NOT NULL,
+                createdAtEpochMs INTEGER NOT NULL, syncState TEXT NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_transactions_local_ownerPrincipalId_occurredAtEpochMs ON fuel_transactions_local(ownerPrincipalId, occurredAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_transactions_local_ownerPrincipalId_vehicleId_occurredAtEpochMs ON fuel_transactions_local(ownerPrincipalId, vehicleId, occurredAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_transactions_local_ownerPrincipalId_rideId ON fuel_transactions_local(ownerPrincipalId, rideId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_transactions_local_ownerPrincipalId_syncState ON fuel_transactions_local(ownerPrincipalId, syncState)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS fuel_reward_ledger_local (
+                entryId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                transactionId TEXT, deltaUnits INTEGER NOT NULL, balanceAfterUnits INTEGER NOT NULL,
+                reasonCode TEXT NOT NULL, authorityState TEXT NOT NULL, serverVersion INTEGER NOT NULL,
+                occurredAtEpochMs INTEGER NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_reward_ledger_local_ownerPrincipalId_occurredAtEpochMs ON fuel_reward_ledger_local(ownerPrincipalId, occurredAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_reward_ledger_local_ownerPrincipalId_transactionId ON fuel_reward_ledger_local(ownerPrincipalId, transactionId)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_fuel_reward_ledger_local_ownerPrincipalId_serverVersion ON fuel_reward_ledger_local(ownerPrincipalId, serverVersion)")
+
+            db.execSQL("""CREATE TABLE IF NOT EXISTS fuel_station_price_observations (
+                observationId TEXT NOT NULL PRIMARY KEY, ownerPrincipalId TEXT NOT NULL,
+                stationId TEXT NOT NULL, fuelType TEXT NOT NULL, pricePerLiterMinor INTEGER NOT NULL,
+                currency TEXT NOT NULL, source TEXT NOT NULL, truthState TEXT NOT NULL,
+                observedAtEpochMs INTEGER NOT NULL, expiresAtEpochMs INTEGER NOT NULL
+            )""".trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_station_price_observations_stationId_fuelType_observedAtEpochMs ON fuel_station_price_observations(stationId, fuelType, observedAtEpochMs)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_fuel_station_price_observations_ownerPrincipalId_expiresAtEpochMs ON fuel_station_price_observations(ownerPrincipalId, expiresAtEpochMs)")
+        }
+    }
+
+    internal val MIGRATION_66_67 = object : Migration(66, 67) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE fuel_transactions_local ADD COLUMN fuelType TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            db.execSQL("ALTER TABLE fuel_transactions_local ADD COLUMN odometerMeters INTEGER")
+            db.execSQL("ALTER TABLE fuel_transactions_local ADD COLUMN distanceSincePreviousMeters INTEGER")
+        }
+    }
+
+    internal val MIGRATION_67_68 = object : Migration(67, 68) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS active_ride_selections (
+                    ownerPrincipalId TEXT NOT NULL PRIMARY KEY,
+                    rideRequestId TEXT NOT NULL,
+                    updatedAtEpochMs INTEGER NOT NULL
+                )""".trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_active_ride_selections_rideRequestId ON active_ride_selections(rideRequestId)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4182,7 +4315,12 @@ object AppModule {
             MIGRATION_59_60,
             MIGRATION_60_61,
             MIGRATION_61_62,
-            MIGRATION_62_63
+            MIGRATION_62_63,
+            MIGRATION_63_64,
+            MIGRATION_64_65,
+            MIGRATION_65_66,
+            MIGRATION_66_67,
+            MIGRATION_67_68
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4217,6 +4355,16 @@ object AppModule {
 
     @Provides
     fun provideVehicleDao(db: MeetDatabase): VehicleDao = db.vehicleDao()
+
+    @Provides
+    fun provideActiveVehicleSelectionDao(db: MeetDatabase): ActiveVehicleSelectionDao =
+        db.activeVehicleSelectionDao()
+
+    @Provides
+    fun provideLegalEvidenceDao(db: MeetDatabase): LegalEvidenceDao = db.legalEvidenceDao()
+
+    @Provides
+    fun provideFuelLedgerDao(db: MeetDatabase): FuelLedgerDao = db.fuelLedgerDao()
 
     @Provides
     fun provideDiagnosticSessionDao(db: MeetDatabase): DiagnosticSessionDao = db.sessionDao()

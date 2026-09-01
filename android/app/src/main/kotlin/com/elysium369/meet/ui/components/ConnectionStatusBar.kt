@@ -33,6 +33,7 @@ fun ConnectionStatusBar(
     val protocol by viewModel.detectedProtocol.collectAsState()
     val adapterVer by viewModel.adapterVersion.collectAsState()
     val isClone by viewModel.isCloneAdapter.collectAsState()
+    val activeOperations by viewModel.activeOperations.collectAsState()
 
     val infiniteTransition = rememberInfiniteTransition(label = "statusPulse")
     val ledPulse by infiniteTransition.animateFloat(
@@ -108,6 +109,15 @@ fun ConnectionStatusBar(
                         QosMetric("${qos.latencyMs}", "ms", if (qos.latencyMs < 200) com.elysium369.meet.ui.theme.MeetColors.neonGreen else if (qos.latencyMs < 500) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                         QosMetric(String.format("%.0f%%", qos.reliability), "fiab.", if (qos.reliability > 95) com.elysium369.meet.ui.theme.MeetColors.neonGreen else if (qos.reliability > 80) com.elysium369.meet.ui.theme.MeetColors.warning else com.elysium369.meet.ui.theme.MeetColors.neonGreen)
                     }
+                }
+
+                if (activeOperations.size > 1) {
+                    Text(
+                        text = "${activeOperations.size} OPERACIONES",
+                        color = MeetColors.electricBlue,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                    )
                 }
 
                 if (state == ObdState.CONNECTING || state == ObdState.NEGOTIATING) {

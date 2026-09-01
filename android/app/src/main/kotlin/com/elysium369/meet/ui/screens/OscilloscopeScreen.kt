@@ -58,34 +58,19 @@ fun OscilloscopeScreen(
     // ─── 1. STATE FOR OBD VIRTUAL OSCILLOSCOPE ───
     val allPids = remember { PidSignalRegistry.SIGNALS }
     var selectedPid by remember { mutableStateOf(allPids[0]) }
-    var obdIsRunning by remember { mutableStateOf(false) }
+    val obdIsRunning by viewModel.isOscilloscopeRunning.collectAsState()
+    val activeOscilloscopePid by viewModel.activeOscilloscopePid.collectAsState()
+    val dataBuffer by viewModel.oscilloscopeCapture.collectAsState()
+    val captureStartTime by viewModel.oscilloscopeStartedAt.collectAsState()
     var showPidPicker by remember { mutableStateOf(false) }
-    val dataBuffer = remember { mutableStateListOf<Pair<Long, Float>>() }
-    val maxPoints = 300
-    var captureStartTime by remember { mutableStateOf(0L) }
     val analyzer = remember { SignalAnalyzer() }
     var obdDiagnosis by remember { mutableStateOf<SignalDiagnosis?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
     var captureCount by remember { mutableIntStateOf(0) }
 
-    // OBD Stream collection
-    LaunchedEffect(obdIsRunning, selectedPid.code, activeTab) {
-        if (activeTab == 0 && obdIsRunning) {
-            dataBuffer.clear()
-            obdDiagnosis = null
-            captureStartTime = System.currentTimeMillis()
-            try {
-                viewModel.startOscilloscope(selectedPid.code)
-                viewModel.oscilloscopeStream.collect { point ->
-                    if (dataBuffer.size >= maxPoints) dataBuffer.removeAt(0)
-                    dataBuffer.add(point)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("OscScope", "Stream: ${e.message}")
-                obdIsRunning = false
-            }
-        } else {
-            try { viewModel.stopOscilloscope() } catch (_: Exception) {}
+    LaunchedEffect(activeOscilloscopePid) {
+        activeOscilloscopePid?.let { activeCode ->
+            allPids.firstOrNull { it.code == activeCode }?.let { selectedPid = it }
         }
     }
 
@@ -121,14 +106,6 @@ fun OscilloscopeScreen(
     val usbTriggerLevel by viewModel.usbTriggerLevel.collectAsState()
     val usbTriggerEdgeRising by viewModel.usbTriggerEdgeRising.collectAsState()
     val usbSamplingRate by viewModel.usbSamplingRate.collectAsState()
-
-    // Cleanup streams on exit
-    DisposableEffect(Unit) {
-        onDispose {
-            try { viewModel.stopOscilloscope() } catch (_: Exception) {}
-            try { viewModel.stopUsbOscilloscopeStream() } catch (_: Exception) {}
-        }
-    }
 
     val scrollState = rememberScrollState()
 
@@ -219,9 +196,6 @@ fun OscilloscopeScreen(
             EliteTopAppBar(
                 title = "COCKPIT OSCILOSCOPIO",
                 onBackClick = {
-                    obdIsRunning = false
-                    try { viewModel.stopOscilloscope() } catch (_: Exception) {}
-                    try { viewModel.stopUsbOscilloscopeStream() } catch (_: Exception) {}
                     onNavigateBack()
                 },
                 backgroundColor = MeetColors.backgroundDark
@@ -254,11 +228,7 @@ fun OscilloscopeScreen(
             ) {
                 Tab(
                     selected = activeTab == 0,
-                    onClick = {
-                        activeTab = 0
-                        // Stop USB capture if running
-                        try { viewModel.stopUsbOscilloscopeStream() } catch (_: Exception) {}
-                    },
+                    onClick = { activeTab = 0 },
                     text = {
                         Text(
                             "VIRTUAL ELM327",
@@ -270,12 +240,7 @@ fun OscilloscopeScreen(
                 )
                 Tab(
                     selected = activeTab == 1,
-                    onClick = {
-                        activeTab = 1
-                        // Stop OBD stream if running
-                        obdIsRunning = false
-                        try { viewModel.stopOscilloscope() } catch (_: Exception) {}
-                    },
+                    onClick = { activeTab = 1 },
                     text = {
                         Text(
                             "FÍSICO USB HANTEK",
@@ -345,7 +310,7 @@ fun OscilloscopeScreen(
                                 modifier = Modifier.clickable {
                                     if (!obdIsRunning) {
                                         selectedPid = pid
-                                        dataBuffer.clear()
+                                        viewModel.clearOscilloscopeCapture()
                                         obdDiagnosis = null
                                         showPidPicker = false
                                     }
@@ -381,7 +346,7 @@ fun OscilloscopeScreen(
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         OscilloscopeGrid()
-                        OscilloscopeWaveform(dataPoints = dataBuffer.toList())
+                        OscilloscopeWaveform(dataPoints = dataBuffer.takeLast(300))
                         if (obdIsRunning) ScanningLineEffect()
 
                         // HUD Overlay
@@ -432,13 +397,16 @@ fun OscilloscopeScreen(
                 ) {
                     EliteButton(
                         text = if (obdIsRunning) "⏹ DETENER" else "▶ CAPTURAR OBD",
-                        onClick = { obdIsRunning = !obdIsRunning },
+                        onClick = {
+                            if (obdIsRunning) viewModel.stopOscilloscope()
+                            else viewModel.startOscilloscope(selectedPid.code)
+                        },
                         color = if (obdIsRunning) MeetColors.error else MeetColors.neonGreen,
                         modifier = Modifier.weight(1f)
                     )
                     EliteButton(
                         text = "🗑 LIMPIAR",
-                        onClick = { dataBuffer.clear(); obdDiagnosis = null },
+                        onClick = { viewModel.clearOscilloscopeCapture(); obdDiagnosis = null },
                         isEnabled = !obdIsRunning && dataBuffer.isNotEmpty(),
                         color = Color(0xFF666666),
                         modifier = Modifier.weight(0.6f)

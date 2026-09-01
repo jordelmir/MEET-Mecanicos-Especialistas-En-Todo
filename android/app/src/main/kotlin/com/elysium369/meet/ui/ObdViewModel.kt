@@ -110,6 +110,13 @@ import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.data.remote.ServiceVerificationTypePolicy
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.identity.ActivePrincipalKernel
+import com.elysium369.meet.vehicle.ActiveVehicleChangeReason
+import com.elysium369.meet.vehicle.ActiveVehicleKernel
+import com.elysium369.meet.operations.ActiveOperation
+import com.elysium369.meet.operations.ActiveOperationsRegistry
+import com.elysium369.meet.operations.OperationOwner
+import com.elysium369.meet.operations.OperationRecoverability
+import com.elysium369.meet.operations.OperationState
 import com.elysium369.meet.identity.OfflineOwnership
 import com.elysium369.meet.ride.traffic.RideRoadIncident
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
@@ -481,6 +488,8 @@ class ObdViewModel @Inject constructor(
     private val rideCommandRepository: RideCommandRepository,
     private val rideRemoteProjectionRepository: RideRemoteProjectionRepository,
     private val activePrincipalKernel: ActivePrincipalKernel,
+    private val activeVehicleKernel: ActiveVehicleKernel,
+    private val activeOperationsRegistry: ActiveOperationsRegistry,
     private val vehicleRuntimeServer: com.elysium369.meet.core.evair.bridge.VehicleRuntimeServer,
     val vehicleAccessManager: com.elysium369.meet.core.vehicleaccess.application.VehicleAccessManager,
     val entitlementManager: com.elysium369.meet.core.monetization.EntitlementManager,
@@ -494,6 +503,7 @@ class ObdViewModel @Inject constructor(
     val activePrincipal = activePrincipalKernel.activePrincipal
 
     val connectionState: StateFlow<ObdState> = obdSession.state
+    val activeOperations = activeOperationsRegistry.operations
     val statusMessage: StateFlow<String> = obdSession.statusMessage
     val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
     val detectedDtcs: StateFlow<Set<String>> = obdSession.allDetectedDtcs
@@ -591,8 +601,8 @@ class ObdViewModel @Inject constructor(
         return localShellManager.isDistroInstalled(distro)
     }
 
-    private val _selectedVehicle = MutableStateFlow<Vehicle?>(null)
-    val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle.asStateFlow()
+    private val _selectedVehicle: StateFlow<Vehicle?> = activeVehicleKernel.activeVehicle
+    val selectedVehicle: StateFlow<Vehicle?> = _selectedVehicle
 
     // ── LiveLink PRO remote session state ──
     private val liveLinkProEngine = LiveLinkSessionEngine()
@@ -2142,8 +2152,15 @@ class ObdViewModel @Inject constructor(
         }
     }
 
-    fun selectVehicle(vehicle: Vehicle?) {
-        _selectedVehicle.value = vehicle
+    fun selectVehicle(
+        vehicle: Vehicle?,
+        reason: ActiveVehicleChangeReason = ActiveVehicleChangeReason.USER_SELECTED,
+    ) {
+        if (vehicle == null) {
+            Log.w("ObdVM", "Ignored unaudited attempt to clear active vehicle")
+            return
+        }
+        activeVehicleKernel.select(vehicle, reason)
         obdSession.setVehicleCapabilityContext(
             manufacturer = vehicle?.make,
             modelFamily = vehicle?.model,
@@ -2156,8 +2173,6 @@ class ObdViewModel @Inject constructor(
         // Reset sensor smoothers when switching vehicles to prevent cross-vehicle data contamination
         sensorSmoother.resetAll()
         predictiveEstimator.reset()
-        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-            .edit().putString("selected_vehicle_id", vehicle?.id).apply()
         evaluateDnaInference()
     }
 
@@ -2196,7 +2211,7 @@ class ObdViewModel @Inject constructor(
         check(binding.bindingState == VehicleSessionBindingState.UNBOUND && binding.observedVin == null) {
             "La confirmación manual solo está permitida cuando la ECU no entregó VIN y no existe conflicto"
         }
-        _selectedVehicle.value = vehicle
+        activeVehicleKernel.select(vehicle, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
         obdSession.setVehicleCapabilityContext(vehicle.make, vehicle.model, vehicle.year)
         _vehicleSessionBinding.value = binding.bindUserConfirmed(
             vehicleId = vehicle.id,
@@ -2851,7 +2866,7 @@ class ObdViewModel @Inject constructor(
             
             // 1. If an existing vehicle in the garage already has this exact VIN, select it
             vehicleRepository.getVehicleByVin(ownerId, cleanVin)?.let { existing ->
-                selectVehicle(existing)
+                selectVehicle(existing, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
                 lastAutoRecognizedVin = cleanVin
                 voiceFeedbackManager.speak(
                     "Vehículo reconocido por VIN. ${existing.make} ${existing.model} seleccionado.",
@@ -2866,7 +2881,7 @@ class ObdViewModel @Inject constructor(
                 if (currentVehicle.vin.isBlank() || currentVehicle.vin == "NOT_SET" || currentVehicle.vin == "PENDIENTE" || currentVehicle.vin == "N/A") {
                     val updatedVehicle = currentVehicle.copy(vin = cleanVin)
                     vehicleRepository.insertVehicle(updatedVehicle)
-                    selectVehicle(updatedVehicle)
+                    selectVehicle(updatedVehicle, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
                     lastAutoRecognizedVin = cleanVin
                     addTerminalLog("[VIN] VIN $cleanVin vinculado y guardado permanentemente para ${updatedVehicle.make} ${updatedVehicle.model}.", TerminalLineType.SYSTEM)
                     return@withLock updatedVehicle
@@ -2890,7 +2905,7 @@ class ObdViewModel @Inject constructor(
                 plate = "NOT_SET",
             )
             vehicleRepository.insertVehicle(remembered)
-            selectVehicle(remembered)
+            selectVehicle(remembered, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
             lastAutoRecognizedVin = cleanVin
             voiceFeedbackManager.speak(
                 "VIN detectado y vehículo guardado permanentemente en tu garaje.",
@@ -3014,13 +3029,55 @@ class ObdViewModel @Inject constructor(
 
     // --- Digital Oscilloscope ---
     val oscilloscopeStream: SharedFlow<Pair<Long, Float>> = obdSession.oscilloscopeStream
+    private val _oscilloscopeCapture = MutableStateFlow<List<Pair<Long, Float>>>(emptyList())
+    val oscilloscopeCapture: StateFlow<List<Pair<Long, Float>>> = _oscilloscopeCapture.asStateFlow()
+    private val _isOscilloscopeRunning = MutableStateFlow(false)
+    val isOscilloscopeRunning: StateFlow<Boolean> = _isOscilloscopeRunning.asStateFlow()
+    private val _activeOscilloscopePid = MutableStateFlow<String?>(null)
+    val activeOscilloscopePid: StateFlow<String?> = _activeOscilloscopePid.asStateFlow()
+    private val _oscilloscopeStartedAt = MutableStateFlow(0L)
+    val oscilloscopeStartedAt: StateFlow<Long> = _oscilloscopeStartedAt.asStateFlow()
+    private var oscilloscopeCaptureJob: Job? = null
 
     fun startOscilloscope(pidCode: String) {
+        if (_isOscilloscopeRunning.value && _activeOscilloscopePid.value == pidCode) return
+        oscilloscopeCaptureJob?.cancel()
+        _oscilloscopeCapture.value = emptyList()
+        _activeOscilloscopePid.value = pidCode
+        _oscilloscopeStartedAt.value = System.currentTimeMillis()
+        _isOscilloscopeRunning.value = true
+        val now = System.currentTimeMillis()
+        activeOperationsRegistry.upsert(
+            ActiveOperation(
+                operationId = "oscilloscope-obd",
+                type = "OBD_OSCILLOSCOPE",
+                vehicleId = selectedVehicle.value?.id,
+                startedAtEpochMs = now,
+                state = OperationState.RUNNING,
+                progress = null,
+                owner = OperationOwner.VEHICLE_SCOPED,
+                recoverability = OperationRecoverability.ACTIVITY_RECREATION,
+                lastHeartbeatEpochMs = now,
+            ),
+        )
+        oscilloscopeCaptureJob = viewModelScope.launch {
+            obdSession.oscilloscopeStream.collect { point ->
+                _oscilloscopeCapture.update { current -> (current + point).takeLast(2_000) }
+            }
+        }
         obdSession.startOscilloscope(pidCode)
     }
 
     fun stopOscilloscope() {
+        _isOscilloscopeRunning.value = false
+        oscilloscopeCaptureJob?.cancel()
+        oscilloscopeCaptureJob = null
         obdSession.stopOscilloscope()
+        activeOperationsRegistry.complete("oscilloscope-obd")
+    }
+
+    fun clearOscilloscopeCapture() {
+        if (!_isOscilloscopeRunning.value) _oscilloscopeCapture.value = emptyList()
     }
 
     // ── Physical USB Oscilloscope (Hantek 6022BE) ──
@@ -3037,8 +3094,23 @@ class ObdViewModel @Inject constructor(
     fun toggleUsbOscilloscopeStream() {
         if (usbOscilloscopeManager.isStreaming.value) {
             usbOscilloscopeManager.stopStreaming()
+            activeOperationsRegistry.complete("oscilloscope-usb")
         } else {
             usbOscilloscopeManager.startStreaming()
+            val now = System.currentTimeMillis()
+            activeOperationsRegistry.upsert(
+                ActiveOperation(
+                    operationId = "oscilloscope-usb",
+                    type = "USB_OSCILLOSCOPE",
+                    vehicleId = selectedVehicle.value?.id,
+                    startedAtEpochMs = now,
+                    state = OperationState.RUNNING,
+                    progress = null,
+                    owner = OperationOwner.VEHICLE_SCOPED,
+                    recoverability = OperationRecoverability.ACTIVITY_RECREATION,
+                    lastHeartbeatEpochMs = now,
+                ),
+            )
         }
     }
 
@@ -3064,6 +3136,7 @@ class ObdViewModel @Inject constructor(
 
     fun stopUsbOscilloscopeStream() {
         usbOscilloscopeManager.stopStreaming()
+        activeOperationsRegistry.complete("oscilloscope-usb")
     }
 
     // --- Oscilloscope Capture Persistence ---
@@ -3419,7 +3492,6 @@ class ObdViewModel @Inject constructor(
                 notesPollingJob?.cancel()
                 providerRolesJob?.cancel()
                 stopRideProjectionSync()
-                _selectedVehicle.value = null
                 _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
                     diagnosticSessionId = currentSessionId,
                     physicalConnectionId = "PRINCIPAL_CHANGED",
@@ -3428,10 +3500,6 @@ class ObdViewModel @Inject constructor(
                 _isMechanic.value = false
                 _isTowTruckDriver.value = false
                 _isPartsStore.value = false
-                context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-                    .edit()
-                    .remove("selected_vehicle_id")
-                    .apply()
                 refreshProviderRoles()
                 if (principal.isAuthenticated) {
                     syncPendingTrustApplications()
@@ -3504,6 +3572,7 @@ class ObdViewModel @Inject constructor(
             launch {
                 var lastState: ObdState? = null
                 connectionState.collect { state ->
+                    projectObdOperation(state)
                     if (state != lastState) {
                         lastState = state
                         when (state) {
@@ -3514,6 +3583,19 @@ class ObdViewModel @Inject constructor(
                             else -> {}
                         }
                     }
+                }
+            }
+
+            launch {
+                // ActiveVehicleKernel may restore after this ViewModel is created.
+                // Keep every OBD consumer on that single durable authority without
+                // manufacturing a selection from a transient garage list.
+                selectedVehicle.collect { vehicle ->
+                    obdSession.setVehicleCapabilityContext(
+                        manufacturer = vehicle?.make,
+                        modelFamily = vehicle?.model,
+                        year = vehicle?.year,
+                    )
                 }
             }
 
@@ -3778,23 +3860,9 @@ class ObdViewModel @Inject constructor(
         // Subscriptions and Cloud Sync — isolated from main flow collectors
         viewModelScope.launch {
             try {
-                // ─── STEP 1: ALWAYS restore selected vehicle from local persistence ───
-                // This runs BEFORE cloud sync to ensure instant UI readiness.
-                val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-                val savedVehicleId = prefs.getString("selected_vehicle_id", null)
-
-                if (savedVehicleId != null) {
-                    val vehicle = vehicleRepository.getVehicleById(currentProviderUserId(), savedVehicleId)
-                    if (vehicle != null) {
-                        selectVehicle(vehicle)
-                        android.util.Log.d("ObdVM", "✅ Restored selected vehicle: ${vehicle.make} ${vehicle.model}")
-                    } else {
-                        android.util.Log.w("ObdVM", "⚠️ Saved vehicle ID not found in DB — clearing preference")
-                        prefs.edit().remove("selected_vehicle_id").apply()
-                    }
-                }
-
-                // ─── STEP 2: Cloud sync (only if authenticated) ───
+                // ActiveVehicleKernel restores owner-scoped intent independently
+                // from this ViewModel and transient authentication states. Cloud
+                // reconciliation may enrich the garage but never picks a replacement.
                 val user = try {
                     SupabaseManager.client.auth.currentUserOrNull()
                 } catch (e: Exception) {
@@ -3807,7 +3875,7 @@ class ObdViewModel @Inject constructor(
                     _cloudSyncState.value = "Sincronización completa"
                 }
 
-                // ─── STEP 3: Prune old AI consultations from cache (TTL 30 days) ───
+                // Prune old AI consultations from cache (TTL 30 days).
                 launch(Dispatchers.IO) {
                     try {
                         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
@@ -4076,7 +4144,6 @@ class ObdViewModel @Inject constructor(
             saveSessionResults()
             obdSession.disconnect()
             context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
-            _selectedVehicle.value = null
             clearState()
         }
     }
@@ -4090,6 +4157,58 @@ class ObdViewModel @Inject constructor(
             saveSessionResults()
             obdSession.disconnect()
             context.stopService(Intent(context, com.elysium369.meet.core.obd.ObdForegroundService::class.java))
+        }
+    }
+
+    private fun projectObdOperation(state: ObdState) {
+        val operationId = "obd-session"
+        when (state) {
+            ObdState.CONNECTING, ObdState.NEGOTIATING -> {
+                if (activeOperationsRegistry.operations.value[operationId] == null) {
+                    val now = System.currentTimeMillis()
+                    activeOperationsRegistry.upsert(
+                        ActiveOperation(
+                            operationId = operationId,
+                            type = "OBD_SESSION",
+                            vehicleId = selectedVehicle.value?.id,
+                            startedAtEpochMs = now,
+                            state = OperationState.STARTING,
+                            progress = null,
+                            owner = OperationOwner.FOREGROUND_SERVICE_SCOPED,
+                            recoverability = OperationRecoverability.ACTIVITY_RECREATION,
+                            lastHeartbeatEpochMs = now,
+                        ),
+                    )
+                } else {
+                    activeOperationsRegistry.heartbeat(operationId, OperationState.STARTING)
+                }
+            }
+            ObdState.CONNECTED -> {
+                if (activeOperationsRegistry.operations.value[operationId] == null) {
+                    val now = System.currentTimeMillis()
+                    activeOperationsRegistry.upsert(
+                        ActiveOperation(
+                            operationId = operationId,
+                            type = "OBD_SESSION",
+                            vehicleId = selectedVehicle.value?.id,
+                            startedAtEpochMs = now,
+                            state = OperationState.RUNNING,
+                            progress = null,
+                            owner = OperationOwner.FOREGROUND_SERVICE_SCOPED,
+                            recoverability = OperationRecoverability.ACTIVITY_RECREATION,
+                            lastHeartbeatEpochMs = now,
+                        ),
+                    )
+                } else {
+                    activeOperationsRegistry.heartbeat(operationId, OperationState.RUNNING)
+                }
+            }
+            ObdState.ERROR -> activeOperationsRegistry.heartbeat(
+                operationId,
+                OperationState.FAILED,
+                errorCode = "OBD_CONNECTION_ERROR",
+            )
+            ObdState.DISCONNECTED -> activeOperationsRegistry.complete(operationId)
         }
     }
 
@@ -4400,7 +4519,7 @@ class ObdViewModel @Inject constructor(
             try {
                 vehicleRepository.deleteVehicle(vehicle)
                 if (_selectedVehicle.value?.id == vehicle.id) {
-                    _selectedVehicle.value = null
+                    activeVehicleKernel.clearIfDeleted(vehicle)
                 }
             } catch (e: Exception) {
                 Log.e("ObdVM", "Error deleting vehicle", e)
@@ -4446,7 +4565,7 @@ class ObdViewModel @Inject constructor(
                     val updated = vehicle.copy(vin = detectedVin)
                     vehicleRepository.insertVehicle(updated)
                     if (_selectedVehicle.value?.id == vehicle.id) {
-                        _selectedVehicle.value = updated
+                        activeVehicleKernel.updateIfActive(updated)
                     }
                     val route = listOfNotNull(vinResult.header, vinResult.command).joinToString(" → ")
                     _vinReadFeedback.value = "✓ VIN $detectedVin verificado físicamente por $route (${vinResult.protocol ?: "protocolo OBD detectado"}) y guardado."
@@ -6526,7 +6645,7 @@ class ObdViewModel @Inject constructor(
             )
 
             // Fix: Call selectVehicle to ensure persistence of the selected ID
-            selectVehicle(vehicle)
+            selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
         }
     }
 
@@ -7473,6 +7592,21 @@ class ObdViewModel @Inject constructor(
             Log.d("MeetRides", "Ride projection deferred until authentication")
             return
         }
+        val operationId = "ride-realtime-projection"
+        val now = System.currentTimeMillis()
+        activeOperationsRegistry.upsert(
+            ActiveOperation(
+                operationId = operationId,
+                type = "RIDE_REALTIME_SYNC",
+                vehicleId = null,
+                startedAtEpochMs = now,
+                state = OperationState.STARTING,
+                progress = null,
+                owner = OperationOwner.APPLICATION_SCOPED,
+                recoverability = OperationRecoverability.ACTIVITY_RECREATION,
+                lastHeartbeatEpochMs = now,
+            ),
+        )
         rideProjectionJob = viewModelScope.launch(Dispatchers.IO) {
             _rideProjectionConnectionState.value =
                 RideProjectionConnectionState.CONNECTING
@@ -7481,6 +7615,7 @@ class ObdViewModel @Inject constructor(
                 .onEach {
                     _rideProjectionConnectionState.value =
                         RideProjectionConnectionState.LIVE
+                    activeOperationsRegistry.heartbeat(operationId, OperationState.RUNNING)
                 }
                 .retryWhen { error, attempt ->
                     if (currentCloudUserId() == null) {
@@ -7491,6 +7626,7 @@ class ObdViewModel @Inject constructor(
                         val delayMs = RideProjectionSyncPolicy.reconnectDelayMs(attempt)
                         _rideProjectionConnectionState.value =
                             RideProjectionConnectionState.RECOVERING
+                        activeOperationsRegistry.heartbeat(operationId, OperationState.RETRYING)
                         Log.w(
                             "MeetRides",
                             "Realtime wake-up interrupted; reconnecting in ${delayMs}ms",
@@ -7521,6 +7657,7 @@ class ObdViewModel @Inject constructor(
         rideProjectionJob?.cancel()
         rideProjectionJob = null
         _rideProjectionConnectionState.value = RideProjectionConnectionState.IDLE
+        activeOperationsRegistry.complete("ride-realtime-projection")
     }
 
     fun refreshRideProjectionNow() {
@@ -7628,6 +7765,24 @@ class ObdViewModel @Inject constructor(
     }
 
     fun selectActiveRide(request: RideRequestEntity?) {
+        val ownerId = activePrincipalKernel.current().id
+        viewModelScope.launch(Dispatchers.IO) {
+            if (request == null) {
+                rideDao.clearActiveRideSelection(ownerId)
+            } else {
+                rideDao.upsertActiveRideSelection(
+                    ActiveRideSelectionEntity(
+                        ownerPrincipalId = ownerId,
+                        rideRequestId = request.requestId,
+                        updatedAtEpochMs = System.currentTimeMillis(),
+                    ),
+                )
+            }
+        }
+        applyActiveRide(request)
+    }
+
+    private fun applyActiveRide(request: RideRequestEntity?) {
         _activeRideRequest.value = request
         jobOffersCollection?.cancel()
         jobChatCollection?.cancel()
@@ -7662,6 +7817,31 @@ class ObdViewModel @Inject constructor(
         } else {
             _rideOffers.value = emptyList()
             _rideChatMessages.value = emptyList()
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            activePrincipalKernel.activePrincipal
+                .map { it.id }
+                .distinctUntilChanged()
+                .collectLatest { ownerId ->
+                    // A principal boundary clears only the in-memory projection.
+                    // The owner-scoped pointer is retained and restored when that
+                    // principal returns; remote refresh cannot pick a replacement.
+                    applyActiveRide(null)
+                    val selection = withContext(Dispatchers.IO) {
+                        rideDao.getActiveRideSelection(ownerId)
+                    } ?: return@collectLatest
+                    val request = withContext(Dispatchers.IO) {
+                        rideDao.getRequestById(selection.rideRequestId)
+                    }
+                    if (request == null) {
+                        Log.w("MeetRides", "Active ride unavailable locally; durable pointer retained")
+                    } else {
+                        applyActiveRide(request)
+                    }
+                }
         }
     }
 

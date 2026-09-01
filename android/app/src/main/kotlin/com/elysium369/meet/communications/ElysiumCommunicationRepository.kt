@@ -338,20 +338,34 @@ class ElysiumCommunicationRepository @Inject constructor(
                             associatedData(event.conversationId, event.eventId, event.senderPrincipalId),
                         )
                     }
+                    val plaintext = body.getOrNull()
+                    val voiceParts = plaintext?.split('\n', limit = 2)
+                        ?.takeIf { event.eventType == "VOICE_NOTE" && it.size == 2 }
                     DecryptedMessage(
                         id = event.eventId,
                         senderPrincipalId = event.senderPrincipalId,
-                        body = body.getOrElse { "Mensaje cifrado no disponible en este dispositivo" },
+                        body = when {
+                            body.isFailure -> "Mensaje cifrado no disponible en este dispositivo"
+                            voiceParts != null -> "Nota de voz · ${voiceParts[1].toLongOrNull()?.div(1000L) ?: 0L} s"
+                            else -> plaintext.orEmpty()
+                        },
                         isMine = event.senderPrincipalId == principal.id,
                         createdAtEpochMs = event.createdAtEpochMs,
                         deliveryState = event.syncState,
+                        eventType = event.eventType,
+                        replyToEventId = event.replyToEventId,
+                        localMediaPath = voiceParts?.firstOrNull(),
                         decryptionFailed = body.isFailure,
                     )
                 }
             }
         }
 
-    suspend fun sendText(conversationId: String, text: String): SendMessageOutcome {
+    suspend fun sendText(
+        conversationId: String,
+        text: String,
+        replyToEventId: String? = null,
+    ): SendMessageOutcome {
         val normalized = text.trim()
         if (normalized.isEmpty()) return SendMessageOutcome.EmptyMessage
         val principal = principalKernel.current()
@@ -377,6 +391,43 @@ class ElysiumCommunicationRepository @Inject constructor(
                 eventType = "TEXT",
                 localCiphertextBase64 = encrypted.ciphertextBase64,
                 localNonceBase64 = encrypted.nonceBase64,
+                replyToEventId = replyToEventId,
+                syncState = "LOCAL_ONLY",
+                createdAtEpochMs = System.currentTimeMillis(),
+            ),
+        )
+        return if (inserted) SendMessageOutcome.SentLocally(eventId) else SendMessageOutcome.ConversationUnavailable
+    }
+
+    suspend fun sendVoiceNote(
+        conversationId: String,
+        draft: VoiceNoteDraft,
+        replyToEventId: String? = null,
+    ): SendMessageOutcome {
+        val principal = principalKernel.current()
+        if (!draft.file.isFile || draft.file.length() <= 0L) return SendMessageOutcome.ConversationUnavailable
+        if (dao.activePeerPrincipalIds(conversationId, principal.id).any { dao.isBlocked(principal.id, it) }) {
+            return SendMessageOutcome.ConversationUnavailable
+        }
+        if (dao.activeParticipantCount(conversationId, principal.id) < 2) {
+            return SendMessageOutcome.WaitingForAuthorizedParticipant
+        }
+        val eventId = UUID.randomUUID().toString()
+        val encrypted = cipher.encrypt(
+            "${draft.file.absolutePath}\n${draft.durationMs}",
+            associatedData(conversationId, eventId, principal.id),
+        )
+        val inserted = dao.appendEvent(
+            CommunicationEventEntity(
+                eventId = eventId,
+                conversationId = conversationId,
+                ownerPrincipalId = principal.id,
+                senderPrincipalId = principal.id,
+                senderDeviceId = principalKernel.localDeviceId,
+                eventType = "VOICE_NOTE",
+                localCiphertextBase64 = encrypted.ciphertextBase64,
+                localNonceBase64 = encrypted.nonceBase64,
+                replyToEventId = replyToEventId,
                 syncState = "LOCAL_ONLY",
                 createdAtEpochMs = System.currentTimeMillis(),
             ),

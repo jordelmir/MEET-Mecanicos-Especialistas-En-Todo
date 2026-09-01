@@ -15,6 +15,8 @@ import com.elysium369.meet.communications.ContactSearchOutcome
 import com.elysium369.meet.communications.ContactSearchResult
 import com.elysium369.meet.communications.ElysiumContact
 import com.elysium369.meet.communications.ElysiumIdentityProfile
+import com.elysium369.meet.communications.VoiceNoteRecorder
+import com.elysium369.meet.communications.VoiceNoteRecordingState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,6 +32,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class CommunicationViewModel @Inject constructor(
     private val repository: ElysiumCommunicationRepository,
+    private val voiceNoteRecorder: VoiceNoteRecorder,
 ) : ViewModel() {
     val conversations: StateFlow<List<ConversationSummary>> = repository.conversations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -42,6 +45,7 @@ class CommunicationViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val blockedContacts: StateFlow<List<BlockedContact>> = repository.blockedContacts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val voiceNoteState: StateFlow<VoiceNoteRecordingState> = voiceNoteRecorder.state
 
     private val selectedConversationId = MutableStateFlow<String?>(null)
     val selectedConversation: StateFlow<ConversationSummary?> = selectedConversationId
@@ -137,10 +141,10 @@ class CommunicationViewModel @Inject constructor(
         }
     }
 
-    fun sendText(text: String, onAccepted: () -> Unit) {
+    fun sendText(text: String, replyToEventId: String?, onAccepted: () -> Unit) {
         val id = selectedConversationId.value ?: return
         viewModelScope.launch {
-            when (repository.sendText(id, text)) {
+            when (repository.sendText(id, text, replyToEventId)) {
                 is SendMessageOutcome.SentLocally -> {
                     notice.value = "Guardado de forma segura en este dispositivo; transporte remoto pendiente."
                     onAccepted()
@@ -152,6 +156,38 @@ class CommunicationViewModel @Inject constructor(
                     notice.value = "La conversación ya no está disponible para esta identidad."
             }
         }
+    }
+
+    fun startVoiceNote() {
+        val id = selectedConversationId.value ?: return
+        if (!voiceNoteRecorder.start(id)) notice.value = "No se pudo iniciar la grabación."
+    }
+
+    fun stopAndSendVoiceNote(replyToEventId: String? = null) {
+        val draft = voiceNoteRecorder.stop() ?: run {
+            notice.value = "No se obtuvo una nota de voz válida."
+            return
+        }
+        viewModelScope.launch {
+            when (repository.sendVoiceNote(draft.conversationId, draft, replyToEventId)) {
+                is SendMessageOutcome.SentLocally ->
+                    notice.value = "Nota de voz guardada localmente; transporte remoto pendiente."
+                SendMessageOutcome.WaitingForAuthorizedParticipant -> {
+                    draft.file.delete()
+                    notice.value = "Espera a un participante autorizado antes de enviar audio."
+                }
+                SendMessageOutcome.ConversationUnavailable -> {
+                    draft.file.delete()
+                    notice.value = "La conversación ya no está disponible."
+                }
+                SendMessageOutcome.EmptyMessage -> Unit
+            }
+        }
+    }
+
+    fun cancelVoiceNote() {
+        voiceNoteRecorder.cancel()
+        notice.value = "Grabación descartada."
     }
 
     fun startCall() {
