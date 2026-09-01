@@ -92,10 +92,51 @@ MEET v2.2.0 introduces the **Elite Diagnostic Report**, a professional-grade PDF
 ## 6. Production Workflow & Deployment
  
 ### 6.1. Build & Versioning
-- **Android Build**: Compiled via `./gradlew assembleDebug` for high-performance testing.
+- **Android Build**: Compiled via `./gradlew assembleRelease` for signed production APKs and `./gradlew assembleDebug` for testing.
 - **Binary Storage**: Latest stable APKs are archived in the `/releases` directory of the repository for internal distribution.
-- **Version Sync**: The project uses unified versioning across Android and Web components (v2.2.0-stable).
+- **Version Sync**: Current production: Android `4.23.1` (`versionCode 51`).
  
 ### 6.2. CI/CD Integration
 - **Git Flow**: All feature patches are synchronized to the `main` branch.
 - **Verification**: Every production-grade build undergoes a local compilation check to ensure logic integrity before being pushed to the global repository.
+
+---
+
+## 7. Account Isolation & MEET Rides Security (v4.23.1)
+
+### 7.1. Session Identity Policy (`AuthSessionIdentityPolicy`)
+Multi-device testing exposed a critical session leak: login only verified that *some* session existed, not that the session matched the requested email. v4.23.1 enforces:
+- **Exact email match**: Normalized comparison between the requested email and the authenticated session's email.
+- **Stale session invalidation**: If a previous session belongs to a different account, it is signed out and local provisioning is cleared *before* attempting authentication.
+- **Fail-closed on mismatch**: Post-login exceptions only grant access if the authenticated session's email matches; otherwise the session is destroyed.
+
+### 7.2. Ride Actor Ownership by Principal
+Ride verification records (driver and passenger) were previously indexed by `localDeviceId`, meaning two accounts on the same phone could inherit each other's verification status. Now:
+- **Records keyed by `activePrincipal.id`**: The authenticated Supabase user ID, not the device fingerprint.
+- **Trust Center sync by actor**: `refreshOwnTrustDecisions()` and `syncPendingTrustApplications()` query and update by the authenticated principal.
+- **No automatic reassignment**: Ambiguous legacy records indexed by device ID are not silently reassigned to a new account.
+
+### 7.3. Responsive Rides Gateway
+The `RideFirstAccessGateway` uses `BoxWithConstraints` to adapt to screen dimensions:
+- **Compact mode** (`< 600dp height` or `< 360dp width`): Reduced padding (16dp), smaller icons (60dp/31dp), tighter spacing (10dp), smaller title (17sp).
+- **Standard mode**: Full padding (22dp/26dp), large icons (82dp/42dp), 14dp spacing, 20sp title.
+- **Scrollable content**: The card column uses `verticalScroll` to prevent content clipping on small screens.
+- **Max width cap**: 560dp prevents the card from stretching absurdly on tablets.
+
+### 7.4. Legacy Schema Guard (`MarketplaceCloudSyncPolicy`)
+The marketplace sync loop previously polled `service_requests` / `service_bids` tables every 10 seconds. If the remote database doesn't have these legacy tables, the policy now:
+- Detects the "relation does not exist" error pattern.
+- Disables cloud polling for the remainder of the session.
+- Preserves local data availability without repeated error logging.
+
+---
+
+## 8. Release History
+
+| Version | Code | Date | Highlights |
+|---------|------|------|------------|
+| 4.23.1 | 51 | 2026-08-31 | Account isolation, responsive Rides, legacy schema guard |
+| 4.23.0 | 50 | 2026-08-31 | Operational continuity, navigation preservation |
+| 4.18.2 | — | — | Active principal offline ownership |
+| 4.18.1 | — | — | Authenticated ride roles |
+| 4.16.0 | — | — | CI Android verification |
