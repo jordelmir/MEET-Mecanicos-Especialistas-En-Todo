@@ -398,6 +398,7 @@ data class RideRequestEntity(
     val boardingPinExpiresAt: Long? = null,
     val passengerRating: Double? = null,  // Calificación dada al conductor
     val driverRating: Double? = null,     // Calificación dada al pasajero
+    val tipAmountMinor: Long? = null,     // Propina en moneda menor (CRC o centavos USD)
     val createdAt: Long,
     val completedAt: Long? = null
 )

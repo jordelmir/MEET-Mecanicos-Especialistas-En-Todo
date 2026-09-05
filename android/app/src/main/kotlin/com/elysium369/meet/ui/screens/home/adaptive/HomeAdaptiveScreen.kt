@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ fun HomeAdaptiveScreen(
     onCancelPreview: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val compactHeader = LocalConfiguration.current.screenWidthDp < 600
     val prefs = remember { context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE) }
     val userProfile = remember { prefs.getString("user_profile", "owner").orEmpty() }
 
@@ -140,15 +142,42 @@ fun HomeAdaptiveScreen(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 24.sp)) {
+                            withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = if (compactHeader) 18.sp else 24.sp)) {
                                 append("COMMAND")
                             }
-                            append(" ")
-                            withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
+                            append(if (compactHeader) "\n" else " ")
+                            withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = if (compactHeader) 14.sp else 18.sp)) {
                                 append("CENTER")
                             }
-                        }
+                        },
+                        softWrap = true,
+                        maxLines = 2,
                     )
+                    // Role badge
+                    val roleLabel = when (userProfile) {
+                        "owner" -> "Dueño de carro"
+                        "mechanic" -> "Mecánico"
+                        "workshop" -> "Taller"
+                        "fleet" -> "Flota"
+                        "ride_passenger" -> "Pasajero"
+                        "ride_driver" -> "Conductor"
+                        else -> "Usuario"
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                        border = ButtonDefaults.outlinedButtonBorder,
+                    ) {
+                        Text(
+                            text = roleLabel,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MeetColors.neonGreen,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                        )
+                    }
                 }
 
                 Row(
@@ -276,12 +305,13 @@ fun HomeAdaptiveScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        MiniCommandBadge(
-                            title = "Salud",
-                            value = if (healthScore > 0) "$healthScore%" else "—",
-                            color = if (healthScore >= 80) MeetColors.neonGreen else if (healthScore >= 50) MeetColors.warning else MeetColors.error,
-                            modifier = Modifier.weight(1f)
-                        )
+                    val isObdOnline = obdState == ObdState.CONNECTED
+                    MiniCommandBadge(
+                        title = "Salud",
+                        value = if (isObdOnline && healthScore > 0) "$healthScore%" else if (!isObdOnline) "—" else "$healthScore%",
+                        color = if (!isObdOnline) MeetColors.textMuted else if (healthScore >= 80) MeetColors.neonGreen else if (healthScore >= 50) MeetColors.warning else MeetColors.error,
+                        modifier = Modifier.weight(1f)
+                    )
                         MiniCommandBadge(
                             title = "Fallas (DTC)",
                             value = "$totalDtcs",

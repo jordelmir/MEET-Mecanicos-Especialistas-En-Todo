@@ -160,6 +160,31 @@ fun HomeClassicScreen(
                                     }
                                 }
                             )
+                            // Role badge
+                            val roleLabel = when (userProfile) {
+                                "owner" -> "Dueño de carro"
+                                "mechanic" -> "Mecánico"
+                                "workshop" -> "Taller"
+                                "fleet" -> "Flota"
+                                "ride_passenger" -> "Pasajero"
+                                "ride_driver" -> "Conductor"
+                                else -> "Usuario"
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                                border = ButtonDefaults.outlinedButtonBorder,
+                            ) {
+                                Text(
+                                    text = roleLabel,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeetColors.neonGreen,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                )
+                            }
                         }
 
                         // Header Actions

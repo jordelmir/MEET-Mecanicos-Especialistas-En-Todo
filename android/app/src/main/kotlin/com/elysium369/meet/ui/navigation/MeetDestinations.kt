@@ -36,7 +36,7 @@ object MeetDestinations {
     const val PRO_HUB = "pro_hub"
     const val TRUST_CENTER = "platform_trust_center"
     const val RIDE_HOME = "ride_service"
-    const val RIDE_DRIVER_MODE = "provider_registration"
+    const val RIDE_DRIVER_MODE = "ride_driver_registration"
     const val RIDE_PASSENGER_REQUEST = "ride_service"
     const val CAMPAIGNS = "reports"
     const val BATTERY_HEALTH = "health_score"

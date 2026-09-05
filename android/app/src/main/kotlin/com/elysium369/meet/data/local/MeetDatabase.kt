@@ -174,8 +174,11 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         VehicleIdentityObservationEntity::class,
         DiagnosticScanManifestEntity::class,
         TelemetryUploadQueueEntity::class,
+
+        // ACTIVE OPERATIONS REGISTRY
+        com.elysium369.meet.core.operations.ActiveOperationEntity::class,
     ],
-    version = 68,
+    version = 70,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -251,7 +254,10 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun humanityEvidenceDao(): HumanityEvidenceDao
     abstract fun humanityCapabilityDao(): HumanityCapabilityDao
 
-    // ELYSIUM VANGUARD MARKET OPERATING SYSTEM
-    abstract fun marketOsDao(): MarketOsDao
-    abstract fun vanguardConvergenceDao(): VanguardConvergenceDao
+// ELYSIUM VANGUARD MARKET OPERATING SYSTEM
+        abstract fun marketOsDao(): MarketOsDao
+        abstract fun vanguardConvergenceDao(): VanguardConvergenceDao
+
+        // ACTIVE OPERATIONS REGISTRY
+        abstract fun activeOperationDao(): ActiveOperationDao
 }

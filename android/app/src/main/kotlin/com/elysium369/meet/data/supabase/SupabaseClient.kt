@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.elysium369.meet.core.remote.RemoteResult
 import com.elysium369.meet.identity.ActivePrincipalKernel
 import com.elysium369.meet.identity.OfflineOwnership
 import com.elysium369.meet.data.local.dao.VehicleDao
@@ -157,8 +158,8 @@ class VehicleRepository @Inject constructor(
         }
     }
 
-    suspend fun syncVehiclesFromCloud(userId: String) {
-        try {
+    suspend fun syncVehiclesFromCloud(userId: String): RemoteResult<Int> {
+        return try {
             val cloudVehicles = SupabaseManager.client.postgrest["cloud_vehicles"]
                 .select {
                     filter {
@@ -169,8 +170,18 @@ class VehicleRepository @Inject constructor(
             cloudVehicles.forEach { vehicle ->
                 vehicleDao.insertVehicle(vehicle.toLocalVehicle().toEntity())
             }
+            RemoteResult.Success(cloudVehicles.size)
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to sync vehicles from cloud", e)
+            when {
+                e.message?.contains("auth", ignoreCase = true) == true ||
+                e.message?.contains("jwt", ignoreCase = true) == true ->
+                    RemoteResult.Unauthorized
+                e.message?.contains("timeout", ignoreCase = true) == true ||
+                e.message?.contains("connect", ignoreCase = true) == true ->
+                    RemoteResult.TransportFailure(code = "SYNC_FAILED", message = e.message)
+                else -> RemoteResult.ServerFailure(code = "SYNC_FAILED", message = e.message)
+            }
         }
     }
 
@@ -184,34 +195,48 @@ class VehicleRepository @Inject constructor(
         return vehicleDao.getVehicleByVinForUser(userId, cleanVin)?.toDomain()
     }
     
-    suspend fun insertVehicle(vehicle: Vehicle) {
+    suspend fun insertVehicle(vehicle: Vehicle): RemoteResult<Unit> {
         // Save locally
         vehicleDao.insertVehicle(vehicle.toEntity())
         
         // Sync to cloud
-        try {
+        return try {
             val authenticatedUserId = SupabaseManager.client.auth.currentUserOrNull()?.id
-            if (authenticatedUserId != vehicle.user_id) return
+            if (authenticatedUserId != vehicle.user_id) {
+                return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Authenticated user does not match vehicle owner")
+            }
             SupabaseManager.client.postgrest["cloud_vehicles"].upsert(vehicle.toCloudVehicle())
+            RemoteResult.Success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to push vehicle to cloud", e)
+            when {
+                e.message?.contains("auth", ignoreCase = true) == true ->
+                    RemoteResult.Unauthorized
+                else -> RemoteResult.TransportFailure(code = "PUSH_FAILED", message = e.message)
+            }
         }
     }
 
-    suspend fun deleteVehicle(vehicle: Vehicle) {
+    suspend fun deleteVehicle(vehicle: Vehicle): RemoteResult<Unit> {
         // Delete locally
         vehicleDao.deleteVehicle(vehicle.toEntity())
         
         // Delete from cloud
-        try {
+        return try {
             SupabaseManager.client.postgrest["cloud_vehicles"].delete {
                 filter {
                     eq("id", vehicle.id)
                     eq("user_id", vehicle.user_id)
                 }
             }
+            RemoteResult.Success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to delete vehicle from cloud", e)
+            when {
+                e.message?.contains("auth", ignoreCase = true) == true ->
+                    RemoteResult.Unauthorized
+                else -> RemoteResult.TransportFailure(code = "DELETE_FAILED", message = e.message)
+            }
         }
     }
 }

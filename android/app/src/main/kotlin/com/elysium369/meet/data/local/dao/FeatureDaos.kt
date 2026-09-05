@@ -976,6 +976,10 @@ interface RideDao {
     @Query("UPDATE ride_offers SET status = 'REJECTED' WHERE requestId = :requestId AND offerId != :acceptedOfferId")
     suspend fun rejectOtherOffers(requestId: String, acceptedOfferId: String)
 
+    @Deprecated(
+        message = "Legacy local mutation. Authoritative acceptance must be executed via RideCommandRepository using RideCommandType.ACCEPT_OFFER.",
+        level = DeprecationLevel.WARNING
+    )
     @Transaction
     suspend fun acceptOfferAtomically(
         requestId: String,

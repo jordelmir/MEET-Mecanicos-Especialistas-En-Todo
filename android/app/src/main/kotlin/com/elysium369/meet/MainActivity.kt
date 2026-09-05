@@ -258,6 +258,9 @@ fun MeetApp(
     val navController = rememberNavController()
     val liveLinkServer = remember { LiveLinkServer.shared() }
     var mainGraphEstablished by rememberSaveable { mutableStateOf(false) }
+    val sharedPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+    val onboardingCompleted = sharedPrefs.getBoolean("onboarding_completed", false)
+    val hasProfile = !sharedPrefs.getString("user_profile", null).isNullOrBlank()
 
     LaunchedEffect(accessDecision) {
         mainGraphEstablished = MainGraphRetentionPolicy.nextEstablished(
@@ -288,6 +291,13 @@ fun MeetApp(
                 }
                 obdViewModel.syncSelectedUsageProfile()
                 obdViewModel.syncPendingTrustApplications()
+                val completed = sharedPrefs.getBoolean("onboarding_completed", false)
+                val hasProfile = !sharedPrefs.getString("user_profile", null).isNullOrBlank()
+                if (!completed || !hasProfile) {
+                    navController.navigate("onboarding") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             },
         )
         return
@@ -310,6 +320,13 @@ fun MeetApp(
                 }
                 obdViewModel.syncSelectedUsageProfile()
                 obdViewModel.syncPendingTrustApplications()
+                val completed = sharedPrefs.getBoolean("onboarding_completed", false)
+                val hasProfile = !sharedPrefs.getString("user_profile", null).isNullOrBlank()
+                if (!completed || !hasProfile) {
+                    navController.navigate("onboarding") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             },
         )
         return
@@ -331,8 +348,11 @@ fun MeetApp(
         }
     }
 
-    val sharedPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
-    val startDestination = "home"
+    val startDestination = when {
+        !onboardingCompleted -> "onboarding"
+        !hasProfile -> "onboarding"
+        else -> "home"
+    }
     
     val trips by obdViewModel.trips.collectAsState()
     val customPids by obdViewModel.customPids.collectAsState()
@@ -367,7 +387,14 @@ fun MeetApp(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        // paddingValues accounts for the top status bar and bottom navigation bar.
+        // Apply it once to the Box so all children stay within the safe area.
+        // Do NOT re-apply on NavHost — that double-squeezes content and breaks layout.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+        ) {
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
             val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium")
@@ -377,13 +404,13 @@ fun MeetApp(
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier.fillMaxSize().padding(paddingValues)
+                modifier = Modifier.fillMaxSize()
             ) {
             composable("onboarding") {
                 OnboardingScreen(
                     onFinish = { 
                         sharedPrefs.edit().putBoolean("onboarding_completed", true).apply()
-                        navController.navigate("auth") {
+                        navController.navigate("home") {
                             popUpTo("onboarding") { inclusive = true }
                         }
                     }
@@ -392,9 +419,20 @@ fun MeetApp(
             composable("auth") {
                 AuthScreen(
                     onAuthSuccess = {
+                        SupabaseModule.client.auth.currentUserOrNull()?.id?.let {
+                            PrincipalProvisioningStore.recordAuthenticated(context, it)
+                        }
                         obdViewModel.syncSelectedUsageProfile()
-                        navController.navigate("home") {
-                            popUpTo("auth") { inclusive = true }
+                        val completed = sharedPrefs.getBoolean("onboarding_completed", false)
+                        val hasProfile = !sharedPrefs.getString("user_profile", null).isNullOrBlank()
+                        if (!completed || !hasProfile) {
+                            navController.navigate("onboarding") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        } else {
+                            navController.navigate("home") {
+                                popUpTo("auth") { inclusive = true }
+                            }
                         }
                     },
                 )
@@ -1063,7 +1101,7 @@ fun MeetApp(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.backOrHome() },
                     onOpenDriverRegistration = {
-                        navController.navigate("provider_registration")
+                        navController.navigate("ride_driver_registration")
                     },
                     onOpenMessages = { referenceId ->
                         navController.navigate(
@@ -1118,6 +1156,13 @@ fun MeetApp(
             composable("trust_center") {
                 PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.backOrHome() })
             }
+            composable("ride_driver_registration") {
+                com.elysium369.meet.ui.screens.ProviderRegistrationScreen(
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.backOrHome() },
+                    openDriverOnStart = true,
+                )
+            }
             composable("trip_log") {
                 TripScreen(trips = trips, isPremium = isPremium, onExportPdf = { obdViewModel.exportTripToPdf(it) })
             }
@@ -1135,7 +1180,7 @@ fun MeetApp(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.backOrHome() },
                     onOpenDriverRegistration = {
-                        navController.navigate("provider_registration")
+                        navController.navigate("ride_driver_registration")
                     },
                     onOpenMessages = { referenceId ->
                         navController.navigate(

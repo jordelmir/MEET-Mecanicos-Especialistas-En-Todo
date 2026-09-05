@@ -14,6 +14,9 @@ import com.elysium369.meet.data.supabase.toDomain
 import com.elysium369.meet.identity.ActivePrincipal
 import com.elysium369.meet.identity.ActivePrincipalKernel
 import com.elysium369.meet.identity.OfflineOwnership
+import com.elysium369.meet.core.operations.ActiveOperationScope
+import com.elysium369.meet.core.operations.ActiveOperationType
+import com.elysium369.meet.core.operations.ActiveOperationsKernel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.jan.supabase.postgrest.postgrest
@@ -47,6 +50,7 @@ class SyncWorker @AssistedInject constructor(
     private val tripDao: TripDao,
     private val dtcDao: com.elysium369.meet.data.local.dao.DtcDao,
     private val activePrincipalKernel: ActivePrincipalKernel,
+    private val activeOpsKernel: ActiveOperationsKernel,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -55,6 +59,12 @@ class SyncWorker @AssistedInject constructor(
         val activePrincipal = activePrincipalKernel.current()
         if (!activePrincipal.canSyncToCloud) return Result.success()
 
+        val op = activeOpsKernel.register(
+            operationType = ActiveOperationType.CLOUD_SYNC,
+            scope = ActiveOperationScope.PERSISTENT_WORK_SCOPED,
+            metadata = mapOf("principalId" to activePrincipal.id),
+        )
+
         return try {
             val sessions = syncSessions(activePrincipal)
             val trips = syncTrips(activePrincipal)
@@ -62,13 +72,16 @@ class SyncWorker @AssistedInject constructor(
 
             if (sessions.hasRetryableFailure || trips.hasRetryableFailure || dtcs.hasRetryableFailure) {
                 Log.w("SyncWorker", "Partial batch failure (sessions=${sessions.retryableCount}, trips=${trips.retryableCount}, dtcs=${dtcs.retryableCount}); requesting WorkManager retry.")
+                activeOpsKernel.fail(op.operationId, "Partial batch failure: sessions=${sessions.retryableCount}, trips=${trips.retryableCount}, dtcs=${dtcs.retryableCount}")
                 Result.retry()
             } else {
                 Log.i("SyncWorker", "Sync complete: sessions=${sessions.successCount}, trips=${trips.successCount}, dtcs=${dtcs.successCount}")
+                activeOpsKernel.complete(op.operationId)
                 Result.success()
             }
         } catch (e: Exception) {
             Log.e("SyncWorker", "Sync worker caught fatal exception", e)
+            activeOpsKernel.fail(op.operationId, e.message ?: "Unknown error")
             Result.retry()
         }
     }

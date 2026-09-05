@@ -5,7 +5,7 @@ import com.elysium369.meet.platform.marketos.TruthClaim
 import java.util.UUID
 
 enum class PropertyOperation { SALE, RENT, RENT_TO_OWN, TEMPORARY, PRESALE, ASSIGNMENT }
-enum class PropertyListingState { DRAFT, COMPLIANCE_REVIEW, PUBLISHED, RESERVED, UNDER_DUE_DILIGENCE, CLOSED, WITHDRAWN }
+enum class PropertyListingState { DRAFT, COMPLIANCE_REVIEW, PUBLISHED, RESERVED, UNDER_DUE_DILIGENCE, CLOSED, WITHDRAWN; val isActive: Boolean get() = this in listOf(DRAFT, COMPLIANCE_REVIEW, PUBLISHED, RESERVED, UNDER_DUE_DILIGENCE) }
 enum class PropertyTrustRisk { VERIFIED_OWNER, AUTHORIZED_AGENT, DOCUMENT_PENDING, REGISTRY_MISMATCH, HIGH_RISK, UNKNOWN }
 enum class AddressDisclosure { APPROXIMATE_ZONE, AUTHORIZED_EXACT }
 

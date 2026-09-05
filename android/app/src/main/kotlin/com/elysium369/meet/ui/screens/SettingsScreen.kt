@@ -1,6 +1,7 @@
 package com.elysium369.meet.ui.screens
 
 import com.elysium369.meet.ui.navigation.backOrHome
+import com.elysium369.meet.ui.navigation.navigateTopLevel
 
 import android.content.Context
 import android.widget.Toast
@@ -34,6 +35,8 @@ import androidx.navigation.NavController
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.vanguard.DiagnosticTelemetryConsent
 import com.elysium369.meet.core.vanguard.VanguardPrivacyGuard
+import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.identity.PrincipalProvisioningStore
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.AnimatedIconPreset
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -48,6 +51,7 @@ import com.elysium369.meet.ui.components.setAnimatedIconPreset
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.github.jan.supabase.gotrue.auth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1098,6 +1102,42 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             }
 
             // Bottom spacer
+            item {
+                Column {
+                    PhantomSectionHeader(label = "CUENTA MEET", accentColor = MeetColors.warning)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.warning,
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(
+                                SupabaseModule.client.auth.currentUserOrNull()?.email
+                                    ?: "Sin sesión remota activa",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        runCatching { SupabaseModule.client.auth.signOut() }
+                                        PrincipalProvisioningStore.clear(context)
+                                        navController.navigateTopLevel("home")
+                                    }
+                                },
+                                enabled = SupabaseModule.client.auth.currentUserOrNull() != null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("CERRAR SESIÓN")
+                            }
+                        }
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
     }

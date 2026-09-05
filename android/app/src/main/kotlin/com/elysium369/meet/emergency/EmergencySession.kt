@@ -29,6 +29,14 @@ data class EmergencyTriageStep(
     val diagnosticData: Map<String, String> = emptyMap()
 )
 
+/**
+ * Authoritative Emergency Session Root.
+ *
+ * Laws:
+ * - One EmergencySession root for the entire product (no competing CircleEmergency or PttEmergency).
+ * - Emergency priority affects floor arbitration, but NEVER grants remote microphone activation.
+ * - Local device remains sole microphone authority.
+ */
 data class EmergencySession(
     val sessionId: String,
     val vehicleId: String,
@@ -37,5 +45,10 @@ data class EmergencySession(
     val steps: List<EmergencyTriageStep> = emptyList(),
     val recommendedResolution: EmergencyResolution? = null,
     val evidenceRefs: List<EntityRef.EvidenceRef> = emptyList(),
-    val isResolved: Boolean = false
+    val isResolved: Boolean = false,
+    val journeyRef: String? = null,
+    val circleRef: String? = null,
+    val conversationRef: String? = null,
+    val pttChannelRef: String? = null,
+    val presenceEvidence: String? = null,
 )

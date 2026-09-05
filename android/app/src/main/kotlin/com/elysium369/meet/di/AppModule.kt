@@ -4266,6 +4266,40 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_68_69 = object : Migration(68, 69) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE ride_requests ADD COLUMN tipAmountMinor INTEGER")
+        }
+    }
+
+    internal val MIGRATION_69_70 = object : Migration(69, 70) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Active Operations Registry
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `active_operations` (
+                    `operationId` TEXT NOT NULL PRIMARY KEY,
+                    `operationType` TEXT NOT NULL,
+                    `scope` TEXT NOT NULL,
+                    `ownerPrincipalId` TEXT NOT NULL,
+                    `vehicleId` TEXT,
+                    `rideId` TEXT,
+                    `startedAt` INTEGER NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `progress` REAL,
+                    `recoverability` TEXT NOT NULL,
+                    `lastHeartbeat` INTEGER NOT NULL,
+                    `error` TEXT,
+                    `metadataJson` TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_active_operations_owner ON active_operations(ownerPrincipalId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_active_operations_vehicle ON active_operations(vehicleId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_active_operations_ride ON active_operations(rideId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_active_operations_scope ON active_operations(scope)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_active_operations_state ON active_operations(state)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4320,7 +4354,9 @@ object AppModule {
             MIGRATION_64_65,
             MIGRATION_65_66,
             MIGRATION_66_67,
-            MIGRATION_67_68
+            MIGRATION_67_68,
+            MIGRATION_68_69,
+            MIGRATION_69_70,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4618,6 +4654,9 @@ object AppModule {
 
     @Provides
     fun provideMarketOsDao(db: MeetDatabase): MarketOsDao = db.marketOsDao()
+
+    @Provides
+    fun provideActiveOperationDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.ActiveOperationDao = db.activeOperationDao()
 
     @Provides
     @Singleton

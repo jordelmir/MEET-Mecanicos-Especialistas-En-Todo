@@ -108,10 +108,12 @@ object TrustCenterObservability {
             "INVALID_QUEUE_FILTER",
             "INVALID_REVIEW_DECISION",
             "APPLICATION_NOT_FOUND",
+            "REVIEWABLE_EVIDENCE_REQUIRED",
         ).firstOrNull(normalized::contains)
             ?: when {
-                normalized.contains("TIMEOUT") -> "TIMEOUT"
-                normalized.contains("NETWORK") || normalized.contains("HOST") -> "NETWORK_UNAVAILABLE"
+                normalized.contains("TIMEOUT") || normalized.contains("TIMED OUT") -> "TIMEOUT"
+                normalized.contains("NETWORK") || normalized.contains("HOST") || normalized.contains("UNREACHABLE") -> "NETWORK_UNAVAILABLE"
+                normalized.contains("CONNECTION") || normalized.contains("REFUSED") -> "CONNECTION_FAILED"
                 else -> "REMOTE_TRANSPORT_FAILURE"
             }
     }

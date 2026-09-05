@@ -18,6 +18,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     
     <!-- WiFi and Network control (Normal permissions that satisfy FGS connectedDevice "any of" check) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -92,6 +93,11 @@
         <service
             android:name=".core.obd.ObdForegroundService"
             android:foregroundServiceType="connectedDevice"
+            android:exported="false" />
+
+        <service
+            android:name=".ride.location.RideLocationTrackingService"
+            android:foregroundServiceType="location"
             android:exported="false" />
             
         <service
