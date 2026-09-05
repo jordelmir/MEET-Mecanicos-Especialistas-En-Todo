@@ -291,5 +291,182 @@ class ElysiumFulfillmentOsTest {
             "MainActivity.kt must NOT contain hardcoded 'Rodrigo Alvarado'",
             mainContent.contains("Rodrigo Alvarado")
         )
+        assertFalse(
+            "MainActivity.kt must NOT contain synthetic 'MEET-CR' plate fallback",
+            mainContent.contains("\"MEET-CR\"")
+        )
+        assertFalse(
+            "MainActivity.kt must NOT fallback unknown ride state to DRIVER_EN_ROUTE",
+            mainContent.contains("getOrDefault(com.elysium369.meet.ride.domain.RideState.DRIVER_EN_ROUTE)")
+        )
+    }
+
+    // ── 5. SEMANTIC TRUTH & TRUTH-SAFE FALLBACK TESTS ──
+
+    @Test
+    fun unknownRideStateDoesNotBecomeDriverEnRouteTest() {
+        val unknownStateString = "UNKNOWN_OR_UNPARSEABLE_STATUS"
+        val resolved = runCatching {
+            RideState.valueOf(unknownStateString)
+        }.getOrNull() ?: RideState.SEARCHING
+
+        assertNotEquals(
+            "An unknown ride state must NEVER be coerced into DRIVER_EN_ROUTE",
+            RideState.DRIVER_EN_ROUTE,
+            resolved
+        )
+        assertEquals(RideState.SEARCHING, resolved)
+    }
+
+    @Test
+    fun missingDriverDoesNotCreateMatchedDriverTest() {
+        val assignedDriverId: String? = null
+        val matchedDriver = assignedDriverId?.let { driverId ->
+            MatchedDriver(
+                driverId = driverId,
+                name = "Conductor",
+                rating = null,
+                totalTrips = null
+            )
+        }
+
+        assertNull("When assignedDriverId is null, matchedDriver MUST be null", matchedDriver)
+
+        val activeRide = ActiveRideViewState(
+            rideId = "ride_unassigned",
+            driver = matchedDriver,
+            pickup = RidePlaceInput("p1", "Pickup", null, 9.9333, -84.0833),
+            dropoff = RidePlaceInput("d1", "Dropoff", null, 9.9300, -84.1400),
+            fareQuote = FareQuote(0L, 0L, 0L, 0L, "CRC", 0.0, 0),
+            state = RideState.SEARCHING
+        )
+        assertNull("ActiveRideViewState must allow null driver", activeRide.driver)
+    }
+
+    @Test
+    fun finalSettlementMathInvariantsTest() {
+        val base = Money.ofCrc(10000L)
+        val extras = Money.ofCrc(2500L)
+        val taxes = Money.ofCrc(1625L)
+        val correctTotal = Money.ofCrc(14125L)
+
+        // 1. Valid settlement satisfies total == base + extras + taxes
+        val validSettlement = FulfillmentPricing.FinalSettlement(
+            base = base,
+            extras = extras,
+            taxes = taxes,
+            total = correctTotal
+        )
+        assertEquals(14125L, validSettlement.total.amountMinor)
+
+        // 2. Mismatched total throws IllegalArgumentException
+        val badTotal = Money.ofCrc(15000L)
+        try {
+            FulfillmentPricing.FinalSettlement(
+                base = base,
+                extras = extras,
+                taxes = taxes,
+                total = badTotal
+            )
+            fail("Should throw IllegalArgumentException when total does not equal base + extras + taxes")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message?.contains("must equal base") == true)
+        }
+
+        // 3. Mismatched currencies throw IllegalArgumentException
+        val usdTotal = Money.ofUsdCents(14125L)
+        try {
+            FulfillmentPricing.FinalSettlement(
+                base = base,
+                extras = extras,
+                taxes = taxes,
+                total = usdTotal
+            )
+            fail("Should throw IllegalArgumentException when settlement currencies do not match")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message?.contains("currencies must match") == true)
+        }
+    }
+
+    @Test
+    fun cancelledTowDoesNotMarkFutureTimelineStepsCompleteTest() {
+        val cancelledJob = TowJob(
+            jobId = UUID.randomUUID(),
+            customerId = UUID.randomUUID(),
+            customerName = "Test Client",
+            customerPhone = "+506 8888-8888",
+            vehicleSummary = "Sedan",
+            pickupLocation = GeoPoint(9.9333, -84.0833),
+            pickupAddress = "San José",
+            state = TowState.CANCELLED
+        )
+
+        val projection = TowFulfillmentAdapter.toFulfillmentProjection(cancelledJob)
+
+        assertTrue(projection.phase is FulfillmentPhase.Cancelled)
+
+        // Ensure future milestones (ASSIGNED, EN_ROUTE, LOADED, DELIVERED, COMPLETED) are NOT marked completed
+        for (event in projection.timeline) {
+            if (event.phase in setOf("ASSIGNED", "EN_ROUTE", "LOADED", "DELIVERED", "COMPLETED")) {
+                assertFalse(
+                    "Cancelled job must NOT have future phase ${event.phase} marked completed",
+                    event.isCompleted
+                )
+            }
+        }
+    }
+
+    @Test
+    fun towCommandRepositoryCasAndRoomMappingTest() {
+        val repo = TowCommandRepository()
+
+        val job = repo.requestTow(
+            customerId = UUID.randomUUID(),
+            customerName = "Maria Rojas",
+            customerPhone = "+506 7000-0000",
+            vehicleVin = null,
+            vehicleSummary = "Nissan Tiida",
+            pickupLocation = GeoPoint(9.9333, -84.0833),
+            pickupAddress = "Escazú",
+            destinationLocation = null,
+            destinationAddress = null,
+            requiredCapabilities = setOf(TowCapabilities.FLATBED),
+            estimatedPrice = Money.ofCrc(18000L)
+        )
+
+        assertEquals(1L, job.serverVersion)
+        assertEquals(TowState.REQUESTED, job.state)
+
+        // 1. CAS Concurrency Conflict: passing wrong expectedServerVersion
+        val conflictResult = repo.executeAction(
+            jobId = job.jobId,
+            action = TowAction.AssignOperator(UUID.randomUUID(), "TOW-UNIT-99"),
+            actorRole = ServiceRole.TOW_OPERATOR,
+            expectedServerVersion = 999L // Wrong version
+        )
+        assertTrue("Must detect concurrency conflict", conflictResult is TowCommandResult.ConcurrencyConflict)
+
+        // 2. Successful transition with correct version
+        val successResult = repo.executeAction(
+            jobId = job.jobId,
+            action = TowAction.AssignOperator(UUID.randomUUID(), "TOW-UNIT-99"),
+            actorRole = ServiceRole.TOW_OPERATOR,
+            expectedServerVersion = 1L
+        )
+        assertTrue("Must succeed with matching version", successResult is TowCommandResult.Success)
+        val assignedJob = (successResult as TowCommandResult.Success).job
+        assertEquals(2L, assignedJob.serverVersion)
+        assertEquals(TowState.ASSIGNED, assignedJob.state)
+
+        // 3. Entity round-trip conversion integrity
+        val entity = with(TowCommandRepository) { assignedJob.toEntity() }
+        assertEquals(assignedJob.jobId.toString(), entity.requestId)
+        assertEquals("TAKEN", entity.status)
+        assertEquals(18000.0, entity.priceOffer, 0.01)
+
+        val reconstructedJob = with(TowCommandRepository) { entity.toTowJob() }
+        assertEquals(assignedJob.jobId, reconstructedJob.jobId)
+        assertEquals(TowState.ASSIGNED, reconstructedJob.state)
+        assertEquals(18000L, reconstructedJob.estimatedPrice?.amountMinor)
     }
 }

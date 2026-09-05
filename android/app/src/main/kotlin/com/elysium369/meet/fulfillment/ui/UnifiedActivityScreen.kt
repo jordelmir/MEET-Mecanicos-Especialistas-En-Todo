@@ -56,13 +56,13 @@ fun UnifiedActivityScreen(
     var selectedFilter by remember { mutableStateOf(ActivityFilter.ALL) }
 
     val rideRequests by viewModel.rideRequests.collectAsState(initial = emptyList())
-    val activeTowJob by towRepository.activeTowJob.collectAsState()
+    val allTowJobs by towRepository.observeAllJobs().collectAsState(initial = emptyList())
 
-    val activityItems = remember(rideRequests, activeTowJob, selectedFilter) {
+    val activityItems = remember(rideRequests, allTowJobs, selectedFilter) {
         val list = mutableListOf<UnifiedActivityItem>()
 
         // 1. Tow items
-        activeTowJob?.let { tow ->
+        allTowJobs.forEach { tow ->
             list.add(
                 UnifiedActivityItem(
                     id = tow.jobId.toString(),
@@ -71,7 +71,7 @@ fun UnifiedActivityScreen(
                     subtitle = "Hacia ${tow.destinationAddress ?: "Destino"}",
                     status = tow.state.displayName,
                     isActive = tow.state.isActive,
-                    priceFormatted = tow.estimatedPrice?.formatted() ?: "₡22.000",
+                    priceFormatted = tow.finalSettlement?.formatted() ?: tow.quotedPrice?.formatted() ?: tow.estimatedPrice?.formatted(),
                     timestampEpochMs = tow.createdAtEpochMs
                 )
             )
@@ -87,7 +87,7 @@ fun UnifiedActivityScreen(
                     subtitle = "Recogida: ${ride.pickupAddress}",
                     status = ride.status,
                     isActive = ride.status in setOf("OPEN", "ACCEPTED", "IN_PROGRESS", "DRIVER_EN_ROUTE"),
-                    priceFormatted = "${ride.currency} ${ride.priceOfferMinor}",
+                    priceFormatted = if (ride.priceOfferMinor > 0) "${ride.currency} ${ride.priceOfferMinor}" else null,
                     timestampEpochMs = ride.createdAt
                 )
             )

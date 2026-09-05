@@ -92,21 +92,12 @@ fun ActiveRideTrackingScreen(
                     id = "drv_loc",
                     role = GeoMarkerRole.PROVIDER_LIVE,
                     point = GeoPoint(loc.latitude, loc.longitude),
-                    label = ride.driver.name
+                    label = ride.driver?.name ?: "Conductor"
                 )
             )
         }
-        val route = listOf(
-            GeoRoute(
-                points = listOf(
-                    GeoPoint(ride.pickup.latitude, ride.pickup.longitude),
-                    GeoPoint(ride.dropoff.latitude, ride.dropoff.longitude)
-                ),
-                distanceMeters = (ride.fareQuote.estimatedDistanceKm * 1000).toLong(),
-                durationSeconds = ride.fareQuote.estimatedDurationMin * 60L
-            )
-        )
-        CommonMapState(markers = markers, routes = route)
+        // Do not render synthetic 2-point straight lines as navigation routes (Charter Rule: route truth)
+        CommonMapState(markers = markers, routes = emptyList())
     }
 
     Scaffold(
@@ -169,11 +160,14 @@ fun ActiveRideTrackingScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // PTT Audio Session Bar (Push-To-Talk Voice Item 5)
-                PttAudioSessionBar(
-                    channelName = "Canal Seguro de Voz con ${ride.driver.name}",
-                    state = pttVoiceState,
-                    speakerName = ride.driver.name
-                )
+                val driverName = ride.driver?.name
+                if (driverName != null) {
+                    PttAudioSessionBar(
+                        channelName = "Canal Seguro de Voz con $driverName",
+                        state = pttVoiceState,
+                        speakerName = driverName
+                    )
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -201,7 +195,7 @@ fun ActiveRideTrackingScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Text(
-                                        ride.driver.name.take(1).uppercase(),
+                                        ride.driver?.name?.take(1)?.uppercase() ?: "?",
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
                                         color = MeetColors.neonGreen
@@ -210,23 +204,40 @@ fun ActiveRideTrackingScreen(
                             }
 
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(ride.driver.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                                Text("${ride.driver.vehicle} • ${ride.driver.plate}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
-                                Text("★ ${ride.driver.rating} (${ride.driver.totalTrips} viajes)", style = MaterialTheme.typography.labelSmall, color = MeetColors.neonGreen)
+                                Text(
+                                    ride.driver?.name ?: "Buscando conductor...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeetColors.textPrimary
+                                )
+                                if (ride.driver != null) {
+                                    val vehicleDesc = listOfNotNull(ride.driver.vehicle, ride.driver.plate).joinToString(" • ")
+                                    if (vehicleDesc.isNotBlank()) {
+                                        Text(vehicleDesc, style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                                    }
+                                    if (ride.driver.rating != null) {
+                                        val tripsText = ride.driver.totalTrips?.let { " ($it viajes)" } ?: ""
+                                        Text("★ ${ride.driver.rating}$tripsText", style = MaterialTheme.typography.labelSmall, color = MeetColors.neonGreen)
+                                    }
+                                } else {
+                                    Text("Asignación en curso en la red", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                                }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                OutlinedIconButton(
-                                    onClick = onCallDriver,
-                                    border = BorderStroke(1.dp, MeetColors.neonGreen)
-                                ) {
-                                    Icon(Icons.Default.Phone, contentDescription = "Llamar", tint = MeetColors.neonGreen)
-                                }
-                                OutlinedIconButton(
-                                    onClick = onMessageDriver,
-                                    border = BorderStroke(1.dp, MeetColors.electricBlue)
-                                ) {
-                                    Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MeetColors.electricBlue)
+                            if (ride.driver != null) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedIconButton(
+                                        onClick = onCallDriver,
+                                        border = BorderStroke(1.dp, MeetColors.neonGreen)
+                                    ) {
+                                        Icon(Icons.Default.Phone, contentDescription = "Llamar", tint = MeetColors.neonGreen)
+                                    }
+                                    OutlinedIconButton(
+                                        onClick = onMessageDriver,
+                                        border = BorderStroke(1.dp, MeetColors.electricBlue)
+                                    ) {
+                                        Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MeetColors.electricBlue)
+                                    }
                                 }
                             }
                         }
@@ -236,7 +247,7 @@ fun ActiveRideTrackingScreen(
                             InfoPill(
                                 icon = { Icon(Icons.Default.DirectionsCar, null, tint = MeetColors.neonGreen) },
                                 label = "Llegada",
-                                value = "~${ride.driver.etaMinutes} min",
+                                value = ride.driver?.etaMinutes?.let { "~$it min" } ?: "Calculando...",
                                 color = MeetColors.neonGreen,
                                 modifier = Modifier.weight(1f)
                             )
@@ -249,17 +260,19 @@ fun ActiveRideTrackingScreen(
                             )
                         }
 
-                        // Interactive PTT Voice Button Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            PttFloatingButton(
-                                state = pttVoiceState,
-                                activeSpeakerName = ride.driver.name,
-                                onPressStart = { pttVoiceState = PttVoiceState.TRANSMITTING },
-                                onPressEnd = { pttVoiceState = PttVoiceState.IDLE }
-                            )
+                        // Interactive PTT Voice Button Row (only if driver assigned)
+                        if (driverName != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                PttFloatingButton(
+                                    state = pttVoiceState,
+                                    activeSpeakerName = driverName,
+                                    onPressStart = { pttVoiceState = PttVoiceState.TRANSMITTING },
+                                    onPressEnd = { pttVoiceState = PttVoiceState.IDLE }
+                                )
+                            }
                         }
 
                         // Expandable details button
@@ -353,7 +366,7 @@ fun ActiveRideTrackingScreen(
 
             if (showRatingSheet) {
                 RideRatingAndReviewSheet(
-                    counterpartName = ride.driver.name,
+                    counterpartName = ride.driver?.name ?: "Conductor",
                     onSubmitReview = { stars, tip, notes ->
                         showRatingSheet = false
                         onBack()

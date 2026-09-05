@@ -29,14 +29,15 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
             FulfillmentProviderInfo(
                 id = unit.towUnitId,
                 name = source.assignedOperatorName ?: "Operador de Grúa",
-                rating = 4.95,
-                totalJobs = 340,
+                rating = source.assignedOperatorRating,
+                totalJobs = source.assignedOperatorCompletedJobs,
                 phone = source.assignedOperatorPhone,
                 vehicleDescription = "${unit.brandModel} (${unit.capabilities.joinToString { it.displayName }})",
                 licensePlate = unit.licensePlate,
                 providerType = ProviderType.TOW_PROVIDER,
-                etaMinutes = if (source.state == TowState.EN_ROUTE) 12 else null,
-                distanceMeters = if (source.state == TowState.EN_ROUTE) 3500L else null
+                etaMinutes = null,
+                distanceMeters = null,
+                currentPoint = source.operatorLocation
             )
         }
 
@@ -46,11 +47,11 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 extras = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
                 taxes = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
                 total = source.finalSettlement,
-                ledgerAttestationHash = "SHA256:TOW-${source.jobId}"
+                ledgerAttestationHash = source.custodyRecords.lastOrNull()?.evidenceHash
             )
             source.authorizedPrice != null -> FulfillmentPricing.AuthorizedAmount(
                 amount = source.authorizedPrice,
-                authorizationId = "AUTH-${source.jobId}"
+                authorizationId = "AUTH_${source.jobId}_v${source.serverVersion}"
             )
             source.quotedPrice != null -> FulfillmentPricing.Quote(
                 amount = source.quotedPrice,
@@ -63,13 +64,32 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
             else -> null
         }
 
+        val isCancelledOrDisputed = source.state == TowState.CANCELLED || source.state == TowState.DISPUTED
+        val assignedCompleted = !isCancelledOrDisputed && source.state in setOf(
+            TowState.ASSIGNED, TowState.EN_ROUTE, TowState.ARRIVED, TowState.LOADING,
+            TowState.LOADED, TowState.IN_TRANSIT, TowState.ARRIVED_DESTINATION,
+            TowState.UNLOADING, TowState.DELIVERED, TowState.COMPLETED
+        )
+        val enRouteCompleted = !isCancelledOrDisputed && source.state in setOf(
+            TowState.EN_ROUTE, TowState.ARRIVED, TowState.LOADING,
+            TowState.LOADED, TowState.IN_TRANSIT, TowState.ARRIVED_DESTINATION,
+            TowState.UNLOADING, TowState.DELIVERED, TowState.COMPLETED
+        )
+        val loadedCompleted = !isCancelledOrDisputed && source.state in setOf(
+            TowState.LOADED, TowState.IN_TRANSIT, TowState.ARRIVED_DESTINATION,
+            TowState.UNLOADING, TowState.DELIVERED, TowState.COMPLETED
+        )
+        val deliveredCompleted = !isCancelledOrDisputed && source.state in setOf(
+            TowState.DELIVERED, TowState.COMPLETED
+        )
+
         val timelineEvents = listOf(
             FulfillmentTimelineEvent(
                 phase = "REQUESTED",
                 title = "Solicitud Creada",
                 description = "Vehículo: ${source.vehicleSummary}",
                 timestampEpochMs = source.createdAtEpochMs,
-                isCompleted = source.state.ordinal >= TowState.REQUESTED.ordinal,
+                isCompleted = true,
                 isCurrent = source.state == TowState.REQUESTED
             ),
             FulfillmentTimelineEvent(
@@ -77,7 +97,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 title = "Grúa Asignada",
                 description = source.assignedOperatorName ?: "Esperando operador compatible",
                 timestampEpochMs = source.updatedAtEpochMs,
-                isCompleted = source.state.ordinal >= TowState.ASSIGNED.ordinal,
+                isCompleted = assignedCompleted,
                 isCurrent = source.state == TowState.ASSIGNED
             ),
             FulfillmentTimelineEvent(
@@ -85,7 +105,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 title = "En Camino al Vehículo",
                 description = "Hacia ${source.pickupAddress}",
                 timestampEpochMs = source.updatedAtEpochMs,
-                isCompleted = source.state.ordinal >= TowState.EN_ROUTE.ordinal,
+                isCompleted = enRouteCompleted,
                 isCurrent = source.state == TowState.EN_ROUTE
             ),
             FulfillmentTimelineEvent(
@@ -93,7 +113,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 title = "Vehículo Cargado y Asegurado",
                 description = source.custodyRecords.firstOrNull { it.checkpoint == TowCustodyCheckpoint.LOADED_SECURED }?.evidenceHash ?: "Inspección y anclaje",
                 timestampEpochMs = source.updatedAtEpochMs,
-                isCompleted = source.state.ordinal >= TowState.LOADED.ordinal,
+                isCompleted = loadedCompleted,
                 isCurrent = source.state == TowState.LOADED || source.state == TowState.LOADING
             ),
             FulfillmentTimelineEvent(
@@ -101,13 +121,13 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 title = "Entrega en Destino",
                 description = source.destinationAddress ?: "Destino final",
                 timestampEpochMs = source.updatedAtEpochMs,
-                isCompleted = source.state.ordinal >= TowState.DELIVERED.ordinal,
+                isCompleted = deliveredCompleted,
                 isCurrent = source.state == TowState.DELIVERED || source.state == TowState.UNLOADING
             ),
             FulfillmentTimelineEvent(
                 phase = "COMPLETED",
-                title = "Servicio Finalizado y Certificado",
-                description = "Custodia cerrada sin incidencias",
+                title = "Servicio Finalizado",
+                description = "Custodia completada",
                 timestampEpochMs = source.updatedAtEpochMs,
                 isCompleted = source.state == TowState.COMPLETED,
                 isCurrent = source.state == TowState.COMPLETED
@@ -116,17 +136,17 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
 
         val evidenceSnapshots = source.custodyRecords.map { rec ->
             FulfillmentEvidenceSnapshot(
-                evidenceId = "custody_${rec.checkpoint.name}_${rec.recordedAtEpochMs}",
+                evidenceId = rec.canonicalEvidenceId?.toString() ?: "custody_${rec.checkpoint.name}_${rec.recordedAtEpochMs}",
                 label = rec.checkpoint.displayName,
                 sha256Hash = rec.evidenceHash,
                 capturedAtEpochMs = rec.recordedAtEpochMs,
-                verificationLevel = "CRYPTOGRAPHICALLY_ANCHORED"
+                verificationLevel = if (rec.canonicalEvidenceId != null) "SERVER_ATTESTED" else "UNVERIFIED"
             )
         }
 
         val mapState = TowMapAdapter.buildMapState(
             vehicleOrigin = source.pickupLocation,
-            towTruckPoint = if (source.state.isActive) source.pickupLocation else null,
+            towTruckPoint = source.operatorLocation,
             destinationPoint = source.destinationLocation,
             driverName = source.assignedOperatorName
         )

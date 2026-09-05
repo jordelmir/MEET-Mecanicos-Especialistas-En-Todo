@@ -85,7 +85,7 @@ sealed interface FulfillmentPhase {
     }
 
     object Completed : FulfillmentPhase {
-        override val displayName: String = "Completado y Certificado"
+        override val displayName: String = "Completado"
         override val stepOrder: Int = 8
         override val isTerminal: Boolean = true
     }
@@ -142,7 +142,12 @@ sealed interface FulfillmentPricing {
         val ledgerAttestationHash: String? = null,
     ) : FulfillmentPricing {
         init {
-            require(base.currency == total.currency) { "Currencies must match in settlement" }
+            require(base.currency == extras.currency && extras.currency == taxes.currency && taxes.currency == total.currency) {
+                "All settlement currencies must match: base=${base.currency}, extras=${extras.currency}, taxes=${taxes.currency}, total=${total.currency}"
+            }
+            require(total.amountMinor == base.amountMinor + extras.amountMinor + taxes.amountMinor) {
+                "Settlement total (${total.amountMinor}) must equal base (${base.amountMinor}) + extras (${extras.amountMinor}) + taxes (${taxes.amountMinor})"
+            }
         }
     }
 }
@@ -158,8 +163,8 @@ data class PricingItem(
 data class FulfillmentProviderInfo(
     val id: String,
     val name: String,
-    val rating: Double,
-    val totalJobs: Int,
+    val rating: Double? = null,
+    val totalJobs: Int? = null,
     val avatarUrl: String? = null,
     val phone: String? = null,
     val vehicleDescription: String? = null,
@@ -191,7 +196,7 @@ data class FulfillmentEvidenceSnapshot(
     val sha256Hash: String,
     val capturedAtEpochMs: Long,
     val uri: String? = null,
-    val verificationLevel: String = "PHYSICALLY_VERIFIED",
+    val verificationLevel: String = "UNVERIFIED",
 )
 
 /**

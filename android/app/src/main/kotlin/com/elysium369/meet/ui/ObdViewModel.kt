@@ -517,6 +517,10 @@ class ObdViewModel @Inject constructor(
         com.elysium369.meet.core.obd.UdsProtocolManager(obdSession)
     }
 
+    // --- Elysium Authoritative Tow Command Repository ---
+    val towCommandRepository: com.elysium369.meet.core.services.tow.TowCommandRepository by lazy {
+        com.elysium369.meet.core.services.tow.TowCommandRepository(towTruckDao, viewModelScope)
+    }
 
     // --- Force Clone Mode ---
     private val _forceCloneMode = MutableStateFlow(false)

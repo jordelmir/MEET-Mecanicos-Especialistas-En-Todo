@@ -293,8 +293,13 @@ fun DriverProfileOverlay(
                         Text("${driver.vehicle} • ${driver.plate}", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RatingStars(rating = driver.rating)
-                            Text("${driver.rating} (${driver.totalTrips} viajes)", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                            if (driver.rating != null) {
+                                RatingStars(rating = driver.rating)
+                                val tripsText = driver.totalTrips?.let { " ($it viajes)" } ?: ""
+                                Text("${driver.rating}$tripsText", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                            } else {
+                                Text("Sin calificaciones previas", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                            }
                         }
                     }
 

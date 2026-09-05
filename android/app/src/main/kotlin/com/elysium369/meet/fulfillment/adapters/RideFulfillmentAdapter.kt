@@ -41,12 +41,13 @@ object RideFulfillmentAdapter : FulfillmentPresentationAdapter<ActiveRideViewSta
                 licensePlate = drv.plate,
                 providerType = ProviderType.RIDE_DRIVER,
                 etaMinutes = drv.etaMinutes,
-                distanceMeters = drv.distanceMeters.toLong(),
+                distanceMeters = drv.distanceMeters?.toLong(),
                 currentPoint = source.driverLocation?.let { GeoPoint(it.latitude, it.longitude) }
             )
         }
 
-        val currency = CurrencyCode.fromStringOrNull(source.fareQuote.currency) ?: CurrencyCode.CRC
+        val currency = CurrencyCode.fromStringOrNull(source.fareQuote.currency)
+            ?: throw IllegalArgumentException("Unknown or unsupported currency: ${source.fareQuote.currency}")
         val pricing = FulfillmentPricing.Quote(
             amount = Money(source.fareQuote.totalFare, currency),
             breakdown = listOf(
@@ -87,20 +88,8 @@ object RideFulfillmentAdapter : FulfillmentPresentationAdapter<ActiveRideViewSta
             )
         }
 
-        val routes = if (source.dropoff != null) {
-            listOf(
-                GeoRoute(
-                    points = listOf(
-                        GeoPoint(source.pickup.latitude, source.pickup.longitude),
-                        GeoPoint(source.dropoff.latitude, source.dropoff.longitude)
-                    ),
-                    distanceMeters = (source.fareQuote.estimatedDistanceKm * 1000).toLong(),
-                    durationSeconds = source.fareQuote.estimatedDurationMin * 60L
-                )
-            )
-        } else emptyList()
-
-        val mapState = CommonMapState(markers = markers, routes = routes)
+        // Straight lines are not road routes; routes remain empty until navigation engine provides a polyline
+        val mapState = CommonMapState(markers = markers, routes = emptyList())
 
         val aggregateId = runCatching { UUID.fromString(source.rideId) }.getOrElse { UUID.nameUUIDFromBytes(source.rideId.toByteArray()) }
 
@@ -125,7 +114,7 @@ object RideFulfillmentAdapter : FulfillmentPresentationAdapter<ActiveRideViewSta
             canCancel = source.state in setOf(RideState.DRAFT, RideState.SEARCHING, RideState.OFFERED, RideState.ASSIGNED, RideState.DRIVER_EN_ROUTE),
             canMessage = source.driver != null,
             canCall = source.driver?.phone != null,
-            canPTT = source.driver != null
+            canPTT = false // Not enabled until floor lease is verified
         )
     }
 }

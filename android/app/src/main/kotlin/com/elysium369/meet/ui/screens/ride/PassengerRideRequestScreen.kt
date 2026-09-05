@@ -55,31 +55,24 @@ fun PassengerRideRequestScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    var pickup by remember {
+    val currentGps by viewModel.currentGpsLocation.collectAsState()
+
+    var pickup by remember(currentGps) {
         mutableStateOf(
-            RidePlaceInput(
-                placeId = "pickup_default",
-                displayName = "Mi ubicación actual",
-                address = "San José, Costa Rica (GPS Alta Precisión)",
-                latitude = 9.9333,
-                longitude = -84.0833,
+            currentGps?.let {
+                RidePlaceInput.fromCurrentLocation(it.latitude, it.longitude)
+            } ?: RidePlaceInput(
+                placeId = "pickup_pending",
+                displayName = "Ubicación actual",
+                address = "Esperando señal de GPS...",
+                latitude = 0.0,
+                longitude = 0.0,
                 placeType = PlaceType.CURRENT
             )
         )
     }
 
-    var dropoff by remember {
-        mutableStateOf<RidePlaceInput?>(
-            RidePlaceInput(
-                placeId = "dropoff_default",
-                displayName = "Aeropuerto Juan Santamaría (SJO)",
-                address = "Alajuela, Costa Rica",
-                latitude = 9.9939,
-                longitude = -84.2088,
-                placeType = PlaceType.SEARCH
-            )
-        )
-    }
+    var dropoff by remember { mutableStateOf<RidePlaceInput?>(null) }
 
     var fareMode by remember { mutableStateOf(RideFareMode.METERED_TIME_DISTANCE) }
     var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
@@ -97,26 +90,39 @@ fun PassengerRideRequestScreen(
             MatchedDriver(
                 driverId = driverId,
                 name = activeRideReq?.assignedDriverName ?: "Conductor Asignado",
-                rating = activeRideReq?.driverRating ?: 4.95,
-                totalTrips = 240,
-                vehicle = activeRideReq?.assignedDriverVehicle ?: "Vehículo Registrado",
-                plate = activeRideReq?.serverAssignedVehicleId ?: "MEET-CR",
-                etaMinutes = activeRideReq?.estimatedDurationMin?.coerceAtLeast(1) ?: 4,
-                distanceMeters = ((activeRideReq?.estimatedDistanceKm ?: 1.0) * 1000).toInt()
+                rating = activeRideReq?.driverRating,
+                totalTrips = null,
+                vehicle = activeRideReq?.assignedDriverVehicle,
+                plate = activeRideReq?.serverAssignedVehicleId,
+                etaMinutes = activeRideReq?.estimatedDurationMin?.takeIf { it > 0 },
+                distanceMeters = activeRideReq?.estimatedDistanceKm?.takeIf { it > 0.0 }?.let { (it * 1000).toInt() }
             )
         }
     }
 
     val fareQuote = remember(pickup, dropoff, fareMode) {
-        if (dropoff != null) {
+        val dest = dropoff
+        if (dest != null && pickup.latitude != 0.0 && dest.latitude != 0.0) {
+            val dLat = Math.toRadians(dest.latitude - pickup.latitude)
+            val dLng = Math.toRadians(dest.longitude - pickup.longitude)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(pickup.latitude)) * Math.cos(Math.toRadians(dest.latitude)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            val distanceKm = (6371.0 * c).coerceAtLeast(0.1)
+            val estDurationMin = Math.max(1, (distanceKm * 2.0).toInt())
+            val engineQuote = com.elysium369.meet.ride.domain.RideFareEngine.quoteCostaRica(
+                distanceMeters = (distanceKm * 1000).toLong(),
+                durationSeconds = estDurationMin * 60L
+            )
             FareQuote(
-                baseFare = 1200L,
-                distanceFare = 5800L,
-                timeFare = 1400L,
-                totalFare = 8400L,
+                baseFare = 0L,
+                distanceFare = engineQuote.distanceFareMinor,
+                timeFare = engineQuote.timeFareMinor,
+                totalFare = engineQuote.estimatedTotalMinor,
                 currency = "CRC",
-                estimatedDistanceKm = 17.2,
-                estimatedDurationMin = 24,
+                estimatedDistanceKm = distanceKm,
+                estimatedDurationMin = estDurationMin,
                 fareMode = fareMode
             )
         } else null
@@ -227,8 +233,13 @@ fun PassengerRideRequestScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("¡Conductor Asignado!", style = MaterialTheme.typography.labelMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                                 Text(driver.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                                Text("${driver.vehicle} • ${driver.plate}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
-                                Text("Llegada estimada en ${driver.etaMinutes} min", style = MaterialTheme.typography.labelSmall, color = MeetColors.electricBlue, fontWeight = FontWeight.SemiBold)
+                                Text("${driver.vehicle ?: "Vehículo Registrado"} • ${driver.plate ?: "---"}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                                Text(
+                                    driver.etaMinutes?.let { "Llegada estimada en $it min" } ?: "Llegada en cálculo",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeetColors.electricBlue,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                             Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = MeetColors.neonGreen)
                         }
@@ -240,13 +251,13 @@ fun PassengerRideRequestScreen(
                                 rideId = activeRideReq?.requestId ?: "ride_${System.currentTimeMillis()}",
                                 driver = driver,
                                 pickup = pickup,
-                                dropoff = dropoff!!,
-                                fareQuote = fareQuote!!,
+                                dropoff = dropoff ?: pickup,
+                                fareQuote = fareQuote ?: FareQuote(0L, 0L, 0L, 0L, "CRC", 0.0, 0),
                                 state = runCatching {
-                                    RideState.valueOf(activeRideReq?.status ?: "DRIVER_EN_ROUTE")
-                                }.getOrDefault(RideState.DRIVER_EN_ROUTE),
-                                driverLocation = RideLocationPoint(latitude = pickup.latitude + 0.002, longitude = pickup.longitude + 0.002),
-                                passengerLocation = RideLocationPoint(latitude = pickup.latitude, longitude = pickup.longitude)
+                                    RideState.valueOf(activeRideReq?.status ?: "ASSIGNED")
+                                }.getOrDefault(RideState.ASSIGNED),
+                                driverLocation = null, // Truth rule: driver GPS must stream live from server, NEVER fabricated
+                                passengerLocation = if (pickup.latitude != 0.0) RideLocationPoint(latitude = pickup.latitude, longitude = pickup.longitude) else null
                             )
                             onStartActiveRide(activeState)
                         },
@@ -327,7 +338,7 @@ fun PassengerRideRequestScreen(
 
             if (showDriverProfile && matchedDriver != null) {
                 DriverProfileOverlay(
-                    driver = matchedDriver!!,
+                    driver = matchedDriver,
                     onDismiss = { showDriverProfile = false },
                     onCall = { /* Call driver */ },
                     onMessage = { /* Chat driver */ }

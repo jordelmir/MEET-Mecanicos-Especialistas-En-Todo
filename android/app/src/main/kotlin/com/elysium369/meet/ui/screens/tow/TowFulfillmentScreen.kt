@@ -70,9 +70,10 @@ fun TowFulfillmentScreen(
             viewModel = viewModel,
             onBack = onBack,
             onRequestTow = { originAddr, destAddr, capabilities ->
-                val originPoint = GeoPoint(9.9333, -84.0833)
-                val destPoint = GeoPoint(9.9939, -84.2088)
-                val price = Money.ofCrc(22000L)
+                val gps = viewModel.currentGpsLocation.value
+                val originPoint = if (gps != null) GeoPoint(gps.latitude, gps.longitude) else GeoPoint(0.0, 0.0)
+                val destPoint: GeoPoint? = null
+                val price: Money? = null
 
                 val customerId = runCatching {
                     UUID.fromString(viewModel.currentUserId ?: "")
@@ -88,9 +89,9 @@ fun TowFulfillmentScreen(
                     vehicleVin = selectedVeh?.vin,
                     vehicleSummary = selectedVeh?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Registrado",
                     pickupLocation = originPoint,
-                    pickupAddress = originAddr,
+                    pickupAddress = originAddr.ifBlank { "Ubicación GPS actual" },
                     destinationLocation = destPoint,
-                    destinationAddress = destAddr,
+                    destinationAddress = destAddr.takeIf { it.isNotBlank() },
                     requiredCapabilities = capabilities,
                     estimatedPrice = price
                 )
@@ -106,8 +107,11 @@ private fun TowRequestConfigScreen(
     onRequestTow: (String, String, Set<TowCapabilities>) -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    var pickupAddress by remember { mutableStateOf("San José, Costa Rica (GPS Alta Precisión)") }
-    var destinationAddress by remember { mutableStateOf("Taller Central Autorizado MEET, La Uruca") }
+    val currentGps by viewModel.currentGpsLocation.collectAsState()
+    var pickupAddress by remember(currentGps) {
+        mutableStateOf(currentGps?.let { "Lat: %.4f, Lng: %.4f".format(it.latitude, it.longitude) } ?: "")
+    }
+    var destinationAddress by remember { mutableStateOf("") }
     val selectedCapabilities = remember { mutableStateListOf(TowCapabilities.FLATBED) }
     val selectedVeh by viewModel.selectedVehicle.collectAsState()
 

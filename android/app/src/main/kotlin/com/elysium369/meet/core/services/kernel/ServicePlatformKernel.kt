@@ -364,14 +364,12 @@ data class ProviderIdentity(
     val phone: String? = null,
 ) {
     val isVerified: Boolean
-        get() = trustSnapshot?.isAuthorizedToWork ?: (isVerifiedLegacy && isActiveLegacy)
+        get() = trustSnapshot?.isAuthorizedToWork ?: false
 
     val isEligibleToWork: Boolean
-        get() = if (trustSnapshot != null) {
-            trustSnapshot.isAuthorizedToWork && trustSnapshot.providerProfileId == providerProfileId
-        } else {
-            isVerifiedLegacy && isActiveLegacy && status.equals("active", ignoreCase = true)
-        }
+        get() = trustSnapshot != null &&
+                trustSnapshot.isAuthorizedToWork &&
+                trustSnapshot.providerProfileId == providerProfileId
 }
 
 /**
@@ -407,9 +405,10 @@ data class ServiceCommandEnvelope(
 
 /**
  * Reference to a cryptographically validated piece of service evidence.
+ * Invariant: A reference must point to canonical evidence; it does NOT mint evidence itself.
  */
 data class ServiceEvidenceRef(
-    val evidenceId: UUID = UUID.randomUUID(),
+    val evidenceId: UUID,
     val workOrderId: UUID,
     val evidenceType: String,
     val sha256Hash: String,

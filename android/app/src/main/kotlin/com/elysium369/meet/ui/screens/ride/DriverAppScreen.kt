@@ -60,13 +60,46 @@ fun DriverAppScreen(
     var showNavigation by remember { mutableStateOf(false) }
 
     val openRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
+    val allRequests by viewModel.rideRequests.collectAsState(initial = emptyList())
+    val currentDriverId = viewModel.driverVerification.value?.driverId ?: viewModel.currentRideActorId
+
+    // Observe actual server-assigned ride for this driver
+    val assignedRide = remember(allRequests, currentDriverId) {
+        allRequests.firstOrNull {
+            it.assignedDriverId == currentDriverId && it.status in setOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED_PICKUP", "IN_TRIP")
+        }?.let { req ->
+            ActiveDriverRide(
+                rideId = req.requestId,
+                passenger = PassengerInfo(
+                    passengerId = req.passengerId,
+                    name = req.passengerName,
+                    rating = null,
+                    totalTrips = null,
+                    photoUrl = null,
+                    phone = req.passengerPhone
+                ),
+                pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
+                dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
+                fare = req.priceOfferMinor,
+                state = runCatching { RideState.valueOf(req.status) }.getOrDefault(RideState.ASSIGNED),
+                startedAt = req.createdAt
+            )
+        }
+    }
 
     val incomingRequests = remember(openRequests, isOnline) {
         if (!isOnline) emptyList()
         else openRequests.filter { it.assignedDriverId == null }.map { req ->
             IncomingRideRequest(
                 rideId = req.requestId,
-                passenger = PassengerInfo(req.passengerId, req.passengerName, 4.9, 20, null, req.passengerPhone),
+                passenger = PassengerInfo(
+                    passengerId = req.passengerId,
+                    name = req.passengerName,
+                    rating = null,
+                    totalTrips = null,
+                    photoUrl = null,
+                    phone = req.passengerPhone
+                ),
                 pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
                 dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
                 fare = req.priceOfferMinor,
@@ -79,7 +112,10 @@ fun DriverAppScreen(
     }
 
     var dismissedRequestId by remember { mutableStateOf<String?>(null) }
+    var pendingOfferSubmittedId by remember { mutableStateOf<String?>(null) }
     val activeRideRequest = incomingRequests.firstOrNull { it.rideId != dismissedRequestId }
+
+    val effectiveActiveRide = assignedRide ?: activeRide
 
     val toggleOnline = {
         val next = !isOnline
@@ -93,30 +129,23 @@ fun DriverAppScreen(
         val dName = driver?.fullName ?: "Conductor MEET"
         val dPhone = driver?.phone ?: "+506 8000-0000"
         val veh = driver?.vehicleModel ?: (viewModel.selectedVehicle.value?.let { "${it.make} ${it.model}" } ?: "Vehículo Registrado")
+        val gps = viewModel.currentGpsLocation.value
         viewModel.makeRideOffer(
             requestId = request.rideId,
             driverId = dId,
             driverName = dName,
             driverPhone = dPhone,
-            driverRating = 5.0,
+            driverRating = 0.0,
             driverTotalTrips = 0,
             vehicleDesc = veh,
             counterPrice = request.fare.toDouble(),
             currency = "CRC",
             estArrivalMin = 5,
-            driverLat = request.pickup.latitude,
-            driverLng = request.pickup.longitude,
-            message = "Oferta de viaje aceptada"
+            driverLat = gps?.latitude ?: 0.0,
+            driverLng = gps?.longitude ?: 0.0,
+            message = "Oferta de viaje enviada"
         )
-        activeRide = ActiveDriverRide(
-            rideId = request.rideId,
-            passenger = request.passenger,
-            pickup = request.pickup,
-            dropoff = request.dropoff,
-            fare = request.fare,
-            state = RideState.ASSIGNED,
-            startedAt = System.currentTimeMillis()
-        )
+        pendingOfferSubmittedId = request.rideId
     }
 
     val declineRide = { request: IncomingRideRequest ->
@@ -250,7 +279,12 @@ fun DriverAppScreen(
                                     }
                                     Column {
                                         Text(req.passenger.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                                        Text("★ ${req.passenger.rating} (${req.passenger.totalTrips} viajes)", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                                        if (req.passenger.rating != null) {
+                                            val trips = req.passenger.totalTrips?.let { " ($it viajes)" } ?: ""
+                                            Text("★ ${req.passenger.rating}$trips", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                                        } else {
+                                            Text("Pasajero registrado", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
+                                        }
                                     }
                                 }
                                 Text(
@@ -283,15 +317,30 @@ fun DriverAppScreen(
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
                                 ) {
-                                    Text("ACEPTAR", fontWeight = FontWeight.Bold)
+                                    Text("ENVIAR OFERTA", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
 
-                // Active Ride Controls (when in trip)
-                activeRide?.let { ride ->
+                // Pending Offer Feedback
+                if (pendingOfferSubmittedId != null && effectiveActiveRide == null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                        border = BorderStroke(1.dp, MeetColors.electricBlue)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Oferta Enviada", style = MaterialTheme.typography.labelMedium, color = MeetColors.electricBlue, fontWeight = FontWeight.Bold)
+                            Text("Esperando que el pasajero confirme la asignación...", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                        }
+                    }
+                }
+
+                // Active Ride Controls (when assigned / in trip)
+                effectiveActiveRide?.let { ride ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
@@ -318,6 +367,7 @@ fun DriverAppScreen(
                                 Button(
                                     onClick = {
                                         activeRide = null
+                                        pendingOfferSubmittedId = null
                                         showEarnings = true
                                     },
                                     modifier = Modifier.weight(1f),

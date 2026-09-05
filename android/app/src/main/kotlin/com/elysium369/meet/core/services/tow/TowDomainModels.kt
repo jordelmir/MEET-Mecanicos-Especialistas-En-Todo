@@ -34,8 +34,8 @@ data class TowUnit(
     val licensePlate: String,
     val capabilities: Set<TowCapabilities>,
     val maxWeightKg: Int = 3500,
-    val isVerified: Boolean = true,
-    val isAvailable: Boolean = true,
+    val isVerified: Boolean = false,
+    val isAvailable: Boolean = false,
 )
 
 /**
@@ -57,6 +57,7 @@ data class TowCustodyRecord(
     val evidenceHash: String,
     val recordedAtEpochMs: Long,
     val recordedByActorId: UUID,
+    val canonicalEvidenceId: UUID? = null,
     val notes: String? = null,
 ) {
     init {
@@ -84,6 +85,10 @@ data class TowJob(
     val assignedUnit: TowUnit? = null,
     val assignedOperatorName: String? = null,
     val assignedOperatorPhone: String? = null,
+    val assignedOperatorRating: Double? = null,
+    val assignedOperatorCompletedJobs: Int? = null,
+    val operatorLocation: GeoPoint? = null,
+    val operatorLocationFreshnessEpochMs: Long? = null,
     val state: TowState = TowState.REQUESTED,
     val estimatedPrice: Money? = null,
     val quotedPrice: Money? = null,

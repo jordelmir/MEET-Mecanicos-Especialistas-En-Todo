@@ -53,21 +53,21 @@ data class FareQuote(
 data class MatchedDriver(
     val driverId: String,
     val name: String,
-    val rating: Double,
-    val totalTrips: Int,
-    val vehicle: String,
-    val plate: String,
+    val rating: Double? = null,
+    val totalTrips: Int? = null,
+    val vehicle: String? = null,
+    val plate: String? = null,
     val photoUrl: String? = null,
     val phone: String? = null,
-    val etaMinutes: Int,
-    val distanceMeters: Int,
+    val etaMinutes: Int? = null,
+    val distanceMeters: Int? = null,
 )
 
 data class PassengerInfo(
     val passengerId: String,
     val name: String,
-    val rating: Double,
-    val totalTrips: Int,
+    val rating: Double? = null,
+    val totalTrips: Int? = null,
     val photoUrl: String? = null,
     val phone: String? = null,
 )
@@ -83,7 +83,7 @@ data class RideLocationPoint(
 
 data class ActiveRideViewState(
     val rideId: String,
-    val driver: MatchedDriver,
+    val driver: MatchedDriver? = null,
     val pickup: RidePlaceInput,
     val dropoff: RidePlaceInput,
     val fareQuote: FareQuote,

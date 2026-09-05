@@ -408,7 +408,7 @@ fun MeetApp(
             if (currentRoute !in hideBgRoutes && currentRoute != null) {
                 HolographicBackgroundShared()
             }
-            val towRepository = remember { com.elysium369.meet.core.services.tow.TowCommandRepository() }
+            val towRepository = obdViewModel.towCommandRepository
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
@@ -1220,29 +1220,26 @@ fun MeetApp(
             composable("ride_active_tracking") {
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
                 val activeRide = activeRideReq?.let { req ->
+                    val parsedState = runCatching {
+                        com.elysium369.meet.ride.domain.RideState.valueOf(req.status)
+                    }.getOrNull() ?: com.elysium369.meet.ride.domain.RideState.SEARCHING
+
+                    val matchedDriver = req.assignedDriverId?.let { driverId ->
+                        com.elysium369.meet.ui.screens.ride.MatchedDriver(
+                            driverId = driverId,
+                            name = req.assignedDriverName ?: "Conductor Asignado",
+                            rating = req.driverRating,
+                            totalTrips = null,
+                            vehicle = req.assignedDriverVehicle,
+                            plate = req.serverAssignedVehicleId,
+                            etaMinutes = req.estimatedDurationMin.takeIf { it > 0 },
+                            distanceMeters = req.estimatedDistanceKm.takeIf { it > 0.0 }?.let { (it * 1000).toInt() }
+                        )
+                    }
+
                     com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
                         rideId = req.requestId,
-                        driver = req.assignedDriverId?.let { driverId ->
-                            com.elysium369.meet.ui.screens.ride.MatchedDriver(
-                                driverId = driverId,
-                                name = req.assignedDriverName ?: "Conductor Asignado",
-                                rating = req.driverRating ?: 4.95,
-                                totalTrips = 240,
-                                vehicle = req.assignedDriverVehicle ?: "Vehículo Registrado",
-                                plate = req.serverAssignedVehicleId ?: "MEET-CR",
-                                etaMinutes = req.estimatedDurationMin.coerceAtLeast(1),
-                                distanceMeters = ((req.estimatedDistanceKm.takeIf { it > 0.0 } ?: 1.0) * 1000).toInt()
-                            )
-                        } ?: com.elysium369.meet.ui.screens.ride.MatchedDriver(
-                            driverId = "pending",
-                            name = "Buscando conductor en la red...",
-                            rating = 5.0,
-                            totalTrips = 0,
-                            vehicle = "En asignación",
-                            plate = "---",
-                            etaMinutes = 5,
-                            distanceMeters = 1000
-                        ),
+                        driver = matchedDriver,
                         pickup = com.elysium369.meet.ui.screens.ride.RidePlaceInput(
                             placeId = "p_${req.requestId}",
                             displayName = req.pickupAddress,
@@ -1260,17 +1257,15 @@ fun MeetApp(
                             placeType = com.elysium369.meet.ui.screens.ride.PlaceType.SEARCH
                         ),
                         fareQuote = com.elysium369.meet.ui.screens.ride.FareQuote(
-                            baseFare = req.estimatedFareMinor / 4,
-                            distanceFare = req.estimatedFareMinor / 2,
-                            timeFare = req.estimatedFareMinor / 4,
+                            baseFare = req.estimatedFareMinor,
+                            distanceFare = 0L,
+                            timeFare = 0L,
                             totalFare = req.estimatedFareMinor,
                             currency = req.currency,
                             estimatedDistanceKm = req.estimatedDistanceKm,
                             estimatedDurationMin = req.estimatedDurationMin
                         ),
-                        state = runCatching {
-                            com.elysium369.meet.ride.domain.RideState.valueOf(req.status)
-                        }.getOrDefault(com.elysium369.meet.ride.domain.RideState.DRIVER_EN_ROUTE)
+                        state = parsedState
                     )
                 }
 

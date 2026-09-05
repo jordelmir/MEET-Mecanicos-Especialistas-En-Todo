@@ -103,7 +103,7 @@ Located in package `com.elysium369.meet.fulfillment.ui`:
 
 All changes are strictly validated against automated verification gates:
 
-1. **`ElysiumFulfillmentOsTest` (8/8 tests passed)**:
+1. **`ElysiumFulfillmentOsTest` (13/13 tests)**:
    - `towValidLifecycleProgressionTest`: Confirms valid `TowJob` transition sequence.
    - `towInvalidTransitionsFailClosedTest`: Confirms invalid transitions are rejected.
    - `towActorAuthorizationGuardsTest`: Confirms driver/customer role boundaries.
@@ -112,7 +112,24 @@ All changes are strictly validated against automated verification gates:
    - `towFulfillmentAdapterProjectsCorrectPhasesTest`: Validates projection adapter mapping.
    - `rideFulfillmentAdapterProjectsActiveRideTest`: Validates ride projection mapping.
    - `productionRideRoutesHaveNoSyntheticRodrigoOrFakeDelaysTest`: Prohibits hardcoded drivers or fake delays across all ride screen files.
+   - `unknownRideStateDoesNotBecomeDriverEnRouteTest`: Prohibits coercing unparseable/unknown ride state to `DRIVER_EN_ROUTE`.
+   - `missingDriverDoesNotCreateMatchedDriverTest`: Guarantees null driver state remains honestly null.
+   - `finalSettlementMathInvariantsTest`: Proves financial mathematical invariant `total == base + extras + taxes` and currency match.
+   - `cancelledTowDoesNotMarkFutureTimelineStepsCompleteTest`: Guarantees cancelled/disputed jobs do not falsely indicate future completion.
+   - `towCommandRepositoryCasAndRoomMappingTest`: Proves Room entity round-trip conversion and CAS optimistic concurrency checks.
 2. **`ProductionHardcodedActorGuardTest` (PASSED)**:
    - Verifies zero hardcoded actors across entire codebase.
 3. **Cross-Runtime Parity Verification (`bash tests/parity/ci-verify.sh`)**:
    - TypeScript ≡ Kotlin SHA-256 byte-exact parity: `Cross-runtime parity OK`.
+
+---
+
+## 7. Truth Certification Matrix
+
+| Dimension | Certification Level | Notes / Constraints |
+|---|---|---|
+| **Architecture & Contracts** | `CLIENT_IMPLEMENTED` | Complete fulfillment presentation shell & projection contracts. |
+| **Domain State Machines** | `UNIT_VERIFIED` | Finite state transitions, actor role guards, CAS concurrency controls verified. |
+| **Data Persistence** | `LOCALLY_INTEGRATED` | Durable Room backing via `TowTruckDao` converged with `TowJob`. |
+| **Location & Route Truth** | `TRUTH_HARDENED` | Zero synthetic straight-line routes; live GPS stream required or null. |
+| **Hardware / In-Vehicle Dispatch** | `PENDING_FIELD_VALIDATION` | Physical tow rig dispatch & in-vehicle telemetry requires physical hardware testing. |

@@ -166,17 +166,27 @@ fun ProviderTrackingCard(
                         )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = MeetColors.warning, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
+                    if (provider.rating != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = MeetColors.warning, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                String.format(java.util.Locale.US, "%.2f", provider.rating),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.textPrimary
+                            )
+                            provider.totalJobs?.let { jobs ->
+                                Text(
+                                    " ($jobs servicios)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeetColors.textSecondary
+                                )
+                            }
+                        }
+                    } else if (provider.totalJobs != null) {
                         Text(
-                            String.format("%.2f", provider.rating),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MeetColors.textPrimary
-                        )
-                        Text(
-                            " (${provider.totalJobs} servicios)",
+                            "${provider.totalJobs} servicios completados",
                             style = MaterialTheme.typography.labelSmall,
                             color = MeetColors.textSecondary
                         )
