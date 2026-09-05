@@ -1,6 +1,27 @@
 package com.elysium369.meet.ui.home.activity
 
 import java.util.UUID
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.elysium369.meet.ui.theme.MeetColors
 
 /**
  * HomeActivityStrip — Global cross-domain activity dashboard.
@@ -216,3 +237,139 @@ data class VehicleAlert(
     val severity: String,
     val isCritical: Boolean,
 )
+
+@Composable
+fun HomeActivityStripWidget(
+    strip: HomeActivityStrip,
+    onItemClick: (ActivityItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!strip.hasActiveOperations) return
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MeetColors.neonGreen)
+                    )
+                    Text(
+                        "ACTIVIDADES EN VIVO",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.neonGreen,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                Text(
+                    "${strip.items.size} activas",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MeetColors.textSecondary
+                )
+            }
+
+            strip.items.forEach { item ->
+                val domainColor = when (item.domain) {
+                    ActivityDomain.RIDE -> MeetColors.neonGreen
+                    ActivityDomain.PTT -> MeetColors.electricBlue
+                    ActivityDomain.SAFE_JOURNEY -> MeetColors.hotMagenta
+                    else -> MeetColors.cyberCyan
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = domainColor.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, domainColor.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onItemClick(item) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = domainColor.copy(alpha = 0.2f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(
+                                        imageVector = when (item.domain) {
+                                            ActivityDomain.RIDE -> Icons.Default.DirectionsCar
+                                            ActivityDomain.PTT -> Icons.Default.Mic
+                                            else -> Icons.Default.Security
+                                        },
+                                        contentDescription = null,
+                                        tint = domainColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            Column {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeetColors.textPrimary
+                                )
+                                item.subtitle?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = domainColor.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = item.state,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = domainColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

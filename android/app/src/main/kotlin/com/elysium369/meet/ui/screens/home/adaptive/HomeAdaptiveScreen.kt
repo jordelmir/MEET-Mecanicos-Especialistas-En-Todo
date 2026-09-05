@@ -38,6 +38,8 @@ import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.screens.home.components.HomeExperiencePreviewBanner
 import com.elysium369.meet.ui.screens.home.components.HomeExperienceSelectionDialog
 import com.elysium369.meet.ui.screens.home.components.HomeExperienceSwitcherHeaderButton
+import com.elysium369.meet.ui.home.activity.HomeActivityStripPolicy
+import com.elysium369.meet.ui.home.activity.HomeActivityStripWidget
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.Calendar
 
@@ -224,6 +226,178 @@ fun HomeAdaptiveScreen(
                             size = 18.dp,
                             fallbackGlyph = "⚙️"
                         )
+                    }
+                }
+            }
+
+            val activityStrip = remember {
+                HomeActivityStripPolicy.buildFromState(
+                    activeRides = emptyList(),
+                    fuelAlerts = emptyList(),
+                    activeJourneys = emptyList(),
+                    activePttChannels = emptyList(),
+                    pendingMessages = 0,
+                    activeListings = 0,
+                    vehicleAlerts = emptyList()
+                )
+            }
+
+            if (activityStrip.hasActiveOperations) {
+                HomeActivityStripWidget(
+                    strip = activityStrip,
+                    onItemClick = { item ->
+                        item.actionRoute?.let { navController.safeNavigate(it) }
+                    }
+                )
+            }
+
+            if (userProfile == "ride_passenger") {
+                // ── Passenger Mobility Hero Card (Ride-Centric Home Screen) ──
+                EliteCard(
+                    glowColor = MeetColors.neonGreen,
+                    borderColor = MeetColors.neonGreen.copy(alpha = 0.5f),
+                    backgroundColor = Color(0xFF0C1524),
+                    shape = RoundedCornerShape(16.dp),
+                    onClick = { navController.safeNavigate("ride_passenger_request") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🚕", fontSize = 20.sp)
+                                Column {
+                                    Text(
+                                        "¿A dónde te llevamos hoy?",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        "Transporte inteligente con tarifa verificada",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "MEET RIDES",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    color = MeetColors.neonGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MeetColors.cardBackground,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderSubtle),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { navController.safeNavigate("ride_passenger_request") }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("🔍", fontSize = 14.sp)
+                                Text(
+                                    "Ingresa tu punto de destino...",
+                                    color = MeetColors.textMuted,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { navController.safeNavigate("ride_passenger_request") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
+                        ) {
+                            Text("PEDIR VIAJE AHORA", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else if (userProfile == "ride_driver") {
+                // ── Driver Cockpit Hero Card (Ride-Centric Home Screen) ──
+                EliteCard(
+                    glowColor = MeetColors.electricBlue,
+                    borderColor = MeetColors.electricBlue.copy(alpha = 0.5f),
+                    backgroundColor = Color(0xFF0C1524),
+                    shape = RoundedCornerShape(16.dp),
+                    onClick = { navController.safeNavigate("ride_driver_cockpit") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🚘", fontSize = 20.sp)
+                                Column {
+                                    Text(
+                                        "Cockpit del Conductor",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        "Turno y despacho inteligente MEET",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MeetColors.electricBlue.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.electricBlue.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "DRIVER OS",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    color = MeetColors.electricBlue,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { navController.safeNavigate("ride_driver_cockpit") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue, contentColor = Color.White)
+                        ) {
+                            Text("ABRIR COCKPIT DEL CONDUCTOR", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
