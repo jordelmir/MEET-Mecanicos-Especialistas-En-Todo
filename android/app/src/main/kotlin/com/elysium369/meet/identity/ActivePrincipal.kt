@@ -55,11 +55,15 @@ object OfflineOwnership {
             !ownerPrincipalId.startsWith("local_device_")
 }
 
+interface ActivePrincipalProvider {
+    fun current(): ActivePrincipal
+}
+
 @Singleton
 class ActivePrincipalKernel @Inject constructor(
     @ApplicationContext context: Context,
     scope: CoroutineScope,
-) {
+) : ActivePrincipalProvider {
     val localDeviceId: String = stableDeviceId(context)
     private val localPrincipal = ActivePrincipal.local(localDeviceId)
     private val restoredPrincipal = PrincipalProvisioningStore.principalId(context)
@@ -71,7 +75,7 @@ class ActivePrincipalKernel @Inject constructor(
             .distinctUntilChanged()
             .stateIn(scope, SharingStarted.Eagerly, currentOrRestored(localPrincipal))
 
-    fun current(): ActivePrincipal = activePrincipal.value
+    override fun current(): ActivePrincipal = activePrincipal.value
 
     private fun currentOrRestored(fallback: ActivePrincipal): ActivePrincipal =
         SupabaseModule.client.auth.currentUserOrNull()?.id

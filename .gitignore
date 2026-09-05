@@ -62,6 +62,7 @@ logs/
 android/app/build/
 android/.gradle/
 android/build/
+android/.kotlin/
 artifacts/physical-device/
 android/local.properties
 android/**/local.properties
