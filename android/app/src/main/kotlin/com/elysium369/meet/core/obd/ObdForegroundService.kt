@@ -15,6 +15,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.elysium369.meet.MainActivity
 import com.elysium369.meet.core.alerts.AlertManager
+import com.elysium369.meet.core.operations.ActiveOperationState
+import com.elysium369.meet.core.operations.ActiveOperationType
+import com.elysium369.meet.core.operations.ActiveOperationsKernel
+import com.elysium369.meet.core.operations.ActiveOperationScope
 import com.elysium369.meet.core.trips.TripManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -35,6 +39,9 @@ class ObdForegroundService : Service() {
     @Inject lateinit var obdSession: ObdSession
     @Inject lateinit var alertManager: AlertManager
     @Inject lateinit var tripManager: TripManager
+    @Inject lateinit var activeOpsKernel: ActiveOperationsKernel
+
+    private var operationId: String? = null
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val NOTIF_ID = 1
@@ -101,6 +108,15 @@ class ObdForegroundService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        val op = activeOpsKernel.register(
+            operationType = ActiveOperationType.OBD_SESSION,
+            scope = ActiveOperationScope.FOREGROUND_SERVICE_SCOPED,
+            vehicleId = vehicleId,
+            metadata = mapOf("sessionId" to java.util.UUID.randomUUID().toString()),
+        )
+        operationId = op.operationId
+        Log.i("ObdForegroundService", "Registered active operation: ${op.operationId}")
 
         telemetryJob?.cancel()
         telemetryJob = serviceScope.launch {
@@ -243,6 +259,7 @@ class ObdForegroundService : Service() {
     }
     
     override fun onDestroy() {
+        operationId?.let { activeOpsKernel.complete(it) }
         runBlocking(Dispatchers.IO) {
             try {
                 tripManager.endTrip()

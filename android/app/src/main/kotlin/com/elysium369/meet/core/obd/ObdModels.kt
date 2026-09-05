@@ -57,10 +57,10 @@ data class PhysicalPidReadEvidence(
 data class QosMetrics(
     val cmdsPerSecond: Float = 0f,
     val latencyMs: Int = 0,
-    val isStable: Boolean = true,
+    val isStable: Boolean = false,
     // Compatibility and advanced metrics
     val avgLatencyMs: Float = 0f,
-    val reliability: Float = 100f,
+    val reliability: Float = 0f,
     val totalRequests: Int = 0,
     val successfulRequests: Int = 0
 )

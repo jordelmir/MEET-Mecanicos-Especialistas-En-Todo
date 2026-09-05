@@ -1,0 +1,71 @@
+[
+  {
+    "vectorId": "UDS-POS-10-01",
+    "name": "DiagnosticSessionControl Default Session Positive Response",
+    "rawHex": "50 01 00 32 01 F4",
+    "expectedService": "50",
+    "isPositive": true,
+    "sessionType": "01",
+    "p2ServerMaxMs": 50,
+    "p2StarServerMaxMs": 5000
+  },
+  {
+    "vectorId": "UDS-POS-10-02",
+    "name": "DiagnosticSessionControl Programming Session Positive Response",
+    "rawHex": "50 02 00 32 01 F4",
+    "expectedService": "50",
+    "isPositive": true,
+    "sessionType": "02",
+    "p2ServerMaxMs": 50,
+    "p2StarServerMaxMs": 5000
+  },
+  {
+    "vectorId": "UDS-POS-22-F190",
+    "name": "ReadDataByIdentifier VIN Positive Response",
+    "rawHex": "62 F1 90 57 56 57 5A 5A 5A 31 4A 5A 31 57 30 30 30 30 30 31",
+    "expectedService": "62",
+    "isPositive": true,
+    "did": "F190",
+    "decodedValue": "WVWZZZ1JZ1W000001"
+  },
+  {
+    "vectorId": "UDS-NEG-7F-10-12",
+    "name": "SubFunctionNotSupported Negative Response",
+    "rawHex": "7F 10 12",
+    "expectedService": "7F",
+    "isPositive": false,
+    "rejectedService": "10",
+    "nrc": "12",
+    "nrcMeaning": "Sub-function Not Supported"
+  },
+  {
+    "vectorId": "UDS-NEG-7F-27-33",
+    "name": "SecurityAccessDenied Negative Response",
+    "rawHex": "7F 27 33",
+    "expectedService": "7F",
+    "isPositive": false,
+    "rejectedService": "27",
+    "nrc": "33",
+    "nrcMeaning": "Security Access Denied"
+  },
+  {
+    "vectorId": "UDS-NEG-7F-31-22",
+    "name": "ConditionsNotCorrect Negative Response",
+    "rawHex": "7F 31 22",
+    "expectedService": "7F",
+    "isPositive": false,
+    "rejectedService": "31",
+    "nrc": "22",
+    "nrcMeaning": "Conditions Not Correct"
+  },
+  {
+    "vectorId": "UDS-NEG-7F-36-78",
+    "name": "RequestCorrectlyReceivedResponsePending (Wait P2* Extension)",
+    "rawHex": "7F 36 78",
+    "expectedService": "7F",
+    "isPositive": false,
+    "rejectedService": "36",
+    "nrc": "78",
+    "nrcMeaning": "Response Pending"
+  }
+]

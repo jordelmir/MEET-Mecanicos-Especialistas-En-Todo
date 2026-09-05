@@ -1,0 +1,43 @@
+[
+  {
+    "vectorId": "ISOTP-SF-01",
+    "name": "Single Frame 2 bytes payload",
+    "rawHex": "02 10 01 00 00 00 00 00",
+    "frameType": "SINGLE_FRAME",
+    "dataLength": 2,
+    "payloadHex": "10 01"
+  },
+  {
+    "vectorId": "ISOTP-FF-01",
+    "name": "First Frame 20 bytes payload",
+    "rawHex": "10 14 62 F1 90 57 56 57",
+    "frameType": "FIRST_FRAME",
+    "totalLength": 20,
+    "initialPayloadHex": "62 F1 90 57 56 57"
+  },
+  {
+    "vectorId": "ISOTP-FC-CTS",
+    "name": "Flow Control Continue To Send",
+    "rawHex": "30 08 0A 00 00 00 00 00",
+    "frameType": "FLOW_CONTROL",
+    "flowStatus": "CONTINUE_TO_SEND",
+    "blockSize": 8,
+    "stMinMs": 10
+  },
+  {
+    "vectorId": "ISOTP-CF-01",
+    "name": "Consecutive Frame index 1",
+    "rawHex": "21 5A 5A 5A 31 4A 5A 31",
+    "frameType": "CONSECUTIVE_FRAME",
+    "sequenceNumber": 1,
+    "payloadHex": "5A 5A 5A 31 4A 5A 31"
+  },
+  {
+    "vectorId": "ISOTP-CF-02",
+    "name": "Consecutive Frame index 2",
+    "rawHex": "22 57 30 30 30 30 30 31",
+    "frameType": "CONSECUTIVE_FRAME",
+    "sequenceNumber": 2,
+    "payloadHex": "57 30 30 30 30 30 31"
+  }
+]

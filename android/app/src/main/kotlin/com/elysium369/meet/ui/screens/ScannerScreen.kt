@@ -214,6 +214,9 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         return
     }
 
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val compactScanner = screenWidthDp < 400
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -256,7 +259,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                                     viewModel.toggleVoiceCopilot(false)
                                 }
                             },
-                            modifier = Modifier.padding(end = 8.dp)
+                            modifier = Modifier.padding(end = 4.dp)
                         ) {
                             AnimatedNeonIcon(
                                 imageVector = if (voiceCopilotEnabled) Icons.Default.Mic else Icons.Default.MicOff,
@@ -272,61 +275,29 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                             )
                         }
 
-                        // Language Selector
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
-                            Text("EN", color = if(isSpanish) MeetColors.textSecondary else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                            Switch(
-                                checked = isSpanish,
-                                onCheckedChange = { 
-                                    isSpanish = it
-                                    viewModel.setLanguage(if(it) "es" else "en")
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
-                                    checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
-                                    uncheckedThumbColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
-                                    uncheckedTrackColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f)
-                                ),
-                                modifier = Modifier.padding(horizontal = 4.dp).height(24.dp)
-                            )
-                            Text("ES", color = if(isSpanish) Color.White else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        // Language Selector — compact on small screens
+                        if (!compactScanner) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                                Text("EN", color = if(isSpanish) MeetColors.textSecondary else Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                Switch(
+                                    checked = isSpanish,
+                                    onCheckedChange = { 
+                                        isSpanish = it
+                                        viewModel.setLanguage(if(it) "es" else "en")
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen,
+                                        checkedTrackColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue,
+                                        uncheckedTrackColor = com.elysium369.meet.ui.theme.MeetColors.electricBlue.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 4.dp).height(24.dp)
+                                )
+                                Text("ES", color = if(isSpanish) Color.White else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            }
                         }
 
-                        // High Speed Mode Indicator
-                        if (highSpeedMode) {
-                            com.elysium369.meet.ui.components.EliteCard(
-                                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(4.dp),
-                                borderColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen
-                            ) {
-                                Text(
-                                    "HIGH-SPEED: ${qosMetrics.cmdsPerSecond.toInt()}Hz", 
-                                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen, 
-                                    fontWeight = FontWeight.Black, 
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        
-                        // Logging indicator
-                        if (isLogging) {
-                            com.elysium369.meet.ui.components.EliteCard(
-                                backgroundColor = com.elysium369.meet.ui.theme.MeetColors.error.copy(alpha = 0.2f), 
-                                shape = RoundedCornerShape(4.dp), 
-                                borderColor = com.elysium369.meet.ui.theme.MeetColors.error
-                            ) {
-                                Text(
-                                    "● REC ${dataLog.size}", 
-                                    color = com.elysium369.meet.ui.theme.MeetColors.error, 
-                                    fontWeight = FontWeight.Black, 
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
+                        // Connection button — always visible
                         when (state) {
                             ObdState.CONNECTED -> {
                                 com.elysium369.meet.ui.components.EliteTextButton(
@@ -396,13 +367,13 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         }
                     }
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if (isSpanish) "RENDIMIENTO" else "PERFORMANCE", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if (isSpanish) "DIAGNÓSTICO" else "DIAGNOSTICS", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if (isSpanish) "SENSORES" else "SENSORS", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text(if (isSpanish) "HERRAM." else "TOOLS", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text(if (isSpanish) "MONITORES" else "MONITORS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
-                    Tab(selected = selectedTab == 6, onClick = { selectedTab = 6 }, text = { Text(if (isSpanish) "ESTADÍSTICAS" else "STATS", color = if (selectedTab == 6) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) })
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if (compactScanner) "POWER" else if (isSpanish) "RENDIMIENTO" else "PERFORMANCE", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if (compactScanner) "DIAG" else if (isSpanish) "DIAGNÓSTICO" else "DIAGNOSTICS", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if (isSpanish) "SENSORES" else "SENSORS", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text(if (isSpanish) "HERRAM." else "TOOLS", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text(if (isSpanish) "MONIT." else "MONITORS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(selected = selectedTab == 6, onClick = { selectedTab = 6 }, text = { Text(if (compactScanner) "STATS" else if (isSpanish) "ESTADÍSTICAS" else "STATS", color = if (selectedTab == 6) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
                 }
             }
         },

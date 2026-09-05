@@ -107,8 +107,12 @@ import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
+import com.elysium369.meet.ride.data.remote.TrustEvidenceFile
 import com.elysium369.meet.ride.data.remote.ServiceVerificationTypePolicy
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
+import com.elysium369.meet.ride.location.GpsTrailRecorder
+import com.elysium369.meet.ride.location.GpsTrailPdfExporter
+import com.elysium369.meet.ride.location.RideLocationTrackingService
 import com.elysium369.meet.identity.ActivePrincipalKernel
 import com.elysium369.meet.vehicle.ActiveVehicleChangeReason
 import com.elysium369.meet.vehicle.ActiveVehicleKernel
@@ -1552,48 +1556,7 @@ class ObdViewModel @Inject constructor(
                 runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
                     .onSuccess { applications ->
                         val profiles = providerProfileDao.getProfilesForUser(userId).first()
-                        val submittedProfileReferences = applications
-                            .mapTo(mutableSetOf()) { it.profileReference }
-                        var submittedPendingProfile = false
-                        profiles
-                            .filter { profile ->
-                                profile.isActive &&
-                                    !profile.verified &&
-                                    profile.profileId !in submittedProfileReferences &&
-                                    ServiceVerificationTypePolicy.canonicalSubmissionType(
-                                        profile.providerType,
-                                    ) != null
-                            }
-                            .forEach { profile ->
-                                runCatching {
-                                    PlatformTrustCenterGateway.submit(
-                                        ServiceVerificationSubmission(
-                                            serviceType = profile.providerType,
-                                            profileReference = profile.profileId,
-                                            displayName = profile.ownerName,
-                                            businessName = profile.businessName,
-                                            phone = profile.phone,
-                                            locationLabel = profile.location,
-                                            licenseReference = profile.licenseNumber
-                                                .takeIf(String::isNotBlank),
-                                        ),
-                                    )
-                                }.onSuccess {
-                                    submittedPendingProfile = true
-                                }.onFailure {
-                                    Log.w(
-                                        "MeetTrustCenter",
-                                        "Pending provider verification submission unavailable",
-                                    )
-                                }
-                            }
-                        val reconciledApplications = if (submittedPendingProfile) {
-                            runCatching { PlatformTrustCenterGateway.loadOwnApplications() }
-                                .getOrDefault(applications)
-                        } else {
-                            applications
-                        }
-                        val decisions = reconciledApplications
+                        val decisions = applications
                             .associateBy { it.profileReference }
                         profiles.forEach { profile ->
                             val decision = decisions[profile.profileId] ?: return@forEach
@@ -2902,15 +2865,22 @@ class ObdViewModel @Inject constructor(
             _selectedVehicle.value?.let { currentVehicle ->
                 if (currentVehicle.vin.isBlank() || currentVehicle.vin == "NOT_SET" || currentVehicle.vin == "PENDIENTE" || currentVehicle.vin == "N/A") {
                     val updatedVehicle = currentVehicle.copy(vin = cleanVin)
-                    vehicleRepository.insertVehicle(updatedVehicle)
-                    selectVehicle(updatedVehicle, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
-                    lastAutoRecognizedVin = cleanVin
-                    addTerminalLog("[VIN] VIN $cleanVin vinculado y guardado permanentemente para ${updatedVehicle.make} ${updatedVehicle.model}.", TerminalLineType.SYSTEM)
-                    return@withLock updatedVehicle
+                    when (val result = vehicleRepository.insertVehicle(updatedVehicle)) {
+                        is com.elysium369.meet.core.remote.RemoteResult.Success -> {
+                            selectVehicle(updatedVehicle, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
+                            lastAutoRecognizedVin = cleanVin
+                            addTerminalLog("[VIN] VIN $cleanVin vinculado y guardado permanentemente para ${updatedVehicle.make} ${updatedVehicle.model}.", TerminalLineType.SYSTEM)
+                            return@withLock updatedVehicle
+                        }
+                        else -> {
+                            Log.w("ObdVM", "VIN bind failed: $result")
+                        }
+                    }
                 }
             }
 
-            // 3. Otherwise, create a new persistent vehicle in the garage from the decoded VIN
+            // 3. Save the vehicle to the garage but NEVER auto-select it.
+            //    Active vehicle changes only by explicit user intent.
             val decoded = VinDecoder.decode(cleanVin)
             _vinDecoded.value = decoded
             val parsedYear = decoded?.modelYear?.toIntOrNull() ?: 0
@@ -2926,15 +2896,21 @@ class ObdViewModel @Inject constructor(
                 vin = cleanVin,
                 plate = "NOT_SET",
             )
-            vehicleRepository.insertVehicle(remembered)
-            selectVehicle(remembered, ActiveVehicleChangeReason.VERIFIED_ECU_BINDING)
-            lastAutoRecognizedVin = cleanVin
+            when (val result = vehicleRepository.insertVehicle(remembered)) {
+                is com.elysium369.meet.core.remote.RemoteResult.Success -> {
+                    lastAutoRecognizedVin = cleanVin
+                }
+                else -> {
+                    Log.w("ObdVM", "New vehicle save failed: $result")
+                }
+            }
+            val currentVehicleName = _selectedVehicle.value?.let { "${it.make} ${it.model}" } ?: "ninguno"
             voiceFeedbackManager.speak(
-                "VIN detectado y vehículo guardado permanentemente en tu garaje.",
-                "VIN detected and vehicle saved permanently in your garage.",
+                "VIN detectado. Nuevo vehículo $parsedMake $parsedModel guardado en Garage. Tu vehículo activo sigue siendo $currentVehicleName.",
+                "VIN detected. New vehicle $parsedMake $parsedModel saved in Garage. Your active vehicle remains $currentVehicleName.",
             )
             addTerminalLog(
-                "[VIN] Nueva identidad guardada permanentemente en garaje: $parsedMake $parsedModel (VIN: $cleanVin).",
+                "[VIN] Nuevo vehículo guardado en Garage (no activado): $parsedMake $parsedModel (VIN: $cleanVin). Selecciona manualmente desde Garage para activarlo.",
                 TerminalLineType.SYSTEM,
             )
             remembered
@@ -3526,7 +3502,14 @@ class ObdViewModel @Inject constructor(
                 if (principal.isAuthenticated) {
                     syncPendingTrustApplications()
                     withContext(Dispatchers.IO) {
-                        vehicleRepository.syncVehiclesFromCloud(principal.id)
+                        when (val result = vehicleRepository.syncVehiclesFromCloud(principal.id)) {
+                            is com.elysium369.meet.core.remote.RemoteResult.Success ->
+                                Log.i("ObdVM", "Vehicle sync: ${result.value} vehicles synced")
+                            is com.elysium369.meet.core.remote.RemoteResult.Unauthorized ->
+                                Log.w("ObdVM", "Vehicle sync: auth expired, skipping")
+                            else ->
+                                Log.w("ObdVM", "Vehicle sync failed: $result")
+                        }
                     }
                 }
             }
@@ -3538,6 +3521,28 @@ class ObdViewModel @Inject constructor(
         }
         startMarketplaceSync()
         refreshProviderRoles()
+
+        // Realtime subscription for own verification status — instant UI update after owner approval
+        var ownVerificationJob: Job? = null
+        viewModelScope.launch {
+            activePrincipalKernel.activePrincipal.collectLatest { principal ->
+                ownVerificationJob?.cancel()
+                if (principal.isAuthenticated) {
+                    ownVerificationJob = viewModelScope.launch(Dispatchers.IO) {
+                        PlatformTrustCenterGateway.ownVerificationChanges()
+                            .retryWhen { _, attempt ->
+                                delay((2_000L shl attempt.coerceAtMost(5).toInt()).coerceAtMost(30_000L))
+                                true
+                            }
+                            .collectLatest {
+                                Log.i("MeetTrustCenter", "Own verification changed; syncing from server")
+                                refreshOwnTrustDecisions()
+                                refreshProviderRoles()
+                            }
+                    }
+                }
+            }
+        }
         // Voice command manager callbacks and initial startup checking
         voiceCommandManager.onCommandRecognized = { command ->
             handleVoiceCommand(command)
@@ -3814,6 +3819,18 @@ class ObdViewModel @Inject constructor(
                             if (state == ObdState.DISCONNECTED || state == ObdState.ERROR) {
                                 hasCompletedInitialDtcScan = false
                                 _latestDiagnosticScan.value = null
+                                _healthScore.value = 0
+                                _qosMetrics.value = QosMetrics(
+                                    cmdsPerSecond = 0f,
+                                    latencyMs = 0,
+                                    isStable = false,
+                                    avgLatencyMs = 0f,
+                                    reliability = 0f,
+                                    totalRequests = 0,
+                                    successfulRequests = 0,
+                                )
+                                _anomalousPids.value = emptyList()
+                                _liveData.value = emptyMap()
                                 _vehicleSessionBinding.value = VehicleSessionBinding.unbound(
                                     diagnosticSessionId = currentSessionId,
                                     physicalConnectionId = "NOT_CONNECTED",
@@ -3893,8 +3910,14 @@ class ObdViewModel @Inject constructor(
 
                 if (user != null) {
                     _cloudSyncState.value = "Sincronizando garaje..."
-                    vehicleRepository.syncVehiclesFromCloud(user.id)
-                    _cloudSyncState.value = "Sincronización completa"
+                    when (val result = vehicleRepository.syncVehiclesFromCloud(user.id)) {
+                        is com.elysium369.meet.core.remote.RemoteResult.Success ->
+                            _cloudSyncState.value = "Sincronización completa (${result.value} vehículos)"
+                        is com.elysium369.meet.core.remote.RemoteResult.Unauthorized ->
+                            _cloudSyncState.value = "Sesión expirada; inicia sesión de nuevo"
+                        else ->
+                            _cloudSyncState.value = "Error de sincronización"
+                    }
                 }
 
                 // Prune old AI consultations from cache (TTL 30 days).
@@ -4532,6 +4555,17 @@ class ObdViewModel @Inject constructor(
         // they will reload based on _selectedVehicle change
         _readinessMonitors.value = null
         _liveData.value = emptyMap()
+        _healthScore.value = 0
+        _qosMetrics.value = QosMetrics(
+            cmdsPerSecond = 0f,
+            latencyMs = 0,
+            isStable = false,
+            avgLatencyMs = 0f,
+            reliability = 0f,
+            totalRequests = 0,
+            successfulRequests = 0,
+        )
+        _anomalousPids.value = emptyList()
         predictiveEstimator.reset()
     }
 
@@ -4539,14 +4573,20 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch {
             _isDeletingVehicle.value = true
             try {
-                vehicleRepository.deleteVehicle(vehicle)
-                if (_selectedVehicle.value?.id == vehicle.id) {
-                    activeVehicleKernel.clearIfDeleted(vehicle)
+                when (val result = vehicleRepository.deleteVehicle(vehicle)) {
+                    is com.elysium369.meet.core.remote.RemoteResult.Success -> {
+                        if (_selectedVehicle.value?.id == vehicle.id) {
+                            activeVehicleKernel.clearIfDeleted(vehicle)
+                        }
+                    }
+                    is com.elysium369.meet.core.remote.RemoteResult.Unauthorized ->
+                        Log.w("ObdVM", "Delete vehicle: auth expired")
+                    else ->
+                        Log.w("ObdVM", "Delete vehicle failed: $result")
                 }
             } catch (e: Exception) {
                 Log.e("ObdVM", "Error deleting vehicle", e)
             } finally {
-                // Small delay to allow animation to show
                 kotlinx.coroutines.delay(800)
                 _isDeletingVehicle.value = false
             }
@@ -4585,12 +4625,21 @@ class ObdViewModel @Inject constructor(
                         return@launch
                     }
                     val updated = vehicle.copy(vin = detectedVin)
-                    vehicleRepository.insertVehicle(updated)
-                    if (_selectedVehicle.value?.id == vehicle.id) {
-                        activeVehicleKernel.updateIfActive(updated)
+                    when (val result = vehicleRepository.insertVehicle(updated)) {
+                        is com.elysium369.meet.core.remote.RemoteResult.Success -> {
+                            if (_selectedVehicle.value?.id == vehicle.id) {
+                                activeVehicleKernel.updateIfActive(updated)
+                            }
+                            val route = listOfNotNull(vinResult.header, vinResult.command).joinToString(" → ")
+                            _vinReadFeedback.value = "✓ VIN $detectedVin verificado físicamente por $route (${vinResult.protocol ?: "protocolo OBD detectado"}) y guardado."
+                        }
+                        else -> {
+                            _vinReadFeedback.value = "⚠️ VIN guardado localmente; sincronización remota pendiente ($result)"
+                            if (_selectedVehicle.value?.id == vehicle.id) {
+                                activeVehicleKernel.updateIfActive(updated)
+                            }
+                        }
                     }
-                    val route = listOfNotNull(vinResult.header, vinResult.command).joinToString(" → ")
-                    _vinReadFeedback.value = "✓ VIN $detectedVin verificado físicamente por $route (${vinResult.protocol ?: "protocolo OBD detectado"}) y guardado."
                 } else {
                     _vinReadFeedback.value = when (vinResult.outcome) {
                         VinReadOutcome.NOT_CONNECTED -> "⚠️ El enlace OBD se desconectó antes de consultar la ECU."
@@ -6588,6 +6637,52 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Export the GPS forensic trail for a completed ride as a PDF.
+     * The PDF includes QR verification code and SHA-256 integrity hash
+     * for presentation to law enforcement or judicial authorities.
+     */
+    fun exportGpsForensicTrail(rideId: String) {
+        viewModelScope.launch {
+            _rideVerificationNotice.emit("Generando reporte GPS forense…")
+            val trail = GpsTrailRecorder.loadTrail(context, rideId)
+            if (trail == null || trail.points.isEmpty()) {
+                _rideVerificationNotice.emit("No hay datos GPS registrados para este viaje.")
+                return@launch
+            }
+            val result = com.elysium369.meet.ride.location.GpsTrailPdfExporter.exportPdf(context, trail)
+            if (result != null) {
+                com.elysium369.meet.ride.location.GpsTrailPdfExporter.sharePdf(context, result)
+                _rideVerificationNotice.emit(
+                    "Reporte GPS forense generado: ${result.pointCount} puntos, " +
+                        "hash ${result.integrityHash.take(16)}…",
+                )
+            } else {
+                _rideVerificationNotice.emit("Error al generar el reporte GPS.")
+            }
+        }
+    }
+
+    fun submitTip(rideId: String, tipMinor: Long, currency: String) {
+        viewModelScope.launch {
+            _rideVerificationNotice.emit("Enviando propina…")
+            runCatching {
+                com.elysium369.meet.data.remote.SupabaseModule.client.postgrest.rpc(
+                    function = "ride_submit_tip_v1",
+                    parameters = kotlinx.serialization.json.buildJsonObject {
+                        put("p_ride_id", rideId)
+                        put("p_tip_minor", tipMinor)
+                        put("p_currency", currency)
+                    },
+                )
+            }.onSuccess {
+                _rideVerificationNotice.emit("Propina de $tipMinor $currency enviada. ¡Gracias!")
+            }.onFailure {
+                _rideVerificationNotice.emit("Error al enviar propina: ${it.message?.take(80)}")
+            }
+        }
+    }
+
     fun getCurrentTrip(): TripEntity? {
         return tripManager.currentTrip
     }
@@ -6660,11 +6755,21 @@ class ObdViewModel @Inject constructor(
             )
 
             android.util.Log.d("ObdVM", "Saving vehicle: ${vehicle.make} ${vehicle.model} (ID: ${vehicle.id})")
-            vehicleRepository.insertVehicle(vehicle)
-            voiceFeedbackManager.speak(
-                "Vehículo $make $model guardado exitosamente.",
-                "Vehicle $make $model saved successfully."
-            )
+            when (val result = vehicleRepository.insertVehicle(vehicle)) {
+                is com.elysium369.meet.core.remote.RemoteResult.Success -> {
+                    voiceFeedbackManager.speak(
+                        "Vehículo $make $model guardado exitosamente.",
+                        "Vehicle $make $model saved successfully."
+                    )
+                }
+                else -> {
+                    voiceFeedbackManager.speak(
+                        "Vehículo guardado localmente; sincronización remota pendiente.",
+                        "Vehicle saved locally; remote sync pending."
+                    )
+                    Log.w("ObdVM", "Insert vehicle failed: $result")
+                }
+            }
 
             // Fix: Call selectVehicle to ensure persistence of the selected ID
             selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
@@ -7865,6 +7970,45 @@ class ObdViewModel @Inject constructor(
                     }
                 }
         }
+        viewModelScope.launch {
+            combine(_rideDriverMode, _activeRideRequest) { isDriver, ride ->
+                ride?.takeIf {
+                    isDriver && it.status in setOf(
+                        "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED",
+                        "PASSENGER_ONBOARD", "IN_PROGRESS",
+                    )
+                }
+            }.distinctUntilChangedBy { it?.requestId to it?.status }
+                .collectLatest { ride ->
+                    if (ride == null) {
+                        // Stop GPS forensic trail recording
+                        GpsTrailRecorder.getActiveRideId(context)?.let { activeRideId ->
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                GpsTrailRecorder.stopRecording(context, activeRideId)
+                            }
+                        }
+                        RideLocationTrackingService.stop(context)
+                        return@collectLatest
+                    }
+                    // Start GPS forensic trail recording
+                    if (!GpsTrailRecorder.hasActiveRecording(context)) {
+                        GpsTrailRecorder.startRecording(
+                            context = context,
+                            rideId = ride.requestId,
+                            driverId = ride.assignedDriverId.orEmpty(),
+                            passengerId = ride.passengerId,
+                        )
+                    }
+                    runCatching { RideLocationTrackingService.start(context, ride.requestId) }
+                        .onFailure { Log.w("MeetRides", "Unable to start visible trip tracking", it) }
+                    while (isActive) {
+                        detectCurrentLocation(context)
+                        delay(2_500)
+                        recordRideSpeedObservation(ride.requestId)
+                        delay(12_500)
+                    }
+                }
+        }
     }
 
     @Serializable
@@ -8091,6 +8235,9 @@ class ObdViewModel @Inject constructor(
         if (tripId.isBlank()) return
         val gps = _currentGpsLocation.value ?: return
         val now = System.currentTimeMillis()
+        val capturedAt = gps.timestamp.takeIf { it > 0L } ?: now
+        val ageMs = (now - capturedAt).coerceAtLeast(0L)
+        if (ageMs > 30_000L || gps.accuracy !in 0f..100f) return
         val sample = RideSegmentSpeedSample(
             speedMetersPerSecond = gps.speed.toDouble().coerceAtLeast(0.0),
             capturedAtEpochMs = now,
@@ -8110,7 +8257,7 @@ class ObdViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return@launch
-            val capturedAt = java.time.Instant.ofEpochMilli(now).toString()
+            val capturedAtIso = java.time.Instant.ofEpochMilli(now).toString()
             val bucketAt = java.time.Instant.ofEpochMilli(minuteBucket).toString()
             runCatching {
                 SupabaseManager.client.postgrest["ride_segment_speed_observations"].insert(
@@ -8121,7 +8268,7 @@ class ObdViewModel @Inject constructor(
                         speed_mps = gps.speed.coerceIn(0f, 100f),
                         accuracy_meters = gps.accuracy.coerceAtLeast(0f),
                         bearing_degrees = gps.bearing.coerceIn(0f, 360f),
-                        captured_at = capturedAt,
+                        captured_at = capturedAtIso,
                         time_bucket = bucketAt,
                     ),
                 )
@@ -8322,8 +8469,11 @@ class ObdViewModel @Inject constructor(
                 } else {
                     """{"mode":"METERED_TIME_DISTANCE","distanceFareMinor":${meteredQuote.distanceFareMinor},"timeFareMinor":${meteredQuote.timeFareMinor},"estimatedTotalMinor":${meteredQuote.estimatedTotalMinor},"currency":"CRC","rateCardVersion":${meteredQuote.rateCardVersion}}"""
                 },
-                status = "OPEN",
-                serverState = "SEARCHING",
+                // Local persistence is not proof that the authoritative RPC
+                // accepted the request. The worker replaces these values from
+                // the server projection after a real receipt.
+                status = "PENDING_PUBLICATION",
+                serverState = "PENDING_PUBLICATION",
                 serverVersion = 0L,
                 syncState = "PENDING",
                 createdAt = System.currentTimeMillis()
@@ -9217,9 +9367,12 @@ class ObdViewModel @Inject constructor(
                     }
                 }
                 if (
-                    verification?.status == RideVerificationPolicy.PILOT_APPROVED &&
-                    evaluateDriverEvidence(verification).isReady
+                    verification?.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED) &&
+                    verification != null && evaluateDriverEvidence(verification).isReady
                 ) {
+                    // Re-enqueueing is deliberate: WorkManager is the durable
+                    // authority and this recovers an interrupted/failed release
+                    // worker after process recreation or an app upgrade.
                     enqueueDriverPilotEnrollment(verification)
                 }
             }
@@ -9518,6 +9671,16 @@ class ObdViewModel @Inject constructor(
                 ).joinToString(" "),
                 seats = verification.vehicleSeats,
                 evidenceManifestSha256 = evidenceManifest,
+                evidenceFiles = evidenceFiles.map {
+                    TrustEvidenceFile(kind = it.label, localPath = it.path)
+                },
+                phone = verification.phone,
+                email = verification.email,
+                vehicleMake = verification.vehicleMake,
+                vehicleModel = verification.vehicleModel,
+                vehicleYear = verification.vehicleYear,
+                vehicleColor = verification.vehicleColor,
+                vehiclePlate = verification.vehiclePlate,
             ),
         )
     }
@@ -9665,6 +9828,9 @@ class ObdViewModel @Inject constructor(
                     displayName = verification.fullName,
                     phone = verification.phone,
                     evidenceManifestSha256 = manifest,
+                    evidenceFiles = evidenceFiles.map {
+                        TrustEvidenceFile(kind = it.label, localPath = it.path)
+                    },
                 ),
             )
         }

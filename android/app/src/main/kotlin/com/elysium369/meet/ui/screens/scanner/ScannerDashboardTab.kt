@@ -311,12 +311,16 @@ fun ScannerDashboardTab(
                         ) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 AnimatedEntryItem(index = 0, visibleCount = visibleCount) {
-                                    HealthIndexCard(healthScore = healthScore, anomalousPids = anomalousPids)
+                                    HealthIndexCard(
+                                        healthScore = healthScore,
+                                        anomalousPids = anomalousPids,
+                                        isConnected = connectionState == ObdState.CONNECTED
+                                    )
                                 }
                             }
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 AnimatedEntryItem(index = 1, visibleCount = visibleCount) {
-                                    LiveAITerminal(anomalousPids = anomalousPids)
+                                    LiveAITerminal(anomalousPids = anomalousPids, isConnected = connectionState == ObdState.CONNECTED)
                                 }
                             }
                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -566,13 +570,20 @@ fun Modifier.crtScanlines(color: Color = Color.Black.copy(alpha = 0.12f)): Modif
 @Composable
 private fun HealthIndexCard(
     healthScore: Int,
-    anomalousPids: List<com.elysium369.meet.core.ai.HealthAnomaly>
+    anomalousPids: List<com.elysium369.meet.core.ai.HealthAnomaly>,
+    isConnected: Boolean = false
 ) {
-    val scoreColor = if (healthScore > 80) MeetColors.neonGreen else if (healthScore > 50) MeetColors.warning else MeetColors.error
+    val scoreColor = when {
+        !isConnected -> MeetColors.textMuted
+        healthScore > 80 -> MeetColors.neonGreen
+        healthScore > 50 -> MeetColors.warning
+        else -> MeetColors.error
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "healthPulse")
     val borderGlow by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.7f,
+        initialValue = if (isConnected) 0.3f else 0.1f,
+        targetValue = if (isConnected) 0.7f else 0.2f,
         animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "borderGlow"
     )
@@ -599,6 +610,7 @@ private fun HealthIndexCard(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = when {
+                            !isConnected -> "OBD NO DISPONIBLE"
                             healthScore > 90 -> "CORE OPERATIVO ÓPTIMO"
                             healthScore > 75 -> "SISTEMA ESTABLE"
                             healthScore > 50 -> "ALERTA DE ANOMALÍA PREVENTIVA"
@@ -613,14 +625,14 @@ private fun HealthIndexCard(
 
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(76.dp)) {
                     CircularProgressIndicator(
-                        progress = healthScore / 100f,
+                        progress = if (isConnected) healthScore / 100f else 0f,
                         modifier = Modifier.fillMaxSize(),
                         color = scoreColor,
                         strokeWidth = 6.dp,
                         trackColor = scoreColor.copy(alpha = 0.1f)
                     )
                     Text(
-                        "$healthScore%", 
+                        if (isConnected) "$healthScore%" else "—",
                         color = scoreColor, 
                         fontWeight = FontWeight.Black, 
                         fontSize = 18.sp,
@@ -660,9 +672,15 @@ private fun HealthIndexCard(
 // ═══════════════════════════════════════
 
 @Composable
-private fun LiveAITerminal(anomalousPids: List<com.elysium369.meet.core.ai.HealthAnomaly>) {
-    val terminalLines = remember(anomalousPids) {
-        if (anomalousPids.isEmpty()) {
+private fun LiveAITerminal(anomalousPids: List<com.elysium369.meet.core.ai.HealthAnomaly>, isConnected: Boolean = false) {
+    val terminalLines = remember(anomalousPids, isConnected) {
+        if (!isConnected) {
+            listOf(
+                "> CORTEX AI: SIN ENLACE OBD.",
+                "> CONECTA UN ADAPTADOR PARA INICIAR MONITOREO.",
+                "> OBD NO DISPONIBLE — MODO INACTIVO."
+            )
+        } else if (anomalousPids.isEmpty()) {
             listOf(
                 "> CORTEX AI: MONITOREO ACTIVO...",
                 "> ESCANEANDO FLUJO DE DATOS OBD EN TIEMPO REAL...",
