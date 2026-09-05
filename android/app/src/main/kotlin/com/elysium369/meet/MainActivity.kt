@@ -1191,6 +1191,48 @@ fun MeetApp(
                     },
                 )
             }
+            composable("ride_passenger_request") {
+                com.elysium369.meet.ui.screens.ride.PassengerRideRequestScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onStartActiveRide = {
+                        navController.navigate("ride_service")
+                    }
+                )
+            }
+            composable("ride_driver_cockpit") {
+                com.elysium369.meet.ui.screens.ride.DriverAppScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() }
+                )
+            }
+            composable("ride_active_tracking") {
+                val activeRide = com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
+                    rideId = "ride_active",
+                    driver = com.elysium369.meet.ui.screens.ride.MatchedDriver(
+                        driverId = "drv_live",
+                        name = "Rodrigo Alvarado",
+                        rating = 4.95,
+                        totalTrips = 842,
+                        vehicle = "Toyota Corolla 2022",
+                        plate = "BGH-409",
+                        etaMinutes = 3,
+                        distanceMeters = 800
+                    ),
+                    pickup = com.elysium369.meet.ui.screens.ride.RidePlaceInput("p1", "Mi ubicación actual", "San José", 9.9333, -84.0833, com.elysium369.meet.ui.screens.ride.PlaceType.CURRENT),
+                    dropoff = com.elysium369.meet.ui.screens.ride.RidePlaceInput("d1", "Aeropuerto Juan Santamaría (SJO)", "Alajuela", 9.9939, -84.2088, com.elysium369.meet.ui.screens.ride.PlaceType.SEARCH),
+                    fareQuote = com.elysium369.meet.ui.screens.ride.FareQuote(1200L, 5800L, 1400L, 8400L, "CRC", 17.2, 24),
+                    state = com.elysium369.meet.ride.domain.RideState.DRIVER_EN_ROUTE
+                )
+                com.elysium369.meet.ui.screens.ride.ActiveRideTrackingScreen(
+                    ride = activeRide,
+                    onCancelRide = { navController.backOrHome() },
+                    onBack = { navController.backOrHome() }
+                )
+            }
+
             composable("fleet") {
                 val chatViewModel: FleetChatViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 FleetChatListScreen(navController = navController, viewModel = chatViewModel, businessId = "fleet_default", onBack = { navController.backOrHome() })
