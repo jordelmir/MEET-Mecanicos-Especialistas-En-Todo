@@ -110,3 +110,63 @@ scope for the next APK.
 
 If the new task conflicts with the principle ("should I pick A or B?"),
 **stop and re-read** this file before continuing.
+
+---
+
+## Skill Orchestration — World-Class Engine
+
+The `world-class-orchestrator` skill is the **master brain**. It coordinates
+150+ skills into a unified execution engine. Every agent must load it first.
+
+### Skill Loading Protocol
+
+1. **First load**: `world-class-orchestrator` — decides which skills to activate
+2. **Tier 1 (always)**: `elite-engineering`, `elite-debugging`, `elite-compilation`
+3. **Tier 2 (domain)**: Load based on task type:
+   - Android/Kotlin → `elite-android-dev`, `android-mac-bridge`
+   - Web/React → `fullstack-weaver`, `ui-craft-master`
+   - API/Backend → `api-architect`, `data-architect`
+   - DevOps/Deploy → `system-conductor`, `elite-cicd-deploy`
+   - QA/Testing → `elite-qa-testing`, `elite-code-review`
+   - Debugging → `elite-debugging`, `systematic-debugging`
+   - Refactoring → `elite-refactoring`, `code-architect`
+4. **Tier 3 (specialist)**: Load as needed:
+   - Security → `security-champion`, `security-hardening`
+   - Performance → `performance-tuner`, `performance-budget`
+   - Database → `database-optimizer`, `database-designer`
+   - API Design → `api-designer`, `api-contract-guardian`
+   - CI/CD → `ci-cd-architect`, `ci-cd-pipeline`
+   - Observability → `observability-starter`, `monitoring-designer`
+   - Frontend → `frontend-design`, `interface-design`, `ux-scientist`
+   - Testing → `test-automation`, `test-strategy-master`, `qa-engine`
+
+### Parallel Agent Orchestration
+
+When multiple agents work simultaneously:
+
+1. **Agent A (Primary)**: Loads `world-class-orchestrator` + domain skills
+2. **Agent B (Specialist)**: Loads domain-specific skills for focused work
+3. **Agent C (Reviewer)**: Loads `elite-code-review` + `security-champion` for cross-review
+
+### Cross-Review Protocol
+
+Before any merge to `main`:
+1. Agent writes code with `elite-engineering` workflow
+2. Second agent reviews with `elite-code-review` skill
+3. Security audit with `security-champion` if touching auth/data
+4. Build verification with `elite-compilation` + `elite-qa-testing`
+5. Only then: merge via `sync.sh --auto` or manual `--no-ff` merge
+
+### Skill Location Registry
+
+| Location | Purpose |
+|---|---|
+| `~/.config/opencode/skills/` | Core opencode skills (auto-loaded) |
+| `~/.agents/skills/` | Elite skills (150+ domain skills) |
+| `~/.mavis/skills/` | Mavis-specific skills |
+| `~/.claude/skills/` | Claude-specific skills |
+| `~/.gemini/skills/` | Gemini-specific skills |
+
+All skill directories are scanned automatically. Skills are triggered by
+task matching (description-based). The orchestrator decides which to load
+based on task complexity and domain.

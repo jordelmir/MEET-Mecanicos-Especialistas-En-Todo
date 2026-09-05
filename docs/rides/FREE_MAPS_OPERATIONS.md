@@ -74,3 +74,26 @@ Fuentes primarias:
 El software es gratuito y autoalojable; cómputo, ancho de banda, soporte y
 operación de producción no son gratis y se deben presupuestar antes de prometer
 disponibilidad mundial.
+
+## Descarga offline de Costa Rica (diseño aprobado, no implementado todavía)
+
+Es viable ofrecer dentro de Viajes un botón **Descargar Costa Rica** después de
+instalar la APK. La ruta gratuita del piloto es generar un paquete vectorial
+propio a partir de datos abiertos de OpenStreetMap, publicarlo como artefacto de
+versión y administrarlo con MapLibre. Nunca se hará descarga masiva desde los
+servidores públicos de teselas de OSM.
+
+El paquete deberá ser versionado, reanudable, verificar SHA-256 antes de
+activarse, conservar la versión anterior hasta completar el cambio y permitir
+eliminación desde Ajustes. Un motor local de rutas y un índice local de lugares
+permitirán mapa, GPS, búsqueda y navegación sin conexión. Tráfico, cierres,
+reportes colaborativos y despacho en vivo seguirán requiriendo conexión y una
+infraestructura propia; no se presentarán como datos actuales estando offline.
+
+La generación puede automatizarse inicialmente con GitHub Actions y publicarse
+en una versión de GitHub. Esto evita licencias comerciales en el piloto, pero
+no convierte ancho de banda y operación a escala en recursos ilimitados.
+
+Fuente adicional del motor seleccionado:
+
+- [MapLibre Compose — administración de regiones offline](https://maplibre.org/maplibre-compose/offline/)
