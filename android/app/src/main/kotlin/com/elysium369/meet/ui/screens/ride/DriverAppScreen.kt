@@ -53,43 +53,61 @@ fun DriverAppScreen(
     val scope = rememberCoroutineScope()
 
     var isOnline by remember { mutableStateOf(false) }
-    var activeRideRequest by remember { mutableStateOf<IncomingRideRequest?>(null) }
     var activeRide by remember { mutableStateOf<ActiveDriverRide?>(null) }
     var showEarnings by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showSafetyCenter by remember { mutableStateOf(false) }
     var showNavigation by remember { mutableStateOf(false) }
 
-    val incomingRequests = remember { mutableStateListOf<IncomingRideRequest>() }
+    val openRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
 
-    val toggleOnline = {
-        isOnline = !isOnline
-        if (isOnline) {
-            scope.launch {
-                delay(2000)
-                val req = IncomingRideRequest(
-                    rideId = "ride_${System.currentTimeMillis()}",
-                    passenger = PassengerInfo("pax_101", "Mariela Quesada", 4.92, 64, null, "+506 8888-1234"),
-                    pickup = RidePlaceInput("p1", "Parque La Sabana", "Costado Este, San José", 9.9350, -84.1000),
-                    dropoff = RidePlaceInput("d1", "Centro Corporativo El Cedral", "Escazú", 9.9280, -84.1420),
-                    fare = 4800L,
-                    distanceKm = 5.6,
-                    durationMin = 14,
-                    fareMode = RideFareMode.METERED_TIME_DISTANCE,
-                    paymentMethod = RidePaymentMethod.SINPE_MOVIL
-                )
-                activeRideRequest = req
-                incomingRequests.add(req)
-            }
-        } else {
-            activeRideRequest = null
-            incomingRequests.clear()
+    val incomingRequests = remember(openRequests, isOnline) {
+        if (!isOnline) emptyList()
+        else openRequests.filter { it.assignedDriverId == null }.map { req ->
+            IncomingRideRequest(
+                rideId = req.requestId,
+                passenger = PassengerInfo(req.passengerId, req.passengerName, 4.9, 20, null, req.passengerPhone),
+                pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
+                dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
+                fare = req.priceOfferMinor,
+                distanceKm = req.estimatedDistanceKm,
+                durationMin = req.estimatedDurationMin,
+                fareMode = runCatching { RideFareMode.valueOf(req.fareMode) }.getOrDefault(RideFareMode.OPEN_BID),
+                paymentMethod = runCatching { RidePaymentMethod.valueOf(req.paymentMethod) }.getOrDefault(RidePaymentMethod.CASH)
+            )
         }
     }
 
+    var dismissedRequestId by remember { mutableStateOf<String?>(null) }
+    val activeRideRequest = incomingRequests.firstOrNull { it.rideId != dismissedRequestId }
+
+    val toggleOnline = {
+        val next = !isOnline
+        isOnline = next
+        viewModel.setRideDriverMode(next)
+    }
+
     val acceptRide = { request: IncomingRideRequest ->
-        activeRideRequest = null
-        incomingRequests.remove(request)
+        val driver = viewModel.driverVerification.value
+        val dId = driver?.driverId ?: viewModel.currentRideActorId
+        val dName = driver?.fullName ?: "Conductor MEET"
+        val dPhone = driver?.phone ?: "+506 8000-0000"
+        val veh = driver?.vehicleModel ?: (viewModel.selectedVehicle.value?.let { "${it.make} ${it.model}" } ?: "Vehículo Registrado")
+        viewModel.makeRideOffer(
+            requestId = request.rideId,
+            driverId = dId,
+            driverName = dName,
+            driverPhone = dPhone,
+            driverRating = 5.0,
+            driverTotalTrips = 0,
+            vehicleDesc = veh,
+            counterPrice = request.fare.toDouble(),
+            currency = "CRC",
+            estArrivalMin = 5,
+            driverLat = request.pickup.latitude,
+            driverLng = request.pickup.longitude,
+            message = "Oferta de viaje aceptada"
+        )
         activeRide = ActiveDriverRide(
             rideId = request.rideId,
             passenger = request.passenger,
@@ -102,10 +120,7 @@ fun DriverAppScreen(
     }
 
     val declineRide = { request: IncomingRideRequest ->
-        incomingRequests.remove(request)
-        if (activeRideRequest == request) {
-            activeRideRequest = null
-        }
+        dismissedRequestId = request.rideId
     }
 
     Scaffold(

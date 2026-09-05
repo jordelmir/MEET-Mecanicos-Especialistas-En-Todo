@@ -38,6 +38,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.core.geo.CommonMapState
+import com.elysium369.meet.core.geo.GeoMarker
+import com.elysium369.meet.core.geo.GeoMarkerRole
+import com.elysium369.meet.core.geo.GeoPoint
+import com.elysium369.meet.core.geo.GeoRoute
+import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ride.payment.RidePaymentMethod
 import com.elysium369.meet.ui.theme.MeetColors
@@ -60,6 +66,48 @@ fun ActiveRideTrackingScreen(
     var showRatingSheet by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     var pttVoiceState by remember { mutableStateOf(PttVoiceState.IDLE) }
+
+    val mapState = remember(ride) {
+        val markers = mutableListOf<GeoMarker>()
+        markers.add(
+            GeoMarker(
+                id = "pax_pickup",
+                role = GeoMarkerRole.USER_LOCATION,
+                point = GeoPoint(ride.pickup.latitude, ride.pickup.longitude),
+                label = ride.pickup.displayName,
+                isHighlighted = true
+            )
+        )
+        markers.add(
+            GeoMarker(
+                id = "dest_dropoff",
+                role = GeoMarkerRole.DESTINATION,
+                point = GeoPoint(ride.dropoff.latitude, ride.dropoff.longitude),
+                label = ride.dropoff.displayName
+            )
+        )
+        ride.driverLocation?.let { loc ->
+            markers.add(
+                GeoMarker(
+                    id = "drv_loc",
+                    role = GeoMarkerRole.PROVIDER_LIVE,
+                    point = GeoPoint(loc.latitude, loc.longitude),
+                    label = ride.driver.name
+                )
+            )
+        }
+        val route = listOf(
+            GeoRoute(
+                points = listOf(
+                    GeoPoint(ride.pickup.latitude, ride.pickup.longitude),
+                    GeoPoint(ride.dropoff.latitude, ride.dropoff.longitude)
+                ),
+                distanceMeters = (ride.fareQuote.estimatedDistanceKm * 1000).toLong(),
+                durationSeconds = ride.fareQuote.estimatedDurationMin * 60L
+            )
+        )
+        CommonMapState(markers = markers, routes = route)
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
@@ -102,73 +150,14 @@ fun ActiveRideTrackingScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Simulated High-Integrity Map Surface
+            // Real Authoritative Map Panel (fail-honest; MapLibre CommonMapPanel)
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFF070E1A),
-                                Color(0xFF0F1C30),
-                                MeetColors.backgroundDeep
-                            )
-                        )
-                    )
+                modifier = Modifier.fillMaxSize()
             ) {
-                // Route line simulation
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .padding(horizontal = 40.dp)
-                        .align(Alignment.Center)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(MeetColors.neonGreen, MeetColors.electricBlue)
-                            )
-                        )
+                CommonMapPanel(
+                    state = mapState,
+                    modifier = Modifier.fillMaxSize()
                 )
-
-                // Pickup Pin
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 32.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MeetColors.neonGreen),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                }
-
-                // Driver Moving Vehicle Avatar (Location Streaming Item 6)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(x = (-30).dp, y = (-20).dp)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(MeetColors.neonGreen)
-                        .border(2.dp, Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
-                }
-
-                // Dropoff Pin
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 32.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MeetColors.electricBlue),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Flag, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                }
             }
 
             // Bottom Floating Controls & Ride Info Sheet

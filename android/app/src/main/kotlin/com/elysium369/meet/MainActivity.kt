@@ -11,16 +11,23 @@ import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
@@ -401,6 +408,7 @@ fun MeetApp(
             if (currentRoute !in hideBgRoutes && currentRoute != null) {
                 HolographicBackgroundShared()
             }
+            val towRepository = remember { com.elysium369.meet.core.services.tow.TowCommandRepository() }
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
@@ -1208,27 +1216,126 @@ fun MeetApp(
                     onBack = { navController.backOrHome() }
                 )
             }
+
             composable("ride_active_tracking") {
-                val activeRide = com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
-                    rideId = "ride_active",
-                    driver = com.elysium369.meet.ui.screens.ride.MatchedDriver(
-                        driverId = "drv_live",
-                        name = "Rodrigo Alvarado",
-                        rating = 4.95,
-                        totalTrips = 842,
-                        vehicle = "Toyota Corolla 2022",
-                        plate = "BGH-409",
-                        etaMinutes = 3,
-                        distanceMeters = 800
-                    ),
-                    pickup = com.elysium369.meet.ui.screens.ride.RidePlaceInput("p1", "Mi ubicación actual", "San José", 9.9333, -84.0833, com.elysium369.meet.ui.screens.ride.PlaceType.CURRENT),
-                    dropoff = com.elysium369.meet.ui.screens.ride.RidePlaceInput("d1", "Aeropuerto Juan Santamaría (SJO)", "Alajuela", 9.9939, -84.2088, com.elysium369.meet.ui.screens.ride.PlaceType.SEARCH),
-                    fareQuote = com.elysium369.meet.ui.screens.ride.FareQuote(1200L, 5800L, 1400L, 8400L, "CRC", 17.2, 24),
-                    state = com.elysium369.meet.ride.domain.RideState.DRIVER_EN_ROUTE
+                val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
+                val activeRide = activeRideReq?.let { req ->
+                    com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
+                        rideId = req.requestId,
+                        driver = req.assignedDriverId?.let { driverId ->
+                            com.elysium369.meet.ui.screens.ride.MatchedDriver(
+                                driverId = driverId,
+                                name = req.assignedDriverName ?: "Conductor Asignado",
+                                rating = req.driverRating ?: 4.95,
+                                totalTrips = 240,
+                                vehicle = req.assignedDriverVehicle ?: "Vehículo Registrado",
+                                plate = req.serverAssignedVehicleId ?: "MEET-CR",
+                                etaMinutes = req.estimatedDurationMin.coerceAtLeast(1),
+                                distanceMeters = ((req.estimatedDistanceKm.takeIf { it > 0.0 } ?: 1.0) * 1000).toInt()
+                            )
+                        } ?: com.elysium369.meet.ui.screens.ride.MatchedDriver(
+                            driverId = "pending",
+                            name = "Buscando conductor en la red...",
+                            rating = 5.0,
+                            totalTrips = 0,
+                            vehicle = "En asignación",
+                            plate = "---",
+                            etaMinutes = 5,
+                            distanceMeters = 1000
+                        ),
+                        pickup = com.elysium369.meet.ui.screens.ride.RidePlaceInput(
+                            placeId = "p_${req.requestId}",
+                            displayName = req.pickupAddress,
+                            address = req.pickupAddress,
+                            latitude = req.pickupLatitude,
+                            longitude = req.pickupLongitude,
+                            placeType = com.elysium369.meet.ui.screens.ride.PlaceType.CURRENT
+                        ),
+                        dropoff = com.elysium369.meet.ui.screens.ride.RidePlaceInput(
+                            placeId = "d_${req.requestId}",
+                            displayName = req.destAddress,
+                            address = req.destAddress,
+                            latitude = req.destLatitude,
+                            longitude = req.destLongitude,
+                            placeType = com.elysium369.meet.ui.screens.ride.PlaceType.SEARCH
+                        ),
+                        fareQuote = com.elysium369.meet.ui.screens.ride.FareQuote(
+                            baseFare = req.estimatedFareMinor / 4,
+                            distanceFare = req.estimatedFareMinor / 2,
+                            timeFare = req.estimatedFareMinor / 4,
+                            totalFare = req.estimatedFareMinor,
+                            currency = req.currency,
+                            estimatedDistanceKm = req.estimatedDistanceKm,
+                            estimatedDurationMin = req.estimatedDurationMin
+                        ),
+                        state = runCatching {
+                            com.elysium369.meet.ride.domain.RideState.valueOf(req.status)
+                        }.getOrDefault(com.elysium369.meet.ride.domain.RideState.DRIVER_EN_ROUTE)
+                    )
+                }
+
+                if (activeRide != null) {
+                    com.elysium369.meet.ui.screens.ride.ActiveRideTrackingScreen(
+                        ride = activeRide,
+                        onCancelRide = {
+                            obdViewModel.cancelRide(
+                                requestId = activeRide.rideId,
+                                reason = com.elysium369.meet.ride.domain.RideCancellationReason.CHANGE_OF_PLANS,
+                                detail = "Cancelado desde seguimiento",
+                                actorRole = "PASSENGER"
+                            )
+                            navController.backOrHome()
+                        },
+                        onBack = { navController.backOrHome() }
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(com.elysium369.meet.ui.theme.MeetColors.backgroundDeep)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "No hay ningún viaje activo",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = com.elysium369.meet.ui.theme.MeetColors.textPrimary
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Solicita un viaje desde la sección de Movilidad para iniciar el seguimiento.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(Modifier.height(24.dp))
+                            Button(
+                                onClick = { navController.navigate("ride_passenger_request") },
+                                colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, contentColor = Color.Black)
+                            ) {
+                                Text("SOLICITAR VIAJE", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            composable("tow_active_tracking") {
+                com.elysium369.meet.ui.screens.tow.TowFulfillmentScreen(
+                    viewModel = obdViewModel,
+                    towRepository = towRepository,
+                    onBack = { navController.backOrHome() }
                 )
-                com.elysium369.meet.ui.screens.ride.ActiveRideTrackingScreen(
-                    ride = activeRide,
-                    onCancelRide = { navController.backOrHome() },
+            }
+
+            composable("unified_activity") {
+                com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(
+                    viewModel = obdViewModel,
+                    towRepository = towRepository,
+                    onNavigateToRide = { navController.navigate("ride_active_tracking") },
+                    onNavigateToTow = { navController.navigate("tow_active_tracking") },
                     onBack = { navController.backOrHome() }
                 )
             }

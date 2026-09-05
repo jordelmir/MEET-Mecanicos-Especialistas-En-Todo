@@ -7813,6 +7813,10 @@ class ObdViewModel @Inject constructor(
         _rideDriverMode.value = !_rideDriverMode.value
     }
 
+    fun setRideDriverMode(enabled: Boolean) {
+        _rideDriverMode.value = enabled
+    }
+
     fun recordDriverLiveness(evidenceSha256: String, capturedAtEpochMs: Long) {
         if (!evidenceSha256.matches(Regex("[0-9a-f]{64}"))) return
         viewModelScope.launch(Dispatchers.IO) {

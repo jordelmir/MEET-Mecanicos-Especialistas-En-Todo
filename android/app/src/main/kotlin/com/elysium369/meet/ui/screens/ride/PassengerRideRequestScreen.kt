@@ -86,9 +86,26 @@ fun PassengerRideRequestScreen(
     var showFareModeSheet by remember { mutableStateOf(false) }
     var showPaymentSheet by remember { mutableStateOf(false) }
     var showSafetyCenter by remember { mutableStateOf(false) }
-    var isRequesting by remember { mutableStateOf(false) }
-    var matchedDriver by remember { mutableStateOf<MatchedDriver?>(null) }
     var showDriverProfile by remember { mutableStateOf(false) }
+
+    val activeRideReq by viewModel.activeRideRequest.collectAsState()
+    val isRequesting = activeRideReq != null && activeRideReq?.assignedDriverId == null &&
+            activeRideReq?.status in setOf("PENDING_PUBLICATION", "OPEN", "SEARCHING")
+
+    val matchedDriver: MatchedDriver? = remember(activeRideReq) {
+        activeRideReq?.assignedDriverId?.let { driverId ->
+            MatchedDriver(
+                driverId = driverId,
+                name = activeRideReq?.assignedDriverName ?: "Conductor Asignado",
+                rating = activeRideReq?.driverRating ?: 4.95,
+                totalTrips = 240,
+                vehicle = activeRideReq?.assignedDriverVehicle ?: "Vehículo Registrado",
+                plate = activeRideReq?.serverAssignedVehicleId ?: "MEET-CR",
+                etaMinutes = activeRideReq?.estimatedDurationMin?.coerceAtLeast(1) ?: 4,
+                distanceMeters = ((activeRideReq?.estimatedDistanceKm ?: 1.0) * 1000).toInt()
+            )
+        }
+    }
 
     val fareQuote = remember(pickup, dropoff, fareMode) {
         if (dropoff != null) {
@@ -220,13 +237,15 @@ fun PassengerRideRequestScreen(
                     Button(
                         onClick = {
                             val activeState = ActiveRideViewState(
-                                rideId = "ride_${System.currentTimeMillis()}",
+                                rideId = activeRideReq?.requestId ?: "ride_${System.currentTimeMillis()}",
                                 driver = driver,
                                 pickup = pickup,
                                 dropoff = dropoff!!,
                                 fareQuote = fareQuote!!,
-                                state = RideState.DRIVER_EN_ROUTE,
-                                driverLocation = RideLocationPoint(latitude = 9.9350, longitude = -84.0840),
+                                state = runCatching {
+                                    RideState.valueOf(activeRideReq?.status ?: "DRIVER_EN_ROUTE")
+                                }.getOrDefault(RideState.DRIVER_EN_ROUTE),
+                                driverLocation = RideLocationPoint(latitude = pickup.latitude + 0.002, longitude = pickup.longitude + 0.002),
                                 passengerLocation = RideLocationPoint(latitude = pickup.latitude, longitude = pickup.longitude)
                             )
                             onStartActiveRide(activeState)
@@ -247,19 +266,28 @@ fun PassengerRideRequestScreen(
                         fareQuote = fareQuote,
                         isRequesting = isRequesting,
                         onClick = {
-                            isRequesting = true
-                            scope.launch {
-                                delay(3000)
-                                isRequesting = false
-                                matchedDriver = MatchedDriver(
-                                    driverId = "drv_481",
-                                    name = "Rodrigo Alvarado",
-                                    rating = 4.94,
-                                    totalTrips = 842,
-                                    vehicle = "Toyota Corolla 2022",
-                                    plate = "BGH-409",
-                                    etaMinutes = 4,
-                                    distanceMeters = 950
+                            val quote = fareQuote
+                            if (quote != null) {
+                                val passenger = viewModel.passengerVerification.value
+                                val pId = viewModel.currentUserId ?: viewModel.currentRideActorId
+                                viewModel.createRideRequest(
+                                    passengerId = pId,
+                                    passengerName = passenger?.fullName ?: "Usuario MEET",
+                                    passengerPhone = passenger?.phone ?: "+506 8000-0000",
+                                    countryCode = "CR",
+                                    pickupLat = pickup.latitude,
+                                    pickupLng = pickup.longitude,
+                                    pickupAddr = pickup.address ?: "San José",
+                                    pickupAcc = 5.0f,
+                                    destLat = dropoff?.latitude ?: 0.0,
+                                    destLng = dropoff?.longitude ?: 0.0,
+                                    destAddr = dropoff?.address ?: "Destino",
+                                    priceOffer = quote.totalFare.toDouble(),
+                                    currency = quote.currency,
+                                    estDistance = quote.estimatedDistanceKm,
+                                    estDuration = quote.estimatedDurationMin,
+                                    paymentMethod = paymentMethod.name,
+                                    fareMode = fareMode
                                 )
                             }
                         }
