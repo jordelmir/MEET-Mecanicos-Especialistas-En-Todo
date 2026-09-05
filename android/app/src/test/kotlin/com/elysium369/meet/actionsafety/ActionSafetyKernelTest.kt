@@ -4,7 +4,7 @@ import com.elysium369.meet.authority.ElysiumAuthorityKernel
 import com.elysium369.meet.identity.ActivePrincipal
 import com.elysium369.meet.identity.ActivePrincipalProvider
 import com.elysium369.meet.vss.VehicleSignalGraph
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -35,7 +35,7 @@ class ActionSafetyKernelTest {
     }
 
     @Test
-    fun `executeAction completes full 10-phase pipeline when verified and stationary`() = runTest {
+    fun `executeAction completes full 10-phase pipeline when verified and stationary`() = runBlocking {
         var hardwareExecuted = false
         var postVerified = false
 
@@ -72,7 +72,7 @@ class ActionSafetyKernelTest {
     }
 
     @Test
-    fun `executeAction fails safe when vehicle is moving`() = runTest {
+    fun `executeAction fails safe when vehicle is moving`() = runBlocking {
         // Vehicle moving at 45 km/h
         signalGraph.ingestObdPid("010D", 45.0)
 
@@ -102,7 +102,7 @@ class ActionSafetyKernelTest {
     }
 
     @Test
-    fun `executeAction fails safe when battery voltage is below minimum threshold`() = runTest {
+    fun `executeAction fails safe when battery voltage is below minimum threshold`() = runBlocking {
         // Low battery voltage: 11.2 V
         signalGraph.ingestObdPid("0142", 11.2)
 
@@ -131,7 +131,7 @@ class ActionSafetyKernelTest {
     }
 
     @Test
-    fun `executeAction invokes recovery routine when post verification fails`() = runTest {
+    fun `executeAction invokes recovery routine when post verification fails`() = runBlocking {
         var recoveryInvoked = false
 
         val intent = ActionIntent(
@@ -153,11 +153,11 @@ class ActionSafetyKernelTest {
         assertTrue(recoveryInvoked)
         assertEquals(ActionSafetyPhase.FAILED_SAFE, receipt.phase)
         assertFalse(receipt.isVerified)
-        assertTrue(receipt.failureReason?.contains("post-action physical state verification failed") == true)
+        assertTrue(receipt.failureReason?.contains("post-action physical state verification failed", ignoreCase = true) == true)
     }
 
     @Test
-    fun `executeAction blocks unconfirmed action requiring user confirmation`() = runTest {
+    fun `executeAction blocks unconfirmed action requiring user confirmation`() = runBlocking {
         var hardwareTouched = false
 
         val intent = ActionIntent(

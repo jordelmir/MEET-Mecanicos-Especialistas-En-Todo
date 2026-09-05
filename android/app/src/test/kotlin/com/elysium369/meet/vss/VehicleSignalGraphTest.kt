@@ -3,7 +3,7 @@ package com.elysium369.meet.vss
 import com.elysium369.meet.authority.VerificationLevel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -94,21 +94,25 @@ class VehicleSignalGraphTest {
     }
 
     @Test
-    fun `subscribe receives realtime VISS stream updates`() = runTest {
+    fun `subscribe receives realtime VISS stream updates`() = runBlocking {
         val received = mutableListOf<Float>()
 
-        val job = launch {
+        val job = launch(kotlinx.coroutines.Dispatchers.IO) {
             graph.subscribe(VssStandardPaths.VEHICLE_SPEED).collect { snapshot ->
-                snapshot.asFloat()?.let { received.add(it) }
+                snapshot.asFloat()?.let { synchronized(received) { received.add(it) } }
             }
         }
+        kotlinx.coroutines.delay(50)
 
         graph.ingestObdPid("010D", 10.0)
         graph.ingestObdPid("010D", 20.0)
         graph.ingestObdPid("010D", 30.0)
+        kotlinx.coroutines.delay(100)
 
-        assertEquals(3, received.size)
-        assertEquals(listOf(10.0f, 20.0f, 30.0f), received)
+        synchronized(received) {
+            assertEquals(3, received.size)
+            assertEquals(listOf(10.0f, 20.0f, 30.0f), received)
+        }
 
         job.cancel()
     }

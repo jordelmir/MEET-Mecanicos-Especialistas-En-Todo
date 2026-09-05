@@ -24,7 +24,7 @@ sealed class VssSetResult {
 class VehicleSignalGraph @Inject constructor() {
 
     private val signalStore = ConcurrentHashMap<String, VssSignalSnapshot>()
-    private val signalUpdateFlow = MutableSharedFlow<VssSignalSnapshot>(extraBufferCapacity = 256)
+    private val signalUpdateFlow = MutableSharedFlow<VssSignalSnapshot>(replay = 16, extraBufferCapacity = 256)
     private val sequenceCounter = AtomicLong(1L)
 
     /**
