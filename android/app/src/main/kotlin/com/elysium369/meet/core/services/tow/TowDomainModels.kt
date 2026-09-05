@@ -62,6 +62,9 @@ data class TowCustodyRecord(
 ) {
     init {
         require(evidenceHash.isNotBlank()) { "Custody evidence hash cannot be blank" }
+        require(evidenceHash.matches(Regex("^[a-fA-F0-9]{64}$"))) {
+            "Custody evidence hash must be a valid 64-character hexadecimal SHA-256 string, received: $evidenceHash"
+        }
         require(recordedAtEpochMs > 0) { "Custody timestamp must be positive" }
     }
 }
@@ -96,6 +99,7 @@ data class TowJob(
     val finalSettlement: Money? = null,
     val custodyRecords: List<TowCustodyRecord> = emptyList(),
     val serverVersion: Long = 1L,
+    val correlationId: String = UUID.randomUUID().toString(),
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     val updatedAtEpochMs: Long = System.currentTimeMillis(),
 ) {

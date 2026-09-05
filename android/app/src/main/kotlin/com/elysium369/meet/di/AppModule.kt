@@ -4300,6 +4300,58 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_70_71 = object : Migration(70, 71) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `tow_jobs` (
+                    `jobId` TEXT NOT NULL PRIMARY KEY,
+                    `customerId` TEXT NOT NULL,
+                    `customerName` TEXT NOT NULL,
+                    `customerPhone` TEXT NOT NULL,
+                    `vehicleVin` TEXT,
+                    `vehicleSummary` TEXT NOT NULL,
+                    `pickupLatitude` REAL NOT NULL,
+                    `pickupLongitude` REAL NOT NULL,
+                    `pickupAccuracyMeters` REAL,
+                    `pickupCapturedAt` INTEGER,
+                    `pickupAddress` TEXT NOT NULL,
+                    `destinationLatitude` REAL,
+                    `destinationLongitude` REAL,
+                    `destinationAddress` TEXT,
+                    `state` TEXT NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `updatedAtEpochMs` INTEGER NOT NULL,
+                    `assignedProviderId` TEXT,
+                    `assignedOperatorId` TEXT,
+                    `assignedTowUnitId` TEXT,
+                    `assignedOperatorName` TEXT,
+                    `assignedOperatorPhone` TEXT,
+                    `assignedOperatorRating` REAL,
+                    `assignedOperatorCompletedJobs` INTEGER,
+                    `operatorLatitude` REAL,
+                    `operatorLongitude` REAL,
+                    `operatorFreshnessEpochMs` INTEGER,
+                    `requiredCapabilities` TEXT NOT NULL,
+                    `assignedUnitJson` TEXT,
+                    `estimatedPriceMinor` INTEGER,
+                    `quotedPriceMinor` INTEGER,
+                    `authorizedPriceMinor` INTEGER,
+                    `finalSettlementMinor` INTEGER,
+                    `currency` TEXT NOT NULL DEFAULT 'CRC',
+                    `quoteId` TEXT,
+                    `authorizationId` TEXT,
+                    `correlationId` TEXT NOT NULL,
+                    `custodyRecordsJson` TEXT NOT NULL DEFAULT '[]'
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_state` ON `tow_jobs`(`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_customer` ON `tow_jobs`(`customerId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_operator` ON `tow_jobs`(`assignedOperatorId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_correlation` ON `tow_jobs`(`correlationId`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4357,6 +4409,7 @@ object AppModule {
             MIGRATION_67_68,
             MIGRATION_68_69,
             MIGRATION_69_70,
+            MIGRATION_70_71,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4533,6 +4586,9 @@ object AppModule {
 
     @Provides
     fun provideTowTruckDao(db: MeetDatabase): TowTruckDao = db.towTruckDao()
+
+    @Provides
+    fun provideTowJobDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.TowJobDao = db.towJobDao()
 
     @Provides
     fun provideRatingDao(db: MeetDatabase): RatingDao = db.ratingDao()

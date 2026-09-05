@@ -61,14 +61,7 @@ fun PassengerRideRequestScreen(
         mutableStateOf(
             currentGps?.let {
                 RidePlaceInput.fromCurrentLocation(it.latitude, it.longitude)
-            } ?: RidePlaceInput(
-                placeId = "pickup_pending",
-                displayName = "Ubicación actual",
-                address = "Esperando señal de GPS...",
-                latitude = 0.0,
-                longitude = 0.0,
-                placeType = PlaceType.CURRENT
-            )
+            }
         )
     }
 
@@ -101,12 +94,13 @@ fun PassengerRideRequestScreen(
     }
 
     val fareQuote = remember(pickup, dropoff, fareMode) {
+        val orig = pickup
         val dest = dropoff
-        if (dest != null && pickup.latitude != 0.0 && dest.latitude != 0.0) {
-            val dLat = Math.toRadians(dest.latitude - pickup.latitude)
-            val dLng = Math.toRadians(dest.longitude - pickup.longitude)
+        if (orig != null && dest != null && orig.latitude != 0.0 && dest.latitude != 0.0) {
+            val dLat = Math.toRadians(dest.latitude - orig.latitude)
+            val dLng = Math.toRadians(dest.longitude - orig.longitude)
             val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(Math.toRadians(pickup.latitude)) * Math.cos(Math.toRadians(dest.latitude)) *
+                    Math.cos(Math.toRadians(orig.latitude)) * Math.cos(Math.toRadians(dest.latitude)) *
                     Math.sin(dLng / 2) * Math.sin(dLng / 2)
             val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
             val distanceKm = (6371.0 * c).coerceAtLeast(0.1)
@@ -171,7 +165,7 @@ fun PassengerRideRequestScreen(
                 // Route Input Cards
                 RideInputCard(
                     title = "Punto de recogida",
-                    subtitle = pickup.displayName,
+                    subtitle = pickup?.displayName ?: "Esperando señal de GPS...",
                     icon = { Icon(Icons.Default.MyLocation, contentDescription = null, tint = MeetColors.neonGreen) },
                     iconColor = MeetColors.neonGreen,
                     isActive = true,
@@ -245,22 +239,29 @@ fun PassengerRideRequestScreen(
                         }
                     }
 
+                    val curReq = activeRideReq
+                    val curPickup = pickup
+                    val curDropoff = dropoff
+                    val curQuote = fareQuote
+                    val canViewLive = curReq?.requestId != null && curPickup != null && curDropoff != null && curQuote != null
                     Button(
                         onClick = {
+                            if (!canViewLive) return@Button
                             val activeState = ActiveRideViewState(
-                                rideId = activeRideReq?.requestId ?: "ride_${System.currentTimeMillis()}",
+                                rideId = curReq.requestId,
                                 driver = driver,
-                                pickup = pickup,
-                                dropoff = dropoff ?: pickup,
-                                fareQuote = fareQuote ?: FareQuote(0L, 0L, 0L, 0L, "CRC", 0.0, 0),
+                                pickup = curPickup,
+                                dropoff = curDropoff,
+                                fareQuote = curQuote,
                                 state = runCatching {
-                                    RideState.valueOf(activeRideReq?.status ?: "ASSIGNED")
-                                }.getOrDefault(RideState.ASSIGNED),
+                                    RideState.valueOf(curReq.status)
+                                }.getOrDefault(RideState.UNKNOWN),
                                 driverLocation = null, // Truth rule: driver GPS must stream live from server, NEVER fabricated
-                                passengerLocation = if (pickup.latitude != 0.0) RideLocationPoint(latitude = pickup.latitude, longitude = pickup.longitude) else null
+                                passengerLocation = if (curPickup.latitude != 0.0) RideLocationPoint(latitude = curPickup.latitude, longitude = curPickup.longitude) else null
                             )
                             onStartActiveRide(activeState)
                         },
+                        enabled = canViewLive,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
@@ -273,36 +274,60 @@ fun PassengerRideRequestScreen(
 
                 // Request Button (when not yet matched)
                 if (matchedDriver == null) {
+                    val curPickup = pickup
+                    val curDropoff = dropoff
+                    val curQuote = fareQuote
+                    val passenger = viewModel.passengerVerification.collectAsState().value
+                    val passengerName = passenger?.fullName?.takeIf { it.isNotBlank() }
+                        ?: viewModel.currentUserId?.takeIf { it.isNotBlank() }
+                    val passengerPhone = passenger?.phone?.takeIf { it.isNotBlank() }
+
+                    val canSubmitRequest = curPickup != null && curDropoff != null && curQuote != null &&
+                            passengerName != null && passengerPhone != null
+
                     RequestRideButton(
-                        fareQuote = fareQuote,
+                        fareQuote = curQuote,
                         isRequesting = isRequesting,
+                        enabled = canSubmitRequest && !isRequesting,
                         onClick = {
-                            val quote = fareQuote
-                            if (quote != null) {
-                                val passenger = viewModel.passengerVerification.value
-                                val pId = viewModel.currentUserId ?: viewModel.currentRideActorId
-                                viewModel.createRideRequest(
-                                    passengerId = pId,
-                                    passengerName = passenger?.fullName ?: "Usuario MEET",
-                                    passengerPhone = passenger?.phone ?: "+506 8000-0000",
-                                    countryCode = "CR",
-                                    pickupLat = pickup.latitude,
-                                    pickupLng = pickup.longitude,
-                                    pickupAddr = pickup.address ?: "San José",
-                                    pickupAcc = 5.0f,
-                                    destLat = dropoff?.latitude ?: 0.0,
-                                    destLng = dropoff?.longitude ?: 0.0,
-                                    destAddr = dropoff?.address ?: "Destino",
-                                    priceOffer = quote.totalFare.toDouble(),
-                                    currency = quote.currency,
-                                    estDistance = quote.estimatedDistanceKm,
-                                    estDuration = quote.estimatedDurationMin,
-                                    paymentMethod = paymentMethod.name,
-                                    fareMode = fareMode
-                                )
-                            }
+                            if (!canSubmitRequest) return@RequestRideButton
+                            val pId = viewModel.currentUserId ?: viewModel.currentRideActorId
+                            viewModel.createRideRequest(
+                                passengerId = pId,
+                                passengerName = passengerName,
+                                passengerPhone = passengerPhone,
+                                countryCode = "CR",
+                                pickupLat = curPickup.latitude,
+                                pickupLng = curPickup.longitude,
+                                pickupAddr = curPickup.address ?: curPickup.displayName,
+                                pickupAcc = 5.0f,
+                                destLat = curDropoff.latitude,
+                                destLng = curDropoff.longitude,
+                                destAddr = curDropoff.address ?: curDropoff.displayName,
+                                priceOffer = curQuote.totalFare.toDouble(),
+                                currency = curQuote.currency,
+                                estDistance = curQuote.estimatedDistanceKm,
+                                estDuration = curQuote.estimatedDurationMin,
+                                paymentMethod = paymentMethod.name,
+                                fareMode = fareMode
+                            )
                         }
                     )
+                    if (passengerName == null || passengerPhone == null) {
+                        Text(
+                            text = "Requiere verificar perfil de pasajero (nombre y teléfono) para solicitar.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MeetColors.error,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    } else if (curPickup == null) {
+                        Text(
+                            text = "Esperando señal de GPS para determinar punto de recogida.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MeetColors.warning,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(40.dp))

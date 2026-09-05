@@ -156,4 +156,5 @@ fun getRideStatusLabel(state: RideState): String = when (state) {
     RideState.CANCELLED -> "Viaje cancelado"
     RideState.EXPIRED -> "Expirado"
     RideState.DISPUTED -> "En revisión"
+    RideState.UNKNOWN -> "Estado desconocido"
 }

@@ -27,6 +27,7 @@ object RideFulfillmentAdapter : FulfillmentPresentationAdapter<ActiveRideViewSta
             RideState.CANCELLED -> FulfillmentPhase.Cancelled("Cancelado")
             RideState.EXPIRED -> FulfillmentPhase.Failed("Tiempo de espera agotado")
             RideState.DISPUTED -> FulfillmentPhase.Disputed("En disputa")
+            RideState.UNKNOWN -> FulfillmentPhase.Failed("Estado desconocido")
         }
 
         val providerInfo = source.driver?.let { drv ->

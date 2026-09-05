@@ -50,14 +50,16 @@ fun TowFulfillmentScreen(
                         towRepository.executeAction(
                             jobId = activeJob!!.jobId,
                             action = TowAction.Cancel("Cancelado por el cliente"),
-                            actorRole = ServiceRole.CUSTOMER
+                            actorRole = ServiceRole.CUSTOMER,
+                            expectedVersion = activeJob!!.serverVersion
                         )
                     }
                     is FulfillmentUiAction.ConfirmCompletion -> {
                         towRepository.executeAction(
                             jobId = activeJob!!.jobId,
                             action = TowAction.CompleteService,
-                            actorRole = ServiceRole.CUSTOMER
+                            actorRole = ServiceRole.CUSTOMER,
+                            expectedVersion = activeJob!!.serverVersion
                         )
                     }
                     else -> Unit
@@ -70,24 +72,25 @@ fun TowFulfillmentScreen(
             viewModel = viewModel,
             onBack = onBack,
             onRequestTow = { originAddr, destAddr, capabilities ->
-                val gps = viewModel.currentGpsLocation.value
-                val originPoint = if (gps != null) GeoPoint(gps.latitude, gps.longitude) else GeoPoint(0.0, 0.0)
+                val gps = viewModel.currentGpsLocation.value ?: return@TowRequestConfigScreen
+                val originPoint = GeoPoint(gps.latitude, gps.longitude)
                 val destPoint: GeoPoint? = null
                 val price: Money? = null
 
+                val userId = viewModel.currentUserId ?: return@TowRequestConfigScreen
                 val customerId = runCatching {
-                    UUID.fromString(viewModel.currentUserId ?: "")
-                }.getOrElse { UUID.randomUUID() }
+                    UUID.fromString(userId)
+                }.getOrElse { UUID.nameUUIDFromBytes(userId.toByteArray()) }
 
                 val passenger = viewModel.passengerVerification.value
-                val selectedVeh = viewModel.selectedVehicle.value
+                val selectedVeh = viewModel.selectedVehicle.value ?: return@TowRequestConfigScreen
 
                 towRepository.requestTow(
                     customerId = customerId,
-                    customerName = passenger?.fullName ?: "Usuario MEET",
-                    customerPhone = passenger?.phone ?: "+506 8000-0000",
-                    vehicleVin = selectedVeh?.vin,
-                    vehicleSummary = selectedVeh?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Registrado",
+                    customerName = passenger?.fullName ?: "Cliente",
+                    customerPhone = passenger?.phone ?: "",
+                    vehicleVin = selectedVeh.vin,
+                    vehicleSummary = "${selectedVeh.make} ${selectedVeh.model} ${selectedVeh.year}",
                     pickupLocation = originPoint,
                     pickupAddress = originAddr.ifBlank { "Ubicación GPS actual" },
                     destinationLocation = destPoint,
@@ -138,6 +141,7 @@ private fun TowRequestConfigScreen(
             }
         },
         bottomBar = {
+            val canRequest = currentGps != null && selectedVeh != null && !viewModel.currentUserId.isNullOrBlank()
             Surface(
                 color = MeetColors.cardBackgroundLighter,
                 border = BorderStroke(1.dp, MeetColors.borderSubtle)
@@ -146,17 +150,31 @@ private fun TowRequestConfigScreen(
                     onClick = {
                         onRequestTow(pickupAddress, destinationAddress, selectedCapabilities.toSet())
                     },
+                    enabled = canRequest,
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(16.dp)
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.neonGreen,
+                        contentColor = Color.Black,
+                        disabledContainerColor = MeetColors.cardBackground,
+                        disabledContentColor = MeetColors.textSecondary
+                    )
                 ) {
-                    Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.LocalShipping, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("BUSCAR GRÚA COMPATIBLE", fontWeight = FontWeight.Black)
+                    Text(
+                        when {
+                            currentGps == null -> "SEÑAL DE GPS REQUERIDA"
+                            selectedVeh == null -> "SELECCIONA UN VEHÍCULO"
+                            viewModel.currentUserId.isNullOrBlank() -> "INICIA SESIÓN"
+                            else -> "BUSCAR GRÚA COMPATIBLE"
+                        },
+                        fontWeight = FontWeight.Black
+                    )
                 }
             }
         }
@@ -169,6 +187,24 @@ private fun TowRequestConfigScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (currentGps == null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                    border = BorderStroke(1.dp, MeetColors.electricBlue)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MeetColors.warning, modifier = Modifier.size(20.dp))
+                        Text("Ubicación GPS no disponible. Active el GPS para solicitar rescate vial.", style = MaterialTheme.typography.bodySmall, color = MeetColors.textPrimary)
+                    }
+                }
+            }
+
             // Vehicle Context Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,7 +222,7 @@ private fun TowRequestConfigScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        selectedVeh?.let { "${it.make} ${it.model} ${it.year}" } ?: "Vehículo Activo Registrado",
+                        selectedVeh?.let { "${it.make} ${it.model} ${it.year}" } ?: "Ningún vehículo seleccionado",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MeetColors.textPrimary
@@ -272,23 +308,16 @@ private fun TowRequestConfigScreen(
                 }
             }
 
-            // Estimated Price Card
+            // Pricing Policy Card (Estimación Abierta)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                 border = BorderStroke(1.dp, MeetColors.borderSubtle)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Estimación inicial", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
-                        Text("8.7 km aproximados", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
-                    }
-                    Text("₡18.000 – ₡24.000", fontWeight = FontWeight.Black, color = MeetColors.neonGreen, fontSize = 18.sp)
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Cotización Abierta", fontWeight = FontWeight.Bold, color = MeetColors.neonGreen, fontSize = 16.sp)
+                    Text("La tarifa final se cotiza en tiempo real por el operador asignado según el tipo de maniobra, patines de rescate y kilometraje de traslado.", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
                 }
             }
         }

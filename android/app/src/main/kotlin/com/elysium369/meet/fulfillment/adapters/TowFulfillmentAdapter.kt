@@ -47,11 +47,11 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
                 extras = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
                 taxes = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
                 total = source.finalSettlement,
-                ledgerAttestationHash = source.custodyRecords.lastOrNull()?.evidenceHash
+                ledgerAttestationHash = null
             )
             source.authorizedPrice != null -> FulfillmentPricing.AuthorizedAmount(
                 amount = source.authorizedPrice,
-                authorizationId = "AUTH_${source.jobId}_v${source.serverVersion}"
+                authorizationId = null
             )
             source.quotedPrice != null -> FulfillmentPricing.Quote(
                 amount = source.quotedPrice,
@@ -136,7 +136,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
 
         val evidenceSnapshots = source.custodyRecords.map { rec ->
             FulfillmentEvidenceSnapshot(
-                evidenceId = rec.canonicalEvidenceId?.toString() ?: "custody_${rec.checkpoint.name}_${rec.recordedAtEpochMs}",
+                evidenceId = rec.canonicalEvidenceId?.toString(),
                 label = rec.checkpoint.displayName,
                 sha256Hash = rec.evidenceHash,
                 capturedAtEpochMs = rec.recordedAtEpochMs,
@@ -160,7 +160,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
             phase = phase,
             vertical = ServiceVertical.TOW,
             serviceName = "Auxilio Vial y Grúas",
-            serviceDescription = "Remolque y rescate vehicular con custodia certificada",
+            serviceDescription = "Remolque y rescate vehicular con registro de custodia",
             userLocation = source.pickupLocation,
             targetLocation = source.pickupLocation,
             destinationLocation = source.destinationLocation,
@@ -172,7 +172,7 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
             canCancel = source.state in setOf(TowState.REQUESTED, TowState.MATCHING, TowState.ASSIGNED),
             canMessage = source.assignedOperatorName != null,
             canCall = source.assignedOperatorPhone != null,
-            canPTT = source.assignedOperatorName != null
+            canPTT = false
         )
     }
 }

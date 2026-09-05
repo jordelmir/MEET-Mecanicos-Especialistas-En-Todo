@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +53,7 @@ fun DriverAppScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    var isOnline by remember { mutableStateOf(false) }
+    val isOnline by viewModel.rideDriverMode.collectAsState()
     var activeRide by remember { mutableStateOf<ActiveDriverRide?>(null) }
     var showEarnings by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -62,6 +63,14 @@ fun DriverAppScreen(
     val openRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
     val allRequests by viewModel.rideRequests.collectAsState(initial = emptyList())
     val currentDriverId = viewModel.driverVerification.value?.driverId ?: viewModel.currentRideActorId
+
+    val completedRides = remember(allRequests, currentDriverId) {
+        allRequests.filter { it.assignedDriverId == currentDriverId && (it.status == "COMPLETED" || it.serverState == "COMPLETED") }
+    }
+    val todayEarnings = remember(completedRides) {
+        completedRides.sumOf { it.priceOfferMinor }
+    }
+    val tripsToday = completedRides.size
 
     // Observe actual server-assigned ride for this driver
     val assignedRide = remember(allRequests, currentDriverId) {
@@ -81,7 +90,7 @@ fun DriverAppScreen(
                 pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
                 dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
                 fare = req.priceOfferMinor,
-                state = runCatching { RideState.valueOf(req.status) }.getOrDefault(RideState.ASSIGNED),
+                state = runCatching { RideState.valueOf(req.status) }.getOrDefault(RideState.UNKNOWN),
                 startedAt = req.createdAt
             )
         }
@@ -118,34 +127,44 @@ fun DriverAppScreen(
     val effectiveActiveRide = assignedRide ?: activeRide
 
     val toggleOnline = {
-        val next = !isOnline
-        isOnline = next
-        viewModel.setRideDriverMode(next)
+        viewModel.setRideDriverMode(!isOnline)
     }
 
     val acceptRide = { request: IncomingRideRequest ->
         val driver = viewModel.driverVerification.value
         val dId = driver?.driverId ?: viewModel.currentRideActorId
-        val dName = driver?.fullName ?: "Conductor MEET"
-        val dPhone = driver?.phone ?: "+506 8000-0000"
-        val veh = driver?.vehicleModel ?: (viewModel.selectedVehicle.value?.let { "${it.make} ${it.model}" } ?: "Vehículo Registrado")
+        val dName = driver?.fullName?.takeIf { it.isNotBlank() }
+        val dPhone = driver?.phone?.takeIf { it.isNotBlank() }
+        val veh = driver?.vehicleModel ?: viewModel.selectedVehicle.value?.let { "${it.make} ${it.model}" }
         val gps = viewModel.currentGpsLocation.value
-        viewModel.makeRideOffer(
-            requestId = request.rideId,
-            driverId = dId,
-            driverName = dName,
-            driverPhone = dPhone,
-            driverRating = 0.0,
-            driverTotalTrips = 0,
-            vehicleDesc = veh,
-            counterPrice = request.fare.toDouble(),
-            currency = "CRC",
-            estArrivalMin = 5,
-            driverLat = gps?.latitude ?: 0.0,
-            driverLng = gps?.longitude ?: 0.0,
-            message = "Oferta de viaje enviada"
-        )
-        pendingOfferSubmittedId = request.rideId
+
+        if (dName != null && dPhone != null && veh != null && gps != null && gps.latitude != 0.0 && gps.longitude != 0.0) {
+            val dLat = Math.toRadians(request.pickup.latitude - gps.latitude)
+            val dLng = Math.toRadians(request.pickup.longitude - gps.longitude)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(gps.latitude)) * Math.cos(Math.toRadians(request.pickup.latitude)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            val distKm = 6371.0 * c
+            val estArrival = Math.max(1, (distKm / 30.0 * 60).toInt())
+
+            viewModel.makeRideOffer(
+                requestId = request.rideId,
+                driverId = dId,
+                driverName = dName,
+                driverPhone = dPhone,
+                driverRating = 0.0,
+                driverTotalTrips = 0,
+                vehicleDesc = veh,
+                counterPrice = request.fare.toDouble(),
+                currency = "CRC",
+                estArrivalMin = estArrival,
+                driverLat = gps.latitude,
+                driverLng = gps.longitude,
+                message = "Oferta de viaje enviada"
+            )
+            pendingOfferSubmittedId = request.rideId
+        }
     }
 
     val declineRide = { request: IncomingRideRequest ->
@@ -366,6 +385,7 @@ fun DriverAppScreen(
 
                                 Button(
                                     onClick = {
+                                        viewModel.updateRideStatus(ride.rideId, "COMPLETED")
                                         activeRide = null
                                         pendingOfferSubmittedId = null
                                         showEarnings = true
@@ -390,8 +410,13 @@ fun DriverAppScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Ganancias de Hoy", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
-                        Text("₡45,600", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MeetColors.neonGreen)
-                        Text("8 viajes completados • 4h 12m conectado", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                        Text(
+                            "₡${todayEarnings.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MeetColors.neonGreen
+                        )
+                        Text("$tripsToday viajes completados hoy", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
                     }
                 }
 
@@ -414,10 +439,10 @@ fun DriverAppScreen(
             // Bottom Sheets
             if (showEarnings) {
                 DriverEarningsBottomSheet(
-                    todayEarnings = 45600L,
-                    weekEarnings = 187500L,
-                    monthEarnings = 723400L,
-                    tripsToday = 8,
+                    todayEarnings = todayEarnings,
+                    weekEarnings = todayEarnings,
+                    monthEarnings = todayEarnings,
+                    tripsToday = tripsToday,
                     onDismiss = { showEarnings = false }
                 )
             }
@@ -430,13 +455,26 @@ fun DriverAppScreen(
                 )
             }
 
+            val context = LocalContext.current
             if (showSafetyCenter) {
                 SafetyCenterOverlay(
                     ride = null,
                     onDismiss = { showSafetyCenter = false },
-                    onShareTrip = { /* Share trip */ },
-                    onSOS = { /* SOS */ },
-                    onGuardian = { /* Guardian */ }
+                    onShareTrip = {
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Conductor MEET en servicio activo.")
+                            type = "text/plain"
+                        }
+                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Compartir estado"))
+                    },
+                    onSOS = {
+                        val dialIntent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                            data = android.net.Uri.parse("tel:911")
+                        }
+                        context.startActivity(dialIntent)
+                    },
+                    onGuardian = { /* Guardian mode */ }
                 )
             }
         }

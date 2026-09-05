@@ -486,6 +486,7 @@ class ObdViewModel @Inject constructor(
     private val repairCaseRepository: RepairCaseRepository,
     private val dtcKnowledgeGraphDao: com.elysium369.meet.data.local.dao.DtcKnowledgeGraphDao,
     private val towTruckDao: TowTruckDao,
+    private val towJobDao: com.elysium369.meet.data.local.dao.TowJobDao,
     private val ratingDao: RatingDao,
     private val providerProfileDao: ProviderProfileDao,
     private val rideDao: com.elysium369.meet.data.local.dao.RideDao,
@@ -519,7 +520,7 @@ class ObdViewModel @Inject constructor(
 
     // --- Elysium Authoritative Tow Command Repository ---
     val towCommandRepository: com.elysium369.meet.core.services.tow.TowCommandRepository by lazy {
-        com.elysium369.meet.core.services.tow.TowCommandRepository(towTruckDao, viewModelScope)
+        com.elysium369.meet.core.services.tow.TowCommandRepository(towJobDao, towTruckDao, viewModelScope)
     }
 
     // --- Force Clone Mode ---
@@ -7398,7 +7399,7 @@ class ObdViewModel @Inject constructor(
         return sb.toString()
     }
 
-    /** Client creates a new tow truck / mechanic request */
+    /** Client creates a new tow truck / mechanic request via authoritative TowCommandRepository */
     fun createTowTruckRequest(
         latitude: Double,
         longitude: Double,
@@ -7410,59 +7411,60 @@ class ObdViewModel @Inject constructor(
         priceOffer: Double,
         vehicleInfoOverride: String? = null
     ) {
-        viewModelScope.launch {
-            val request = TowTruckRequestEntity(
-                requestId = java.util.UUID.randomUUID().toString(),
-                userId = _selectedVehicle.value?.user_id ?: "anonymous",
-                vehicleInfo = vehicleInfoOverride ?: buildVehicleInfoForRequest(),
-                latitude = latitude,
-                longitude = longitude,
-                locationName = locationName,
-                destinationLatitude = destLat,
-                destinationLongitude = destLng,
-                destinationName = destName,
-                phone = phone,
-                status = "OPEN",
-                priceOffer = priceOffer,
-                createdAt = System.currentTimeMillis()
-            )
-            towTruckDao.insertRequest(request)
-        }
+        val custId = runCatching { java.util.UUID.fromString(currentUserId ?: "") }
+            .getOrElse { java.util.UUID.nameUUIDFromBytes((currentUserId ?: "anon").toByteArray()) }
+        val veh = _selectedVehicle.value
+        val summary = vehicleInfoOverride ?: buildVehicleInfoForRequest()
+        towCommandRepository.requestTow(
+            customerId = custId,
+            customerName = passengerVerification.value?.fullName ?: "Cliente",
+            customerPhone = phone,
+            vehicleVin = veh?.vin,
+            vehicleSummary = summary,
+            pickupLocation = com.elysium369.meet.core.geo.GeoPoint(latitude, longitude),
+            pickupAddress = locationName,
+            destinationLocation = if (destLat != null && destLng != null) com.elysium369.meet.core.geo.GeoPoint(destLat, destLng) else null,
+            destinationAddress = destName,
+            requiredCapabilities = setOf(com.elysium369.meet.core.services.tow.TowCapabilities.FLATBED),
+            estimatedPrice = if (priceOffer > 0.0) com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOffer.toLong()) else null
+        )
     }
 
-    /** Driver/mechanic takes an open request */
+    /** Driver/mechanic takes an open request via authoritative TowCommandRepository */
     fun takeTowTruckRequest(requestId: String, driverId: String, driverName: String, driverPhone: String) {
-        viewModelScope.launch {
-            towTruckDao.updateDriverAndStatus(
-                requestId = requestId,
-                status = "TAKEN",
-                driverId = driverId,
-                driverName = driverName,
-                driverPhone = driverPhone
-            )
-        }
+        val jId = runCatching { java.util.UUID.fromString(requestId) }.getOrNull() ?: return
+        val current = towCommandRepository.getJobById(jId) ?: return
+        val opId = runCatching { java.util.UUID.fromString(driverId) }.getOrElse { java.util.UUID.nameUUIDFromBytes(driverId.toByteArray()) }
+        towCommandRepository.executeAction(
+            jobId = jId,
+            action = com.elysium369.meet.core.services.tow.TowAction.AssignOperator(operatorId = opId, towUnitId = driverId),
+            actorRole = com.elysium369.meet.core.services.kernel.ServiceRole.TOW_OPERATOR,
+            expectedVersion = current.serverVersion
+        )
     }
 
-    /** Mark a request as completed */
+    /** Mark a request as completed via authoritative TowCommandRepository */
     fun completeTowTruckRequest(requestId: String) {
-        viewModelScope.launch {
-            towTruckDao.updateRequestStatusAndCompletedTime(
-                requestId = requestId,
-                status = "COMPLETED",
-                completedAt = System.currentTimeMillis()
-            )
-        }
+        val jId = runCatching { java.util.UUID.fromString(requestId) }.getOrNull() ?: return
+        val current = towCommandRepository.getJobById(jId) ?: return
+        towCommandRepository.executeAction(
+            jobId = jId,
+            action = com.elysium369.meet.core.services.tow.TowAction.CompleteService,
+            actorRole = com.elysium369.meet.core.services.kernel.ServiceRole.CUSTOMER,
+            expectedVersion = current.serverVersion
+        )
     }
 
-    /** Cancel a request */
+    /** Cancel a request via authoritative TowCommandRepository */
     fun cancelTowTruckRequest(requestId: String) {
-        viewModelScope.launch {
-            towTruckDao.updateRequestStatusAndCompletedTime(
-                requestId = requestId,
-                status = "CANCELLED",
-                completedAt = System.currentTimeMillis()
-            )
-        }
+        val jId = runCatching { java.util.UUID.fromString(requestId) }.getOrNull() ?: return
+        val current = towCommandRepository.getJobById(jId) ?: return
+        towCommandRepository.executeAction(
+            jobId = jId,
+            action = com.elysium369.meet.core.services.tow.TowAction.Cancel("Cancelado por el usuario"),
+            actorRole = com.elysium369.meet.core.services.kernel.ServiceRole.CUSTOMER,
+            expectedVersion = current.serverVersion
+        )
     }
 
     /** User manually deletes a completed/cancelled request */

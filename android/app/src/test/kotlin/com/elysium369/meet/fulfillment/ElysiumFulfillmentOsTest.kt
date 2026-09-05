@@ -62,7 +62,7 @@ class ElysiumFulfillmentOsTest {
         // 5. LOADING -> LOADED (Requires cryptographic evidence hash)
         val s5 = TowStateEngine.getNextState(
             fromState = TowState.LOADING,
-            action = TowAction.ConfirmLoaded("SHA256:EVIDENCE_LOADED_CAR_01"),
+            action = TowAction.ConfirmLoaded("a".repeat(64)),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertEquals(TowState.LOADED, s5)
@@ -94,7 +94,7 @@ class ElysiumFulfillmentOsTest {
         // 9. UNLOADING -> DELIVERED (Requires delivery evidence hash)
         val s9 = TowStateEngine.getNextState(
             fromState = TowState.UNLOADING,
-            action = TowAction.ConfirmDelivered("SHA256:EVIDENCE_DELIVERED_CAR_01"),
+            action = TowAction.ConfirmDelivered("b".repeat(64)),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertEquals(TowState.DELIVERED, s9)
@@ -132,7 +132,7 @@ class ElysiumFulfillmentOsTest {
         // Customer cannot declare themselves as loaded
         val customerLoaded = TowStateEngine.getNextState(
             fromState = TowState.LOADING,
-            action = TowAction.ConfirmLoaded("SHA256:FAKE"),
+            action = TowAction.ConfirmLoaded("c".repeat(64)),
             actorRole = ServiceRole.CUSTOMER
         )
         assertNull(customerLoaded)
@@ -308,14 +308,14 @@ class ElysiumFulfillmentOsTest {
         val unknownStateString = "UNKNOWN_OR_UNPARSEABLE_STATUS"
         val resolved = runCatching {
             RideState.valueOf(unknownStateString)
-        }.getOrNull() ?: RideState.SEARCHING
+        }.getOrNull() ?: RideState.UNKNOWN
 
         assertNotEquals(
             "An unknown ride state must NEVER be coerced into DRIVER_EN_ROUTE",
             RideState.DRIVER_EN_ROUTE,
             resolved
         )
-        assertEquals(RideState.SEARCHING, resolved)
+        assertEquals(RideState.UNKNOWN, resolved)
     }
 
     @Test
@@ -370,7 +370,7 @@ class ElysiumFulfillmentOsTest {
             )
             fail("Should throw IllegalArgumentException when total does not equal base + extras + taxes")
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("must equal base") == true)
+            assertTrue(e.message?.contains("must equal (base + extras) + taxes") == true)
         }
 
         // 3. Mismatched currencies throw IllegalArgumentException
@@ -384,7 +384,7 @@ class ElysiumFulfillmentOsTest {
             )
             fail("Should throw IllegalArgumentException when settlement currencies do not match")
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("currencies must match") == true)
+            assertTrue(e.message?.contains("Cannot add distinct currencies") == true || e.message?.contains("currencies") == true)
         }
     }
 
@@ -442,7 +442,7 @@ class ElysiumFulfillmentOsTest {
             jobId = job.jobId,
             action = TowAction.AssignOperator(UUID.randomUUID(), "TOW-UNIT-99"),
             actorRole = ServiceRole.TOW_OPERATOR,
-            expectedServerVersion = 999L // Wrong version
+            expectedVersion = 999L // Wrong version
         )
         assertTrue("Must detect concurrency conflict", conflictResult is TowCommandResult.ConcurrencyConflict)
 
@@ -451,22 +451,155 @@ class ElysiumFulfillmentOsTest {
             jobId = job.jobId,
             action = TowAction.AssignOperator(UUID.randomUUID(), "TOW-UNIT-99"),
             actorRole = ServiceRole.TOW_OPERATOR,
-            expectedServerVersion = 1L
+            expectedVersion = 1L
         )
         assertTrue("Must succeed with matching version", successResult is TowCommandResult.Success)
         val assignedJob = (successResult as TowCommandResult.Success).job
         assertEquals(2L, assignedJob.serverVersion)
         assertEquals(TowState.ASSIGNED, assignedJob.state)
 
-        // 3. Entity round-trip conversion integrity
-        val entity = with(TowCommandRepository) { assignedJob.toEntity() }
-        assertEquals(assignedJob.jobId.toString(), entity.requestId)
-        assertEquals("TAKEN", entity.status)
-        assertEquals(18000.0, entity.priceOffer, 0.01)
+        // 3. Entity round-trip conversion integrity with TowJobEntity (v71)
+        val entity = with(TowCommandRepository) { assignedJob.toTowJobEntity() }
+        assertEquals(assignedJob.jobId.toString(), entity.jobId)
+        assertEquals("ASSIGNED", entity.state)
+        assertEquals(2L, entity.serverVersion)
+        assertEquals(18000L, entity.estimatedPriceMinor)
 
         val reconstructedJob = with(TowCommandRepository) { entity.toTowJob() }
         assertEquals(assignedJob.jobId, reconstructedJob.jobId)
         assertEquals(TowState.ASSIGNED, reconstructedJob.state)
+        assertEquals(2L, reconstructedJob.serverVersion)
         assertEquals(18000L, reconstructedJob.estimatedPrice?.amountMinor)
+    }
+
+    @Test
+    fun towRoomRoundTripPreservesExactStateTest() {
+        for (state in TowState.values()) {
+            val job = TowJob(
+                jobId = UUID.randomUUID(),
+                customerId = UUID.randomUUID(),
+                customerName = "Cliente Prueba",
+                customerPhone = "+506 8000-1111",
+                vehicleSummary = "Toyota Hilux",
+                pickupLocation = GeoPoint(9.9333, -84.0833),
+                pickupAddress = "San José",
+                state = state,
+                serverVersion = 5L
+            )
+            val entity = with(TowCommandRepository) { job.toTowJobEntity() }
+            assertEquals("TowJobEntity must store exact state name without collapsing", state.name, entity.state)
+            val reconstructed = with(TowCommandRepository) { entity.toTowJob() }
+            assertEquals("Reconstructed TowJob must preserve exact state enum", state, reconstructed.state)
+        }
+    }
+
+    @Test
+    fun towRoomRoundTripPreservesServerVersionTest() {
+        val testVersions = listOf(1L, 2L, 42L, 1000L, 999999L)
+        for (ver in testVersions) {
+            val job = TowJob(
+                jobId = UUID.randomUUID(),
+                customerId = UUID.randomUUID(),
+                customerName = "Version Tester",
+                customerPhone = "+506 8888-9999",
+                vehicleSummary = "Suzuki Jimny",
+                pickupLocation = GeoPoint(9.9333, -84.0833),
+                pickupAddress = "Heredia",
+                state = TowState.EN_ROUTE,
+                serverVersion = ver
+            )
+            val entity = with(TowCommandRepository) { job.toTowJobEntity() }
+            assertEquals("TowJobEntity must store exact serverVersion", ver, entity.serverVersion)
+            val reconstructed = with(TowCommandRepository) { entity.toTowJob() }
+            assertEquals("Reconstructed TowJob must retain identical serverVersion", ver, reconstructed.serverVersion)
+        }
+    }
+
+    @Test
+    fun towAtomicCasRejectsStaleVersionTest() {
+        val repo = TowCommandRepository()
+        val job = repo.requestTow(
+            customerId = UUID.randomUUID(),
+            customerName = "CAS Test",
+            customerPhone = "+506 8888-7777",
+            vehicleSummary = "Honda CR-V",
+            pickupLocation = GeoPoint(9.9333, -84.0833),
+            pickupAddress = "Alajuela",
+            estimatedPrice = Money.ofCrc(25000L)
+        )
+
+        assertEquals(1L, job.serverVersion)
+
+        // Attempt transition with stale/wrong version
+        val staleResult = repo.executeAction(
+            jobId = job.jobId,
+            action = TowAction.AssignOperator(UUID.randomUUID(), "UNIT-CAS-01"),
+            actorRole = ServiceRole.TOW_OPERATOR,
+            expectedVersion = 0L // Stale
+        )
+        assertTrue("CAS must reject stale version 0L", staleResult is TowCommandResult.ConcurrencyConflict)
+
+        // Transition with exact version 1L
+        val successResult = repo.executeAction(
+            jobId = job.jobId,
+            action = TowAction.AssignOperator(UUID.randomUUID(), "UNIT-CAS-01"),
+            actorRole = ServiceRole.TOW_OPERATOR,
+            expectedVersion = 1L
+        )
+        assertTrue("CAS must accept matching version 1L", successResult is TowCommandResult.Success)
+        val updated = (successResult as TowCommandResult.Success).job
+        assertEquals(2L, updated.serverVersion)
+
+        // Attempt another action with old version 1L
+        val staleResult2 = repo.executeAction(
+            jobId = job.jobId,
+            action = TowAction.StartEnRoute,
+            actorRole = ServiceRole.TOW_OPERATOR,
+            expectedVersion = 1L
+        )
+        assertTrue("CAS must reject previously used version 1L", staleResult2 is TowCommandResult.ConcurrencyConflict)
+    }
+
+    @Test
+    fun unknownRideStateRemainsUnknownTest() {
+        val state = runCatching {
+            RideState.valueOf("NON_EXISTENT_RIDE_STATE")
+        }.getOrDefault(RideState.UNKNOWN)
+
+        assertEquals(RideState.UNKNOWN, state)
+        assertFalse("UNKNOWN ride state must have isActive = false", state.isActive)
+    }
+
+    @Test
+    fun finalSettlementOverflowSafeAdditionTest() {
+        val base = Money.ofCrc(10000L)
+        val extras = Money.ofCrc(5000L)
+        val taxes = Money.ofCrc(1950L)
+        val correctTotal = Money.ofCrc(16950L)
+
+        val settlement = FulfillmentPricing.FinalSettlement(
+            base = base,
+            extras = extras,
+            taxes = taxes,
+            total = correctTotal,
+            ledgerAttestationHash = null
+        )
+        assertEquals(16950L, settlement.total.amountMinor)
+        assertNull("Ledger attestation hash must be decoupled", settlement.ledgerAttestationHash)
+
+        // Arithmetic overflow detection using Money addition
+        try {
+            val overflowBase = Money(Long.MAX_VALUE - 100, CurrencyCode.CRC)
+            val overflowExtras = Money(200L, CurrencyCode.CRC)
+            FulfillmentPricing.FinalSettlement(
+                base = overflowBase,
+                extras = overflowExtras,
+                taxes = Money.zero(CurrencyCode.CRC),
+                total = Money.zero(CurrencyCode.CRC)
+            )
+            fail("Must throw ArithmeticException when base + extras overflows Long.MAX_VALUE")
+        } catch (e: ArithmeticException) {
+            // Success: overflow detected safely without silent wraparound
+        }
     }
 }

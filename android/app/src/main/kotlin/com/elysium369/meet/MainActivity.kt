@@ -1222,7 +1222,7 @@ fun MeetApp(
                 val activeRide = activeRideReq?.let { req ->
                     val parsedState = runCatching {
                         com.elysium369.meet.ride.domain.RideState.valueOf(req.status)
-                    }.getOrNull() ?: com.elysium369.meet.ride.domain.RideState.SEARCHING
+                    }.getOrNull() ?: com.elysium369.meet.ride.domain.RideState.UNKNOWN
 
                     val matchedDriver = req.assignedDriverId?.let { driverId ->
                         com.elysium369.meet.ui.screens.ride.MatchedDriver(

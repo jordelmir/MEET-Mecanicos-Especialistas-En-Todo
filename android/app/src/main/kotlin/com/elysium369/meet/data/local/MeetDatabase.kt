@@ -63,6 +63,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         VehicleTwinProfileEntity::class,
         TwinAnomalyEntity::class,
         TowTruckRequestEntity::class,
+        TowJobEntity::class,
         RatingEntity::class,
         ProviderProfileEntity::class,
 
@@ -178,7 +179,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         // ACTIVE OPERATIONS REGISTRY
         com.elysium369.meet.core.operations.ActiveOperationEntity::class,
     ],
-    version = 70,
+    version = 71,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -214,6 +215,7 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun blackBoxDao(): BlackBoxDao
     abstract fun vehicleTwinDao(): VehicleTwinDao
     abstract fun towTruckDao(): TowTruckDao
+    abstract fun towJobDao(): TowJobDao
     abstract fun ratingDao(): RatingDao
     abstract fun providerProfileDao(): ProviderProfileDao
 

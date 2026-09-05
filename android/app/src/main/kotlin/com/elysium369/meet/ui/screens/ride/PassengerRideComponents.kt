@@ -236,6 +236,7 @@ fun RequestRideButton(
     isRequesting: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = !isRequesting,
 ) {
     val buttonText = when {
         isRequesting -> "Buscando conductor cercano..."
@@ -244,8 +245,8 @@ fun RequestRideButton(
     }
 
     Button(
-        onClick = { if (!isRequesting) onClick() },
-        enabled = !isRequesting,
+        onClick = { if (!isRequesting && enabled) onClick() },
+        enabled = !isRequesting && enabled,
         modifier = modifier
             .fillMaxWidth()
             .height(54.dp),

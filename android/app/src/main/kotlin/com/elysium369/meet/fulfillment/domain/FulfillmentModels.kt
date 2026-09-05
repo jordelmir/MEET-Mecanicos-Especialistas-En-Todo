@@ -131,7 +131,7 @@ sealed interface FulfillmentPricing {
 
     data class AuthorizedAmount(
         val amount: Money,
-        val authorizationId: String,
+        val authorizationId: String? = null,
     ) : FulfillmentPricing
 
     data class FinalSettlement(
@@ -145,8 +145,9 @@ sealed interface FulfillmentPricing {
             require(base.currency == extras.currency && extras.currency == taxes.currency && taxes.currency == total.currency) {
                 "All settlement currencies must match: base=${base.currency}, extras=${extras.currency}, taxes=${taxes.currency}, total=${total.currency}"
             }
-            require(total.amountMinor == base.amountMinor + extras.amountMinor + taxes.amountMinor) {
-                "Settlement total (${total.amountMinor}) must equal base (${base.amountMinor}) + extras (${extras.amountMinor}) + taxes (${taxes.amountMinor})"
+            val expectedTotal = (base + extras) + taxes
+            require(total == expectedTotal) {
+                "Settlement total (${total.amountMinor} ${total.currency}) must equal (base + extras) + taxes (${expectedTotal.amountMinor} ${expectedTotal.currency})"
             }
         }
     }
@@ -191,7 +192,7 @@ data class FulfillmentTimelineEvent(
  * Cryptographic or physical proof record attached to a fulfillment phase.
  */
 data class FulfillmentEvidenceSnapshot(
-    val evidenceId: String,
+    val evidenceId: String? = null,
     val label: String,
     val sha256Hash: String,
     val capturedAtEpochMs: Long,
