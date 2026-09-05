@@ -47,6 +47,8 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
     val isScanning by viewModel.isScanning.collectAsState()
     val syncState by viewModel.cloudSyncState.collectAsState()
     val qos by viewModel.qosMetrics.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
+    val isObdConnected = connectionState == com.elysium369.meet.core.obd.ObdState.CONNECTED
     val language by viewModel.language.collectAsState()
     val isSpanish = language == "es"
     val scope = rememberCoroutineScope()
@@ -345,18 +347,18 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                     ) {
                         QosStat(
                             label = if (isSpanish) "Muestreo" else "Sampling",
-                            value = "${"%.1f".format(qos.cmdsPerSecond)} Hz",
-                            color = if (qos.cmdsPerSecond > 10) MeetColors.neonGreen else MeetColors.warning
+                            value = if (isObdConnected) "${"%.1f".format(qos.cmdsPerSecond)} Hz" else if (isSpanish) "SIN ENLACE" else "OFFLINE",
+                            color = if (!isObdConnected) MeetColors.textMuted else if (qos.cmdsPerSecond > 10) MeetColors.neonGreen else MeetColors.warning
                         )
                         QosStat(
                             label = if (isSpanish) "Latencia" else "Latency",
-                            value = "${qos.latencyMs} ms",
-                            color = if (qos.latencyMs < 100) MeetColors.neonGreen else MeetColors.error
+                            value = if (isObdConnected) "${qos.latencyMs} ms" else "—",
+                            color = if (!isObdConnected) MeetColors.textMuted else if (qos.latencyMs < 100) MeetColors.neonGreen else MeetColors.error
                         )
                         QosStat(
                             label = if (isSpanish) "Estado" else "Status",
-                            value = if (qos.isStable) (if (isSpanish) "ESTABLE" else "STABLE") else (if (isSpanish) "INHABIL" else "UNSTABLE"),
-                            color = if (qos.isStable) MeetColors.neonGreen else MeetColors.error
+                            value = if (!isObdConnected) (if (isSpanish) "OFFLINE" else "OFFLINE") else if (qos.isStable) (if (isSpanish) "ESTABLE" else "STABLE") else (if (isSpanish) "INHABIL" else "UNSTABLE"),
+                            color = if (!isObdConnected) MeetColors.textMuted else if (qos.isStable) MeetColors.neonGreen else MeetColors.error
                         )
                     }
                 }

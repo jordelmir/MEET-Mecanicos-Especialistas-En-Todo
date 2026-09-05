@@ -66,7 +66,8 @@ class DekraConciergeContractTest {
 
     @Test
     fun `official knowledge covers every manual chapter`() {
-        assertEquals(11, DekraInspectionKnowledge.officialInspectionSections.size)
+        assertEquals(7, DekraInspectionKnowledge.officialInspectionSections.size)
+        assertTrue(DekraInspectionKnowledge.officialInspectionSections.all { it.items.isNotEmpty() })
         assertTrue(DekraInspectionKnowledge.OFFICIAL_BOOKING_URL.startsWith("https://booking.dekra.com/"))
         assertTrue(DekraInspectionKnowledge.OFFICIAL_MANUAL_URL.startsWith("https://repositorio.mopt.go.cr/"))
     }

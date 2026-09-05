@@ -640,9 +640,20 @@ private fun ChecklistCard(
             sections.forEach { section ->
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.CheckCircle, null, tint = accent, modifier = Modifier.size(17.dp))
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(section.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text(section.summary, color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+                        if (section.items.isNotEmpty()) {
+                            Column(Modifier.padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                section.items.forEach { item ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("•", color = accent.copy(alpha = 0.7f), fontSize = 10.sp)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(item, color = MeetColors.textSecondary.copy(alpha = 0.9f), fontSize = 10.sp, lineHeight = 13.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

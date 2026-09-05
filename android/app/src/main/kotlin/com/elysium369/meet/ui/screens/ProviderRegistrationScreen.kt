@@ -114,7 +114,8 @@ private val providerTypes = listOf(
 @Composable
 fun ProviderRegistrationScreen(
     viewModel: ObdViewModel,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    openDriverOnStart: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -136,7 +137,9 @@ fun ProviderRegistrationScreen(
     val selectedTypeInfo = providerTypes.firstOrNull { it.type == selectedType }
 
     // Driver onboarding dialog state
-    var showDriverOnboarding by rememberSaveable { mutableStateOf(false) }
+    var showDriverOnboarding by rememberSaveable(openDriverOnStart) {
+        mutableStateOf(openDriverOnStart)
+    }
 
     // Delete confirmation dialog state
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -416,6 +419,43 @@ private fun ProviderRegistrationHeroCard(
                     text = "$activeProfileCount activos",
                     color = MeetColors.cyberCyan,
                     modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Guided 3-step process
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MeetColors.backgroundDark.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Cómo funciona",
+                    color = MeetColors.neonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                listOf(
+                    "1. Elige tu tipo de servicio y completa el formulario",
+                    "2. Tu solicitud se envía al Centro de Confianza para revisión",
+                    "3. Un administrador aprueba o rechaza manualmente. No hay aprobación automática.",
+                ).forEach { step ->
+                    Text(
+                        step,
+                        color = MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                    )
+                }
+            }
+
+            if (!isCloudSession) {
+                Text(
+                    "Inicia sesión para enviar solicitudes al Centro de Confianza. Sin sesión, solo puedes usar funciones básicas.",
+                    color = MeetColors.warning,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
                 )
             }
         }

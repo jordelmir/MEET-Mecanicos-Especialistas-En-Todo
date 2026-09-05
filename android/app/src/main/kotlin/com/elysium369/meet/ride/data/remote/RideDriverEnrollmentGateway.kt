@@ -21,6 +21,14 @@ data class RideDriverPilotEnrollment(
     val vehicleDisplayName: String,
     val seats: Int,
     val evidenceManifestSha256: String,
+    val evidenceFiles: List<TrustEvidenceFile> = emptyList(),
+    val phone: String? = null,
+    val email: String? = null,
+    val vehicleMake: String? = null,
+    val vehicleModel: String? = null,
+    val vehicleYear: Int? = null,
+    val vehicleColor: String? = null,
+    val vehiclePlate: String? = null,
 )
 
 sealed interface RideDriverEnrollmentResult {

@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.RatingEntity
 import com.elysium369.meet.data.local.entities.TowTruckRequestEntity
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.AccessLevel
+import com.elysium369.meet.ui.components.AccessStatusCard
+import com.elysium369.meet.ui.components.AccessStep
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -160,34 +163,41 @@ fun TowTruckServiceScreen(
                         }
                     )
                 } else {
-                    // Blocked View - Requires Tow Truck Driver Registration
+                    // Guided Access Status View
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(24.dp)
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text("🚛", fontSize = 64.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(Modifier.height(40.dp))
+                        AccessStatusCard(
+                            serviceName = "Conductor / Gruista",
+                            serviceIcon = "🚛",
+                            accessLevel = AccessLevel.NOT_REGISTERED,
+                            steps = listOf(
+                                AccessStep(1, "Crear perfil de conductor", done = false),
+                                AccessStep(2, "Enviar documentos al Centro de Confianza", done = false),
+                                AccessStep(3, "Esperar aprobación manual", done = false),
+                            ),
+                            accentColor = TowTruckColors.orangeAccent,
+                        )
                         Text(
-                            text = "MODO CONDUCTOR EXCLUSIVO",
+                            "¿Qué puedo hacer como conductor de grúa registrado?",
                             color = TowTruckColors.orangeAccent,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
-                            letterSpacing = 1.5.sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Para recibir solicitudes de asistencia vial y grúa de otros usuarios y tomar servicios, debes registrarte como conductor o gruista verificado en MEET.",
-                            color = TowTruckColors.textSecondary,
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+                        listOf(
+                            "Recibir solicitudes de auxilio vial cerca de ti",
+                            "Aceptar servicios y coordinar llegada",
+                            "Ver ubicación del cliente en tiempo real",
+                            "Calificar clientes después del servicio",
+                        ).forEach { item ->
+                            Text("• $item", color = TowTruckColors.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { showRegistrationScreen = true },
                             colors = ButtonDefaults.buttonColors(containerColor = TowTruckColors.orangeAccent),

@@ -349,7 +349,12 @@ class RideCommandSyncWorker @AssistedInject constructor(
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 IMMEDIATE_WORK_NAME,
-                ExistingWorkPolicy.KEEP,
+                // A publication can be inserted while the previous worker is
+                // finishing an empty batch. KEEP would discard this wake-up
+                // and leave the command waiting for the periodic worker.
+                // APPEND_OR_REPLACE guarantees a follow-up pass without
+                // interrupting the worker that currently owns a lease.
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
                 request,
             )
         }

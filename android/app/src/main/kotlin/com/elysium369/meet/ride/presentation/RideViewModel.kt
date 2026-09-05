@@ -27,6 +27,7 @@ import com.elysium369.meet.ride.data.RideProjectionSyncPolicy
 import com.elysium369.meet.ride.data.RideRemoteProjectionRepository
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.RideDriverPilotEnrollment
+import com.elysium369.meet.ride.data.remote.TrustEvidenceFile
 import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.dispatch.RideExposureGateway
 import com.elysium369.meet.ride.dispatch.RideExposureTracker
@@ -2073,6 +2074,16 @@ class RideViewModel @Inject constructor(
                 ).joinToString(" "),
                 seats = verification.vehicleSeats,
                 evidenceManifestSha256 = evidenceManifest,
+                evidenceFiles = evidenceFiles.map {
+                    TrustEvidenceFile(kind = it.label, localPath = it.path)
+                },
+                phone = verification.phone,
+                email = verification.email,
+                vehicleMake = verification.vehicleMake,
+                vehicleModel = verification.vehicleModel,
+                vehicleYear = verification.vehicleYear,
+                vehicleColor = verification.vehicleColor,
+                vehiclePlate = verification.vehiclePlate,
             ),
         )
     }

@@ -30,7 +30,8 @@ class RideFirstAccessContractTest {
         assertTrue(screen.contains("COMPLETAR REGISTRO DE CHOFER"))
         assertTrue(screen.contains("BoxWithConstraints"))
         assertTrue(screen.contains("verticalScroll(rememberScrollState())"))
-        assertTrue(activity.contains("navController.navigate(\"provider_registration\")"))
+        assertTrue(activity.contains("navController.navigate(\"ride_driver_registration\")"))
+        assertTrue(activity.contains("openDriverOnStart = true"))
     }
 
     @Test

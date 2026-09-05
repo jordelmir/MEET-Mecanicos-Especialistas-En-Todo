@@ -71,4 +71,76 @@ class RideEligibilityPolicyTest {
         )
         assertFalse(result.eligible)
     }
+
+    @Test
+    fun verified_driver_with_no_vehicle_assigned_cannot_go_online() {
+        val now = 100_000L
+        val result = RideEligibilityPolicy.evaluateQualifications(
+            qualifications = RideEligibilityPolicy.DriverOperationalQualifications(
+                identityVerified = true,
+                driverApproved = true,
+                vehicleAssigned = false,
+                vehicleEligible = false,
+                availability = RideDriverAvailability.AVAILABLE,
+                lastSeenAtMs = now - 10_000L,
+            ),
+            nowMs = now,
+        )
+        assertFalse(result.eligible)
+        assertTrue(result.reason?.contains("NO_VEHICLE_ASSIGNED") == true)
+    }
+
+    @Test
+    fun verified_driver_with_ineligible_vehicle_cannot_go_online() {
+        val now = 100_000L
+        val result = RideEligibilityPolicy.evaluateQualifications(
+            qualifications = RideEligibilityPolicy.DriverOperationalQualifications(
+                identityVerified = true,
+                driverApproved = true,
+                vehicleAssigned = true,
+                vehicleEligible = false, // Expired Dekra or insurance
+                availability = RideDriverAvailability.AVAILABLE,
+                lastSeenAtMs = now - 10_000L,
+            ),
+            nowMs = now,
+        )
+        assertFalse(result.eligible)
+        assertTrue(result.reason?.contains("VEHICLE_NOT_ELIGIBLE") == true)
+    }
+
+    @Test
+    fun unverified_identity_driver_candidate_cannot_go_online() {
+        val now = 100_000L
+        val result = RideEligibilityPolicy.evaluateQualifications(
+            qualifications = RideEligibilityPolicy.DriverOperationalQualifications(
+                identityVerified = false,
+                driverApproved = false,
+                vehicleAssigned = true,
+                vehicleEligible = true,
+                availability = RideDriverAvailability.AVAILABLE,
+                lastSeenAtMs = now - 10_000L,
+            ),
+            nowMs = now,
+        )
+        assertFalse(result.eligible)
+        assertTrue(result.reason?.contains("IDENTITY_NOT_VERIFIED") == true)
+    }
+
+    @Test
+    fun fully_qualified_driver_with_eligible_vehicle_and_fresh_telemetry_is_eligible() {
+        val now = 100_000L
+        val result = RideEligibilityPolicy.evaluateQualifications(
+            qualifications = RideEligibilityPolicy.DriverOperationalQualifications(
+                identityVerified = true,
+                driverApproved = true,
+                vehicleAssigned = true,
+                vehicleEligible = true,
+                availability = RideDriverAvailability.AVAILABLE,
+                lastSeenAtMs = now - 10_000L,
+            ),
+            nowMs = now,
+        )
+        assertTrue(result.eligible)
+        assertNull(result.reason)
+    }
 }

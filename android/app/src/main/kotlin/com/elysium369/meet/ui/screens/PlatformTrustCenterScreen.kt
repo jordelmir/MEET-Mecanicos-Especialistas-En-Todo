@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -68,6 +73,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -105,6 +112,10 @@ fun PlatformTrustCenterScreen(
     var pendingDecision by remember {
         mutableStateOf<Pair<TrustVerificationApplication, String>?>(null)
     }
+    var pendingDecisionAfterMfa by remember {
+        mutableStateOf<Pair<TrustVerificationApplication, String>?>(null)
+    }
+    var evidenceApplication by remember { mutableStateOf<TrustVerificationApplication?>(null) }
     val scope = rememberCoroutineScope()
     val reloadMutex = remember { Mutex() }
 
@@ -114,7 +125,21 @@ fun PlatformTrustCenterScreen(
             loading = true
             runCatching { PlatformTrustCenterGateway.loadQueue(filter) }
                 .onSuccess {
-                    snapshot = it
+                    // Enrich applications that have a manifest but no evidence rows
+                    val enriched = it.copy(
+                        items = it.items.map { app ->
+                            if (app.evidence.isEmpty() && app.evidenceManifestSha256 != null) {
+                                val fallbackEvidence = runCatching {
+                                    PlatformTrustCenterGateway.listEvidenceFromStorage(
+                                        applicantUserId = app.applicantUserId,
+                                        serviceType = app.serviceType,
+                                    )
+                                }.getOrDefault(emptyList())
+                                if (fallbackEvidence.isNotEmpty()) app.copy(evidence = fallbackEvidence) else app
+                            } else app
+                        }
+                    )
+                    snapshot = enriched
                     lastSyncEpochMs = System.currentTimeMillis()
                     if (message?.startsWith("Sincronización") == true) message = null
                 }
@@ -326,8 +351,17 @@ fun PlatformTrustCenterScreen(
                         items(snapshot.items, key = { it.id }) { application ->
                             TrustApplicationCard(
                                 application = application,
-                                canDecide = mfaState.isAal2,
-                                onDecision = { decision -> pendingDecision = application to decision },
+                                canDecide = true,
+                                onDecision = { decision ->
+                                    if (!mfaState.isAal2) {
+                                        // MFA not verified — prepare MFA first, then retry decision
+                                        pendingDecisionAfterMfa = application to decision
+                                        prepareMfa()
+                                    } else {
+                                        pendingDecision = application to decision
+                                    }
+                                },
+                                onOpenEvidence = { evidenceApplication = application },
                             )
                         }
                     }
@@ -361,17 +395,36 @@ fun PlatformTrustCenterScreen(
                     }.onSuccess {
                         message = "Decisión ${statusLabel(decision).lowercase()} registrada y auditada."
                         reload()
-                    }.onFailure {
-                        val code = TrustCenterObservability.failureCode(it)
-                        message = if (code == "AAL2_REQUIRED") {
-                            "El servidor exige segundo factor. Valida MFA y vuelve a intentar; no se modificó el registro."
-                        } else {
-                            "La decisión no se guardó. No se modificó el registro. Código: $code."
+                    }.onFailure { error ->
+                        val code = TrustCenterObservability.failureCode(error)
+                        val detail = error.message?.take(120) ?: "Sin detalle"
+                        message = when (code) {
+                            "AAL2_REQUIRED" ->
+                                "El servidor exige segundo factor. Valida MFA y vuelve a intentar."
+                            "REVIEWABLE_EVIDENCE_REQUIRED" ->
+                                "Faltan archivos de evidencia adjuntos a la solicitud. El servidor los requiere para aprobar."
+                            "TIMEOUT", "CONNECTION_FAILED" ->
+                                "El servidor no respondió. Verifica tu conexión e intenta de nuevo."
+                            "NETWORK_UNAVAILABLE" ->
+                                "Sin conexión a internet. Reconecta e intenta de nuevo."
+                            "PLATFORM_OWNER_REQUIRED" ->
+                                "Se requiere ser propietario de plataforma para esta acción."
+                            "APPLICATION_NOT_FOUND" ->
+                                "La solicitud no fue encontrada. Puede que ya haya sido procesada."
+                            else ->
+                                "Error del servidor: $detail"
                         }
                         loading = false
                     }
                 }
             },
+        )
+    }
+
+    evidenceApplication?.let { application ->
+        TrustEvidenceDialog(
+            application = application,
+            onDismiss = { evidenceApplication = null },
         )
     }
 
@@ -396,12 +449,17 @@ fun PlatformTrustCenterScreen(
                                 saveSession = true,
                             )
                             refreshMfaState()
-                        }.onSuccess {
-                            mfaDialogVisible = false
-                            mfaEnrollment = null
-                            message = "Segundo factor verificado. Las decisiones sensibles están habilitadas."
-                            reloadNow()
-                        }.onFailure { error ->
+                    }.onSuccess {
+                        mfaDialogVisible = false
+                        mfaEnrollment = null
+                        message = "Segundo factor verificado. Las decisiones sensibles están habilitadas."
+                        reloadNow()
+                        // Auto-retry any pending decision that was blocked by MFA
+                        pendingDecisionAfterMfa?.let { (app, decision) ->
+                            pendingDecisionAfterMfa = null
+                            pendingDecision = app to decision
+                        }
+                    }.onFailure { error ->
                             message = "El código MFA no se validó. Intenta con el código vigente. Código: ${TrustCenterObservability.failureCode(error)}."
                         }
                         loading = false
@@ -461,6 +519,7 @@ private fun TrustApplicationCard(
     application: TrustVerificationApplication,
     canDecide: Boolean,
     onDecision: (String) -> Unit,
+    onOpenEvidence: () -> Unit,
 ) {
     EliteCard(
         glowColor = statusColor(application.status),
@@ -475,19 +534,54 @@ private fun TrustApplicationCard(
                 }
                 Text(statusLabel(application.status), color = statusColor(application.status), fontWeight = FontWeight.Black)
             }
-            application.businessName?.let { TrustLine("Negocio", it) }
+            Spacer(Modifier.height(8.dp))
+
+            // ── Datos del solicitante ──
+            Text("DATOS DEL SOLICITANTE", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            Spacer(Modifier.height(4.dp))
+            application.businessName?.let { TrustLine("Vehículo / Negocio", it) }
             application.applicantEmail?.let { TrustLine("Cuenta", it) }
             application.phone?.let { TrustLine("Teléfono", it) }
-            application.locationLabel?.let { TrustLine("Zona", it) }
-            application.licenseReference?.let { TrustLine("Licencia/registro", it) }
+            application.locationLabel?.let { TrustLine("Zona / Detalle", it) }
+            application.licenseReference?.let { TrustLine("Placa / Licencia", it) }
             TrustLine("Solicitud", application.submittedAt)
             application.correlationId?.let { TrustLine("Seguimiento", it.take(12)) }
-            TrustLine(
-                "Evidencia",
-                application.evidenceManifestSha256?.let { "Manifiesto SHA-256 ${it.take(12)}…" }
-                    ?: "No aportada; no aprobar sin validación suficiente",
-            )
-            application.decisionReason?.let { TrustLine("Motivo", it) }
+
+            Spacer(Modifier.height(8.dp))
+
+            // ── Evidencia ──
+            Text("EVIDENCIA", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            Spacer(Modifier.height(4.dp))
+            if (application.evidence.isNotEmpty()) {
+                TrustLine("Archivos", "${application.evidence.size} imágenes privadas")
+                application.evidenceManifestSha256?.let { TrustLine("Manifiesto", "${it.take(16)}…") }
+                OutlinedButton(
+                    onClick = onOpenEvidence,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text("REVISAR EVIDENCIA (${application.evidence.size})", fontWeight = FontWeight.Bold) }
+            } else {
+                Surface(
+                    color = MeetColors.warning.copy(alpha = 0.10f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Text(
+                        "Sin archivos de evidencia adjuntos. " +
+                            (application.evidenceManifestSha256?.let { "Hash del manifiesto: ${it.take(16)}…" }
+                                ?: "No se generó manifiesto."),
+                        color = MeetColors.warning,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+            }
+
+            application.decisionReason?.let {
+                Spacer(Modifier.height(8.dp))
+                TrustLine("Motivo de decisión", it)
+            }
+
             if (application.status == "PENDING") {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -530,6 +624,61 @@ private fun TrustApplicationCard(
             }
         }
     }
+}
+
+@Composable
+private fun TrustEvidenceDialog(
+    application: TrustVerificationApplication,
+    onDismiss: () -> Unit,
+) {
+    var images by remember(application.id) { mutableStateOf<Map<String, androidx.compose.ui.graphics.ImageBitmap>>(emptyMap()) }
+    var error by remember(application.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(application.id) {
+        runCatching {
+            application.evidence.associate { item ->
+                val bytes = PlatformTrustCenterGateway.downloadEvidence(item.storagePath)
+                val bitmap = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        ?: error("INVALID_IMAGE")
+                }
+                item.kind to bitmap
+            }
+        }.onSuccess { images = it }
+            .onFailure { error = "No se pudo abrir la evidencia privada. Código: ${TrustCenterObservability.failureCode(it)}" }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Evidencia · ${application.displayName}") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (images.size < application.evidence.size && error == null) {
+                    item { CircularProgressIndicator(color = MeetColors.cyberCyan) }
+                }
+                error?.let { item { Text(it, color = MeetColors.error) } }
+                items(application.evidence, key = { it.kind }) { item ->
+                    Column {
+                        Text(item.kind.replace('_', ' ').uppercase(), fontWeight = FontWeight.Bold)
+                        images[item.kind]?.let { bitmap ->
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = "Evidencia ${item.kind}",
+                                modifier = Modifier.fillMaxWidth().height(220.dp),
+                            )
+                        }
+                        Text(
+                            "SHA-256 ${item.contentSha256.take(16)}… · ${item.byteCount} bytes",
+                            fontSize = 10.sp,
+                            color = MeetColors.textSecondary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("CERRAR") } },
+    )
 }
 
 @Composable

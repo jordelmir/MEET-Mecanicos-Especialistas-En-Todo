@@ -143,6 +143,7 @@ object DekraProviderEligibilityPolicy {
 data class DekraChecklistSection(
     val title: String,
     val summary: String,
+    val items: List<String> = emptyList(),
 )
 
 object DekraInspectionKnowledge {
@@ -165,16 +166,90 @@ object DekraInspectionKnowledge {
     )
 
     val officialInspectionSections = listOf(
-        DekraChecklistSection("1. Identificación", "DEKRA comprueba matrícula y VIN o número de chasis contra la identificación oficial."),
-        DekraChecklistSection("2. Exterior, carrocería y chasis", "Estado, fijaciones, corrosión, elementos exteriores y condiciones que afecten seguridad."),
-        DekraChecklistSection("3. Interior", "Asientos, cinturones, reposacabezas, puertas, mandos y otros elementos de seguridad interior."),
-        DekraChecklistSection("4. Alumbrado y señalización", "Luces, color, cantidad, ubicación, funcionamiento y señalización reglamentaria."),
-        DekraChecklistSection("5. Emisiones y ruido", "Emisiones según combustible y categoría, escape, humo y ruido cuando corresponda."),
-        DekraChecklistSection("6. Frenos", "Eficacia, equilibrio, freno de servicio y estacionamiento, circuitos y componentes visibles."),
-        DekraChecklistSection("7. Dirección", "Deriva, holguras, fijación y estado de componentes accesibles."),
-        DekraChecklistSection("8. Ejes y suspensión", "Ruedas, aros, ejes, amortiguadores, resortes, rótulas, brazos, fijaciones y holguras."),
-        DekraChecklistSection("9. Motor y transmisión", "Fugas, anclajes, escape, transmisión y otros componentes aplicables, sin desmontar piezas."),
-        DekraChecklistSection("10. Otros requisitos", "Se agregan controles según categoría: transporte público, carga, motocicleta, grúa, emergencia u otros."),
-        DekraChecklistSection("11. Situaciones especiales", "El manual define cómo proceder ante servicios no finalizados y otras condiciones excepcionales."),
+        DekraChecklistSection(
+            title = "1. Prueba en Carretera",
+            summary = "Verificación dinámica del comportamiento del vehículo bajo condiciones reales de conducción.",
+            items = listOf(
+                "Prueba de funcionamiento general",
+                "Ruidos y comportamiento",
+                "Desempeño del vehículo",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "2. Interiores",
+            summary = "Estado del tablero, elementos de seguridad pasiva y componentes de cabina.",
+            items = listOf(
+                "Tablero de instrumentos",
+                "Luces: pito, escobillas",
+                "Sujeción de cinturones",
+                "KM, aceite (sticker) y tipo de aceite",
+                "Ventanas",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "3. Motor",
+            summary = "Niveles, fugas, filtros, batería y componentes del sistema de alimentación.",
+            items = listOf(
+                "Niveles y líquidos (aceite, frenos, clutch, dirección, coolant, etc.)",
+                "Fugas de aceite (superiores e inferiores)",
+                "Filtro de aire, filtro de combustible",
+                "Batería (cobertores, sujeción)",
+                "Mantenimiento A/C",
+                "Gases y bujías",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "4. Exteriores",
+            summary = "Fajas, bumper, faldones, cinta reflectiva, luces y parabrisas.",
+            items = listOf(
+                "Fajas de motor y abanico",
+                "Altura de bumper trasero",
+                "Faldones",
+                "Cinta reflectiva",
+                "Nivel de luces",
+                "Parabrisas",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "5. Suspensión y Dirección",
+            summary = "Compensadores, bushings, rótulas, mangueras, llantas, roles y botas de ejes.",
+            items = listOf(
+                "Compensadores delanteros y traseros (topes y soportes)",
+                "Bushing de tijeras y de compensadores",
+                "Rótulas de suspensión y dirección",
+                "Manguera de frenos y estabilizadora",
+                "Llantas delanteras, traseras y de repuesto",
+                "Roles de bocinas y rodamientos",
+                "Botas de ejes / trípode",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "6. Frenos",
+            summary = "Pastillas, discos, calipers, fibras, tambores, cables y roles de bocinas.",
+            items = listOf(
+                "Pastillas delanteras",
+                "Discos delanteros",
+                "Caliper delanteros",
+                "Fibras traseras",
+                "Discos y tambores traseros",
+                "Empaque de bombas traseras",
+                "Cables de freno de mano",
+                "Roles de bocinas traseros",
+            ),
+        ),
+        DekraChecklistSection(
+            title = "7. Soportes y Otros Sistemas",
+            summary = "Soportes de motor, aceites de transmisión, cruces de barras y estado de la mufa.",
+            items = listOf(
+                "Soportes de motor",
+                "Fugas de aceite inferiores",
+                "Aceites de transmisión (caja, transfer, diferencial)",
+                "Cruces de barras y porta rol",
+                "Soportes de cabina",
+                "Bushing de ballesta y balancines",
+                "Mangueras de frenos traseros",
+                "Estado de mufa",
+            ),
+        ),
     )
 }

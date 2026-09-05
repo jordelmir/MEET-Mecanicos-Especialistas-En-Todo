@@ -40,7 +40,8 @@ class PlatformTrustCenterDeliveryContractTest {
         assertTrue(migration.contains("AUTO_LOCKSMITH"))
 
         assertTrue(gateway.contains("meet_submit_service_verification_v2"))
-        assertTrue(gateway.contains("meet_owner_verification_queue_v2"))
+        assertTrue(gateway.contains("meet_owner_verification_queue_v3"))
+        assertTrue(gateway.contains("meet_owner_decide_verification_v3"))
         assertTrue(gateway.contains("meet_own_verification_applications_v1"))
         assertTrue(gateway.contains("postgresChangeFlow"))
         assertTrue(gateway.contains("TrustSubmissionReceipt"))

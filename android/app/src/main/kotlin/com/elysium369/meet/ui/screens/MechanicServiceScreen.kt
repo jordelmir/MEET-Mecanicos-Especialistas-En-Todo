@@ -36,6 +36,9 @@ import com.elysium369.meet.core.services.WorkshopServiceCatalog
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.data.local.entities.RatingEntity
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.AccessLevel
+import com.elysium369.meet.ui.components.AccessStatusCard
+import com.elysium369.meet.ui.components.AccessStep
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -159,34 +162,41 @@ fun MechanicServiceScreen(
                         }
                     )
                 } else {
-                    // Blocked View - Requires Mechanic Registration
+                    // Guided Access Status View
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(24.dp)
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text("🛠️", fontSize = 64.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(Modifier.height(40.dp))
+                        AccessStatusCard(
+                            serviceName = "Mecánico / Taller",
+                            serviceIcon = "🛠️",
+                            accessLevel = AccessLevel.NOT_REGISTERED,
+                            steps = listOf(
+                                AccessStep(1, "Crear perfil de proveedor", done = false),
+                                AccessStep(2, "Enviar documents al Centro de Confianza", done = false),
+                                AccessStep(3, "Esperar aprobación manual", done = false),
+                            ),
+                            accentColor = MechanicColors.cyanAccent,
+                        )
                         Text(
-                            text = "MODO PROVEEDOR EXCLUSIVO",
+                            "¿Qué puedo hacer como mecánico registrado?",
                             color = MechanicColors.cyanAccent,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
-                            letterSpacing = 1.5.sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Para recibir solicitudes de servicio mecánico de otros usuarios y enviar cotizaciones, debes registrarte como mecánico o taller en MEET.",
-                            color = MechanicColors.textSecondary,
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+                        listOf(
+                            "Recibir solicitudes de clientes cerca de ti",
+                            "Enviar cotizaciones con precios reales",
+                            "Aceptar trabajos y coordinar citas",
+                            "Calificar clientes después del servicio",
+                        ).forEach { item ->
+                            Text("• $item", color = MechanicColors.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { showRegistrationScreen = true },
                             colors = ButtonDefaults.buttonColors(containerColor = MechanicColors.cyanAccent),

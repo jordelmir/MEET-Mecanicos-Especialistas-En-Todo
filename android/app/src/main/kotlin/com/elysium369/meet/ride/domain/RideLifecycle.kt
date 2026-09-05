@@ -12,7 +12,9 @@ enum class RideState {
     COMPLETED,
     CANCELLED,
     EXPIRED,
-    DISPUTED,
+    DISPUTED;
+
+    val isActive: Boolean get() = this in listOf(DRAFT, SEARCHING, OFFERED, ASSIGNED, DRIVER_EN_ROUTE, ARRIVED, PASSENGER_ONBOARD, IN_PROGRESS)
 }
 
 enum class RideActorRole {

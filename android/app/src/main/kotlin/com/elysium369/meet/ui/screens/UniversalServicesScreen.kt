@@ -32,6 +32,9 @@ import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideMapStateFactory
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.AccessLevel
+import com.elysium369.meet.ui.components.AccessStatusCard
+import com.elysium369.meet.ui.components.AccessStep
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.UUID
 
@@ -122,13 +125,43 @@ fun UniversalServicesScreen(
                 ),
         ) {
             if (providerMode) {
-                ProviderServiceBoard(
-                    viewModel = viewModel,
-                    requests = allRequests.filter { it.vehicleId.startsWith(UNIVERSAL_PREFIX) },
-                    providerName = myProfile?.businessName.orEmpty(),
-                    providerPhone = myProfile?.phone.orEmpty(),
-                    providerId = myProfile?.profileId,
-                )
+                if (myProfile != null) {
+                    ProviderServiceBoard(
+                        viewModel = viewModel,
+                        requests = allRequests.filter { it.vehicleId.startsWith(UNIVERSAL_PREFIX) },
+                        providerName = myProfile?.businessName.orEmpty(),
+                        providerPhone = myProfile?.phone.orEmpty(),
+                        providerId = myProfile?.profileId,
+                    )
+                } else {
+                    // Guided Access Status for providers
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AccessStatusCard(
+                            serviceName = "Proveedor de Servicios",
+                            serviceIcon = "🔧",
+                            accessLevel = AccessLevel.NOT_REGISTERED,
+                            steps = listOf(
+                                AccessStep(1, "Crear perfil de proveedor", done = false),
+                                AccessStep(2, "Enviar documents al Centro de Confianza", done = false),
+                                AccessStep(3, "Esperar aprobación manual", done = false),
+                            ),
+                            accentColor = MeetColors.neonGreen,
+                        )
+                        Button(
+                            onClick = { showProviderRegistration = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                        ) {
+                            Text("REGISTRARME COMO PROVEEDOR", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             } else {
                 OutlinedTextField(
                     value = query,
