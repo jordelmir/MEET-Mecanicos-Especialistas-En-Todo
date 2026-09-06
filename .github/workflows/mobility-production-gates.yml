@@ -20,6 +20,8 @@ jobs:
         run: bash tests/mobility/verify-mobility-authority-postgres.sh
       - name: Execute 100-Way Concurrent Dispatch and Idempotency Suite
         run: bash tests/mobility/test-100-concurrent-dispatches.sh
+      - name: Execute Mobility Financial Authority & Balanced Ledger Suite
+        run: bash tests/mobility/verify-mobility-finance-postgres.sh
 
   android-mobility-gates:
     name: Android Mobility OS Domain & Outbox Tests
