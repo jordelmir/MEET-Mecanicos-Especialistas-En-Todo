@@ -4345,10 +4345,104 @@ object AppModule {
                     `custodyRecordsJson` TEXT NOT NULL DEFAULT '[]'
                 )
             """)
-            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_state` ON `tow_jobs`(`state`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_customer` ON `tow_jobs`(`customerId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_operator` ON `tow_jobs`(`assignedOperatorId`)")
-            db.execSQL("CREATE INDEX IF NOT EXISTS `idx_tow_jobs_correlation` ON `tow_jobs`(`correlationId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_tow_jobs_state` ON `tow_jobs` (`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_tow_jobs_customerId` ON `tow_jobs` (`customerId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_tow_jobs_assignedOperatorId` ON `tow_jobs` (`assignedOperatorId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_tow_jobs_correlationId` ON `tow_jobs` (`correlationId`)")
+
+            val cursor = db.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tow_truck_requests'")
+            val legacyTableExists = cursor.use { it.moveToFirst() }
+            if (legacyTableExists) {
+                db.execSQL("""
+                    INSERT OR IGNORE INTO `tow_jobs` (
+                        `jobId`,
+                        `customerId`,
+                        `customerName`,
+                        `customerPhone`,
+                        `vehicleVin`,
+                        `vehicleSummary`,
+                        `pickupLatitude`,
+                        `pickupLongitude`,
+                        `pickupAccuracyMeters`,
+                        `pickupCapturedAt`,
+                        `pickupAddress`,
+                        `destinationLatitude`,
+                        `destinationLongitude`,
+                        `destinationAddress`,
+                        `state`,
+                        `serverVersion`,
+                        `createdAtEpochMs`,
+                        `updatedAtEpochMs`,
+                        `assignedProviderId`,
+                        `assignedOperatorId`,
+                        `assignedTowUnitId`,
+                        `assignedOperatorName`,
+                        `assignedOperatorPhone`,
+                        `assignedOperatorRating`,
+                        `assignedOperatorCompletedJobs`,
+                        `operatorLatitude`,
+                        `operatorLongitude`,
+                        `operatorFreshnessEpochMs`,
+                        `requiredCapabilities`,
+                        `assignedUnitJson`,
+                        `estimatedPriceMinor`,
+                        `quotedPriceMinor`,
+                        `authorizedPriceMinor`,
+                        `finalSettlementMinor`,
+                        `currency`,
+                        `quoteId`,
+                        `authorizationId`,
+                        `correlationId`,
+                        `custodyRecordsJson`
+                    )
+                    SELECT
+                        requestId AS jobId,
+                        userId AS customerId,
+                        'Dato no capturado' AS customerName,
+                        phone AS customerPhone,
+                        NULL AS vehicleVin,
+                        vehicleInfo AS vehicleSummary,
+                        latitude AS pickupLatitude,
+                        longitude AS pickupLongitude,
+                        NULL AS pickupAccuracyMeters,
+                        createdAt AS pickupCapturedAt,
+                        locationName AS pickupAddress,
+                        destinationLatitude,
+                        destinationLongitude,
+                        destinationName AS destinationAddress,
+                        CASE
+                            WHEN status IN ('COMPLETED', 'completed') THEN 'COMPLETED'
+                            WHEN status IN ('CANCELLED', 'cancelled', 'CANCELED', 'canceled') THEN 'CANCELLED'
+                            WHEN status IN ('TAKEN', 'taken', 'ASSIGNED', 'assigned', 'IN_PROGRESS', 'in_progress') THEN 'ASSIGNED'
+                            ELSE 'REQUESTED'
+                        END AS state,
+                        1 AS serverVersion,
+                        createdAt AS createdAtEpochMs,
+                        COALESCE(completedAt, createdAt) AS updatedAtEpochMs,
+                        assignedDriverId AS assignedProviderId,
+                        assignedDriverId AS assignedOperatorId,
+                        NULL AS assignedTowUnitId,
+                        assignedDriverName AS assignedOperatorName,
+                        assignedDriverPhone AS assignedOperatorPhone,
+                        NULL AS assignedOperatorRating,
+                        NULL AS assignedOperatorCompletedJobs,
+                        NULL AS operatorLatitude,
+                        NULL AS operatorLongitude,
+                        NULL AS operatorFreshnessEpochMs,
+                        '[]' AS requiredCapabilities,
+                        NULL AS assignedUnitJson,
+                        CAST(priceOffer * 100 AS INTEGER) AS estimatedPriceMinor,
+                        CAST(priceOffer * 100 AS INTEGER) AS quotedPriceMinor,
+                        NULL AS authorizedPriceMinor,
+                        CASE WHEN status IN ('COMPLETED', 'completed') THEN CAST(priceOffer * 100 AS INTEGER) ELSE NULL END AS finalSettlementMinor,
+                        'CRC' AS currency,
+                        NULL AS quoteId,
+                        NULL AS authorizationId,
+                        'legacy_' || requestId AS correlationId,
+                        '[]' AS custodyRecordsJson
+                    FROM tow_truck_requests
+                """)
+            }
         }
     }
 
