@@ -99,10 +99,10 @@ import java.util.UUID
  *     status)
  *   - 5-chip type selector (Pre-Scan / Post-Scan / Repair Evidence /
  *     Peritaje / DVIR)
- *   - Per-type sub-flow composables. Only Pre-Scan is fully wired in
- *     this commit; the other 4 render an honest "Próximamente" card so
- *     the surface is honest about what is and isn't ready, instead of
- *     silently pretending to capture data we have no logic for.
+ *   - Per-type sub-flow composables: All 5 subflows (PreScanSubFlow,
+ *     PostScanSubFlow, RepairEvidenceSubFlow, PrePurchaseSubFlow, DvirSubFlow)
+ *     are fully implemented with cryptographic signing, QR payload generation,
+ *     BeforeAfterComparator analysis, and PDF export.
  *
  * The 4-line ReportIntegrityCard addition on the legacy `ReportScreen.kt`
  * (commit `e1076723`) is preserved exactly — this new screen is a
