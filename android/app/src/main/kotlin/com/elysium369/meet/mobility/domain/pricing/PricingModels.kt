@@ -29,6 +29,17 @@ enum class FinancialRounding {
     HALF_EVEN,
 }
 
+private val BIGINT_TWO = BigInteger.valueOf(2L)
+private val MIN_LONG_BI = BigInteger.valueOf(Long.MIN_VALUE)
+private val MAX_LONG_BI = BigInteger.valueOf(Long.MAX_VALUE)
+
+private fun BigInteger.toLongExactCompat(): Long {
+    if (this < MIN_LONG_BI || this > MAX_LONG_BI) {
+        throw ArithmeticException("BigInteger out of long range: $this")
+    }
+    return this.toLong()
+}
+
 fun Money.multiply(
     rate: Rate,
     rounding: FinancialRounding = FinancialRounding.DOWN,
@@ -56,7 +67,7 @@ fun Money.multiply(
         FinancialRounding.HALF_UP -> {
             if (
                 remainder
-                    .multiply(BigInteger.TWO)
+                    .multiply(BIGINT_TWO)
                     >= denominator
             ) {
                 quotient += BigInteger.ONE
@@ -66,7 +77,7 @@ fun Money.multiply(
         FinancialRounding.HALF_EVEN -> {
             val doubled =
                 remainder.multiply(
-                    BigInteger.TWO
+                    BIGINT_TWO
                 )
 
             if (
@@ -82,7 +93,7 @@ fun Money.multiply(
     }
 
     return Money(
-        minorUnits = quotient.longValueExact(),
+        minorUnits = quotient.toLongExactCompat(),
         currency = currency,
     )
 }

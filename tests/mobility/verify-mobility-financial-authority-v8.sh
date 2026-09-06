@@ -82,6 +82,7 @@ psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906020000_mobilit
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906030000_mobility_communications_reputation_and_surge.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906040000_mobility_financial_and_concurrency_p0_lockdown.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906050000_mobility_financial_authority_v8_closure.sql"
+psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906060000_mobility_provider_capture_v9_closure.sql"
 
 echo "=== 4. Seeding Global Market, Service Category, Pricing Policy, Users & Vehicle ==="
 psql "${psql_args[@]}" <<'SQL'
@@ -321,7 +322,7 @@ BEGIN
         );
         RAISE EXCEPTION 'TEST_FAILED: Cross-request quote reuse should have been rejected!';
     EXCEPTION WHEN OTHERS THEN
-        IF SQLERRM NOT LIKE '%CROSS_REQUEST_QUOTE_REUSE_REJECTED%' AND SQLERRM NOT LIKE '%PAYMENT_AMOUNT_MISMATCH%' THEN
+        IF SQLERRM NOT LIKE '%CROSS_REQUEST_QUOTE_REUSE_REJECTED%' AND SQLERRM NOT LIKE '%PAYMENT_AMOUNT_MISMATCH%' AND SQLERRM NOT LIKE '%PAYMENT_QUOTE_BINDING_MISMATCH%' THEN
             RAISE EXCEPTION 'Unexpected error: %', SQLERRM;
         END IF;
     END;
@@ -346,6 +347,108 @@ BEGIN
 END $$;
 SQL
 echo ">>> PASSED: TEST E (Direct settlement strictly revoked from ordinary authenticated clients)."
+
+echo "=== 9b. TEST E2: PROVIDER CAPTURE AUTHORITY & SETTLEMENT ENFORCEMENT (V9 Closure) ==="
+psql "${psql_args[@]}" <<'SQL'
+SET ROLE service_role;
+DO $$
+DECLARE
+    v_quote1_id UUID;
+    v_auth1_id UUID;
+BEGIN
+    SELECT quote_id INTO v_quote1_id FROM public.ride_quotes WHERE ride_request_id = '44444444-4444-4444-4444-444444444444'::uuid;
+    SELECT payment_authorization_id INTO v_auth1_id FROM public.payment_authorizations WHERE rider_id = '11111111-1111-1111-1111-111111111111'::uuid;
+
+    -- 1. Attempt settlement on AUTHORIZED payment without capture MUST FAIL
+    BEGIN
+        PERFORM public.mobility_settle_trip(
+            '55555555-5555-5555-5555-555555555555'::uuid,
+            v_auth1_id,
+            v_quote1_id,
+            extensions.gen_random_uuid()
+        );
+        RAISE EXCEPTION 'TEST_FAILED: Settle on uncaptured electronic payment must fail!';
+    EXCEPTION WHEN OTHERS THEN
+        IF SQLERRM NOT LIKE '%PAYMENT_NOT_CAPTURED_BY_PROVIDER%' THEN
+            RAISE EXCEPTION 'Unexpected error on uncaptured settlement: %', SQLERRM;
+        END IF;
+    END;
+END $$;
+
+-- 2. Authenticated role CANNOT call mobility_confirm_provider_capture
+SET ROLE authenticated;
+SET "request.jwt.claim.sub" = '11111111-1111-1111-1111-111111111111';
+DO $$
+DECLARE
+    v_auth1_id UUID;
+BEGIN
+    SELECT payment_authorization_id INTO v_auth1_id FROM public.payment_authorizations WHERE rider_id = '11111111-1111-1111-1111-111111111111'::uuid;
+    BEGIN
+        PERFORM public.mobility_confirm_provider_capture(v_auth1_id, 'ch_cap_fake_123', 'evt_cap_fake_123');
+        RAISE EXCEPTION 'TEST_FAILED: Authenticated should NOT have EXECUTE on mobility_confirm_provider_capture!';
+    EXCEPTION WHEN insufficient_privilege THEN
+        -- Expected 42501
+    END;
+END $$;
+
+-- 3. Provider capture with wrong amount or currency fails
+SET ROLE service_role;
+DO $$
+DECLARE
+    v_auth1_id UUID;
+BEGIN
+    SELECT payment_authorization_id INTO v_auth1_id FROM public.payment_authorizations WHERE rider_id = '11111111-1111-1111-1111-111111111111'::uuid;
+    BEGIN
+        PERFORM public.mobility_confirm_provider_capture(
+            v_auth1_id,
+            'ch_cap_bad_amount',
+            'evt_cap_bad_amount',
+            999999999,
+            'CRC'
+        );
+        RAISE EXCEPTION 'TEST_FAILED: Provider capture with mismatching amount should fail!';
+    EXCEPTION WHEN OTHERS THEN
+        IF SQLERRM NOT LIKE '%PROVIDER_CAPTURE_AMOUNT_MISMATCH%' THEN
+            RAISE EXCEPTION 'Unexpected error on amount mismatch: %', SQLERRM;
+        END IF;
+    END;
+END $$;
+
+-- 4. Valid provider capture by service_role succeeds and sets CAPTURED
+SET ROLE service_role;
+DO $$
+DECLARE
+    v_auth1_id UUID;
+    v_res JSONB;
+    v_state TEXT;
+BEGIN
+    SELECT payment_authorization_id INTO v_auth1_id FROM public.payment_authorizations WHERE rider_id = '11111111-1111-1111-1111-111111111111'::uuid;
+    v_res := public.mobility_confirm_provider_capture(
+        v_auth1_id,
+        'ch_stripe_capture_real_999',
+        'evt_stripe_cap_999',
+        NULL,
+        NULL,
+        '{"status":"captured"}'::jsonb
+    );
+
+    v_state := (v_res->'authorization'->>'state');
+    IF v_state <> 'CAPTURED' THEN
+        RAISE EXCEPTION 'TEST_FAILED: State should be CAPTURED after provider capture, got %', v_state;
+    END IF;
+
+    -- 5. Anti-replay idempotency: repeating the same event returns existing state
+    v_res := public.mobility_confirm_provider_capture(
+        v_auth1_id,
+        'ch_stripe_capture_real_999',
+        'evt_stripe_cap_999'
+    );
+    IF (v_res->'authorization'->>'state') <> 'CAPTURED' THEN
+        RAISE EXCEPTION 'TEST_FAILED: Idempotent capture replay failed!';
+    END IF;
+END $$;
+SQL
+echo ">>> PASSED: TEST E2 (V9 Provider Capture strictly required prior to settlement; authenticated access blocked; amounts verified; idempotent)."
 
 echo "=== 10. TEST F: VALID SETTLEMENT & DOUBLE-ENTRY LEDGER BALANCE ==="
 psql "${psql_args[@]}" <<'SQL'
@@ -435,8 +538,10 @@ BEGIN
     SELECT quote_id INTO v_qid FROM public.ride_quotes WHERE ride_request_id = '77777777-7777-7777-7777-777777777777'::uuid;
     v_ares := public.mobility_authorize_quote_payment(v_qid, 'CARD_TOKEN', extensions.gen_random_uuid());
     v_aid := (v_ares->'authorization'->>'payment_authorization_id')::UUID;
-    -- Confirm provider
+    -- Confirm provider authorization
     PERFORM public.mobility_confirm_provider_authorization(v_aid, 'ch_stripe_race_test', 'evt_race_test');
+    -- Confirm provider capture (V9 requirement prior to settlement)
+    PERFORM public.mobility_confirm_provider_capture(v_aid, 'ch_stripe_race_cap', 'evt_race_cap');
 END $$;
 
 -- Trip
@@ -458,7 +563,7 @@ SQL
 # Launch 100 concurrent settlements via background workers
 results_file="$runtime_dir/concurrent_results.txt"
 qid=$(psql "${psql_args[@]}" -t -A -c "SELECT quote_id FROM public.ride_quotes WHERE ride_request_id = '77777777-7777-7777-7777-777777777777'::uuid;")
-aid=$(psql "${psql_args[@]}" -t -A -c "SELECT payment_authorization_id FROM public.payment_authorizations WHERE trip_id IS NULL AND state = 'AUTHORIZED' ORDER BY created_at DESC LIMIT 1;")
+aid=$(psql "${psql_args[@]}" -t -A -c "SELECT payment_authorization_id FROM public.payment_authorizations WHERE trip_id IS NULL AND state = 'CAPTURED' ORDER BY created_at DESC LIMIT 1;")
 
 echo "Executing 100 concurrent settlements on trip 88888888-8888-8888-8888-888888888888..."
 for i in {1..100}; do

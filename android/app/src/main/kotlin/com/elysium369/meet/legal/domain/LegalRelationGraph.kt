@@ -94,7 +94,7 @@ class LegalRelationGraph {
         val queue = mutableListOf(entityId to 0)
 
         while (queue.isNotEmpty()) {
-            val (current, depth) = queue.removeFirst()
+            val (current, depth) = queue.removeAt(0)
             if (current in visited || depth > maxDepth) continue
             visited.add(current)
 
@@ -119,7 +119,7 @@ class LegalRelationGraph {
         val queue = mutableListOf(listOf(from))
 
         while (queue.isNotEmpty()) {
-            val path = queue.removeFirst()
+            val path = queue.removeAt(0)
             val current = path.last()
 
             if (current == to) return path
